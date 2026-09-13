@@ -4,11 +4,9 @@
 
 export type VendorStatus = "Pending" | "Approved" | "Rejected" | "Suspended";
 export type LeadStatus =
-  | "New" | "Assigned" | "Contacted" | "Site Visit Scheduled"
-  | "Quotation Sent" | "Won" | "Lost" | "Duplicate"
-  | "Quality Checked" | "Clarification Required" | "Hot Lead" | "Nurture" | "Rejected Quality";
-export type VendorLeadStatus =
-  | "New" | "Contacted" | "Follow-up Needed" | "Site Visit Scheduled" | "Quotation Sent" | "Converted" | "Won" | "Lost";
+  | "New" | "Verified" | "Quality Checked" | "Clarification Required"
+  | "Hot Lead" | "Nurture" | "Rejected Quality" | "Duplicate"
+  | "Bad Lead" | "Assigned";
 export type AssignmentType = "client_selected" | "auto_assigned" | "admin_assigned";
 
 export interface CreateLeadInput {
@@ -211,9 +209,6 @@ export interface VendorDashboardStats {
   remaining_credits: number;
   total_credits: number;
   total_leads: number;
-  won: number;
-  lost: number;
-  in_progress: number;
   bad_lead_reports: number;
 }
 

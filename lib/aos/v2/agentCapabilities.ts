@@ -9,6 +9,8 @@ export interface AosV2AgentCapability {
   sourceOfTruth: string;
   directN8n: false;
   businessWrites: false;
+  customerConversation: false;
+  postDeliveryCommercialManagement: false;
 }
 
 const SOURCE_OF_TRUTH: Readonly<Record<string, string>> = Object.freeze({
@@ -31,6 +33,8 @@ export const AOS_V2_AGENT_CAPABILITIES: AosV2AgentCapability[] =
     sourceOfTruth: SOURCE_OF_TRUTH[agent.slug],
     directN8n: false,
     businessWrites: false,
+    customerConversation: false,
+    postDeliveryCommercialManagement: false,
   }));
 
 export const AOS_V2_OPERATIONAL_AGENT_COUNT = AOS_V2_AGENT_CAPABILITIES.length;

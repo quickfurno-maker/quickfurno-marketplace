@@ -1,4 +1,4 @@
-﻿import type { CRMLead } from "@/lib/crm/types";
+import type { CRMLead } from "@/lib/crm/types";
 
 export interface OpsBriefReport {
   agent: "QF-AOS-OpsBrief";
@@ -12,7 +12,7 @@ export interface OpsBriefReport {
   assigned: number;
   unassigned: number;
   nurture: number;
-  follow_ups_due: number;
+  clarification_required: number;
   top_service: string;
   top_area: string;
   agent_health: Array<{ agent: string; status: string }>;
@@ -25,19 +25,15 @@ export function runOpsBrief(leads: CRMLead[], vendorCount = 0): OpsBriefReport {
   const quality = { hot: 0, warm: 0, cold: 0, weak: 0 };
   let assigned = 0;
   let nurture = 0;
-  let followUpsDue = 0;
+  let clarificationRequired = 0;
   const serviceCounts = new Map<string, number>();
   const areaCounts = new Map<string, number>();
-  const now = Date.now();
 
   for (const lead of leads) {
     quality[mapCoreQualityClass(readMetaString(lead, "core_quality_class"))] += 1;
     if ((lead.assigned_vendor_count ?? 0) > 0 || lead.status === "assigned") assigned += 1;
     if (lead.status === "nurture_later") nurture += 1;
-    if (lead.next_follow_up_date) {
-      const due = new Date(lead.next_follow_up_date).getTime();
-      if (!Number.isNaN(due) && due <= now) followUpsDue += 1;
-    }
+    if (lead.status === "clarification_required") clarificationRequired += 1;
     count(serviceCounts, lead.service);
     count(areaCounts, lead.area);
   }
@@ -45,7 +41,7 @@ export function runOpsBrief(leads: CRMLead[], vendorCount = 0): OpsBriefReport {
   const unassigned = Math.max(0, leads.length - assigned);
   const recommendedActions: string[] = [];
   if (quality.hot > 0) recommendedActions.push(`Prioritize ${quality.hot} Core-qualified high-intent lead(s).`);
-  if (followUpsDue > 0) recommendedActions.push(`${followUpsDue} follow-up(s) are due in CRM.`);
+  if (clarificationRequired > 0) recommendedActions.push(`${clarificationRequired} lead(s) still require quality clarification.`);
   if (unassigned > 0) recommendedActions.push(`${unassigned} lead(s) are currently unassigned; inspect Core matching/hold reasons.`);
   if (vendorCount === 0 && leads.length > 0) recommendedActions.push("No active-vendor count was supplied to this read-only brief.");
   if (!recommendedActions.length) recommendedActions.push("No urgent action detected from canonical Core state.");
@@ -59,7 +55,7 @@ export function runOpsBrief(leads: CRMLead[], vendorCount = 0): OpsBriefReport {
     assigned,
     unassigned,
     nurture,
-    follow_ups_due: followUpsDue,
+    clarification_required: clarificationRequired,
     top_service: topOf(serviceCounts),
     top_area: topOf(areaCounts),
     agent_health: [

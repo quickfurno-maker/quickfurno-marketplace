@@ -23,52 +23,6 @@
 // row. A mixed list is normal: one lead's contact may be visible while the next
 // one's is not.
 // ============================================================================
-import type { VendorLeadStatus } from "@/lib/types";
-
-// ---------------------------------------------------------------------------
-// Statuses
-// ---------------------------------------------------------------------------
-
-/**
- * The statuses a vendor may SET. Exactly the pre-V2 list — no Accepted /
- * Rejected / Declined / Cancelled, because no such assignment semantics exist:
- * a vendor cannot accept, reject or decline an already assigned lead.
- *
- * "Won" is deliberately absent. It is a legacy value that still exists in
- * VendorLeadStatus and in stored data (services/vendorService.ts counts it), so
- * it is DISPLAYED wherever it occurs and counted with Converted, but it is not
- * offered as a new choice.
- */
-export const SETTABLE_LEAD_STATUSES: readonly VendorLeadStatus[] = [
-  "New",
-  "Contacted",
-  "Follow-up Needed",
-  "Site Visit Scheduled",
-  "Quotation Sent",
-  "Converted",
-  "Lost",
-];
-
-/** Open statuses — still needing vendor work. */
-export const ACTIVE_LEAD_STATUSES: readonly VendorLeadStatus[] = [
-  "New",
-  "Contacted",
-  "Follow-up Needed",
-  "Site Visit Scheduled",
-  "Quotation Sent",
-];
-
-/** Converted and its legacy synonym, which real rows still carry. */
-export const CONVERTED_LEAD_STATUSES: readonly VendorLeadStatus[] = ["Converted", "Won"];
-
-export type VendorLeadStatusGroup = "active" | "converted" | "lost";
-
-export function statusGroup(status: VendorLeadStatus): VendorLeadStatusGroup {
-  if (CONVERTED_LEAD_STATUSES.includes(status)) return "converted";
-  if (status === "Lost") return "lost";
-  return "active";
-}
-
 // ---------------------------------------------------------------------------
 // Assignment source
 // ---------------------------------------------------------------------------
@@ -111,8 +65,15 @@ export interface VendorLeadRawRow {
   assigned_at: string | null;
   assignment_type: string | null;
   assignment_source: string | null;
-  vendor_status: VendorLeadStatus;
   is_bad_lead_reported: boolean | null;
+  connection_assurance_supported?: boolean | null;
+  connection_assurance?: {
+    vendor_outcome?: "responded" | "no_response" | null;
+    vendor_reported_at?: string | null;
+    window_expires_at?: string | null;
+    client_responded_at?: string | null;
+    riya_handoff_status?: string | null;
+  } | null;
   /**
    * Per-assignment contact entitlement, decided server-side. Anything other than
    * a literal `true` is treated as "not entitled" — this fails closed.
@@ -140,8 +101,6 @@ export interface VendorLeadRawRow {
  */
 export interface VendorLeadView {
   id: string;
-  status: VendorLeadStatus;
-  group: VendorLeadStatusGroup;
   assignedAt: string | null;
   assignedAgo: string | null;
   isReported: boolean;
@@ -159,6 +118,12 @@ export interface VendorLeadView {
   phone: string | null;
   /** Whether this specific assignment's client contact may be shown. */
   contactAllowed: boolean;
+  connectionAssuranceSupported: boolean;
+  connectionOutcome: "responded" | "no_response" | null;
+  connectionWindowExpiresAt: string | null;
+  connectionWindowOpen: boolean;
+  connectionClientRespondedAt: string | null;
+  connectionRiyaHandoffStatus: string | null;
   /** Lowercased haystack for local search. Name / service / area / city ONLY. */
   searchText: string;
 }
@@ -194,14 +159,24 @@ export function buildVendorLeadViews(
     const city = text(lead.city) ?? "";
     const area = text(lead.area);
     const place = [area, city].filter(Boolean).join(", ");
-    const status = (row.vendor_status || "New") as VendorLeadStatus;
     // Strictly `true`. Missing/null/"true"/1 are all NOT entitlement.
     const contactAllowed = row.contact_allowed === true;
+    const connectionAssuranceSupported = row.connection_assurance_supported === true;
+    const assurance = row.connection_assurance ?? null;
+    const connectionOutcome =
+      assurance?.vendor_outcome === "responded" || assurance?.vendor_outcome === "no_response"
+        ? assurance.vendor_outcome
+        : null;
+    const assignedMs = row.assigned_at ? new Date(row.assigned_at).getTime() : Number.NaN;
+    const fallbackExpiryMs = Number.isFinite(assignedMs) ? assignedMs + 24 * 60 * 60 * 1000 : Number.NaN;
+    const suppliedExpiryMs = assurance?.window_expires_at ? new Date(assurance.window_expires_at).getTime() : Number.NaN;
+    const expiryMs = Number.isFinite(suppliedExpiryMs) ? suppliedExpiryMs : fallbackExpiryMs;
+    const connectionWindowExpiresAt = Number.isFinite(expiryMs) ? new Date(expiryMs).toISOString() : null;
+    const connectionWindowOpen =
+      connectionAssuranceSupported && connectionOutcome === null && Number.isFinite(expiryMs) && now <= expiryMs;
 
     views.push({
       id: row.id,
-      status,
-      group: statusGroup(status),
       assignedAt: row.assigned_at,
       assignedAgo: formatRelativeTime(row.assigned_at, now),
       isReported: row.is_bad_lead_reported === true,
@@ -218,6 +193,12 @@ export function buildVendorLeadViews(
       // The single gate, per row. `lead.phone` is read here and nowhere else.
       phone: contactAllowed ? text(lead.phone) : null,
       contactAllowed,
+      connectionAssuranceSupported,
+      connectionOutcome,
+      connectionWindowExpiresAt,
+      connectionWindowOpen,
+      connectionClientRespondedAt: text(assurance?.client_responded_at),
+      connectionRiyaHandoffStatus: text(assurance?.riya_handoff_status),
       searchText: [name, service, area, city].filter(Boolean).join(" ").toLowerCase(),
     });
   }
@@ -242,84 +223,27 @@ export function formatRelativeTime(value: string | null | undefined, now: number
 }
 
 // ---------------------------------------------------------------------------
-// Summary + filters — presentation only, over already-loaded rows.
-// No count here is invented: each is a length of a filtered array.
+// Summary + search ? QuickFurno does not track vendor sales stages.
 // ---------------------------------------------------------------------------
 export interface VendorLeadSummary {
   total: number;
-  fresh: number;
-  followUp: number;
-  converted: number;
+  contactAvailable: number;
+  reported: number;
 }
 
 export function summarizeLeads(views: VendorLeadView[]): VendorLeadSummary {
   return {
     total: views.length,
-    fresh: views.filter((v) => v.status === "New").length,
-    followUp: views.filter((v) => v.status === "Follow-up Needed").length,
-    // Converted counts its legacy synonym too, so the number matches the list.
-    converted: views.filter((v) => v.group === "converted").length,
+    contactAvailable: views.filter((v) => v.contactAllowed && Boolean(v.phone)).length,
+    reported: views.filter((v) => v.isReported).length,
   };
 }
 
-export type VendorLeadFilterKey =
-  | "all"
-  | "active"
-  | "New"
-  | "Contacted"
-  | "Follow-up Needed"
-  | "Site Visit Scheduled"
-  | "Quotation Sent"
-  | "converted"
-  | "Lost";
-
-export interface VendorLeadFilterOption {
-  key: VendorLeadFilterKey;
-  label: string;
-  count: number;
-}
-
-function matchesFilter(view: VendorLeadView, key: VendorLeadFilterKey): boolean {
-  if (key === "all") return true;
-  if (key === "active") return view.group === "active";
-  if (key === "converted") return view.group === "converted";
-  return view.status === key;
-}
-
-const FILTER_LABELS: { key: VendorLeadFilterKey; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "active", label: "Active" },
-  { key: "New", label: "New" },
-  { key: "Contacted", label: "Contacted" },
-  { key: "Follow-up Needed", label: "Follow-up" },
-  { key: "Site Visit Scheduled", label: "Site visit" },
-  { key: "Quotation Sent", label: "Quotation" },
-  { key: "converted", label: "Converted" },
-  { key: "Lost", label: "Lost" },
-];
-
-/**
- * "All" and "Active" always show; a status chip appears only when at least one
- * loaded lead has it. Filtering to a bucket that cannot contain anything is
- * noise, and on a phone the chip row has to stay short.
- */
-export function buildFilterOptions(views: VendorLeadView[]): VendorLeadFilterOption[] {
-  return FILTER_LABELS.map((entry) => ({
-    ...entry,
-    count: views.filter((view) => matchesFilter(view, entry.key)).length,
-  })).filter((entry) => entry.key === "all" || entry.key === "active" || entry.count > 0);
-}
-
-/** Local, in-memory filtering. No query, no request, no new index. */
-export function applyLeadFilter(
-  views: VendorLeadView[],
-  key: VendorLeadFilterKey,
-  query: string,
-): VendorLeadView[] {
+/** Local, in-memory search only. No status or sales-stage filters exist. */
+export function applyLeadSearch(views: VendorLeadView[], query: string): VendorLeadView[] {
   const needle = query.trim().toLowerCase();
-  return views.filter(
-    (view) => matchesFilter(view, key) && (needle.length === 0 || view.searchText.includes(needle)),
-  );
+  if (!needle) return views;
+  return views.filter((view) => view.searchText.includes(needle));
 }
 
 // ---------------------------------------------------------------------------
@@ -334,8 +258,12 @@ export interface VendorLeadFeedback {
 
 export function readLeadFeedback(param: string | undefined): VendorLeadFeedback | null {
   switch (param) {
-    case "status-updated":
-      return { tone: "ok", message: "Lead status updated." };
+    case "client-responded":
+      return { tone: "ok", message: "Client response confirmed. No connection reminders will be sent for this lead." };
+    case "client-no-response":
+      return { tone: "ok", message: "No response recorded. QuickFurno will run the bounded client connection-assistance sequence for this vendor." };
+    case "connection-failed":
+      return { tone: "error", message: "Client-response status could not be recorded. The 24-hour window may have closed or an outcome may already be locked." };
     case "bad-lead-submitted":
       return {
         tone: "ok",

@@ -198,15 +198,11 @@ export function decideVendorBusinessState(facts: VendorBusinessFacts): VendorBus
     }
 
     case "vendor.response_reminder": {
+      // Final QuickFurno boundary: vendor response chasing is post-delivery sales
+      // management. Historical correctly-scoped reminders are terminal no-send;
+      // a wrong entity pairing remains unmapped/fail-closed.
       if (facts.entityType !== "lead_assignment") return unmapped();
-      // A reminder whose durable source identity names no known window cannot be
-      // interpreted, and the executor already treats that as a definitive refusal.
-      if (resolveResponseReminderWindow(facts.sourceEventKey) === null) return stale();
-      if (facts.assignmentExists !== true) return stale();
-      if (!facts.assignmentVendorId || facts.assignmentVendorId !== facts.resolvedVendorId) return stale();
-      // The nudge exists only while the assigned lead has not progressed past New.
-      if (facts.assignmentVendorStatus !== "New") return stale();
-      return eligible();
+      return stale();
     }
 
     case "vendor.onboarding_reminder": {

@@ -113,8 +113,8 @@ export function leadName(leads: Lead[], id?: string | null) {
   return leads.find((lead) => lead.id === id)?.name || shortId(id);
 }
 
-export function assignmentStatus(assignment: Assignment) {
-  return assignment.vendor_status || assignment.assignment_type || "Assigned";
+export function assignmentStatus(_assignment: Assignment) {
+  return "Assigned / delivered";
 }
 
 export function includesQuery(values: Array<unknown>, query: string) {

@@ -38,16 +38,27 @@ export function computePriority(lead: Lead, signals: LeadScoringSignals): CrmPri
 }
 
 export function statusBucket(lead: Lead, assignedCount: number): CrmStatusBucket {
-  const s = String(lead.status ?? "").toLowerCase();
-  if (lead.is_duplicate || s.includes("duplicate")) return "duplicate";
-  if (/spam|bad|invalid|junk|rejected quality/.test(s) || String(lead.lead_quality_class ?? "").toUpperCase() === "D") return "spam";
-  if (s.includes("won") || s.includes("convert")) return "won";
-  if (s.includes("lost")) return "lost";
-  if (s.includes("quotation")) return "quotation";
-  if (s.includes("site")) return "site_visit";
-  if (s.includes("contact")) return "contacted";
-  if (s.includes("assign") || assignedCount > 0) return "assigned";
+  const status = String(lead.status ?? "").toLowerCase();
+  const qualityClass = String(lead.lead_quality_class ?? "").toUpperCase();
+  if (lead.is_duplicate || status.includes("duplicate")) return "duplicate";
+  if (/spam|bad|invalid|junk|rejected quality/.test(status) || qualityClass === "D") return "invalid";
+  if (lead.clarification_required === true || status.includes("clarification")) return "clarification";
+  if (status.includes("nurture")) return "nurture";
+  if (assignedCount > 0 || status.includes("assign")) return "assigned";
+  if (qualityClass === "A+" || qualityClass === "A" || /verified|quality checked|hot lead/.test(status)) return "quality_ready";
   return "new";
+}
+
+export function statusLabel(bucket: CrmStatusBucket): string {
+  switch (bucket) {
+    case "clarification": return "Needs clarification";
+    case "quality_ready": return "Quality ready";
+    case "assigned": return "Assigned / delivery";
+    case "nurture": return "Nurture";
+    case "invalid": return "Invalid / low quality";
+    case "duplicate": return "Duplicate";
+    default: return "New";
+  }
 }
 
 export function leadQualityBadge(lead: Lead): QualityBadge {
@@ -88,13 +99,6 @@ export function isToday(value?: string | null): boolean {
   return d.toDateString() === new Date().toDateString();
 }
 
-export function followUpDue(value?: string | null): boolean {
-  if (!value) return false;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return false;
-  const now = new Date();
-  return d.getTime() <= now.getTime() || d.toDateString() === now.toDateString();
-}
 
 export function buildRows(data: Snapshot): CrmRow[] {
   const leads = data.leads ?? [];
@@ -133,9 +137,8 @@ export function buildRows(data: Snapshot): CrmRow[] {
         assignments,
         priority: computePriority(lead, signals),
         bucket: statusBucket(lead, assignedCount),
-        statusLabel: lead.status || "New",
+        statusLabel: statusLabel(statusBucket(lead, assignedCount)),
         createdAt: lead.created_at ?? null,
-        followUp: lead.follow_up_date ?? null,
         signals,
       };
     });
@@ -186,15 +189,13 @@ export function buildKpis(rows: CrmRow[]): Kpi[] {
   return [
     { key: "total", label: "Total leads", value: rows.length, helper: "All captured leads", tone: "indigo" },
     { key: "new_today", label: "New today", value: count((r) => isToday(r.createdAt)), helper: "Created today", tone: "emerald" },
-    { key: "hot", label: "Hot leads", value: count((r) => r.priority === "hot"), helper: "Budget + urgency + valid phone", tone: "rose" },
-    { key: "unassigned", label: "Unassigned", value: count((r) => r.assignedCount === 0 && !["won", "lost", "spam", "duplicate"].includes(r.bucket)), helper: "No vendor yet", tone: "amber" },
-    { key: "assigned", label: "Assigned", value: count((r) => r.assignedCount > 0), helper: "At least one vendor", tone: "emerald" },
+    { key: "quality_ready", label: "Quality ready", value: count((r) => r.bucket === "quality_ready"), helper: "Ready for matching", tone: "emerald" },
+    { key: "clarification", label: "Needs clarification", value: count((r) => r.bucket === "clarification"), helper: "Missing or unclear lead details", tone: "amber" },
+    { key: "unassigned", label: "Unassigned", value: count((r) => r.assignedCount === 0 && !["invalid", "duplicate", "nurture"].includes(r.bucket)), helper: "No vendor yet", tone: "amber" },
+    { key: "assigned", label: "Assigned", value: count((r) => r.assignedCount > 0), helper: "Lead assigned for delivery", tone: "emerald" },
     { key: "vendor_selected", label: "Vendor-selected", value: count((r) => r.isPreferred), helper: "Client picked a vendor", tone: "indigo" },
-    { key: "follow_ups", label: "Follow-ups due", value: count((r) => followUpDue(r.followUp)), helper: "Due or overdue", tone: "amber" },
-    { key: "site_visit", label: "Site visits", value: count((r) => r.bucket === "site_visit"), helper: "Scheduled", tone: "indigo" },
-    { key: "won", label: "Won", value: count((r) => r.bucket === "won"), helper: "Converted", tone: "emerald" },
-    { key: "lost", label: "Lost", value: count((r) => r.bucket === "lost"), helper: "Closed lost", tone: "rose" },
-    { key: "spam_dup", label: "Spam / duplicate", value: count((r) => r.bucket === "spam" || r.bucket === "duplicate"), helper: "Flagged low quality", tone: "slate" },
+    { key: "nurture", label: "Nurture", value: count((r) => r.bucket === "nurture"), helper: "Not ready for delivery yet", tone: "slate" },
+    { key: "invalid_dup", label: "Invalid / duplicate", value: count((r) => r.bucket === "invalid" || r.bucket === "duplicate"), helper: "Lead validity exceptions", tone: "rose" },
   ];
 }
 
@@ -203,14 +204,13 @@ export function passesQuickFilter(row: CrmRow, filter: QuickFilter): boolean {
   switch (filter) {
     case "all": return true;
     case "new_today": return isToday(row.createdAt);
-    case "hot": return row.priority === "hot";
-    case "unassigned": return row.assignedCount === 0 && !["won", "lost", "spam", "duplicate"].includes(row.bucket);
+    case "quality_ready": return row.bucket === "quality_ready";
+    case "clarification": return row.bucket === "clarification";
+    case "unassigned": return row.assignedCount === 0 && !["invalid", "duplicate", "nurture"].includes(row.bucket);
     case "assigned": return row.assignedCount > 0;
     case "vendor_selected": return row.isPreferred;
-    case "site_visit": return row.bucket === "site_visit";
-    case "won": return row.bucket === "won";
-    case "lost": return row.bucket === "lost";
-    case "spam_dup": return row.bucket === "spam" || row.bucket === "duplicate";
+    case "nurture": return row.bucket === "nurture";
+    case "invalid_dup": return row.bucket === "invalid" || row.bucket === "duplicate";
     default: return true;
   }
 }

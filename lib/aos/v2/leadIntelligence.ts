@@ -147,8 +147,7 @@ export function deriveAosV2LeadRecommendation(
   }
   if (quality.recommended_action === "nurture") {
     return recommendation("nurture", "medium", 1,
-      "Core classified the lead for nurture rather than immediate distribution.",
-      "client.transactional_followup");
+      "Core classified the lead for nurture rather than immediate distribution. AOS does not create a customer conversation; Core owns any standard nurture policy.");
   }
   if (quality.hard_block_reason || quality.recommended_action === "reject_or_manual_review") {
     return recommendation("manual_review", "high", 1,

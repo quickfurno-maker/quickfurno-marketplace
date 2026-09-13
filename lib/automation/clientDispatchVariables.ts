@@ -44,10 +44,10 @@ const FORBIDDEN_TEXT = /[\r\n\t]/;
  * The intended source keys for the three client actions whose provider template is
  * NOT an approved QF-MVP-40.12 binding.
  *
- * `clarification_request` and `clarification_reminder` exist in the provider manifest
- * as DRAFT candidates. `client_transactional_followup` has no provider candidate at
- * all — it is Core dispatch intent only, and a separately governed provider-contract
- * task must create, review, submit and map it before any real send can succeed.
+ * `clarification_request`, `clarification_reminder`, and the vendor-specific
+ * `client_vendor_connection_reminder` require exact provider contracts/mappings before
+ * a real send can succeed. The action name remains historical compatibility only;
+ * message content is governed by the connection-reminder template key below.
  */
 export const CLIENT_DRAFT_TEMPLATE_SOURCE_KEYS: Readonly<
   Record<string, readonly BusinessSourceKeyValue[]>
@@ -60,9 +60,10 @@ export const CLIENT_DRAFT_TEMPLATE_SOURCE_KEYS: Readonly<
     BusinessSourceKey.CLIENT_NAME,
     BusinessSourceKey.OUTSTANDING_ITEM,
   ]),
-  client_transactional_followup: Object.freeze([
+  client_vendor_connection_reminder: Object.freeze([
     BusinessSourceKey.CLIENT_NAME,
-    BusinessSourceKey.LEAD_REFERENCE,
+    BusinessSourceKey.VENDOR_NAME,
+    BusinessSourceKey.VENDOR_PHONE,
   ]),
 });
 
@@ -134,12 +135,13 @@ export function buildClarificationReminderVariables(
   ]);
 }
 
-export function buildClientTransactionalFollowupVariables(
-  input: { clientName: unknown; leadReference: unknown },
+export function buildClientVendorConnectionReminderVariables(
+  input: { clientName: unknown; vendorName: unknown; vendorPhone: unknown },
 ): BusinessVariableResult {
-  return assembleDraft("client_transactional_followup", [
+  return assembleDraft("client_vendor_connection_reminder", [
     [BusinessSourceKey.CLIENT_NAME, text(input?.clientName, "clientName")],
-    [BusinessSourceKey.LEAD_REFERENCE, text(input?.leadReference, "leadReference")],
+    [BusinessSourceKey.VENDOR_NAME, text(input?.vendorName, "vendorName")],
+    [BusinessSourceKey.VENDOR_PHONE, text(input?.vendorPhone, "vendorPhone")],
   ]);
 }
 
@@ -162,7 +164,7 @@ export const CLIENT_ACTION_VARIABLE_BUILDERS: Readonly<
   "client.lead_status_update": buildClientLeadStatusUpdateVariables as (input: never) => BusinessVariableResult,
   "client.requirement_collection": buildClarificationRequestVariables as (input: never) => BusinessVariableResult,
   "client.missing_information_reminder": buildClarificationReminderVariables as (input: never) => BusinessVariableResult,
-  "client.transactional_followup": buildClientTransactionalFollowupVariables as (input: never) => BusinessVariableResult,
+  "client.transactional_followup": buildClientVendorConnectionReminderVariables as (input: never) => BusinessVariableResult,
 });
 
 export function getClientActionVariableBuilder(

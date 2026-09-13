@@ -60,6 +60,8 @@ export const BusinessSourceKey = Object.freeze({
   CLIENT_NAME: "client_name",
   LEAD_STATUS_LABEL: "lead_status_label",
   MATCHED_VENDOR_COUNT: "matched_vendor_count",
+  VENDOR_NAME: "vendor_name",
+  VENDOR_PHONE: "vendor_phone",
   LEAD_REFERENCE: "lead_reference",
   OUTSTANDING_ITEM: "outstanding_item",
 } as const);

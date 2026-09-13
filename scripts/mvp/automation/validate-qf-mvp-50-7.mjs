@@ -76,9 +76,12 @@ const ROUTE_PATH = "app/api/internal/automation/n8n/cancel-stale/route.ts";
 const VENDOR_EXECUTOR_PATH = "services/automationVendorExecutionService.ts";
 const WORKFLOW_PATH = "automation/n8n/QF-MVP-50-07-Stale-Business-Supervisor.workflow.json";
 const DOC_PATH = "docs/QF-MVP-50-7-STALE-BUSINESS-JOB-GOVERNANCE.md";
+const FINAL_SCOPE_PATH = "supabase/migrations/20260912050000_qf_lead_generation_scope_lock.sql";
 
 const migrationSource = read(MIGRATION_PATH);
 const migrationCode = stripSql(migrationSource);
+const finalScopeSource = read(FINAL_SCOPE_PATH);
+const finalScopeCode = stripSql(finalScopeSource);
 const predicateCode = stripJs(read(PREDICATE_PATH));
 const contractCode = stripJs(read(CONTRACT_PATH));
 const serviceCode = stripJs(read(SERVICE_PATH));
@@ -152,8 +155,8 @@ const rr = (over) => decide({
   sourceEventKey: "vendor:abc:resp2h", assignmentExists: true,
   assignmentVendorId: VENDOR, resolvedVendorId: VENDOR, assignmentVendorStatus: "New", ...over,
 });
-record("B01 New + resp2h is ELIGIBLE", rr({}) === S.ELIGIBLE);
-record("B02 New + resp24h is ELIGIBLE", rr({ sourceEventKey: "vendor:abc:resp24h" }) === S.ELIGIBLE);
+record("B01 New + resp2h is STALE under the final lead-delivery boundary", rr({}) === S.STALE);
+record("B02 New + resp24h is STALE under the final lead-delivery boundary", rr({ sourceEventKey: "vendor:abc:resp24h" }) === S.STALE);
 record("B03 Contacted is STALE", rr({ assignmentVendorStatus: "Contacted" }) === S.STALE);
 record("B04 every progressed status is STALE",
   ["Contacted", "Quoted", "Won", "Lost", "Closed", "", null].every((s) => rr({ assignmentVendorStatus: s }) === S.STALE));
@@ -482,16 +485,17 @@ record("M04b the SQL maintenance authority is MORE conservative: a query error a
 record("M05 the executor collapses stale AND unmapped to one code; only the maintenance lane separates them",
   /const state = decideVendorBusinessState\(gathered\.facts\)/.test(vendorExecutorCode) &&
   /if \(state === VendorBusinessState\.ELIGIBLE\) return \{ ok: true \}/.test(vendorExecutorCode));
-record("M06 the SQL authority encodes the SAME predicates as the pure module",
-  // Each rule appears on both sides. Changing one alone fails this assertion.
-  /v_vendor_status is distinct from 'New'/.test(migrationCode) &&
-  /v_stage is distinct from 'new'/.test(migrationCode) &&
-  /v_package_status is distinct from 'active'/.test(migrationCode) &&
-  /v_credits > v_threshold/.test(migrationCode) &&
-  /like '%:resp2h' or p_source_event_key like '%:resp24h'/.test(migrationCode) &&
-  /'\^\\d\{14\}\$'/.test(migrationCode) &&
-  /to_char\(v_expires at time zone 'UTC', 'YYYYMMDDHH24MISS'\)/.test(migrationCode) &&
-  predicateCode.includes('!== "New"') && predicateCode.includes('!== "new"') &&
+record("M06 the final SQL authority and pure module agree on retired response reminders and remaining predicates",
+  // The historical 50.7 migration stays byte-frozen; the final scope-lock successor
+  // overrides only response_reminder to stale/no-send while preserving other rules.
+  /if p_action_type = 'vendor\.response_reminder' then\s*return 'stale';/i.test(finalScopeCode) &&
+  /v_stage is distinct from 'new'/.test(finalScopeCode) &&
+  /v_package_status is distinct from 'active'/.test(finalScopeCode) &&
+  /v_credits > v_threshold/.test(finalScopeCode) &&
+  /'\^\\d\{14\}\$'/.test(finalScopeCode) &&
+  /to_char\(v_expires at time zone 'UTC', 'YYYYMMDDHH24MISS'\)/.test(finalScopeCode) &&
+  predicateCode.includes('case "vendor.response_reminder"') &&
+  predicateCode.includes('return stale();') && predicateCode.includes('!== "new"') &&
   predicateCode.includes('!== "active"') && predicateCode.includes("> facts.lowCreditThreshold"));
 record("M07 the SQL authority is closed to the same four actions and the same pairings",
   /p_action_type = 'vendor\.response_reminder'[\s\S]{0,200}p_entity_type <> 'lead_assignment'/.test(migrationCode) &&
@@ -621,10 +625,10 @@ record("P07 no pre-existing shape clause was weakened",
 // ---------------------------------------------------------------------------
 record("Q01 the migration is the pinned forward-only file and is the newest 50.x authority",
   canonicalSha256(readFileSync(path.join(ROOT, MIGRATION_PATH))) === MIGRATION_SHA &&
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort().at(-4) ===
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort().at(-6) ===
     "20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql");
-record("Q02 the local migration set is exactly 109",
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 109);
+record("Q02 the local migration set is exactly 111",
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 111);
 record("Q03 a fail-closed dependency preflight runs before anything is installed",
   migrationCode.indexOf("QF-MVP-50.7: the automation persistence and transport tables must exist.") <
     migrationCode.indexOf("create or replace function public.qf_automation_vendor_business_state_v1") &&
@@ -666,7 +670,7 @@ record("Q08 no staging evidence id is hard-coded anywhere",
 record("Q09 the manifest pins the migration as SOURCE-PENDING with no application evidence",
   (() => {
     const pin = (manifest.pendingPostAnchorMigrations ?? []).find((r) => r.version === "20260906000000");
-    return manifest.pendingPostAnchorMigrations.length === 5 &&
+    return manifest.pendingPostAnchorMigrations.length === 7 &&
       pin?.sha256 === MIGRATION_SHA && pin.path === MIGRATION_PATH && pin.phase === "QF-MVP-50.7" &&
       pin.operationalStatus === "PENDING" && pin.appliedToStaging === false &&
       pin.appliedToProduction === false && pin.appliedByThisPhase === false &&
@@ -674,12 +678,12 @@ record("Q09 the manifest pins the migration as SOURCE-PENDING with no applicatio
       pin.remoteHistoryCountObservedAtApply === false &&
       pin.requiresSeparateStagingDeploymentGate === true &&
       !("remoteHistoryCountAfterApply" in pin) && !("appliedEvidenceMarker" in pin) &&
-      manifest.appliedAnchor.postAnchorMigrationCount === 22;
+      manifest.appliedAnchor.postAnchorMigrationCount === 24;
   })());
 record("Q10 G1 was re-pinned to the exact new truth, never loosened",
-  /const MIGRATION_COUNT = 109;/.test(g1Source) &&
+  /const MIGRATION_COUNT = 111;/.test(g1Source) &&
   g1Source.includes(`sha: "${MIGRATION_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 5") &&
+  g1Source.includes("pendingPins.length === 7") &&
   g1Source.includes("appliedPins.length === 10") &&
   g1Source.includes("reconciledPins.length === 5") &&
   /const RECONCILIATION_MIGRATION_COUNT = 102;/.test(g1Source) &&

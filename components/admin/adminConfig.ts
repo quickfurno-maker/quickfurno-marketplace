@@ -64,7 +64,7 @@ export type AdminNavGroup = {
 
 export const adminSections: AdminSectionConfig[] = [
   { key: "dashboard", href: "/admin/dashboard", label: "Dashboard", description: "Marketplace command center", icon: "dashboard", addLabel: "Add Lead" },
-  { key: "leads", href: "/admin/leads", label: "Leads", description: "Pipeline, assignments, follow-ups", icon: "leads", addLabel: "Add Lead" },
+  { key: "leads", href: "/admin/leads", label: "Leads", description: "Capture, quality, assignments, delivery", icon: "leads", addLabel: "Add Lead" },
   { key: "vendors", href: "/admin/vendors", label: "Vendors", description: "Studios, vendors, verification", icon: "vendors", addLabel: "Add Vendor" },
   { key: "vendor-crm", href: "/admin/vendor-crm", label: "Vendor CRM", description: "Vendor relationships, contacts, tags, notes, tasks", icon: "vendors", addLabel: "" },
   { key: "vendor-segments", href: "/admin/vendor-crm/segments", label: "Vendor Segments", description: "Deterministic saved rules — preview only, never send authorization", icon: "vendors", addLabel: "" },
@@ -79,8 +79,8 @@ export const adminSections: AdminSectionConfig[] = [
   { key: "vendor-subscriptions", href: "/admin/vendor-subscriptions", label: "Vendor Subscriptions", description: "Credits, expiry, renewals", icon: "subscriptions", addLabel: "Renew Package" },
   { key: "reports", href: "/admin/reports", label: "Reports", description: "Exports and business views", icon: "reports", addLabel: "Export Report" },
   { key: "aos", href: "/admin/aos", label: "AOS Agents", description: "Readiness status — foundation not active", icon: "aos", addLabel: "" },
-  { key: "crm", href: "/admin/crm", label: "CRM", description: "Pipeline, follow-ups, nurture, calendar", icon: "crm", addLabel: "Add Lead" },
-  { key: "analytics", href: "/admin/analytics", label: "Analytics", description: "Sources, funnel, services, revenue", icon: "analytics", addLabel: "Export Analytics" },
+  { key: "crm", href: "/admin/crm", label: "CRM", description: "Lead quality, clarification, assignment, delivery", icon: "crm", addLabel: "Add Lead" },
+  { key: "analytics", href: "/admin/analytics", label: "Analytics", description: "Sources, lead quality, services, revenue", icon: "analytics", addLabel: "Export Analytics" },
   { key: "automations", href: "/admin/automations", label: "Automations", description: "Webhooks and workflows", icon: "automations", addLabel: "Create Automation" },
   { key: "website-content", href: "/admin/website-content", label: "Website Content", description: "CMS-ready content blocks", icon: "content", addLabel: "Save Content" },
   { key: "reviews", href: "/admin/reviews", label: "Reviews & Ratings", description: "Moderation and trust signals", icon: "reviews", addLabel: "Add Review" },

@@ -5,7 +5,7 @@
 // WhatsApp, no distribution, and no credit deduction.
 //
 // Existing lead table: public.leads (see services/adminService.ts snapshot).
-// This adapter is defensive â€” every field has a safe fallback so it never throws
+// This adapter is defensive -- every field has a safe fallback so it never throws
 // if the live schema differs or columns are missing.
 //
 // Phone safety: list/table/card views must use `phone_masked` only. The raw
@@ -28,7 +28,7 @@ export type CRMLeadLoadState = "live" | "empty" | "failed";
 
 const TEST_NAME_RE = /^(test|abc|xyz|asdf|asdfgh|demo|qwerty|aaa+|na|n\/?a|sample|dummy)\b/i;
 
-// Compute privacy-preserving scoring signals from a raw lead. Booleans only â€”
+// Compute privacy-preserving scoring signals from a raw lead. Booleans only --
 // raw phone / email / message text never leave this function.
 export function computeLeadSignals(lead: Lead, phoneFrequency?: Map<string, number>): LeadScoringSignals {
   const digits = String(lead.phone ?? "").replace(/\D/g, "");
@@ -75,18 +75,16 @@ function isFieldSet(value?: string | null) {
 export function normalizeLeadStatus(raw?: string | null): CRMLeadStatus {
   const value = String(raw ?? "").toLowerCase().trim();
   if (!value) return "new";
-  if (value.includes("won") || value.includes("convert")) return "won";
-  if (value.includes("lost")) return "lost";
   if (value.includes("duplicate")) return "duplicate";
-  if (value.includes("spam")) return "spam_review";
-  if (value.includes("invalid")) return "invalid";
-  if (value.includes("quotation")) return "quotation_sent";
-  if (value.includes("site")) return "site_visit_scheduled";
-  if (value.includes("contact")) return "client_contacted";
-  if (value.includes("assign")) return "assigned";
-  if (value.includes("qualif") || value.includes("verified")) return "qualified";
+  if (value.includes("spam") || value.includes("bad")) return "spam_review";
+  if (value.includes("invalid") || value.includes("rejected quality")) return "invalid";
+  if (value.includes("clarification")) return "clarification_required";
   if (value.includes("nurture")) return "nurture_later";
-  if (value.includes("new")) return "new";
+  if (value.includes("matching")) return "vendor_matching";
+  // Historical post-delivery commercial statuses collapse to QuickFurno's
+  // terminal marketplace boundary rather than remaining active CRM stages.
+  if (/assign|contact|site|quotation|convert|won|lost/.test(value)) return "assigned";
+  if (/qualif|verified|quality checked|hot lead/.test(value)) return "qualified";
   return "new";
 }
 
@@ -117,7 +115,7 @@ export function crmLeadAdapter(lead: Lead, phoneFrequency?: Map<string, number>)
     id: lead.id,
     lead_id: lead.id,
     client_name: lead.name || "Unnamed lead",
-    // Masked only â€” full phone is never placed in the CRM view model.
+    // Masked only -- full phone is never placed in the CRM view model.
     phone_masked: maskPhone(lead.phone),
     email_masked: maskEmail(lead.email),
     service: lead.service_required || lead.category || "Not set",
@@ -132,8 +130,8 @@ export function crmLeadAdapter(lead: Lead, phoneFrequency?: Map<string, number>)
     assigned_vendor_count: lead.lead_assignments?.length ?? 0,
     owner: null, // TODO(crm-sync): owner comes from crm_leads overlay once applied.
     created_at: lead.created_at ?? null,
-    // Real follow-up date if present, otherwise a safe placeholder (not scheduled).
-    next_follow_up_date: lead.follow_up_date ?? null,
+    // Legacy generic follow-up dates are not carried into the active lead-generation CRM.
+    next_follow_up_date: null,
     nurture_stage: normalizeLeadStatus(lead.status) === "nurture_later" ? "reopen_later" : null,
     nurture_reason: null,
     nurture_follow_up_date: null,

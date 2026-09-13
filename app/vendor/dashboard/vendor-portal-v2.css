@@ -1106,17 +1106,6 @@ a.qf-vendor-v2-metric:hover {
   white-space: nowrap;
 }
 
-.qf-vendor-v2-leadstatus[data-status="New"] {
-  background: var(--v2-blue-tint);
-  border-color: var(--v2-blue-line);
-  color: var(--v2-blue-deep);
-}
-
-.qf-vendor-v2-leadstatus[data-status="Follow-up Needed"] {
-  background: var(--v2-warn-tint);
-  border-color: var(--v2-warn-line);
-  color: var(--v2-warn);
-}
 
 .qf-vendor-v2-leadlink {
   display: inline-flex;

@@ -23,6 +23,13 @@ export const AUTOMATION_ACTION_TYPES = [
   "campaign.execute_recipient",
 ] as const;
 
+
+export const RETIRED_POST_DELIVERY_AUTOMATION_ACTIONS = Object.freeze([
+  // Vendor response chasing remains retired. The client transactional action is
+  // reactivated only for the bounded assignment-specific connection-assurance loop.
+  "vendor.response_reminder",
+] as const);
+
 export type AutomationActionType = (typeof AUTOMATION_ACTION_TYPES)[number];
 
 export type AutomationWorkflowFamily =
@@ -38,8 +45,6 @@ export interface AutomationActionDefinition {
 }
 
 const CORE_SOURCES = ["core", "admin", "system"] as const;
-const CLIENT_AGENT_SOURCES = ["jarvis", "riya", "anisha"] as const;
-const JARVIS_ONLY = ["jarvis"] as const;
 
 export const AUTOMATION_ACTION_REGISTRY: Readonly<
   Record<AutomationActionType, AutomationActionDefinition>
@@ -47,32 +52,32 @@ export const AUTOMATION_ACTION_REGISTRY: Readonly<
   "client.lead_confirmation": definition(
     "client.lead_confirmation",
     "client_whatsapp",
-    [...CORE_SOURCES, ...CLIENT_AGENT_SOURCES],
+    [...CORE_SOURCES],
   ),
   "client.requirement_collection": definition(
     "client.requirement_collection",
     "client_whatsapp",
-    [...CORE_SOURCES, ...CLIENT_AGENT_SOURCES],
+    [...CORE_SOURCES],
   ),
   "client.missing_information_reminder": definition(
     "client.missing_information_reminder",
     "client_whatsapp",
-    [...CORE_SOURCES, ...CLIENT_AGENT_SOURCES],
+    [...CORE_SOURCES],
   ),
   "client.matching_update": definition(
     "client.matching_update",
     "client_whatsapp",
-    [...CORE_SOURCES, ...CLIENT_AGENT_SOURCES],
+    [...CORE_SOURCES],
   ),
   "client.lead_status_update": definition(
     "client.lead_status_update",
     "client_whatsapp",
-    [...CORE_SOURCES, ...CLIENT_AGENT_SOURCES],
+    [...CORE_SOURCES],
   ),
   "client.transactional_followup": definition(
     "client.transactional_followup",
     "client_whatsapp",
-    [...CORE_SOURCES, ...CLIENT_AGENT_SOURCES],
+    [...CORE_SOURCES],
   ),
   "vendor.lead_offer": definition(
     "vendor.lead_offer",
@@ -82,17 +87,17 @@ export const AUTOMATION_ACTION_REGISTRY: Readonly<
   "vendor.response_reminder": definition(
     "vendor.response_reminder",
     "vendor_whatsapp",
-    [...CORE_SOURCES, ...JARVIS_ONLY],
+    [],
   ),
   "vendor.onboarding_reminder": definition(
     "vendor.onboarding_reminder",
     "vendor_whatsapp",
-    [...CORE_SOURCES, ...JARVIS_ONLY],
+    [...CORE_SOURCES],
   ),
   "vendor.document_reminder": definition(
     "vendor.document_reminder",
     "vendor_whatsapp",
-    [...CORE_SOURCES, ...JARVIS_ONLY],
+    [...CORE_SOURCES],
   ),
   "vendor.package_expiry_warning": definition(
     "vendor.package_expiry_warning",

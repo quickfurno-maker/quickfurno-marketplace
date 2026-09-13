@@ -7,7 +7,7 @@ export const leadFlowAgentConfig: AgentConfig = {
   status: "active",
   version: "0.1.0",
   description: "Models lead lifecycle steps without changing live lead state.",
-  capabilities: ["lead workflow preview", "follow-up placeholder", "replacement placeholder"],
+  capabilities: ["lead workflow preview", "delivery-state preview", "replacement placeholder"],
   permissions: noExternalSideEffectsPermission,
 };
 

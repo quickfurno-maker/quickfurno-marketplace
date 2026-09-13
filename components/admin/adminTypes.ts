@@ -177,7 +177,6 @@ export type Assignment = {
   id: string;
   lead_id?: string | null;
   vendor_id?: string | null;
-  vendor_status?: string | null;
   assignment_type?: string | null;
   assigned_at?: string | null;
   created_at?: string | null;

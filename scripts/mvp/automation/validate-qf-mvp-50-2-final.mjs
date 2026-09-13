@@ -261,8 +261,10 @@ record("E01 the reproof runs inside intent building, before any provider constru
   executeBody.indexOf("buildClientCommunicationIntent(") < executeBody.indexOf("createRuntimeCommunicationService("));
 record("E02 the reminder revalidates the live clarification requirement",
   /case "client\.missing_information_reminder":[\s\S]{0,900}?clarification_required[\s\S]{0,400}?clarification_status/.test(executionCode));
-record("E03 the follow-up revalidates the live Quotation Sent status",
-  /case "client\.transactional_followup":[\s\S]{0,300}?lead\.status !== "Quotation Sent"/.test(executionCode));
+record("E03 generic/legacy transactional follow-up is terminal no-send while bounded connection keys are admitted",
+  /CONNECTION_ACTION_KEY_RE/.test(executionCode) &&
+  /conn_/.test(executionCode) &&
+  /QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE/.test(executionCode));
 record("E04 an ineligible action is a bounded terminal non-send, not a provider failure",
   PRE_COMMUNICATION_FAILURE_RULINGS.QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE.classification === "definitive_failure" &&
   PRE_COMMUNICATION_FAILURE_RULINGS.QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE.safeCode === "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" &&
@@ -302,7 +304,7 @@ const TRIGGER_MATRIX = {
   "client.missing_information_reminder": { template: "clarification_reminder", token: "clarrem" },
   "client.matching_update": { template: "client_matching_update", token: "match" },
   "client.lead_status_update": { template: "client_lead_status_update", token: "status" },
-  "client.transactional_followup": { template: "client_transactional_followup", token: "qsfu" },
+  "client.transactional_followup": { template: "client_vendor_connection_reminder", token: "qsfu" },
 };
 record("S01 the frozen action set is still exactly six",
   CLIENT_AUTOMATION_ACTION_TYPES.length === 6 &&
@@ -419,7 +421,7 @@ record("R18 the execute_v1 repair is present, ordered immediately before the wed
     // QF-MVP-82A-R0 RE-PIN: 103 -> 104, adding ONLY the SOURCE-PENDING Realtime
     // publication membership (20260904000000). Still exact equality, still an
     // ordering proof — no existing migration moved.
-    return files.length === 110 &&
+    return files.length === 111 &&
       files.indexOf(WEDGE_NAME) === files.indexOf(REPAIR_NAME) + 1;
   })());
 
@@ -508,11 +510,11 @@ record("W18 the repair touches no provider, n8n, vendor, campaign or Jarvis surf
 // QF-MVP-75.02 RE-PIN: 100 -> 101, adding ONLY the SOURCE-PENDING geo normalization /
 // PostGIS shortlist foundation (20260816000000). No existing migration was changed,
 // renamed, deleted or reordered. Still exact equality.
-record("W19 the wedge repair is present and the migration set is exactly 110",
+record("W19 the wedge repair is present and the migration set is exactly 111",
   (() => {
     const files = readdirSync(path.join(ROOT, "supabase/migrations"))
       .filter((f) => f.endsWith(".sql")).sort();
-    return files.length === 110 && files.includes(WEDGE_NAME);
+    return files.length === 111 && files.includes(WEDGE_NAME);
   })());
 
 // ---------------------------------------------------------------------------
@@ -572,9 +574,9 @@ record("G02 the ten applied records are 21 through 30 in exact ascending order",
 // renamed, deleted or reordered. Still exact equality.
 // QF-MVP-50.6 RE-PIN: 17 / 104 -> 18 / 105, adding ONLY the SOURCE-PENDING orphan
 // cancellation authority (20260905000000). Still exact equality on both numbers.
-record("G03 post-anchor evidence and local migration count remain exact at 23 / 110",
-  manifest.appliedAnchor.postAnchorMigrationCount === 23 &&
-  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 110);
+record("G03 post-anchor evidence and local migration count remain exact at 24 / 111",
+  manifest.appliedAnchor.postAnchorMigrationCount === 24 &&
+  readdirSync(path.join(ROOT, "supabase/migrations")).filter((f) => f.endsWith(".sql")).length === 111);
 record("G03a the G1 staging-history gate was re-pinned to the applied truth, not loosened",
   g1Source.includes(`marker: "${R2_APPLIED_MARKER}"`) &&
   g1Source.includes("remoteHistory: 23") &&
@@ -593,15 +595,15 @@ record("G03a the G1 staging-history gate was re-pinned to the applied truth, not
   // the production activation authority. APPLIED stays exactly ten throughout.
   // QF-MVP-50.6: PENDING is TWO again — the 80.14A production activation authority
   // and the source-only orphan cancellation authority. Still an exact count.
-  g1Source.includes("the explicit PENDING post-anchor set holds exactly the six pinned entries") &&
+  g1Source.includes("the explicit PENDING post-anchor set holds exactly the seven pinned entries") &&
   g1Source.includes("the explicit STAGING-APPLIED post-anchor set holds exactly the two pinned entries") &&
   g1Source.includes("manifest declares exactly five RECONCILED post-anchor migrations") &&
   // no `>=`, no wildcard: the count assertions stay exact
   g1Source.includes("appliedPins.length === 10") &&
-  g1Source.includes("pendingPins.length === 6") &&
+  g1Source.includes("pendingPins.length === 7") &&
   g1Source.includes("stagingAppliedPins.length === 2") &&
   g1Source.includes("reconciledPins.length === 5") &&
-  g1Source.includes("const MIGRATION_COUNT = 110;"));
+  g1Source.includes("const MIGRATION_COUNT = 111;"));
 record("G03b the atomic producer staging certification is recorded",
   doc.includes(ATOMIC_PRODUCER_MARKER) && doc.includes(R2_APPLIED_MARKER));
 // An unearned marker may be NAMED in prose only to disclaim it. It must never
@@ -837,7 +839,7 @@ const mutants = [
           existsSync(path.join(ROOT, WEDGE_PATH))],
   ["silently loosening the G1 post-anchor pin is impossible",
     () => g1Source.includes("appliedPins.length === 10") &&
-          g1Source.includes("pendingPins.length === 6") &&
+          g1Source.includes("pendingPins.length === 7") &&
           g1Source.includes("reconciledPins.length === 5") &&
           !/appliedPins\.length\s*>=/.test(g1Source) &&
           !/reconciledPins\.length\s*>=/.test(g1Source) &&

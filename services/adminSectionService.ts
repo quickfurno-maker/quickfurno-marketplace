@@ -297,7 +297,7 @@ export async function getAdminAuditLogsPage(query: AdminAuditLogsQuery): Promise
  *  labelled "latest N" by the consuming UI. */
 const ANALYTICS_SAMPLE_SIZE = 50;
 const ANALYTICS_LEAD_COLUMNS =
-  "id, status, city, locality, area, source, utm_source, service_required, category, is_duplicate, lead_quality_class, lead_priority, lead_quality_score, lead_intent, created_at, follow_up_date, lead_assignments(id, vendor_id)";
+  "id, status, city, locality, area, source, utm_source, service_required, category, is_duplicate, lead_quality_class, lead_priority, lead_quality_score, lead_intent, created_at, lead_assignments(id, vendor_id)";
 
 export async function getAdminReportsPage(): Promise<Result<Row>> {
   try {
@@ -357,35 +357,20 @@ export async function getAdminCrmBase(): Promise<Result<Row>> {
 export type CrmTabKey =
   | "overview"
   | "pipeline"
-  | "followups"
   | "queue"
   | "vendor_activity"
   | "sources"
   | "nurture";
 
-/** statusBucket()'s status patterns expressed as server conditions. */
-const BUCKET_OR: Record<string, string> = {
-  won: "status.ilike.*won*,status.ilike.*convert*",
-  lost: "status.ilike.*lost*",
-  quotation: "status.ilike.*quotation*",
-  site_visit: "status.ilike.*site*",
-  contacted: "status.ilike.*contact*",
-  spam_dup:
-    "is_duplicate.eq.true,lead_quality_class.eq.D,status.ilike.*spam*,status.ilike.*bad*,status.ilike.*invalid*,status.ilike.*junk*,status.ilike.*duplicate*",
-};
+/** Marketplace-safe status buckets, aligned with leadCrmUtils.statusBucket(). */
+const CRM_BUCKET_OR = {
+  quality_ready: "lead_quality_class.eq.A+,lead_quality_class.eq.A,status.ilike.*verified*,status.ilike.*quality checked*,status.ilike.*hot lead*",
+  clarification: "clarification_required.eq.true,status.ilike.*clarification*",
+  nurture: "status.ilike.*nurture*",
+  invalid_dup: "is_duplicate.eq.true,lead_quality_class.eq.D,status.ilike.*spam*,status.ilike.*bad*,status.ilike.*invalid*,status.ilike.*junk*,status.ilike.*duplicate*,status.ilike.*rejected quality*",
+} as const;
 
-const CRM_TAB_ROW_SELECT = "*, lead_assignments!left(id, vendor_id, vendor_status, assignment_type, assigned_at)";
-
-function endOfTodayIso(): string {
-  const d = new Date();
-  d.setHours(23, 59, 59, 999);
-  return d.toISOString();
-}
-function startOfTodayIso(): string {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
-}
+const CRM_TAB_ROW_SELECT = "*, lead_assignments!left(id, vendor_id, assignment_type, assigned_at)";
 
 export async function getCrmTabData(tab: CrmTabKey, pageInput?: unknown): Promise<Result<Row>> {
   try {
@@ -394,79 +379,57 @@ export async function getCrmTabData(tab: CrmTabKey, pageInput?: unknown): Promis
     const { from, to } = pageRange(page);
 
     if (tab === "overview") {
-      // Real database-wide counts, mirroring the Inbox quick-filter semantics.
-      const [total, newToday, hot, unassigned, assigned, vendorSelected, followUps, siteVisit, won, lost, spamDup] =
-        await Promise.all([
-          safeCount("crm.total", head(db.from("leads"))),
-          safeCount("crm.newToday", head(db.from("leads")).gte("created_at", startOfTodayIso())),
-          safeCount("crm.hot", head(db.from("leads")).in("lead_quality_class", ["A+", "A"])),
-          (async () => {
-            try {
-              const { count, error } = await db
-                .from("leads")
-                .select("id, lead_assignments!left(id)", { count: "exact", head: true })
-                .is("lead_assignments", null)
-                .or("status.is.null,status.not.in.(Converted,Won,Lost,Duplicate,Spam,Invalid)");
-              return error ? null : count ?? 0;
-            } catch { return null; }
-          })(),
-          (async () => {
-            try {
-              const { count, error } = await db
-                .from("leads")
-                .select("id, lead_assignments!left(id)", { count: "exact", head: true })
-                .not("lead_assignments", "is", null);
-              return error ? null : count ?? 0;
-            } catch { return null; }
-          })(),
-          safeCount("crm.vendorSelected", head(db.from("leads")).eq("lead_intent", "preferred_vendor")),
-          safeCount("crm.followups", head(db.from("leads")).not("follow_up_date", "is", null).lte("follow_up_date", endOfTodayIso())),
-          safeCount("crm.siteVisit", head(db.from("leads")).ilike("status", "*site*")),
-          safeCount("crm.won", head(db.from("leads")).or(BUCKET_OR.won)),
-          safeCount("crm.lost", head(db.from("leads")).or(BUCKET_OR.lost)),
-          safeCount("crm.spamDup", head(db.from("leads")).or(BUCKET_OR.spam_dup)),
-        ]);
-      return ok({ counts: { total, newToday, hot, unassigned, assigned, vendorSelected, followUps, siteVisit, won, lost, spamDup } });
+      const [total, newToday, qualityReady, clarification, unassigned, assigned, vendorSelected, nurture, invalidDup] = await Promise.all([
+        safeCount("crm.total", head(db.from("leads"))),
+        safeCount("crm.newToday", head(db.from("leads")).gte("created_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())),
+        safeCount("crm.qualityReady", head(db.from("leads")).or(CRM_BUCKET_OR.quality_ready)),
+        safeCount("crm.clarification", head(db.from("leads")).or(CRM_BUCKET_OR.clarification)),
+        (async () => {
+          try {
+            const { count, error } = await db.from("leads")
+              .select("id, lead_assignments!left(id)", { count: "exact", head: true })
+              .is("lead_assignments", null)
+              .or("status.is.null,status.not.in.(Duplicate,Spam,Invalid,Rejected Quality,Bad Lead,Nurture)")
+              .or("is_duplicate.is.null,is_duplicate.eq.false");
+            return error ? null : count ?? 0;
+          } catch { return null; }
+        })(),
+        (async () => {
+          try {
+            const { count, error } = await db.from("leads")
+              .select("id, lead_assignments!left(id)", { count: "exact", head: true })
+              .not("lead_assignments", "is", null);
+            return error ? null : count ?? 0;
+          } catch { return null; }
+        })(),
+        safeCount("crm.vendorSelected", head(db.from("leads")).eq("lead_intent", "preferred_vendor")),
+        safeCount("crm.nurture", head(db.from("leads")).or(CRM_BUCKET_OR.nurture)),
+        safeCount("crm.invalidDup", head(db.from("leads")).or(CRM_BUCKET_OR.invalid_dup)),
+      ]);
+      return ok({ counts: { total, newToday, qualityReady, clarification, unassigned, assigned, vendorSelected, nurture, invalidDup } });
     }
 
     if (tab === "pipeline") {
-      // Real per-stage counts + a labelled latest-N sample for the lane cards.
-      const [contacted, siteVisit, quotation, won, lost, spamDup, total, sample] = await Promise.all([
-        safeCount("pipe.contacted", head(db.from("leads")).or(BUCKET_OR.contacted)),
-        safeCount("pipe.site", head(db.from("leads")).or(BUCKET_OR.site_visit)),
-        safeCount("pipe.quotation", head(db.from("leads")).or(BUCKET_OR.quotation)),
-        safeCount("pipe.won", head(db.from("leads")).or(BUCKET_OR.won)),
-        safeCount("pipe.lost", head(db.from("leads")).or(BUCKET_OR.lost)),
-        safeCount("pipe.spamDup", head(db.from("leads")).or(BUCKET_OR.spam_dup)),
+      const [qualityReady, clarification, assigned, nurture, invalidDup, total, sample] = await Promise.all([
+        safeCount("pipe.qualityReady", head(db.from("leads")).or(CRM_BUCKET_OR.quality_ready)),
+        safeCount("pipe.clarification", head(db.from("leads")).or(CRM_BUCKET_OR.clarification)),
+        (async () => {
+          try {
+            const { count, error } = await db.from("leads")
+              .select("id, lead_assignments!left(id)", { count: "exact", head: true })
+              .not("lead_assignments", "is", null);
+            return error ? null : count ?? 0;
+          } catch { return null; }
+        })(),
+        safeCount("pipe.nurture", head(db.from("leads")).or(CRM_BUCKET_OR.nurture)),
+        safeCount("pipe.invalidDup", head(db.from("leads")).or(CRM_BUCKET_OR.invalid_dup)),
         safeCount("pipe.total", head(db.from("leads"))),
         safeAggregateRows(
           "pipe.sample",
           db.from("leads").select(CRM_TAB_ROW_SELECT).order("created_at", { ascending: false }).limit(ANALYTICS_SAMPLE_SIZE),
         ),
       ]);
-      return ok({ stageCounts: { contacted, site_visit: siteVisit, quotation, won, lost, spam: spamDup, total }, sample });
-    }
-
-    if (tab === "followups") {
-      const nowStart = startOfTodayIso();
-      const nowEnd = endOfTodayIso();
-      const groupLimit = ADMIN_DIRECTORY_PAGE_SIZE;
-      const [overdueRes, todayRes, upcomingRes, overdueCount, todayCount, upcomingCount, unscheduledCount] = await Promise.all([
-        db.from("leads").select(CRM_TAB_ROW_SELECT).not("follow_up_date", "is", null).lt("follow_up_date", nowStart).order("follow_up_date", { ascending: true }).limit(groupLimit),
-        db.from("leads").select(CRM_TAB_ROW_SELECT).gte("follow_up_date", nowStart).lte("follow_up_date", nowEnd).order("follow_up_date", { ascending: true }).limit(groupLimit),
-        db.from("leads").select(CRM_TAB_ROW_SELECT).gt("follow_up_date", nowEnd).order("follow_up_date", { ascending: true }).limit(groupLimit),
-        safeCount("fu.overdue", head(db.from("leads")).not("follow_up_date", "is", null).lt("follow_up_date", nowStart)),
-        safeCount("fu.today", head(db.from("leads")).gte("follow_up_date", nowStart).lte("follow_up_date", nowEnd)),
-        safeCount("fu.upcoming", head(db.from("leads")).gt("follow_up_date", nowEnd)),
-        safeCount("fu.unscheduled", head(db.from("leads")).is("follow_up_date", null)),
-      ]);
-      return ok({
-        overdue: overdueRes.data ?? [],
-        today: todayRes.data ?? [],
-        upcoming: upcomingRes.data ?? [],
-        counts: { overdue: overdueCount, today: todayCount, upcoming: upcomingCount, unscheduled: unscheduledCount },
-        groupLimit,
-      });
+      return ok({ stageCounts: { qualityReady, clarification, assigned, nurture, invalidDup, total }, sample });
     }
 
     if (tab === "queue") {
@@ -481,12 +444,9 @@ export async function getCrmTabData(tab: CrmTabKey, pageInput?: unknown): Promis
     }
 
     if (tab === "vendor_activity") {
-      const [logsRes, logsTotal, statusAgg, contactShared, creditDeducted] = await Promise.all([
+      const [logsRes, logsTotal, contactShared, creditDeducted] = await Promise.all([
         db.from("lead_delivery_logs").select("*").order("created_at", { ascending: false }).order("id", { ascending: true }).range(from, to),
         safeCount("activity.logs", head(db.from("lead_delivery_logs"))),
-        // Column-only projection: vendor progress distribution over all
-        // assignments (single small column, bounded defensively).
-        safeAggregateRows("activity.status", db.from("lead_assignments").select("vendor_status").limit(2000)),
         safeCount("activity.contact", head(db.from("lead_delivery_logs")).eq("contact_shared", true)),
         safeCount("activity.credit", head(db.from("lead_delivery_logs")).eq("credit_deducted", true)),
       ]);
@@ -495,7 +455,6 @@ export async function getCrmTabData(tab: CrmTabKey, pageInput?: unknown): Promis
       const vendors = await vendorIdentities(db, rows.map((r: Row) => String(r.vendor_id ?? "")));
       return ok({
         result: { rows, page, pageSize: ADMIN_DIRECTORY_PAGE_SIZE, total: logsTotal },
-        progressAgg: statusAgg,
         counts: { logsTotal, contactShared, creditDeducted },
         vendors,
       });
@@ -540,9 +499,10 @@ async function openUnassignedLeads(db: any, limit: number): Promise<Row[]> {
   try {
     const { data, error } = await db
       .from("leads")
-      .select("*, lead_assignments!left(id, vendor_id, vendor_status, assignment_type, assigned_at)")
+      .select("*, lead_assignments!left(id, vendor_id, assignment_type, assigned_at)")
       .is("lead_assignments", null)
-      .or("status.is.null,status.not.in.(Converted,Won,Lost,Duplicate,Spam,Invalid)")
+      .or("status.is.null,status.not.in.(Duplicate,Spam,Invalid,Rejected Quality,Bad Lead,Nurture)")
+      .or("is_duplicate.is.null,is_duplicate.eq.false")
       .order("created_at", { ascending: false })
       .limit(limit);
     if (error) {

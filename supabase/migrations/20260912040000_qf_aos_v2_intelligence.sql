@@ -257,14 +257,20 @@ begin
 end
 $$;
 
-revoke all on table public.aos_runs from anon;
-revoke all on table public.aos_agent_logs from anon;
-revoke all on table public.aos_recommendations from anon;
-revoke all on table public.aos_agent_memory from anon;
-revoke all on table public.aos_audit_logs from anon;
+revoke all on table public.aos_runs from public, anon, authenticated;
+revoke all on table public.aos_agent_logs from public, anon, authenticated;
+revoke all on table public.aos_recommendations from public, anon, authenticated;
+revoke all on table public.aos_agent_memory from public, anon, authenticated;
+revoke all on table public.aos_audit_logs from public, anon, authenticated;
 
 grant select on table public.aos_runs to authenticated;
 grant select on table public.aos_agent_logs to authenticated;
 grant select on table public.aos_recommendations to authenticated;
 grant select on table public.aos_agent_memory to authenticated;
 grant select on table public.aos_audit_logs to authenticated;
+
+grant select, insert, update on table public.aos_runs to service_role;
+grant select, insert, update on table public.aos_agent_logs to service_role;
+grant select, insert, update on table public.aos_recommendations to service_role;
+grant select, insert, update on table public.aos_agent_memory to service_role;
+grant select, insert, update on table public.aos_audit_logs to service_role;

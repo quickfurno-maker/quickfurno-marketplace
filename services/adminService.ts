@@ -134,12 +134,9 @@ export async function collectAdminKpiStats(db: ReturnType<typeof adminClient>) {
   const weekIso = startOfWeek(now).toISOString();
   const monthIso = month.toISOString();
 
-  const ASSIGNED_STATUSES = ["Assigned", "Contacted", "Site Visit Scheduled", "Quotation Sent", "Converted", "Won"];
-  const FOLLOWUP_STATUSES = ["New", "Verified", "Assigned", "Contacted"];
-
   const [
     cTotalLeads, cLeadsToday, cLeadsWeek, cLeadsMonth,
-    cAssignedLeads, cConvertedLeads, cDuplicateLeads, cPendingFollowups,
+    assignmentLeadRows, cDuplicateLeads,
     cTotalVendors, cApprovedVendors, cActiveVendors, cPendingVendors,
     cLowBalanceVendors, cExpiredVendors, cPendingPayments, cBadReportsPending, cLeadsDistributed,
     cActiveCities,
@@ -148,10 +145,8 @@ export async function collectAdminKpiStats(db: ReturnType<typeof adminClient>) {
     safeCount("leads.today", head(db.from("leads")).gte("created_at", todayIso)),
     safeCount("leads.week", head(db.from("leads")).gte("created_at", weekIso)),
     safeCount("leads.month", head(db.from("leads")).gte("created_at", monthIso)),
-    safeCount("leads.assigned", head(db.from("leads")).in("status", ASSIGNED_STATUSES)),
-    safeCount("leads.converted", head(db.from("leads")).in("status", ["Converted", "Won"])),
+    safeAggregateRows("assignments.leads", db.from("lead_assignments").select("lead_id")),
     safeCount("leads.duplicate", head(db.from("leads")).or("is_duplicate.eq.true,status.eq.Duplicate")),
-    safeCount("leads.followups", head(db.from("leads")).in("status", FOLLOWUP_STATUSES)),
     safeCount("vendors.total", head(db.from("vendors"))),
     safeCount("vendors.approved", head(db.from("vendors")).eq("status", "Approved")),
     safeCount("vendors.active", head(db.from("vendors")).eq("is_active", true).in("status", ["Approved", "Active"])),
@@ -170,6 +165,7 @@ export async function collectAdminKpiStats(db: ReturnType<typeof adminClient>) {
     safeAggregateRows("vendor_packages.paid", db.from("vendor_packages").select("vendor_id").or("payment_status.eq.Paid,status.eq.Active")),
   ]);
 
+  const cAssignedLeads = new Set(assignmentLeadRows.map((row) => row.lead_id).filter(Boolean)).size;
   const totalRevenue = sumNumbers(paidPaymentRowsAll, (p) => p.amount);
   const revenueThisMonth = sumNumbers(
     paidPaymentRowsAll.filter((p) => { const d = safeDate(p.created_at); return d ? d >= month : false; }),
@@ -196,8 +192,6 @@ export async function collectAdminKpiStats(db: ReturnType<typeof adminClient>) {
     pending_payments: cPendingPayments,
     low_balance_vendors: cLowBalanceVendors,
     active_cities: cActiveCities,
-    pending_followups: cPendingFollowups,
-    conversion_rate: cTotalLeads ? Math.round((cConvertedLeads / cTotalLeads) * 100) : 0,
     lead_distribution_success_rate: cTotalLeads ? Math.round((cAssignedLeads / cTotalLeads) * 100) : 0,
     leads_distributed: cLeadsDistributed,
     remaining_vendor_credits: remainingVendorCredits,
@@ -242,11 +236,11 @@ export async function getAdminDashboardStats(): Promise<Result<AdminDashboardSta
   try {
     const db = adminClient();
     const [
-      leads, assigned, duplicates, vendors, approved, pending, active,
+      leads, assignmentLeadRows, duplicates, vendors, approved, pending, active,
       distributed, badPending, paidPayments, creditRows,
     ] = await Promise.all([
       head(db.from("leads")),
-      head(db.from("leads")).eq("status", "Assigned"),
+      safeAggregateRows("dashboard.assignments", db.from("lead_assignments").select("lead_id")),
       head(db.from("leads")).eq("is_duplicate", true),
       head(db.from("vendors")),
       head(db.from("vendors")).eq("status", "Approved"),
@@ -261,9 +255,11 @@ export async function getAdminDashboardStats(): Promise<Result<AdminDashboardSta
     const revenue = (paidPayments.data ?? []).reduce((s: number, r: { amount?: number }) => s + Number(r.amount ?? 0), 0);
     const credits = (creditRows.data ?? []).reduce((s: number, r: { remaining_credits?: number }) => s + Number(r.remaining_credits ?? 0), 0);
 
+    const assignedLeadCount = new Set(assignmentLeadRows.map((row) => row.lead_id).filter(Boolean)).size;
+
     return ok({
       total_leads: leads.count ?? 0,
-      assigned_leads: assigned.count ?? 0,
+      assigned_leads: assignedLeadCount,
       duplicate_leads: duplicates.count ?? 0,
       total_vendors: vendors.count ?? 0,
       approved_vendors: approved.count ?? 0,
@@ -342,7 +338,7 @@ export async function getSuperadminSnapshot(): Promise<Result<Record<string, unk
     ] = await Promise.all([
       // Leads: latest N only (primary embeds each lead's assignments; fallback
       // drops the embed). Accurate lead totals come from count queries below.
-      safeSelect("leads", db.from("leads").select("*, lead_assignments(id, vendor_id, vendor_status, assignment_type, assigned_at)").order("created_at", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT), db.from("leads").select("*").order("created_at", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT)),
+      safeSelect("leads", db.from("leads").select("*, lead_assignments(id, vendor_id, assignment_type, assigned_at)").order("created_at", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT), db.from("leads").select("*").order("created_at", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT)),
       safeSelect("vendors", db.from("vendors").select("*").order("created_at", { ascending: false }).limit(DEFAULT_ADMIN_ROW_LIMIT)),
       // packages / categories / cities / settings are small config tables — unlimited.
       safeSelect("packages", db.from("packages").select("*").order("lead_count", { ascending: true })),
@@ -458,7 +454,7 @@ export async function getAllLeads(): Promise<Result<unknown[]>> {
   try {
     const { data, error } = await adminClient()
       .from("leads")
-      .select("*, lead_assignments(id, vendor_id, vendor_status, assignment_type)")
+      .select("*, lead_assignments(id, vendor_id, assignment_type)")
       .order("created_at", { ascending: false });
     if (error) throw error;
     return ok(data ?? []);
@@ -467,7 +463,7 @@ export async function getAllLeads(): Promise<Result<unknown[]>> {
   }
 }
 
-/** Admin sets a lead's workflow status (New/Verified/Assigned/Contacted/Converted/Bad Lead…). */
+/** Legacy admin status writer retained for compatibility; active CRM uses the marketplace lead-generation lifecycle only. */
 export async function updateLeadStatus(leadId: string, status: string, actorUserId: string): Promise<Result<null>> {
   if (!actorUserId) return fail(appError("UNAUTHORIZED"));
   try {

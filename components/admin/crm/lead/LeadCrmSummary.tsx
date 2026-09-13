@@ -14,42 +14,34 @@ import { type QuickFilter, type Kpi } from "./leadCrmTypes";
  * would be fabricated.
  *
  * The strip is split into "Needs attention" (queues a human must act on) and
- * "Pipeline volume" (context), because a flat grid of eleven equal cards makes
+ * "Lead-generation volume" (context), because a flat grid of eleven equal cards makes
  * the actionable ones disappear.
  */
 
 /** Queues that represent work waiting on a human, in priority order. */
-const ATTENTION_KEYS = ["unassigned", "follow_ups", "hot"] as const;
+const ATTENTION_KEYS = ["clarification", "unassigned", "invalid_dup"] as const;
 
 const ICONS: Record<string, AdminIconName> = {
   total: "leads",
   new_today: "leads",
-  hot: "notifications",
+  quality_ready: "notifications",
+  clarification: "crm",
   unassigned: "distribution",
   assigned: "vendors",
   vendor_selected: "vendors",
-  follow_ups: "crm",
-  site_visit: "cities",
-  won: "reports",
-  lost: "reports",
-  spam_dup: "audit",
+  nurture: "crm",
+  invalid_dup: "audit",
 };
 
 export function Overview({
   kpis,
   onCard,
-  onGoFollowUps,
 }: {
   kpis: Kpi[];
   onCard: (f: QuickFilter) => void;
-  onGoFollowUps: () => void;
 }) {
   const handlerFor = (kpi: Kpi) =>
-    kpi.key === "total"
-      ? () => onCard("all")
-      : kpi.key === "follow_ups"
-        ? onGoFollowUps
-        : () => onCard(kpi.key as QuickFilter);
+    kpi.key === "total" ? () => onCard("all") : () => onCard(kpi.key as QuickFilter);
 
   const attention = ATTENTION_KEYS.map((key) => kpis.find((k) => k.key === key)).filter(
     (k): k is Kpi => Boolean(k),
@@ -79,7 +71,7 @@ export function Overview({
 
       <section aria-labelledby="crm-volume-heading">
         <h2 id="crm-volume-heading" className="mb-2 text-[13px] font-bold uppercase tracking-wide text-slate-500">
-          Pipeline volume
+          Lead-generation volume
         </h2>
         <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
           {volume.map((kpi) => (

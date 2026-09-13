@@ -34,7 +34,6 @@ import { emptySnapshot } from "../../adminTypes";
 import { PRIORITY_TONE, QUICK_FILTER_LABEL, type CrmRow, type QuickFilter } from "./leadCrmTypes";
 import {
   waNumber,
-  followUpDue,
   clarificationBadge,
   buildRows,
   cap,
@@ -46,7 +45,6 @@ export function LeadInbox({
   quickFilter,
   setQuickFilter,
   onSelect,
-  onUpdateStatus,
   onAssign,
   isPending,
   filterOptions,
@@ -55,7 +53,6 @@ export function LeadInbox({
   quickFilter: QuickFilter;
   setQuickFilter: (f: QuickFilter) => void;
   onSelect: (row: CrmRow) => void;
-  onUpdateStatus: (leadId: string, status: string) => void;
   onAssign: (row: CrmRow) => void;
   isPending: boolean;
   filterOptions: { cities: string[]; services: string[]; sources: string[] };
@@ -235,7 +232,7 @@ export function LeadInbox({
               </div>
             ),
           },
-          { header: "Stage", cell: (row) => <StatusBadge value={row.statusLabel} /> },
+          { header: "Lead state", cell: (row) => <StatusBadge value={row.statusLabel} /> },
           {
             header: "Clarification",
             cell: (row) => {
@@ -252,25 +249,13 @@ export function LeadInbox({
               />
             ),
           },
-          {
-            header: "Follow-up",
-            cell: (row) =>
-              row.followUp ? (
-                <StatusBadge
-                  value={followUpDue(row.followUp) ? `Due ${formatDate(row.followUp)}` : formatDate(row.followUp)}
-                  tone={followUpDue(row.followUp) ? "rose" : "slate"}
-                />
-              ) : (
-                <span className="text-slate-400">None</span>
-              ),
-          },
           { header: "Created", cell: (row) => <span className="whitespace-nowrap text-[11px] text-slate-500">{formatDate(row.createdAt)}</span> },
           {
             header: "Actions",
             className: "text-right",
             cell: (row) => (
               <div className="flex items-center justify-end gap-1">
-                {row.phoneDigits ? (
+                {row.phoneDigits && row.assignedCount === 0 ? (
                   <>
                     <a
                       href={`tel:${row.phoneDigits}`}
@@ -293,11 +278,7 @@ export function LeadInbox({
                 <ActionMenu
                   actions={[
                     { label: "View details", onClick: () => onSelect(row) },
-                    { label: "Mark contacted", onClick: () => onUpdateStatus(row.id, "Contacted") },
-                    { label: "Mark converted", onClick: () => onUpdateStatus(row.id, "Converted") },
-                    { label: "Mark lost", onClick: () => onUpdateStatus(row.id, "Lost") },
-                    { label: "Mark spam", onClick: () => onUpdateStatus(row.id, "Spam") },
-                    { label: "Assign vendor", onClick: () => onAssign(row) },
+                    ...(row.assignedCount === 0 ? [{ label: "Assign vendor", onClick: () => onAssign(row) }] : []),
                   ]}
                 />
               </div>
@@ -310,7 +291,7 @@ export function LeadInbox({
         page={page}
         pageSize={20}
         total={total}
-        noun="matching leads"
+        noun="leads"
         isPending={loading}
         onPageChange={setPage}
       />

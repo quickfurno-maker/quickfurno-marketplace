@@ -1,17 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { vendorRecordClientResponseFromForm } from "@/app/actions";
 import { VendorLeadReportForm } from "@/components/vendors/VendorLeadReportForm";
 import { VendorIcon } from "../icons";
-import { VendorLeadStatusControl } from "./VendorLeadStatusControl";
 import type { VendorLeadView } from "./leadsModel";
 
 /**
  * One lead in the inbox: a compact scannable row that expands in place.
  *
  * The collapsed row carries only what is needed to triage — who, what, where,
- * how much, how old, current status, one contact action. Everything else (the
- * enquiry message, project details, the status control, the issue report) lives
+ * how much, how old, and one contact action. Everything else (the
+ * enquiry message, project details, and lead-validity report) lives
  * in the expansion, so the list stays scannable and no row shows seven status
  * buttons or an open report form.
  *
@@ -36,6 +37,23 @@ export function VendorLeadCard({
   // charged assignment stays readable even after the package lapsed or the
   // wallet hit zero, so this can differ from one card to the next.
   const contactAllowed = lead.contactAllowed;
+  const [clockNow, setClockNow] = useState(() => Date.now());
+  const connectionExpiryMs = lead.connectionWindowExpiresAt
+    ? new Date(lead.connectionWindowExpiresAt).getTime()
+    : Number.NaN;
+  const connectionWindowOpen =
+    lead.connectionAssuranceSupported &&
+    lead.connectionOutcome === null &&
+    Number.isFinite(connectionExpiryMs) &&
+    clockNow <= connectionExpiryMs;
+
+  useEffect(() => {
+    if (!connectionWindowOpen) return;
+    const timer = window.setInterval(() => setClockNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, [connectionWindowOpen]);
+
+  const connectionTimeLabel = formatConnectionWindow(connectionExpiryMs, clockNow);
 
   return (
     <li className="qf-vendor-v2-leads-card" data-expanded={expanded ? "true" : undefined}>
@@ -43,9 +61,7 @@ export function VendorLeadCard({
         <div className="qf-vendor-v2-leads-card-body">
           <div className="qf-vendor-v2-leads-card-title" id={headerId}>
             <h3>{lead.name}</h3>
-            <span className="qf-vendor-v2-leads-status" data-status={lead.status}>
-              {lead.status}
-            </span>
+            <span className="qf-vendor-v2-leads-status">Delivered lead</span>
           </div>
 
           <p className="qf-vendor-v2-leads-card-service">{lead.service}</p>
@@ -103,6 +119,32 @@ export function VendorLeadCard({
         </div>
       </div>
 
+      <section className="qf-vendor-v2-connection-check" aria-label={`Client response check for ${lead.name}`}>
+        <div className="qf-vendor-v2-connection-copy">
+          <strong>Did the client respond?</strong>
+          {lead.connectionOutcome === "responded" ? (
+            <span>Recorded: Client responded. No QuickFurno connection reminders will run.</span>
+          ) : lead.connectionOutcome === "no_response" ? (
+            <span>Recorded: No response. QuickFurno is handling the bounded client connection-assistance sequence.</span>
+          ) : !lead.connectionAssuranceSupported ? (
+            <span>Connection check is not active on this environment yet.</span>
+          ) : connectionWindowOpen ? (
+            <span>Available only during the first 24 hours after lead delivery - {connectionTimeLabel}</span>
+          ) : (
+            <span>24-hour response window closed. This option is now read-only.</span>
+          )}
+        </div>
+        <form action={vendorRecordClientResponseFromForm} className="qf-vendor-v2-connection-actions">
+          <input type="hidden" name="assignmentId" value={lead.id} />
+          <button type="submit" name="outcome" value="responded" disabled={!connectionWindowOpen}>
+            Yes, responded
+          </button>
+          <button type="submit" name="outcome" value="no_response" disabled={!connectionWindowOpen}>
+            No response
+          </button>
+        </form>
+      </section>
+
       {expanded ? (
         <div className="qf-vendor-v2-leads-detail" id={panelId} role="region" aria-labelledby={headerId}>
           <section className="qf-vendor-v2-leads-detail-block">
@@ -154,13 +196,9 @@ export function VendorLeadCard({
 
           {contactAllowed ? (
             <>
-              <section className="qf-vendor-v2-leads-detail-block">
-                <h4>Status</h4>
-                <VendorLeadStatusControl assignmentId={lead.id} currentStatus={lead.status} />
-              </section>
 
               <section className="qf-vendor-v2-leads-detail-block">
-                <h4>Lead issue</h4>
+                <h4>Lead validity issue</h4>
                 {lead.isReported ? (
                   <p className="qf-vendor-v2-leads-note">
                     Reported — under review. An admin will look at this report. Lead credit is not
@@ -169,8 +207,7 @@ export function VendorLeadCard({
                 ) : (
                   <>
                     <p className="qf-vendor-v2-leads-note">
-                      Something wrong with this lead? QuickFurno will review the issue. Lead credit
-                      is not refunded automatically.
+                      Report only genuine lead-validity problems such as an invalid number, duplicate, or materially incorrect lead details. QuickFurno does not review quotation, site visit, negotiation, or sale outcomes. Lead credit is not refunded automatically.
                     </p>
                     {/* Unchanged component, unchanged action. Only the surrounding
                         chrome is restyled, via the scoped wrapper class. */}
@@ -183,9 +220,9 @@ export function VendorLeadCard({
             </>
           ) : (
             <section className="qf-vendor-v2-leads-detail-block">
-              <h4>Status</h4>
+              <h4>Lead support</h4>
               <p className="qf-vendor-v2-leads-note">
-                Status updates and issue reports are unavailable for this assignment.
+                Lead-validity reporting is unavailable for this assignment. Contact QuickFurno support if you believe this lead was charged incorrectly.
               </p>
               <Link
                 href="/vendor/dashboard/support"
@@ -199,4 +236,16 @@ export function VendorLeadCard({
       ) : null}
     </li>
   );
+}
+
+function formatConnectionWindow(expiryMs: number, nowMs: number): string {
+  if (!Number.isFinite(expiryMs)) return "Window unavailable";
+  const remainingMs = Math.max(0, expiryMs - nowMs);
+  if (remainingMs === 0) return "Window closed";
+  const totalMinutes = Math.ceil(remainingMs / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m remaining`;
+  if (hours > 0) return `${hours}h remaining`;
+  return `${minutes}m remaining`;
 }

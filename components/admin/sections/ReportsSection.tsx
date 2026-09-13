@@ -19,7 +19,7 @@ import {
 } from "../adminUtils";
 
 export function ReportsPage({ leadSample }: { leadSample: Array<Pick<LeadSampleRow, "id" | "status" | "city" | "source" | "service_required" | "category">> }) {
-  const reports = ["Daily leads", "Weekly leads", "Monthly leads", "Leads by category", "Leads by city", "Leads by source", "Vendor-wise usage", "Revenue by package", "Low balance vendors", "Duplicate/spam leads", "Lost lead reasons"];
+  const reports = ["Daily leads", "Weekly leads", "Monthly leads", "Leads by category", "Leads by city", "Leads by source", "Vendor-wise usage", "Revenue by package", "Low balance vendors", "Duplicate/spam leads", "Lead issue reasons"];
   return (
     <div className="space-y-5">
       <NoteBar>

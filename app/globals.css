@@ -5461,13 +5461,12 @@ h1, h2 {
   border-bottom-left-radius: 8px;
 }
 .admin-surface .qfa-pipe--new { --seg-strong: rgba(45, 124, 255, 0.28); --seg-soft: rgba(45, 124, 255, 0.07); --seg-text: #6aa5ff; }
-.admin-surface .qfa-pipe--contacted { --seg-strong: rgba(0, 216, 255, 0.24); --seg-soft: rgba(0, 216, 255, 0.06); --seg-text: #4fe0ff; }
-.admin-surface .qfa-pipe--assigned { --seg-strong: rgba(255, 159, 28, 0.26); --seg-soft: rgba(255, 159, 28, 0.06); --seg-text: #ffb454; }
-.admin-surface .qfa-pipe--site_visit { --seg-strong: rgba(124, 77, 255, 0.28); --seg-soft: rgba(124, 77, 255, 0.07); --seg-text: #a98aff; }
-.admin-surface .qfa-pipe--quotation { --seg-strong: rgba(142, 162, 255, 0.26); --seg-soft: rgba(142, 162, 255, 0.06); --seg-text: #8ea2ff; }
-.admin-surface .qfa-pipe--won { --seg-strong: rgba(19, 216, 154, 0.28); --seg-soft: rgba(19, 216, 154, 0.07); --seg-text: #35e6ae; }
-.admin-surface .qfa-pipe--lost { --seg-strong: rgba(255, 77, 103, 0.26); --seg-soft: rgba(255, 77, 103, 0.06); --seg-text: #ff7a8d; }
-.admin-surface .qfa-pipe--spam { --seg-strong: rgba(136, 168, 214, 0.18); --seg-soft: rgba(136, 168, 214, 0.05); --seg-text: #a5b4c8; }
+.admin-surface .qfa-pipe--clarification { --seg-strong: rgba(255, 159, 28, 0.26); --seg-soft: rgba(255, 159, 28, 0.06); --seg-text: #ffb454; }
+.admin-surface .qfa-pipe--quality_ready { --seg-strong: rgba(0, 216, 255, 0.24); --seg-soft: rgba(0, 216, 255, 0.06); --seg-text: #4fe0ff; }
+.admin-surface .qfa-pipe--assigned { --seg-strong: rgba(19, 216, 154, 0.28); --seg-soft: rgba(19, 216, 154, 0.07); --seg-text: #35e6ae; }
+.admin-surface .qfa-pipe--nurture { --seg-strong: rgba(124, 77, 255, 0.28); --seg-soft: rgba(124, 77, 255, 0.07); --seg-text: #a98aff; }
+.admin-surface .qfa-pipe--invalid { --seg-strong: rgba(255, 77, 103, 0.26); --seg-soft: rgba(255, 77, 103, 0.06); --seg-text: #ff7a8d; }
+.admin-surface .qfa-pipe--duplicate { --seg-strong: rgba(136, 168, 214, 0.18); --seg-soft: rgba(136, 168, 214, 0.05); --seg-text: #a5b4c8; }
 .admin-surface .qfa-pipe-label { color: var(--seg-text, var(--qfa-muted)); }
 
 /* --- Founder action queue ------------------------------------ */

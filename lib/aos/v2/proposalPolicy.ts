@@ -5,7 +5,6 @@ import {
 
 export const CERTIFIED_AOS_PROPOSAL_ACTIONS: ReadonlySet<AutomationActionType> =
   new Set<AutomationActionType>([
-    "client.transactional_followup",
     "vendor.onboarding_reminder",
     "vendor.package_expiry_warning",
     "vendor.low_credit_warning",

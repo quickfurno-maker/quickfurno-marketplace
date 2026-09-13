@@ -171,7 +171,7 @@ const EXPECTED_TEMPLATE = {
   "client.missing_information_reminder": "clarification_reminder",
   "client.matching_update": "client_matching_update",
   "client.lead_status_update": "client_lead_status_update",
-  "client.transactional_followup": "client_transactional_followup",
+  "client.transactional_followup": "client_vendor_connection_reminder",
 };
 const manifestEntries = [];
 (function walk(node) {
@@ -267,15 +267,15 @@ const reqOk = CLIENT_ACTION_VARIABLE_BUILDERS["client.requirement_collection"](
 const remOk = CLIENT_ACTION_VARIABLE_BUILDERS["client.missing_information_reminder"](
   { clientName: "Asha", outstandingItem: "preferred budget range" });
 const folOk = CLIENT_ACTION_VARIABLE_BUILDERS["client.transactional_followup"](
-  { clientName: "Asha", leadReference: "QF-LEAD-1001" });
+  { clientName: "Asha", vendorName: "Vendor X", vendorPhone: "+919876543210" });
 const keysOf = (r) => (r.ok ? Object.keys(r.variables).sort().join(",") : `FAIL:${r.reason}`);
 
 record("B07 requirement_collection emits exactly client_name + outstanding_item",
   keysOf(reqOk) === "client_name,outstanding_item");
 record("B08 missing_information_reminder emits exactly client_name + outstanding_item",
   keysOf(remOk) === "client_name,outstanding_item");
-record("B09 transactional_followup emits exactly client_name + lead_reference",
-  keysOf(folOk) === "client_name,lead_reference");
+record("B09 connection followup emits exactly client_name + vendor_name + vendor_phone",
+  keysOf(folOk) === "client_name,vendor_name,vendor_phone");
 record("B10 emitted values are the trimmed inputs",
   reqOk.ok && reqOk.variables.client_name === "Asha" &&
   reqOk.variables.outstanding_item === "preferred budget range");
@@ -302,18 +302,18 @@ record("B16 control characters fail closed",
       { clientName: `As${c}ha`, outstandingItem: "x" }).ok === false));
 record("B17 extra input fields never leak into the emitted set",
   keysOf(CLIENT_ACTION_VARIABLE_BUILDERS["client.transactional_followup"]({
-    clientName: "Asha", leadReference: "QF-LEAD-1001",
+    clientName: "Asha", vendorName: "Vendor X", vendorPhone: "+919876543210",
     destination: "SYNTHETIC_DESTINATION", templateKey: "other", providerAccountId: "x",
-  })) === "client_name,lead_reference");
+  })) === "client_name,vendor_name,vendor_phone");
 record("B18 declared draft source keys match the emitted sets",
   CLIENT_DRAFT_TEMPLATE_SOURCE_KEYS.clarification_request.join(",") === "client_name,outstanding_item" &&
   CLIENT_DRAFT_TEMPLATE_SOURCE_KEYS.clarification_reminder.join(",") === "client_name,outstanding_item" &&
-  CLIENT_DRAFT_TEMPLATE_SOURCE_KEYS.client_transactional_followup.join(",") === "client_name,lead_reference");
+  CLIENT_DRAFT_TEMPLATE_SOURCE_KEYS.client_vendor_connection_reminder.join(",") === "client_name,vendor_name,vendor_phone");
 record("B19 draft contract map is frozen and holds exactly three entries",
   Object.isFrozen(CLIENT_DRAFT_TEMPLATE_SOURCE_KEYS) &&
   Object.keys(CLIENT_DRAFT_TEMPLATE_SOURCE_KEYS).length === 3);
 record("B20 variable module accepts no destination/template/provider override",
-  !/destination|providerAccount|provider_account|templateOverride|phone/i.test(variablesCode));
+  !/destination|providerAccount|provider_account|templateOverride/i.test(variablesCode));
 
 // ---------------------------------------------------------------------------
 // C. QF-MVP-40.12 SEPARATION

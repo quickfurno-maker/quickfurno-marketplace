@@ -347,7 +347,7 @@ export interface OpsBriefReport {
   assigned: number;
   unassigned: number;
   nurture: number;
-  follow_ups_due: number;
+  clarification_required: number;
   top_service: string;
   top_area: string;
   agent_health: Array<{ agent: string; status: string }>;
@@ -364,7 +364,7 @@ export function runOpsBrief(leads: CRMLead[], vendorCount = 0): OpsBriefReport {
     agent_status: mode === "disabled" ? "Disabled" : "Active (read-only report)",
     total_leads: 0,
     hot: 0, warm: 0, cold: 0, weak: 0,
-    assigned: 0, unassigned: 0, nurture: 0, follow_ups_due: 0,
+    assigned: 0, unassigned: 0, nurture: 0, clarification_required: 0,
     top_service: "Not enough data",
     top_area: "Not enough data",
     agent_health: [],
@@ -379,20 +379,16 @@ export function runOpsBrief(leads: CRMLead[], vendorCount = 0): OpsBriefReport {
     const quality = { hot: 0, warm: 0, cold: 0, weak: 0 };
     let assigned = 0;
     let nurture = 0;
-    let followUpsDue = 0;
+    let clarificationRequired = 0;
     const serviceCounts = new Map<string, number>();
     const areaCounts = new Map<string, number>();
-    const now = Date.now();
 
     leads.forEach((lead) => {
       const lens = runLeadLens(lead);
       quality[lens.lead_quality] += 1;
       if ((lead.assigned_vendor_count ?? 0) > 0 || lead.status === "assigned") assigned += 1;
       if (lead.status === "nurture_later") nurture += 1;
-      if (lead.next_follow_up_date) {
-        const due = new Date(lead.next_follow_up_date).getTime();
-        if (!Number.isNaN(due) && due <= now) followUpsDue += 1;
-      }
+      if (lead.status === "clarification_required") clarificationRequired += 1;
       const svc = String(lead.service ?? "").trim();
       if (svc && svc !== "Not set") serviceCounts.set(svc, (serviceCounts.get(svc) ?? 0) + 1);
       const area = String(lead.area ?? "").trim();
@@ -410,8 +406,8 @@ export function runOpsBrief(leads: CRMLead[], vendorCount = 0): OpsBriefReport {
     ];
 
     const recommended_actions: string[] = [];
-    if (quality.hot > 0) recommended_actions.push(`Prioritize ${quality.hot} hot lead(s) for fast follow-up.`);
-    if (followUpsDue > 0) recommended_actions.push(`${followUpsDue} follow-up(s) are due — review the CRM calendar.`);
+    if (quality.hot > 0) recommended_actions.push(`Prioritize ${quality.hot} Core-qualified high-intent lead(s) for matching.`);
+    if (clarificationRequired > 0) recommended_actions.push(`${clarificationRequired} lead(s) require quality clarification before matching.`);
     if (leads.length - assigned > 0) recommended_actions.push(`${leads.length - assigned} unassigned lead(s) await manual vendor review (no auto-assignment).`);
     if (!recommended_actions.length) recommended_actions.push("No urgent actions detected from rule-based review.");
 
@@ -419,7 +415,7 @@ export function runOpsBrief(leads: CRMLead[], vendorCount = 0): OpsBriefReport {
       ...base,
       total_leads: leads.length,
       hot: quality.hot, warm: quality.warm, cold: quality.cold, weak: quality.weak,
-      assigned, unassigned: leads.length - assigned, nurture, follow_ups_due: followUpsDue,
+      assigned, unassigned: leads.length - assigned, nurture, clarification_required: clarificationRequired,
       top_service: topOf(serviceCounts),
       top_area: topOf(areaCounts),
       agent_health: agent_health.map((a) => ({ agent: a.agent, status: String(a.status) })),

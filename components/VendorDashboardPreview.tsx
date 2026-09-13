@@ -2,8 +2,6 @@ const dashboardStats = [
   ["Total leads", "86"],
   ["Remaining leads", "14"],
   ["New leads", "8"],
-  ["Contacted", "42"],
-  ["Converted", "11"],
   ["Rating", "4.8"],
 ];
 

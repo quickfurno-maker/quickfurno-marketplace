@@ -103,9 +103,10 @@ There is no transition out of `authorized` or `rejected`.
 
 The database repeats the 50.1A source/action scope:
 
-- all six sources can request client communication actions;
-- only Jarvis (plus Core/admin/system) can request the three selected vendor reminder classes;
-- AI sources cannot request vendor lead offers, package/credit warnings, or campaign execution.
+- The historical six-source vocabulary remains readable as provenance for existing rows.
+- Under the final scope lock (`20260912050000_qf_lead_generation_scope_lock.sql`), only Core/admin/system may originate new automation requests.
+- Jarvis/Riya/Anisha do not create automation requests; they converse only after a Core-authorized handoff.
+- `vendor.response_reminder` is retired and cannot be newly requested. `client.transactional_followup` is retained only as the Core-owned transport action for the bounded assignment-specific connection-assurance sequence (`conn_<assignment>_r1..r5`); historical/generic sales follow-up remains ineligible at execution time.
 
 Authorization/rejection can be recorded only with a `core_service` or `admin_user` decision actor.
 
@@ -298,29 +299,22 @@ Before request persistence it again verifies:
 - registered action type;
 - source/action requestability.
 
-## 13. Jarvis provision retained
+## 13. Jarvis conversation boundary after the final scope lock
 
-Nothing in 50.1B directly connects Jarvis.
+The original 50.1B migration keeps the six-source provenance vocabulary so historical rows remain auditable. The final QuickFurno operating rule is enforced forward-only by `20260912050000_qf_lead_generation_scope_lock.sql`.
 
-Future QF-MVP-60 can submit a request through Core with:
+For all new automation requests:
 
-```text
-source = jarvis | riya | anisha
-requested_by_type = jarvis_agent
-```
+- only `core`, `admin`, or `system` may originate the request;
+- Jarvis/Riya/Anisha do not create automation requests;
+- standard clarification conditions are triggered by Core;
+- AOS may recommend a non-standard conversation, but Core authorizes it;
+- Jarvis/Riya converse only after a Core-authorized handoff;
+- n8n executes only the authorized handoff;
+- structured conversation results return to Core;
+- `vendor.response_reminder` is retired. `client.transactional_followup` is restricted to the five-message connection-assurance sequence and is not a quotation/site-visit/conversion follow-up.
 
-That request is persisted as provenance, then separately accepted/rejected by Core.
-
-Jarvis does not:
-
-- create jobs;
-- claim jobs;
-- complete attempts;
-- write the database;
-- call n8n;
-- call Meta.
-
-That separation means QuickFurno continues to operate when Jarvis is offline.
+Jarvis does not create jobs, call n8n directly, call Meta directly, mutate canonical lead state, or decide business authorization. This separation keeps QuickFurno operational when Jarvis is offline.
 
 ## 14. Environment application order
 

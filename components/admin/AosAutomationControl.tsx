@@ -33,6 +33,10 @@ interface AosV2Status {
     legacyPreviewRouterRetired: true;
     oldWorkflowKernelInstalledByAosV2: false;
     actionProposalsEnabled: boolean;
+    coreIntegrationHub: true;
+    jarvisIntegration: "future_via_quickfurno_core";
+    leadGenerationResponsibilityEndsAt: "quality_lead_successfully_delivered_to_assigned_vendor";
+    postDeliveryCommercialManagement: false;
   };
   agents: Array<{
     slug: string;
@@ -157,6 +161,10 @@ export function AosAutomationControl({
 
         <div className="mt-5 grid gap-3 md:grid-cols-2">
           <ArchitectureRow label="QuickFurno Core business authority" good={status.architecture.coreAuthority} />
+          <ArchitectureRow label="QuickFurno Core integration hub" good={status.architecture.coreIntegrationHub} />
+          <ArchitectureRow label="Jarvis customer care" good={status.architecture.jarvisIntegration === "future_via_quickfurno_core"} value="Via Core only - future integration" />
+          <ArchitectureRow label="QuickFurno lead responsibility" good={status.architecture.leadGenerationResponsibilityEndsAt === "quality_lead_successfully_delivered_to_assigned_vendor"} value="Ends at verified vendor delivery" />
+          <ArchitectureRow label="Quotation / site visit / negotiation / project" good={!status.architecture.postDeliveryCommercialManagement} value="Vendor + client owned" />
           <ArchitectureRow label="Direct AOS → n8n" good={!status.architecture.directN8nFromAos} value="Retired / impossible" />
           <ArchitectureRow label="Legacy preview router" good={status.architecture.legacyPreviewRouterRetired} value="Retired" />
           <ArchitectureRow label="Old AOS workflow kernel" good={!status.architecture.oldWorkflowKernelInstalledByAosV2} value="Not installed" />

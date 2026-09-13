@@ -27,12 +27,15 @@ const MIG =
 const TYPES = "lib/automation/persistenceTypes.ts";
 const SERVICE = "services/automationPersistenceService.ts";
 const DOC = "docs/QF-MVP-50-1B-DURABLE-AUTOMATION-PERSISTENCE.md";
+const SCOPE_LOCK = "supabase/migrations/20260912050000_qf_lead_generation_scope_lock.sql";
 
 const read = (p) => readFileSync(path.join(ROOT, p), "utf8");
 const sql = read(MIG);
 const types = read(TYPES);
 const service = read(SERVICE);
 const doc = read(DOC);
+const scopeLockSql = read(SCOPE_LOCK);
+const finalRequestScope = scopeLockSql.match(/add constraint automation_action_requests_source_action_scope_check[\s\S]*?check\s*\(([\s\S]*?)\)\s*not valid;/i)?.[1] ?? "";
 
 const results = [];
 const record = (name, ok, detail = "") =>
@@ -126,21 +129,28 @@ record(
   ),
 );
 record(
-  "10 client AI requestability remains enabled",
-  ["jarvis", "riya", "anisha"].every((source) =>
-    canSourceRequestAction(source, "client.transactional_followup"),
-  ) &&
-    /client\.transactional_followup[\s\S]{0,800}source in \('core', 'admin', 'system', 'jarvis', 'riya', 'anisha'\)/.test(
-      sql,
-    ),
+  "10 final successor removes Jarvis/Riya/Anisha trigger authority",
+  Boolean(finalRequestScope) &&
+    ["jarvis", "riya", "anisha"].every((source) =>
+      AUTOMATION_ACTION_TYPES.every((action) => !canSourceRequestAction(source, action)),
+    ) &&
+    !/jarvis|riya|anisha/i.test(finalRequestScope) &&
+    /source in \('core', 'admin', 'system'\)/.test(finalRequestScope),
 );
 record(
-  "11 Jarvis-only vendor reminder provision is preserved",
-  canSourceRequestAction("jarvis", "vendor.response_reminder") &&
-    !canSourceRequestAction("riya", "vendor.response_reminder") &&
-    /vendor\.response_reminder[\s\S]{0,500}source in \('core', 'admin', 'system', 'jarvis'\)/.test(
-      sql,
-    ),
+  "11 final successor narrows post-delivery requestability to bounded Core connection assurance",
+  Boolean(finalRequestScope) &&
+    ["core", "admin", "system"].every((source) =>
+      canSourceRequestAction(source, "client.transactional_followup"),
+    ) &&
+    ["jarvis", "riya", "anisha"].every((source) =>
+      !canSourceRequestAction(source, "client.transactional_followup"),
+    ) &&
+    AUTOMATION_REQUEST_SOURCES.every((source) =>
+      !canSourceRequestAction(source, "vendor.response_reminder"),
+    ) &&
+    /client\.transactional_followup/.test(finalRequestScope) &&
+    !/vendor\.response_reminder/.test(finalRequestScope),
 );
 record(
   "12 AI cannot request campaign execution in DB constraint",
@@ -628,11 +638,12 @@ record(
 // 12. Documentation/non-action lock
 // ---------------------------------------------------------------------------
 record(
-  "83 documentation explicitly keeps Jarvis request-only",
-  doc.includes("Jarvis does not:") &&
-    doc.includes("create jobs") &&
-    doc.includes("call n8n") &&
-    doc.includes("call Meta"),
+  "83 documentation locks Jarvis conversation-only via Core",
+  doc.includes("Jarvis/Riya/Anisha do not create automation requests") &&
+    doc.includes("Core-authorized handoff") &&
+    doc.includes("structured conversation results return to Core") &&
+    doc.includes("client.transactional_followup") &&
+    doc.includes("vendor.response_reminder"),
 );
 record(
   "84 documentation preserves old preview/workflow non-activation boundary",

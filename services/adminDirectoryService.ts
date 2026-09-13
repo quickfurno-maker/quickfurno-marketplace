@@ -30,7 +30,7 @@ type Row = Record<string, any>;
 const head = (q: any) => q.select("id", { count: "exact", head: true });
 
 /** Statuses that close a lead — a closed lead is never "unassigned work". */
-const CLOSED_LEAD_STATUSES = ["Converted", "Won", "Lost", "Duplicate", "Spam", "Invalid"];
+const CLOSED_LEAD_STATUSES = ["Duplicate", "Spam", "Invalid", "Rejected Quality", "Bad Lead", "Nurture"];
 const NOT_CLOSED_OR = `status.is.null,status.not.in.(${CLOSED_LEAD_STATUSES.join(",")})`;
 
 /** Lead directory rows embed their assignments (needed by every consumer:
@@ -38,7 +38,7 @@ const NOT_CLOSED_OR = `status.is.null,status.not.in.(${CLOSED_LEAD_STATUSES.join
  *  row keeps select("*"): the drawer renders ~20 lead fields and the table is
  *  bounded to 20 rows, so a narrow projection would save little and risk
  *  silently dropping drawer fields. */
-const LEAD_ROW_SELECT = "*, lead_assignments(id, vendor_id, vendor_status, assignment_type, assigned_at)";
+const LEAD_ROW_SELECT = "*, lead_assignments(id, vendor_id, assignment_type, assigned_at)";
 
 /** Thin projection used ONLY for bounded aggregate samples (pipeline,
  *  distribution donuts, hot/unassigned sample KPIs). */
@@ -161,7 +161,7 @@ function applyLeadFilters(q: any, query: AdminLeadsQuery) {
 /** Server-side mirror of the UI's isHotLead() heuristic, expressed over the
  *  authoritative stored fields only. */
 const HOT_LEAD_OR =
-  "lead_priority.ilike.*hot*,lead_priority.ilike.*high*,lead_quality_score.gte.70,status.ilike.*interested*,status.ilike.*quotation*";
+  "lead_priority.ilike.*hot*,lead_priority.ilike.*high*,lead_quality_score.gte.70,status.eq.Hot Lead";
 
 /** Count of open leads with zero vendor assignments, evaluated in the
  *  database via a left-join null filter. Returns null (not 0) when the
@@ -324,8 +324,11 @@ function applyCrmInboxFilters(q: any, query: CrmInboxQuery) {
       q = q.gte("created_at", today.toISOString());
       break;
     }
-    case "hot":
+    case "quality_ready":
       q = q.in("lead_quality_class", ["A+", "A"]);
+      break;
+    case "clarification":
+      q = q.or("clarification_required.eq.true,status.ilike.*clarification*");
       break;
     case "unassigned":
       q = q.is("lead_assignments", null).or(NOT_CLOSED_OR).or("is_duplicate.is.null,is_duplicate.eq.false");
@@ -336,18 +339,12 @@ function applyCrmInboxFilters(q: any, query: CrmInboxQuery) {
     case "vendor_selected":
       q = q.eq("lead_intent", "preferred_vendor");
       break;
-    case "site_visit":
-      q = q.ilike("status", "*site*");
+    case "nurture":
+      q = q.ilike("status", "*nurture*");
       break;
-    case "won":
-      q = q.or("status.ilike.*won*,status.ilike.*convert*");
-      break;
-    case "lost":
-      q = q.ilike("status", "*lost*");
-      break;
-    case "spam_dup":
+    case "invalid_dup":
       q = q.or(
-        "is_duplicate.eq.true,lead_quality_class.eq.D,status.ilike.*spam*,status.ilike.*bad*,status.ilike.*invalid*,status.ilike.*junk*,status.ilike.*duplicate*",
+        "is_duplicate.eq.true,lead_quality_class.eq.D,status.ilike.*spam*,status.ilike.*bad*,status.ilike.*invalid*,status.ilike.*junk*,status.ilike.*duplicate*,status.ilike.*rejected quality*",
       );
       break;
     default:
@@ -358,7 +355,7 @@ function applyCrmInboxFilters(q: any, query: CrmInboxQuery) {
 
 /** CRM Inbox needs a left-joined embed so unassigned/assigned quick filters
  *  can be evaluated in the database. */
-const CRM_ROW_SELECT = "*, lead_assignments!left(id, vendor_id, vendor_status, assignment_type, assigned_at)";
+const CRM_ROW_SELECT = "*, lead_assignments!left(id, vendor_id, assignment_type, assigned_at)";
 
 export async function getCrmInboxPage(query: CrmInboxQuery): Promise<Result<Row>> {
   try {

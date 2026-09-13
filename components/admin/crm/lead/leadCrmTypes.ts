@@ -24,13 +24,11 @@ export type CRMDashboardProps = {
 export type CrmPriority = "hot" | "warm" | "cold" | "weak" | "spam" | "duplicate";
 export type CrmStatusBucket =
   | "new"
-  | "contacted"
+  | "clarification"
+  | "quality_ready"
   | "assigned"
-  | "site_visit"
-  | "quotation"
-  | "won"
-  | "lost"
-  | "spam"
+  | "nurture"
+  | "invalid"
   | "duplicate";
 
 export type PreferredBadge =
@@ -64,17 +62,15 @@ export type CrmRow = {
   bucket: CrmStatusBucket;
   statusLabel: string;
   createdAt: string | null;
-  followUp: string | null;
   signals: LeadScoringSignals;
 };
 
 export const TABS = [
   "Overview",
   "Lead Inbox",
-  "Pipeline Board",
-  "Follow-ups",
+  "Lead Flow",
   "Assignment Queue",
-  "Vendor Activity",
+  "Delivery Evidence",
   "Source Analytics",
   "Nurture",
 ];
@@ -82,24 +78,22 @@ export const TABS = [
 export type QuickFilter =
   | "all"
   | "new_today"
-  | "hot"
+  | "quality_ready"
+  | "clarification"
   | "unassigned"
   | "assigned"
   | "vendor_selected"
-  | "site_visit"
-  | "won"
-  | "lost"
-  | "spam_dup";
+  | "nurture"
+  | "invalid_dup";
 
 export const PIPELINE_COLUMNS: Array<{ bucket: CrmStatusBucket; label: string }> = [
   { bucket: "new", label: "New" },
-  { bucket: "contacted", label: "Contacted" },
-  { bucket: "assigned", label: "Assigned" },
-  { bucket: "site_visit", label: "Site Visit" },
-  { bucket: "quotation", label: "Quotation" },
-  { bucket: "won", label: "Won" },
-  { bucket: "lost", label: "Lost" },
-  { bucket: "spam", label: "Spam / Duplicate" },
+  { bucket: "clarification", label: "Needs clarification" },
+  { bucket: "quality_ready", label: "Quality ready" },
+  { bucket: "assigned", label: "Assigned / delivery" },
+  { bucket: "nurture", label: "Nurture" },
+  { bucket: "invalid", label: "Invalid / low quality" },
+  { bucket: "duplicate", label: "Duplicate" },
 ];
 
 export const PRIORITY_TONE: Record<CrmPriority, BadgeTone> = {
@@ -115,19 +109,18 @@ export const PRIORITY_TONE: Record<CrmPriority, BadgeTone> = {
 // Pure helpers
 // ---------------------------------------------------------------------------
 
-export type Kpi = { key: QuickFilter | "follow_ups" | "total"; label: string; value: number; helper: string; tone: Tone };
+export type Kpi = { key: QuickFilter | "total"; label: string; value: number; helper: string; tone: Tone };
 
 export const QUICK_FILTER_LABEL: Record<QuickFilter, string> = {
   all: "All leads",
   new_today: "New today",
-  hot: "Hot leads",
+  quality_ready: "Quality ready",
+  clarification: "Needs clarification",
   unassigned: "Unassigned",
   assigned: "Assigned",
   vendor_selected: "Vendor-selected",
-  site_visit: "Site visits",
-  won: "Won",
-  lost: "Lost",
-  spam_dup: "Spam / duplicate",
+  nurture: "Nurture",
+  invalid_dup: "Invalid / duplicate",
 };
 
 

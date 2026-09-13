@@ -5,6 +5,10 @@ import {
   AOS_V2_AGENT_COUNT,
 } from "@/lib/aos/v2/agentCapabilities";
 import { getAosV2RuntimeState } from "@/lib/aos/v2/runtime";
+import {
+  QUICKFURNO_LEAD_GENERATION_BOUNDARY,
+  QUICKFURNO_PLATFORM_BOUNDARY,
+} from "@/lib/aos/v2/architectureBoundary";
 
 export interface AosV2AdminSnapshot {
   runtime: Awaited<ReturnType<typeof getAosV2RuntimeState>>;
@@ -27,6 +31,10 @@ export interface AosV2AdminSnapshot {
     legacyPreviewRouterRetired: true;
     oldWorkflowKernelInstalledByAosV2: false;
     actionProposalsEnabled: boolean;
+    coreIntegrationHub: true;
+    jarvisIntegration: "future_via_quickfurno_core";
+    leadGenerationResponsibilityEndsAt: "delivery_plus_bounded_connection_assurance";
+    postDeliveryCommercialManagement: false;
   };
 }
 
@@ -106,6 +114,10 @@ function architecture(actionProposalsEnabled: boolean) {
     legacyPreviewRouterRetired: true as const,
     oldWorkflowKernelInstalledByAosV2: false as const,
     actionProposalsEnabled,
+    coreIntegrationHub: QUICKFURNO_PLATFORM_BOUNDARY.core.integrationHub,
+    jarvisIntegration: QUICKFURNO_PLATFORM_BOUNDARY.jarvis.integration,
+    leadGenerationResponsibilityEndsAt: QUICKFURNO_LEAD_GENERATION_BOUNDARY.responsibilityEndsAt,
+    postDeliveryCommercialManagement: QUICKFURNO_LEAD_GENERATION_BOUNDARY.postDeliveryCommercialManagement,
   };
 }
 

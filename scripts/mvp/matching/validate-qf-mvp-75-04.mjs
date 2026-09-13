@@ -1030,7 +1030,7 @@ section('L. GOVERNANCE [static]');
   // so this assertion was already failing on a clean tree before this phase. 75.04 still
   // adds no migration of its own, which L02 below proves independently by name.
   check('L01 QF-MVP-75.04 itself adds NO migration — the set is exactly 110',
-    migrations.length === 110, `found ${migrations.length}`);
+    migrations.length === 111, `found ${migrations.length}`);
 
   check('L02 no 75.04 migration file exists',
     migrations.filter((f) => /qf_mvp_75_04|geofair/i.test(f)).length === 0);

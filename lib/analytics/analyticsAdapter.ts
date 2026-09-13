@@ -41,15 +41,15 @@ const sourceCategories = [
 
 const serviceCategories = ["interiors", "carpentry", "modular kitchen", "sofa", "painting", "civil work"] as const;
 
-const funnelStages: Array<{ key: string; status: CRMLeadStatus | "contacted"; label: string }> = [
+const funnelStages: Array<{ key: string; status: CRMLeadStatus; label: string }> = [
   { key: "new", status: "new", label: "new" },
-  { key: "qualified", status: "qualified", label: "qualified" },
-  { key: "assigned", status: "assigned", label: "assigned" },
-  { key: "contacted", status: "contacted", label: "contacted" },
-  { key: "site_visit_scheduled", status: "site_visit_scheduled", label: "site_visit_scheduled" },
-  { key: "quotation_sent", status: "quotation_sent", label: "quotation_sent" },
-  { key: "won", status: "won", label: "won" },
-  { key: "lost", status: "lost", label: "lost" },
+  { key: "clarification_required", status: "clarification_required", label: "clarification required" },
+  { key: "qualified", status: "qualified", label: "quality ready" },
+  { key: "vendor_matching", status: "vendor_matching", label: "vendor matching" },
+  { key: "assigned", status: "assigned", label: "assigned / delivered" },
+  { key: "nurture_later", status: "nurture_later", label: "nurture" },
+  { key: "invalid", status: "invalid", label: "invalid" },
+  { key: "duplicate", status: "duplicate", label: "duplicate" },
 ];
 
 function statNumber(data: Snapshot, key: string, fallback: number) {
@@ -91,8 +91,7 @@ function isAssigned(lead: CRMLead) {
   return (lead.assigned_vendor_count ?? 0) > 0 || lead.status === "assigned";
 }
 
-function countStatus(leads: CRMLead[], stage: CRMLeadStatus | "contacted") {
-  if (stage === "contacted") return leads.filter((lead) => lead.status === "client_contacted" || lead.status === "vendor_contact_pending").length;
+function countStatus(leads: CRMLead[], stage: CRMLeadStatus) {
   return leads.filter((lead) => lead.status === stage).length;
 }
 
@@ -110,17 +109,16 @@ export function buildAnalyticsModel(data: Snapshot): QuickFurnoAnalyticsModel {
     vendors.filter((vendor) => vendor.is_active !== false && !String(vendor.status ?? "").toLowerCase().includes("suspend")).length,
   );
   const paidVendorCount = statNumber(data, "paid_vendors", 0);
-  const followUpsDue = leads.filter((lead) => lead.next_follow_up_date).length;
+  const clarificationDue = leads.filter((lead) => lead.status === "clarification_required").length;
 
   const cards: AnalyticsMetric[] = [
     { key: "total_leads", label: "Total Leads", value: statNumber(data, "total_leads", leads.length), helper: crm.isSample ? "Sample placeholder" : "Safe admin snapshot", kind: crm.isSample ? "placeholder" : "live" },
     { key: "leads_today", label: "Leads Today", value: statNumber(data, "leads_today", leads.filter((lead) => isToday(lead.created_at)).length), helper: "Created today", kind: crm.isSample ? "placeholder" : "live" },
-    { key: "conversion_rate", label: "Conversion Rate placeholder", value: "0%", helper: "Not active yet", kind: "placeholder" },
-    { key: "revenue", label: "Revenue placeholder", value: "INR --", helper: "Payments not connected", kind: "placeholder" },
+    { key: "quality_ready", label: "Quality Ready", value: leads.filter((lead) => lead.status === "qualified").length, helper: "Ready for matching", kind: crm.isSample ? "placeholder" : "live" },
+    { key: "assigned", label: "Assigned / Delivered", value: leads.filter(isAssigned).length, helper: "Quality leads assigned to vendors", kind: crm.isSample ? "placeholder" : "live" },
+    { key: "clarification", label: "Needs Clarification", value: clarificationDue, helper: "Lead details still needed", kind: crm.isSample ? "placeholder" : "live" },
     { key: "active_vendors", label: "Active Vendors", value: activeVendorCount, helper: "Safe vendor count", kind: "live" },
     { key: "paid_vendors", label: "Paid Vendors", value: paidVendorCount, helper: "Package count when available", kind: "live" },
-    { key: "followups_due", label: "Follow-ups Due", value: followUpsDue, helper: "CRM placeholder queue", kind: "placeholder" },
-    { key: "aos_events", label: "AOS Events placeholder", value: "0", helper: "No agent runs connected", kind: "placeholder" },
   ];
 
   const sources: SourceMetric[] = sourceCategories.map((source) => {
@@ -130,20 +128,17 @@ export function buildAnalyticsModel(data: Snapshot): QuickFurnoAnalyticsModel {
       leads: rows.length,
       hot_leads: rows.filter((lead) => lead.priority === "hot").length,
       assigned_leads: rows.filter(isAssigned).length,
-      won_leads: rows.filter((lead) => lead.status === "won").length,
-      lost_leads: rows.filter((lead) => lead.status === "lost").length,
       cost_placeholder: "INR --",
       cpl_placeholder: "INR --",
       cost_per_hot_lead_placeholder: "INR --",
-      cost_per_won_lead_placeholder: "INR --",
     };
   });
 
   const campaigns: CampaignMetric[] = [
-    { id: "campaign-website", campaign: "Website direct intake", source: "website", leads: sources.find((s) => s.source === "website")?.leads ?? 0, spend_placeholder: "INR --", cpl_placeholder: "INR --", conversion_placeholder: "--" },
-    { id: "campaign-google", campaign: "Google Ads search", source: "google_ads", leads: sources.find((s) => s.source === "google_ads")?.leads ?? 0, spend_placeholder: "INR --", cpl_placeholder: "INR --", conversion_placeholder: "--" },
-    { id: "campaign-meta", campaign: "Meta lead campaign", source: "meta_ads", leads: sources.find((s) => s.source === "meta_ads")?.leads ?? 0, spend_placeholder: "INR --", cpl_placeholder: "INR --", conversion_placeholder: "--" },
-    { id: "campaign-referral", campaign: "Referral tracking", source: "referral", leads: sources.find((s) => s.source === "referral")?.leads ?? 0, spend_placeholder: "INR --", cpl_placeholder: "INR --", conversion_placeholder: "--" },
+    { id: "campaign-website", campaign: "Website direct intake", source: "website", leads: sources.find((s) => s.source === "website")?.leads ?? 0, spend_placeholder: "INR --", cpl_placeholder: "INR --" },
+    { id: "campaign-google", campaign: "Google Ads search", source: "google_ads", leads: sources.find((s) => s.source === "google_ads")?.leads ?? 0, spend_placeholder: "INR --", cpl_placeholder: "INR --" },
+    { id: "campaign-meta", campaign: "Meta lead campaign", source: "meta_ads", leads: sources.find((s) => s.source === "meta_ads")?.leads ?? 0, spend_placeholder: "INR --", cpl_placeholder: "INR --" },
+    { id: "campaign-referral", campaign: "Referral tracking", source: "referral", leads: sources.find((s) => s.source === "referral")?.leads ?? 0, spend_placeholder: "INR --", cpl_placeholder: "INR --" },
   ];
 
   const funnel: FunnelMetric[] = funnelStages.map((stage) => ({
@@ -159,7 +154,6 @@ export function buildAnalyticsModel(data: Snapshot): QuickFurnoAnalyticsModel {
       leads: rows.length,
       hot_leads: rows.filter((lead) => lead.priority === "hot").length,
       assigned: rows.filter(isAssigned).length,
-      won: rows.filter((lead) => lead.status === "won").length,
       revenue_estimate: "INR --",
       vendor_supply_gap_placeholder: "Placeholder",
     };
@@ -246,10 +240,11 @@ export function buildAnalyticsModel(data: Snapshot): QuickFurnoAnalyticsModel {
   ];
 
   const followUps: AnalyticsMetric[] = [
-    { key: "followups_due", label: "Follow-ups Due", value: followUpsDue, helper: "Placeholder CRM task count", kind: "placeholder" },
+    { key: "clarification_due", label: "Clarification Required", value: clarificationDue, helper: "Leads awaiting quality clarification", kind: crm.isSample ? "placeholder" : "live" },
+    { key: "nurture", label: "Nurture", value: leads.filter((lead) => lead.status === "nurture_later").length, helper: "Leads not ready for delivery yet", kind: crm.isSample ? "placeholder" : "live" },
   ];
 
-  const agents: AgentAnalyticsRow[] = ["LeadLens", "TrustShield", "MatchForge", "LeadFlow", "ClientCare", "OpsBrief"].map((agent) => ({
+  const agents: AgentAnalyticsRow[] = ["NexusKernel", "FurnoMemory", "LeadLens", "TrustShield", "MatchForge", "LeadFlow", "OpsBrief"].map((agent) => ({
     agent,
     runs: "0",
     success_rate: "Placeholder",

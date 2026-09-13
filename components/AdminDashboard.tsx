@@ -26,7 +26,7 @@ import {
   type Vendor,
 } from "@/components/admin/adminTypes";
 import { PIPELINE_COLUMNS } from "@/components/admin/crm/lead/leadCrmTypes";
-import { statusBucket } from "@/components/admin/crm/lead/leadCrmUtils";
+import { statusBucket, statusLabel } from "@/components/admin/crm/lead/leadCrmUtils";
 import {
   assignmentStatus,
   formatDate,
@@ -40,7 +40,7 @@ import {
   vendorName,
 } from "@/components/admin/adminUtils";
 
-const closedLeadStatuses = new Set(["converted", "won", "lost", "duplicate", "spam", "invalid"]);
+const closedLeadStatuses = new Set(["duplicate", "spam", "invalid", "rejected quality", "bad lead", "nurture"]);
 
 /**
  * Every entry points at an admin route that already exists in adminConfig.
@@ -87,7 +87,6 @@ export function AdminDashboard({ data, error }: { data: CommandCenterData | null
   // payload. Nothing here pretends to be a global total.
   const hotLeads = d.leadSample.filter(isHotLead);
   const unassignedLeads = d.leadSample.filter(isUnassignedLead);
-  const followUpsDue = Number(stats.pending_followups ?? 0);
   // Vendor lookup pool for drawers (recent + credit-watch, deduped).
   const vendorPool = useMemo(() => {
     const map = new Map<string, Vendor>();
@@ -123,7 +122,7 @@ export function AdminDashboard({ data, error }: { data: CommandCenterData | null
     { label: "New Leads Today", value: formatNumber(stats.leads_today), helper: `${formatNumber(stats.leads_this_month)} this month`, icon: "leads", glow: "qfa-glow-cyan", bloom: "rgba(0, 216, 255, 0.18)", href: "/admin/leads" },
     { label: "Hot Leads", value: formatNumber(hotLeads.length), helper: `In latest ${formatNumber(sampleSize)} leads`, icon: "notifications", glow: "qfa-glow-red", bloom: "rgba(255, 77, 103, 0.2)", href: "/admin/crm" },
     { label: "Unassigned Leads", value: formatNumber(unassignedLeads.length), helper: `In latest ${formatNumber(sampleSize)} leads`, icon: "distribution", glow: "qfa-glow-amber", bloom: "rgba(255, 159, 28, 0.2)", href: "/admin/leads" },
-    { label: "Follow-ups Due", value: formatNumber(followUpsDue), helper: "Sales queue", icon: "crm", glow: "qfa-glow-blue", bloom: "rgba(45, 124, 255, 0.22)", href: "/admin/crm" },
+    { label: "Lead Deliveries", value: formatNumber(stats.leads_distributed), helper: "Vendor assignments created", icon: "distribution", glow: "qfa-glow-blue", bloom: "rgba(45, 124, 255, 0.22)", href: "/admin/lead-distribution" },
     { label: "Revenue This Month", value: formatINR(stats.revenue_this_month), helper: `${formatINR(stats.total_revenue)} lifetime`, icon: "payments", glow: "qfa-glow-green", bloom: "rgba(19, 216, 154, 0.2)", href: "/admin/payments" },
   ];
 
@@ -136,15 +135,13 @@ export function AdminDashboard({ data, error }: { data: CommandCenterData | null
     const counts = new Map<string, number>();
     for (const lead of d.leadSample) {
       const bucket = statusBucket(lead as Lead, lead.lead_assignments?.length ?? 0);
-      // "duplicate" shares the Spam / Duplicate column, same as the CRM board.
-      const key = bucket === "duplicate" ? "spam" : bucket;
-      counts.set(key, (counts.get(key) ?? 0) + 1);
+      counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
     }
     return PIPELINE_COLUMNS.map((column) => ({
       bucket: column.bucket,
       label: column.label,
       count: counts.get(column.bucket) ?? 0,
-    })).filter((stage) => stage.bucket !== "spam" || stage.count > 0);
+    }));
   }, [d.leadSample]);
 
   const cityRows = useMemo(() => groupBy(d.leadSample, (lead) => lead.city || "City not set"), [d.leadSample]);
@@ -274,7 +271,7 @@ export function AdminDashboard({ data, error }: { data: CommandCenterData | null
                 header: "Quality",
                 cell: (lead: Lead) => <QualityCell lead={lead} />,
               },
-              { header: "Status", cell: (lead: Lead) => <StatusBadge value={lead.status || "New"} /> },
+              { header: "Stage", cell: (lead: Lead) => <StatusBadge value={statusLabel(statusBucket(lead, lead.lead_assignments?.length ?? 0))} /> },
               {
                 header: "Created",
                 cell: (lead: Lead) => <span className="whitespace-nowrap text-[11px] text-slate-500">{formatDate(lead.created_at)}</span>,
@@ -575,7 +572,7 @@ function LeadDrawer({ lead, vendors, onClose }: { lead: Lead; vendors: Vendor[];
       onClose={onClose}
       header={
         <div className="flex flex-wrap gap-1.5">
-          <StatusBadge value={lead.status || "New"} />
+          <StatusBadge value={statusLabel(statusBucket(lead, lead.lead_assignments?.length ?? 0))} />
           {lead.lead_priority ? <StatusBadge value={lead.lead_priority} /> : null}
           <StatusBadge value={lead.source || "Website"} tone="slate" />
         </div>
@@ -721,9 +718,8 @@ function DrawerBlock({ title, children }: { title: string; children: React.React
 
 function isHotLead(lead: LeadSampleRow) {
   const priority = String(lead.lead_priority ?? "").toLowerCase();
-  const status = String(lead.status ?? "").toLowerCase();
   const score = Number(lead.lead_quality_score ?? 0);
-  return priority.includes("hot") || priority.includes("high") || score >= 70 || status.includes("interested") || status.includes("quotation");
+  return priority.includes("hot") || priority.includes("high") || score >= 70;
 }
 
 function isUnassignedLead(lead: LeadSampleRow) {

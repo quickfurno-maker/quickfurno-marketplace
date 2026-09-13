@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Blank,
   DataTable,
   NoteBar,
   StatusBadge,
@@ -44,7 +43,6 @@ export function Nurture({ rows, onSelect }: { rows: CrmRow[]; onSelect: (row: Cr
         { header: "City", cell: (row) => row.city },
         { header: "Priority", cell: (row) => <StatusBadge value={cap(row.priority)} tone={PRIORITY_TONE[row.priority]} /> },
         { header: "Status", cell: (row) => <StatusBadge value={row.statusLabel} /> },
-        { header: "Follow-up", cell: (row) => row.followUp ? <span className="whitespace-nowrap">{formatDate(row.followUp)}</span> : <Blank /> },
       ]}
     />
     </div>

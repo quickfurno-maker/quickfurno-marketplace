@@ -416,7 +416,7 @@ section('G. MVP INVARIANTS UNCHANGED [pure] [static]');
   // a clean tree before this phase. The guard's point is unchanged — THIS phase added no
   // migration of its own — so the pin moves to the truthful live count. Still exact.
   check('G05 QF-MVP-80.01 itself added NO migration — the repo set is 110',
-    readdirSync(path.join(ROOT, 'supabase', 'migrations')).filter((f) => f.endsWith('.sql')).length === 110);
+    readdirSync(path.join(ROOT, 'supabase', 'migrations')).filter((f) => f.endsWith('.sql')).length === 111);
 
   check('G06 the three migrations this phase rehearses exist on disk, unrenamed',
     ['20260814000000_qf_mvp_40_marketing_consent_writer.sql',

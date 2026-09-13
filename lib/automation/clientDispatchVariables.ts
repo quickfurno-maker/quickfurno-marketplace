@@ -41,6 +41,18 @@ import type { ClientAutomationActionType } from "./clientDispatchRegistry";
 const FORBIDDEN_TEXT = /[\r\n\t]/;
 
 /**
+ * Connection-assurance-only source keys. These deliberately DO NOT belong to
+ * the frozen QF-MVP-40.12 ordinary-business vocabulary.
+ */
+const ClientDraftOnlySourceKey = Object.freeze({
+  VENDOR_NAME: "vendor_name",
+  VENDOR_PHONE: "vendor_phone",
+} as const);
+type ClientDraftSourceKey =
+  | BusinessSourceKeyValue
+  | (typeof ClientDraftOnlySourceKey)[keyof typeof ClientDraftOnlySourceKey];
+
+/**
  * The intended source keys for the three client actions whose provider template is
  * NOT an approved QF-MVP-40.12 binding.
  *
@@ -50,7 +62,7 @@ const FORBIDDEN_TEXT = /[\r\n\t]/;
  * message content is governed by the connection-reminder template key below.
  */
 export const CLIENT_DRAFT_TEMPLATE_SOURCE_KEYS: Readonly<
-  Record<string, readonly BusinessSourceKeyValue[]>
+  Record<string, readonly ClientDraftSourceKey[]>
 > = Object.freeze({
   clarification_request: Object.freeze([
     BusinessSourceKey.CLIENT_NAME,
@@ -62,8 +74,8 @@ export const CLIENT_DRAFT_TEMPLATE_SOURCE_KEYS: Readonly<
   ]),
   client_vendor_connection_reminder: Object.freeze([
     BusinessSourceKey.CLIENT_NAME,
-    BusinessSourceKey.VENDOR_NAME,
-    BusinessSourceKey.VENDOR_PHONE,
+    ClientDraftOnlySourceKey.VENDOR_NAME,
+    ClientDraftOnlySourceKey.VENDOR_PHONE,
   ]),
 });
 
@@ -97,7 +109,7 @@ function text(value: unknown, field: string): FieldResult {
  */
 function assembleDraft(
   templateKey: string,
-  parts: readonly (readonly [BusinessSourceKeyValue, FieldResult])[],
+  parts: readonly (readonly [ClientDraftSourceKey, FieldResult])[],
 ): BusinessVariableResult {
   for (const [, r] of parts) {
     if (!r.ok) return { ok: false, reason: r.reason, field: r.field };
@@ -140,8 +152,8 @@ export function buildClientVendorConnectionReminderVariables(
 ): BusinessVariableResult {
   return assembleDraft("client_vendor_connection_reminder", [
     [BusinessSourceKey.CLIENT_NAME, text(input?.clientName, "clientName")],
-    [BusinessSourceKey.VENDOR_NAME, text(input?.vendorName, "vendorName")],
-    [BusinessSourceKey.VENDOR_PHONE, text(input?.vendorPhone, "vendorPhone")],
+    [ClientDraftOnlySourceKey.VENDOR_NAME, text(input?.vendorName, "vendorName")],
+    [ClientDraftOnlySourceKey.VENDOR_PHONE, text(input?.vendorPhone, "vendorPhone")],
   ]);
 }
 

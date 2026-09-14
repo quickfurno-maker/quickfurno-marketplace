@@ -15,6 +15,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader, TabPanel, Tabs, EmptyState } from "../AdminPrimitives";
 import { WhatsAppOverviewTab } from "./WhatsAppOverviewTab";
+import { WhatsAppInbox } from "./inbox/WhatsAppInbox";
 import { WhatsAppTemplatesTab } from "./WhatsAppTemplatesTab";
 import { WhatsAppMessagesTab } from "./WhatsAppMessagesTab";
 import { WhatsAppDeliveryTab } from "./WhatsAppDeliveryTab";
@@ -73,6 +74,7 @@ export function WhatsAppControlCenter({
     else sp.set(key, value);
 
     if (key !== "page") sp.delete("page");
+    if (key === "filter" || key === "search") sp.delete("conversation");
     if (key === "view") {
       for (const dependent of ["status", "scope", "state", "lane", "message"]) sp.delete(dependent);
     }
@@ -103,6 +105,12 @@ export function WhatsAppControlCenter({
           <EmptyState title="WhatsApp control center unavailable" message={error} />
         ) : payload.tab === "overview" ? (
           <WhatsAppOverviewTab overview={payload.overview} onNavigate={setParam} />
+        ) : payload.tab === "inbox" ? (
+          <WhatsAppInbox
+            inbox={payload.inbox}
+            selectedId={query.conversation ?? null}
+            setParam={setParam}
+          />
         ) : payload.tab === "templates" ? (
           <WhatsAppTemplatesTab result={payload.templates} query={query} setParam={setParam} />
         ) : payload.tab === "messages" ? (

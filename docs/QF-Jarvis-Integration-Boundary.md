@@ -1,3 +1,5 @@
+> **QF-MVP-60 implementation (2026-09-15):** repository integration implemented, activation OFF. See docs/QF-MVP-60-JARVIS-INTEGRATION.md.
+
 # QuickFurno — QF Jarvis Integration Boundary (Phase 5F-A future-compat)
 
 This documents the **boundary** between QuickFurno and a future QF Jarvis. Phase

@@ -180,7 +180,8 @@
     "test:mvp:82a-r0": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-qf-mvp-82a-r0-realtime-publication.mjs",
     "test:mvp:82a-r0-s1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-qf-mvp-82a-r0-s1-staging-certification.mjs",
     "test:launch:pune-only": "node scripts/mvp/launch/validate-pune-only-launch.mjs",
-    "test:aos:v2": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/aos/validate-qf-aos-v2.mjs"
+    "test:aos:v2": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/aos/validate-qf-aos-v2.mjs",
+    "test:mvp:60": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-mvp-60-integration.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-mvp-60-context-recommendations.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

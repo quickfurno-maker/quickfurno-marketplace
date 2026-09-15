@@ -1034,8 +1034,15 @@ export const suite = {
         assertTrue(footer.includes('Free for homeowners'), 'public footer keeps its summary');
         const sticky = readFileSync('components/StickyMobileCTA.tsx', 'utf8');
         assertTrue(sticky.includes('MobileBottomNav'), 'public bottom nav wrapper intact');
-        // Homeowner pages still compose the public bottom nav.
-        for (const file of ['app/page.tsx', 'app/vendors/page.tsx', 'app/category/[slug]/page.tsx']) {
+        // Homeowner pages still compose a public bottom nav. The final homepage
+        // owns its locked five-item nav directly; listing/category pages keep
+        // using the shared StickyMobileCTA wrapper.
+        const homePage = readFileSync('app/page.tsx', 'utf8');
+        const finalHome = readFileSync('components/home/FinalHomepage.tsx', 'utf8');
+        assertTrue(homePage.includes('<FinalHomepage />'), 'app/page.tsx mounts the final homepage');
+        assertTrue(finalHome.includes('<HomeMobileBottomNav />'),
+          'final homepage still renders its public bottom nav');
+        for (const file of ['app/vendors/page.tsx', 'app/category/[slug]/page.tsx']) {
           assertTrue(readFileSync(file, 'utf8').includes('<StickyMobileCTA />'),
             file + ' still renders the public bottom nav');
         }
@@ -1244,15 +1251,14 @@ export const suite = {
         const footer = readFileSync('components/Footer.tsx', 'utf8');
         const footerCode = footer.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
         assertFalse(footerCode.includes('id="contact"'), 'footer no longer duplicates the id');
-        assertTrue(readFileSync('components/home/HomeSectionsV2.tsx', 'utf8').includes('id="contact"'),
-          'the homepage anchor target is kept');
+        const finalHome = readFileSync('components/home/FinalHomepage.tsx', 'utf8');
+        assertTrue(finalHome.includes('id="contact"'), 'the homepage anchor target is kept');
         // Every header anchor must exist in the homepage composition.
         for (const [href, id] of [['/#categories', 'categories'], ['/#how-it-works', 'how-it-works'],
                                   ['/#why-quickfurno', 'why-quickfurno']]) {
           assertTrue(header.includes(href), 'header links ' + href);
         }
-        const home = readFileSync('app/page.tsx', 'utf8')
-          + readFileSync('components/home/HomeSectionsV2.tsx', 'utf8');
+        const home = readFileSync('app/page.tsx', 'utf8') + finalHome;
         for (const id of ['categories', 'how-it-works', 'why-quickfurno']) {
           assertTrue(home.includes('id="' + id + '"'), 'anchor #' + id + ' exists on the homepage');
         }
@@ -1535,8 +1541,7 @@ export const suite = {
         assertFalse(/href=""/.test(all), 'no empty href');
         // Header anchors must point at ids the homepage actually renders.
         const home = readFileSync('app/page.tsx', 'utf8')
-          + readFileSync('components/home/HomeSectionsV2.tsx', 'utf8')
-          + readFileSync('components/home/HomeServiceLauncher.tsx', 'utf8');
+          + readFileSync('components/home/FinalHomepage.tsx', 'utf8');
         for (const id of ['categories', 'how-it-works', 'why-quickfurno', 'services']) {
           if (!all.includes('/#' + id) && !all.includes('#' + id)) continue;
           assertTrue(home.includes('id="' + id + '"'), 'anchor #' + id + ' exists on the homepage');

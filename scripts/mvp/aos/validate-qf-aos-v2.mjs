@@ -137,6 +137,7 @@ const vendorProducerBody = scopeMigration.match(/create or replace function publ
 check("Successor migration retires client sales follow-up", Boolean(clientProducerBody) && !clientProducerBody.includes("client.transactional_followup"));
 check("Successor migration retires vendor response reminders", Boolean(vendorProducerBody) && !vendorProducerBody.includes("vendor.response_reminder"));
 check("Successor migration preserves lead delivery notification", vendorProducerBody.includes("vendor.lead_offer"));
+check("Scope-lock verifier tolerates pg_get_functiondef comments before stale return", scopeMigration.includes("then[^;]*return ''stale'';"));
 check("Successor migration preserves generic pre-delivery status update", scopeMigration.includes("client.lead_status_update"));
 check("Successor migration guards downstream commercial statuses", ["Contacted", "Site Visit Scheduled", "Quotation Sent", "Converted", "Won", "Lost"].every((status) => scopeMigration.includes(status)));
 

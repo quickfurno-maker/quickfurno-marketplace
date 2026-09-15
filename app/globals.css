@@ -5564,3 +5564,26 @@ h1, h2 {
 .admin-surface .qf-sidebar .text-slate-300 { color: #b9c8de; }
 .admin-surface .qf-sidebar .text-slate-400 { color: #8fa3c0; }
 .admin-surface .qf-sidebar .text-slate-500 { color: #71839d; }
+
+/* Automation Studio controls */
+.qfas-input {
+  width: 100%;
+  border: 1px solid rgb(226 232 240);
+  border-radius: 0.5rem;
+  background: white;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.75rem;
+  line-height: 1.15rem;
+  color: rgb(15 23 42);
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.qfas-input:focus {
+  border-color: rgb(139 92 246);
+  box-shadow: 0 0 0 3px rgb(237 233 254);
+}
+.qfas-input:disabled {
+  cursor: not-allowed;
+  background: rgb(248 250 252);
+  color: rgb(100 116 139);
+}

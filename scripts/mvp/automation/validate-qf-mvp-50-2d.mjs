@@ -11,6 +11,7 @@ import { createHash, createHmac } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readRetiredWorkflow } from "./historicalWorkflowSource.mjs";
 import {
   COMPLETION_EVIDENCE_RULINGS,
   N8N_COMPLETE_REQUEST_KEYS,
@@ -623,11 +624,11 @@ record("C05a the 50.2A and 50.2B candidates are byte-frozen and completion-path-
         "93f75377da159f6f64c5c816178df4e982e240cecee108d626e266dedcc4705c",
     };
     return Object.entries(frozen).every(([file, expected]) => {
-      const full = path.join(ROOT, "automation/n8n", file);
-      if (!existsSync(full)) return false;
-      const bytes = readFileSync(full);
-      if (JSON.stringify(JSON.parse(bytes.toString("utf8"))).includes(N8N_COMPLETE_ROUTE_PATH)) return false;
-      return canonicalSha256(bytes) === expected;
+      const activePath = path.join(ROOT, "automation/n8n", file);
+      if (existsSync(activePath)) return false;
+      const text = readRetiredWorkflow(file);
+      if (JSON.stringify(JSON.parse(text)).includes(N8N_COMPLETE_ROUTE_PATH)) return false;
+      return canonicalSha256(Buffer.from(text, "utf8")) === expected;
     });
   })());
 record("C06 the completion route path is declared once, in transportTypes",

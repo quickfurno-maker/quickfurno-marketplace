@@ -573,11 +573,12 @@ record("O06 it verifies the signed response before reading any state, and is fai
   /QF_N8N_TRANSPORT_ENABLED === 'true'/.test(workflowText) &&
   workflow.connections["IF — Stale Sweep Transport Configured"].main[1][0].node ===
     "STOP — Stale Sweep Runtime Not Configured");
-record("O07 every workflow in the repository is still inactive, and the set is exactly eight",
+record("O07 every active-tree workflow is inactive in source, and the set is exactly the canonical six",
   (() => {
     const flows = readdirSync(path.join(ROOT, "automation/n8n")).filter((f) => f.endsWith(".workflow.json")).sort();
-    return flows.length === 8 &&
+    return flows.length === 6 &&
       flows.includes("QF-MVP-50-07-Stale-Business-Supervisor.workflow.json") &&
+      !flows.some((f) => f.includes("Core-Job-Dispatcher")) &&
       flows.every((f) => JSON.parse(read(`automation/n8n/${f}`)).active === false);
   })());
 

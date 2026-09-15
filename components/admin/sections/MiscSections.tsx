@@ -14,6 +14,7 @@ import {
   formatNumber,
 } from "../adminUtils";
 import { AosAutomationControl } from "../AosAutomationControl";
+import { AutomationStudio } from "../AutomationStudio";
 import { Strong } from "./shared";
 
 export const automationRows = [
@@ -58,31 +59,8 @@ export function AosReadinessPage({ notify }: { notify: (message: string, tone?: 
   );
 }
 
-export function AutomationsPage({ notify }: { notify: (message: string, tone?: "success" | "error" | "info") => void }) {
-  return (
-    <div className="space-y-5">
-      <AosAutomationControl notify={notify} />
-      <SectionCard title="Automation Workflows" description="Placeholder workflow catalog. n8n forwarding is governed by the AOS / n8n control above.">
-        <DataTable
-          rows={automationRows}
-          emptyTitle="No automations"
-          emptyMessage="Automation workflows will appear here after the automations table is connected."
-          columns={[
-            { header: "Automation", cell: (row) => <Strong title={row[0]} subtitle={row[1]} /> },
-            { header: "Trigger", cell: (row) => row[1] },
-            { header: "Action", cell: (row) => row[2] },
-            { header: "Status", cell: (row) => <StatusBadge value={row[3]} /> },
-            { header: "Last Run", cell: () => "Not run" },
-            { header: "Success", cell: () => "0" },
-            { header: "Failed", cell: () => "0" },
-            /* The Actions column offered "Test webhook" and "Enable/disable",
-               both of which only fired a "…placeholder ready" toast. This is a
-               read-only catalogue, so it no longer pretends to have controls. */
-          ]}
-        />
-      </SectionCard>
-    </div>
-  );
+export function AutomationsPage({ notify: _notify }: { notify: (message: string, tone?: "success" | "error" | "info") => void }) {
+  return <AutomationStudio />;
 }
 
 /**

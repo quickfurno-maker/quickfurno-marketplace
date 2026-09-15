@@ -29,6 +29,7 @@ import {
 import { parseCancelOrphanRequestBody } from "@/lib/automation/orphanCancellationContract";
 import { N8N_CANCEL_ORPHAN_ROUTE_PATH } from "@/lib/automation/transportTypes";
 import { cancelOrphanAutomationJobForN8nTransport } from "@/services/automationOrphanCancellationService";
+import { isAutomationStudioWorkflowEnabled } from "@/services/automationStudioService";
 import { getAutomationTransportRuntimeConfig } from "@/services/automationTransportService";
 
 export const runtime = "nodejs";
@@ -104,6 +105,10 @@ export async function POST(request: Request) {
       verified.requestId,
       config.responseSecret,
     );
+  }
+
+  if (!(await isAutomationStudioWorkflowEnabled("orphan_cleanup"))) {
+    return signedJson({ ok: true, transportVersion: 1, requestId: verified.requestId, route: "cancel_orphan_v1", orchestrationState: "cancel_orphan_empty", replayed: false }, 200, verified.requestId, config.responseSecret);
   }
 
   try {

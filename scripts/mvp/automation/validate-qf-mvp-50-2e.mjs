@@ -11,6 +11,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readRetiredWorkflow } from "./historicalWorkflowSource.mjs";
 import {
   AUTOMATION_EXECUTION_ORCHESTRATION_STATES,
   COMMUNICATION_EXECUTION_PARTITION,
@@ -699,9 +700,10 @@ record("N16 all three route paths appear exactly once each in a canonical block"
   (workflowText.match(/\/api\/internal\/automation\/n8n\/complete/g) ?? []).length === 3);
 record("N17 the workflow performs no business decision",
   !/recipient_id|template_key|variables:|provider_account|consent_|credit|package|assign/i.test(wfExecText));
-record("N18 the pre-existing 50.2A and 50.2B workflows are byte-frozen",
+record("N18 the retired 50.2A and 50.2B workflows remain hash-proven in Git history and absent from the active tree",
   Object.entries(FROZEN_WORKFLOWS).every(([f, sha]) =>
-    canonicalSha256(readFileSync(path.join(ROOT, "automation/n8n", f))) === sha));
+    !existsSync(path.join(ROOT, "automation/n8n", f)) &&
+    canonicalSha256(Buffer.from(readRetiredWorkflow(f), "utf8")) === sha));
 record("N19 every workflow in the tree is inactive and unpublished",
   readdirSync(path.join(ROOT, "automation/n8n"))
     .filter((f) => f.endsWith(".workflow.json"))
@@ -715,13 +717,11 @@ record("N19 every workflow in the tree is inactive and unpublished",
 // QF-MVP-50.6 RE-PIN: six -> seven. The orphan cancellation supervisor is added as a
 // NEW file; not one of the six certified candidates is renamed, edited or removed, and
 // the list stays an EXACT sorted allowlist rather than a count or a prefix match.
-record("N20 exactly eight workflow candidates exist, by exact name",
+record("N20 exactly six canonical workflow definitions exist, by exact name",
   (() => {
     const flows = readdirSync(path.join(ROOT, "automation/n8n"))
       .filter((f) => f.endsWith(".workflow.json")).sort();
-    return flows.length === 8 && same(flows, [
-      "QF-MVP-50-01-Core-Job-Dispatcher.50.2B-selfhost-env.workflow.json",
-      "QF-MVP-50-01-Core-Job-Dispatcher.workflow.json",
+    return flows.length === 6 && same(flows, [
       "QF-MVP-50-02-Client-Whatsapp-Executor.50.2E-selfhost-env.workflow.json",
       "QF-MVP-50-03-Vendor-Whatsapp-Executor.workflow.json",
       "QF-MVP-50-04-Campaign-Execution-Executor.workflow.json",

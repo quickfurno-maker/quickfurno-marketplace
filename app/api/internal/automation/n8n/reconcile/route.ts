@@ -23,6 +23,7 @@ import {
 import { parseRecoveryRequestBody } from "@/lib/automation/recoveryContract";
 import { N8N_RECONCILE_ROUTE_PATH } from "@/lib/automation/transportTypes";
 import { reconcileStaleAutomationAttemptForN8nTransport } from "@/services/automationRecoveryService";
+import { isAutomationStudioWorkflowEnabled } from "@/services/automationStudioService";
 import { getAutomationTransportRuntimeConfig } from "@/services/automationTransportService";
 
 export const runtime = "nodejs";
@@ -96,6 +97,10 @@ export async function POST(request: Request) {
       verified.requestId,
       config.responseSecret,
     );
+  }
+
+  if (!(await isAutomationStudioWorkflowEnabled("recovery"))) {
+    return signedJson({ ok: true, transportVersion: 1, requestId: verified.requestId, route: "reconcile_v1", orchestrationState: "reconcile_empty", replayed: false }, 200, verified.requestId, config.responseSecret);
   }
 
   try {

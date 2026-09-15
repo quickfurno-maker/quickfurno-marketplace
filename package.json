@@ -132,6 +132,7 @@
     "test:mvp:50-5": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-5.mjs",
     "test:mvp:50-6": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-6.mjs",
     "test:mvp:50-7": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-7.mjs",
+    "test:automation:canonical-six": "node scripts/mvp/automation/validate-qf-n8n-canonical-six.mjs",
     "test:security:launch-closeout": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/security/validate-qf-launch-security-closeout.mjs",
     "test:mvp:50-7-toctou": "node scripts/mvp/automation/local-toctou-qf-mvp-50-7.mjs",
     "test:mvp:50-3-50-4-bridge": "node scripts/mvp/automation/validate-qf-mvp-50-3-50-4-policy-config-bridge.mjs",
@@ -181,6 +182,7 @@
     "test:mvp:82a-r0-s1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-qf-mvp-82a-r0-s1-staging-certification.mjs",
     "test:launch:pune-only": "node scripts/mvp/launch/validate-pune-only-launch.mjs",
     "test:aos:v2": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/aos/validate-qf-aos-v2.mjs",
+    "test:automation-studio": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-automation-studio.mjs",
     "test:mvp:60": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-mvp-60-integration.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-mvp-60-context-recommendations.mjs"
   },
   "dependencies": {

@@ -8,18 +8,15 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readRetiredWorkflow } from "./historicalWorkflowSource.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-const workflowPath = path.join(
-  ROOT,
-  "automation/n8n/QF-MVP-50-01-Core-Job-Dispatcher.workflow.json",
-);
 const docPath = path.join(
   ROOT,
   "docs/QF-MVP-50-2A-FRESH-N8N-DISPATCHER.md",
 );
 
-const workflowText = readFileSync(workflowPath, "utf8");
+const workflowText = readRetiredWorkflow("QF-MVP-50-01-Core-Job-Dispatcher.workflow.json");
 const doc = readFileSync(docPath, "utf8");
 const workflow = JSON.parse(workflowText);
 

@@ -1,6 +1,6 @@
 # Graphify Repository Intelligence Snapshot
 
-Generated: 2026-09-15T03:31:28.764Z
+Generated: 2026-09-15T03:39:24.807Z
 Built from commit: `2157af9a`
 Mode: local deterministic repository extraction; generated graph artifacts remain ignored from Git.
 

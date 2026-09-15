@@ -40,8 +40,8 @@ export function VendorPortal({ initialMode = "login" }: { initialMode?: Mode }) 
       </h1>
       <p className="qf-vendor-intro-sub">
         {mode === "login"
-          ? "View assigned leads, credits, profile status, and package details."
-          : "Submit your business details. QuickFurno will verify your profile before activating lead access."}
+          ? "View client matches, matching credits, profile status, and package details."
+          : "Submit your business details. QuickFurno will verify your profile before activating client matching."}
       </p>
 
       <div className="qf-vauth-tabs" role="tablist" aria-label="Vendor portal">

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 /**
@@ -22,11 +23,13 @@ export function VendorPortalHeader() {
     <header className="qf-vauth-header">
       <div className="qf-vauth-header-inner">
         <Link href="/" className="qf-vauth-brand-link" aria-label="QuickFurno home">
-          <span className="qf-vauth-brand-text">
-            <span className="qf-vauth-bw-quick">Quick</span>
-            <span className="qf-vauth-bw-furno">Furno</span>
-          </span>
-          <span className="qf-vauth-brand-tagline">Your Home, Our Priority.</span>
+          <Image
+            src="/assets/quickfurno/logos/quickfurno-logo.svg"
+            alt="QuickFurno"
+            width={260}
+            height={70}
+            priority
+          />
         </Link>
 
         <div className="qf-vauth-header-right">

@@ -25,7 +25,7 @@ export function VendorOverviewHeader({ vendor }: { vendor: VendorProfileSummary 
           Welcome back, <span>{vendor.business_name}</span>
         </h1>
         <p className="qf-vendor-v2-greeting-sub">
-          Manage your leads, profile and QuickFurno credits from one place.
+          Manage your client matches, profile and QuickFurno credits from one place.
         </p>
       </div>
 

@@ -10,6 +10,7 @@ import {
   notificationIcon,
   notificationTypeLabel,
   unreadCount,
+  vendorFacingNotificationText,
   type NoticeFeedback,
 } from "./notificationsModel";
 
@@ -44,7 +45,7 @@ export function VendorNotificationsWorkspace({
     <div className="qf-vendor-v2-notice">
       <VendorUtilityHeader
         title="Notifications"
-        subtitle="QuickFurno updates about leads, profile reviews, support and your account."
+        subtitle="QuickFurno updates about client matching, profile reviews, support and your account."
         action={
           <form action={vendorMarkAllNotificationsRead}>
             <button
@@ -122,7 +123,7 @@ export function VendorNotificationsWorkspace({
 function NotificationRow({ notification }: { notification: VendorNotification }) {
   const isUnread = !notification.is_read;
   const href = internalCtaHref(notification.cta_url);
-  const ctaLabel = (notification.cta_label ?? "").trim();
+  const ctaLabel = vendorFacingNotificationText(notification.cta_label);
   const high = isHighPriority(notification.priority);
 
   return (
@@ -142,8 +143,8 @@ function NotificationRow({ notification }: { notification: VendorNotification })
           </span>
         </div>
 
-        <h2 className="qf-vendor-v2-notice-title">{notification.title}</h2>
-        <p className="qf-vendor-v2-notice-message">{notification.message}</p>
+        <h2 className="qf-vendor-v2-notice-title">{vendorFacingNotificationText(notification.title)}</h2>
+        <p className="qf-vendor-v2-notice-message">{vendorFacingNotificationText(notification.message)}</p>
 
         <div className="qf-vendor-v2-notice-actions">
           {href && ctaLabel ? (

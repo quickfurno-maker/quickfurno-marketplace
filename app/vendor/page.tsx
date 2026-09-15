@@ -15,7 +15,7 @@ const steps = [
   },
   {
     title: "Account becomes eligible",
-    copy: "Lead access depends on your account being approved and active, with a package and credits in place.",
+    copy: "Client matching access depends on your account being approved and active, with a package and credits in place.",
   },
   {
     title: "Manage matched enquiries",
@@ -26,7 +26,7 @@ const steps = [
 const faqs = [
   {
     question: "How do I sign up as a vendor?",
-    answer: "Use the New Vendor Signup tab above to create your vendor account and submit your business details in one step. QuickFurno will review your profile before enabling dashboard lead access.",
+    answer: "Use the New Vendor Signup tab above to create your vendor account and submit your business details in one step. QuickFurno will review your profile before enabling dashboard client matching.",
   },
   {
     question: "How do I log in later?",
@@ -80,7 +80,7 @@ export default function VendorPortalPage({
           <section className="qf-home-section">
             <div className="qf-section-head">
               <h2>How QuickFurno works for vendors</h2>
-              <p>A simple path from signup to dashboard-based lead management.</p>
+              <p>A simple path from signup to dashboard-based client matching.</p>
             </div>
             <div className="qf-steps-flow">
               {steps.map((step, index) => (

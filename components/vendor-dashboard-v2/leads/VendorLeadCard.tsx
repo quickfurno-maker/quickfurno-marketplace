@@ -61,7 +61,7 @@ export function VendorLeadCard({
         <div className="qf-vendor-v2-leads-card-body">
           <div className="qf-vendor-v2-leads-card-title" id={headerId}>
             <h3>{lead.name}</h3>
-            <span className="qf-vendor-v2-leads-status">Delivered lead</span>
+            <span className="qf-vendor-v2-leads-status">Client match</span>
           </div>
 
           <p className="qf-vendor-v2-leads-card-service">{lead.service}</p>
@@ -129,7 +129,7 @@ export function VendorLeadCard({
           ) : !lead.connectionAssuranceSupported ? (
             <span>Connection check is not active on this environment yet.</span>
           ) : connectionWindowOpen ? (
-            <span>Available only during the first 24 hours after lead delivery - {connectionTimeLabel}</span>
+            <span>Available only during the first 24 hours after matching - {connectionTimeLabel}</span>
           ) : (
             <span>24-hour response window closed. This option is now read-only.</span>
           )}
@@ -189,7 +189,7 @@ export function VendorLeadCard({
               <p className="qf-vendor-v2-leads-locked">
                 <VendorIcon name="lock" size={15} />
                 Client contact is unavailable for this assignment. Contact QuickFurno support if you
-                believe this lead was charged.
+                believe this match was charged.
               </p>
             )}
           </section>
@@ -198,16 +198,16 @@ export function VendorLeadCard({
             <>
 
               <section className="qf-vendor-v2-leads-detail-block">
-                <h4>Lead validity issue</h4>
+                <h4>Match review</h4>
                 {lead.isReported ? (
                   <p className="qf-vendor-v2-leads-note">
-                    Reported — under review. An admin will look at this report. Lead credit is not
-                    refunded automatically.
+                    Reported — under review. An admin will look at this report. Matching credit is not
+                    reversed automatically.
                   </p>
                 ) : (
                   <>
                     <p className="qf-vendor-v2-leads-note">
-                      Report only genuine lead-validity problems such as an invalid number, duplicate, or materially incorrect lead details. QuickFurno does not review quotation, site visit, negotiation, or sale outcomes. Lead credit is not refunded automatically.
+                      Report only genuine match-quality problems such as an invalid number, duplicate, or materially incorrect client details. QuickFurno does not review quotation, site visit, negotiation, or sale outcomes. Matching credit is not reversed automatically.
                     </p>
                     {/* Unchanged component, unchanged action. Only the surrounding
                         chrome is restyled, via the scoped wrapper class. */}
@@ -220,9 +220,9 @@ export function VendorLeadCard({
             </>
           ) : (
             <section className="qf-vendor-v2-leads-detail-block">
-              <h4>Lead support</h4>
+              <h4>Match support</h4>
               <p className="qf-vendor-v2-leads-note">
-                Lead-validity reporting is unavailable for this assignment. Contact QuickFurno support if you believe this lead was charged incorrectly.
+                Match-quality reporting is unavailable for this assignment. Contact QuickFurno support if you believe this match was charged incorrectly.
               </p>
               <Link
                 href="/vendor/dashboard/support"

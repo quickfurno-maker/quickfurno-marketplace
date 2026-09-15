@@ -67,7 +67,7 @@ export function VendorSupportWorkspace({
               <VendorUtilityEmpty
                 icon="support"
                 title="No support conversations yet"
-                message="Create a request whenever you need help with your profile, package or leads."
+                message="Create a request whenever you need help with your profile, package or client matching."
               />
             </div>
           ) : null}

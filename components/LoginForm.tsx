@@ -48,7 +48,7 @@ export function LoginForm({
     <div className="qf-vauth-card">
       <h2 className="qf-vauth-card-title">Welcome back</h2>
       <p className="qf-vauth-card-sub">
-        Sign in to manage assigned leads, credits and your business profile.
+        Sign in to manage client matches, matching credits and your business profile.
       </p>
 
       {error ? (

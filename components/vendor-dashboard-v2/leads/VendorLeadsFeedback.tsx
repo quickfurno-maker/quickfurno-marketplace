@@ -25,7 +25,7 @@ export function VendorLeadsFeedback({ feedback }: { feedback: VendorLeadFeedback
         type="button"
         className="qf-vendor-v2-iconbtn"
         aria-label="Dismiss message"
-        onClick={() => router.replace("/vendor/dashboard/leads")}
+        onClick={() => router.replace("/vendor/dashboard/matching")}
       >
         <VendorIcon name="close" size={16} />
       </button>

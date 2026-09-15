@@ -484,7 +484,7 @@ async function deliverToVendor(leadId: string, vendorId: string, notifyTitle: st
     type: "lead_assigned",
     priority: "high",
     cta_label: "View lead",
-    cta_url: "/vendor/dashboard/leads",
+    cta_url: "/vendor/dashboard/matching",
   });
   if (!notify.ok) console.warn("[delayed fill] vendor notification skipped", { code: notify.code });
 }

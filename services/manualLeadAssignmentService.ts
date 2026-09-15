@@ -352,7 +352,7 @@ export async function assignLeadManually(
         type: "lead_assigned",
         priority: "high",
         cta_label: "View lead",
-        cta_url: "/vendor/dashboard/leads",
+        cta_url: "/vendor/dashboard/matching",
       });
       if (!notify.ok) logWarnings.push(`vendor_notification:${notify.code}`);
     }

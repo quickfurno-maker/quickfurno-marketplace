@@ -5,6 +5,7 @@ import { VendorPortalSidebar } from "@/components/vendor-dashboard-v2/VendorPort
 import { VendorPortalTopbar } from "@/components/vendor-dashboard-v2/VendorPortalTopbar";
 import { isVendorVerified } from "@/components/vendor-dashboard-v2/vendorOverviewModel";
 import "./vendor-portal-v2.css";
+import "./vendor-final-ui.css";
 
 export default async function VendorDashboardLayout({ children }: { children: React.ReactNode }) {
   // Auth gate is UNCHANGED: no session role, no portal.

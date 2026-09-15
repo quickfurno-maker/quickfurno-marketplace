@@ -946,7 +946,7 @@ export const suite = {
     },
 
     {
-      name: 'vendor portal page states eligibility without promising leads',
+      name: 'vendor portal page states matching eligibility without unsupported promises',
       run: () => {
         // Assert on shipped code only — the file header comment records what the
         // old copy said.
@@ -969,8 +969,8 @@ export const suite = {
         assertTrue(/approved and active/i.test(src), 'states approved and active');
         assertTrue(/package and credits in place/i.test(src), 'states package and credits');
         assertTrue(/matched enquiries/i.test(src), 'uses matched-enquiry wording');
-        assertTrue(src.includes('Lead access depends on your account being approved and active'),
-          'process step states the eligibility dependency');
+        assertTrue(src.includes('Client matching access depends on your account being approved and active'),
+          'process step states the matching eligibility dependency');
 
         // Title intent is unchanged; the description is the truthful one.
         assertTrue(src.includes('Vendor Portal | QuickFurno'), 'title kept');
@@ -1064,8 +1064,8 @@ export const suite = {
           .replace(/\s+/g, ' ');
         assertTrue(src.includes('manage matched home-service enquiries when eligible'),
           'V2-11R metadata description unchanged');
-        assertTrue(src.includes('Lead access depends on your account being approved and active, with a package and credits in place.'),
-          'V2-11R eligibility step copy unchanged');
+        assertTrue(src.includes('Client matching access depends on your account being approved and active, with a package and credits in place.'),
+          'vendor eligibility step uses Client Matching language');
         assertTrue(src.includes('When can matched enquiries appear?'), 'V2-11R FAQ question unchanged');
         assertFalse(/verified home-service client leads/i.test(shipped),
           'no regression to the old claim in shipped code');
@@ -1087,6 +1087,40 @@ export const suite = {
         // The intro heading itself is untouched.
         assertTrue(portal.includes('qf-vendor-intro-title'), 'intro title still rendered');
         assertTrue(portal.includes('Login to your vendor dashboard'), 'login title copy unchanged');
+      },
+    },
+
+    {
+      name: 'vendor UI is Client Matching-first and preserves the legacy route safely',
+      run: () => {
+        const nav = readFileSync('components/vendor-dashboard-v2/navigation.ts', 'utf8');
+        assertTrue(nav.includes('label: "Client Matching"'), 'desktop nav uses Client Matching');
+        assertTrue(nav.includes('shortLabel: "Matching"'), 'mobile nav uses Matching');
+        assertTrue(nav.includes('href: "/vendor/dashboard/matching"'), 'canonical vendor matching route');
+        assertFalse(/label:\s*"Leads"/.test(nav), 'retired Leads nav label cannot return');
+
+        const matching = readFileSync('app/vendor/dashboard/matching/page.tsx', 'utf8');
+        assertTrue(matching.includes('title: "Client Matching - QuickFurno"'), 'matching metadata is client-facing');
+        assertTrue(matching.includes('>Client Matching</h1>'), 'matching page h1 is correct');
+        const legacy = readFileSync('app/vendor/dashboard/leads/page.tsx', 'utf8');
+        assertTrue(legacy.includes('redirect(`/vendor/dashboard/matching'), 'legacy /leads route redirects safely');
+
+        const overview = readFileSync('components/vendor-dashboard-v2/VendorOverview.tsx', 'utf8');
+        for (const copy of ['Client matches', 'Match reviews', 'Matching credits']) {
+          assertTrue(overview.includes(copy), 'overview keeps: ' + copy);
+        }
+        const packageCopy = readFileSync('components/vendor-dashboard-v2/package/VendorPackageWorkspace.tsx', 'utf8')
+          + readFileSync('components/vendor-dashboard-v2/package/packageModel.ts', 'utf8');
+        assertTrue(/matching credits/i.test(packageCopy), 'package uses matching-credit terminology');
+        assertFalse(/lead credits?/i.test(packageCopy), 'package never shows retired credit terminology');
+
+        const notices = readFileSync('components/vendor-dashboard-v2/notifications/notificationsModel.ts', 'utf8');
+        assertTrue(notices.includes('lead_assigned: "Client match"'), 'historical notification type renders as Client match');
+        assertTrue(notices.includes('vendorFacingNotificationText'), 'historical stored notification copy is normalized');
+        assertTrue(notices.includes('/vendor/dashboard/matching'), 'historical notification CTA is canonicalized');
+
+        const support = readFileSync('components/vendor-dashboard-v2/support/supportModel.ts', 'utf8');
+        assertTrue(support.includes('{ value: "leads", label: "Client matching" }'), 'support keeps backend topic value but changes visible label');
       },
     },
 

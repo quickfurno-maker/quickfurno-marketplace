@@ -30,7 +30,7 @@ export function notificationIcon(type: string | null | undefined): VendorIconNam
 
 /** Human label per stored `type`, again with a neutral fallback. */
 const TYPE_LABEL: Record<string, string> = {
-  lead_assigned: "Lead assigned",
+  lead_assigned: "Client match",
   lead_selected_recharge: "Credits needed",
   profile: "Profile review",
   support: "Support",
@@ -39,10 +39,21 @@ const TYPE_LABEL: Record<string, string> = {
   general: "Update",
 };
 
+export function vendorFacingNotificationText(value: string | null | undefined): string {
+  const raw = (value ?? "").trim();
+  if (!raw) return "";
+  return raw
+    .replace(/\blead credits\b/gi, "matching credits")
+    .replace(/\blead credit\b/gi, "matching credit")
+    .replace(/\bleads\b/gi, "client matches")
+    .replace(/\blead\b/gi, "client match");
+}
+
 export function notificationTypeLabel(type: string | null | undefined): string {
   const key = (type ?? "").trim().toLowerCase();
   if (!key) return "Update";
-  return TYPE_LABEL[key] ?? key.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const fallback = key.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return TYPE_LABEL[key] ?? vendorFacingNotificationText(fallback);
 }
 
 /**
@@ -68,6 +79,9 @@ export function internalCtaHref(url: string | null | undefined): string | null {
   if (!trimmed.startsWith("/")) return null;
   // Protocol-relative "//host" would leave the site.
   if (trimmed.startsWith("//")) return null;
+  if (trimmed === "/vendor/dashboard/leads" || trimmed.startsWith("/vendor/dashboard/leads?")) {
+    return trimmed.replace("/vendor/dashboard/leads", "/vendor/dashboard/matching");
+  }
   return trimmed;
 }
 

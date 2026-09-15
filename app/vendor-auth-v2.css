@@ -743,3 +743,52 @@
   .qf-vauth-tab,
   .qf-vauth-btn { transition-duration: 0.01ms !important; }
 }
+
+/* Final QuickFurno vendor visual lock: same green/orange system as homepage. */
+.qf-vauth-header,
+.qf-vendor-public-page,
+.qf-vauth-footer,
+.qf-vauth-page {
+  --qf-brand-blue: #07965f;
+  --qf-brand-blue-deep: #006b43;
+  --qf-brand-blue-tint: #eaf8f1;
+  --qf-brand-orange: #ff4f2f;
+}
+
+.qf-vauth-brand-link {
+  display: flex;
+  align-items: center;
+}
+
+.qf-vauth-brand-link img {
+  width: 142px;
+  height: auto;
+}
+
+.qf-vauth-context {
+  border-color: #b8e7d2;
+  background: #edf9f3;
+  color: #00784c;
+}
+
+.qf-vauth-btn,
+.qf-vendor-public-page .qf-rf-btn--primary {
+  border-color: #ff4f2f;
+  background: #ff4f2f;
+  box-shadow: 0 8px 20px -14px rgba(255, 79, 47, 0.75);
+}
+
+.qf-vauth-btn:hover:not(:disabled),
+.qf-vendor-public-page .qf-rf-btn--primary:hover:not(:disabled) {
+  border-color: #e94125;
+  background: #e94125;
+}
+
+.qf-vauth-tab[aria-selected="true"] {
+  background: #006b43;
+}
+
+@media (max-width: 640px) {
+  .qf-vauth-brand-link img { width: 128px; }
+  .qf-vauth-context { font-size: 0.62rem; padding-inline: 0.55rem; }
+}

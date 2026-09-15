@@ -681,7 +681,7 @@ export function VendorRegisterForm() {
           <h2>Vendor account created</h2>
           <p>
             Your vendor account and application have been submitted. QuickFurno will review your
-            profile. Once approved and credited, leads will appear in your dashboard. You can log
+            profile. Once approved and credited, client matches will appear in your dashboard. You can log
             in from this page.
           </p>
           <a className="qf-rf-btn qf-rf-btn--primary qf-rf-btn--full" href="/vendor?mode=login">

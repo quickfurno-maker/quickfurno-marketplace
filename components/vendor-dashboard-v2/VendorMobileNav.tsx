@@ -77,7 +77,7 @@ export function VendorMobileNav() {
                     aria-current={active ? "page" : undefined}
                   >
                     <VendorIcon name={item.icon} size={19} />
-                    <span>{item.label}</span>
+                    <span>{item.shortLabel ?? item.label}</span>
                     <VendorIcon name="arrow-right" size={17} className="qf-vendor-v2-sheet-chevron" />
                   </Link>
                 </li>
@@ -105,7 +105,7 @@ export function VendorMobileNav() {
               aria-current={active ? "page" : undefined}
             >
               <VendorIcon name={item.icon} size={21} />
-              <span>{item.label}</span>
+              <span>{item.shortLabel ?? item.label}</span>
             </Link>
           );
         })}

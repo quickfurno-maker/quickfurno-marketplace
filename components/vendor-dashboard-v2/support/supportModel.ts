@@ -18,7 +18,7 @@ export const SUPPORT_TOPICS: readonly { value: string; label: string }[] = [
   { value: "general", label: "General" },
   { value: "profile", label: "Profile" },
   { value: "package", label: "Package / recharge" },
-  { value: "leads", label: "Leads" },
+  { value: "leads", label: "Client matching" },
   { value: "billing", label: "Billing" },
 ];
 

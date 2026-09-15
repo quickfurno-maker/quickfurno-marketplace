@@ -21,7 +21,7 @@ export interface VendorNavItem {
 /** Primary work surfaces — the four things a vendor operates day to day. */
 export const VENDOR_PRIMARY_NAV: VendorNavItem[] = [
   { label: "Overview", href: "/vendor/dashboard", icon: "overview" },
-  { label: "Leads", href: "/vendor/dashboard/leads", icon: "leads" },
+  { label: "Client Matching", shortLabel: "Matching", href: "/vendor/dashboard/matching", icon: "leads" },
   { label: "My Profile", shortLabel: "Profile", href: "/vendor/dashboard/profile", icon: "profile" },
   { label: "Credits & Package", shortLabel: "Credits", href: "/vendor/dashboard/package", icon: "credits" },
 ];
@@ -41,7 +41,7 @@ export const VENDOR_ALL_NAV: VendorNavItem[] = [...VENDOR_PRIMARY_NAV, ...VENDOR
  */
 export const VENDOR_MOBILE_NAV: VendorNavItem[] = [
   { label: "Home", href: "/vendor/dashboard", icon: "overview" },
-  { label: "Leads", href: "/vendor/dashboard/leads", icon: "leads" },
+  { label: "Client Matching", shortLabel: "Matching", href: "/vendor/dashboard/matching", icon: "leads" },
   { label: "Profile", href: "/vendor/dashboard/profile", icon: "profile" },
   { label: "Credits", href: "/vendor/dashboard/package", icon: "credits" },
 ];

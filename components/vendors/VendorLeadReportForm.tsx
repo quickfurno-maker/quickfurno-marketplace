@@ -53,7 +53,7 @@ export function VendorLeadReportForm({ vendorId, assignmentId }: { vendorId: str
   if (done) {
     return (
       <p className="qf-vd-report-done">
-        Your report has been submitted for admin review. Reporting a lead does not automatically reverse lead credit.
+        Your report has been submitted for admin review. Reporting a match does not automatically reverse matching credit.
       </p>
     );
   }
@@ -61,7 +61,7 @@ export function VendorLeadReportForm({ vendorId, assignmentId }: { vendorId: str
   if (!open) {
     return (
       <button type="button" className="qf-vd-link" onClick={() => setOpen(true)}>
-        Report lead issue
+        Report match issue
       </button>
     );
   }
@@ -94,7 +94,7 @@ export function VendorLeadReportForm({ vendorId, assignmentId }: { vendorId: str
         </button>
         <button type="button" className="qf-vd-link" onClick={() => { setOpen(false); setError(null); }}>cancel</button>
       </div>
-      <p className="qf-vd-note">Reporting a lead does not automatically reverse lead credit. An admin will review your report.</p>
+      <p className="qf-vd-note">Reporting a match does not automatically reverse matching credit. An admin will review your report.</p>
     </div>
   );
 }

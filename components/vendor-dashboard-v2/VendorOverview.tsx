@@ -40,25 +40,25 @@ export function VendorOverview({
   const metrics: VendorMetric[] = [
     {
       key: "assigned",
-      label: "Assigned leads",
+      label: "Client matches",
       value: String(stats.total_leads),
-      caption: "Enquiries matched to you in total",
+      caption: "Clients matched to your business",
       icon: "leads",
-      href: "/vendor/dashboard/leads",
+      href: "/vendor/dashboard/matching",
     },
     {
       key: "validity",
-      label: "Validity reports",
+      label: "Match reviews",
       value: String(reportedLeads),
-      caption: "Lead-quality issues submitted for review",
+      caption: "Match-quality issues submitted for review",
       icon: "alert",
-      href: "/vendor/dashboard/leads",
+      href: "/vendor/dashboard/matching",
     },
     {
       key: "credits",
-      label: "Lead credits",
+      label: "Matching credits",
       value: String(credits),
-      caption: credits <= 0 ? "Recharge to receive new enquiries" : "Remaining on your package",
+      caption: credits <= 0 ? "Recharge to receive new matches" : "Remaining on your package",
       icon: "credits",
       tone: credits <= LOW_CREDIT_THRESHOLD ? "warn" : "default",
       href: "/vendor/dashboard/package",
@@ -104,7 +104,7 @@ export function VendorOverview({
       {completion.complete ? null : <VendorBusinessSummary vendor={vendor} variant="strip" />}
 
       <p className="qf-vendor-v2-overview-foot">
-        Need a hand with a lead or your package?{" "}
+        Need a hand with client matching or your package?{" "}
         <Link href="/vendor/dashboard/support">Contact QuickFurno support</Link>.
       </p>
     </div>

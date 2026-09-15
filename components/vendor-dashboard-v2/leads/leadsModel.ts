@@ -44,13 +44,13 @@ export function assignmentSourceBadge(
 ): VendorLeadSource | null {
   const s = (source ?? "").toLowerCase();
   if (s === "client_selected_vendor") return { label: "Client selected your profile", tone: "client" };
-  if (s === "auto_fill" || s === "auto_assigned") return { label: "QuickFurno matched this lead", tone: "auto" };
+  if (s === "auto_fill" || s === "auto_assigned") return { label: "QuickFurno matched this enquiry", tone: "auto" };
   if (s.includes("recovery")) return { label: "Recovery assignment", tone: "recovery" };
   if (s.startsWith("manual") || s === "admin_assigned") return { label: "Admin assigned", tone: "admin" };
 
   const t = (type ?? "").toLowerCase();
   if (t === "client_selected") return { label: "Client selected your profile", tone: "client" };
-  if (t === "auto_assigned") return { label: "QuickFurno matched this lead", tone: "auto" };
+  if (t === "auto_assigned") return { label: "QuickFurno matched this enquiry", tone: "auto" };
   if (t === "admin_assigned") return { label: "Admin assigned", tone: "admin" };
   return null;
 }
@@ -259,7 +259,7 @@ export interface VendorLeadFeedback {
 export function readLeadFeedback(param: string | undefined): VendorLeadFeedback | null {
   switch (param) {
     case "client-responded":
-      return { tone: "ok", message: "Client response confirmed. No connection reminders will be sent for this lead." };
+      return { tone: "ok", message: "Client response confirmed. No connection reminders will be sent for this match." };
     case "client-no-response":
       return { tone: "ok", message: "No response recorded. QuickFurno will run the bounded client connection-assistance sequence for this vendor." };
     case "connection-failed":
@@ -268,7 +268,7 @@ export function readLeadFeedback(param: string | undefined): VendorLeadFeedback 
       return {
         tone: "ok",
         message:
-          "Report submitted for admin review. Lead credit is not refunded automatically.",
+          "Report submitted for admin review. Matching credit is not reversed automatically.",
       };
     case "failed":
     case "report-failed":

@@ -59,7 +59,7 @@ export function VendorPackageWorkspace({
     <div className="qf-vendor-v2-package">
       <VendorUtilityHeader
         title="Credits & Package"
-        subtitle="Manage your lead credits and QuickFurno package."
+        subtitle="Manage your matching credits and QuickFurno package."
         action={
           <Link href="/vendor/dashboard/support" className="qf-vendor-v2-btn qf-vendor-v2-btn--quiet">
             Support
@@ -80,13 +80,13 @@ export function VendorPackageWorkspace({
       {/* Balance first: the number a vendor opens this page for. */}
       <section className="qf-vendor-v2-panel qf-vendor-v2-package-balance">
         <div className="qf-vendor-v2-package-balance-main">
-          <p className="qf-vendor-v2-package-balance-label">Remaining lead credits</p>
+          <p className="qf-vendor-v2-package-balance-label">Remaining matching credits</p>
           <strong className="qf-vendor-v2-package-balance-value" data-tone={credits.tone}>
             {formatCount(credits.remaining)}
           </strong>
           <p className="qf-vendor-v2-package-balance-of">
             {credits.total > 0
-              ? `${formatCount(credits.remaining)} of ${formatCount(credits.total)} lead credits remaining`
+              ? `${formatCount(credits.remaining)} of ${formatCount(credits.total)} matching credits remaining`
               : "No package credits recorded yet"}
           </p>
 
@@ -98,7 +98,7 @@ export function VendorPackageWorkspace({
               aria-valuenow={credits.percent}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label="Lead credits remaining"
+              aria-label="Matching credits remaining"
             >
               <span
                 className="qf-vendor-v2-progress-fill"
@@ -170,7 +170,7 @@ export function VendorPackageWorkspace({
                   <ul className="qf-vendor-v2-package-card-facts">
                     <li>
                       <VendorIcon name="leads" size={14} />
-                      {formatCount(item.lead_count)} lead credits
+                      {formatCount(item.lead_count)} matching credits
                     </li>
                     <li>
                       <VendorIcon name="clock" size={14} />

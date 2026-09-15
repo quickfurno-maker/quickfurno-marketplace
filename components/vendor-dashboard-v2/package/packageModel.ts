@@ -54,7 +54,7 @@ export function deriveCreditState(summary: VendorCurrentPackageSummary | null, f
       total,
       percent,
       tone: "empty",
-      headline: "No lead credits remaining",
+      headline: "No matching credits remaining",
       detail: "New enquiries cannot be assigned to you until credits are added.",
     };
   }
@@ -65,8 +65,8 @@ export function deriveCreditState(summary: VendorCurrentPackageSummary | null, f
       total,
       percent,
       tone: "low",
-      headline: "Lead credits running low",
-      detail: `Only ${remaining} lead credit${remaining === 1 ? "" : "s"} left.`,
+      headline: "Matching credits running low",
+      detail: `Only ${remaining} matching credit${remaining === 1 ? "" : "s"} left.`,
     };
   }
 
@@ -75,7 +75,7 @@ export function deriveCreditState(summary: VendorCurrentPackageSummary | null, f
     total,
     percent,
     tone: "ok",
-    headline: "Lead credits available",
+    headline: "Matching credits available",
     detail: "Matched enquiries can be assigned to your business.",
   };
 }

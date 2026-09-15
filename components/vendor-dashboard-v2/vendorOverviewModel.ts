@@ -162,7 +162,7 @@ export const LOW_CREDIT_THRESHOLD = 3;
 const PROFILE_HREF = "/vendor/dashboard/profile";
 const PACKAGE_HREF = "/vendor/dashboard/package";
 const SUPPORT_HREF = "/vendor/dashboard/support";
-const LEADS_HREF = "/vendor/dashboard/leads";
+const LEADS_HREF = "/vendor/dashboard/matching";
 
 export function isVendorVerified(vendor: VendorProfileSummary): boolean {
   return vendor.verification_status === "Verified" || vendor.status === "Approved";
@@ -192,7 +192,7 @@ export function deriveAccessState(
       tone: "pending",
       headline: "Profile under review",
       detail:
-        "Our team is verifying your business details. Lead access switches on once your profile is approved.",
+        "Our team is verifying your business details. Client matching switches on once your profile is approved.",
       actions: [
         { label: "Review my profile", href: PROFILE_HREF },
         { label: "Contact support", href: SUPPORT_HREF },
@@ -225,8 +225,8 @@ export function deriveAccessState(
   if (remainingCredits <= 0) {
     return {
       tone: "warn",
-      headline: "No lead credits left",
-      detail: "New enquiries cannot be assigned to you until you recharge your lead credits.",
+      headline: "No matching credits left",
+      detail: "New client matches cannot be assigned to you until you recharge your matching credits.",
       actions: [{ label: "Recharge credits", href: PACKAGE_HREF }],
     };
   }
@@ -234,18 +234,18 @@ export function deriveAccessState(
   if (remainingCredits <= LOW_CREDIT_THRESHOLD) {
     return {
       tone: "warn",
-      headline: "Lead credits running low",
-      detail: `Only ${remainingCredits} lead credit${remainingCredits === 1 ? "" : "s"} left. Recharge to keep receiving matched enquiries without a gap.`,
+      headline: "Matching credits running low",
+      detail: `Only ${remainingCredits} matching credit${remainingCredits === 1 ? "" : "s"} left. Recharge to keep receiving client matches without a gap.`,
       actions: [{ label: "Recharge credits", href: PACKAGE_HREF }],
     };
   }
 
   return {
     tone: "ok",
-    headline: "Active and receiving leads",
+    headline: "Client matching active",
     detail:
-      "Your profile is approved and your package is active. Matched enquiries are being assigned to you.",
-    actions: [{ label: "View all leads", href: LEADS_HREF }],
+      "Your profile is approved and your package is active. Relevant client enquiries can now be matched to your business.",
+    actions: [{ label: "View all matches", href: LEADS_HREF }],
   };
 }
 
@@ -277,7 +277,7 @@ export function deriveAccessFacts(
       tone: vendor.public_visibility ? "ok" : "pending",
     },
     {
-      label: "Lead credits",
+      label: "Matching credits",
       value: String(remainingCredits),
       tone: remainingCredits <= LOW_CREDIT_THRESHOLD ? "warn" : "ok",
     },

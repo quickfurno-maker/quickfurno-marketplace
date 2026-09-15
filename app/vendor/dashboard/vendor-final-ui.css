@@ -1,0 +1,287 @@
+
+/* QuickFurno Vendor Portal ? final green/orange application skin.
+   Imported after vendor-portal-v2.css; authority/layout semantics stay unchanged. */
+.qf-vendor-v2-shell {
+  --v2-blue: #07965f;
+  --v2-blue-deep: #075645;
+  --v2-blue-tint: #e9f7f0;
+  --v2-blue-line: #cfe9dd;
+  --v2-gold: #c67821;
+  --v2-ink: #082b3b;
+  --v2-ink-2: #173a48;
+  --v2-muted: #66747c;
+  --v2-faint: #8b969b;
+  --v2-page: #f6f9f8;
+  --v2-surface: #ffffff;
+  --v2-inset: #f8fbfa;
+  --v2-line: #e2e9e6;
+  --v2-line-soft: #edf2f0;
+  --v2-ok: #078758;
+  --v2-ok-tint: #e9f7f0;
+  --v2-ok-line: #c9e8d9;
+  --v2-warn: #b66a09;
+  --v2-warn-tint: #fff8ec;
+  --v2-warn-line: #f1ddbb;
+  --v2-danger: #b53a32;
+  --v2-danger-tint: #fff3f1;
+  --v2-danger-line: #f3d4d0;
+  --v2-orange: #ff552f;
+  --v2-orange-deep: #ef4723;
+  --v2-radius-sm: 10px;
+  --v2-radius: 16px;
+  --v2-radius-lg: 20px;
+  --v2-sidebar-w: 236px;
+  --v2-content-max: 1220px;
+  --v2-shadow: 0 10px 30px rgba(8,43,59,.055);
+  background: linear-gradient(180deg,#f8fbfa 0%,#f4f8f6 100%);
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.qf-vendor-v2-sidebar {
+  background: #fff;
+  border-right: 1px solid #e3ebe7;
+}
+.qf-vendor-v2-sidebar-head { padding: 1.15rem 1rem 1rem; }
+.qf-vendor-v2-brand {
+  display: grid;
+  gap: .32rem;
+  align-items: start;
+}
+.qf-vendor-v2-brand-logo { width: auto; height: 38px; object-fit: contain; }
+.qf-vendor-v2-brand--sm .qf-vendor-v2-brand-logo { height: 31px; }
+.qf-vendor-v2-brand-tag {
+  padding-left: 2.6rem;
+  color: #718079;
+  font-size: .64rem;
+  font-weight: 800;
+  letter-spacing: .09em;
+}
+.qf-vendor-v2-brand-mark,.qf-vendor-v2-brand-text { display:none; }
+
+.qf-vendor-v2-navgroup-label { color:#91a09a; font-weight:800; }
+.qf-vendor-v2-navlink {
+  min-height: 44px;
+  padding: 0 .72rem;
+  border-radius: 11px;
+  color:#38505b;
+  font-weight:650;
+}
+.qf-vendor-v2-navlink svg { color:#7b9188; }
+.qf-vendor-v2-navlink:hover { background:#f2f8f5; color:#075645; }
+.qf-vendor-v2-navlink[data-active="true"] {
+  background: linear-gradient(90deg,#e5f6ed,#f2fbf6);
+  color:#075645;
+  font-weight:800;
+}
+.qf-vendor-v2-navlink[data-active="true"] svg { color:#07965f; }
+.qf-vendor-v2-navlink[data-active="true"]::before { background:#ff552f; height:24px; }
+.qf-vendor-v2-sidebar-foot { border-top-color:#edf2ef; }
+
+.qf-vendor-v2-topbar {
+  min-height: 64px;
+  background: rgba(255,255,255,.94);
+  border-bottom-color:#e7edea;
+  backdrop-filter: blur(18px);
+}
+.qf-vendor-v2-topbar-eyebrow { color:#7d8c86; font-weight:800; }
+.qf-vendor-v2-topbar-title { color:#082b3b; font-weight:800; }
+.qf-vendor-v2-account {
+  border:1px solid #e4ebe8;
+  border-radius:999px;
+  background:#fff;
+  padding:.28rem .65rem .28rem .3rem;
+}
+.qf-vendor-v2-account-avatar { background:#e8f7ef; color:#06774c; font-weight:800; }
+.qf-vendor-v2-iconbtn { border-color:#e4ebe8; background:#fff; border-radius:999px; }
+.qf-vendor-v2-iconbtn:hover { background:#f2f8f5; border-color:#cfe4d9; color:#075645; }
+
+.qf-vendor-v2-content { padding-top:1.35rem; }
+.qf-vendor-v2-overview { gap:1.15rem; }
+.qf-vendor-v2-overview-head { padding:.25rem .1rem 0; align-items:center; }
+.qf-vendor-v2-greeting { color:#082b3b; font-weight:800; font-size:clamp(1.55rem,3vw,2rem); }
+.qf-vendor-v2-greeting span { color:#07965f; }
+.qf-vendor-v2-greeting-sub { color:#66747c; font-size:.9rem; }
+
+.qf-vendor-v2-panel,
+.qf-vendor-v2-metric {
+  border-color:#e1e9e5;
+  border-radius:16px;
+  box-shadow:0 10px 28px rgba(8,43,59,.055);
+}
+.qf-vendor-v2-panel { padding:1.05rem; }
+.qf-vendor-v2-panel-title { color:#082b3b; font-weight:800; }
+.qf-vendor-v2-panel-hint { color:#6d7b80; }
+.qf-vendor-v2-textlink { color:#075645; font-weight:800; }
+
+.qf-vendor-v2-metric-grid { gap:.85rem; }
+.qf-vendor-v2-metric { min-height:132px; padding:1rem; gap:.42rem; }
+.qf-vendor-v2-metric-top { justify-content:space-between; }
+.qf-vendor-v2-metric-icon {
+  width:38px;height:38px;flex-basis:38px;border-radius:12px;
+  background:#e9f7f0;color:#078758;
+}
+.qf-vendor-v2-metric:nth-child(2) .qf-vendor-v2-metric-icon { background:#fff6e5;color:#d07a00; }
+.qf-vendor-v2-metric:nth-child(3) .qf-vendor-v2-metric-icon { background:#fff0eb;color:#ef5a32; }
+.qf-vendor-v2-metric:nth-child(4) .qf-vendor-v2-metric-icon { background:#eef4ff;color:#4777bc; }
+.qf-vendor-v2-metric-label { font-weight:750;color:#5f7076; }
+.qf-vendor-v2-metric-value { color:#082b3b;font-weight:800; }
+.qf-vendor-v2-metric-caption { color:#7e8b90; }
+
+a.qf-vendor-v2-metric:hover { border-color:#bcdccc; box-shadow:0 14px 34px rgba(8,43,59,.08); }
+
+.qf-vendor-v2-btn--primary {
+  background:linear-gradient(135deg,#ff552f,#ef4723);
+  border-color:#ff552f;
+  box-shadow:0 8px 18px rgba(255,85,47,.18);
+}
+.qf-vendor-v2-btn--primary:hover { background:#ef4723;border-color:#ef4723; }
+.qf-vendor-v2-btn--quiet { border-color:#dfe8e4;color:#29434e; }
+.qf-vendor-v2-btn--quiet:hover { background:#f3f8f5;border-color:#cce0d6;color:#075645; }
+
+.qf-vendor-v2-leadrow {
+  background:#fff;
+  border-color:#e7eeeb;
+  border-radius:14px;
+  padding:.9rem;
+}
+.qf-vendor-v2-leadrow:hover { border-color:#cde3d8; background:#fbfdfc; }
+.qf-vendor-v2-leadstatus {
+  background:#e8f7ef!important;
+  color:#06784d!important;
+  border-color:#cce9da!important;
+}
+.qf-vendor-v2-leadlink,.qf-vendor-v2-panel-foot-link { color:#075645; font-weight:800; }
+
+.qf-vendor-v2-access-banner[data-tone="ok"] {
+  background:linear-gradient(135deg,#e8f7ef,#f4fbf7);
+  border-color:#c9e7d8;
+}
+.qf-vendor-v2-fact { border-bottom-color:#eef3f1; }
+.qf-vendor-v2-fact dt { color:#6f7e83; }
+.qf-vendor-v2-fact dd { color:#183a47; font-weight:750; }
+.qf-vendor-v2-progress-fill { background:linear-gradient(90deg,#07965f,#19ad72); }
+
+.qf-vendor-v2-pill[data-tone="ok"] { background:#e8f7ef;border-color:#c9e7d8;color:#06784d; }
+.qf-vendor-v2-pill[data-tone="pending"] { background:#fff8ec;border-color:#f1ddbb;color:#a45b08; }
+
+.qf-vendor-v2-bottomnav {
+  background:rgba(255,255,255,.98);
+  border-top-color:#e1e9e5;
+  box-shadow:0 -10px 30px rgba(8,43,59,.08);
+}
+.qf-vendor-v2-bottomnav-item { color:#64777e;font-weight:700; }
+.qf-vendor-v2-bottomnav-item[data-active="true"] { background:#e9f7f0;color:#075645;font-weight:800; }
+
+@media (min-width:1080px) {
+  .qf-vendor-v2-content { padding:1.6rem 2rem 3rem; }
+  .qf-vendor-v2-columns { grid-template-columns:minmax(0,1.65fr) minmax(310px,.85fr); gap:1rem; }
+  .qf-vendor-v2-sidebar { box-shadow:8px 0 28px rgba(8,43,59,.025); }
+}
+
+@media (max-width:699px) {
+  .qf-vendor-v2-content { padding:.9rem .75rem calc(var(--v2-bottomnav-h) + 1.35rem + env(safe-area-inset-bottom)); }
+  .qf-vendor-v2-topbar { padding-left:.75rem;padding-right:.75rem; }
+  .qf-vendor-v2-topbar-brand .qf-vendor-v2-brand-logo { height:29px; }
+  .qf-vendor-v2-account { max-width:38px;padding:.2rem;border-color:transparent;background:transparent; }
+  .qf-vendor-v2-account-avatar { width:34px;height:34px;flex-basis:34px; }
+  .qf-vendor-v2-metric-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.65rem; }
+  .qf-vendor-v2-metric { min-height:118px;padding:.85rem; }
+  .qf-vendor-v2-metric-value { font-size:1.55rem; }
+  .qf-vendor-v2-overview-head { gap:.7rem; }
+  .qf-vendor-v2-overview-headmeta { width:100%; }
+  .qf-vendor-v2-overview-headmeta .qf-vendor-v2-btn { min-height:36px; }
+  .qf-vendor-v2-panel { border-radius:15px;padding:.9rem; }
+  .qf-vendor-v2-bottomnav-item[data-active="true"] { background:transparent;color:#07965f; }
+  .qf-vendor-v2-bottomnav-item:nth-child(2)[data-active="true"] { color:#ff552f; }
+}
+
+
+/* Final cross-page polish ? Client Matching, Profile, Package, Notifications, Support. */
+.qf-vendor-v2-leads-title,
+.qf-vendor-v2-profile-title,
+.qf-vendor-v2-utilhead-title {
+  color: var(--v2-ink);
+  font-weight: 800;
+  font-size: clamp(1.35rem, 3vw, 1.7rem);
+}
+
+.qf-vendor-v2-leads-sub,
+.qf-vendor-v2-profile-sub,
+.qf-vendor-v2-utilhead-sub { color: #6c7b80; }
+
+.qf-vendor-v2-leads-stat,
+.qf-vendor-v2-leads-card,
+.qf-vendor-v2-profile-status,
+.qf-vendor-v2-profile-submit,
+.qf-vendor-v2-package-card,
+.qf-vendor-v2-package-order,
+.qf-vendor-v2-notice-item,
+.qf-vendor-v2-support-thread {
+  border-color: #e1e9e5;
+  border-radius: 15px;
+  box-shadow: 0 8px 26px rgba(8,43,59,.045);
+}
+
+.qf-vendor-v2-leads-stat-icon,
+.qf-vendor-v2-notice-item[data-unread="true"] .qf-vendor-v2-notice-icon {
+  background: #e9f7f0;
+  color: #078758;
+}
+.qf-vendor-v2-leads-card[data-expanded="true"],
+.qf-vendor-v2-support-thread[data-open="true"] { border-color: #b9ddcc; }
+.qf-vendor-v2-leads-status { background:#e9f7f0; border-color:#cae8d9; color:#06784d; }
+.qf-vendor-v2-leads-source[data-tone="client"],
+.qf-vendor-v2-leads-phone svg { color:#078758; }
+.qf-vendor-v2-leads-search:focus-within,
+.qf-vendor-v2-profile-input:focus-visible,
+.qf-vendor-v2-support-input:focus-visible { border-color:#9fd1ba; outline-color:#07965f; }
+
+.qf-vendor-v2-profile-chip {
+  border-color:#c9e8d9;
+  background:#e9f7f0;
+  color:#06784d;
+}
+.qf-vendor-v2-profile-chip button { background:rgba(7,150,95,.12); }
+.qf-vendor-v2-profile-chip button:hover { background:rgba(7,150,95,.22); }
+.qf-vendor-v2-profile-history-status[data-status="pending"] {
+  background:#fff8ec; border-color:#f1ddbb; color:#a35a09;
+}
+
+.qf-vendor-v2-package-balance-value { color:#082b3b; }
+.qf-vendor-v2-package-card { background:#fbfdfc; }
+.qf-vendor-v2-package-card:hover { border-color:#c6e2d4; }
+.qf-vendor-v2-package-bar .qf-vendor-v2-progress-fill { background:linear-gradient(90deg,#07965f,#19ad72); }
+.qf-vendor-v2-package-card .qf-vendor-v2-btn--primary { min-height:42px; }
+
+.qf-vendor-v2-notice-tab[data-active="true"] { background:#006b43; border-color:#006b43; }
+.qf-vendor-v2-notice-item[data-unread="true"] {
+  border-color:#c9e6d8;
+  border-left-color:#07965f;
+  background:#f0faf5;
+}
+.qf-vendor-v2-notice-unread { background:#07965f; }
+.qf-vendor-v2-notice-markread { color:#006b43; }
+
+.qf-vendor-v2-support-message[data-side="vendor"] {
+  border-color:#c9e8d9;
+  background:#eaf8f1;
+}
+.qf-vendor-v2-support-status[data-tone="open"] { color:#06784d; }
+.qf-vendor-v2-support-submit .qf-vendor-v2-btn--primary,
+.qf-vendor-v2-support-reply .qf-vendor-v2-btn--primary { min-height:42px; }
+
+@media (max-width: 699px) {
+  .qf-vendor-v2-leads-head,
+  .qf-vendor-v2-profile-head,
+  .qf-vendor-v2-utilhead { padding-top:.15rem; }
+  .qf-vendor-v2-leads-summary { gap:.55rem; }
+  .qf-vendor-v2-leads-stat { min-height:64px; }
+  .qf-vendor-v2-leads-card-main { padding:.9rem; }
+  .qf-vendor-v2-profile-layout,
+  .qf-vendor-v2-package,
+  .qf-vendor-v2-notice,
+  .qf-vendor-v2-support { gap:.75rem; }
+  .qf-vendor-v2-package-card,
+  .qf-vendor-v2-notice-item,
+  .qf-vendor-v2-support-thread { border-radius:14px; }
+}

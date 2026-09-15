@@ -42,7 +42,7 @@ export function VendorAccessStatus({
   const healthy = state.tone === "ok";
 
   return (
-    <VendorPanel title="Lead access">
+    <VendorPanel title="Client matching">
       <div
         className="qf-vendor-v2-access-banner"
         data-tone={state.tone}

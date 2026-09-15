@@ -438,7 +438,7 @@ async function deliverAssignment(leadId: string, vendorId: string, source: strin
     type: "lead_assigned",
     priority: "high",
     cta_label: "View lead",
-    cta_url: "/vendor/dashboard/leads",
+    cta_url: "/vendor/dashboard/matching",
   });
   if (!notify.ok) warnings.push(`vendor_notification:${notify.code}`);
   return warnings;

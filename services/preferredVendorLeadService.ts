@@ -322,7 +322,7 @@ async function deliverPreferredAssignment(leadId: string, vendorId: string, vend
     type: "lead_assigned",
     priority: "high",
     cta_label: "View lead",
-    cta_url: "/vendor/dashboard/leads",
+    cta_url: "/vendor/dashboard/matching",
   });
   if (!notify.ok) console.warn("[preferred vendor] vendor notification skipped", { code: notify.code });
 }

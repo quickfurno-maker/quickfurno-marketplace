@@ -87,7 +87,7 @@ const VENDOR_SERVICE_RAW = readRaw("services/vendorService.ts");
 const VENDOR_SERVICE = stripComments(VENDOR_SERVICE_RAW);
 const MODEL_RAW = readRaw("components/vendor-dashboard-v2/leads/leadsModel.ts");
 const MODEL_SRC = stripComments(MODEL_RAW);
-const PAGE_SRC = readCode("app/vendor/dashboard/leads/page.tsx");
+const PAGE_SRC = readCode("app/vendor/dashboard/matching/page.tsx");
 const ACCESS_RAW = readRaw("lib/vendors/assignedLeadContactAccess.ts");
 const ACCESS_SRC = stripComments(ACCESS_RAW);
 const AUTO_ELIG_SRC = readCode("lib/vendors/vendorAutomaticEligibility.ts");
@@ -355,7 +355,7 @@ check("25 [static] no 'recharge/activate a package' copy on the assigned-lead pa
   for (const p of [
     "components/vendor-dashboard-v2/leads/VendorLeadCard.tsx",
     "components/vendor-dashboard-v2/leads/VendorLeadAccessNotice.tsx",
-    "app/vendor/dashboard/leads/page.tsx",
+    "app/vendor/dashboard/matching/page.tsx",
   ]) {
     const src = readRaw(p);
     assert(!/Recharge your lead credits/i.test(src), `${p} still asks for a recharge`);

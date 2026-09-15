@@ -165,7 +165,7 @@ export async function createVendorLeadWhatsappPreview(
       `Preview only: New QuickFurno lead for ${vendorName}.`,
       `${lead.name ?? "Client"} needs ${lead.service_required ?? "a service"} in ${[lead.area, lead.city].filter(Boolean).join(", ") || "their city"}.`,
       `Phone: ${lead.phone ?? "available in dashboard"}.`,
-      "No live WhatsApp was sent. Open /vendor/dashboard/leads to respond.",
+      "No live WhatsApp was sent. Open /vendor/dashboard/matching to respond.",
     ].join(" ");
 
     const { error } = await adminClient().from("lead_delivery_logs").insert({

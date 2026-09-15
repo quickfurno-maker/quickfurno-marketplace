@@ -20,7 +20,7 @@ export function VendorLeadAccessNotice({ vendor }: { vendor: VendorProfileSummar
 
   const message = !approved
     ? "Your vendor profile must be approved before client contact is visible."
-    : "Your vendor account is inactive. Contact QuickFurno support to restore lead access.";
+    : "Your vendor account is inactive. Contact QuickFurno support to restore client matching access.";
 
   const action = !approved
     ? { label: "Review my profile", href: "/vendor/dashboard/profile" }

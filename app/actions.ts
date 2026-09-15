@@ -280,7 +280,7 @@ export async function sendClientSelectedVendorEnquiry(
     const recorded = await requirementGroups.recordClientSelectedVendor(group.data.id, vendorId, leadId);
     if (!recorded.ok) return recorded;
 
-    revalidatePath("/vendor/dashboard/leads");
+    revalidatePath("/vendor/dashboard/matching");
     revalidatePath("/vendor/dashboard");
     revalidatePath("/admin/lead-distribution");
     return ok({
@@ -398,7 +398,7 @@ export async function vendorLeads(vendorId: string) {
 
 export async function vendorRecordClientResponseFromForm(formData: FormData) {
   const me = await getMyVendor();
-  if (!me.ok || !me.data) redirect("/vendor/dashboard/leads?lead=no-vendor");
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/matching?match=no-vendor");
 
   const assignmentId = String(formData.get("assignmentId") ?? "");
   const outcome = String(formData.get("outcome") ?? "");
@@ -407,12 +407,12 @@ export async function vendorRecordClientResponseFromForm(formData: FormData) {
     assignmentId,
     outcome === "responded" ? "responded" : outcome === "no_response" ? "no_response" : ("" as never),
   );
-  revalidatePath("/vendor/dashboard/leads");
+  revalidatePath("/vendor/dashboard/matching");
   revalidatePath("/vendor/dashboard");
   if (!result.ok) {
-    redirect(`/vendor/dashboard/leads?lead=connection-failed&code=${encodeURIComponent(result.code)}`);
+    redirect(`/vendor/dashboard/matching?match=connection-failed&code=${encodeURIComponent(result.code)}`);
   }
-  redirect(`/vendor/dashboard/leads?lead=${outcome === "responded" ? "client-responded" : "client-no-response"}`);
+  redirect(`/vendor/dashboard/matching?match=${outcome === "responded" ? "client-responded" : "client-no-response"}`);
 }
 
 export async function vendorReportBadLead(
@@ -430,7 +430,7 @@ export async function vendorSubmitLeadReport(
 ) {
   try { await requireVendorOwner(vendorId); } catch (e) { return fail(e); }
   const result = await vendors.submitStructuredLeadReport(vendorId, assignmentId, reasonCode, comment);
-  revalidatePath("/vendor/dashboard/leads");
+  revalidatePath("/vendor/dashboard/matching");
   revalidatePath("/vendor/dashboard");
   revalidatePath("/admin/leads");
   return result;
@@ -438,7 +438,7 @@ export async function vendorSubmitLeadReport(
 
 export async function vendorReportBadLeadFromForm(formData: FormData) {
   const me = await getMyVendor();
-  if (!me.ok || !me.data) redirect("/vendor/dashboard/leads?lead=no-vendor");
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/matching?match=no-vendor");
 
   const assignmentId = String(formData.get("assignmentId") ?? "");
   const reportType = String(formData.get("report_type") ?? "");
@@ -446,11 +446,11 @@ export async function vendorReportBadLeadFromForm(formData: FormData) {
   const vendorComment = String(formData.get("vendor_comment") ?? "");
   const result = await vendorReportBadLead(me.data.id, assignmentId, reportType, reportReason, vendorComment);
 
-  revalidatePath("/vendor/dashboard/leads");
+  revalidatePath("/vendor/dashboard/matching");
   revalidatePath("/vendor/dashboard");
   revalidatePath("/admin/leads");
-  if (!result.ok) redirect(`/vendor/dashboard/leads?lead=report-failed&code=${encodeURIComponent(result.code)}`);
-  redirect("/vendor/dashboard/leads?lead=bad-lead-submitted");
+  if (!result.ok) redirect(`/vendor/dashboard/matching?match=report-failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/matching?match=bad-lead-submitted");
 }
 
 export async function vendorCreatePackageOrder(formData: FormData) {
@@ -753,7 +753,7 @@ export const adminProcessDueLeadAssignmentQueue = async (limit?: number) =>
     const result = await processDueLeadAssignmentQueue(limit);
     revalidatePath("/admin/lead-distribution");
     revalidatePath("/admin/leads");
-    revalidatePath("/vendor/dashboard/leads");
+    revalidatePath("/vendor/dashboard/matching");
     revalidatePath("/vendor/dashboard");
     return result;
   });
@@ -805,7 +805,7 @@ export const adminAssignLeadManually = async (leadId: string, vendorIds: string[
     const result = await manualAssign.assignLeadManually(leadId, vendorIds, user.id);
     revalidatePath("/admin/lead-distribution");
     revalidatePath("/admin/leads");
-    revalidatePath("/vendor/dashboard/leads");
+    revalidatePath("/vendor/dashboard/matching");
     return result;
   });
 
@@ -822,7 +822,7 @@ export const adminProcessDueRequirementAutoFills = async () =>
     await requireSuperadmin();
     const result = await requirementGroups.processDueRequirementAutoFills();
     revalidatePath("/admin/lead-distribution");
-    revalidatePath("/vendor/dashboard/leads");
+    revalidatePath("/vendor/dashboard/matching");
     revalidatePath("/vendor/dashboard");
     return result;
   });
@@ -832,7 +832,7 @@ export const adminProcessRequirementAutoFill = async (groupId: string) =>
     await requireSuperadmin();
     const result = await requirementGroups.processRequirementAutoFill(groupId);
     revalidatePath("/admin/lead-distribution");
-    revalidatePath("/vendor/dashboard/leads");
+    revalidatePath("/vendor/dashboard/matching");
     revalidatePath("/vendor/dashboard");
     return result;
   });
@@ -843,7 +843,7 @@ export const adminProcessPreferredVendorWindow = async (groupId: string) =>
     await requireSuperadmin();
     const result = await requirementGroups.processPreferredVendorWindow(groupId);
     revalidatePath("/admin/lead-distribution");
-    revalidatePath("/vendor/dashboard/leads");
+    revalidatePath("/vendor/dashboard/matching");
     revalidatePath("/vendor/dashboard");
     return result;
   });
@@ -853,7 +853,7 @@ export const adminProcessPreferredVendorRechargeWindows = async () =>
     await requireSuperadmin();
     const result = await requirementGroups.processDuePreferredVendorRechargeWindows();
     revalidatePath("/admin/lead-distribution");
-    revalidatePath("/vendor/dashboard/leads");
+    revalidatePath("/vendor/dashboard/matching");
     revalidatePath("/vendor/dashboard");
     return result;
   });

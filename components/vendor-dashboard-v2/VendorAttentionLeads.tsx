@@ -11,7 +11,7 @@ import {
   type VendorOverviewLead,
 } from "./vendorOverviewModel";
 
-const LEADS_HREF = "/vendor/dashboard/leads";
+const MATCHING_HREF = "/vendor/dashboard/matching";
 
 /**
  * "Needs your attention" — a SHORTLIST, not the CRM.
@@ -34,22 +34,22 @@ export function VendorAttentionLeads({
 
   return (
     <VendorPanel
-      title="Recent delivered leads"
-      hint="Latest quality leads delivered to your account."
-      action={leads.length > 0 ? { label: "All leads", href: LEADS_HREF } : undefined}
+      title="Recent client matches"
+      hint="Latest client enquiries matched to your business."
+      action={leads.length > 0 ? { label: "All matches", href: MATCHING_HREF } : undefined}
     >
       {shortlist.length === 0 ? (
         <VendorEmptyState
           icon="inbox"
-          title="No leads assigned yet"
+          title="No client matches yet"
           message={
             leads.length === 0
               ? verified
-                ? "Matched client enquiries will appear here as soon as they are assigned to you."
-                : "Client enquiries will start arriving once your profile is verified and lead access is active."
-              : "New matched leads will show up here."
+                ? "Matched client enquiries will appear here as soon as QuickFurno connects them to your business."
+                : "Client enquiries will start arriving once your profile is verified and client matching is active."
+              : "New client matches will show up here."
           }
-          action={leads.length === 0 ? undefined : { label: "Open Leads", href: LEADS_HREF }}
+          action={leads.length === 0 ? undefined : { label: "Open Matching", href: MATCHING_HREF }}
         />
       ) : (
         <>
@@ -102,8 +102,8 @@ export function VendorAttentionLeads({
                     )}
                     {/* Quiet text link, not a second button: one solid action
                         per row keeps the list from reading as a wall of CTAs. */}
-                    <Link href={LEADS_HREF} className="qf-vendor-v2-leadlink">
-                      Open lead
+                    <Link href={MATCHING_HREF} className="qf-vendor-v2-leadlink">
+                      Open match
                       <VendorIcon name="arrow-right" size={15} />
                     </Link>
                   </div>
@@ -116,11 +116,11 @@ export function VendorAttentionLeads({
               are hidden in CSS — see .qf-vendor-v2-leadlist), so this is the
               route to the ones not shown. The trailing clause is desktop-only
               because there the whole shortlist is already visible. */}
-          <Link href={LEADS_HREF} className="qf-vendor-v2-panel-foot-link">
+          <Link href={MATCHING_HREF} className="qf-vendor-v2-panel-foot-link">
             {/* One flex item, so the space before the trailing clause is a real
                 space rather than the row's gap (which reads as a double space). */}
             <span>
-              View all leads<span className="qf-vendor-v2-foot-link-more"> and review details</span>
+              View all matches<span className="qf-vendor-v2-foot-link-more"> and review client details</span>
             </span>
             <VendorIcon name="arrow-right" size={16} />
           </Link>

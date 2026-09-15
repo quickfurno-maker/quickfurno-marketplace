@@ -1262,3 +1262,14 @@
 
   .qf-sf-cta.qf-sf-cta { max-width: 420px; }
 }
+
+/* Final conversion-action lock: orange for homeowner submission, green for trust/selection. */
+.qf-rf-btn--primary.qf-rf-btn--primary,
+.qf-free-interest-actions button:last-child {
+  background:linear-gradient(135deg,#ff552f,#ef4723);
+  border-color:#ff552f;
+  color:#fff;
+  box-shadow:0 10px 22px rgba(255,85,47,.18);
+}
+.qf-rf-btn--primary:hover,
+.qf-free-interest-actions button:last-child:hover { background:#ef4723; border-color:#ef4723; }

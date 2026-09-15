@@ -67,7 +67,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
         <section className="qf-cat-intro">
           <div className="qf-pub-container qf-cat-intro-shell">
             <div className="qf-cat-intro-copy">
-              <Link href="/#categories" className="qf-cat-back">
+              <Link href="/#services" className="qf-cat-back">
                 <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
                   <path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -113,9 +113,9 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
                       serviceCategory={enquiryService}
                       source={`Category listing unavailable: ${category.name}`}
                     >
-                      Get Free Team Matches
+                      Get Matched
                     </EnquiryModalTrigger>
-                    <Link href="/#categories" className="qf-pub-btn qf-pub-btn--secondary">
+                    <Link href="/#services" className="qf-pub-btn qf-pub-btn--secondary">
                       Browse services
                     </Link>
                   </div>
@@ -144,7 +144,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
                   serviceCategory={enquiryService}
                   source={`Category assistance: ${category.name}`}
                 >
-                  Get Free Team Matches
+                  Get Matched
                 </EnquiryModalTrigger>
                 <ul>
                   <li>Free for homeowners</li>
@@ -168,9 +168,9 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
                 serviceCategory={enquiryService}
                 source={`Category final CTA: ${category.name}`}
               >
-                Get Free Team Matches
+                Get Matched
               </EnquiryModalTrigger>
-              <Link href="/#categories" className="qf-pub-btn qf-pub-btn--secondary">
+              <Link href="/#services" className="qf-pub-btn qf-pub-btn--secondary">
                 Browse services
               </Link>
             </div>

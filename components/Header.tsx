@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
+import { QFIcon } from "@/components/QuickFurnoIcons";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 
 // Single source of truth for the unified public-site navigation.
@@ -9,10 +11,10 @@ import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 // pages Next.js navigates home first, then scrolls to the anchor.
 const NAV_LINKS = [
   { label: "Home", href: "/" },
-  { label: "Services", href: "/#categories" },
+  { label: "Services", href: "/#services" },
   { label: "How It Works", href: "/#how-it-works" },
-  { label: "For Professionals", href: "/vendors" },
-  { label: "Resources", href: "/#why-quickfurno" },
+  { label: "For Vendors", href: "/vendors" },
+  { label: "About", href: "/#why-quickfurno" },
 ];
 
 export function Header() {
@@ -56,14 +58,26 @@ export function Header() {
   return (
     <header className={`qf-site-header${scrolled ? " qf-site-header--scrolled" : ""}`}>
       <div className="qf-header-shell">
+        <button
+          type="button"
+          className="qf-nav-toggle"
+          aria-label="Toggle navigation menu"
+          aria-expanded={open}
+          aria-controls="qf-mobile-menu"
+          onClick={() => setOpen((value) => !value)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
         <Link href="/" className="qf-brand" aria-label="QuickFurno home" onClick={() => setOpen(false)}>
-          <span className="qf-brand-lockup">
-            <span className="qf-brand-text">
-              <span className="qf-bw-quick">Quick</span>
-              <span className="qf-bw-furno">Furno</span>
-            </span>
-            <span className="qf-brand-tagline">Your Home, Our Priority.</span>
-          </span>
+          <Image
+            src="/assets/quickfurno/logos/quickfurno-logo.svg"
+            alt="QuickFurno"
+            width={260}
+            height={70}
+            priority
+          />
         </Link>
 
         <nav className="qf-nav" aria-label="Primary navigation">
@@ -75,21 +89,11 @@ export function Header() {
         </nav>
 
         <div className="qf-header-actions">
+          <span className="qf-location-pill"><QFIcon name="pin" /> Pune</span>
           <EnquiryModalTrigger className="qf-header-cta" source="Header CTA">
-            Get Free Team Matches
+            Get a Free Quote
           </EnquiryModalTrigger>
-          <button
-            type="button"
-            className="qf-nav-toggle"
-            aria-label="Toggle navigation menu"
-            aria-expanded={open}
-            aria-controls="qf-mobile-menu"
-            onClick={() => setOpen((value) => !value)}
-          >
-            <span />
-            <span />
-            <span />
-          </button>
+
         </div>
       </div>
 
@@ -110,7 +114,7 @@ export function Header() {
             source="Header CTA"
             onClick={() => setOpen(false)}
           >
-            Get Free Team Matches
+            Get a Free Quote
           </EnquiryModalTrigger>
         </nav>
       ) : null}

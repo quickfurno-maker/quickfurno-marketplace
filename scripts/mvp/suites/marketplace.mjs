@@ -830,21 +830,37 @@ export const suite = {
       },
     },
     {
+      name: 'vendor conversion page is Client Matching-first and canonical-category driven',
+      run: () => {
+        const src = readFileSync('app/vendors/page.tsx', 'utf8')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+        assertTrue(src.includes('categories, categorySlug, type QuickFurnoCategory'),
+          'vendor conversion imports the canonical category registry');
+        assertTrue(src.includes('const SERVICE_CARDS = categories.map'),
+          'vendor conversion derives service cards from canonical categories');
+        assertTrue(src.includes('with Client Matching'), 'Client Matching is the primary conversion proposition');
+        assertFalse(/\bleads?\b/i.test(src), 'retired lead terminology is absent from vendor conversion UI');
+        assertFalse(/Mumbai/i.test(src), 'Mumbai cannot return to the Pune launch conversion page');
+        assertFalse(/Wardrobes?\s*&?\s*Storage/i.test(src), 'non-canonical wardrobe/storage category cannot return');
+      },
+    },
+    {
       name: 'vendor page preview is labelled illustrative and the journey states eligibility',
       run: () => {
         const src = readFileSync('app/vendors/page.tsx', 'utf8');
-        // The dashboard preview must announce itself as an example, not live data.
-        assertTrue(src.includes('Example view'), 'visible example label');
-        assertTrue(/aria-label="Illustrative example[^"]*Not live data\./.test(src),
-          'accessible name says illustrative and not live');
-        assertTrue(src.includes('Example enquiry'), 'example enquiry labelled');
-        // The journey must not imply enquiries start immediately after signup.
-        assertTrue(/reviews your profile/i.test(src), 'states QuickFurno review');
-        assertTrue(/approved, active and credited/i.test(src), 'states eligibility reality');
-        assertTrue(/package and credits/i.test(src), 'states package/credit reality');
-        // Metadata is truthful.
-        assertFalse(/verified client matches/i.test(src), 'metadata claim removed');
-        assertTrue(src.includes('manage matched home-service enquiries'), 'truthful metadata');
+        // Product/example previews must announce themselves as illustrative, never live demand.
+        assertTrue(src.includes('Product preview ? illustrative'), 'visible illustrative product label');
+        assertTrue(src.includes('Illustrative Client Matching product preview. Not live demand data.'),
+          'accessible name says illustrative and not live demand');
+        assertTrue(src.includes('Example'), 'example match cards are labelled');
+        // The journey must not imply matching starts immediately after signup.
+        assertTrue(/reviews your business details/i.test(src), 'states QuickFurno review');
+        assertTrue(/signup alone does not activate client matching/i.test(src), 'states eligibility boundary');
+        assertTrue(/package and matching credits/i.test(src), 'states package/credit reality');
+        // Metadata is truthful and client-matching-first.
+        assertFalse(/verified client matches/i.test(src), 'unsupported client verification claim absent');
+        assertTrue(src.includes('manage relevant client matches'), 'truthful metadata');
       },
     },
     {
@@ -1028,7 +1044,7 @@ export const suite = {
       run: () => {
         // The shared components must still carry their homeowner behaviour.
         const header = readFileSync('components/Header.tsx', 'utf8');
-        assertTrue(header.includes('Get Free Team Matches'), 'public header keeps its CTA');
+        assertTrue(header.includes('Get a Free Quote'), 'public header keeps the approved quote CTA');
         assertTrue(header.includes('Toggle navigation menu'), 'public header keeps its menu toggle');
         const footer = readFileSync('components/Footer.tsx', 'utf8');
         assertTrue(footer.includes('Free for homeowners'), 'public footer keeps its summary');
@@ -1195,7 +1211,7 @@ export const suite = {
       run: () => {
         // The phase is admin-only; these approved surfaces must be unchanged.
         const header = readFileSync('components/Header.tsx', 'utf8');
-        assertTrue(header.includes('Get Free Team Matches'), 'public header CTA intact');
+        assertTrue(header.includes('Get a Free Quote'), 'public header CTA intact');
         const vHeader = readFileSync('components/vendor/VendorPortalHeader.tsx', 'utf8');
         assertTrue(vHeader.includes('Vendor Portal'), 'vendor chrome intact');
         assertFalse(vHeader.includes('qfa-'), 'admin tokens did not leak into vendor chrome');
@@ -1245,16 +1261,16 @@ export const suite = {
           'no hardcoded active item');
         assertTrue(code.includes('usePathname()'), 'active state reads the real pathname');
         assertTrue(/isHome\s*=\s*pathname === "\/"/.test(code), 'Home is active only on /');
-        assertTrue(/isCategory\s*=\s*pathname.startsWith\("\/category"\)/.test(code),
-          'Categories owns the active state on category routes');
+        assertTrue(/isServices\s*=\s*pathname.startsWith\("\/category"\)/.test(code),
+          'Services owns the active state on category routes');
         // Screen readers must get the same fact the highlight conveys.
         assertTrue((code.match(/aria-current=\{/g) || []).length >= 2, 'aria-current is exposed');
-        // WhatsApp leaves the site, so it is never a page and never "current".
-        // (Fill Form IS current on /enquiry - see the V2-14R case below.)
-        const waIndex = code.indexOf('WhatsAppGlyph />');
-        assertTrue(waIndex > 0, 'WhatsApp item found');
-        assertFalse(/aria-current/.test(code.slice(waIndex - 300, waIndex + 200)),
-          'WhatsApp is never marked as the current page');
+        // The locked public mobile nav has five product destinations.
+        for (const label of ['Home', 'Services', 'Quote', 'Vendors', 'More']) {
+          assertTrue(code.includes(`<span>${label}</span>`), `mobile nav keeps ${label}`);
+        }
+        assertTrue(/isVendors\s*=\s*pathname === "\/vendors" \|\| pathname.startsWith\("\/vendors\/"\)/.test(code),
+          'Vendors owns public vendor listing/profile routes');
       },
     },
     {
@@ -1288,12 +1304,12 @@ export const suite = {
         const finalHome = readFileSync('components/home/FinalHomepage.tsx', 'utf8');
         assertTrue(finalHome.includes('id="contact"'), 'the homepage anchor target is kept');
         // Every header anchor must exist in the homepage composition.
-        for (const [href, id] of [['/#categories', 'categories'], ['/#how-it-works', 'how-it-works'],
+        for (const [href, id] of [['/#services', 'services'], ['/#how-it-works', 'how-it-works'],
                                   ['/#why-quickfurno', 'why-quickfurno']]) {
           assertTrue(header.includes(href), 'header links ' + href);
         }
         const home = readFileSync('app/page.tsx', 'utf8') + finalHome;
-        for (const id of ['categories', 'how-it-works', 'why-quickfurno']) {
+        for (const id of ['services', 'how-it-works', 'why-quickfurno']) {
           assertTrue(home.includes('id="' + id + '"'), 'anchor #' + id + ' exists on the homepage');
         }
       },
@@ -1313,10 +1329,12 @@ export const suite = {
         }
         const vendorPage = readFileSync('app/vendor/page.tsx', 'utf8');
         assertFalse(vendorPage.includes('<StickyMobileCTA />'), '/vendor renders no public bottom nav');
-        // WhatsApp destination authority stays in lib/config, not inlined here.
+        // The public bottom nav is the locked five-item product navigation, with no contact shortcut.
         const bottom = readFileSync('components/MobileBottomNav.tsx', 'utf8');
-        assertTrue(bottom.includes('whatsappLink()'), 'WhatsApp uses the existing helper');
-        assertFalse(/wa\.me\/\d/.test(bottom), 'no hardcoded second contact authority');
+        for (const label of ['Home', 'Services', 'Quote', 'Vendors', 'More']) {
+          assertTrue(bottom.includes(`<span>${label}</span>`), `bottom nav keeps ${label}`);
+        }
+        assertFalse(/whatsappLink|wa\.me\/\d/i.test(bottom), 'no contact authority is embedded in navigation');
       },
     },
 
@@ -1329,26 +1347,30 @@ export const suite = {
 
         // The three predicates that drive the whole table.
         assertTrue(/isHome\s*=\s*pathname === "\/"/.test(code), 'Home: exact "/"');
-        assertTrue(/isCategory\s*=\s*pathname.startsWith\("\/category"\)/.test(code),
-          'Categories: /category prefix');
-        assertTrue(/isEnquiry\s*=\s*pathname === "\/enquiry"/.test(code),
-          'Fill Form: exact "/enquiry"');
+        assertTrue(/isServices\s*=\s*pathname.startsWith\("\/category"\)/.test(code),
+          'Services: /category prefix');
+        assertTrue(/isQuote\s*=\s*pathname === "\/enquiry"/.test(code),
+          'Quote: exact "/enquiry"');
+        assertTrue(/isVendors\s*=\s*pathname === "\/vendors" \|\| pathname.startsWith\("\/vendors\/"\)/.test(code),
+          'Vendors: public vendor routes');
 
         // Reproduce the table the predicates imply, for every certified route.
         const activeFor = (pathname) => {
           const hits = [];
           if (pathname === '/') hits.push('Home');
-          if (pathname.startsWith('/category')) hits.push('Categories');
-          if (pathname === '/enquiry') hits.push('Fill Form');
+          if (pathname.startsWith('/category')) hits.push('Services');
+          if (pathname === '/enquiry') hits.push('Quote');
+          if (pathname === '/vendors' || pathname.startsWith('/vendors/')) hits.push('Vendors');
           return hits;
         };
         const expected = {
           '/': ['Home'],
-          '/category/carpenters': ['Categories'],
-          '/enquiry': ['Fill Form'],
+          '/category/carpenters': ['Services'],
+          '/enquiry': ['Quote'],
           '/privacy': [],
           '/terms': [],
-          '/vendors': [],
+          '/vendors': ['Vendors'],
+          '/vendors/example': ['Vendors'],
         };
         for (const [route, want] of Object.entries(expected)) {
           const got = activeFor(route);
@@ -1357,13 +1379,12 @@ export const suite = {
           assertTrue(got.length <= 1, route + ' has at most one current item');
         }
 
-        // Fill Form stays a modal-opening button; it was NOT turned into a link
-        // just to get active styling.
-        assertTrue(code.includes('<EnquiryModalTrigger'), 'Fill Form is still the modal trigger');
-        assertFalse(/<Link[^>]*Fill Form/s.test(code), 'Fill Form was not converted to a link');
-        // Active styling reuses the established class, not a new one.
-        assertEqual((code.match(/qf-bottom-nav-item--active/g) || []).length, 3,
-          'all three active items share one class');
+        // Quote stays a modal-opening button; it is not converted into a route link.
+        assertTrue(code.includes('<EnquiryModalTrigger'), 'Quote is still the modal trigger');
+        assertTrue(code.includes('<span>Quote</span>'), 'Quote label is present');
+        // Active styling reuses the established class for Home, Services, Quote and Vendors.
+        assertEqual((code.match(/qf-bottom-nav-item--active/g) || []).length, 4,
+          'all four route-aware items share one active class');
       },
     },
 
@@ -1540,7 +1561,7 @@ export const suite = {
           'error state still comes from a null read');
         assertTrue(page.includes('Vendor listings are temporarily unavailable.'),
           'unavailable copy unchanged');
-        assertTrue(page.includes('Get Free Team Matches'), 'primary CTA unchanged');
+        assertTrue(page.includes('Get Matched'), 'primary CTA uses the approved concise matching copy');
         assertTrue(page.includes('Browse services'), 'secondary CTA unchanged');
         // Routing is untouched by an artwork phase.
         assertTrue(page.includes('getCategoryBySlug'), 'category routing unchanged');

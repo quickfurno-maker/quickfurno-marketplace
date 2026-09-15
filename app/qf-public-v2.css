@@ -25,14 +25,14 @@
   --qf-brand-faint: #8d97a8;
 
   /* Primary action — the same blue the approved vendor portal uses */
-  --qf-brand-blue: #2563eb;
-  --qf-brand-blue-deep: #1d4ed8;
-  --qf-brand-blue-tint: #eff4ff;
-  --qf-brand-blue-line: #d7e3fd;
+  --qf-brand-blue: #07965f;
+  --qf-brand-blue-deep: #075645;
+  --qf-brand-blue-tint: #e9f7f0;
+  --qf-brand-blue-line: #cfe9dd;
 
   /* Brand warmth — wordmark and small accents only, never a button colour */
-  --qf-brand-orange: #c67821;
-  --qf-brand-orange-deep: #9a5e16;
+  --qf-brand-orange: #ff552f;
+  --qf-brand-orange-deep: #ef4723;
 
   /* Surfaces */
   --qf-brand-bg: #f6f8fb;
@@ -1193,4 +1193,71 @@
 
   .qf-pub-btn--primary:hover,
   .qf-launcher-item:hover { transform: none; }
+}
+
+/* Final public UI lock — align all non-home public routes with the approved homepage. */
+.qf-pub-btn--primary,
+.qf-site-header .qf-header-cta {
+  background: linear-gradient(135deg, #ff552f, #ef4723);
+  border-color: #ff552f;
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(255,85,47,.20);
+}
+.qf-pub-btn--primary:hover,
+.qf-site-header .qf-header-cta:hover { background:#ef4723; border-color:#ef4723; }
+.qf-final-cta { background:linear-gradient(135deg,#064e3e,#075645 65%,#086b50); }
+.qf-final-cta .qf-pub-btn--primary { background:linear-gradient(135deg,#ff552f,#ef4723); border-color:#ff552f; color:#fff; }
+.qf-final-cta .qf-pub-btn--primary:hover { background:#ef4723; border-color:#ef4723; }
+
+.qf-site-header .qf-brand { display:inline-flex; align-items:center; }
+.qf-site-header .qf-brand img { width:176px; height:auto; display:block; }
+.qf-site-header .qf-location-pill {
+  min-height:38px; display:inline-flex; align-items:center; gap:.42rem;
+  padding:0 .82rem; border:1px solid var(--qf-brand-line); border-radius:999px;
+  background:#fff; color:var(--qf-brand-ink); font-size:.8rem; font-weight:700;
+}
+.qf-site-header .qf-location-pill svg { width:15px; height:15px; }
+.qf-site-header .qf-nav-link { font-weight:650; }
+.qf-site-header .qf-nav-link:hover { color:var(--qf-brand-blue-deep); background:var(--qf-brand-blue-tint); }
+.qf-site-header .qf-header-cta { border-radius:999px; font-weight:800; }
+.qf-site-header .qf-mobile-nav-link:hover { background:var(--qf-brand-blue-tint); color:var(--qf-brand-blue-deep); }
+
+@media (max-width:879px) {
+  .qf-site-header .qf-header-shell { min-height:62px; position:relative; justify-content:center; }
+  .qf-site-header .qf-brand img { width:142px; }
+  .qf-site-header .qf-nav-toggle { position:absolute; left:1rem; border-radius:50%; }
+  .qf-site-header .qf-header-actions { position:absolute; right:1rem; }
+  .qf-site-header .qf-location-pill { min-height:36px; padding:0 .65rem; font-size:.72rem; }
+}
+
+.qf-foot.qf-foot { background:#064e3e; border-top:0; color:#fff; }
+.qf-foot .qf-foot-logo-q { color:#fff; }
+.qf-foot .qf-foot-logo-f { color:#ff8a6d; }
+.qf-foot .qf-foot-tagline { color:rgba(255,255,255,.72); }
+.qf-foot .qf-foot-acc { border-bottom-color:rgba(255,255,255,.11); }
+.qf-foot .qf-foot-acc-btn { color:#fff; }
+.qf-foot .qf-foot-acc-chev { border-color:rgba(255,255,255,.52); }
+.qf-foot .qf-foot-links a,
+.qf-foot .qf-foot-links span { color:rgba(255,255,255,.68); }
+.qf-foot .qf-foot-links a:hover { color:#fff; }
+.qf-foot .qf-foot-bottom {
+  border-top-color:rgba(255,255,255,.12);
+  color:rgba(255,255,255,.58);
+}
+
+.qf-bottom-nav.qf-bottom-nav--five { grid-template-columns:repeat(5,minmax(0,1fr)); padding-top:.38rem; }
+.qf-bottom-nav .qf-bottom-nav-item { min-width:0; font-weight:700; }
+.qf-bottom-nav .qf-bottom-nav-item--active { background:transparent; color:#07965f; }
+.qf-bottom-nav .qf-bottom-nav-item--quote { position:relative; color:#ff552f; font-weight:800; }
+.qf-bottom-nav .qf-bottom-nav-quote-icon {
+  width:36px; height:36px; margin-top:-13px; display:grid; place-items:center;
+  border-radius:50%; background:linear-gradient(135deg,#ff552f,#ef4723); color:#fff;
+  box-shadow:0 8px 18px rgba(255,85,47,.28); border:3px solid #fff;
+}
+.qf-bottom-nav .qf-bottom-nav-quote-icon svg { width:17px; height:17px; }
+
+@media (max-width:879px) {
+  .qf-site-header .qf-nav-toggle { left:1rem; right:auto !important; transform:none !important; }
+  .qf-site-header .qf-header-actions { left:auto !important; right:1rem; transform:none !important; }
+  .qf-site-header .qf-brand { margin-inline:auto; }
 }

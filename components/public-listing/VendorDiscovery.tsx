@@ -174,7 +174,7 @@ export function VendorDiscovery({
               serviceCategory={enquiryService}
               source={`Category empty state: ${categoryName}`}
             >
-              Get Free Team Matches
+              Get Matched
             </EnquiryModalTrigger>
           </div>
         </div>

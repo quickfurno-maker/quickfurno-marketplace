@@ -615,19 +615,17 @@ record("D09 the workflow is fail-closed by default",
 
 record("D10 the certified 50.2E / 50.3 / 50.4 / 50.5 workflows are untouched",
   (() => {
-    const FROZEN = {
-      "QF-MVP-50-01-Core-Job-Dispatcher.50.2B-selfhost-env.workflow.json": true,
-      "QF-MVP-50-01-Core-Job-Dispatcher.workflow.json": true,
-      "QF-MVP-50-02-Client-Whatsapp-Executor.50.2E-selfhost-env.workflow.json": true,
-      "QF-MVP-50-03-Vendor-Whatsapp-Executor.workflow.json": true,
-      "QF-MVP-50-04-Campaign-Execution-Executor.workflow.json": true,
-      "QF-MVP-50-05-Recovery-Supervisor.workflow.json": true,
-    };
+    const CANONICAL = [
+      "QF-MVP-50-02-Client-Whatsapp-Executor.50.2E-selfhost-env.workflow.json",
+      "QF-MVP-50-03-Vendor-Whatsapp-Executor.workflow.json",
+      "QF-MVP-50-04-Campaign-Execution-Executor.workflow.json",
+      "QF-MVP-50-05-Recovery-Supervisor.workflow.json",
+      "QF-MVP-50-06-Orphan-Cancellation-Supervisor.workflow.json",
+      "QF-MVP-50-07-Stale-Business-Supervisor.workflow.json",
+    ];
     const flows = readdirSync(path.join(ROOT, "automation/n8n"))
       .filter((f) => f.endsWith(".workflow.json")).sort();
-    return flows.length === 8 &&
-      Object.keys(FROZEN).every((f) => flows.includes(f)) &&
-      // every pre-existing workflow is still inactive too
+    return same(flows, CANONICAL) &&
       flows.every((f) => JSON.parse(read(`automation/n8n/${f}`)).active === false);
   })());
 

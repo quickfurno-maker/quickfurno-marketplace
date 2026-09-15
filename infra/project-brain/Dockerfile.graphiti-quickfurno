@@ -1,0 +1,33 @@
+FROM python:3.11-slim-bookworm
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    MCP_SERVER_HOST=0.0.0.0
+
+WORKDIR /app/mcp
+
+RUN pip install --no-cache-dir \
+    "mcp>=1.27.2,<2" \
+    "graphiti-core[google-genai]==0.30.2" \
+    "openai>=2.41.0" \
+    "google-genai>=2.8.0" \
+    "pydantic-settings>=2.0.0" \
+    "pyyaml>=6.0.3" \
+    "typing-extensions>=4.0.0"
+
+COPY main.py ./
+COPY src/ ./src/
+COPY config/ ./config/
+
+# Upstream Graphiti 0.30.2 Gemini factory leaves small_model unset, which falls back
+# to retired gemini-2.5-flash-lite. Pin the small slot to the configured model.
+RUN sed -i "/case 'gemini':/,/return GeminiClient/ s/model=config.model,/model=config.model,\\n                    small_model=config.model,/" src/services/factories.py
+
+RUN mkdir -p /var/log/graphiti
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=5 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)" || exit 1
+
+CMD ["python", "main.py"]

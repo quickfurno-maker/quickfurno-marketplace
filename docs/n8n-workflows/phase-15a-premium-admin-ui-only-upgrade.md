@@ -80,8 +80,8 @@ Via the shared shell + primitives (no page logic changed):
 
 - ✅ UI-only. No WhatsApp, no vendor notification, no credit deduction, no
   auto-assignment, no n8n call, no AOS behavior change.
-- ✅ Cities remain admin-managed (Pune, Mumbai); categories remain admin-managed
-  (Interior / Sofa / Painter / Civil Work; Interior subcategories: Interior
+- ✅ Cities remain admin-managed, with the current launch policy exposing Pune only;
+  categories remain admin-managed (Interior / Sofa / Painter / Civil Work; Interior
   Designers, Carpenters, Modular Factory, Premium Interiors).
 - ✅ No fake cities/categories introduced. No fake demo metrics added; the one
   pre-existing fake metric ("76% marketplace health") was removed.

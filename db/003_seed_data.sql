@@ -23,16 +23,16 @@ insert into public.service_categories (name, slug) values
   ('Custom Furniture',   'custom-furniture')
 on conflict (slug) do nothing;
 
--- ---- Cities (QuickFurno launch markets) -----------------------------------
-insert into public.cities (name, slug) values
-  ('Pune',      'pune'),
-  ('Mumbai',    'mumbai'),
-  ('Bengaluru', 'bengaluru'),
-  ('Hyderabad', 'hyderabad'),
-  ('Delhi',     'delhi'),
-  ('Nagpur',    'nagpur'),
-  ('Nashik',    'nashik')
-on conflict (slug) do nothing;
+-- ---- Cities (Pune-only launch; future markets remain inactive) ------------
+insert into public.cities (name, slug, is_active) values
+  ('Pune',      'pune',      true),
+  ('Mumbai',    'mumbai',    false),
+  ('Bengaluru', 'bengaluru', false),
+  ('Hyderabad', 'hyderabad', false),
+  ('Delhi',     'delhi',     false),
+  ('Nagpur',    'nagpur',    false),
+  ('Nashik',    'nashik',    false)
+on conflict (slug) do update set is_active = excluded.is_active;
 
 -- ---- App settings ---------------------------------------------------------
 insert into public.app_settings (key, value) values

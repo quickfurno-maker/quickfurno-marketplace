@@ -10,6 +10,7 @@ import { evaluateAssignedLeadContactAccess } from "../lib/vendors/assignedLeadCo
 // QF-MVP-80.16C — the Indian mobile contract, stated once in a pure module so
 // the server authority, the live form and the notification lane cannot drift.
 import { isValidIndianMobile } from "../lib/vendors/vendorContactContract";
+import { normalizeLaunchCity } from "../lib/locations/launchCityPolicy";
 import type {
   VendorRegistrationInput, VendorDashboardStats,
 } from "../lib/types";
@@ -27,7 +28,7 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
     const businessNameClean = (input.business_name ?? "").trim();
     const ownerNameClean = (input.owner_name ?? "").trim();
     const emailClean = (input.email ?? "").trim();
-    const cityClean = (input.city ?? "").trim();
+    const cityClean = normalizeLaunchCity(input.city);
 
     // Check if it's the full onboarding registration wizard or simple form.
     // (Pincode removed from this signal in Phase 1 — location is now Google-based.)
@@ -78,7 +79,7 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       office_address_line1: input.office_address_line1 ?? null,
       office_address_line2: input.office_address_line2 ?? null,
       office_landmark: input.office_landmark ?? null,
-      office_city: input.office_city ?? cityClean,
+      office_city: normalizeLaunchCity(input.office_city) ?? cityClean,
       office_state: input.office_state ?? null,
       // office_pincode intentionally not written (Phase 1: pincode retired). The
       // legacy column stays in the schema; existing vendor rows are untouched.

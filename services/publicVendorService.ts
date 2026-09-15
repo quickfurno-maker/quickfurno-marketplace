@@ -35,6 +35,7 @@ import {
 import { getVendorPublicVisibility } from "@/lib/vendors/vendorVisibility";
 import { normalizeStatus } from "@/lib/vendors/vendorEligibility";
 import { type QuickFurnoCategory, type Vendor } from "@/lib/quickfurno-data";
+import { LAUNCH_CITY, normalizeLaunchCity } from "@/lib/locations/launchCityPolicy";
 
 type VendorRow = Record<string, unknown>;
 
@@ -142,6 +143,7 @@ export async function getPublicVendorsForCategory(
     const { data, error } = await adminClient()
       .from("vendors")
       .select("*")
+      .ilike("city", LAUNCH_CITY)
       .order("rating", { ascending: false })
       .limit(250);
 
@@ -215,6 +217,7 @@ export async function getPublicVendorProfileBySlugOrId(
       : (await fetchVendorRowByColumn("slug", key)) ?? (await fetchVendorRowByColumn("public_slug", key));
 
     if (row) {
+      if (!normalizeCity(row)) return null;
       const visibility = getVendorPublicVisibility(row, runtimeSettings);
       if (!visibility.isPubliclyVisible) return null;
       return mapToPublicVendor(row, resolveVendorCategory(row), visibility.visibilityType);
@@ -259,6 +262,7 @@ function mapToPublicVendor(
   if (!id) return null;
 
   const city = normalizeCity(row);
+  if (!city) return null;
   // Paid + trial vendors use the standard (QuickFurno-brokered) contact path;
   // free/unpaid vendors get activePaidPlan=false so the card only exposes the
   // gated interest flow. This is a DISPLAY flag — lead-assignment eligibility is
@@ -417,10 +421,11 @@ function coerceServiceValues(value: unknown): string[] {
   return text.split(",").map((part) => part.trim()).filter(Boolean);
 }
 
-/** Public city is constrained to Pune | Mumbai; anything else defaults to Pune. */
-function normalizeCity(row: VendorRow): "Pune" | "Mumbai" {
-  const raw = (asText(row.city) ?? asText(row.office_city) ?? "").toLowerCase();
-  return raw.includes("mumbai") ? "Mumbai" : "Pune";
+/** Public city is Pune-only during launch; unsupported explicit cities fail closed. */
+function normalizeCity(row: VendorRow): "Pune" | null {
+  const serviceCity = asText(row.city);
+  if (serviceCity) return normalizeLaunchCity(serviceCity);
+  return normalizeLaunchCity(row.office_city);
 }
 
 function normalizeText(value: unknown): string {

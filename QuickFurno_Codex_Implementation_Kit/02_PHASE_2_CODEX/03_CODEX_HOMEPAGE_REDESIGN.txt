@@ -19,7 +19,7 @@ Homepage requirements:
 6. Trust strip: Verified Vendors, Fast Response, Transparent Process, Location-Based Matching
 7. How QuickFurno Works section
 8. USP section
-9. Pune & Mumbai coverage section
+9. Pune launch coverage section
 10. Testimonials
 11. Final CTA section
 12. Lead enquiry form opens as popup/modal on CTA click

@@ -12,7 +12,7 @@ export type QualityLevel = "Budget" | "Standard" | "Premium";
 export type Vendor = {
   slug: string;
   businessName: string;
-  city: "Pune" | "Mumbai";
+  city: "Pune";
   category: QuickFurnoCategory;
   subCategory: string;
   rating: number;
@@ -52,7 +52,7 @@ export type VendorServiceChip = {
 
 export const brandName = "QuickFurno";
 
-export const cities = ["Pune", "Mumbai"] as const;
+export const cities = ["Pune"] as const;
 
 export const categories: Array<{
   name: QuickFurnoCategory;
@@ -155,22 +155,6 @@ export const vendors: Vendor[] = [
     imageTone: "kitchen-line",
   },
   {
-    slug: "mumbai-carpenter-pro",
-    businessName: "Mumbai Carpenter Pro",
-    city: "Mumbai",
-    category: "Carpenters",
-    subCategory: "Custom Woodwork",
-    rating: 4.6,
-    reviews: 82,
-    rate: "₹950/sq.ft",
-    experience: "7 years",
-    responseTime: "30 min",
-    activePaidPlan: true,
-    verified: true,
-    description: "On-site carpentry, wardrobes, storage and custom woodwork.",
-    imageTone: "wood-craft",
-  },
-  {
     slug: "elite-sofa-works",
     businessName: "Elite Sofa Works",
     city: "Pune",
@@ -185,22 +169,6 @@ export const vendors: Vendor[] = [
     verified: true,
     description: "Custom sofas, recliners, fabric selection and upholstery repair.",
     imageTone: "sofa-studio",
-  },
-  {
-    slug: "perfect-paint-studio",
-    businessName: "Perfect Paint Studio",
-    city: "Mumbai",
-    category: "Painter",
-    subCategory: "Premium Painting",
-    rating: 4.7,
-    reviews: 103,
-    rate: "₹22/sq.ft",
-    experience: "6 years",
-    responseTime: "25 min",
-    activePaidPlan: true,
-    verified: true,
-    description: "Premium wall finishes, textures, repainting and managed painting work.",
-    imageTone: "paint-finish",
   },
   {
     slug: "buildright-civil-works",
@@ -250,22 +218,6 @@ export const vendors: Vendor[] = [
     description: "Practical home interiors, storage planning and phased execution support.",
     imageTone: "warm-suite",
   },
-  {
-    slug: "thane-woodcraft-studio",
-    businessName: "Thane Woodcraft Studio",
-    city: "Mumbai",
-    category: "Carpenters",
-    subCategory: "Wardrobe & Storage",
-    rating: 4.1,
-    reviews: 15,
-    rate: "Price on request",
-    experience: "6 years",
-    responseTime: "4 hr",
-    activePaidPlan: false,
-    verified: true,
-    description: "Custom wardrobes, TV units and repair carpentry for apartments.",
-    imageTone: "wood-craft",
-  },
 ];
 
 const vendorListingMeta: Record<
@@ -284,23 +236,11 @@ const vendorListingMeta: Record<
     openStatus: "Responds in 20 min",
     trustSignals: ["Verified", "Factory finish", "High response"],
   },
-  "mumbai-carpenter-pro": {
-    locality: "Andheri, Mumbai",
-    distance: "4.8 km",
-    openStatus: "Responds in 30 min",
-    trustSignals: ["Verified", "Top rated", "High response"],
-  },
   "elite-sofa-works": {
     locality: "Wakad, Pune",
     distance: "5.2 km",
     openStatus: "Available today",
     trustSignals: ["Verified", "Custom work", "High response"],
-  },
-  "perfect-paint-studio": {
-    locality: "Borivali, Mumbai",
-    distance: "6.0 km",
-    openStatus: "Open till 8:30 pm",
-    trustSignals: ["Verified", "Top rated", "Site visit"],
   },
   "buildright-civil-works": {
     locality: "Baner, Pune",
@@ -318,12 +258,6 @@ const vendorListingMeta: Record<
     locality: "Baner, Pune",
     distance: "4.4 km",
     openStatus: "Responds in 3 hr",
-    trustSignals: ["Verified", "Budget friendly", "Local team"],
-  },
-  "thane-woodcraft-studio": {
-    locality: "Thane, Mumbai",
-    distance: "8.2 km",
-    openStatus: "Available tomorrow",
     trustSignals: ["Verified", "Budget friendly", "Local team"],
   },
 };
@@ -526,23 +460,17 @@ export const pricingMatrix: Record<Exclude<QuickFurnoCategory, "Sofa">, Record<Q
 export const portfolioProjects = [
   ["Warm Living Room Interior", "Raj Premium Interiors", "Interior Designers", "Pune"],
   ["Minimal Modular Kitchen", "Kharadi Modular Factory", "Modular Factory", "Pune"],
-  ["Custom Wardrobe Wall", "Mumbai Carpenter Pro", "Carpenters", "Mumbai"],
   ["Premium Bedroom Suite", "Raj Premium Interiors", "Premium Interiors", "Pune"],
   ["Soft Neutral Sofa Set", "Elite Sofa Works", "Sofa", "Pune"],
-  ["Texture Wall Makeover", "Perfect Paint Studio", "Painter", "Mumbai"],
   ["Civil Renovation Work", "BuildRight Civil Works", "Civil Work", "Pune"],
   ["Compact Kitchen Upgrade", "Kharadi Modular Factory", "Modular Factory", "Pune"],
   ["False Ceiling Detail", "Raj Premium Interiors", "Interior Designers", "Pune"],
   ["Family Lounge Sofa", "Elite Sofa Works", "Sofa", "Pune"],
   ["Full Home Turnkey", "Raj Premium Interiors", "Premium Interiors", "Pune"],
-  ["Wood Panel Storage", "Mumbai Carpenter Pro", "Carpenters", "Mumbai"],
-  ["Dining Wall Finish", "Perfect Paint Studio", "Painter", "Mumbai"],
   ["Bathroom Civil Repair", "BuildRight Civil Works", "Civil Work", "Pune"],
   ["Luxury Kitchen Island", "Kharadi Modular Factory", "Modular Factory", "Pune"],
-  ["Kids Room Wardrobe", "Mumbai Carpenter Pro", "Carpenters", "Mumbai"],
   ["Premium TV Unit", "Raj Premium Interiors", "Interior Designers", "Pune"],
   ["Elegant Recliner Set", "Elite Sofa Works", "Sofa", "Pune"],
-  ["Exterior Repaint", "Perfect Paint Studio", "Painter", "Mumbai"],
   ["Home Renovation Shell", "BuildRight Civil Works", "Civil Work", "Pune"],
 ].map(([title, vendorName, category, city], index) => ({
   id: index + 1,
@@ -572,7 +500,7 @@ export const whyChooseQuickFurno: { title: string; body: string }[] = [
   },
   {
     title: "Local network",
-    body: "Start with Pune and Mumbai vendors who understand local pricing and execution.",
+    body: "Start with Pune vendors who understand local pricing and execution.",
   },
   {
     title: "Better comparison",
@@ -589,12 +517,12 @@ export const clientTestimonials = [
   {
     quote: "I needed carpentry work for wardrobes. The response was fast and the profiles were much clearer than random calls.",
     name: "Rohit Mehta",
-    detail: "Carpentry client, Mumbai",
+    detail: "Carpentry client, Pune",
   },
   {
     quote: "The painting quote process was simple. I could understand per sq.ft rates before speaking to the vendor.",
     name: "Priya Shah",
-    detail: "Painting client, Mumbai",
+    detail: "Painting client, Pune",
   },
   {
     quote: "We received modular kitchen options in a day and could see project examples before deciding.",
@@ -622,7 +550,7 @@ export const clientFaqs = [
   },
   {
     question: "Which cities are available?",
-    answer: "QuickFurno is focused on Pune and Mumbai for the MVP launch.",
+    answer: "QuickFurno is launching in Pune only.",
   },
   {
     question: "Can I book interior designer and carpenter separately?",
@@ -653,6 +581,6 @@ export const vendorFaqs = [
   },
   {
     question: "Can I choose city and category?",
-    answer: "Yes. Vendor onboarding captures city, service category, sub-category, rate and experience.",
+    answer: "QuickFurno is currently onboarding vendors for Pune only; category, rate and experience are captured during onboarding.",
   },
 ];

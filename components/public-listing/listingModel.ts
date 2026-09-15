@@ -150,7 +150,7 @@ export function toListingView(vendor: ListingVendorInput): VendorListingView {
 /** The only filters backed by real columns. */
 export type ListingFilters = {
   query: string;
-  /** "All" | "Pune" | "Mumbai" */
+  /** "All" currently means the Pune launch catalog. */
   city: string;
   /** Real vendor-uploaded portfolio images present. */
   hasPhotos: boolean;

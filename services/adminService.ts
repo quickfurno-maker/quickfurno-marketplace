@@ -5,6 +5,7 @@
 import { adminClient } from "../lib/supabase";
 import { appError, type Result, ok, fail, isMissingRelationError } from "../lib/errors";
 import type { AdminDashboardStats } from "../lib/types";
+import { isLaunchCity } from "../lib/locations/launchCityPolicy";
 
 const head = (q: any) => q.select("id", { count: "exact", head: true });
 
@@ -588,7 +589,7 @@ export async function createCity(input: AdminNameInput, actorUserId: string): Pr
     if (!name) throw appError("VALIDATION");
     const { data, error } = await adminClient()
       .from("cities")
-      .insert({ name, slug: slugify(name), is_active: input.is_active ?? true })
+      .insert({ name, slug: slugify(name), is_active: isLaunchCity(name) ? (input.is_active ?? true) : false })
       .select("id")
       .single();
     if (error) throw error;
@@ -602,7 +603,13 @@ export async function createCity(input: AdminNameInput, actorUserId: string): Pr
 export async function setCityActive(id: string, isActive: boolean, actorUserId: string): Promise<Result<null>> {
   if (!actorUserId) return fail(appError("UNAUTHORIZED"));
   try {
-    const { error } = await adminClient().from("cities").update({ is_active: isActive }).eq("id", id);
+    const db = adminClient();
+    if (isActive) {
+      const { data: city, error: readError } = await db.from("cities").select("name, slug").eq("id", id).single();
+      if (readError) throw readError;
+      if (!city || (!isLaunchCity(city.name) && !isLaunchCity(city.slug))) throw appError("VALIDATION");
+    }
+    const { error } = await db.from("cities").update({ is_active: isActive }).eq("id", id);
     if (error) throw error;
     await recordAuditLog(isActive ? "city.enabled" : "city.disabled", "city", id, {}, actorUserId);
     return ok(null);

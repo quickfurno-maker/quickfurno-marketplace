@@ -43,7 +43,7 @@ const SLIDES: HeroSlide[] = [
     id: "core",
     headline: "Find the right verified team for your home project.",
     support:
-      "Get matched with up to 3 relevant verified local teams in Pune & Mumbai — free for homeowners.",
+      "Get matched with up to 3 relevant verified local teams in Pune — free for homeowners.",
     media: "/assets/quickfurno/images/hero/hero-01-matching.svg",
     alt: "",
   },
@@ -51,7 +51,7 @@ const SLIDES: HeroSlide[] = [
     id: "interiors",
     headline: "From custom carpentry to modular work, find the right team.",
     support:
-      "Compare verified carpenters and modular specialists across Pune & Mumbai.",
+      "Compare verified carpenters and modular specialists across Pune.",
     media: "/assets/quickfurno/images/hero/hero-02-carpentry.svg",
     alt: "",
   },

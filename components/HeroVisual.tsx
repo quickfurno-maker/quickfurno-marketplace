@@ -13,7 +13,7 @@ export function HeroVisual() {
       <div className="hero-photo-frame hero-float-slow">
         <Image
           src={heroImage}
-          alt="Premium home interior delivered by QuickFurno verified vendors in Pune and Mumbai"
+          alt="Premium home interior delivered by QuickFurno verified vendors in Pune"
           fill
           priority
           sizes="(max-width: 980px) 100vw, 520px"

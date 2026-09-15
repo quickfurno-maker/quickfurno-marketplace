@@ -463,7 +463,7 @@ begin
   if position('vendor.lead_offer' in v_vendor) = 0 then
     raise exception 'QF_LEAD_SCOPE_LOCK: lead delivery notification was lost';
   end if;
-  if v_business !~* 'if p_action_type = ''vendor\.response_reminder'' then[[:space:]]+return ''stale'';' then
+  if v_business !~* 'if p_action_type = ''vendor\.response_reminder'' then[^;]*return ''stale'';' then
     raise exception 'QF_LEAD_SCOPE_LOCK: response reminder business-state retirement missing';
   end if;
   if position('jarvis' in lower(v_request_scope)) > 0

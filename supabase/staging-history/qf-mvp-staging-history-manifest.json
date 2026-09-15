@@ -1055,7 +1055,7 @@
       "version": "20260912050000",
       "name": "qf_lead_generation_scope_lock",
       "path": "supabase/migrations/20260912050000_qf_lead_generation_scope_lock.sql",
-      "sha256": "543aaaba8a37030c2e8f459c3cd17f0376542001240d022134ec8e158e3ab19d",
+      "sha256": "45e83f3b9631c24bdfa3860fb42434fdb129ffb3f4e0ce05c6ad269e23d331c5",
       "phase": "QF-AOS-V2-BOUNDARY",
       "operationalStatus": "PENDING",
       "purpose": "Locks the final QuickFurno operating principle: quality lead generation, matching and vendor delivery plus one bounded connection-assurance service. Vendor response chasing and all commercial sales stages remain retired; Core alone may schedule up to five assignment-specific client connection reminders after a vendor reports no response within 24 hours, with a future Core-authorized Riya handoff only after the unanswered sequence. Historical migrations/data remain unchanged.",

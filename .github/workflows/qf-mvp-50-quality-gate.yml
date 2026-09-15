@@ -126,7 +126,10 @@ jobs:
         run: npm run test:mvp:50-7
 
       - name: Canonical six n8n workflow guard
-        run: npm run test:n8n:canonical-six
+        run: npm run test:automation:canonical-six
+
+      - name: Automation Studio control-plane guard
+        run: npm run test:automation-studio
 
       - name: QF launch security closeout validator
         run: npm run test:security:launch-closeout

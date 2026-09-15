@@ -13,6 +13,10 @@ import {
   claimAutomationJobForN8nTransport,
   getAutomationTransportRuntimeConfig,
 } from "@/services/automationTransportService";
+import {
+  getAutomationStudioWorkflowKeyForFamily,
+  isAutomationStudioWorkflowEnabled,
+} from "@/services/automationStudioService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -117,6 +121,26 @@ export async function POST(request: Request) {
         code: "AUTOMATION_TRANSPORT_WORKER_NOT_AUTHORIZED",
       },
       403,
+      verified.requestId,
+      config.responseSecret,
+    );
+  }
+  const studioWorkflow = "workflowFamily" in parsed.body
+    ? getAutomationStudioWorkflowKeyForFamily(parsed.body.workflowFamily)
+    : "client_journey";
+
+  if (!(await isAutomationStudioWorkflowEnabled(studioWorkflow))) {
+    return signedJson(
+      {
+        ok: true,
+        transportVersion: 1,
+        requestId: verified.requestId,
+        state: "empty",
+        replayed: false,
+        executable: false,
+        code: "AUTOMATION_STUDIO_PAUSED",
+      },
+      200,
       verified.requestId,
       config.responseSecret,
     );

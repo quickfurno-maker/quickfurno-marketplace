@@ -32,6 +32,7 @@ import {
 import { parseCancelStaleRequestBody } from "@/lib/automation/staleBusinessContract";
 import { N8N_CANCEL_STALE_ROUTE_PATH } from "@/lib/automation/transportTypes";
 import { cancelStaleBusinessAutomationJobForN8nTransport } from "@/services/automationStaleBusinessCancellationService";
+import { isAutomationStudioWorkflowEnabled } from "@/services/automationStudioService";
 import { getAutomationTransportRuntimeConfig } from "@/services/automationTransportService";
 
 export const runtime = "nodejs";
@@ -107,6 +108,10 @@ export async function POST(request: Request) {
       verified.requestId,
       config.responseSecret,
     );
+  }
+
+  if (!(await isAutomationStudioWorkflowEnabled("stale_cleanup"))) {
+    return signedJson({ ok: true, transportVersion: 1, requestId: verified.requestId, route: "cancel_stale_v1", orchestrationState: "cancel_stale_empty", replayed: false }, 200, verified.requestId, config.responseSecret);
   }
 
   try {

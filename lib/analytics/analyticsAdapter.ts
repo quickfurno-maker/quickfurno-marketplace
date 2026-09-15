@@ -199,7 +199,7 @@ export function buildAnalyticsModel(data: Snapshot): QuickFurnoAnalyticsModel {
   if (areas.length === 0) {
     areas.push(
       { city: "Pune", locality: "Kharadi", area: "Kharadi", leads: 0, lead_count: 0, hot_leads: 0, active_vendors: 0, vendor_count: 0, assigned_leads: 0, unassigned_leads: 0, demand_supply_gap: "Placeholder" },
-      { city: "Mumbai", locality: "Thane", area: "Thane", leads: 0, lead_count: 0, hot_leads: 0, active_vendors: 0, vendor_count: 0, assigned_leads: 0, unassigned_leads: 0, demand_supply_gap: "Placeholder" },
+      { city: "Pune", locality: "Baner", area: "Baner", leads: 0, lead_count: 0, hot_leads: 0, active_vendors: 0, vendor_count: 0, assigned_leads: 0, unassigned_leads: 0, demand_supply_gap: "Placeholder" },
     );
   }
 
@@ -213,7 +213,7 @@ export function buildAnalyticsModel(data: Snapshot): QuickFurnoAnalyticsModel {
     ? vendors
     : [
         { id: "sample-vendor-1", business_name: "Verified Interiors Studio", status: "Active", remaining_credits: 12, service_categories: ["interiors"], city: "Pune" },
-        { id: "sample-vendor-2", business_name: "Premium Carpentry Works", status: "Active", remaining_credits: 8, service_categories: ["carpentry"], city: "Mumbai" },
+        { id: "sample-vendor-2", business_name: "Premium Carpentry Works", status: "Active", remaining_credits: 8, service_categories: ["carpentry"], city: "Pune" },
       ];
 
   const vendorRows: VendorMetric[] = vendorSource.slice(0, 12).map((vendor, index) => ({

@@ -19,7 +19,7 @@ const homeStats: Stat[] = [
   { icon: "user", value: "Verified", label: "Teams near you", short: "Verified Teams" },
   { icon: "request", value: "Up to 3", label: "Team matches per enquiry", short: "Up to 3 Matches" },
   { icon: "tag", value: "Free", label: "Client enquiries", short: "Free Enquiry" },
-  { icon: "map", value: "Pune & Mumbai", label: "Now serving", short: "Pune & Mumbai" },
+  { icon: "map", value: "Pune", label: "Now serving", short: "Pune" },
   { icon: "lock", value: "Secure", label: "Data & privacy", short: "Secure & Private" },
 ];
 

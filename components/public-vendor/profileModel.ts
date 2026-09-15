@@ -17,8 +17,8 @@
 //   responseTime   -> "Quick response expected", rendered as a "response" stat
 //   distance       -> getVendorListingMeta() invents "Nearby"
 //   business hours -> the page invented "Mon - Sun, 10:00 am - 9:00 pm"
-//   service areas  -> the page invented Baner/Wakad (Pune) or Andheri/Thane
-//                     (Mumbai) whenever the vendor published none
+//   service areas  -> the page invented locality defaults whenever the vendor
+//                     published none
 //   "Premium"      -> a commercial package flag shown as a quality badge
 //
 // This model reads ONLY fields a vendor actually published and returns explicit

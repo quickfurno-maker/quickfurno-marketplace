@@ -5,8 +5,7 @@ import { QFIcon } from "@/components/QuickFurnoIcons";
  * QF-UI-V2-05 homepage sections.
  *
  * COPY TRUTH. Every claim below is one the product can actually stand behind:
- * verified vendor profiles, up to 3 matches per lead, free for homeowners, Pune
- * and Mumbai. The previous copy asserted things the repo has no support for —
+ * verified vendor profiles, up to 3 matches per lead, free for homeowners, and Pune-only launch coverage. The previous copy asserted things the repo has no support for —
  * "Background-checked professionals", "On-Time Guarantee / on-time or on us",
  * "Quality Assured … every time", "Matches in minutes", "Fast Response",
  * "Clear rates, no surprises", "work gets done … on time, every time" — and all
@@ -21,7 +20,7 @@ const TRUST_POINTS = [
   { icon: "shield" as const, label: "Verified vendor profiles" },
   { icon: "compare" as const, label: "Up to 3 matches" },
   { icon: "noFee" as const, label: "Free for homeowners" },
-  { icon: "pin" as const, label: "Pune & Mumbai" },
+  { icon: "pin" as const, label: "Pune" },
   { icon: "lock" as const, label: "Your details stay private" },
 ];
 
@@ -117,18 +116,16 @@ export function CoverageV2() {
           <div>
             <span className="qf-pub-eyebrow">Coverage</span>
             <h2 style={{ margin: 0, fontSize: "clamp(1.4rem, 3vw, 1.9rem)", fontWeight: 700, letterSpacing: "-0.025em", color: "var(--qf-brand-ink)" }}>
-              Live in Pune &amp; Mumbai
+              Live in Pune
             </h2>
             <p style={{ margin: "0.55rem 0 0", maxWidth: "48ch", lineHeight: 1.6, color: "var(--qf-brand-muted)" }}>
-              QuickFurno currently matches homeowners with verified vendors across these two
-              cities.
+              QuickFurno currently matches homeowners with verified vendors across Pune.
             </p>
           </div>
 
           <div>
             <div className="qf-coverage-cities">
               <span className="qf-coverage-city"><QFIcon name="pin" />Pune</span>
-              <span className="qf-coverage-city"><QFIcon name="pin" />Mumbai</span>
             </div>
             <p className="qf-coverage-note">More cities as we verify vendors there.</p>
           </div>
@@ -155,7 +152,7 @@ export function FinalCTAV2() {
           <div className="qf-final-cta-points">
             <span><QFIcon name="noFee" />Free for homeowners</span>
             <span><QFIcon name="compare" />Up to 3 verified matches</span>
-            <span><QFIcon name="pin" />Pune &amp; Mumbai</span>
+            <span><QFIcon name="pin" />Pune</span>
           </div>
         </div>
       </div>

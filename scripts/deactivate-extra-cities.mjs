@@ -1,14 +1,13 @@
 // ============================================================================
-// QuickFurno — Phase 14B: deactivate extra demo-seed cities
+// QuickFurno — Pune-only launch: deactivate every non-launch city
 //
-// The demo seed inserted 7 cities, ALL active (Pune, Mumbai, Bengaluru,
-// Hyderabad, Delhi, Nagpur, Nashik). The launched marketplace serves only Pune
-// and Mumbai, so every city dropdown (which correctly reads ACTIVE cities) shows
-// all 7. This script deactivates the extras so dropdowns show only Pune+Mumbai.
+// The database may contain historical/future city rows. Pune is the only launch
+// city allowed to remain active. This script deactivates every non-Pune row so
+// rerunning maintenance cannot accidentally re-enable another city.
 //
 // SAFE + REVERSIBLE:
 //   - Only sets is_active = false (NO delete / drop / truncate).
-//   - An admin can re-enable any city anytime from Admin -> Cities & Locations.
+//   - Non-Pune rows are retained for future launches, but stay inactive.
 //   - Reads .env.local READ-ONLY for the Supabase URL + service-role key (the
 //     same pattern as scripts/grant-superadmin.mjs). Never writes .env.
 //   - No WhatsApp, no vendor notification, no credit deduction, no n8n.
@@ -41,8 +40,7 @@ const supabase = createClient(
   { auth: { persistSession: false, autoRefreshToken: false } },
 );
 
-const KEEP_ACTIVE = ["pune", "mumbai"];
-const DEACTIVATE = ["bengaluru", "delhi", "hyderabad", "nagpur", "nashik"];
+const LAUNCH_CITY = "pune";
 
 const { data: before, error: readErr } = await supabase
   .from("cities")
@@ -59,20 +57,24 @@ for (const c of before ?? []) {
   console.log(`  ${c.is_active ? "ACTIVE  " : "inactive"}  ${c.name}`);
 }
 
-// Deactivate the extra demo cities (match by lowercased name).
-const toDeactivate = (before ?? []).filter(
-  (c) => DEACTIVATE.includes(String(c.name ?? "").trim().toLowerCase()) && c.is_active !== false,
-);
+// Deactivate every active row that is not Pune (match name or slug).
+const toDeactivate = (before ?? []).filter((c) => {
+  const name = String(c.name ?? "").trim().toLowerCase();
+  const slug = String(c.slug ?? "").trim().toLowerCase();
+  return name !== LAUNCH_CITY && slug !== LAUNCH_CITY && c.is_active !== false;
+});
 for (const c of toDeactivate) {
   const { error } = await supabase.from("cities").update({ is_active: false }).eq("id", c.id);
   if (error) console.error(`  Failed to deactivate ${c.name}:`, error.message);
   else console.log(`  → deactivated ${c.name}`);
 }
 
-// Ensure the launched cities stay active.
-const toActivate = (before ?? []).filter(
-  (c) => KEEP_ACTIVE.includes(String(c.name ?? "").trim().toLowerCase()) && c.is_active !== true,
-);
+// Ensure Pune stays active.
+const toActivate = (before ?? []).filter((c) => {
+  const name = String(c.name ?? "").trim().toLowerCase();
+  const slug = String(c.slug ?? "").trim().toLowerCase();
+  return (name === LAUNCH_CITY || slug === LAUNCH_CITY) && c.is_active !== true;
+});
 for (const c of toActivate) {
   const { error } = await supabase.from("cities").update({ is_active: true }).eq("id", c.id);
   if (error) console.error(`  Failed to activate ${c.name}:`, error.message);
@@ -92,4 +94,4 @@ if (afterErr) {
 
 console.log("\nAfter — ACTIVE cities (what every dropdown will show):");
 for (const c of after ?? []) console.log(`  • ${c.name}`);
-console.log("\nDone. Re-enable any city anytime from Admin → Cities & Locations.\n");
+console.log("\nDone. Pune is the only launch-active city.\n");

@@ -88,7 +88,7 @@ export function Footer() {
           </Link>
           <p className="qf-foot-tagline">
             QuickFurno connects homeowners with verified interior, carpentry, modular, painting,
-            sofa and civil-work vendors in Pune and Mumbai.
+            sofa and civil-work vendors in Pune.
           </p>
         </div>
 
@@ -126,7 +126,7 @@ export function Footer() {
       </div>
 
       <div className="qf-foot-bottom">
-        <span>© 2026 QuickFurno · Pune &amp; Mumbai</span>
+        <span>© 2026 QuickFurno · Pune</span>
         <span>Verified vendors · Up to 3 matches · Free for homeowners</span>
       </div>
     </footer>

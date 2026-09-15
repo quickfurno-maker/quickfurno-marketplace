@@ -184,7 +184,7 @@ export function FeaturedFlows() {
     <section className="qf-home-section" id="featured">
       <div className="qf-section-head">
         <h2>Popular Services</h2>
-        <p>Most-requested home services across Pune &amp; Mumbai.</p>
+        <p>Most-requested home services across Pune.</p>
       </div>
       <div className="qf-featured-grid" data-reveal-group>
         {featuredFlows.map((flow) => (
@@ -248,21 +248,20 @@ export function CoverageSection() {
       <div className="qf-coverage" data-reveal>
         <div>
           <span className="qf-u-eyebrow">Now Serving</span>
-          <h2>We&apos;re live in Pune &amp; Mumbai</h2>
+          <h2>We&apos;re live in Pune</h2>
           <p>
-            QuickFurno connects homeowners with Verified Teams across Pune and
-            Mumbai — with more cities coming soon.
+            QuickFurno connects homeowners with Verified Teams across Pune,
+            with more cities planned after launch certification.
           </p>
           <div className="qf-coverage-cities">
             <span>Pune</span>
-            <span>Mumbai</span>
-            <span>More cities soon</span>
+            <span>More cities later</span>
           </div>
         </div>
         <div className="qf-coverage-media">
           <img
-            src="/assets/quickfurno/images/city/pune-mumbai-line-art.svg"
-            alt="Pune and Mumbai coverage illustration"
+            src="/assets/quickfurno/images/city/pune-line-art.svg"
+            alt="Pune coverage illustration"
             loading="lazy"
           />
         </div>

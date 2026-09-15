@@ -27,8 +27,8 @@ export function generateMetadata({ params }: CategoryPageProps): Metadata {
   // Same SEO intent and title shape as before. The old description promised
   // "ratings" and "transparent rates" — QuickFurno has no review system and
   // vendors are not required to publish rates, so both claims are removed.
-  const title = `${category.name} in Pune & Mumbai | QuickFurno`;
-  const description = `Find verified ${category.name.toLowerCase()} in Pune & Mumbai on QuickFurno. Browse vendor profiles or send one free enquiry and get matched with up to 3 relevant vendors.`;
+  const title = `${category.name} in Pune | QuickFurno`;
+  const description = `Find verified ${category.name.toLowerCase()} in Pune on QuickFurno. Browse vendor profiles or send one free enquiry and get matched with up to 3 relevant vendors.`;
 
   return {
     title,
@@ -74,7 +74,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
                 Back to services
               </Link>
 
-              <h1 className="qf-cat-title">{category.name} in Pune &amp; Mumbai</h1>
+              <h1 className="qf-cat-title">{category.name} in Pune</h1>
               <p className="qf-cat-copy">{category.description}</p>
 
               <ul className="qf-cat-truths">
@@ -160,7 +160,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           <div className="qf-pub-container">
             <span className="qf-pub-eyebrow">Ready to start?</span>
             <h2>Get matched with verified {category.name.toLowerCase()}.</h2>
-            <p>One free enquiry, up to 3 relevant vendors in Pune &amp; Mumbai.</p>
+            <p>One free enquiry, up to 3 relevant vendors in Pune.</p>
             <div className="qf-final-cta-actions">
               <EnquiryModalTrigger
                 className="qf-pub-btn qf-pub-btn--primary"

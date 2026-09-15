@@ -290,6 +290,9 @@ jobs:
       - name: QF-UI-TRACKING-01 lead attribution persistence
         run: npm run test:ui:lead-attribution
 
+      - name: Pune-only launch geography guard
+        run: npm run test:launch:pune-only
+
       - name: Typecheck
         run: npm run typecheck
 

@@ -15,6 +15,7 @@
 //     degrade to the "no active cities configured" message instead of crashing.
 // ============================================================================
 import { adminClient } from "@/lib/supabase";
+import { LAUNCH_CITY, isLaunchCity } from "@/lib/locations/launchCityPolicy";
 
 export interface ActiveCity {
   id: string;
@@ -37,12 +38,13 @@ export async function getActiveCities(): Promise<ActiveCity[]> {
     for (const row of data as Array<Record<string, unknown>>) {
       const name = typeof row.name === "string" ? row.name.trim() : "";
       if (!name) continue;
-      const key = name.toLowerCase();
+      if (!isLaunchCity(name) && !isLaunchCity(row.slug)) continue;
+      const key = LAUNCH_CITY.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
       out.push({
-        id: String(row.id ?? name),
-        name,
+        id: String(row.id ?? LAUNCH_CITY),
+        name: LAUNCH_CITY,
         slug: typeof row.slug === "string" ? row.slug : null,
       });
     }

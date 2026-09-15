@@ -35,11 +35,11 @@ const LOGIN_HREF = "/vendor?mode=login";
 export const metadata: Metadata = {
   title: "For Vendors | QuickFurno",
   description:
-    "Create a QuickFurno vendor account, build your public business profile, and manage matched home-service enquiries in Pune and Mumbai.",
+    "Create a QuickFurno vendor account, build your public business profile, and manage matched home-service enquiries in Pune.",
   openGraph: {
     title: "For Vendors | QuickFurno",
     description:
-      "Create a QuickFurno vendor account, build your public business profile, and manage matched home-service enquiries in Pune and Mumbai.",
+      "Create a QuickFurno vendor account, build your public business profile, and manage matched home-service enquiries in Pune.",
     url: "https://quickfurno.in/vendors",
     siteName: "QuickFurno",
     type: "website",
@@ -135,7 +135,7 @@ export default function VendorsPage() {
               </h1>
               <p className={styles.heroLede}>
                 Create a QuickFurno vendor account, publish your business profile, and manage the
-                client enquiries matched to your services across Pune &amp; Mumbai.
+                client enquiries matched to your services across Pune.
               </p>
 
               <div className={styles.heroActions}>
@@ -228,7 +228,7 @@ export default function VendorsPage() {
               <span className={styles.eyebrow}>Who it is for</span>
               <h2 id="qf-vend-cats">Built for local service professionals</h2>
               <p className={styles.sectionLede}>
-                QuickFurno currently supports these categories in Pune &amp; Mumbai.
+                QuickFurno currently supports these categories in Pune.
               </p>
             </div>
             <ul className={styles.chips}>

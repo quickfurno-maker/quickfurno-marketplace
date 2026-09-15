@@ -6,7 +6,6 @@ import { FilterChips, type FilterChipItem } from "@/components/FilterChips";
 import { VendorCompactCard } from "@/components/VendorCompactCard";
 import { VendorCompareProvider } from "@/components/VendorCompare";
 import {
-  cities,
   enquiryServiceForCategory,
   getVendorListingMeta,
   getVisibleVendors,
@@ -151,12 +150,7 @@ export function VendorCards({
             <label className="vendor-location-select">
               <span>Location</span>
               <select value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}>
-                <option value="All">Pune & Mumbai</option>
-                {cities.map((city) => (
-                  <option key={city} value={city}>
-                    {city}
-                  </option>
-                ))}
+                <option value="All">Pune</option>
               </select>
             </label>
           </div>

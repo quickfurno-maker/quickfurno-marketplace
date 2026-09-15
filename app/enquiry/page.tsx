@@ -7,7 +7,7 @@ import { StickyMobileCTA } from "@/components/StickyMobileCTA";
 export const metadata: Metadata = {
   title: "Get free quotes — QuickFurno",
   description:
-    "Tell QuickFurno about your project and get matched with up to 3 relevant verified vendors in Pune & Mumbai. Free for homeowners.",
+    "Tell QuickFurno about your project and get matched with up to 3 relevant verified vendors in Pune. Free for homeowners.",
 };
 
 export default function EnquiryPage({ searchParams }: { searchParams: { service?: string } }) {

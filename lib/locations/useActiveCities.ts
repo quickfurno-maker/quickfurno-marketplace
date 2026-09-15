@@ -9,6 +9,7 @@
 //   "No active cities configured. Add cities from Admin → Cities & Locations."
 // ============================================================================
 import { useEffect, useState } from "react";
+import { filterLaunchCityNames } from "@/lib/locations/launchCityPolicy";
 
 export const NO_ACTIVE_CITIES_MESSAGE =
   "No active cities configured. Add cities from Admin → Cities & Locations.";
@@ -32,7 +33,7 @@ export function useActiveCities(): ActiveCitiesState {
         const data = await res.json();
         if (!active) return;
         if (res.ok && data?.ok && Array.isArray(data.cities)) {
-          setCities(data.cities.filter((name: unknown): name is string => typeof name === "string" && name.trim().length > 0));
+          setCities(filterLaunchCityNames(data.cities));
         }
       } catch {
         // Leave the list empty; callers render the safe fallback message.

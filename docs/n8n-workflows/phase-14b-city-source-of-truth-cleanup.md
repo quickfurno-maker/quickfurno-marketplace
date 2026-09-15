@@ -1,5 +1,7 @@
 # Phase 14B — City Source-of-Truth Cleanup
 
+> Historical implementation record. The September 2026 Pune-only launch policy supersedes the multi-city activation described below: current runtime/UI city authority is Pune-only, while historical city rows remain inactive for future expansion.
+
 Bug: several city dropdowns showed **hardcoded** cities (Bengaluru, Delhi,
 Hyderabad, Nagpur, Nashik, Mumbai, Pune) instead of the cities the admin
 actually manages. The demo seed also inserted all 7 cities as **active**.

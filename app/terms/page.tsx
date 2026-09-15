@@ -48,7 +48,7 @@ export default function TermsPage() {
               <h2>1. What QuickFurno does</h2>
               <p>
                 QuickFurno is a marketplace that connects homeowners with verified home-service
-                vendors in Pune and Mumbai. We help you share your requirement and get matched —
+                vendors in Pune. We help you share your requirement and get matched —
                 we do not carry out the work ourselves.
               </p>
             </section>

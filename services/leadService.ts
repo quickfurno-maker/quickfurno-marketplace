@@ -23,6 +23,7 @@ import {
   type PreferredVendorRoutingResult,
 } from "./preferredVendorLeadService";
 import type { CreateLeadInput, PublicVendorCard, AssignResult } from "../lib/types";
+import { normalizeLaunchCity } from "../lib/locations/launchCityPolicy";
 
 function firstText(...values: Array<string | undefined>): string {
   return values.map((value) => value?.trim()).find(Boolean) ?? "";
@@ -44,7 +45,7 @@ export async function createLead(
   try {
     const name = firstText(input.name);
     const phone = firstText(input.phone);
-    const city = firstText(input.city);
+    const city = normalizeLaunchCity(input.city);
     const serviceRequired = firstText(input.service_required, input.service_category, input.serviceCategory);
     const budget = firstText(input.budget, input.budget_range, input.budgetRange);
     const message = firstText(input.message, input.requirement);

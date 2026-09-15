@@ -99,9 +99,7 @@ export function VendorDiscovery({
               value={filters.city}
               onChange={(event) => setFilters((f) => ({ ...f, city: event.target.value }))}
             >
-              <option value="All">All cities</option>
-              <option value="Pune">Pune</option>
-              <option value="Mumbai">Mumbai</option>
+              <option value="All">Pune</option>
             </select>
           </div>
 

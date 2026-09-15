@@ -1,6 +1,6 @@
 # Graphiti Timeline Snapshot
 
-Generated: 2026-09-15T03:12:58.212Z
+Generated: 2026-09-15T03:17:21.507Z
 Group: `quickfurno-marketplace`
 
 Reviewed temporal episodes exported from the local Graphiti service. Canonical docs and independently verified live state remain higher authority.

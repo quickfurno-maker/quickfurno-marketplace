@@ -1,16 +1,16 @@
 # Graphify Repository Intelligence Snapshot
 
-Generated: 2026-09-15T03:22:56.927Z
-Built from commit: `5212607e`
+Generated: 2026-09-15T03:31:28.764Z
+Built from commit: `2157af9a`
 Mode: local deterministic repository extraction; generated graph artifacts remain ignored from Git.
 
 ## Current graph
 
-- Nodes: **17199**
-- Edges: **31297**
-- Communities: **839**
-- Corpus files: **1287**
-- Approximate corpus words: **2,558,603**
+- Nodes: **17201**
+- Edges: **31298**
+- Communities: **834**
+- Corpus files: **1288**
+- Approximate corpus words: **2,558,955**
 
 ## Use from ChatGPT
 

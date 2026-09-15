@@ -32,6 +32,8 @@ import { readFileSync } from "node:fs";
 const MODAL = "components/ClientEnquiryModal.tsx";
 const PAGE = "app/page.tsx";
 const CSS = "app/qf-public-v2.css";
+const FINAL_HOME = "components/home/FinalHomepage.tsx";
+const FINAL_HOME_CSS = "app/home-final.css";
 
 /** Strip block and line comments, then collapse whitespace runs. */
 function code(path) {
@@ -50,6 +52,10 @@ const PAGE_SRC = code(PAGE);
 const PAGE_FLAT = flat(PAGE_SRC);
 const CSS_SRC = code(CSS);
 const CSS_FLAT = flat(CSS_SRC);
+const FINAL_HOME_SRC = code(FINAL_HOME);
+const FINAL_HOME_FLAT = flat(FINAL_HOME_SRC);
+const FINAL_HOME_CSS_SRC = code(FINAL_HOME_CSS);
+const FINAL_HOME_CSS_FLAT = flat(FINAL_HOME_CSS_SRC);
 
 const checks = [];
 const check = (name, fn) => checks.push({ name, fn });
@@ -181,45 +187,46 @@ check("08 no other live modal keys a focus/scroll effect to typed values", () =>
 });
 
 // ---------------------------------------------------------------------------
-// 2. Homepage entry-module layout
+// 2. Final homepage architecture + canonical taxonomy
 // ---------------------------------------------------------------------------
-check("09 the desktop 65/35 hero-beside-categories split is gone", () => {
-  const grid = CSS_FLAT.match(/\.qf-hero-v2-grid\s*\{[^}]*\}/g) ?? [];
-  assert(grid.length > 0, ".qf-hero-v2-grid has no rules at all");
-  for (const block of grid) {
-    assert(!/grid-template-columns/.test(block),
-      `.qf-hero-v2-grid declares grid-template-columns again (${block.trim()}) — the entry module must stay one column`);
-  }
-  assert(!/65fr/.test(CSS_FLAT) && !/35fr/.test(CSS_FLAT),
-    "a 65fr/35fr split is back in the public stylesheet");
+check("09 the final homepage is the single active homepage surface", () => {
+  assert(/<FinalHomepage\s*\/>/.test(PAGE_FLAT), "app/page.tsx does not mount FinalHomepage");
+  assert(!/<HomeHeroSlider|<HomeServiceLauncher|<TrustStripV2/.test(PAGE_FLAT),
+    "a retired homepage surface is still mounted beside FinalHomepage");
+  assert(/\.qfh-hero-grid/.test(FINAL_HOME_CSS_FLAT) && /\.qfh-service-grid/.test(FINAL_HOME_CSS_FLAT),
+    "the locked qfh homepage layout CSS is missing");
 });
 
-check("10 DOM order is hero -> categories -> trust", () => {
-  const hero = PAGE_FLAT.indexOf("<HomeHeroSlider");
-  const launcher = PAGE_FLAT.indexOf("<HomeServiceLauncher");
-  const trust = PAGE_FLAT.indexOf("<TrustStripV2");
-  assert(hero !== -1 && launcher !== -1 && trust !== -1, "one of hero/launcher/trust is missing from the homepage");
-  assert(hero < launcher, "HomeServiceLauncher renders before HomeHeroSlider");
-  assert(launcher < trust, "TrustStripV2 renders before HomeServiceLauncher");
+check("10 DOM order is hero -> stats -> services", () => {
+  const hero = FINAL_HOME_FLAT.indexOf("<Hero");
+  const stats = FINAL_HOME_FLAT.indexOf("<StatsStrip");
+  const services = FINAL_HOME_FLAT.indexOf("<Services");
+  assert(hero !== -1 && stats !== -1 && services !== -1, "hero/stats/services is missing from FinalHomepage");
+  assert(hero < stats && stats < services, "FinalHomepage order must remain hero -> stats -> services");
 });
 
-check("11 neither the hero nor the launcher is duplicated", () => {
-  const count = (needle) => PAGE_FLAT.split(needle).length - 1;
-  assert(count("<HomeHeroSlider") === 1, "the hero slider is rendered more than once");
-  assert(count("<HomeServiceLauncher") === 1, "the service launcher is rendered more than once");
+check("11 hero and services render exactly once", () => {
+  const count = (needle) => FINAL_HOME_FLAT.split(needle).length - 1;
+  assert(count("<Hero") === 1, "the final hero is rendered more than once");
+  assert(count("<Services") === 1, "the final services section is rendered more than once");
 });
 
-check("12 the launcher has an explicit multi-column desktop grid", () => {
-  const blocks = CSS_FLAT.match(/\.qf-launcher-grid\s*\{[^}]*\}/g) ?? [];
-  const columns = blocks.map((b) => b.match(/grid-template-columns:\s*repeat\((\d+)/)).filter(Boolean).map((m) => Number(m[1]));
-  assert(columns.includes(2), "the launcher lost its 2-column mobile grid");
-  assert(columns.some((n) => n >= 3), "the launcher has no widened (3+ column) grid for its full-width placement");
-  assert(columns.some((n) => n >= 4), "the launcher has no 4-column desktop grid");
+check("12 homepage service UI is derived from the canonical category registry", () => {
+  assert(/import \{ categories, categorySlug, type QuickFurnoCategory \}/.test(FINAL_HOME_SRC),
+    "FinalHomepage no longer imports the canonical categories registry");
+  assert(/const SERVICES = categories\.map/.test(FINAL_HOME_FLAT),
+    "homepage services are no longer derived from canonical categories");
+  assert(/Record<QuickFurnoCategory/.test(FINAL_HOME_SRC),
+    "service display metadata is no longer exhaustively typed to QuickFurnoCategory");
 });
 
-check("13 the wide tile spans, rather than orphaning, on the desktop grid", () => {
-  assert(/\.qf-launcher-item--wide\s*\{\s*grid-column:\s*span 2;\s*\}/.test(CSS_FLAT),
-    "the wide launcher tile has no `grid-column: span 2` desktop rule — Civil Work will orphan onto its own row");
+check("13 Wardrobe/Storage cannot return as UI taxonomy and legacy category links still resolve", () => {
+  assert(!/Wardrobes?\s*&?\s*Storage/i.test(FINAL_HOME_SRC),
+    "Wardrobes & Storage returned as a homepage category/subcategory");
+  assert(!/>\s*Wardrobes?\s*</i.test(FINAL_HOME_SRC),
+    "Wardrobe returned as a standalone homepage navigation label");
+  assert(/id="services"/.test(FINAL_HOME_SRC) && /id="categories"/.test(FINAL_HOME_SRC),
+    "new #services or legacy #categories anchor is missing");
 });
 
 // ---------------------------------------------------------------------------
@@ -340,49 +347,40 @@ mutant("M21 [mutant] reject: the submit button stops being disabled while submit
   (s) => /disabled=\{submitting\}/.test(s));
 
 // ---------------------------------------------------------------------------
-// 5. QF-MVP-80.16A — the hero is informational, not a CTA surface
+// 5. Final homepage conversion contract
 // ---------------------------------------------------------------------------
-const HERO = code("components/home/HomeHeroSlider.tsx");
-const HERO_RAW = readRaw("components/home/HomeHeroSlider.tsx");
-const HERO_FLAT = flat(HERO);
-
-check("24 [semantic] no CTA fields remain on a hero slide", () => {
-  assert(!/^\s*primary\s*:/m.test(HERO), "HeroSlide.primary is back");
-  assert(!/^\s*secondary\s*[?:]/m.test(HERO), "HeroSlide.secondary is back");
-  assert(!/\.qf-hero-slide-actions/.test(CSS_SRC), "the hero action row CSS is back");
-  assert(!/qf-hero-slide-actions/.test(HERO), "the hero renders an action row again");
+check("24 [semantic] the approved hero quote entry point is present exactly once", () => {
+  const hits = FINAL_HOME_SRC.match(/source="Homepage hero quote bar"/g) || [];
+  assert(hits.length === 1, `expected one homepage hero quote entry point, found ${hits.length}`);
+  assert(/qfh-quote-bar/.test(FINAL_HOME_SRC), "the approved hero quote bar is gone");
 });
 
-check("25 [semantic] the hero renders no enquiry trigger and no CTA link", () => {
-  assert(!/EnquiryModalTrigger/.test(HERO), "the hero renders an EnquiryModalTrigger again");
-  assert(!/from "next\/link"/.test(HERO), "the hero imports next/link again");
-  assert(!/<Link\b/.test(HERO), "the hero renders a Link CTA again");
-  // The only buttons left must be carousel navigation.
-  const buttons = HERO_FLAT.match(/<button/g) || [];
-  assert(buttons.length > 0, "the carousel lost its navigation buttons");
-  assert(!/qf-pub-btn/.test(HERO), "a public CTA button class is back inside the hero");
+check("25 [semantic] homepage CTAs all use the shared enquiry modal authority", () => {
+  assert(/EnquiryModalTrigger/.test(FINAL_HOME_SRC), "FinalHomepage no longer uses EnquiryModalTrigger");
+  for (const source of ["Homepage header", "Homepage hero quote bar", "Homepage Pune CTA"]) {
+    assert(FINAL_HOME_SRC.includes(`source="${source}"`), `missing approved conversion entry point: ${source}`);
+  }
 });
 
-check("26 [semantic] the carousel itself is fully preserved", () => {
-  const slides = HERO.match(/\bid:\s*"/g) || [];
-  assert(slides.length === 3, `expected exactly 3 hero slides, found ${slides.length}`);
-  assert(/qf-hero-dots/.test(HERO), "the hero dots are gone");
-  assert(/qf-hero-arrows/.test(HERO) || /qf-hero-arrow/.test(HERO), "the hero arrows are gone");
-  assert(/INTERVAL_MS/.test(HERO), "autoplay timing is gone");
-  assert(/onTouchStart|onPointerDown/.test(HERO), "swipe handling is gone");
-  assert(/ArrowLeft|ArrowRight/.test(HERO), "keyboard navigation is gone");
-  assert(/prefers-reduced-motion/.test(HERO) || /reduced/i.test(HERO),
-    "reduced-motion handling is gone");
+check("26 [semantic] the approved mobile bottom navigation remains mounted", () => {
+  assert(/<HomeMobileBottomNav\s*\/>/.test(FINAL_HOME_FLAT), "HomeMobileBottomNav is no longer mounted");
+  const nav = code("components/home/HomeMobileBottomNav.tsx");
+  for (const label of ["Home", "Services", "Quote", "Vendors", "More"]) {
+    assert(nav.includes(`>${label}<`) || nav.includes(`>${label}</span>`), `mobile nav lost ${label}`);
+  }
 });
 
-check("27 [semantic] the homepage keeps its other conversion entry points", () => {
-  assert(/<HomeServiceLauncher/.test(PAGE_FLAT), "the service launcher is gone");
-  assert(/StickyMobileCTA/.test(PAGE_SRC), "StickyMobileCTA is no longer mounted");
-  const hero = PAGE_FLAT.indexOf("<HomeHeroSlider");
-  const launcher = PAGE_FLAT.indexOf("<HomeServiceLauncher");
-  assert(hero !== -1 && launcher !== -1 && hero < launcher,
-    "the service launcher no longer follows the hero");
+check("27 [semantic] homepage keeps multiple non-duplicate conversion entry points", () => {
+  const hits = FINAL_HOME_SRC.match(/<EnquiryModalTrigger/g) || [];
+  assert(hits.length >= 3, `expected at least 3 enquiry entry points, found ${hits.length}`);
+  assert(/Get a Free Quote/.test(FINAL_HOME_SRC), "free-quote CTA copy is gone");
+  assert(/Get Started Today/.test(FINAL_HOME_SRC), "Pune final CTA copy is gone");
 });
+
+mutant("M24 [mutant] reject: the approved hero quote entry point is removed",
+  FINAL_HOME_SRC,
+  (src) => src.replace('source="Homepage hero quote bar"', 'source="Removed hero quote"'),
+  (src) => (src.match(/source="Homepage hero quote bar"/g) || []).length === 1);
 
 // ---------------------------------------------------------------------------
 // 6. QF-MVP-80.16A — dispatch refusal observability stays sanitized
@@ -444,11 +442,6 @@ mutant("M29 [mutant] reject: a raw reason field is added to the response",
     const fn = s.slice(s.indexOf("export function sanitizeDispatchSummary"));
     return !/\berror\s*:/.test(fn);
   });
-
-mutant("M24 [mutant] reject: a hero CTA comes back",
-  HERO,
-  (s) => s.replace("type HeroSlide = {", "type HeroSlide = {\n  primary: string;"),
-  (s) => !/^\s*primary\s*:/m.test(s));
 
 
 // ============================================================================

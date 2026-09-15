@@ -22,6 +22,8 @@ import "./public-utility-v2.css";
 // QF-UI-V2-11 — vendor auth + onboarding (/vendor login & signup,
 // /vendor/set-password). Scoped qf-vauth-* / qf-vrf-* / qf-vendor-* only.
 import "./vendor-auth-v2.css";
+// Final locked homepage visual system; selectors are qfh-* scoped and do not restyle vendor/public utility pages.
+import "./home-final.css";
 
 // Type system: Poppins (geometric sans) for the logo, headlines, body and UI;
 // Playfair Display italic only for the gold accent words.

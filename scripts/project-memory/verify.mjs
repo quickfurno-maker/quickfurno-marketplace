@@ -22,6 +22,7 @@ const required = [
   "scripts/project-memory/export-graphify-summary.mjs",
   "scripts/project-memory/compact-graphiti-snapshots.mjs",
   "scripts/project-memory/refresh.ps1",
+  "scripts/project-memory/publish.ps1",
   "infra/project-brain/docker-compose.yml",
   "infra/project-brain/start-local.ps1",
 ];

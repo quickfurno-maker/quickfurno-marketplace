@@ -52,3 +52,21 @@ Read `ARCHITECTURE.md`, `INTEGRATIONS.md`, `DEPLOYMENTS.md` and `INCIDENTS.md` w
 - run `node scripts/project-memory/verify.mjs`.
 
 The Project Brain is advisory/context infrastructure only. It must never gain authority to send messages, assign leads, debit credits, apply migrations, or bypass QuickFurno Core governance.
+
+## One-command publish
+
+To refresh the local Project Brain and publish the GitHub-readable memory in one safe command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\project-memory\publish.ps1
+```
+
+The publisher:
+- runs the full Project Brain refresh and verifier;
+- refuses to run if unrelated files are already staged;
+- stages only `docs/project-memory/`;
+- commits only when Project Brain documents changed;
+- pushes only the current named branch;
+- never merges a pull request or deploys QuickFurno.
+
+Use `refresh.ps1` when you only want a local refresh without a Git commit/push.

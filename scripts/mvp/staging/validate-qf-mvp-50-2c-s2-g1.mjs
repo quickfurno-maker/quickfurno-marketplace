@@ -321,7 +321,7 @@ const POST_ANCHOR_PENDING = [
   {
     version: "20260912050000",
     name: "qf_lead_generation_scope_lock",
-    sha: "543aaaba8a37030c2e8f459c3cd17f0376542001240d022134ec8e158e3ab19d",
+    sha: "45e83f3b9631c24bdfa3860fb42434fdb129ffb3f4e0ce05c6ad269e23d331c5",
     phase: "QF-AOS-V2-BOUNDARY",
   },
 ].map((m) => ({

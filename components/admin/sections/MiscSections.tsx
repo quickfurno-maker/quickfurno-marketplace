@@ -17,16 +17,6 @@ import { AosAutomationControl } from "../AosAutomationControl";
 import { AutomationStudio } from "../AutomationStudio";
 import { Strong } from "./shared";
 
-export const automationRows = [
-  ["New Lead Notification", "New lead created", "Send admin notification", "Draft"],
-  ["Vendor Lead Assignment", "Lead assigned", "Send vendor notification", "Draft"],
-  ["Package Expiry Reminder", "Vendor package expiring", "Send reminder", "Draft"],
-  ["Low Balance Reminder", "Vendor lead balance low", "Send renewal alert", "Draft"],
-  ["Daily Lead Report", "Daily schedule", "Email report placeholder", "Draft"],
-  ["Weekly Revenue Report", "Weekly schedule", "Email finance report", "Draft"],
-  ["n8n Webhook", "CRM webhook placeholder", "Send webhook", "Disabled"],
-  ["WhatsApp Notification", "Lead assigned", "WhatsApp placeholder", "Disabled"],
-];
 
 /**
  * C-PERF1 (P0-H): truthful AOS readiness page.
@@ -36,21 +26,19 @@ export const automationRows = [
  * confidence, response times, sample memories, cost logs and approvals. None
  * of that data exists anywhere in QuickFurno, so none of it is rendered any
  * more. This page states exactly what is real:
- * the AOS foundation is NOT active, and the only live AOS-related control is
- * the guarded AOS / n8n forwarding switch on the Automations page.
+ * AOS V2 is advisory intelligence only. Its real runtime state is shown below,
+ * while all execution authority remains in QuickFurno Core and the native automation worker.
  */
 export function AosReadinessPage({ notify }: { notify: (message: string, tone?: "success" | "error" | "info") => void }) {
   return (
     <div className="space-y-4">
       <NoteBar>
-        AOS foundation is not active. There are no live agent runs, decisions, memories, approvals or cost
-        records to display — this page will become a real control center only after the AOS backend exists and
-        persists real agent activity.
+        AOS V2 is advisory intelligence. It can observe canonical Core facts and persist recommendations, but it cannot authorize messaging, assignment, credits or automation execution.
       </NoteBar>
 
       <SectionCard
         title="What is real today"
-        description="The only live AOS-related control. Everything else previously shown here was sample data and has been removed."
+        description="Live AOS V2 advisory runtime and architecture boundary. Execution remains owned by QuickFurno Core and the native worker."
       >
         <AosAutomationControl notify={notify} />
       </SectionCard>

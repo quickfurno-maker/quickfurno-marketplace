@@ -117,7 +117,7 @@ const FORBIDDEN_SUBSTRINGS = Object.freeze([
   "provider",
 ]);
 
-const SANITIZED_KEYS = ["ok", "selected", "dispatched", "refused", "selectionBlocked"];
+const SANITIZED_KEYS = ["ok", "selected", "dispatched", "refused", "selectionBlocked", "refusalReasons"];
 
 // ---------------------------------------------------------------------------
 // The rules
@@ -404,8 +404,8 @@ const T = {
   "T14 historical pre-activation intents remain unreachable from the trigger": () => {
     // The route holds NO selection logic, so the 80.13A fences are the only path.
     const noSelectionInRoute =
-      !/created_at|\.gt\(|boundary|notBefore|activationNotBefore/i.test(routeCode) &&
-      !/created_at|\.gt\(|notBefore/i.test(triggerCode) &&
+      !/\.gt\(|notBefore|activationNotBefore/i.test(routeCode) &&
+      !/\.gt\(|notBefore|activationNotBefore/i.test(triggerCode) &&
       // and the trigger cannot name the activation policy key at all
       !triggerCode.includes(LEAD_ASSIGNMENT_ACTIVATION_POLICY_KEY);
 

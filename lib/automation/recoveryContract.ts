@@ -38,89 +38,29 @@ import {
   resolveCommunicationExecutionPartition,
 } from "./clientExecutionContract";
 import { resolveCompletionEvidenceRuling } from "./completionContract";
-import { AUTOMATION_TRANSPORT_MAX_CLOCK_SKEW_SECONDS } from "./transportAuth";
 
 // ---------------------------------------------------------------------------
-// 1. The stale-attempt threshold — DERIVED, not invented
+// 1. The stale-attempt threshold — native worker safety window
 // ---------------------------------------------------------------------------
 
 /**
- * The n8n -> Core HTTP timeout, hard-coded in every signed POST node of every
- * shipped workflow (`timeout: 10000`). A signed transport call cannot outlive it
- * on the n8n side.
- */
-export const TRANSPORT_HTTP_TIMEOUT_SECONDS = 10;
-
-/**
- * How many signed Core calls one legitimate attempt may make end to end:
- * claim/recover, execute, complete. Recovery adds no fourth call to an attempt.
- */
-export const TRANSPORT_CALLS_PER_ATTEMPT = 3;
-
-/**
- * The provider ceiling Core itself enforces. `WHATSAPP_HTTP_TIMEOUT_MS` is read
- * through `readBoundedInt(..., BUSINESS_TIMEOUT_MIN_MS, BUSINESS_TIMEOUT_MAX_MS)`
- * = 1000..30000 ms and is enforced by a real AbortController in
- * `lib/communication/httpTransport.ts`, so 30s is the maximum a provider call can
- * legitimately hold the execution open.
+ * The provider ceiling Core itself enforces. A provider request is bounded to
+ * 30 seconds by the communication transport. The native worker performs the
+ * surrounding Core/database work in-process, so there is no external workflow
+ * HTTP/HMAC timing dependency any more.
  */
 export const PROVIDER_CALL_CEILING_SECONDS = 30;
 
 /**
- * The signed-request validity window. `AUTOMATION_TRANSPORT_MAX_CLOCK_SKEW_SECONDS`
- * is the real upper bound on how late a legitimately signed execute request may
- * still arrive and START work, so it is part of the in-flight window rather than
- * an afterthought.
+ * The 420-second ceiling is retained as a conservative compatibility floor from
+ * the previously certified execution model. The native runtime is strictly
+ * simpler (no external orchestration hops), so retaining rather than lowering
+ * this bound can only make stale-attempt recovery more conservative.
  */
-export const TRANSPORT_SIGNATURE_WINDOW_SECONDS =
-  AUTOMATION_TRANSPORT_MAX_CLOCK_SKEW_SECONDS;
+export const IN_FLIGHT_ATTEMPT_CEILING_SECONDS = 420;
 
-/**
- * The same safety margin the already-reviewed communication-lane recovery
- * constant uses (`RECOVERY_SAFETY_MARGIN_MS` = 60s in
- * `lib/communication/consentAckIntent.ts`). Reused rather than re-chosen so the
- * two recovery surfaces cannot drift on how much slack "safe" means.
- */
-export const RECOVERY_SAFETY_MARGIN_SECONDS = 60;
-
-/**
- * The maximum wall-clock lifetime a legitimately in-flight current attempt can
- * have, summed from the bounds above:
- *
- *   300  signature window — the execute request may legitimately arrive this late
- *  + 30  provider call ceiling
- *  + 30  3 x 10s transport HTTP
- *  + 60  reviewed safety margin
- *   ---
- *   420  seconds
- */
-export const IN_FLIGHT_ATTEMPT_CEILING_SECONDS =
-  TRANSPORT_SIGNATURE_WINDOW_SECONDS +
-  PROVIDER_CALL_CEILING_SECONDS +
-  TRANSPORT_HTTP_TIMEOUT_SECONDS * TRANSPORT_CALLS_PER_ATTEMPT +
-  RECOVERY_SAFETY_MARGIN_SECONDS;
-
-/**
- * THE VERSIONED THRESHOLD. v1 = 900 seconds.
- *
- * Chosen as the smallest round value that is more than DOUBLE the derived 420s
- * ceiling above, and which coincides with the third step of the frozen automation
- * retry schedule (`AUTOMATION_RETRY_DELAY_SCHEDULE_SECONDS` = 60/300/900) so the
- * two timing vocabularies stay coherent.
- *
- * It is a fixed repository constant, exactly like the retry schedule: no
- * environment variable, no admin setting, no n8n input and no provider input.
- * Revising it means a new named version in this file plus a governed successor
- * migration, never an operator edit.
- *
- * WHAT IT BUYS. Below this age Core cannot prove an executor is dead, so
- * reconciliation refuses to act. Above it, combined with the durable evidence
- * table, a stale attempt can be finalized without any risk of terminalizing work
- * that is still legitimately running.
- */
+/** The versioned stale threshold remains frozen at 900 seconds. */
 export const AUTOMATION_STALE_ATTEMPT_THRESHOLD_SECONDS_V1 = 900;
-
-/** The threshold this build uses. */
 export const AUTOMATION_STALE_ATTEMPT_THRESHOLD_SECONDS =
   AUTOMATION_STALE_ATTEMPT_THRESHOLD_SECONDS_V1;
 
@@ -128,11 +68,6 @@ export const AUTOMATION_STALE_ATTEMPT_THRESHOLD_SECONDS =
 export const STALE_THRESHOLD_MIN_SECONDS = 300;
 export const STALE_THRESHOLD_MAX_SECONDS = 86_400;
 
-/**
- * The invariant, asserted at module load exactly as the communication lane's
- * `recoveryThresholdIsSafe()` is: a mis-set threshold must not be silently
- * shippable.
- */
 export function staleThresholdIsSafe(
   thresholdSeconds: number = AUTOMATION_STALE_ATTEMPT_THRESHOLD_SECONDS,
   ceilingSeconds: number = IN_FLIGHT_ATTEMPT_CEILING_SECONDS,

@@ -90,5 +90,5 @@ export interface AosV2RuntimeState {
   intelligenceEnabled: boolean;
   mode: AosV2Mode;
   actionProposalsEnabled: boolean;
-  legacyDirectN8nRetired: true;
+  legacyExternalAutomationRetired: true;
 }

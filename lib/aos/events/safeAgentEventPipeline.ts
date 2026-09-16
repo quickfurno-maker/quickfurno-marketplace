@@ -1,7 +1,5 @@
-import { createSafeSideEffectReport, isQuickFurnoN8nEventType, type QuickFurnoN8nEventResult, type QuickFurnoSafeSideEffectReport } from "@/lib/aos/events/n8nEventTypes";
-import { getWorkflowForN8nEvent } from "@/lib/aos/events/n8nWorkflowMap";
-import { queueEventForN8n } from "@/lib/aos/sync/n8nSyncService";
-import { resolveAosN8nActivation, type AosRuntimeMode } from "@/lib/aos/runtime/aosRuntimeSettings";
+import { createSafeSideEffectReport, isQuickFurnoAutomationEventType, type QuickFurnoSafeSideEffectReport } from "@/lib/aos/events/automationEventTypes";
+import { getWorkflowForAutomationEvent } from "@/lib/aos/events/automationWorkflowMap";
 
 type SafeAgentEventType =
   | "lead.created"
@@ -57,13 +55,13 @@ export interface SafeAgentEventResponse {
   source: string;
   timestamp: string;
   agents: SafeAgentPreviewResult;
-  n8nWebhookCalled: boolean;
+  automationEventQueued: boolean;
   mockMode: boolean;
   runtimeAutomationEnabled: boolean;
-  runtimeAutomationMode: AosRuntimeMode;
+  runtimeAutomationMode: "advisory";
   sideEffects: QuickFurnoSafeSideEffectReport;
   message: string;
-  n8n: {
+  automation: {
     status: string;
     message: string;
     mockMode: boolean;
@@ -93,115 +91,50 @@ export async function runSafeAgentEventPipeline(payload: unknown): Promise<SafeA
   try {
     const normalized = normalizeSafeAgentEventPayload(payload);
     const agents = buildSafeAgentPreview(normalized.eventType);
-    const workflowName = getWorkflowForN8nEvent(normalized.eventType);
-
-    // Two-lock safety gate (Lock 1 = server env, Lock 2 = admin runtime switch).
-    // Only when BOTH locks are ON do we even attempt the outbound webhook.
-    const activation = await resolveAosN8nActivation();
-
-    const n8nResult = activation.shouldCallN8n
-      ? await queueEventForN8n({
-          eventType: normalized.eventType,
-          leadId: normalized.leadId,
-          source: normalized.source,
-          occurredAt: normalized.timestamp,
-          data: {
-            eventType: normalized.eventType,
-            workflowName,
-            leadId: normalized.leadId,
-            source: normalized.source,
-            timestamp: normalized.timestamp,
-            ...normalized.safeData,
-            agentPreviewSummary: summarizeAgents(agents),
-            agents,
-          },
-          metadata: {
-            mode: "safe_agent_preview",
-            sideEffectsDisabled: true,
-          },
-        })
-      : buildLockedN8nResult(normalized.eventType, workflowName, activation.reason);
-
-    const sideEffects: QuickFurnoSafeSideEffectReport = {
-      ...createSafeSideEffectReport(),
-      n8nWebhookCalled: Boolean(n8nResult.sideEffects?.n8nWebhookCalled),
-    };
-
+    const workflowName = getWorkflowForAutomationEvent(normalized.eventType);
+    const sideEffects = createSafeSideEffectReport();
     return {
       ok: true,
-      status: n8nResult.sideEffects?.n8nWebhookCalled ? "accepted" : "mocked",
+      status: "mocked",
       eventType: normalized.eventType,
       workflowName,
       leadId: normalized.leadId,
       source: normalized.source,
       timestamp: normalized.timestamp,
       agents,
-      n8nWebhookCalled: sideEffects.n8nWebhookCalled,
-      mockMode: !sideEffects.n8nWebhookCalled,
-      runtimeAutomationEnabled: activation.runtime.enabled,
-      runtimeAutomationMode: activation.runtime.mode,
+      automationEventQueued: false,
+      mockMode: true,
+      runtimeAutomationEnabled: false,
+      runtimeAutomationMode: "advisory",
       sideEffects,
-      message: sideEffects.n8nWebhookCalled
-        ? "Safe AOS agent preview completed and n8n accepted the event. All other side effects remain disabled."
-        : "Safe AOS agent preview completed in mock mode. n8n was not called or failed safely.",
-      n8n: {
-        status: n8nResult.status,
-        message: n8nResult.message,
-        mockMode: n8nResult.mockMode,
+      message: "Safe AOS advisory preview completed. Core and the native automation engine retain all execution authority.",
+      automation: {
+        status: "advisory",
+        message: "No external workflow runtime was called and no business side effect was executed.",
+        mockMode: true,
       },
     };
   } catch {
     const timestamp = new Date().toISOString();
     const agents = buildSafeAgentPreview("aos.failure");
-    const sideEffects = createSafeSideEffectReport();
     return {
       ok: true,
       status: "mocked",
       eventType: "aos.failure",
-      workflowName: getWorkflowForN8nEvent("aos.failure"),
+      workflowName: getWorkflowForAutomationEvent("aos.failure"),
       leadId: null,
       source: "safe-agent-pipeline-fallback",
       timestamp,
       agents,
-      n8nWebhookCalled: false,
+      automationEventQueued: false,
       mockMode: true,
       runtimeAutomationEnabled: false,
-      runtimeAutomationMode: "off",
-      sideEffects,
+      runtimeAutomationMode: "advisory",
+      sideEffects: createSafeSideEffectReport(),
       message: "Malformed AOS event handled safely. No side effects executed.",
-      n8n: {
-        status: "mocked",
-        message: "n8n was not called because the event pipeline recovered safely.",
-        mockMode: true,
-      },
+      automation: { status: "advisory", message: "Recovered safely.", mockMode: true },
     };
   }
-}
-
-/**
- * Result used when the two-lock gate blocks the outbound webhook. No webhook is
- * attempted; all side effects remain disabled. This keeps AOS in safe mock mode
- * whenever Lock 1 (env) or Lock 2 (admin runtime switch) is OFF.
- */
-function buildLockedN8nResult(
-  eventType: SafeAgentEventType,
-  workflowName: string,
-  reason: string,
-): QuickFurnoN8nEventResult {
-  return {
-    ok: true,
-    status: "mocked",
-    eventType: isQuickFurnoN8nEventType(eventType) ? eventType : "aos.failure",
-    workflowName,
-    message: reason,
-    mockMode: true,
-    sideEffects: createSafeSideEffectReport(),
-    details: {
-      gate: "two_lock",
-      n8nWebhookCalled: false,
-      databasePersisted: false,
-    },
-  };
 }
 
 function normalizeSafeAgentEventPayload(payload: unknown) {
@@ -233,7 +166,7 @@ function normalizeSafeEventType(value: string | null): SafeAgentEventType {
   if (value === "lead.assignment_queue_rechecked") return "lead.assignment_queue_rechecked";
   if (value === "vendor.profile_interest_captured") return "vendor.profile_interest_captured";
   if (value === "vendor.recharge_prompt_preview") return "vendor.recharge_prompt_preview";
-  if (value && supportedSafeAgentEvents.includes(value as SafeAgentEventType) && isQuickFurnoN8nEventType(value)) {
+  if (value && supportedSafeAgentEvents.includes(value as SafeAgentEventType) && isQuickFurnoAutomationEventType(value)) {
     return value as SafeAgentEventType;
   }
   return "aos.failure";

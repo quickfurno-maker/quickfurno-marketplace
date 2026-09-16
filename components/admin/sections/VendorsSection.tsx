@@ -662,7 +662,7 @@ export function AssignPackageModal({ vendor, busy, onClose, onSave }: { vendor: 
           <span className="text-xs font-semibold uppercase text-slate-500">Expiry date (optional)</span>
           <input value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} type="date" className="mt-1 qfa-control w-full px-2.5 outline-none" />
         </label>
-        <p className="text-xs text-slate-500">Updating the package never notifies the vendor and never triggers n8n.</p>
+        <p className="text-xs text-slate-500">Updating the package never notifies the vendor and does not execute automation from this admin action.</p>
         <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
           <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
           <PrimaryButton onClick={() => onSave({ packageName: packageName.trim() || null, packageStatus, creditsToAdd: Number(creditsToAdd) || 0, packageExpiresAt: expiresAt || null })}>{busy ? "Saving..." : "Save"}</PrimaryButton>

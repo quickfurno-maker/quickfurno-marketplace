@@ -18,7 +18,7 @@ import {
   isAutomationActionType,
   type AutomationWorkflowFamily,
 } from "@/lib/automation/actionRegistry";
-import { getAutomationTransportRuntimeConfig } from "@/services/automationTransportService";
+import { getNativeAutomationRuntimeConfig, readNativeAutomationRuntimeSnapshot } from "@/services/nativeAutomationRuntimeService";
 
 const PREFIX = "automation_studio.";
 const GLOBAL_ENABLED_KEY = `${PREFIX}global_enabled`;
@@ -56,12 +56,6 @@ interface ActionRequestRow {
   action_type: string;
 }
 
-interface TransportRow {
-  route_key: string;
-  state: string;
-  worker_id: string | null;
-  created_at: string;
-}
 
 function keyFor(workflowKey: AutomationStudioWorkflowKey, suffix: string) {
   return `${PREFIX}${workflowKey}.${suffix}`;
@@ -154,18 +148,10 @@ function currentStepForStatus(status: string) {
   }
 }
 
-function routeForWorkflow(workflowKey: AutomationStudioWorkflowKey): string[] {
-  if (workflowKey === "recovery") return ["recover_v1", "reconcile_v1"];
-  if (workflowKey === "orphan_cleanup") return ["cancel_orphan_v1"];
-  if (workflowKey === "stale_cleanup") return ["cancel_stale_v1"];
-  return ["claim_v1"];
-}
 export async function getAutomationStudioOverview(): Promise<AutomationStudioOverview> {
   const now = new Date();
   const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-  const since30m = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
-
-  const [settings, jobsResult, transportResult] = await Promise.all([
+  const [settings, jobsResult, nativeSnapshot] = await Promise.all([
     loadStudioSettingRows(),
     adminClient()
       .from("automation_jobs")
@@ -173,19 +159,10 @@ export async function getAutomationStudioOverview(): Promise<AutomationStudioOve
       .gte("created_at", since24h)
       .order("created_at", { ascending: false })
       .limit(250),
-    adminClient()
-      .from("automation_transport_requests")
-      .select("route_key,state,worker_id,created_at")
-      .gte("created_at", since30m)
-      .order("created_at", { ascending: false })
-      .limit(500),
+    readNativeAutomationRuntimeSnapshot(),
   ]);
-
   if (jobsResult.error) throw jobsResult.error;
-  if (transportResult.error) throw transportResult.error;
-
   const jobs = (jobsResult.data ?? []) as JobRow[];
-  const transportRows = (transportResult.data ?? []) as TransportRow[];
   const actionIds = [...new Set(jobs.map((job) => job.action_request_id))];
   let actionRequests: ActionRequestRow[] = [];
   if (actionIds.length) {
@@ -196,44 +173,39 @@ export async function getAutomationStudioOverview(): Promise<AutomationStudioOve
     if (error) throw error;
     actionRequests = (data ?? []) as ActionRequestRow[];
   }
-
   const actionTypeByRequest = new Map(actionRequests.map((row) => [row.id, row.action_type]));
   const globalEnabled = readBoolean(settings.get(GLOBAL_ENABLED_KEY)?.value, true);
-  const runtimeConfig = getAutomationTransportRuntimeConfig();
-  const lastTransport = transportRows[0] ?? null;
-  const lastSeenMs = lastTransport ? Date.parse(lastTransport.created_at) : 0;
-  const transportHealthy = runtimeConfig.ok && runtimeConfig.config.mode !== "off" && lastSeenMs > now.getTime() - 6 * 60 * 1000;
-
+  const nativeConfig = getNativeAutomationRuntimeConfig();
+  const heartbeatMs = nativeSnapshot?.heartbeatAt ? Date.parse(nativeSnapshot.heartbeatAt) : 0;
+  const nativeHealthy = nativeConfig.mode !== "off"
+    && nativeSnapshot != null
+    && nativeSnapshot.mode === nativeConfig.mode
+    && (nativeSnapshot.state === "running" || nativeSnapshot.state === "shadow")
+    && heartbeatMs > now.getTime() - Math.max(nativeConfig.heartbeatMs * 3, 45000);
+  const laneTime = (key: AutomationStudioWorkflowKey): string | null => {
+    if (!nativeSnapshot) return null;
+    if (key === "recovery") return nativeSnapshot.laneLastRunAt.reconcile ?? nativeSnapshot.laneLastRunAt.recovery;
+    return nativeSnapshot.laneLastRunAt[key] ?? null;
+  };
   const workflows = AUTOMATION_STUDIO_WORKFLOWS.map((meta): AutomationStudioWorkflowRuntime => {
     const enabled = globalEnabled && readBoolean(settings.get(keyFor(meta.key, "enabled"))?.value, true);
     const published = readDefinition(settings.get(keyFor(meta.key, "published"))?.value, meta.key);
     const draft = readDefinition(settings.get(keyFor(meta.key, "draft"))?.value, meta.key);
     const history = readHistory(settings.get(keyFor(meta.key, "version_history"))?.value, meta.key);
     const currentVersion = readNumber(settings.get(keyFor(meta.key, "version"))?.value, history[0]?.version ?? 1);
-
     const workflowJobs = jobs.filter((job) => workflowForAction(actionTypeByRequest.get(job.action_request_id) ?? null) === meta.key);
     const terminal = workflowJobs.filter((job) => ["succeeded", "failed", "dead_letter", "uncertain"].includes(job.status));
     const succeeded = terminal.filter((job) => job.status === "succeeded").length;
     const failed = terminal.filter((job) => job.status !== "succeeded").length;
     const queue = workflowJobs.filter((job) => ["pending", "processing", "retry_scheduled"].includes(job.status)).length;
-    const routeSet = new Set(routeForWorkflow(meta.key));
-    const workflowTransport = transportRows.filter((row) => routeSet.has(row.route_key));
-    const lastRunAt = workflowJobs[0]?.updated_at ?? workflowTransport[0]?.created_at ?? null;
-    const recentRoute = workflowTransport[0]?.created_at ? Date.parse(workflowTransport[0].created_at) > now.getTime() - 12 * 60 * 1000 : false;
-
+    const laneLastRunAt = laneTime(meta.key);
+    const lastRunAt = workflowJobs[0]?.updated_at ?? laneLastRunAt;
+    const health = !enabled ? "paused" : nativeHealthy ? "healthy" : nativeSnapshot?.state === "degraded" ? "degraded" : "unknown";
     return {
-      ...meta,
-      enabled,
-      health: !enabled ? "paused" : recentRoute && transportHealthy ? "healthy" : "unknown",
-      queue,
+      ...meta, enabled, health, queue,
       successRate24h: terminal.length ? Math.round((succeeded / terminal.length) * 100) : null,
-      completed24h: succeeded,
-      failed24h: failed,
-      lastRunAt,
-      currentVersion,
-      draftDefinition: draft,
-      publishedDefinition: published,
-      versions: history,
+      completed24h: succeeded, failed24h: failed, lastRunAt, currentVersion,
+      draftDefinition: draft, publishedDefinition: published, versions: history,
     };
   });
   const executions: AutomationStudioExecutionRow[] = jobs.slice(0, 40).map((job) => {
@@ -249,19 +221,27 @@ export async function getAutomationStudioOverview(): Promise<AutomationStudioOve
       attemptCount: job.attempt_count,
     };
   });
-
-  const mode = runtimeConfig.ok ? runtimeConfig.config.mode : "invalid";
-  const workerId = runtimeConfig.ok ? runtimeConfig.config.workerId : null;
-
   return {
     ok: true,
     globalEnabled,
-    transport: {
-      mode,
-      healthy: transportHealthy,
-      workerId: lastTransport?.worker_id ?? workerId,
-      lastSeenAt: lastTransport?.created_at ?? null,
-      routeCalls30m: transportRows.length,
+    nativeEngine: {
+      mode: nativeConfig.mode,
+      healthy: nativeHealthy,
+      workerId: nativeSnapshot?.workerId ?? (nativeConfig.mode === "off" ? null : nativeConfig.workerId),
+      state: nativeSnapshot?.state ?? (nativeConfig.mode === "off" ? "paused" : "not_seen"),
+      engineVersion: nativeSnapshot?.engineVersion ?? null,
+      lastHeartbeatAt: nativeSnapshot?.heartbeatAt ?? null,
+      cycles: nativeSnapshot?.cycles ?? 0,
+      jobsProcessed: nativeSnapshot?.jobsProcessed ?? 0,
+      lastClaimAt: nativeSnapshot?.lastClaimAt ?? null,
+      lastSuccessAt: nativeSnapshot?.lastSuccessAt ?? null,
+      lastErrorAt: nativeSnapshot?.lastErrorAt ?? null,
+      lastSafeCode: nativeSnapshot?.lastSafeCode ?? null,
+      systemLanes: {
+        leadAssignmentDispatchAt: nativeSnapshot?.laneLastRunAt.lead_assignment_dispatch ?? null,
+        consentAckAt: nativeSnapshot?.laneLastRunAt.consent_ack ?? null,
+        delayedFillAt: nativeSnapshot?.laneLastRunAt.delayed_fill ?? null,
+      },
     },
     workflows,
     executions,
@@ -275,7 +255,7 @@ export async function setAutomationStudioGlobalEnabled(enabled: boolean, actorId
     GLOBAL_ENABLED_KEY,
     enabled,
     actorId,
-    "QuickFurno Automation Studio global execution switch. Core reads this before transport execution.",
+    "QuickFurno Automation Studio global execution switch. The native worker reads this before claiming work.",
   );
 }
 
@@ -290,6 +270,23 @@ export async function setAutomationStudioWorkflowEnabled(
     actorId,
     `Automation Studio execution switch for ${workflowKey}.`,
   );
+}
+
+export async function isAutomationStudioGlobalEnabled(): Promise<boolean> {
+  try {
+    const { data, error } = await adminClient()
+      .from("marketplace_runtime_settings")
+      .select("value")
+      .eq("key", GLOBAL_ENABLED_KEY)
+      .maybeSingle();
+    if (error) throw error;
+    return readBoolean(data?.value, true);
+  } catch (error) {
+    console.error("[automation studio] global runtime control read failed; failing closed", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+    return false;
+  }
 }
 
 export async function isAutomationStudioWorkflowEnabled(

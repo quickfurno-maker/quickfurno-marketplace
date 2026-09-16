@@ -25,8 +25,6 @@ export const AOS_AI_ENABLED = false; // real AI stays OFF until explicitly confi
 export const AOS_RULE_BASED_FALLBACK_ENABLED = true;
 
 // --- Hard safety switches (must remain false in this phase) ---
-export const N8N_ENABLED = false;
-export const N8N_OUTBOUND_WEBHOOK_ENABLED = false;
 export const WHATSAPP_SENDING_ENABLED = false;
 export const CREDIT_DEDUCTION_ENABLED = false;
 export const AUTO_ASSIGNMENT_ENABLED = false;
@@ -74,8 +72,6 @@ export const AOS_FEATURE_FLAGS: Array<{ key: string; value: boolean; note: strin
   { key: "AOS_OPSBRIEF_ENABLED", value: AOS_OPSBRIEF_ENABLED, note: "Read-only daily report" },
   { key: "AOS_AI_ENABLED", value: AOS_AI_ENABLED, note: "Real AI off until configured" },
   { key: "AOS_RULE_BASED_FALLBACK_ENABLED", value: AOS_RULE_BASED_FALLBACK_ENABLED, note: "Deterministic fallback" },
-  { key: "N8N_ENABLED", value: N8N_ENABLED, note: "Disabled - foundation only" },
-  { key: "N8N_OUTBOUND_WEBHOOK_ENABLED", value: N8N_OUTBOUND_WEBHOOK_ENABLED, note: "Disabled - no webhook calls" },
   { key: "WHATSAPP_SENDING_ENABLED", value: WHATSAPP_SENDING_ENABLED, note: "Disabled - no messages" },
   { key: "CREDIT_DEDUCTION_ENABLED", value: CREDIT_DEDUCTION_ENABLED, note: "Disabled - no charges" },
   { key: "AUTO_ASSIGNMENT_ENABLED", value: AUTO_ASSIGNMENT_ENABLED, note: "Disabled - suggestions only" },

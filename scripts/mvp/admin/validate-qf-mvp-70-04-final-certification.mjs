@@ -546,7 +546,7 @@ check(
 );
 check(
   "the three control reads are concurrent, not sequential",
-  /await Promise\.all\(\[\s*readAutoAssignmentControl\(\),\s*readAosForwardingControl\(\),\s*readWhatsAppProviderControl\(\),?\s*\]\)/.test(
+  /await Promise\.all\(\[\s*readAutoAssignmentControl\(\),\s*readNativeAutomationControl\(\),\s*readWhatsAppProviderControl\(\),?\s*\]\)/.test(
     launchCode,
   ),
 );
@@ -729,13 +729,13 @@ check(
 // setting key and reading its own `shouldCallN8n` verdict are observation; only
 // INVOKING a forwarder would be a call, so the rule targets invocation.
 check(
-  "the AOS resolver is called to READ the two locks, never to forward",
-  /resolveAosN8nActivation\(\)/.test(launchCode) &&
-    !/\b(dispatchToN8n|forwardToN8n|callN8n|postToN8n|sendToN8n)\s*\(/i.test(launchCode),
+  "the native worker state is read through canonical runtime readers",
+  /getNativeAutomationRuntimeConfig\(\)/.test(launchCode) &&
+    /readNativeAutomationRuntimeSnapshot\(\)/.test(launchCode),
 );
 check(
-  "the AOS switch is read through its canonical setting key, not a new one",
-  /\.eq\("setting_key", AOS_N8N_MASTER_ROUTER_KEY\)/.test(launchCode),
+  "the native worker heartbeat is read through its canonical runtime key",
+  /\.eq\("key", NATIVE_AUTOMATION_RUNTIME_SETTING_KEY\)/.test(launchCode),
 );
 check(
   "no automation transport or signing module is imported",
@@ -805,10 +805,10 @@ check(
       /^\.\.?\/(AdminPrimitives|AdminIcon|adminConfig|adminUtils|AttentionCenter|Pagination)$/,
       /^\.\/(Operations\w+|operationsTypes)$/,
       /^\.\.\/lib\/(supabase|errors|adminPaging)$/,
-      /^\.\.\/lib\/aos\/runtime\/aosRuntimeSettings$/,
       /^\.\.\/lib\/lead-assignment\/runtimeSettings$/,
       /^\.\.\/lib\/automation\/recoveryContract$/,
       /^\.\/adminOperationsService$/,
+      /^\.\/nativeAutomationRuntimeService$/,
     ];
     return [...specs].every((s) => allowed.some((re) => re.test(s)));
   })(),

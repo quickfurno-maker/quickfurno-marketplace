@@ -47,7 +47,7 @@ export interface FreeVendorProfileInterest {
 
 export async function captureFreeVendorInterest(
   input: CaptureFreeVendorInterestInput,
-): Promise<Result<{ id: string; message: string; n8nPreviewCalled: boolean }>> {
+): Promise<Result<{ id: string; message: string; automationPreviewQueued: boolean }>> {
   try {
     const vendorId = (input.vendorId ?? "").trim();
     const digits = normalizeClientPhone(input.clientPhone);
@@ -124,7 +124,7 @@ export async function captureFreeVendorInterest(
       },
     });
 
-    let n8nPreviewCalled = Boolean(profileEvent.n8nWebhookCalled);
+    let automationPreviewQueued = Boolean(profileEvent.automationEventQueued);
     if (settings.notify_free_vendor_recharge_interest) {
       const rechargeEvent = await runSafeAgentEventPipeline({
         eventType: "vendor.recharge_prompt_preview",
@@ -138,19 +138,19 @@ export async function captureFreeVendorInterest(
           clientPhoneMasked: masked,
         },
       });
-      n8nPreviewCalled = n8nPreviewCalled || Boolean(rechargeEvent.n8nWebhookCalled);
+      automationPreviewQueued = automationPreviewQueued || Boolean(rechargeEvent.automationEventQueued);
     }
 
     await adminClient()
       .from("free_vendor_profile_interests")
       .update({
         aos_event_id: `vendor.profile_interest_captured:${interestId}`,
-        n8n_preview_called: n8nPreviewCalled,
+        n8n_preview_called: automationPreviewQueued,
         updated_at: new Date().toISOString(),
       })
       .eq("id", interestId);
 
-    return ok({ id: interestId, message: FREE_VENDOR_INTEREST_CLIENT_MESSAGE, n8nPreviewCalled });
+    return ok({ id: interestId, message: FREE_VENDOR_INTEREST_CLIENT_MESSAGE, automationPreviewQueued });
   } catch (error) {
     return fail(error);
   }

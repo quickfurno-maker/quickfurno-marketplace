@@ -12,7 +12,7 @@
 // READ-ONLY BY CONSTRUCTION. No row creation, no row modification, no row
 // removal, no stored-procedure call, and no writer is imported — the canonical
 // mutation functions (`updateMarketplaceRuntimeSetting`,
-// `setAosN8nMasterRouterSetting`) are deliberately NOT referenced here.
+// the Automation Studio runtime controls) are deliberately NOT referenced here.
 //
 // OPERATIONS IS A COCKPIT, NOT A SECOND CONTROL PLANE.
 //   Every control below already has exactly one canonical home:
@@ -22,9 +22,9 @@
 //                                      "Paid-Only Auto Matching Controls"
 //                               write  adminUpdateMarketplaceRuntimeSetting
 //
-//   aos_n8n_master_router       state  aos_runtime_settings + env Lock 1
-//                               UI     /admin/automations -> AosAutomationControl
-//                               write  POST /api/admin/aos-runtime-settings
+//   native automation engine    state  worker environment + heartbeat
+//                               UI     /admin/automations -> Automation Studio
+//                               write  deployment/runtime configuration
 //
 //   whatsapp provider policy    state  communication_provider_runtime_policies
 //                               UI     /admin/whatsapp?tab=provider (read-only)
@@ -56,9 +56,10 @@ import {
   type AutoAssignmentMode,
 } from "../lib/lead-assignment/runtimeSettings";
 import {
-  AOS_N8N_MASTER_ROUTER_KEY,
-  resolveAosN8nActivation,
-} from "../lib/aos/runtime/aosRuntimeSettings";
+  NATIVE_AUTOMATION_RUNTIME_SETTING_KEY,
+  getNativeAutomationRuntimeConfig,
+  readNativeAutomationRuntimeSnapshot,
+} from "./nativeAutomationRuntimeService";
 import type {
   OperationalClassSummary,
   OperationsOverview,
@@ -301,80 +302,46 @@ async function readAutoAssignmentControl(): Promise<LaunchControl> {
 }
 
 // ===========================================================================
-// CONTROL 2 — AOS TO n8n FORWARDING
+// CONTROL 2 — QUICKFURNO NATIVE AUTOMATION ENGINE
 // ===========================================================================
 
-const AOS_FORWARDING_BASE = Object.freeze({
-  key: AOS_N8N_MASTER_ROUTER_KEY,
-  label: "Agent event forwarding",
+const NATIVE_AUTOMATION_BASE = Object.freeze({
+  key: NATIVE_AUTOMATION_RUNTIME_SETTING_KEY,
+  label: "Native automation engine",
   impact: "advisory" as const,
   actionable: true,
   href: "/admin/automations",
-  actionLabel: "Open control",
+  actionLabel: "Open Automation Studio",
 });
 
-/**
- * Two locks: a server-side environment lock and the stored admin switch. The
- * combined verdict is NOT recomputed here — `resolveAosN8nActivation()` is the
- * single source of truth both the dispatch path and the admin API already use,
- * and it is called rather than reimplemented so the rule cannot drift.
- *
- * Its answer is only TRUSTED when the bounded probe proves the stored row was
- * readable: the resolver falls back to a safe OFF default on any error, and an
- * unproven "off" must not be printed as a fact. Both run concurrently, so the
- * proof costs no added latency.
- */
-async function readAosForwardingControl(): Promise<LaunchControl> {
-  const [source, activation] = await Promise.all([
-    readControlSource("aos-runtime-settings", (db) =>
-      db
-        .from("aos_runtime_settings")
-        .select("setting_key, enabled, mode, updated_at")
-        .eq("setting_key", AOS_N8N_MASTER_ROUTER_KEY)
+async function readNativeAutomationControl(): Promise<LaunchControl> {
+  const [source, snapshot] = await Promise.all([
+    readControlSource("native-automation-runtime", (db) =>
+      db.from("marketplace_runtime_settings")
+        .select("key, value, updated_at")
+        .eq("key", NATIVE_AUTOMATION_RUNTIME_SETTING_KEY)
         .limit(1),
     ),
-    resolveAosN8nActivation(),
+    readNativeAutomationRuntimeSnapshot().catch(() => null),
   ]);
-
-  if (source.fault) return unreadableControl(AOS_FORWARDING_BASE, source.fault);
-
-  const stored = source.rows.length > 0;
-  const updatedAt = stored ? text(source.rows[0]?.updated_at) : null;
-
-  if (activation.shouldCallN8n) {
-    return {
-      ...AOS_FORWARDING_BASE,
-      state: "ACTIVE",
-      stateDetail:
-        "Agent events are being forwarded to the preview router. Both the server lock and the admin switch are on.",
-      sourceStatus: "READ",
-      fault: null,
-      updatedAt,
-    };
+  if (source.fault) return unreadableControl(NATIVE_AUTOMATION_BASE, source.fault);
+  const config = getNativeAutomationRuntimeConfig();
+  const updatedAt = source.rows.length ? text(source.rows[0]?.updated_at) : null;
+  if (config.mode === "off") {
+    return { ...NATIVE_AUTOMATION_BASE, state: "DISABLED", stateDetail: "The native automation worker is configured off. Core remains safe and no automation jobs are claimed.", sourceStatus: source.rows.length ? "READ" : "DEFAULT", fault: null, updatedAt };
   }
-
-  if (activation.runtime.enabled) {
-    return {
-      ...AOS_FORWARDING_BASE,
-      state: "PREVIEW",
-      stateDetail:
-        "The admin switch is on but the server lock is not, so nothing is forwarded. Events are handled in safe mock mode.",
-      sourceStatus: stored ? "READ" : "DEFAULT",
-      fault: null,
-      updatedAt,
-    };
+  const heartbeatMs = snapshot?.heartbeatAt ? Date.parse(snapshot.heartbeatAt) : 0;
+  const heartbeatFresh = heartbeatMs > Date.now() - Math.max(config.heartbeatMs * 3, 45_000);
+  if (!snapshot || snapshot.mode !== config.mode || !heartbeatFresh) {
+    return { ...NATIVE_AUTOMATION_BASE, state: "UNAVAILABLE", stateDetail: "The native automation worker is configured but a fresh matching heartbeat could not be proven.", sourceStatus: source.rows.length ? "READ" : "DEFAULT", fault: "UNAVAILABLE", updatedAt };
   }
-
-  return {
-    ...AOS_FORWARDING_BASE,
-    state: "DISABLED",
-    stateDetail: stored
-      ? "The admin switch is off. Agent events are handled in safe mock mode and nothing is forwarded."
-      : "No switch has been configured, so forwarding stays off and agent events are handled in safe mock mode.",
-    sourceStatus: stored ? "READ" : "DEFAULT",
-    fault: null,
-    updatedAt,
-  };
+  if (config.mode === "shadow") {
+    return { ...NATIVE_AUTOMATION_BASE, state: "PREVIEW", stateDetail: "The native automation worker is healthy in shadow mode. It observes runtime state but does not claim business work.", sourceStatus: "READ", fault: null, updatedAt };
+  }
+  if (snapshot.state !== "running") {
+    return { ...NATIVE_AUTOMATION_BASE, state: "PAUSED", stateDetail: `The native worker heartbeat is fresh but its state is '${snapshot.state}', so active execution is not currently proven.`, sourceStatus: "READ", fault: null, updatedAt };
+  }
+  return { ...NATIVE_AUTOMATION_BASE, state: "ACTIVE", stateDetail: "The QuickFurno native automation worker is healthy and actively executing Core-authorized jobs.", sourceStatus: "READ", fault: null, updatedAt };
 }
 
 // ===========================================================================
@@ -674,15 +641,15 @@ export function deriveLaunchReadiness(
 export async function getOperationsLaunchSnapshot(
   overview: OperationsOverview,
 ): Promise<OperationsLaunchSnapshot> {
-  const [autoAssignment, aosForwarding, whatsAppProvider] = await Promise.all([
+  const [autoAssignment, nativeAutomation, whatsAppProvider] = await Promise.all([
     readAutoAssignmentControl(),
-    readAosForwardingControl(),
+    readNativeAutomationControl(),
     readWhatsAppProviderControl(),
   ]);
 
   const controls: readonly LaunchControl[] = Object.freeze([
     autoAssignment,
-    aosForwarding,
+    nativeAutomation,
     whatsAppProvider,
     leadQueueRecheckControl(),
   ]);

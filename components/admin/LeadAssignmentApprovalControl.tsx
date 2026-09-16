@@ -9,12 +9,12 @@
 // Talks ONLY to:
 //   GET  /api/admin/lead-assignment-preview?leadId=
 //   POST /api/admin/lead-assignment-approval
-// It never sees the service-role key, the n8n webhook URL, or any secret — the
+// It never sees the service-role key, any external automation URL or secret — the
 // APIs return masked/labelled data only.
 //
 // Preview-only by design: approving NEVER sends WhatsApp, notifies vendors,
 // deducts credits, or auto-assigns leads. Only a preview approval record is
-// saved. The n8n call depends on the Phase 12 two-lock safety gate.
+// saved. No external automation runtime is called; AOS remains advisory-only.
 // ============================================================================
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -82,7 +82,7 @@ interface ApprovalResult {
   assignmentApprovalId: string;
   selectedVendorCount: number;
   aosEventEmitted: boolean;
-  n8nWebhookCalled: boolean;
+  automationEventQueued: boolean;
   mockMode: boolean;
   runtimeAutomationEnabled: boolean;
   runtimeAutomationMode: string;
@@ -91,7 +91,7 @@ interface ApprovalResult {
     vendorNotified: boolean;
     creditsDeducted: boolean;
     leadAutoAssigned: boolean;
-    n8nWebhookCalled: boolean;
+    automationEventQueued: boolean;
     databaseWritten: string;
   };
   reason: string;
@@ -214,8 +214,7 @@ export function LeadAssignmentApprovalControl({
       >
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <strong className="font-semibold">Safe preview.</strong> Approving saves a preview/draft record only. No vendor
-          notification, no WhatsApp, no credit deduction, and no auto-assignment is performed. n8n is called only when the
-          Phase 12 two-lock safety gate is fully ON (preview mode).
+          notification, no WhatsApp, no credit deduction, and no auto-assignment is performed. AOS remains advisory-only and cannot execute business automation directly.
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
@@ -392,7 +391,7 @@ function ApprovalSuccessPanel({ result }: { result: ApprovalResult }) {
       <section className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Approval record" value={result.status} helper={`ID ${result.assignmentApprovalId.slice(0, 8)}`} icon="reports" tone="indigo" />
         <StatCard label="Vendors selected" value={String(result.selectedVendorCount)} helper="Preview only" icon="vendors" tone="slate" />
-        <StatCard label="n8n webhook" value={result.n8nWebhookCalled ? "Called" : "Not called"} helper={result.mockMode ? "mockMode=true" : "mockMode=false"} icon="automations" tone={result.n8nWebhookCalled ? "emerald" : "slate"} />
+        <StatCard label="AOS execution handoff" value={result.automationEventQueued ? "Queued" : "None"} helper="Advisory preview only" icon="automations" tone={result.automationEventQueued ? "emerald" : "slate"} />
         <StatCard label="Runtime switch" value={result.runtimeAutomationEnabled ? `ON · ${result.runtimeAutomationMode}` : "OFF"} helper="Phase 12 Lock 2" icon="aos" tone={result.runtimeAutomationEnabled ? "emerald" : "slate"} />
       </section>
 

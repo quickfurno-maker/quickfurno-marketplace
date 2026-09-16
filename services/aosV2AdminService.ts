@@ -27,7 +27,7 @@ export interface AosV2AdminSnapshot {
   agents: typeof AOS_V2_AGENT_CAPABILITIES;
   architecture: {
     coreAuthority: true;
-    directN8nFromAos: false;
+    directExternalAutomationFromAos: false;
     legacyPreviewRouterRetired: true;
     oldWorkflowKernelInstalledByAosV2: false;
     actionProposalsEnabled: boolean;
@@ -110,7 +110,7 @@ export async function getAosV2AdminSnapshot(): Promise<AosV2AdminSnapshot> {
 function architecture(actionProposalsEnabled: boolean) {
   return {
     coreAuthority: true as const,
-    directN8nFromAos: false as const,
+    directExternalAutomationFromAos: false as const,
     legacyPreviewRouterRetired: true as const,
     oldWorkflowKernelInstalledByAosV2: false as const,
     actionProposalsEnabled,

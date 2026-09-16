@@ -89,13 +89,13 @@ check("Canonical snapshot excludes raw message", !JSON.stringify(snapshot).toLow
 check("Registry contains exactly the seven canonical AOS agents", AOS_V2_AGENT_COUNT === 7);
 check("All seven canonical AOS agents are operational", AOS_V2_OPERATIONAL_AGENT_COUNT === 7 && AOS_V2_AGENT_CAPABILITIES.every((a) => a.state === "operational"));
 check("Every AOS agent is advisory only", AOS_V2_AGENT_CAPABILITIES.every((a) => a.authority === "advisory_only"));
-check("Every AOS agent blocks direct n8n", AOS_V2_AGENT_CAPABILITIES.every((a) => a.directN8n === false));
+check("Every AOS agent blocks direct external execution", AOS_V2_AGENT_CAPABILITIES.every((a) => a.directExternalExecutor === false));
 check("Every AOS agent blocks business writes", AOS_V2_AGENT_CAPABILITIES.every((a) => a.businessWrites === false));
 check("Every AOS agent excludes customer conversation", AOS_V2_AGENT_CAPABILITIES.every((a) => a.customerConversation === false));
 check("Every AOS agent excludes post-delivery commercial management", AOS_V2_AGENT_CAPABILITIES.every((a) => a.postDeliveryCommercialManagement === false));
 check("QuickFurno Core is the integration hub", QUICKFURNO_PLATFORM_BOUNDARY.core.integrationHub === true);
 check("Jarvis is customer care via Core only", QUICKFURNO_PLATFORM_BOUNDARY.jarvis.role === "customer_conversation_and_care" && QUICKFURNO_PLATFORM_BOUNDARY.jarvis.integration === "future_via_quickfurno_core");
-check("n8n is execution not business authority", QUICKFURNO_PLATFORM_BOUNDARY.n8n.role === "authorized_execution_orchestration" && QUICKFURNO_PLATFORM_BOUNDARY.n8n.businessAuthority === false);
+check("Native automation is execution not business authority", QUICKFURNO_PLATFORM_BOUNDARY.nativeAutomation.role === "core_authorized_execution_orchestration" && QUICKFURNO_PLATFORM_BOUNDARY.nativeAutomation.businessAuthority === false && QUICKFURNO_PLATFORM_BOUNDARY.nativeAutomation.queue === "automation_jobs");
 check("QuickFurno responsibility ends after delivery plus bounded connection assurance", QUICKFURNO_LEAD_GENERATION_BOUNDARY.responsibilityEndsAt === "delivery_plus_bounded_connection_assurance" && QUICKFURNO_LEAD_GENERATION_BOUNDARY.connectionAssurance.vendorResponseWindowHours === 24 && QUICKFURNO_LEAD_GENERATION_BOUNDARY.connectionAssurance.maxClientAutomatedMessages === 5);
 check("Post-delivery commercial management is outside QuickFurno", QUICKFURNO_LEAD_GENERATION_BOUNDARY.postDeliveryCommercialManagement === false);
 check("Quotation/site visit/negotiation/project execution are vendor-client owned", ["quotation", "site_visit", "negotiation", "project_execution", "commercial_outcome"].every((item) => QUICKFURNO_LEAD_GENERATION_BOUNDARY.vendorClientOwns.includes(item)));
@@ -110,7 +110,7 @@ check("Core owns the standard missing-information reminder", resolveConversation
 check("AOS intelligent clarification requires Core review", resolveConversationTriggerDecision({ origin: "aos_recommendation", actionType: "client.requirement_collection" }) === "core_review_required");
 check("Jarvis is never trigger authority", resolveConversationTriggerDecision({ origin: "jarvis", actionType: "client.requirement_collection" }) === "jarvis_not_trigger_authority");
 check("Architecture says conversation results return to Core", QUICKFURNO_PLATFORM_BOUNDARY.conversationTriggering.resultAuthority === "quickfurno_core");
-check("Architecture says n8n handoff happens only after Core authorization", QUICKFURNO_PLATFORM_BOUNDARY.conversationTriggering.executionHandoff === "n8n_after_core_authorization");
+check("Architecture hands execution to the native worker only after Core authorization", QUICKFURNO_PLATFORM_BOUNDARY.conversationTriggering.executionHandoff === "native_worker_after_core_authorization");
 
 const migration = read("supabase/migrations/20260912040000_qf_aos_v2_intelligence.sql");
 for (const table of ["aos_runs", "aos_agent_logs", "aos_recommendations", "aos_agent_memory", "aos_audit_logs"]) {
@@ -141,15 +141,20 @@ check("Scope-lock verifier tolerates pg_get_functiondef comments before stale re
 check("Successor migration preserves generic pre-delivery status update", scopeMigration.includes("client.lead_status_update"));
 check("Successor migration guards downstream commercial statuses", ["Contacted", "Site Visit Scheduled", "Quotation Sent", "Converted", "Won", "Lost"].every((status) => scopeMigration.includes(status)));
 
-const n8nSync = read("lib/aos/sync/n8nSyncService.ts");
-const queueBlock = n8nSync.slice(n8nSync.indexOf("export async function queueEventForN8n"), n8nSync.indexOf("export function getN8nWorkflowMap"));
-check("Legacy queueEventForN8n cannot call transport", !queueBlock.includes("sendEventToN8n("));
-check("Legacy queue reports retired", queueBlock.includes("retired"));
+for (const retired of [
+  "lib/aos/sync/n8nSyncService.ts",
+  "lib/aos/tools/n8nTool.ts",
+  "lib/aos/events/n8nWorkflowMap.ts",
+  "lib/aos/events/n8nEventTypes.ts",
+  "lib/aos/runtime/aosRuntimeSettings.ts",
+]) {
+  check(`Legacy external automation module removed: ${retired}`, !fs.existsSync(path.join(ROOT, retired)));
+}
 
 for (const route of ["events", "failure", "process-lead", "whatsapp-status"]) {
-  const src = read(`app/api/aos/${route}/route.ts`);
-  check(`Legacy /api/aos/${route} is retired`, src.includes("status: 410"));
+  check(`Legacy /api/aos/${route} is removed`, !fs.existsSync(path.join(ROOT, `app/api/aos/${route}/route.ts`)));
 }
+check("Legacy AOS process-lead workflow module is removed", !fs.existsSync(path.join(ROOT, "lib/aos/workflows/processLeadWorkflow.ts")));
 const leadService = read("services/leadService.ts");
 const matchingIndex = leadService.indexOf("runAutoLeadMatchingForLead(data.id)");
 const aosIndex = leadService.indexOf("runAosV2LeadIntelligence({");

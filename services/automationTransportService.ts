@@ -1,7 +1,7 @@
 // ============================================================================
-// QuickFurno — QF-MVP-50.1C secure n8n transport service
+// QuickFurno — durable automation execution evidence service
 //
-// Server-only Core boundary. No n8n URL, Meta token, provider call or direct
+// Server-only Core boundary. No external workflow runtime, provider call or direct
 // table mutation exists here.
 // ============================================================================
 
@@ -18,7 +18,6 @@ import type {
   AutomationTransportClaimRow,
   AutomationTransportCompletionRow,
   AutomationTransportExecutionRow,
-  AutomationTransportRuntimeConfig,
   FreshClaimEvidence,
   N8nClaimResponseBody,
   N8nCompleteResponseBody,
@@ -28,62 +27,6 @@ const SAFE_WORKER_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/;
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA256_RE = /^[0-9a-f]{64}$/;
-
-export function getAutomationTransportRuntimeConfig():
-  | { ok: true; config: AutomationTransportRuntimeConfig }
-  | { ok: false; code: string } {
-  const modeRaw = process.env.QF_N8N_TRANSPORT_MODE?.trim().toLowerCase() ?? "off";
-
-  if (modeRaw === "off") {
-    return {
-      ok: true,
-      config: {
-        mode: "off",
-        runtimeEnvironment: null,
-        inboundSecret: null,
-        responseSecret: null,
-        workerId: null,
-      },
-    };
-  }
-
-  if (modeRaw !== "staging" && modeRaw !== "production") {
-    return { ok: false, code: "AUTOMATION_TRANSPORT_MODE_INVALID" };
-  }
-
-  const runtimeEnvironment =
-    process.env.QF_AUTOMATION_RUNTIME_ENV?.trim().toLowerCase() ?? "";
-  if (runtimeEnvironment !== modeRaw) {
-    return { ok: false, code: "AUTOMATION_TRANSPORT_ENVIRONMENT_MISMATCH" };
-  }
-
-  const inboundSecret =
-    process.env.QF_N8N_TO_CORE_HMAC_SECRET?.trim() ?? "";
-  const responseSecret =
-    process.env.QF_CORE_TO_N8N_HMAC_SECRET?.trim() ?? "";
-  const workerId = process.env.QF_N8N_WORKER_ID?.trim() ?? "";
-
-  if (inboundSecret.length < 32 || responseSecret.length < 32) {
-    return { ok: false, code: "AUTOMATION_TRANSPORT_SECRET_MISSING" };
-  }
-  if (inboundSecret === responseSecret) {
-    return { ok: false, code: "AUTOMATION_TRANSPORT_DIRECTIONAL_SECRETS_REQUIRED" };
-  }
-  if (!SAFE_WORKER_RE.test(workerId)) {
-    return { ok: false, code: "AUTOMATION_TRANSPORT_WORKER_ID_INVALID" };
-  }
-
-  return {
-    ok: true,
-    config: {
-      mode: modeRaw,
-      runtimeEnvironment: modeRaw,
-      inboundSecret,
-      responseSecret,
-      workerId,
-    },
-  };
-}
 
 /**
  * QF-MVP-50.3/50.4 family-aware claim.
@@ -247,11 +190,11 @@ async function interpretClaimRow(
 // QF-MVP-50.2D — signed attempt completion
 // ---------------------------------------------------------------------------
 
-export type N8nCompletionTransportResult =
+export type AutomationCompletionEvidenceResult =
   | { ok: true; body: N8nCompleteResponseBody }
   | { ok: false; status: 409; code: string };
 
-export interface CompleteAutomationAttemptForN8nTransportInput {
+export interface CompleteAutomationAttemptFromEvidenceInput {
   readonly requestId: string;
   readonly workerId: string;
   readonly bodySha256: string;
@@ -273,9 +216,9 @@ export interface CompleteAutomationAttemptForN8nTransportInput {
  *
  * No provider call, no communication send, no Meta/WhatsApp, no n8n execution.
  */
-export async function completeAutomationAttemptForN8nTransport(
-  input: CompleteAutomationAttemptForN8nTransportInput,
-): Promise<N8nCompletionTransportResult> {
+export async function completeAutomationAttempt(
+  input: CompleteAutomationAttemptFromEvidenceInput,
+): Promise<AutomationCompletionEvidenceResult> {
   if (!UUID_RE.test(input.requestId)) {
     throw new Error("AUTOMATION_TRANSPORT_REQUEST_ID_INVALID");
   }
@@ -433,7 +376,7 @@ export interface RecordedClientExecutionIdentity {
  * AFTER this call commits. No cross-system atomicity exists or is claimed; the
  * crash-safety property comes from every replay re-reading Core truth.
  */
-export async function recordClientExecutionTransportIdentity(input: {
+export async function recordAutomationExecutionIdentity(input: {
   requestId: string;
   workerId: string;
   bodySha256: string;
@@ -494,7 +437,7 @@ export async function recordClientExecutionTransportIdentity(input: {
  * finalized this attempt". Without it, a lost response after a pre-communication
  * finalization would be indistinguishable from an unauthorized request.
  */
-export async function getRecordedClientExecutionIdentity(input: {
+export async function getRecordedAutomationExecutionIdentity(input: {
   jobId: string;
   attemptId: string;
 }): Promise<{ requestId: string } | null> {
@@ -537,3 +480,13 @@ function requireFreshClaimEvidence(
     max_attempts: row.max_attempts,
   };
 }
+/** @deprecated Historical transport alias; native runtime uses completeAutomationAttempt. */
+export const completeAutomationAttemptForN8nTransport = completeAutomationAttempt;
+/** @deprecated Historical name retained for old validators. */
+export type N8nCompletionTransportResult = AutomationCompletionEvidenceResult;
+/** @deprecated Historical name retained for old validators. */
+export type CompleteAutomationAttemptForN8nTransportInput = CompleteAutomationAttemptFromEvidenceInput;
+/** @deprecated Historical name retained for old validators. */
+export const recordClientExecutionTransportIdentity = recordAutomationExecutionIdentity;
+/** @deprecated Historical name retained for old validators. */
+export const getRecordedClientExecutionIdentity = getRecordedAutomationExecutionIdentity;

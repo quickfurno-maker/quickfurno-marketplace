@@ -60,16 +60,16 @@ export interface AutomationStudioWorkflowMeta {
   key: AutomationStudioWorkflowKey;
   name: string;
   shortDescription: string;
-  runtimeAdapter: string;
+  engineLane: string;
   accent: "violet" | "magenta" | "red" | "blue" | "green" | "amber";
 }
 export const AUTOMATION_STUDIO_WORKFLOWS: readonly AutomationStudioWorkflowMeta[] = [
-  { key: "client_journey", name: "Client Journey", shortDescription: "Enquiry → Match → Notify", runtimeAdapter: "client_whatsapp", accent: "violet" },
-  { key: "vendor_journey", name: "Vendor Journey", shortDescription: "Onboarding & engagement", runtimeAdapter: "vendor_whatsapp", accent: "magenta" },
-  { key: "campaigns", name: "Campaigns", shortDescription: "Governed broadcast execution", runtimeAdapter: "campaign_execution", accent: "red" },
-  { key: "recovery", name: "Recovery", shortDescription: "Retry failed automation", runtimeAdapter: "recover_v1 + reconcile_v1", accent: "blue" },
-  { key: "orphan_cleanup", name: "Orphan Cleanup", shortDescription: "Cancel orphan jobs", runtimeAdapter: "cancel_orphan_v1", accent: "green" },
-  { key: "stale_cleanup", name: "Stale Cleanup", shortDescription: "Cancel stale jobs", runtimeAdapter: "cancel_stale_v1", accent: "amber" },
+  { key: "client_journey", name: "Client Journey", shortDescription: "Enquiry → Match → Notify", engineLane: "client_whatsapp", accent: "violet" },
+  { key: "vendor_journey", name: "Vendor Journey", shortDescription: "Onboarding & engagement", engineLane: "vendor_whatsapp", accent: "magenta" },
+  { key: "campaigns", name: "Campaigns", shortDescription: "Governed broadcast execution", engineLane: "campaign_execution", accent: "red" },
+  { key: "recovery", name: "Recovery", shortDescription: "Retry failed automation", engineLane: "recover_v1 + reconcile_v1", accent: "blue" },
+  { key: "orphan_cleanup", name: "Orphan Cleanup", shortDescription: "Cancel orphan jobs", engineLane: "cancel_orphan_v1", accent: "green" },
+  { key: "stale_cleanup", name: "Stale Cleanup", shortDescription: "Cancel stale jobs", engineLane: "cancel_stale_v1", accent: "amber" },
 ] as const;
 
 export const AUTOMATION_STUDIO_BLOCKS = [
@@ -184,7 +184,7 @@ const recovery: AutomationStudioDefinition = {
     node("recovery-recover", "core_action", "Recover Eligible Jobs", "Core selects due retry work", "locked_core", 300, 146, { capability: "recover_v1" }),
     node("recovery-condition", "condition", "Reconcile Due?", "Five-minute reconciliation cadence", "editable_policy", 300, 244, { settings: { intervalMinutes: 5 } }),
     node("recovery-reconcile", "core_action", "Reconcile Attempts", "Core resolves stale attempt state", "locked_core", 538, 342, { capability: "reconcile_v1" }),
-    node("recovery-stop", "stop", "Cycle Complete", "No additional authority in n8n", "locked_core", 300, 446, { capability: "stop" }),
+    node("recovery-stop", "stop", "Cycle Complete", "No additional business authority in the worker", "locked_core", 300, 446, { capability: "stop" }),
   ],
   edges: [
     { id: "r1", from: "recovery-trigger", to: "recovery-recover" },
@@ -445,7 +445,7 @@ export interface AutomationStudioWorkflowRuntime {
   key: AutomationStudioWorkflowKey;
   name: string;
   shortDescription: string;
-  runtimeAdapter: string;
+  engineLane: string;
   accent: AutomationStudioWorkflowMeta["accent"];
   enabled: boolean;
   health: "healthy" | "paused" | "unknown" | "degraded";
@@ -474,12 +474,24 @@ export interface AutomationStudioExecutionRow {
 export interface AutomationStudioOverview {
   ok: true;
   globalEnabled: boolean;
-  transport: {
-    mode: "off" | "staging" | "production" | "invalid";
+  nativeEngine: {
+    mode: "off" | "shadow" | "active";
     healthy: boolean;
     workerId: string | null;
-    lastSeenAt: string | null;
-    routeCalls30m: number;
+    state: string;
+    engineVersion: string | null;
+    lastHeartbeatAt: string | null;
+    cycles: number;
+    jobsProcessed: number;
+    lastClaimAt: string | null;
+    lastSuccessAt: string | null;
+    lastErrorAt: string | null;
+    lastSafeCode: string | null;
+    systemLanes: {
+      leadAssignmentDispatchAt: string | null;
+      consentAckAt: string | null;
+      delayedFillAt: string | null;
+    };
   };
   workflows: AutomationStudioWorkflowRuntime[];
   executions: AutomationStudioExecutionRow[];

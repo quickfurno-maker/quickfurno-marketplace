@@ -37,6 +37,10 @@ export type AutomationWorkflowFamily =
   | "vendor_whatsapp"
   | "campaign_execution";
 
+export function isAutomationWorkflowFamily(value: unknown): value is AutomationWorkflowFamily {
+  return value === "client_whatsapp" || value === "vendor_whatsapp" || value === "campaign_execution";
+}
+
 export interface AutomationActionDefinition {
   actionType: AutomationActionType;
   workflowFamily: AutomationWorkflowFamily;

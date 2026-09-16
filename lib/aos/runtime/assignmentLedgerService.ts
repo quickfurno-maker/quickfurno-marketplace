@@ -7,7 +7,7 @@
 //
 // SAFETY CONTRACT:
 //   - READ ONLY. Performs NO writes, NO assignment, NO WhatsApp, NO vendor
-//     notification, NO credit deduction, NO n8n calls.
+//     notification, NO credit deduction, NO external workflow calls.
 //   - Uses the service-role client; never reaches the browser. Returns no
 //     secrets — the stored event_response is a safe, masked summary only.
 //   - Never throws: any missing table/column resolves to a safe empty result so
@@ -29,7 +29,7 @@ export interface LedgerSideEffects {
   vendorNotified: boolean;
   creditsDeducted: boolean;
   leadAutoAssigned: boolean;
-  n8nWebhookCalled: boolean;
+  automationEventQueued: boolean;
 }
 
 export interface AssignmentLedgerEntry {
@@ -47,8 +47,8 @@ export interface AssignmentLedgerEntry {
   statusLabel: string;
   mode: string;
   aosEventEmitted: boolean;
-  n8nWebhookCalled: boolean;
-  n8nLabel: string;
+  automationEventQueued: boolean;
+  automationLabel: string;
   approvedBy: string | null;
   approvalSource: string;
   approvalNote: string | null;
@@ -69,7 +69,7 @@ export interface AssignmentLogEntry {
   leadName: string | null;
   status: string;
   statusLabel: string;
-  n8nWebhookCalled: boolean;
+  automationEventQueued: boolean;
   approvedBy: string | null;
   approvalSource: string;
 }
@@ -138,7 +138,7 @@ export async function getAssignmentLogs(limit = 50): Promise<{ logs: AssignmentL
       leadName: asText(asObject(row.lead_snapshot).name) ?? asText(row.lead_id),
       status,
       statusLabel: statusLabel(status),
-      n8nWebhookCalled: row.n8n_webhook_called === true,
+      automationEventQueued: row.n8n_webhook_called === true,
       approvedBy: asText(row.approved_by),
       approvalSource: asText(row.approval_source) ?? "admin_preview",
     };
@@ -181,7 +181,7 @@ function mapLedgerRow(row: Record<string, unknown>): AssignmentLedgerEntry {
   const leadSnapshot = asObject(row.lead_snapshot);
   const vendors = asVendorSnapshots(row.vendor_snapshot);
   const status = asText(row.status) ?? "preview_approved";
-  const n8nWebhookCalled = row.n8n_webhook_called === true;
+  const automationEventQueued = row.n8n_webhook_called === true;
   const failureReason = asText(row.failure_reason);
   const aosEventEmitted = row.aos_event_emitted === true;
   const selectedVendorIds = asStringArray(row.selected_vendor_ids);
@@ -201,14 +201,14 @@ function mapLedgerRow(row: Record<string, unknown>): AssignmentLedgerEntry {
     statusLabel: statusLabel(status),
     mode: asText(row.mode) ?? "preview",
     aosEventEmitted,
-    n8nWebhookCalled,
-    n8nLabel: n8nWebhookCalled ? "n8n preview called" : "safe mock mode",
+    automationEventQueued,
+    automationLabel: automationEventQueued ? "legacy preview recorded" : "advisory only",
     approvedBy: asText(row.approved_by),
     approvalSource: asText(row.approval_source) ?? "admin_preview",
     approvalNote: asText(row.approval_note),
     failureReason,
     isFailed: status === "cancelled" || Boolean(failureReason) || !aosEventEmitted,
-    sideEffects: mapSideEffects(row.side_effects, n8nWebhookCalled),
+    sideEffects: mapSideEffects(row.side_effects, automationEventQueued),
     createdAt: asText(row.created_at),
     updatedAt: asText(row.updated_at),
   };
@@ -229,16 +229,16 @@ function statusLabel(status: string): string {
   }
 }
 
-function mapSideEffects(value: unknown, n8nWebhookCalled: boolean): LedgerSideEffects {
+function mapSideEffects(value: unknown, automationEventQueued: boolean): LedgerSideEffects {
   // The preview contract hard-disables all real side effects. We surface the
-  // stored values but they are always false except n8nWebhookCalled.
+  // stored values but they are always false except automationEventQueued.
   const record = asObject(value);
   return {
     whatsappSent: record.whatsappSent === true,
     vendorNotified: record.vendorNotified === true,
     creditsDeducted: record.creditsDeducted === true,
     leadAutoAssigned: record.leadAutoAssigned === true,
-    n8nWebhookCalled: record.n8nWebhookCalled === true || n8nWebhookCalled,
+    automationEventQueued: record.automationEventQueued === true || automationEventQueued,
   };
 }
 

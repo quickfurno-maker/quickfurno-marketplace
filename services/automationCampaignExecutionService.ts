@@ -38,8 +38,8 @@ import {
   proveCurrentAutomationAttemptOwnership,
 } from "@/services/automationPersistenceService";
 import {
-  getRecordedClientExecutionIdentity,
-  recordClientExecutionTransportIdentity,
+  getRecordedAutomationExecutionIdentity,
+  recordAutomationExecutionIdentity,
 } from "@/services/automationTransportService";
 import {
   buildCampaignExecutionPlan,
@@ -69,7 +69,7 @@ interface CommunicationEvidence {
   readonly status: string;
 }
 
-export async function executeCampaignAutomationForN8nTransport(
+export async function executeCampaignAutomationAttempt(
   input: ExecuteCampaignAutomationInput,
 ): Promise<FamilyExecutionResult> {
   if (!UUID_RE.test(input.requestId)) {
@@ -115,7 +115,7 @@ export async function executeCampaignAutomationForN8nTransport(
   }
 
   if (ownership.verdict === "owned_completed") {
-    const reservation = await getRecordedClientExecutionIdentity({
+    const reservation = await getRecordedAutomationExecutionIdentity({
       jobId: input.jobId,
       attemptId: input.attemptId,
     });
@@ -199,7 +199,7 @@ export async function executeCampaignAutomationForN8nTransport(
 
   // D. Reserve the durable, attempt-scoped execution identity
   try {
-    await recordClientExecutionTransportIdentity({
+    await recordAutomationExecutionIdentity({
       requestId: input.requestId,
       workerId: input.workerId,
       bodySha256: input.bodySha256,

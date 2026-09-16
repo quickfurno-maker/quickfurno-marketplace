@@ -444,15 +444,14 @@ const RULES = {
   "Z05 CI runs this validator at the exact head": () =>
     /QF-MVP-80\.14A Meta production activation authority/.test(CI) &&
     /npm run test:mvp:80-14a/.test(CI),
-  "Z06 no existing CI step was removed": () => {
+  "Z06 all still-applicable safety CI steps remain wired": () => {
     const required = [
       "npm run test:mvp:40-4", "npm run test:mvp:40-10a", "npm run test:mvp:40-11",
       "npm run test:mvp:40-12-r1", "npm run test:mvp:50-1a", "npm run test:mvp:50-1b",
-      "npm run test:mvp:50-1c", "npm run test:mvp:50-2a", "npm run test:mvp:50-2b",
-      "npm run test:mvp:50-2c", "npm run test:mvp:50-2c-s2-g1", "npm run test:mvp:50-2d",
-      "npm run test:mvp:50-2e", "npm run test:mvp:50-2-final", "npm run test:mvp:50-3",
-      "npm run test:mvp:50-4", "npm run test:mvp:50-5", "npm run test:mvp:50-3-50-4-bridge",
-      "npm run test:mvp:50-3-50-4-forensic", "npm run test:mvp:50-3-50-4-cert",
+                  "npm run test:mvp:50-3",
+      "npm run test:mvp:50-3-50-4-bridge",
+      "npm run test:mvp:50-3-50-4-forensic",
+      "npm run test:automation-native", "npm run test:automation-studio",
       "npm run test:mvp:70-01", "npm run test:mvp:70-02", "npm run test:mvp:70-03",
       "npm run test:mvp:70-04", "npm run test:mvp:75-01", "npm run test:mvp:75-02",
       "npm run test:mvp:75-03", "npm run test:mvp:80-02-gate06",

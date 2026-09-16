@@ -4,14 +4,14 @@
 // QuickFurno Admin V2 — Automation visibility (C-WA1).
 //
 // READ-ONLY orchestration visibility. There is no Run now, Retry now, Force
-// complete, Release, Unclaim, Change family or Activate n8n control here, and
+// complete, Release, Unclaim or Change family control here, and
 // none may be added: claiming and completing a job are transport operations
 // owned by the executor, and the workflow family is re-proven from durable Core
 // truth rather than being selectable.
 //
 // AUTHORITY, stated plainly on the page: Core decides the action, the entity,
 // the recipient, the template, the variables, consent, eligibility, the provider
-// and the outcome. n8n orchestrates. It is not business authority.
+// and the outcome. The QuickFurno Native Automation Worker executes approved work. It is not business authority.
 // ============================================================================
 
 import { DataTable, SelectFilter, StatusBadge } from "../AdminPrimitives";
@@ -49,7 +49,7 @@ export function WhatsAppAutomationTab({
     <div className="space-y-4">
       <ReadOnlyNotice>
         <strong>Core decides</strong> the action, entity, recipient, template, variables, consent,
-        eligibility, provider and outcome. <strong>n8n orchestrates</strong> — it is not business
+        eligibility, provider and outcome. <strong>The Native Automation Worker executes approved work</strong> — it is not business
         authority and cannot choose any of those. This view is visibility only: there is no run,
         retry, release, unclaim, force-complete or family-change control.
       </ReadOnlyNotice>

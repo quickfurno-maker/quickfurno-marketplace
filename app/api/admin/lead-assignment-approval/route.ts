@@ -11,7 +11,7 @@
 //   - Validates a hard cap of 3 vendors (also enforced by a DB CHECK).
 //   - PREVIEW ONLY: NO real assignment, NO vendor notification, NO WhatsApp,
 //     NO credit deduction. The only DB write is the preview approval record.
-//   - n8n is called ONLY when Phase 12's two locks are both ON (preview mode).
+//   - AOS remains advisory-only; no external workflow runtime is invoked.
 //   - NEVER exposes the service-role key, webhook URL, or any secret.
 // ============================================================================
 import { NextResponse } from "next/server";
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
       selectedVendorCount: result.selectedVendorCount,
       agents: [...ASSIGNMENT_APPROVAL_AGENTS],
       aosEventEmitted: result.aosEventEmitted,
-      n8nWebhookCalled: result.n8nWebhookCalled,
+      automationEventQueued: result.automationEventQueued,
       mockMode: result.mockMode,
       runtimeAutomationEnabled: result.runtimeAutomationEnabled,
       runtimeAutomationMode: result.runtimeAutomationMode,

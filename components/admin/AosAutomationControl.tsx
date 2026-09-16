@@ -15,7 +15,7 @@ interface AosV2Status {
     intelligenceEnabled: boolean;
     mode: "off" | "shadow";
     actionProposalsEnabled: boolean;
-    legacyDirectN8nRetired: true;
+    legacyExternalAutomationRetired: true;
   };
   persistenceReady: boolean;
   counts: {
@@ -29,7 +29,7 @@ interface AosV2Status {
   };
   architecture: {
     coreAuthority: true;
-    directN8nFromAos: false;
+    directExternalAutomationFromAos: false;
     legacyPreviewRouterRetired: true;
     oldWorkflowKernelInstalledByAosV2: false;
     actionProposalsEnabled: boolean;
@@ -144,7 +144,7 @@ export function AosAutomationControl({
     <div className="space-y-5">
       <SectionCard
         title="AOS V2 Intelligence"
-        description="AOS observes canonical QuickFurno Core facts and produces durable recommendations. Core remains the only business authority; AOS has no direct n8n path."
+        description="AOS observes canonical QuickFurno Core facts and produces durable recommendations. Core remains the only business authority; AOS has no direct execution path; Core and the native worker own automation."
         action={
           <StatusBadge
             value={status.runtime.intelligenceEnabled ? "Active · shadow" : "Off"}
@@ -165,14 +165,14 @@ export function AosAutomationControl({
           <ArchitectureRow label="Jarvis customer care" good={status.architecture.jarvisIntegration === "future_via_quickfurno_core"} value="Via Core only - future integration" />
           <ArchitectureRow label="QuickFurno lead responsibility" good={status.architecture.leadGenerationResponsibilityEndsAt === "quality_lead_successfully_delivered_to_assigned_vendor"} value="Ends at verified vendor delivery" />
           <ArchitectureRow label="Quotation / site visit / negotiation / project" good={!status.architecture.postDeliveryCommercialManagement} value="Vendor + client owned" />
-          <ArchitectureRow label="Direct AOS → n8n" good={!status.architecture.directN8nFromAos} value="Retired / impossible" />
+          <ArchitectureRow label="Direct AOS execution" good={!status.architecture.directExternalAutomationFromAos} value="Blocked / impossible" />
           <ArchitectureRow label="Legacy preview router" good={status.architecture.legacyPreviewRouterRetired} value="Retired" />
           <ArchitectureRow label="Old AOS workflow kernel" good={!status.architecture.oldWorkflowKernelInstalledByAosV2} value="Not installed" />
           <ArchitectureRow label="AOS action proposals" good={!status.architecture.actionProposalsEnabled} value={status.architecture.actionProposalsEnabled ? "Enabled" : "Locked off"} />
         </div>
       </SectionCard>
 
-      <SectionCard title="Runtime control" description="This switch controls intelligence only. It cannot enable messaging, assignment, credits or n8n execution.">
+      <SectionCard title="Runtime control" description="This switch controls intelligence only. It cannot enable messaging, assignment, credits or native worker execution.">
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
           <div>
             <p className="text-sm font-semibold text-slate-900">Enable AOS V2 intelligence</p>

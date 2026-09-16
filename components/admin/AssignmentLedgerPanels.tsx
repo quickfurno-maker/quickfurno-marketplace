@@ -9,7 +9,7 @@
 //   - DistributionLogsPanel     → GET /api/admin/lead-assignments/logs
 //   - detail drawer             → GET /api/admin/lead-assignments/[id]
 //
-// These never write, never assign, never notify, never call n8n. The side-effect
+// These never write, never assign, never notify, never invoke an external workflow runtime. The side-effect
 // badges are ALWAYS shown as disabled to make the preview-only contract obvious.
 // ============================================================================
 import { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -41,8 +41,8 @@ interface LedgerEntry {
   statusLabel: string;
   mode: string;
   aosEventEmitted: boolean;
-  n8nWebhookCalled: boolean;
-  n8nLabel: string;
+  automationEventQueued: boolean;
+  automationLabel: string;
   approvedBy: string | null;
   approvalSource: string;
   approvalNote: string | null;
@@ -53,7 +53,7 @@ interface LedgerEntry {
     vendorNotified: boolean;
     creditsDeducted: boolean;
     leadAutoAssigned: boolean;
-    n8nWebhookCalled: boolean;
+    automationEventQueued: boolean;
   };
   createdAt: string | null;
   updatedAt: string | null;
@@ -69,7 +69,7 @@ interface LogEntry {
   leadName: string | null;
   status: string;
   statusLabel: string;
-  n8nWebhookCalled: boolean;
+  automationEventQueued: boolean;
   approvedBy: string | null;
   approvalSource: string;
 }
@@ -105,8 +105,8 @@ function SafetyLegend() {
   );
 }
 
-function N8nBadge({ called }: { called: boolean }) {
-  return <StatusBadge value={called ? "n8n preview called" : "safe mock mode"} tone={called ? "emerald" : "slate"} />;
+function AutomationBadge({ called }: { called: boolean }) {
+  return <StatusBadge value={called ? "legacy preview forwarded" : "safe mock mode"} tone={called ? "emerald" : "slate"} />;
 }
 
 function StatusChip({ entry }: { entry: LedgerEntry }) {
@@ -179,7 +179,7 @@ export function RecentAssignmentsPanel({ notify }: { notify: Notify }) {
             { header: "Vendor names", cell: (row) => <span className="line-clamp-2 min-w-44">{row.selectedVendorNames.length ? row.selectedVendorNames.join(", ") : `${row.selectedVendorCount} selected`}</span> },
             { header: "Status", cell: (row) => <StatusChip entry={row} /> },
             { header: "Mode", cell: (row) => <StatusBadge value={row.mode} tone="slate" /> },
-            { header: "n8n webhook", cell: (row) => <N8nBadge called={row.n8nWebhookCalled} /> },
+            { header: "Legacy forwarding", cell: (row) => <AutomationBadge called={row.automationEventQueued} /> },
             { header: "Side effects", cell: () => <StatusBadge value="All disabled" tone="emerald" /> },
             { header: "Approved by", cell: (row) => row.approvedBy || "Superadmin" },
             { header: "Created", cell: (row) => formatDate(row.createdAt) },
@@ -225,7 +225,7 @@ export function FailedAssignmentsPanel({ notify }: { notify: Notify }) {
             { header: "Category", cell: (row) => row.leadCategory || "Not set" },
             { header: "Status", cell: (row) => <StatusChip entry={row} /> },
             { header: "Reason", cell: (row) => row.failureReason || (row.aosEventEmitted ? "—" : "AOS event not emitted") },
-            { header: "n8n webhook", cell: (row) => <N8nBadge called={row.n8nWebhookCalled} /> },
+            { header: "Legacy forwarding", cell: (row) => <AutomationBadge called={row.automationEventQueued} /> },
             { header: "Created", cell: (row) => formatDate(row.createdAt) },
           ]}
         />
@@ -260,7 +260,7 @@ export function DistributionLogsPanel({ notify }: { notify: Notify }) {
             { header: "Time", cell: (row) => formatDate(row.createdAt) },
             { header: "Lead", cell: (row) => row.leadName || "Unnamed lead" },
             { header: "Status", cell: (row) => <StatusBadge value={row.statusLabel} tone={row.status === "preview_sent_to_aos" ? "emerald" : row.status === "cancelled" ? "rose" : "amber"} /> },
-            { header: "n8n webhook", cell: (row) => <N8nBadge called={row.n8nWebhookCalled} /> },
+            { header: "Legacy forwarding", cell: (row) => <AutomationBadge called={row.automationEventQueued} /> },
             { header: "Source", cell: (row) => <StatusBadge value={row.approvalSource} tone="slate" /> },
             { header: "Approved by", cell: (row) => row.approvedBy || "Superadmin" },
           ]}
@@ -359,7 +359,7 @@ function AssignmentDetailDrawer({ id, notify, onClose }: { id: string; notify: N
                   <h3 className="text-sm font-semibold text-slate-950">Approval</h3>
                   <div className="flex flex-wrap gap-2">
                     <StatusChip entry={detail} />
-                    <N8nBadge called={detail.n8nWebhookCalled} />
+                    <AutomationBadge called={detail.automationEventQueued} />
                   </div>
                 </div>
                 <dl className="mt-3 grid gap-2 text-sm">

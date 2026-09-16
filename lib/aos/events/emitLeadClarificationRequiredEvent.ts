@@ -46,7 +46,7 @@ export async function emitLeadClarificationRequiredEvent(input: EmitLeadClarific
     console.info("[aos][lead.clarification_required] safe event emitted", {
       leadId: input.leadId,
       status: result.status,
-      n8nWebhookCalled: result.n8nWebhookCalled,
+      automationEventQueued: result.automationEventQueued,
       mockMode: result.mockMode,
     });
     return true;

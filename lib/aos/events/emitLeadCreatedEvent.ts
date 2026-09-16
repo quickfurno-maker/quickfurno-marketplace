@@ -5,7 +5,7 @@
 // real client lead has been successfully saved to Supabase.
 //
 // It reuses the existing safe AOS pipeline (runSafeAgentEventPipeline), which:
-//   - Respects N8N_ENABLED / N8N_OUTBOUND_WEBHOOK_ENABLED (env + feature flags).
+//   - Runs only the internal advisory AOS pipeline; no external workflow runtime is called.
 //   - Masks phone numbers / secrets before any outbound dispatch.
 //   - Runs a deterministic, side-effect-free agent PREVIEW.
 //   - Performs NO Supabase writes, NO WhatsApp send, NO credit deduction,
@@ -15,7 +15,7 @@
 //   - Never throws. All failures are swallowed and logged (masked).
 //   - Never blocks lead submission: bounded by an internal timeout race.
 //   - Server-only. Never import this from client components (it pulls in the
-//     service-role n8n pipeline). It is only imported by services/leadService.
+//     service-role AOS pipeline). It is only imported by services/leadService.
 // ============================================================================
 import { runSafeAgentEventPipeline } from "@/lib/aos/events/safeAgentEventPipeline";
 
@@ -49,7 +49,7 @@ export async function emitLeadCreatedEvent(input: EmitLeadCreatedInput): Promise
     const eventType = input.eventType ?? "lead.created";
 
     // Assemble the safe event. The pipeline masks PII before any dispatch and
-    // only forwards a safe summary when n8n is explicitly enabled.
+    // keeps execution authority outside AOS.
     const payload = {
       event: eventType,
       eventType,
@@ -83,7 +83,7 @@ export async function emitLeadCreatedEvent(input: EmitLeadCreatedInput): Promise
       leadId,
       eventType,
       status: result.status,
-      n8nWebhookCalled: result.n8nWebhookCalled,
+      automationEventQueued: result.automationEventQueued,
       mockMode: result.mockMode,
     });
     return true;

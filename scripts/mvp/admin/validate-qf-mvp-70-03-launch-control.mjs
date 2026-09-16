@@ -175,12 +175,12 @@ check("every control href is an EXISTING admin route", (() => {
 // The audit is recorded in the service header so a reviewer can check each
 // claim against source without re-deriving it.
 check("the control audit is documented in the service", /OPERATIONS IS A COCKPIT, NOT A SECOND CONTROL PLANE/.test(launchService));
-check("the audit names each control's canonical state source", ["marketplace_runtime_settings", "aos_runtime_settings", "communication_provider_runtime_policies"].every((t) => launchService.includes(t)));
+check("the audit names each control's canonical state source", ["marketplace_runtime_settings", "communication_provider_runtime_policies", "NATIVE_AUTOMATION_RUNTIME_SETTING_KEY"].every((t) => launchService.includes(t)));
 check("the audit names each control's canonical UI", ["/admin/settings", "/admin/automations", "/admin/whatsapp?tab=provider", "/admin/lead-distribution"].every((h) => launchService.includes(h)));
-check("the audit names each control's canonical writer", /adminUpdateMarketplaceRuntimeSetting/.test(launchService) && /aos-runtime-settings/.test(launchService) && /adminRecheckLeadAssignmentQueue/.test(launchService));
+check("the audit names each control's canonical writer", /adminUpdateMarketplaceRuntimeSetting/.test(launchService) && /deployment\/runtime configuration/.test(launchService) && /adminRecheckLeadAssignmentQueue/.test(launchService));
 check("the marketplace control reuses the canonical normalizer", /normalizeMarketplaceSettings\(/.test(launchCode));
-check("the AOS control reuses the canonical two-lock resolver", /resolveAosN8nActivation\(\)/.test(launchCode));
-check("the AOS two-lock rule is NOT reimplemented", !/bothEnabled\s*&&/.test(launchCode) && !/n8nEnabled\s*&&/.test(launchCode));
+check("the automation control reuses the canonical native runtime readers", /getNativeAutomationRuntimeConfig\(\)/.test(launchCode) && /readNativeAutomationRuntimeSnapshot\(\)/.test(launchCode));
+check("legacy external automation gating is not reimplemented", !/bothEnabled\s*&&/.test(launchCode) && !/n8nEnabled\s*&&/.test(launchCode));
 check("the WhatsApp send rule is applied exactly as the policy states it", /outboundEnabled && \(activationStatus === "canary" \|\| activationStatus === "active"\)/.test(launchCode));
 check("the provider projection selects no secret or payload column", (() => {
   const select = launchCode.match(/\.select\("provider_key[^"]*"\)/);
@@ -317,7 +317,7 @@ check("the UI renders an unknown count as Unavailable, never zero", /value === n
 check("the UI renders an unknown age as Unknown, never zero", /seconds === null \? \(/.test(readiness) && /Unknown/.test(readiness));
 // SLA, case-sensitive: an /sla/i scan matches every `text-slate-*` class.
 check("no service-level target or duration threshold is invented", !/SLA|slaSeconds|thresholdMinutes|targetMinutes|breachedAfter|within \d+ (minute|hour)/.test(allCode));
-check("aging uses only the existing canonical age fields", /ageSeconds/.test(launchCode) && !/Date\.now\(\)|new Date\(\)\.getTime/.test(launchCode));
+check("aging uses canonical incident age plus configured native heartbeat freshness", /ageSeconds/.test(launchCode) && /snapshot\?\.heartbeatAt/.test(launchCode) && /config\.heartbeatMs \* 3/.test(launchCode));
 check("the frozen stale threshold is not redefined", !/= 900\b|STALE_THRESHOLD\s*=/.test(launchCode));
 // Matched on RENDERED elements: the word "trend" also appears in this
 // phase's own copy stating that no trend is shown.

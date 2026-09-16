@@ -316,16 +316,16 @@ function StudioHeader({ overview, saving, onGlobalToggle }: {
   saving: boolean;
   onGlobalToggle: (enabled: boolean) => Promise<void>;
 }) {
-  const healthy = overview.transport.healthy;
+  const healthy = overview.nativeEngine.healthy;
   return (
     <div className="flex w-full min-w-0 max-w-full flex-col gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5 xl:flex-row xl:items-center xl:justify-between">
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-3"><StudioMark /><h1 className="min-w-0 text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">Automation Studio</h1></div>
-        <p className="mt-1 max-w-full break-words text-sm leading-5 text-slate-500">Design, control and monitor QuickFurno automation without opening n8n.</p>
+        <p className="mt-1 max-w-full break-words text-sm leading-5 text-slate-500">Design, control and monitor QuickFurno automation from the native engine.</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <HealthPill label={healthy ? "System healthy" : "Transport needs attention"} healthy={healthy} />
-        <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">{overview.transport.mode.toUpperCase()}</span>
+        <HealthPill label={healthy ? "System healthy" : "Native engine needs attention"} healthy={healthy} />
+        <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">{overview.nativeEngine.mode.toUpperCase()}</span>
         <button
           type="button"
           disabled={saving}
@@ -372,7 +372,7 @@ function BuilderToolbar({ workflow, dirty, saving, onSave, onSimulate, onPublish
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
       <div className="flex items-center gap-3">
-        <div><p className="text-sm font-bold text-slate-950">Workflow Builder</p><p className="text-[11px] text-slate-500">{workflow.name} / {workflow.runtimeAdapter}</p></div>
+        <div><p className="text-sm font-bold text-slate-950">Workflow Builder</p><p className="text-[11px] text-slate-500">{workflow.name} / {workflow.engineLane}</p></div>
         <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${workflow.enabled ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{workflow.enabled ? "ACTIVE" : "PAUSED"}</span>
         {dirty ? <span className="text-[10px] font-bold text-amber-600">UNSAVED</span> : null}
       </div>
@@ -575,12 +575,21 @@ function VersionTable({ workflow, onRollback }: { workflow: AutomationStudioWork
 
 function RuntimeHealth({ overview }: { overview: AutomationStudioOverview }) {
   const items = [
-    ["QuickFurno Core transport", overview.transport.healthy ? "Healthy" : "Needs attention"],
-    ["Runtime mode", overview.transport.mode],
-    ["Production worker", overview.transport.workerId ?? "Not seen"],
-    ["Transport calls / 30m", String(overview.transport.routeCalls30m)],
+    ["QuickFurno Native Engine", overview.nativeEngine.healthy ? "Healthy" : "Needs attention"],
+    ["Runtime mode", overview.nativeEngine.mode],
+    ["Worker state", overview.nativeEngine.state],
+    ["Engine version", overview.nativeEngine.engineVersion ?? "Not seen"],
+    ["Production worker", overview.nativeEngine.workerId ?? "Not seen"],
+    ["Worker cycles", String(overview.nativeEngine.cycles)],
+    ["Jobs processed", String(overview.nativeEngine.jobsProcessed)],
     ["Automation queue", String(overview.queueTotal)],
-    ["Last worker heartbeat", formatTime(overview.transport.lastSeenAt)],
+    ["Last claim", formatTime(overview.nativeEngine.lastClaimAt)],
+    ["Last success", formatTime(overview.nativeEngine.lastSuccessAt)],
+    ["Last heartbeat", formatTime(overview.nativeEngine.lastHeartbeatAt)],
+    ["Last safe code", overview.nativeEngine.lastSafeCode ?? "None"],
+    ["Lead dispatch lane", formatTime(overview.nativeEngine.systemLanes.leadAssignmentDispatchAt)],
+    ["Consent acknowledgement lane", formatTime(overview.nativeEngine.systemLanes.consentAckAt)],
+    ["Delayed fill lane", formatTime(overview.nativeEngine.systemLanes.delayedFillAt)],
   ];
   return <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">{items.map(([label, value]) => <div key={label} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-[10px] font-bold uppercase tracking-[.12em] text-slate-400">{label}</p><p className="mt-2 break-all text-sm font-bold text-slate-900">{value}</p></div>)}</div>;
 }

@@ -7,7 +7,7 @@ export interface AosV2AgentCapability {
   state: "operational";
   authority: "advisory_only";
   sourceOfTruth: string;
-  directN8n: false;
+  directExternalExecutor: false;
   businessWrites: false;
   customerConversation: false;
   postDeliveryCommercialManagement: false;
@@ -31,7 +31,7 @@ export const AOS_V2_AGENT_CAPABILITIES: AosV2AgentCapability[] =
     state: "operational",
     authority: "advisory_only",
     sourceOfTruth: SOURCE_OF_TRUTH[agent.slug],
-    directN8n: false,
+    directExternalExecutor: false,
     businessWrites: false,
     customerConversation: false,
     postDeliveryCommercialManagement: false,

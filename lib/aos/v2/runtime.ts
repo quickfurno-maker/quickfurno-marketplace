@@ -2,8 +2,7 @@
 // QuickFurno AOS V2 — runtime state
 //
 // The existing aos_runtime_settings table is reused only as a lightweight
-// feature switch. It is NOT a workflow authority. AOS V2 never calls n8n
-
+// feature switch. It is NOT a workflow authority. AOS V2 never calls an external automation runtime
 // directly and never authorizes business mutations.
 // =============================================================================
 import { adminClient } from "@/lib/supabase";
@@ -24,7 +23,7 @@ function defaultState(): AosV2RuntimeState {
     intelligenceEnabled: false,
     mode: "off",
     actionProposalsEnabled: false,
-    legacyDirectN8nRetired: true,
+    legacyExternalAutomationRetired: true,
   };
 }
 
@@ -53,7 +52,7 @@ export async function getAosV2RuntimeState(): Promise<AosV2RuntimeState> {
       intelligenceEnabled,
       mode: intelligenceEnabled ? "shadow" : "off",
       actionProposalsEnabled,
-      legacyDirectN8nRetired: true,
+      legacyExternalAutomationRetired: true,
     };
   } catch {
     return defaultState();

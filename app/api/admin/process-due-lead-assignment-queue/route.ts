@@ -7,9 +7,8 @@
 // slots (up to a HARD cap of 3 total) with the best matching eligible vendors.
 //
 // This is a SERVER-ONLY endpoint — there is no admin session here, so it is
-// gated by a shared secret so it can later be triggered by n8n / a VPS cron.
+// gated by a dedicated shared secret for the production scheduler.
 //   - Requires header `x-qf-cron-secret` matching env `QF_CRON_SECRET`
-//     (falls back to `new_n8n_secret` for compatibility).
 //   - Missing secret → rejected in production, allowed as a safe mock in dev.
 //   - The secret value is never logged.
 //
@@ -26,7 +25,6 @@ export const dynamic = "force-dynamic";
 
 const CRON_SECRET_HEADER = "x-qf-cron-secret";
 const PRIMARY_SECRET_ENV_KEY = "QF_CRON_SECRET";
-const FALLBACK_SECRET_ENV_KEY = "new_n8n_secret";
 const MAX_LIMIT = 100;
 
 type SecretCheck =
@@ -43,10 +41,7 @@ function timingSafeEqual(provided: string, expected: string): boolean {
 }
 
 function checkSecret(request: Request): SecretCheck {
-  const expected =
-    process.env[PRIMARY_SECRET_ENV_KEY]?.trim() ||
-    process.env[FALLBACK_SECRET_ENV_KEY]?.trim() ||
-    "";
+  const expected = process.env[PRIMARY_SECRET_ENV_KEY]?.trim() || "";
   const isProduction = process.env.NODE_ENV === "production";
 
   if (!expected) {

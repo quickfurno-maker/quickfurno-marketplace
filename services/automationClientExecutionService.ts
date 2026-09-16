@@ -56,8 +56,8 @@ import {
   proveCurrentAutomationAttemptOwnership,
 } from "@/services/automationPersistenceService";
 import {
-  getRecordedClientExecutionIdentity,
-  recordClientExecutionTransportIdentity,
+  getRecordedAutomationExecutionIdentity,
+  recordAutomationExecutionIdentity,
 } from "@/services/automationTransportService";
 import { createRuntimeCommunicationService } from "@/services/runtimeCommunicationService";
 import { RECIPIENT_REFERENCE_DESTINATION } from "@/lib/communication/types";
@@ -118,7 +118,7 @@ interface CommunicationEvidence {
  * reserved or executed, so a replay of an already-answered attempt never touches
  * the ledger, never re-sends and never re-finalizes.
  */
-export async function executeClientAutomationForN8nTransport(
+export async function executeClientAutomationAttempt(
   input: ExecuteClientAutomationInput,
 ): Promise<ExecuteClientAutomationResult> {
   if (!UUID_RE.test(input.requestId)) {
@@ -191,7 +191,7 @@ export async function executeClientAutomationForN8nTransport(
     // exact shape of a lost response after a pre-communication finalization —
     // but only if WE reserved this attempt. Without that proof Core would be
     // taking credit for somebody else's completion.
-    const reservation = await getRecordedClientExecutionIdentity({
+    const reservation = await getRecordedAutomationExecutionIdentity({
       jobId: input.jobId,
       attemptId: input.attemptId,
     });
@@ -295,7 +295,7 @@ export async function executeClientAutomationForN8nTransport(
   // -------------------------------------------------------------------------
   let reservationReplayed = false;
   try {
-    const reservation = await recordClientExecutionTransportIdentity({
+    const reservation = await recordAutomationExecutionIdentity({
       requestId: input.requestId,
       workerId: input.workerId,
       bodySha256: input.bodySha256,

@@ -432,7 +432,7 @@ function AutoMatchingQueuePanel({
             { header: "Client", cell: (row) => <Strong title={row.client_name || "Client"} subtitle={row.client_phone_masked || "masked"} /> },
             { header: "Requirement", cell: (row) => <Strong title={row.category || "Not set"} subtitle={[row.area, row.city].filter(Boolean).join(", ") || "Area not set"} /> },
             { header: "Status", cell: (row) => <StatusBadge value={row.status || "interest_captured"} /> },
-            { header: "n8n Preview", cell: (row) => <StatusBadge value={row.n8n_preview_called ? "Preview called" : "Mock only"} tone={row.n8n_preview_called ? "blue" : "slate"} /> },
+            { header: "Automation preview", cell: (row) => <StatusBadge value={row.n8n_preview_called ? "Legacy preview recorded" : "Advisory only"} tone={row.n8n_preview_called ? "blue" : "slate"} /> },
             { header: "Created", cell: (row) => formatDate(row.created_at) },
             {
               header: "Actions",

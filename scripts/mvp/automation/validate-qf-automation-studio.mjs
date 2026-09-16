@@ -75,18 +75,17 @@ test("simulation remains non-mutating by contract", () => {
   assert.ok(result.notes.some((note) => note.includes("no database mutation")));
 });
 
-for (const rel of [
-  "app/api/internal/automation/n8n/claim/route.ts",
-  "app/api/internal/automation/n8n/recover/route.ts",
-  "app/api/internal/automation/n8n/reconcile/route.ts",
-  "app/api/internal/automation/n8n/cancel-orphan/route.ts",
-  "app/api/internal/automation/n8n/cancel-stale/route.ts",
-]) {
-  test(`${rel} enforces Automation Studio runtime control`, () => {
-    const source = fs.readFileSync(path.resolve(rel), "utf8");
-    assert.match(source, /isAutomationStudioWorkflowEnabled/);
-    assert.match(source, /AUTOMATION_STUDIO_PAUSED|recovery_empty|reconcile_empty|cancel_orphan_empty|cancel_stale_empty/);
-  });
-}
+test("Studio is bound to the native engine runtime", () => {
+  const source = fs.readFileSync(path.resolve("services/automationStudioService.ts"), "utf8");
+  assert.match(source, /readNativeAutomationRuntimeSnapshot/);
+  assert.match(source, /nativeEngine/);
+  assert.doesNotMatch(source, /getAutomationTransportRuntimeConfig/);
+});
+
+test("Studio UI exposes native engine rather than n8n", () => {
+  const source = fs.readFileSync(path.resolve("components/admin/AutomationStudio.tsx"), "utf8");
+  assert.match(source, /QuickFurno Native Engine/);
+  assert.doesNotMatch(source, /n8n/i);
+});
 
 console.log(`QF Automation Studio guard: ${passed}/${passed} PASS`);

@@ -27,7 +27,6 @@ import {
   emitLeadAssignmentApprovedEvent,
   type LeadAssignmentApprovedEmitResult,
 } from "@/lib/aos/events/emitLeadAssignmentApprovedEvent";
-import type { AosRuntimeMode } from "@/lib/aos/runtime/aosRuntimeSettings";
 
 export const MAX_APPROVAL_VENDORS = 3;
 
@@ -36,7 +35,7 @@ export interface AssignmentApprovalSideEffects {
   vendorNotified: false;
   creditsDeducted: false;
   leadAutoAssigned: false;
-  n8nWebhookCalled: boolean;
+  automationEventQueued: boolean;
   /** The ONLY write performed: the preview approval record. */
   databaseWritten: "preview_approval_record_only";
 }
@@ -103,10 +102,10 @@ export interface AssignmentApprovalSuccess {
   assignmentApprovalId: string;
   selectedVendorCount: number;
   aosEventEmitted: boolean;
-  n8nWebhookCalled: boolean;
+  automationEventQueued: boolean;
   mockMode: boolean;
   runtimeAutomationEnabled: boolean;
-  runtimeAutomationMode: AosRuntimeMode;
+  runtimeAutomationMode: "advisory";
   sideEffects: AssignmentApprovalSideEffects;
   reason: string;
   message: string;
@@ -389,10 +388,10 @@ export async function createLeadAssignmentApprovalPreview(
     });
 
     // 3) Persist the emit outcome on the preview record (best-effort).
-    const finalStatus: AssignmentApprovalSuccess["status"] = emit.n8nWebhookCalled
+    const finalStatus: AssignmentApprovalSuccess["status"] = emit.automationEventQueued
       ? "preview_sent_to_aos"
       : "preview_approved";
-    const finalSideEffects = buildSideEffects(emit.n8nWebhookCalled);
+    const finalSideEffects = buildSideEffects(emit.automationEventQueued);
 
     // Core update — only columns guaranteed by migration 017.
     await db
@@ -400,7 +399,7 @@ export async function createLeadAssignmentApprovalPreview(
       .update({
         status: finalStatus,
         aos_event_emitted: emit.ok,
-        n8n_webhook_called: emit.n8nWebhookCalled,
+        n8n_webhook_called: emit.automationEventQueued,
         side_effects: finalSideEffects,
         updated_at: new Date().toISOString(),
       })
@@ -415,7 +414,7 @@ export async function createLeadAssignmentApprovalPreview(
           event_response: {
             status: emit.status,
             workflowName: emit.workflowName,
-            n8nWebhookCalled: emit.n8nWebhookCalled,
+            automationEventQueued: emit.automationEventQueued,
             mockMode: emit.mockMode,
             runtimeAutomationEnabled: emit.runtimeAutomationEnabled,
             runtimeAutomationMode: emit.runtimeAutomationMode,
@@ -434,7 +433,7 @@ export async function createLeadAssignmentApprovalPreview(
       assignmentApprovalId,
       selectedVendorCount,
       aosEventEmitted: emit.ok,
-      n8nWebhookCalled: emit.n8nWebhookCalled,
+      automationEventQueued: emit.automationEventQueued,
       mockMode: emit.mockMode,
       runtimeAutomationEnabled: emit.runtimeAutomationEnabled,
       runtimeAutomationMode: emit.runtimeAutomationMode,
@@ -451,13 +450,13 @@ export async function createLeadAssignmentApprovalPreview(
   }
 }
 
-function buildSideEffects(n8nWebhookCalled: boolean): AssignmentApprovalSideEffects {
+function buildSideEffects(automationEventQueued: boolean): AssignmentApprovalSideEffects {
   return {
     whatsappSent: false,
     vendorNotified: false,
     creditsDeducted: false,
     leadAutoAssigned: false,
-    n8nWebhookCalled,
+    automationEventQueued,
     databaseWritten: "preview_approval_record_only",
   };
 }

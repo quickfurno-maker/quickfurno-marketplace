@@ -40,8 +40,8 @@ import {
   proveCurrentAutomationAttemptOwnership,
 } from "@/services/automationPersistenceService";
 import {
-  getRecordedClientExecutionIdentity,
-  recordClientExecutionTransportIdentity,
+  getRecordedAutomationExecutionIdentity,
+  recordAutomationExecutionIdentity,
 } from "@/services/automationTransportService";
 import { createRuntimeCommunicationService } from "@/services/runtimeCommunicationService";
 import { RECIPIENT_REFERENCE_DESTINATION } from "@/lib/communication/types";
@@ -78,7 +78,7 @@ interface CommunicationEvidence {
   readonly status: string;
 }
 
-export async function executeVendorAutomationForN8nTransport(
+export async function executeVendorAutomationAttempt(
   input: ExecuteVendorAutomationInput,
 ): Promise<FamilyExecutionResult> {
   if (!UUID_RE.test(input.requestId)) {
@@ -128,7 +128,7 @@ export async function executeVendorAutomationForN8nTransport(
   }
 
   if (ownership.verdict === "owned_completed") {
-    const reservation = await getRecordedClientExecutionIdentity({
+    const reservation = await getRecordedAutomationExecutionIdentity({
       jobId: input.jobId,
       attemptId: input.attemptId,
     });
@@ -216,7 +216,7 @@ export async function executeVendorAutomationForN8nTransport(
   // D. Reserve the durable, attempt-scoped execution identity
   // -------------------------------------------------------------------------
   try {
-    await recordClientExecutionTransportIdentity({
+    await recordAutomationExecutionIdentity({
       requestId: input.requestId,
       workerId: input.workerId,
       bodySha256: input.bodySha256,

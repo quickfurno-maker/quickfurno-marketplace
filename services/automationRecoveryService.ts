@@ -206,7 +206,7 @@ interface CommunicationEvidence {
  *   an attempt whose communication row is still pending. It cannot reclaim a
  *   processing job merely because it is old.
  */
-export async function reconcileStaleAutomationAttemptForN8nTransport(
+export async function reconcileStaleAutomationAttempt(
   input: AutomationRecoveryTransportInput,
 ): Promise<ReconcileResult> {
   assertTransportIdentity(input);

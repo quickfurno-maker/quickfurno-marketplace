@@ -98,6 +98,12 @@ jobs:
       - name: Automation Studio control-plane guard
         run: npm run test:automation-studio
 
+      - name: QF-MVP-60 Jarvis authority boundary
+        run: npm run test:mvp:60
+
+      - name: Jarvis handshake readiness guard
+        run: npm run test:jarvis:handshake-readiness
+
       - name: QF launch security closeout validator
         run: npm run test:security:launch-closeout
 

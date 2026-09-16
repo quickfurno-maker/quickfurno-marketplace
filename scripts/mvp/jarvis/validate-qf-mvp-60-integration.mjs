@@ -140,11 +140,12 @@ check("39 public plaintext Jarvis URL is refused before network", !badBaseResult
 const routeCode = fs.readFileSync(path.join(root, "app/api/internal/jarvis/core-decision/route.ts"), "utf8");
 const serviceCode = fs.readFileSync(path.join(root, "services/jarvisCoreDecisionService.ts"), "utf8");
 const gatewayCode = fs.readFileSync(path.join(root, "services/jarvisRiyaWebGatewayService.ts"), "utf8");
+const authorizerCode = fs.readFileSync(path.join(root, "services/jarvisProductionCoreAuthorizer.ts"), "utf8");
 const all = `${routeCode}\n${serviceCode}\n${gatewayCode}`;
 check("40 Jarvis integration has no Supabase client", !/adminClient|createClient|SUPABASE_SERVICE_ROLE_KEY/.test(all));
 check("41 Jarvis integration has no n8n execution path", !/callN8n|n8nTool|execute-client|execute-vendor|execute-campaign/.test(all));
 check("42 Jarvis integration has no provider credential", !/META_ACCESS_TOKEN|WHATSAPP_TOKEN|GROQ_API_KEY|NARA_API_KEY/.test(all));
-check("43 Core route injects no permissive authorizer", !/authorizer\s*:/.test(routeCode));
+check("43 Core route injects only the bounded production authorizer", /authorizer\s*:\s*authorizeJarvisCoreCommand/.test(routeCode) && /proposalKind === "NO_ACTION"/.test(authorizerCode) && /reply_authority_not_activated/.test(authorizerCode) && !/proposalKind === "REPLY"[\s\S]{0,160}ACCEPTED/.test(authorizerCode));
 check("44 no direct Jarvis database authority", !/adminClient|supabase|\.rpc\s*\(|\.insert\s*\(|\.update\s*\(|\.delete\s*\(/i.test(all));
 
 console.log(`RESULT ${passed} passed, ${failed} failed`);

@@ -1,8 +1,9 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { parseSerializedQfjCoreDecisionCommand, canonicalQfjJson } from "@/lib/jarvis/coreDecisionContract";
 import { QFJ_KEY_ID_HEADER, QFJ_SIGNATURE_HEADER, parseQfjVerificationKeys, verifyQfjCoreDecisionSignature } from "@/lib/jarvis/coreDecisionAuth";
 import { resolveQfJarvisRuntimePolicy } from "@/lib/jarvis/runtimePolicy";
-import { decideJarvisCoreCommand } from "@/services/jarvisCoreDecisionService";
+import { decideJarvisCoreCommandWithReplay } from "@/services/jarvisCoreDecisionReplayService";
+import { authorizeJarvisCoreCommand } from "@/services/jarvisProductionCoreAuthorizer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +24,14 @@ export async function POST(request: Request): Promise<Response> {
     keyId: request.headers.get(QFJ_KEY_ID_HEADER), signature: request.headers.get(QFJ_SIGNATURE_HEADER), keys, now: new Date().toISOString() });
   if (!authenticated) return error(401, "authentication_failed");
 
-  const response = await decideJarvisCoreCommand({ command: parsed.command, policy: resolveQfJarvisRuntimePolicy(), decidedAt: new Date().toISOString() });
-  return new Response(canonicalQfjJson(response), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+  const decision = await decideJarvisCoreCommandWithReplay({
+    command: parsed.command,
+    policy: resolveQfJarvisRuntimePolicy(),
+    decidedAt: new Date().toISOString(),
+    authorizer: authorizeJarvisCoreCommand,
+  });
+  if (!decision.ok) {
+    return error(decision.reason === "conflict" ? 409 : 503, decision.reason === "conflict" ? "idempotency_conflict" : "service_unavailable");
+  }
+  return new Response(canonicalQfjJson(decision.response), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
 }

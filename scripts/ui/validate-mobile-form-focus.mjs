@@ -387,7 +387,8 @@ mutant("M24 [mutant] reject: the approved hero quote entry point is removed",
 // ---------------------------------------------------------------------------
 const TRIGGER = code("lib/communication/leadAssignmentDispatchTrigger.ts");
 const TRIGGER_FLAT = flat(TRIGGER);
-const WRAPPER = readRaw("ops/production/qf-lead-assignment-dispatch.sh");
+const NATIVE_ENGINE = code("services/nativeAutomationEngineService.ts");
+const NATIVE_WORKER = code("worker/nativeAutomationWorker.ts");
 
 check("28 [semantic] refusal reasons are a CLOSED vocabulary", () => {
   assert(/export const DispatchRefusalCategory/.test(TRIGGER), "the refusal vocabulary is gone");
@@ -422,14 +423,17 @@ check("30 [semantic] the aggregator reads only ok/reason from each outcome", () 
     "a raw reason is counted without categorisation");
 });
 
-check("31 [static] the cron wrapper accepts and sanitizes the new field", () => {
-  assert(/"refusalReasons"/.test(WRAPPER), "the wrapper contract still rejects refusalReasons");
-  assert(/test\("\^\[A-Z_\]\+\$"\)/.test(WRAPPER),
-    "the wrapper does not constrain reason keys to a safe shape");
-  assert(/reason_/.test(WRAPPER), "the wrapper does not log the reason counts");
-  // The wrapper must never log the raw body.
-  const codeOnly = WRAPPER.split(String.fromCharCode(10)).filter((l) => !/^\s*#/.test(l)).join(String.fromCharCode(10));
-  assert(!/log ".*http_body/.test(codeOnly), "the wrapper logs the raw response body");
+check("31 [static] native dispatch scheduling keeps refusal observability sanitized", () => {
+  const fn = NATIVE_ENGINE.slice(NATIVE_ENGINE.indexOf("export async function runNativeLeadAssignmentDispatchCycle"));
+  const body = fn.slice(0, fn.indexOf("export async function runNativeConsentAckCycle"));
+  assert(/runLeadAssignmentDispatchBatch\(\{ limit \}\)/.test(body),
+    "the native scheduler no longer delegates to the canonical dispatch batch");
+  assert(/summary\.selected/.test(body) && /summary\.refused/.test(body),
+    "the native scheduler lost bounded aggregate dispatch observability");
+  assert(!/summary\.outcomes|JSON\.stringify\(summary\)|console\./.test(body),
+    "the native scheduler exposes raw dispatch outcomes or logs the raw summary");
+  assert(/runNativeLeadAssignmentDispatchCycle\(cfg\.leadDispatchBatch\)/.test(NATIVE_WORKER),
+    "the native worker no longer owns the lead-assignment dispatch schedule");
 });
 
 mutant("M29 [mutant] reject: a raw reason field is added to the response",

@@ -896,26 +896,33 @@ const RULES = {
   "N06 CI runs this validator at the exact head": () =>
     /QF-MVP-40\.14 Meta transactional mapping authority/.test(CI) &&
     /npm run test:mvp:40-14/.test(CI),
-  "N07 no existing CI step was removed": () => {
+  "N07 CI preserves the reviewed safety gate set across native-engine conversion": () => {
     const required = [
       "npm run test:mvp:40-4", "npm run test:mvp:40-10a", "npm run test:mvp:40-11",
       "npm run test:mvp:40-12-r1", "npm run test:mvp:50-1a", "npm run test:mvp:50-1b",
-      "npm run test:mvp:50-1c", "npm run test:mvp:50-2a", "npm run test:mvp:50-2b",
-      "npm run test:mvp:50-2c", "npm run test:mvp:50-2c-s2-g1", "npm run test:mvp:50-2d",
-      "npm run test:mvp:50-2e", "npm run test:mvp:50-2-final", "npm run test:mvp:50-3",
-      "npm run test:mvp:50-4", "npm run test:mvp:50-5", "npm run test:mvp:50-6",
-      "npm run test:mvp:50-7", "npm run test:security:launch-closeout",
+      "npm run test:mvp:50-2c-s2-g1", "npm run test:automation-native",
+      "npm run test:automation-studio", "npm run test:security:launch-closeout",
       "npm run test:mvp:50-3-50-4-bridge", "npm run test:mvp:50-3-50-4-forensic",
-      "npm run test:mvp:50-3-50-4-cert", "npm run test:mvp:70-01", "npm run test:mvp:70-02",
-      "npm run test:mvp:70-03", "npm run test:mvp:70-04", "npm run test:mvp:75-01",
-      "npm run test:mvp:75-02", "npm run test:mvp:75-03", "npm run test:mvp:80-02-gate06",
-      "npm run test:mvp:80-03-audit", "npm run test:mvp:80-04", "npm run test:mvp:80-14a",
-      "npm run test:mvp:80-14c", "npm run test:mvp:marketplace",
-      "npm run test:mvp:assignment-authority", "npm run test:phase4",
+      "npm run test:mvp:70-01", "npm run test:mvp:70-02", "npm run test:mvp:70-03",
+      "npm run test:mvp:70-04", "npm run test:mvp:75-01", "npm run test:mvp:75-02",
+      "npm run test:mvp:75-03", "npm run test:mvp:80-02-gate06", "npm run test:mvp:80-03-audit",
+      "npm run test:mvp:80-04", "npm run test:mvp:80-14a", "npm run test:mvp:40-14",
+      "npm run test:mvp:marketplace", "npm run test:mvp:assignment-authority", "npm run test:phase4",
+      "npm run test:mvp:80-16b", "npm run test:mvp:80-16c", "npm run test:mvp:80-17a",
+      "npm run test:mvp:80-17a-r1", "npm run test:mvp:80-17a-r1-loader",
       "npm run test:mvp:82a-r0", "npm run test:mvp:82a-r0-s1",
-      "npm run typecheck", "npm run build",
+      "npm run test:ui:mobile-form-focus", "npm run test:ui:lead-attribution",
+      "npm run test:launch:pune-only", "npm run typecheck", "npm run build",
     ];
-    return required.every((step) => CI.includes(step));
+    const retiredExternalRuntime = [
+      "npm run test:mvp:50-1c", "npm run test:mvp:50-2a", "npm run test:mvp:50-2b",
+      "npm run test:mvp:50-2c", "npm run test:mvp:50-2d", "npm run test:mvp:50-2e",
+      "npm run test:mvp:50-2-final", "npm run test:mvp:50-3", "npm run test:mvp:50-4",
+      "npm run test:mvp:50-5", "npm run test:mvp:50-6", "npm run test:mvp:50-7",
+      "npm run test:mvp:50-3-50-4-cert", "npm run test:mvp:80-14c",
+    ];
+    const ciCommands = new Set(CI.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.startsWith("run: npm run ")).map((line) => line.slice("run: ".length)));
+    return required.every((step) => ciCommands.has(step)) && retiredExternalRuntime.every((step) => !ciCommands.has(step));
   },
 };
 

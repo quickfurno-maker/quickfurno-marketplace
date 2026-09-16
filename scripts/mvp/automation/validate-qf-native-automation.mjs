@@ -22,6 +22,8 @@ const authority = read("services/nativeAutomationAuthorityService.ts");
 const studio = read("components/admin/AutomationStudio.tsx");
 const studioService = read("services/automationStudioService.ts");
 const pm2 = read("ops/production/quickfurno-automation-worker.config.cjs");
+const ci = read(".github/workflows/qf-mvp-50-quality-gate.yml");
+const supabase = read("lib/supabase.ts");
 const pkg = JSON.parse(read("package.json"));
 test("native worker defaults fail closed", () => assert.match(runtime, /QF_NATIVE_AUTOMATION_MODE \?\? "off"/));
 test("worker has shadow and active modes", () => {
@@ -50,7 +52,27 @@ test("dedicated PM2 worker is single-instance", () => {
 });
 test("native worker has independent production build", () => {
   assert.match(pkg.scripts["build:automation-worker"], /esbuild/);
+  assert.match(pkg.scripts["build:automation-worker"], /--alias:server-only=\.\/worker\/serverOnlyShim\.ts/);
   assert.match(pkg.scripts["start:automation-worker"], /dist\/automation-worker\.mjs/);
+  assert.equal(fs.existsSync(path.resolve("worker/serverOnlyShim.ts")), true);
+  assert.match(studioService, /^import ["']server-only["'];/m);
+});
+test("native worker defers Next request headers outside worker startup", () => {
+  assert.doesNotMatch(supabase, /^import\s+\{\s*cookies\s*\}\s+from\s+["']next\/headers["']/m);
+  assert.match(supabase, /await import\(["']next\/headers["']\)/);
+});
+test("native worker supplies a Node 20 WebSocket transport before Supabase loads", () => {
+  assert.match(worker, /import WebSocket from ["']ws["']/);
+  const installAt = worker.indexOf('Object.defineProperty(globalThis, "WebSocket"');
+  const runtimeLoadAt = worker.indexOf('await import("@/services/nativeAutomationRuntimeService")');
+  assert.ok(installAt >= 0 && runtimeLoadAt > installAt);
+  assert.equal(typeof pkg.dependencies?.ws, "string");
+  assert.equal(typeof pkg.devDependencies?.["@types/ws"], "string");
+});
+test("CI executes the native worker import graph on production Node 20", () => {
+  assert.match(ci, /QuickFurno native worker startup smoke on production Node 20/);
+  assert.match(ci, /QF_NATIVE_AUTOMATION_WORKER_ID='!'/);
+  assert.match(ci, /NATIVE_AUTOMATION_WORKER_ID_INVALID/);
 });
 test("retired n8n API boundary is absent", () => {
   assert.equal(fs.existsSync(path.resolve("app/api/internal/automation/n8n")), false);

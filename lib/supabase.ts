@@ -9,7 +9,6 @@
 // ============================================================================
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
@@ -41,6 +40,7 @@ export function publicClient(): SupabaseClient {
 
 /** Request-scoped client that respects the signed-in user's session (App Router). */
 export async function serverClient(): Promise<SupabaseClient> {
+  const { cookies } = await import("next/headers");
   const store = await cookies();
   return createServerClient(supabaseUrl(), anonKey(), {
     cookies: {

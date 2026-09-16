@@ -306,3 +306,17 @@ jobs:
 
       - name: QF-MVP-80.17A-R1 runtime loader smoke on production Node 20
         run: npm run test:mvp:80-17a-r1-loader
+
+      - name: QuickFurno native worker startup smoke on production Node 20
+        run: |
+          npm run build:automation-worker
+          set +e
+          OUTPUT=$(QF_NATIVE_AUTOMATION_MODE=shadow QF_NATIVE_AUTOMATION_WORKER_ID='!' node dist/automation-worker.mjs 2>&1)
+          CODE=$?
+          set -e
+          printf '%s\n' "$OUTPUT"
+          test "$CODE" -ne 0
+          grep -q 'NATIVE_AUTOMATION_WORKER_ID_INVALID' <<< "$OUTPUT"
+          ! grep -q 'next/headers' <<< "$OUTPUT"
+          ! grep -q 'server-only' <<< "$OUTPUT"
+          ! grep -q 'without native WebSocket support' <<< "$OUTPUT"

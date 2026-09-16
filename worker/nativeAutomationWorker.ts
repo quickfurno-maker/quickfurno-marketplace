@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { config as loadDotEnv } from "dotenv";
+import WebSocket from "ws";
 import type { NativeAutomationCycleResult } from "@/services/nativeAutomationEngineService";
 import type { NativeAutomationRuntimeSnapshot } from "@/services/nativeAutomationRuntimeService";
 
@@ -16,6 +17,17 @@ function loadEnvironment() {
 }
 
 loadEnvironment();
+
+// Supabase Realtime 2.108+ requires an explicit WebSocket implementation on Node <22.
+// The worker does not use Realtime directly, but SupabaseClient initializes its Realtime
+// client eagerly. Install the transport before any service module can create a client.
+if (typeof globalThis.WebSocket === "undefined") {
+  Object.defineProperty(globalThis, "WebSocket", {
+    value: WebSocket,
+    configurable: true,
+    writable: true,
+  });
+}
 
 const ENGINE_VERSION = "native-v1";
 const sleep = (ms: number) => new Promise<void>((resolveSleep) => setTimeout(resolveSleep, ms));

@@ -166,7 +166,7 @@
     "test:aos:v2": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/aos/validate-qf-aos-v2.mjs",
     "test:automation-studio": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-automation-studio.mjs",
     "test:mvp:60": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-mvp-60-integration.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-mvp-60-context-recommendations.mjs",
-    "build:automation-worker": "esbuild worker/nativeAutomationWorker.ts --bundle --platform=node --format=esm --target=node20 --packages=external --tsconfig=tsconfig.json --outfile=dist/automation-worker.mjs",
+    "build:automation-worker": "esbuild worker/nativeAutomationWorker.ts --bundle --platform=node --format=esm --target=node20 --packages=external --alias:server-only=./worker/serverOnlyShim.ts --tsconfig=tsconfig.json --outfile=dist/automation-worker.mjs",
     "start:automation-worker": "node dist/automation-worker.mjs",
     "test:mvp:50-2c-s2-g1": "node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs",
     "test:automation-native": "node scripts/mvp/automation/validate-qf-native-automation.mjs"
@@ -178,12 +178,14 @@
     "next": "14.2.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "standardwebhooks": "^1.0.0"
+    "standardwebhooks": "^1.0.0",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@types/node": "^20.16.5",
     "@types/react": "^18.3.8",
     "@types/react-dom": "^18.3.0",
+    "@types/ws": "^8.18.1",
     "autoprefixer": "^10.4.20",
     "esbuild": "^0.25.12",
     "eslint": "8.57.0",

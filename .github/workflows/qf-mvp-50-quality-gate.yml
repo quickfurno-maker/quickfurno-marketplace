@@ -86,6 +86,9 @@ jobs:
       - name: QF-MVP-50.1B validator
         run: npm run test:mvp:50-1b
 
+      - name: QF-MVP-50.2C-S2-G1 staging history governance
+        run: npm run test:mvp:50-2c-s2-g1
+
       # Native Automation Engine replaces the retired n8n execution runtime.
       # It keeps the hardened Core/Postgres action, queue, retry, consent and
       # communication authorities while removing HTTP polling/orchestration.

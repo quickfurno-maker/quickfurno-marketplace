@@ -16,6 +16,7 @@ on:
       # gate already runs their validators. Without this glob a 75.x branch got
       # push coverage only once a pull request existed.
       - 'mvp/qf-mvp-75-*'
+      - 'feat/aarohi-*'
 
 permissions:
   contents: read
@@ -254,6 +255,9 @@ jobs:
 
       - name: Pune-only launch geography guard
         run: npm run test:launch:pune-only
+
+      - name: Aarohi Acquisition CRM guard
+        run: npm run test:aarohi:crm
 
       - name: Typecheck
         run: npm run typecheck

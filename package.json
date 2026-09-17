@@ -169,7 +169,8 @@
     "build:automation-worker": "esbuild worker/nativeAutomationWorker.ts --bundle --platform=node --format=esm --target=node20 --packages=external --alias:server-only=./worker/serverOnlyShim.ts --tsconfig=tsconfig.json --outfile=dist/automation-worker.mjs",
     "start:automation-worker": "node dist/automation-worker.mjs",
     "test:mvp:50-2c-s2-g1": "node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs",
-    "test:automation-native": "node scripts/mvp/automation/validate-qf-native-automation.mjs"
+    "test:automation-native": "node scripts/mvp/automation/validate-qf-native-automation.mjs",
+    "test:aarohi:crm": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/aarohi/validate-qf-aarohi-crm.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

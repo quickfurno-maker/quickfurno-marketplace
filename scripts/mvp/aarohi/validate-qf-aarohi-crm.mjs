@@ -1,4 +1,4 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -25,6 +25,7 @@ function test(name, fn) {
 const read = (p) => fs.readFileSync(path.join(ROOT, p), "utf8");
 const migration = read(MIGRATION);
 const manifest = JSON.parse(read(MANIFEST));
+const stagingCertification = read("docs/QF-AAROHI-ACQUISITION-CRM-STAGING-CERTIFICATION.md");
 const route = read("app/api/internal/jarvis/aarohi-projection/route.ts");
 const projectionService = read("services/jarvisAarohiProjectionService.ts");
 const actions = read("app/admin/aarohi/actions.ts");
@@ -172,19 +173,30 @@ test("all Aarohi admin surfaces exist", () => {
   ]) assert.equal(fs.existsSync(path.join(ROOT, p)), true, p);
 });
 
-test("migration is pinned PENDING and not falsely claimed deployed", () => {
-  const pin = manifest.pendingPostAnchorMigrations.find((x) => x.version === "20260917000000");
+test("migration is certified staging-applied and production remains untouched", () => {
+  const pin = manifest.stagingAppliedPostAnchorMigrations.find((x) => x.version === "20260917000000");
   assert.ok(pin);
-  assert.equal(pin.operationalStatus, "PENDING");
-  assert.equal(pin.appliedToStaging, false);
+  assert.equal(pin.operationalStatus, "APPLIED_TO_STAGING");
+  assert.equal(pin.appliedToStaging, true);
+  assert.equal(pin.appliedExactlyOnceToStaging, true);
+  assert.equal(pin.independentRemoteRelistVerified, true);
   assert.equal(pin.appliedToProduction, false);
-  assert.equal(pin.requiresSeparateStagingDeploymentGate, true);
+  assert.equal(pin.productionVersionStatus, "NOT_APPLIED_VERIFIED_ABSENT");
+  assert.equal(pin.requiresSeparateProductionDeploymentGate, true);
+  assert.equal(manifest.pendingPostAnchorMigrations.some((x) => x.version === "20260917000000"), false);
+});
+test("staging certification evidence is pinned", () => {
+  const pin = manifest.stagingAppliedPostAnchorMigrations.find((x) => x.version === "20260917000000");
+  assert.equal(pin.appliedEvidenceMarker, "QF_AAROHI_ACQUISITION_CRM_S1_STAGING_MIGRATION_APPLIED_AND_VERIFIED");
+  assert.equal(pin.evidencePath, "docs/QF-AAROHI-ACQUISITION-CRM-STAGING-CERTIFICATION.md");
+  assert.match(stagingCertification, /remote migrations:\s*\*\*41\*\*/i);
+  assert.match(stagingCertification, /pending migrations:\s*\*\*0\*\*/i);
+  assert.match(stagingCertification, /STAGING_APPLIED_VERIFIED_PRODUCTION_UNTOUCHED/);
 });
 test("manifest hash matches canonical migration bytes", () => {
-  const pin = manifest.pendingPostAnchorMigrations.find((x) => x.version === "20260917000000");
+  const pin = manifest.stagingAppliedPostAnchorMigrations.find((x) => x.version === "20260917000000");
   const canonical = migration.replace(/\r\n/g,"\n").replace(/\r/g,"\n");
   const hash = crypto.createHash("sha256").update(Buffer.from(canonical,"utf8")).digest("hex");
   assert.equal(pin.sha256, hash);
 });
-
 console.log(`QF Aarohi Acquisition CRM guard: ${passed}/${passed} PASS`);

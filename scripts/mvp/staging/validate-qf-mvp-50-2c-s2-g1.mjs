@@ -324,13 +324,6 @@ const POST_ANCHOR_PENDING = [
     sha: "45e83f3b9631c24bdfa3860fb42434fdb129ffb3f4e0ce05c6ad269e23d331c5",
     phase: "QF-AOS-V2-BOUNDARY",
   },
-  // Aarohi Acquisition CRM foundation. SOURCE-PENDING until its own staging gate.
-  {
-    version: "20260917000000",
-    name: "aarohi_acquisition_crm_foundation",
-    sha: "43a68f3c262d4a8c842138703002d630e6e10c4c3cb4e0c8275090e7bb3f8c5d",
-    phase: "QF-AAROHI-ACQUISITION-CRM",
-  },
 ].map((m) => ({
   ...m,
   filename: `${m.version}_${m.name}.sql`,
@@ -387,6 +380,13 @@ const POST_ANCHOR_STAGING_APPLIED = [
     name: "qf_mvp_40_canary_quiesce_transition",
     sha: "6c495d1eb0262fd18eea6309f2ad01dd5ef9c091fa6d9d9da47e58abb1155796",
     phase: "QF-MVP-40",
+  },
+  // Aarohi Acquisition CRM: exact-one staging apply, independently re-listed.
+  {
+    version: "20260917000000",
+    name: "aarohi_acquisition_crm_foundation",
+    sha: "43a68f3c262d4a8c842138703002d630e6e10c4c3cb4e0c8275090e7bb3f8c5d",
+    phase: "QF-AAROHI-ACQUISITION-CRM",
   },
 ].map((m) => ({
   ...m,
@@ -663,12 +663,12 @@ function validateState(state) {
   // version/name/path/SHA, and neither may also be claimed applied anywhere.
   // QF-MVP-40.14 RE-PIN: 4 -> 5. The Meta transactional mapping seed + activation
   // authority (20260912000000) is source-only and joins PENDING.
-  check("the explicit PENDING post-anchor set holds exactly the eight pinned entries",
-    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 8,
+  check("the explicit PENDING post-anchor set holds exactly the seven pinned entries",
+    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 7,
     `actual=${pendingPins?.length}`);
-  check("the explicit STAGING-APPLIED post-anchor set holds exactly the two pinned entries",
+  check("the explicit STAGING-APPLIED post-anchor set holds exactly the three pinned entries",
     stagingAppliedPins !== null && stagingAppliedPins.length === POST_ANCHOR_STAGING_APPLIED.length &&
-    stagingAppliedPins.length === 2,
+    stagingAppliedPins.length === 3,
     `actual=${stagingAppliedPins?.length}`);
   check("the staging-applied record claims staging and explicitly refuses production",
     stagingAppliedPins?.[0]?.operationalStatus === "APPLIED_TO_STAGING" &&
@@ -681,6 +681,25 @@ function validateState(state) {
   check("the staging-applied record fabricates NO remote-history count",
     stagingAppliedPins?.[0]?.remoteHistoryCountObservedAtApply === false &&
     stagingAppliedPins?.[0]?.remoteHistoryCountAfterApply === null);
+  const aarohiStagingPin = stagingAppliedPins?.find((record) => record.version === "20260917000000");
+  check("Aarohi staging application evidence is exact",
+    aarohiStagingPin?.operationalStatus === "APPLIED_TO_STAGING" &&
+    aarohiStagingPin?.appliedToStaging === true &&
+    aarohiStagingPin?.appliedExactlyOnceToStaging === true &&
+    aarohiStagingPin?.stagingRemoteVersionStatus === "PRESENT_IN_STAGING_HISTORY" &&
+    aarohiStagingPin?.independentRemoteRelistVerified === true &&
+    aarohiStagingPin?.appliedEvidenceMarker === "QF_AAROHI_ACQUISITION_CRM_S1_STAGING_MIGRATION_APPLIED_AND_VERIFIED" &&
+    aarohiStagingPin?.appliedEvidenceType === "FIRST_PARTY_EXACT_ONE_DRY_RUN_VERIFIED_ISOLATED_WORKSPACE_STAGING_EXECUTION" &&
+    aarohiStagingPin?.evidencePath === "docs/QF-AAROHI-ACQUISITION-CRM-STAGING-CERTIFICATION.md");
+  check("Aarohi staging certification preserves the production boundary",
+    aarohiStagingPin?.appliedToProduction === false &&
+    aarohiStagingPin?.productionVersionStatus === "NOT_APPLIED_VERIFIED_ABSENT" &&
+    aarohiStagingPin?.productionHistoryVersionPresent === false &&
+    aarohiStagingPin?.productionAarohiSchemaPresent === false &&
+    aarohiStagingPin?.requiresSeparateProductionDeploymentGate === true);
+  check("Aarohi staging certification fabricates NO remote-history count",
+    aarohiStagingPin?.remoteHistoryCountObservedAtApply === false &&
+    aarohiStagingPin?.remoteHistoryCountAfterApply === null);
   check("the pending records appear in exact pinned order",
     same(pendingPins?.map((record) => record.version), POST_ANCHOR_PENDING.map((m) => m.version)));
   // The four sets are compared as a SORTED union, not as concatenated blocks. Since
@@ -814,7 +833,7 @@ function validateState(state) {
     manifest.historyReconciliation?.databaseMutationAuthorized === false);
   // ...and the live tree is exactly the pinned tree, one migration larger, with the
   // difference accounted for as an explicitly pinned PENDING entry and nothing else.
-  check("every migration added since that reconciliation is explicitly pinned as pending",
+  check("every migration added since that reconciliation is explicitly pinned as pending or staging-applied",
     MIGRATION_COUNT - RECONCILIATION_MIGRATION_COUNT === POST_ANCHOR_PENDING.length + POST_ANCHOR_STAGING_APPLIED.length &&
     state.migrations.length === MIGRATION_COUNT);
   check("the reconciliation authorizes no production apply and names both project refs correctly",

@@ -952,6 +952,38 @@
         "providerAccountUnchanged": true
       },
       "requiresSeparateProductionDeploymentGate": true
+    },
+    {
+      "version": "20260917000000",
+      "name": "aarohi_acquisition_crm_foundation",
+      "path": "supabase/migrations/20260917000000_aarohi_acquisition_crm_foundation.sql",
+      "sha256": "43a68f3c262d4a8c842138703002d630e6e10c4c3cb4e0c8275090e7bb3f8c5d",
+      "phase": "QF-AAROHI-ACQUISITION-CRM",
+      "operationalStatus": "APPLIED_TO_STAGING",
+      "stagingApplyCertifiedByPhase": "QF-AAROHI-ACQUISITION-CRM-S1",
+      "appliedEvidenceMarker": "QF_AAROHI_ACQUISITION_CRM_S1_STAGING_MIGRATION_APPLIED_AND_VERIFIED",
+      "appliedEvidenceType": "FIRST_PARTY_EXACT_ONE_DRY_RUN_VERIFIED_ISOLATED_WORKSPACE_STAGING_EXECUTION",
+      "purpose": "Creates the isolated Aarohi Acquisition CRM prospect domain, reviewable identity matching, append-only acquisition events, task/campaign projections, suppression and human-takeover controls, and a Core-gated handoff linking an activated canonical vendor. Creates no vendor directly, no communication send authority, no provider integration, and no duplicate package/payment authority.",
+      "appliedToStaging": true,
+      "appliedExactlyOnceToStaging": true,
+      "stagingRemoteVersionStatus": "PRESENT_IN_STAGING_HISTORY",
+      "independentRemoteRelistVerified": true,
+      "remoteHistoryCountObservedAtApply": false,
+      "remoteHistoryCountAfterApply": null,
+      "appliedToProduction": false,
+      "productionVersionStatus": "NOT_APPLIED_VERIFIED_ABSENT",
+      "requiresSeparateProductionDeploymentGate": true,
+      "applyExecutorProvenance": "SUPABASE_CLI_DB_PUSH_ISOLATED_TEMP_WORKSPACE_LINKED_TO_STAGING",
+      "isolatedWorkspaceLocalMigrationCount": 41,
+      "isolatedWorkspaceRemoteMigrationCountBeforeApply": 40,
+      "isolatedWorkspacePendingBeforeApply": [
+        "20260917000000"
+      ],
+      "stagingSchemaTablesVerified": 13,
+      "stagingSchemaRpcsVerified": 4,
+      "productionHistoryVersionPresent": false,
+      "productionAarohiSchemaPresent": false,
+      "evidencePath": "docs/QF-AAROHI-ACQUISITION-CRM-STAGING-CERTIFICATION.md"
     }
   ],
   "pendingPostAnchorMigrations": [
@@ -1059,22 +1091,6 @@
       "phase": "QF-AOS-V2-BOUNDARY",
       "operationalStatus": "PENDING",
       "purpose": "Locks the final QuickFurno operating principle: quality lead generation, matching and vendor delivery plus one bounded connection-assurance service. Vendor response chasing and all commercial sales stages remain retired; Core alone may schedule up to five assignment-specific client connection reminders after a vendor reports no response within 24 hours, with a future Core-authorized Riya handoff only after the unanswered sequence. Historical migrations/data remain unchanged.",
-      "appliedExactlyOnce": false,
-      "appliedByThisPhase": false,
-      "appliedToStaging": false,
-      "appliedToProduction": false,
-      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
-      "remoteHistoryCountObservedAtApply": false,
-      "requiresSeparateStagingDeploymentGate": true
-    },
-    {
-      "version": "20260917000000",
-      "name": "aarohi_acquisition_crm_foundation",
-      "path": "supabase/migrations/20260917000000_aarohi_acquisition_crm_foundation.sql",
-      "sha256": "43a68f3c262d4a8c842138703002d630e6e10c4c3cb4e0c8275090e7bb3f8c5d",
-      "phase": "QF-AAROHI-ACQUISITION-CRM",
-      "operationalStatus": "PENDING",
-      "purpose": "Creates the isolated Aarohi Acquisition CRM prospect domain, reviewable identity matching, append-only acquisition events, task/campaign projections, suppression and human-takeover controls, and a Core-gated handoff linking an activated canonical vendor. Creates no vendor directly, no communication send authority, no provider integration, and no duplicate package/payment authority.",
       "appliedExactlyOnce": false,
       "appliedByThisPhase": false,
       "appliedToStaging": false,

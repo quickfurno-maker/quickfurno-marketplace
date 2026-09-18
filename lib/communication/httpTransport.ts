@@ -16,7 +16,7 @@
 
 export interface HttpTransportRequest {
   readonly url: string;
-  readonly method: "GET" | "POST" | "PUT";
+  readonly method: "GET" | "POST";
   readonly headers: Record<string, string>;
   readonly body?: string;
   /** Bounded, positive timeout in ms — enforced by AbortController. */

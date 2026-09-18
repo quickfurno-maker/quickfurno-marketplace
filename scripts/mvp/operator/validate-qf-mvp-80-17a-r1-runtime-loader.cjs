@@ -111,6 +111,7 @@ check("L5 the transitive PURE dependency chain actually loaded", () => {
     "lib/communication/types.ts",
     "lib/communication/leadAssignmentResultContract.ts",
     "lib/communication/inboundConsentCommandInput.ts",
+    "lib/communication/consentCommand.ts",
     "services/leadAssignmentResultService.ts",
     "lib/supabase.ts",
   ];
@@ -134,7 +135,7 @@ check("L7 every required R1 module is on the exact allowlist", () => {
   for (const rel of ALLOWED_R1_REPO_MODULES) {
     assert.strictEqual(verdict(rel), R1Resolution.ALLOW_ALLOWLISTED, rel);
   }
-  assert.strictEqual(ALLOWED_R1_REPO_MODULES.length, 9, "the allowlist is exactly the audited graph");
+  assert.strictEqual(ALLOWED_R1_REPO_MODULES.length, 10, "the allowlist is exactly the audited graph");
 });
 
 check("L8 the PURE template binding is allowed; every provider ADAPTER is refused", () => {

@@ -689,13 +689,6 @@ export async function releaseHumanConversationToAi(input: {
     return { ok: false, reason: "stale_revision" };
   }
 
-  await adminClient().from("communication_jarvis_turn_outbox").update({
-    status: "cancelled",
-    last_safe_code: "HUMAN_RELEASE_REVISION_ADVANCED",
-    completed_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }).eq("conversation_id", input.conversationId).in("status", ["pending", "retry_scheduled"]);
-
   await adminClient().from("communication_conversation_outbox").update({
     status: "superseded",
     failure_code: "HUMAN_RELEASE_REVISION_ADVANCED",

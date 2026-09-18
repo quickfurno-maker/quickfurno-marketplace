@@ -613,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 27,
+    "postAnchorMigrationCount": 28,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -1160,6 +1160,23 @@
       "appliedToStaging": false,
       "appliedToProduction": false,
       "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
+      "remoteHistoryCountObservedAtApply": false,
+      "requiresSeparateStagingDeploymentGate": true
+    },
+    {
+      "version": "20260915120000",
+      "name": "qf_jarvis_service_availability",
+      "path": "supabase/migrations/20260915120000_qf_jarvis_service_availability.sql",
+      "sha256": "32e2480dab0126e797bde4aaf14a5f8d1cc844350870afe13af6fcfb8e67189c",
+      "phase": "QF-MVP-60-SERVICE-AVAILABILITY",
+      "operationalStatus": "PENDING",
+      "purpose": "Creates the Core-owned explicit city-service availability taxonomy/pair registry for the signed Jarvis read boundary. It seeds no inferred availability pair and grants no customer-facing serving authority.",
+      "appliedExactlyOnce": false,
+      "appliedByThisPhase": false,
+      "appliedToStaging": false,
+      "appliedToProduction": false,
+      "remoteVersionStatus": "ABSENT_IN_STAGING_AND_PRODUCTION_HISTORY",
+      "remoteHistoryReadEvidence": "SUPABASE_MCP_LIST_MIGRATIONS_2026-09-18",
       "remoteHistoryCountObservedAtApply": false,
       "requiresSeparateStagingDeploymentGate": true
     }

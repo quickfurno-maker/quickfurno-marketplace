@@ -324,6 +324,16 @@ const POST_ANCHOR_PENDING = [
     sha: "45e83f3b9631c24bdfa3860fb42434fdb129ffb3f4e0ce05c6ad269e23d331c5",
     phase: "QF-AOS-V2-BOUNDARY",
   },
+  // QF-MVP-60 service availability remains source-only. Read-only migration-history
+  // checks on 2026-09-18 proved it absent from both staging and production.
+  {
+    version: "20260915120000",
+    name: "qf_jarvis_service_availability",
+    sha: "32e2480dab0126e797bde4aaf14a5f8d1cc844350870afe13af6fcfb8e67189c",
+    phase: "QF-MVP-60-SERVICE-AVAILABILITY",
+    remoteVersionStatus: "ABSENT_IN_STAGING_AND_PRODUCTION_HISTORY",
+    remoteHistoryReadEvidence: "SUPABASE_MCP_LIST_MIGRATIONS_2026-09-18",
+  },
 
 ].map((m) => ({
   ...m,
@@ -450,7 +460,7 @@ const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD
 // QF-MVP-40.14 RE-PIN: 108 -> 109, adding ONLY the SOURCE-PENDING Meta
 // transactional mapping seed + activation authority (20260912000000). No existing
 // migration was changed, renamed, deleted or reordered. Still exact equality.
-const MIGRATION_COUNT = 114;
+const MIGRATION_COUNT = 115;
 // The tree size AT THE MOMENT QF-MVP-80.05 reconciled history. It is a historical
 // fact about that reconciliation, not a live count, and it must never track
 // MIGRATION_COUNT: a later slice that legitimately ADDS a migration does not
@@ -664,9 +674,9 @@ function validateState(state) {
   const stagingAppliedPins = Array.isArray(manifest.stagingAppliedPostAnchorMigrations) ? manifest.stagingAppliedPostAnchorMigrations : null;
   const appliedTruth = [...(appliedPins ?? []), ...(reconciledPins ?? [])];
 
-  check("exactly twenty-seven local migrations are newer than the anchor", postAnchorLocal.length === 27, `actual=${postAnchorLocal.length}`);
+  check("exactly twenty-eight local migrations are newer than the anchor", postAnchorLocal.length === 28, `actual=${postAnchorLocal.length}`);
   check("the post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
-  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 27);
+  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 28);
   check("manifest declares exactly ten APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 10, `actual=${appliedPins?.length}`);
   check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
   check("manifest declares exactly five RECONCILED post-anchor migrations", reconciledPins !== null && reconciledPins.length === 5, `actual=${reconciledPins?.length}`);
@@ -678,8 +688,8 @@ function validateState(state) {
   // version/name/path/SHA, and neither may also be claimed applied anywhere.
   // QF-MVP-40.14 RE-PIN: 4 -> 5. The Meta transactional mapping seed + activation
   // authority (20260912000000) is source-only and joins PENDING.
-  check("the explicit PENDING post-anchor set holds exactly the seven pinned entries",
-    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 7,
+  check("the explicit PENDING post-anchor set holds exactly the eight pinned entries",
+    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 8,
     `actual=${pendingPins?.length}`);
   check("the explicit STAGING-APPLIED post-anchor set holds exactly the five pinned entries",
     stagingAppliedPins !== null && stagingAppliedPins.length === POST_ANCHOR_STAGING_APPLIED.length &&
@@ -839,11 +849,16 @@ function validateState(state) {
     check(`${label}: is PENDING and is never also claimed applied`,
       pin?.operationalStatus === "PENDING" &&
       !appliedTruth.some((record) => record.version === expected.version));
+    const expectedRemoteStatus = expected.remoteVersionStatus ?? "NOT_PROVEN_OFFLINE";
     check(`${label}: claims NO application evidence and NO remote history`,
       pin?.appliedToStaging === false && pin?.appliedToProduction === false &&
-      pin?.remoteVersionStatus === "NOT_PROVEN_OFFLINE" &&
+      pin?.remoteVersionStatus === expectedRemoteStatus &&
       !("remoteHistoryCountAfterApply" in (pin ?? {})) &&
       !("appliedEvidenceMarker" in (pin ?? {})));
+    check(`${label}: any direct read-only absence evidence is pinned exactly`,
+      expected.remoteHistoryReadEvidence === undefined
+        ? !("remoteHistoryReadEvidence" in (pin ?? {}))
+        : pin?.remoteHistoryReadEvidence === expected.remoteHistoryReadEvidence);
     check(`${label}: still requires its own separate deployment gate`,
       pin?.requiresSeparateStagingDeploymentGate === true && pin?.appliedByThisPhase === false);
   }

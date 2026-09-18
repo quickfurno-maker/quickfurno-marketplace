@@ -294,7 +294,7 @@ check("22 the frozen 80.05 reconciliation count is still 102", () => {
   eq(MIGRATIONS.length - MANIFEST.historyReconciliation.migrationCount,
     (MANIFEST.pendingPostAnchorMigrations ?? []).length +
     (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length,
-    "116 - 102 = 14 = nine pending + five staging-applied");
+    "116 - 102 = 14 = eight pending + six staging-applied");
 });
 
 // ---- 23-26. the new vocabulary, and what it may not become -----------------
@@ -304,7 +304,7 @@ check("23 the partial-deployment vocabulary is exact and fail-closed", () => {
   assert(Array.isArray(set), "the set exists");
   // QF-MVP-40: the canary quiesce authority joined this set; Aarohi later joined after its staging gate. R0 remains exactly one
   // member of it, which is what assertion 22 above pins.
-  eq(set.length, 5, "with exactly five members");
+  eq(set.length, 6, "with exactly six members");
   // Every field that could be read as a deployment claim is stated explicitly —
   // nothing is left absent to be inferred generously by a later reader.
   for (const field of [

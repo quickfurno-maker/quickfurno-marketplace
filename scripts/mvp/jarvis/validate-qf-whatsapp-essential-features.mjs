@@ -74,6 +74,15 @@ await test("text, button and list replies remain first-class", () => {
   assert.equal(list.ok, true);
   assert.equal(list.message.messageType, "list_reply");
   assert.equal(list.message.contentMinimized.replyId, "row-1");
+
+  const legacyTemplateButton = normalizeMetaInboundWebhook(payloadFor({
+    type: "button",
+    button: { payload: "template.quick-reply", text: "Continue" },
+  }))[0];
+  assert.equal(legacyTemplateButton.ok, true);
+  assert.equal(legacyTemplateButton.message.messageType, "button_reply");
+  assert.equal(legacyTemplateButton.message.contentMinimized.replyId, "template.quick-reply");
+  assert.equal(legacyTemplateButton.message.contentMinimized.title, "Continue");
 });
 
 await test("all essential inbound media types are normalized without raw URLs", () => {

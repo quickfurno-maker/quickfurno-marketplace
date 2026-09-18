@@ -507,6 +507,33 @@ export async function queueJarvisConversationReply(input: {
   });
 }
 
+export type JarvisWhatsAppReplyReceiptResult =
+  | { readonly ok: true; readonly status: "recorded" }
+  | { readonly ok: false; readonly reason: "replay" | "unavailable" };
+
+export async function recordJarvisWhatsAppReplyReceipt(input: {
+  readonly requestId: string;
+  readonly version: 1 | 2;
+  readonly issuedAt: string;
+  readonly idempotencyKey: string;
+  readonly outboxId: string;
+  readonly rawBody: Uint8Array;
+}): Promise<JarvisWhatsAppReplyReceiptResult> {
+  const requestDigest = createHash("sha256").update(input.rawBody).digest("hex");
+  const { error } = await adminClient().from("communication_jarvis_callback_receipts").insert({
+    request_id: input.requestId,
+    protocol: "qfj.whatsapp.reply",
+    request_version: input.version,
+    request_digest: requestDigest,
+    idempotency_key: input.idempotencyKey,
+    outbox_id: input.outboxId,
+    issued_at: input.issuedAt,
+  });
+  if (!error) return { ok: true, status: "recorded" };
+  if (error.code === "23505") return { ok: false, reason: "replay" };
+  return { ok: false, reason: "unavailable" };
+}
+
 async function queueSystemConversationExperience(input: {
   readonly conversationId: string;
   readonly expectedRevision: number;

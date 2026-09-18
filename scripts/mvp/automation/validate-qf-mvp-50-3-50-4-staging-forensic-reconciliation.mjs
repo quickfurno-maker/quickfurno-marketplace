@@ -51,7 +51,7 @@ const UNKNOWN_PROVENANCE = "UNKNOWN";
 // renamed, deleted or reordered. Still exact equality.
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority. Still exact equality.
-const MIGRATION_COUNT = 113;
+const MIGRATION_COUNT = 114;
 const PRODUCTION_ACTIVATION_FILENAME =
   "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql";
 // QF-MVP-82A-R0: the newest SOURCE-PENDING migration — Realtime publication
@@ -172,14 +172,14 @@ function validateState(state) {
     ? manifest.reconciledPostAnchorMigrations
     : null;
 
-  check("migration count is exactly 113", state.migrationFiles.length === MIGRATION_COUNT);
+  check("migration count is exactly 114", state.migrationFiles.length === MIGRATION_COUNT);
   // QF-MVP-50.6 RE-PIN: the tail grows from twelve to thirteen, adding ONLY the
   // source-only orphan cancellation authority. Still an EXACT ordered comparison.
   // QF-MVP-40.14 RE-PIN: the tail grows from sixteen to seventeen, adding ONLY the
   // source-only Meta transactional mapping seed + activation authority. Still an
   // EXACT ordered comparison.
-  check("the exact final four forensic migration filenames are frozen, followed only by the later governed migrations through the final lead-generation scope lock",
-    same(state.migrationFiles.slice(-21),
+  check("the exact final four forensic migration filenames are frozen, followed only by the later governed migrations through the conversational WhatsApp/Jarvis foundation",
+    same(state.migrationFiles.slice(-22),
       [...FORENSIC_MIGRATIONS.map((migration) => migration.filename), RECOVERY_FILENAME,
        CANARY_AUTHORITY_FILENAME, MARKETING_CONSENT_FILENAME, MATCHCORE_RANK_ORDER_FILENAME,
        GEO_POSTGIS_SHORTLIST_FILENAME, AUDIT_LOG_REPAIR_FILENAME,
@@ -192,7 +192,8 @@ function validateState(state) {
         "20260912040000_qf_aos_v2_intelligence.sql",
         "20260912050000_qf_lead_generation_scope_lock.sql",
         "20260917000000_aarohi_acquisition_crm_foundation.sql",
-        "20260918093000_aarohi_anisha_vendor_crm_handoff.sql"]));
+        "20260918093000_aarohi_anisha_vendor_crm_handoff.sql",
+        "20260918120000_whatsapp_conversational_jarvis_foundation.sql"]));
   check("all four accepted source hashes are exact",
     FORENSIC_MIGRATIONS.every((migration) => state.sourceHashes[migration.version] === migration.sha));
 
@@ -207,8 +208,8 @@ function validateState(state) {
   // QF-MVP-82A-R0-S1: R0 was applied to STAGING and moved to the staging-applied
   // set, so PENDING is the 80.14A production activation authority alone again.
   // QF-MVP-50.6 RE-PIN: 1 -> 2 pending, both source-only.
-  check("the manifest pending set holds exactly seven pinned source-only authorities, four are staging-applied, and the five governed authorities are reconciled as APPLIED",
-    pending !== null && pending.length === 7 &&
+  check("the manifest pending set holds exactly eight pinned source-only authorities, four are staging-applied, and the five governed authorities are reconciled as APPLIED",
+    pending !== null && pending.length === 8 &&
     pending[0].version === "20260903040000" && pending[0].operationalStatus === "PENDING" &&
     pending[1].version === "20260905000000" && pending[1].operationalStatus === "PENDING" &&
     pending[2].version === "20260906000000" &&
@@ -216,6 +217,7 @@ function validateState(state) {
     pending[4].version === "20260912000000" &&
     pending[5].version === "20260912040000" &&
     pending[6].version === "20260912050000" &&
+    pending[7].version === "20260918120000" &&
     Array.isArray(state.manifest.stagingAppliedPostAnchorMigrations) &&
     state.manifest.stagingAppliedPostAnchorMigrations.length === 4 &&
     state.manifest.stagingAppliedPostAnchorMigrations[0].appliedToProduction === false &&
@@ -249,8 +251,8 @@ function validateState(state) {
   check("no forensic applied record was demoted into the pending set",
     pending !== null &&
     EXPECTED_APPLIED.every(([version]) => !pending.some((r) => r.version === version)));
-  check("the anchor post-anchor count equals ten applied, five reconciled, four staging-applied and seven pending authorities",
-    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 5 + 4 + 7);
+  check("the anchor post-anchor count equals ten applied, five reconciled, four staging-applied and eight pending authorities",
+    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 5 + 4 + 8);
 
   for (const expected of FORENSIC_MIGRATIONS) {
     const pin = applied.find((record) => record.version === expected.version);

@@ -1024,12 +1024,13 @@ check("16. the webhook imports ONLY the D2-E orchestrator — never the D2-D wri
   hasNot(/createOutboundConsentEnforcer\b/, code, "the webhook NEVER binds the REAL consent authority");
 });
 
-check("24. the existing D1-B / D2-C / D2-D boundaries stay green", () => {
-  // D1-B remains CONSENT-AGNOSTIC (its own harness enforces this too — we assert it here as well).
+check("24. the existing D1-B / D2-C / D2-D authority boundaries stay green", () => {
+  // D1-B may classify a persisted text as a CONTROL solely to suppress Jarvis enqueue before D2-E runs.
+  // It still owns no consent state, writer, policy decision, or raw command implementation.
   const d1b = stripTs(readF(D1B_SRC));
-  hasNot(/consent/i, d1b, "D1-B contains no consent reference");
-  hasNot(/\bSTOP\b|\bSTART\b|\bUNSUBSCRIBE\b|opt_out|opt_in/, d1b, "D1-B contains no command literal");
-  hasNot(/communicationConsentWriterService|writeConsentCommand|inboundConsentCommandService/, d1b, "D1-B imports no consent module");
+  has(/isConsentControlMessage/, d1b, "D1-B uses the approved pure control classifier");
+  hasNot(/communication_preferences|communication_suppressions|communicationConsentWriterService|writeConsentCommand|inboundConsentCommandService|processInboundConsentCommands/i, d1b, "D1-B contains no consent authority");
+  hasNot(/\bSTOP\b|\bSTART\b|\bUNSUBSCRIBE\b|opt_out|opt_in/, d1b, "D1-B contains no raw command literal/implementation");
   // D2-D + D2-C production files are byte-unchanged in this worktree.
   const dirty = gitDirty();
   for (const f of [WRITER_SRC, COMMAND_SRC, "lib/communication/consentPolicy.ts", D2C_SVC_SRC, D2D_MIGRATION]) {

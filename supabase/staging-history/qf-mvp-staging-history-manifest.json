@@ -613,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 26,
+    "postAnchorMigrationCount": 27,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -1134,6 +1134,23 @@
       "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
       "remoteHistoryCountObservedAtApply": false,
       "requiresSeparateStagingDeploymentGate": true
+    },
+    {
+      "version": "20260918120000",
+      "name": "whatsapp_conversational_jarvis_foundation",
+      "path": "supabase/migrations/20260918120000_whatsapp_conversational_jarvis_foundation.sql",
+      "sha256": "4d33c0f1fc490b6ca3ba254aea6d5e4ee816bb31292ff3651aaf8f99d075f9f7",
+      "phase": "QF-WHATSAPP-JARVIS-CONVERSATIONAL-FOUNDATION",
+      "operationalStatus": "PENDING",
+      "purpose": "Prepares QuickFurno-owned dual-number conversational WhatsApp authority, 24-hour service-window state, encrypted reply/turn outboxes, and signed Jarvis boundaries while preserving Core provider/send authority.",
+      "appliedExactlyOnce": false,
+      "appliedByThisPhase": false,
+      "appliedToStaging": false,
+      "appliedToProduction": false,
+      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
+      "remoteHistoryCountObservedAtApply": false,
+      "requiresSeparateStagingDeploymentGate": true,
+      "requiresSeparateProductionDeploymentGate": true
     }
   ],
   "safety": {

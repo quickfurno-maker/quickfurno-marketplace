@@ -26,6 +26,10 @@ import * as leadClarifications from "../services/leadClarificationService";
 import * as aos from "../services/aosService";
 import * as vendorLoginActivation from "../services/vendorLoginActivationService";
 import * as vendorPrincipalProfiles from "../services/vendorPrincipalProfileService";
+import {
+  queueHumanConversationReply,
+  releaseHumanConversationToAi,
+} from "../services/conversationalWhatsAppService";
 import { getParentCategoryGroup } from "../lib/vendors/categoryMatching";
 import { runAutoAssignmentPreviewForLead } from "../lib/lead-assignment/autoAssignmentEngine";
 import { recheckQueuedLead } from "../lib/lead-assignment/leadQueueService";
@@ -869,3 +873,49 @@ export const adminCreditVendorNow = async (
     if (!paid.ok) return paid;
     return packages.assignPackageAfterPayment(pay.data.id);
   });
+
+
+// --------------------------------------------------------------------------
+// SUPERADMIN — WhatsApp Human Desk
+// --------------------------------------------------------------------------
+export async function humanWhatsAppReplyFromForm(formData: FormData) {
+  const u = await requireSuperadmin();
+  const conversationId = String(formData.get("conversationId") ?? "").trim();
+  const operationId = String(formData.get("operationId") ?? "").trim();
+  const body = String(formData.get("body") ?? "").trim();
+  const expectedRevision = Number(formData.get("expectedRevision"));
+  if (!conversationId || !operationId || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+    redirect("/admin/whatsapp/human-desk?error=invalid");
+  }
+  const result = await queueHumanConversationReply({
+    conversationId,
+    expectedRevision,
+    operationId,
+    operatorUserId: u.id,
+    body,
+  });
+  revalidatePath("/admin/whatsapp/human-desk");
+  if (!result.ok) {
+    redirect(`/admin/whatsapp/human-desk?conversation=${encodeURIComponent(conversationId)}&error=${encodeURIComponent(result.reason)}`);
+  }
+  redirect(`/admin/whatsapp/human-desk?conversation=${encodeURIComponent(conversationId)}&sent=1`);
+}
+
+export async function humanWhatsAppReleaseToAiFromForm(formData: FormData) {
+  const u = await requireSuperadmin();
+  const conversationId = String(formData.get("conversationId") ?? "").trim();
+  const expectedRevision = Number(formData.get("expectedRevision"));
+  if (!conversationId || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+    redirect("/admin/whatsapp/human-desk?error=invalid");
+  }
+  const result = await releaseHumanConversationToAi({
+    conversationId,
+    expectedRevision,
+    operatorUserId: u.id,
+  });
+  revalidatePath("/admin/whatsapp/human-desk");
+  if (!result.ok) {
+    redirect(`/admin/whatsapp/human-desk?conversation=${encodeURIComponent(conversationId)}&error=${encodeURIComponent(result.reason)}`);
+  }
+  redirect(`/admin/whatsapp/human-desk?released=${encodeURIComponent(result.value.actor)}`);
+}

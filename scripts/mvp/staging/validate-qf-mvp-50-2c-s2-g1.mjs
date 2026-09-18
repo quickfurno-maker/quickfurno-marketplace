@@ -337,7 +337,7 @@ const POST_ANCHOR_PENDING = [
   {
     version: "20260918180500",
     name: "jarvis_whatsapp_callback_replay_receipts",
-    sha: "c1ce8bfd058a5434c52e7ffef60f6fe2a00749450a5a00737303ab57ec3cd0af",
+    sha: "0052d194680be37bc0680200e64a37fd414190cd781c2e802a5bd23d65c8b2a9",
     phase: "QF-WHATSAPP-JARVIS-CALLBACK-REPLAY",
   },
 

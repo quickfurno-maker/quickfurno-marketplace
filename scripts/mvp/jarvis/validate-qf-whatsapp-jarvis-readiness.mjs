@@ -114,18 +114,27 @@ await test("Jarvis reply route is signed and feature-gated off by default", () =
   assert.match(replyRoute, /providerAuthority: "quickfurno-core"/);
 });
 
-await test("accepted Jarvis callbacks gain durable replay receipts only after outbox queueing", () => {
+await test("Jarvis callback replay identity is claimed before queueing and finalized after", () => {
   assert.match(callbackReplayMigration, /create table public\.communication_jarvis_callback_receipts/);
   assert.match(callbackReplayMigration, /request_id uuid primary key/);
+  assert.match(callbackReplayMigration, /outbox_id uuid references public\.communication_conversation_outbox/);
+  assert.doesNotMatch(callbackReplayMigration, /outbox_id uuid not null/);
+  assert.match(callbackReplayMigration, /finalized_at timestamptz/);
+  assert.match(callbackReplayMigration, /communication_jarvis_callback_receipt_finalize_chk/);
   assert.match(callbackReplayMigration, /alter table public\.communication_jarvis_callback_receipts enable row level security/);
   assert.match(callbackReplayMigration, /revoke all on public\.communication_jarvis_callback_receipts from public,anon,authenticated/);
-  assert.match(callbackReplayMigration, /grant select,insert on public\.communication_jarvis_callback_receipts to service_role/);
-  assert.match(conversationService, /recordJarvisWhatsAppReplyReceipt/);
-  assert.match(conversationService, /error\.code === "23505"/);
+  assert.match(callbackReplayMigration, /grant select,insert,update on public\.communication_jarvis_callback_receipts to service_role/);
+  assert.match(conversationService, /claimJarvisWhatsAppReplyReceipt/);
+  assert.match(conversationService, /finalizeJarvisWhatsAppReplyReceipt/);
+  assert.match(conversationService, /error\.code !== "23505"/);
+  assert.match(conversationService, /prior\.request_digest !== requestDigest/);
+  assert.match(conversationService, /prior\.idempotency_key !== input\.idempotencyKey/);
+  assert.match(conversationService, /status: "resume"/);
+  const claimAt = replyRoute.indexOf("await claimJarvisWhatsAppReplyReceipt");
   const queuedAt = replyRoute.indexOf("await queueJarvisConversationReply");
-  const receiptAt = replyRoute.indexOf("await recordJarvisWhatsAppReplyReceipt");
-  assert.ok(queuedAt >= 0 && receiptAt > queuedAt);
-  assert.match(replyRoute, /status: "replay_rejected"/);
+  const finalizeAt = replyRoute.indexOf("await finalizeJarvisWhatsAppReplyReceipt");
+  assert.ok(claimAt >= 0 && queuedAt > claimAt && finalizeAt > queuedAt);
+  assert.match(replyRoute, /status: claim\.reason === "replay" \? "replay_rejected" : "request_id_conflict"/);
 });
 await test("QuickFurno to Jarvis gateway carries conversation facts but no provider secrets", () => {
   assert.match(gatewayService, /QF_JARVIS_BASE_URL/);

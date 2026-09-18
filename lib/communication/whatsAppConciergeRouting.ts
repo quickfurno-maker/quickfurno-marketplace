@@ -2,6 +2,7 @@ import {
   QF_CONCIERGE_ACTIONS,
   buildAgentTransitionExperience,
   buildHumanHandoffExperience,
+  buildNonTextGuidanceExperience,
   buildQuickFurnoConciergeMenu,
   buildVendorIdentityRequiredExperience,
   type QfWhatsAppExperienceV1,
@@ -105,6 +106,53 @@ function existingDecision(input: ConciergeRoutingInput): ConciergeRoutingDecisio
   return null;
 }
 
+const NON_TEXT_GUIDANCE_TYPES = new Set([
+  "image", "document", "audio", "video", "sticker", "location", "contact", "order", "unsupported",
+]);
+const PASSIVE_TYPES = new Set(["reaction", "system"]);
+
+function mediaHasUsableCaption(input: ConciergeRoutingInput): boolean {
+  return ["image", "document", "video"].includes(input.messageType) &&
+    typeof input.contentMinimized.caption === "string" &&
+    input.contentMinimized.caption.trim().length > 0;
+}
+
+function nonTextDecision(input: ConciergeRoutingInput): ConciergeRoutingDecision | null {
+  if (input.messageType === "text" || input.messageType === "button_reply" || input.messageType === "list_reply") {
+    return null;
+  }
+
+  const existing = existingDecision(input);
+  if (existing?.humanTakeover) return existing;
+
+  // A bounded caption is usable text; the attachment itself is never represented as
+  // something Jarvis has "seen". Exact/existing specialist routing may proceed below.
+  if (mediaHasUsableCaption(input)) return null;
+
+  if (PASSIVE_TYPES.has(input.messageType)) {
+    const stable = identityDecision(input) ?? existing;
+    if (stable && stable.assignedActor !== "HUMAN") {
+      return route(stable.subjectType, stable.assignedActor, stable.source, { suppress: true });
+    }
+    return route("unknown", "SYSTEM", "existing", { suppress: true });
+  }
+
+  if (NON_TEXT_GUIDANCE_TYPES.has(input.messageType)) {
+    const stable = identityDecision(input) ?? existing;
+    if (stable && stable.assignedActor !== "HUMAN" && stable.assignedActor !== "SYSTEM") {
+      return route(stable.subjectType, stable.assignedActor, stable.source, {
+        suppress: true,
+        experience: buildNonTextGuidanceExperience(input.messageType),
+      });
+    }
+    return route("unknown", "SYSTEM", "menu", {
+      suppress: true,
+      experience: buildNonTextGuidanceExperience(input.messageType),
+    });
+  }
+  return null;
+}
+
 export function resolveWhatsAppConciergeRouting(input: ConciergeRoutingInput): ConciergeRoutingDecision {
   const token = routeToken(input);
 
@@ -114,6 +162,9 @@ export function resolveWhatsAppConciergeRouting(input: ConciergeRoutingInput): C
       experience: buildHumanHandoffExperience(),
     });
   }
+
+  const nonText = nonTextDecision(input);
+  if (nonText) return nonText;
 
   const exactIdentity = identityDecision(input);
   if (exactIdentity) {

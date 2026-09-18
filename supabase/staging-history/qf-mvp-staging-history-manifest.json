@@ -613,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 28,
+    "postAnchorMigrationCount": 29,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -1177,6 +1177,22 @@
       "appliedToProduction": false,
       "remoteVersionStatus": "ABSENT_IN_STAGING_AND_PRODUCTION_HISTORY",
       "remoteHistoryReadEvidence": "SUPABASE_MCP_LIST_MIGRATIONS_2026-09-18",
+      "remoteHistoryCountObservedAtApply": false,
+      "requiresSeparateStagingDeploymentGate": true
+    },
+    {
+      "version": "20260918180500",
+      "name": "jarvis_whatsapp_callback_replay_receipts",
+      "path": "supabase/migrations/20260918180500_jarvis_whatsapp_callback_replay_receipts.sql",
+      "sha256": "c1ce8bfd058a5434c52e7ffef60f6fe2a00749450a5a00737303ab57ec3cd0af",
+      "phase": "QF-WHATSAPP-JARVIS-CALLBACK-REPLAY",
+      "operationalStatus": "PENDING",
+      "purpose": "Adds a service-role-only durable receipt ledger for authenticated Jarvis WhatsApp callback request IDs. It creates no runtime activation, provider credential, destination authority or send authority.",
+      "appliedExactlyOnce": false,
+      "appliedByThisPhase": false,
+      "appliedToStaging": false,
+      "appliedToProduction": false,
+      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
       "remoteHistoryCountObservedAtApply": false,
       "requiresSeparateStagingDeploymentGate": true
     }

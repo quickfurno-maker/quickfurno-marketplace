@@ -482,6 +482,9 @@ async function queueConversationExperience(input: {
     if (input.actor !== undefined && input.actor !== actor) return { ok: false, reason: "conversation_not_sendable" };
     if (experience.actor !== actor) return { ok: false, reason: "conversation_not_sendable" };
   }
+  if (input.source === "HUMAN" && experience.actor !== "HUMAN") {
+    return { ok: false, reason: "conversation_not_sendable" };
+  }
 
   let serialized: string;
   try { serialized = serializeQfWhatsAppExperience(experience); }

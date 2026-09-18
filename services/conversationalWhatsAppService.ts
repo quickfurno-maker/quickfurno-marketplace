@@ -796,6 +796,18 @@ export async function dispatchConversationalOutbox(
     return { ok: false, reason: "conversation_not_sendable" };
   }
 
+  if (source === "SYSTEM" && typeof conversation.last_inbound_provider_message_id === "string") {
+    try {
+      await signalConversationalWhatsAppPresence({
+        conversationId: conversation.id,
+        inboundProviderMessageId: conversation.last_inbound_provider_message_id,
+        typing: true,
+      });
+    } catch {
+      /* presence is best-effort and can never change outbox delivery authority */
+    }
+  }
+
   const provider = new MetaCloudWhatsAppProvider(outboundToRuntime(config.config), new FetchHttpTransport());
   const interactiveBody = [experience.body, ...(experience.items ?? []).map((item) => "• " + item)].join("\n");
   const canSendInteractive = Boolean(experience.actions?.length) && interactiveBody.length <= 1024;

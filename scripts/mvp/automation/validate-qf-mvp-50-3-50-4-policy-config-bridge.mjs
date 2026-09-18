@@ -384,7 +384,7 @@ record("G06 pending holds exactly seven pinned source-only authorities, four are
   manifest.stagingAppliedPostAnchorMigrations[2].appliedToProduction === true &&
   manifest.stagingAppliedPostAnchorMigrations[3].version === "20260918093000" &&
   manifest.stagingAppliedPostAnchorMigrations[3].operationalStatus === "APPLIED_TO_STAGING" &&
-  manifest.stagingAppliedPostAnchorMigrations[3].appliedToProduction === false &&
+  manifest.stagingAppliedPostAnchorMigrations[3].appliedToProduction === true &&
   manifest.reconciledPostAnchorMigrations?.length === 5 &&
   same(manifest.reconciledPostAnchorMigrations.map((r) => r.version), PENDING_ORDER) &&
   manifest.reconciledPostAnchorMigrations.every((r) => r.operationalStatus === "APPLIED" &&

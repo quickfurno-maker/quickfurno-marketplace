@@ -716,11 +716,15 @@ function validateState(state) {
     aarohiAnishaPin?.independentRemoteRelistVerified === true &&
     aarohiAnishaPin?.appliedEvidenceMarker === "QF_AAROHI_ANISHA_HANDOFF_STAGING_MIGRATION_APPLIED_AND_VERIFIED" &&
     aarohiAnishaPin?.appliedEvidenceType === "FIRST_PARTY_EXACT_ONE_DRY_RUN_VERIFIED_ISOLATED_WORKSPACE_STAGING_EXECUTION");
-  check("Aarohi to Anisha bridge remains outside production",
-    aarohiAnishaPin?.appliedToProduction === false &&
-    aarohiAnishaPin?.productionVersionStatus === "NOT_APPLIED_VERIFIED_ABSENT" &&
-    aarohiAnishaPin?.productionHistoryVersionPresent === false &&
-    aarohiAnishaPin?.requiresSeparateProductionDeploymentGate === true);
+  check("Aarohi to Anisha bridge production application is independently recorded",
+    aarohiAnishaPin?.appliedToProduction === true &&
+    aarohiAnishaPin?.productionVersionStatus === "PRESENT_IN_PRODUCTION_HISTORY" &&
+    aarohiAnishaPin?.productionHistoryVersionPresent === true &&
+    aarohiAnishaPin?.productionAppliedExactlyOnce === true &&
+    aarohiAnishaPin?.productionIndependentRemoteRelistVerified === true &&
+    aarohiAnishaPin?.productionBridgeColumnsVerified === 6 &&
+    aarohiAnishaPin?.productionHandoffRpcVerified === true &&
+    aarohiAnishaPin?.requiresSeparateProductionDeploymentGate === false);
   check("Aarohi to Anisha bridge fabricates NO remote-history count",
     aarohiAnishaPin?.remoteHistoryCountObservedAtApply === false &&
     aarohiAnishaPin?.remoteHistoryCountAfterApply === null);

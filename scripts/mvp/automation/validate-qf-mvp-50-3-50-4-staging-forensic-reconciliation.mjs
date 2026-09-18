@@ -226,7 +226,7 @@ function validateState(state) {
     state.manifest.stagingAppliedPostAnchorMigrations[3].version === "20260918093000" &&
     state.manifest.stagingAppliedPostAnchorMigrations[3].operationalStatus === "APPLIED_TO_STAGING" &&
     state.manifest.stagingAppliedPostAnchorMigrations[3].appliedToStaging === true &&
-    state.manifest.stagingAppliedPostAnchorMigrations[3].appliedToProduction === false &&
+    state.manifest.stagingAppliedPostAnchorMigrations[3].appliedToProduction === true &&
     reconciled !== null && reconciled.length === 5 &&
     reconciled[0].version === "20260813000000" &&
     reconciled[1].version === "20260814000000" &&

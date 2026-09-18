@@ -853,7 +853,7 @@ section('J. MIGRATION GOVERNANCE [static]');
     && manifest.stagingAppliedPostAnchorMigrations[2].version === '20260917000000'
     && manifest.stagingAppliedPostAnchorMigrations[2].appliedToProduction === true
     && manifest.stagingAppliedPostAnchorMigrations[3].version === '20260918093000'
-    && manifest.stagingAppliedPostAnchorMigrations[3].appliedToProduction === false);
+    && manifest.stagingAppliedPostAnchorMigrations[3].appliedToProduction === true);
   check('J07 THIS phase still applied nothing: the geo record carries no observed remote-history count',
     geoEntry && geoEntry.remoteVersionStatus === 'PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY'
     && geoEntry.remoteHistoryCountObservedAtApply === false

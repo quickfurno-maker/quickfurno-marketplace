@@ -1003,12 +1003,23 @@
       "independentRemoteRelistVerified": true,
       "remoteHistoryCountObservedAtApply": false,
       "remoteHistoryCountAfterApply": null,
-      "appliedToProduction": false,
-      "productionVersionStatus": "NOT_APPLIED_VERIFIED_ABSENT",
-      "productionHistoryVersionPresent": false,
-      "requiresSeparateProductionDeploymentGate": true,
+      "appliedToProduction": true,
+      "productionVersionStatus": "PRESENT_IN_PRODUCTION_HISTORY",
+      "productionHistoryVersionPresent": true,
+      "requiresSeparateProductionDeploymentGate": false,
       "stagingBridgeColumnsVerified": 6,
-      "stagingHandoffRpcVerified": true
+      "stagingHandoffRpcVerified": true,
+      "productionAppliedExactlyOnce": true,
+      "productionIndependentRemoteRelistVerified": true,
+      "productionRemoteHistoryCountBeforeApply": 49,
+      "productionRemoteHistoryCountAfterApply": 50,
+      "productionBridgeColumnsVerified": 6,
+      "productionHandoffRpcVerified": true,
+      "productionRpcAnonExecute": false,
+      "productionRpcAuthenticatedExecute": false,
+      "productionRpcServiceRoleExecute": true,
+      "productionApplyExecutorProvenance": "SUPABASE_CLI_DB_PUSH_ISOLATED_VERSION_ALIGNED_WORKSPACE_LINKED_TO_PRODUCTION",
+      "productionEvidencePath": "docs/QF-AAROHI-ANISHA-VENDOR-CRM-PRODUCTION-CERTIFICATION.md"
     }
   ],
   "pendingPostAnchorMigrations": [

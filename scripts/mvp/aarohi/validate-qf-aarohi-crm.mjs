@@ -27,6 +27,7 @@ const migration = read(MIGRATION);
 const handoffBridge = read("supabase/migrations/20260918093000_aarohi_anisha_vendor_crm_handoff.sql");
 const manifest = JSON.parse(read(MANIFEST));
 const stagingCertification = read("docs/QF-AAROHI-ACQUISITION-CRM-STAGING-CERTIFICATION.md");
+const productionCertification = read("docs/QF-AAROHI-ANISHA-VENDOR-CRM-PRODUCTION-CERTIFICATION.md");
 const route = read("app/api/internal/jarvis/aarohi-projection/route.ts");
 const projectionService = read("services/jarvisAarohiProjectionService.ts");
 const actions = read("app/admin/aarohi/actions.ts");
@@ -205,7 +206,7 @@ test("foundation migration is certified on staging and production", () => {
   assert.equal(pin.requiresSeparateProductionDeploymentGate, false);
   assert.equal(manifest.pendingPostAnchorMigrations.some((x) => x.version === "20260917000000"), false);
 });
-test("Aarohi to Anisha handoff migration is staging-applied and production-gated", () => {
+test("Aarohi to Anisha handoff migration is certified on staging and production", () => {
   const pin = manifest.stagingAppliedPostAnchorMigrations.find((x) => x.version === "20260918093000");
   assert.ok(pin);
   assert.equal(pin.operationalStatus, "APPLIED_TO_STAGING");
@@ -213,9 +214,16 @@ test("Aarohi to Anisha handoff migration is staging-applied and production-gated
   assert.equal(pin.appliedExactlyOnceToStaging, true);
   assert.equal(pin.stagingRemoteVersionStatus, "PRESENT_IN_STAGING_HISTORY");
   assert.equal(pin.independentRemoteRelistVerified, true);
-  assert.equal(pin.appliedToProduction, false);
-  assert.equal(pin.productionVersionStatus, "NOT_APPLIED_VERIFIED_ABSENT");
-  assert.equal(pin.requiresSeparateProductionDeploymentGate, true);
+  assert.equal(pin.appliedToProduction, true);
+  assert.equal(pin.productionVersionStatus, "PRESENT_IN_PRODUCTION_HISTORY");
+  assert.equal(pin.productionHistoryVersionPresent, true);
+  assert.equal(pin.productionAppliedExactlyOnce, true);
+  assert.equal(pin.productionBridgeColumnsVerified, 6);
+  assert.equal(pin.productionHandoffRpcVerified, true);
+  assert.equal(pin.productionEvidencePath, "docs/QF-AAROHI-ANISHA-VENDOR-CRM-PRODUCTION-CERTIFICATION.md");
+  assert.equal(pin.requiresSeparateProductionDeploymentGate, false);
+  assert.match(productionCertification, /QF_AAROHI_ANISHA_VENDOR_CRM_PRODUCTION_APPLIED_AND_VERIFIED/);
+  assert.match(productionCertification, /PRODUCTION_APPLIED_VERIFIED/);
   assert.equal(manifest.pendingPostAnchorMigrations.some((x) => x.version === "20260918093000"), false);
   const canonical = handoffBridge.replace(/\r\n/g,"\n").replace(/\r/g,"\n");
   const hash = crypto.createHash("sha256").update(Buffer.from(canonical,"utf8")).digest("hex");

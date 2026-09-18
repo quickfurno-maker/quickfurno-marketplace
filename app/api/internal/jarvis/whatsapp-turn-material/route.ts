@@ -76,6 +76,7 @@ export async function POST(request: Request): Promise<Response> {
     dataClass: material.value.dataClass,
     ...(material.value.subjectRef === undefined ? {} : { subjectRef: material.value.subjectRef }),
     receivedAt: material.value.receivedAt,
+    inbound: material.value.inbound,
     ...(material.value.normalizedText === undefined ? {} : { normalizedText: material.value.normalizedText }),
   });
 }

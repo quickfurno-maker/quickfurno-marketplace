@@ -14,6 +14,7 @@ import {
   buildMetaReadReceiptPayload,
 } from "../../../lib/communication/providers/metaWhatsAppRich.ts";
 import { resolveWhatsAppConciergeRouting } from "../../../lib/communication/whatsAppConciergeRouting.ts";
+import { deriveQfWhatsAppInboundMaterial } from "../../../lib/jarvis/whatsAppInboundMaterial.ts";
 
 const root = process.cwd();
 const read = (path) => readFileSync(resolve(root, path), "utf8");
@@ -176,6 +177,47 @@ await test("Jarvis text derivation never claims unseen attachment content", () =
   assert.equal(deriveJarvisNormalizedText("audio", { mediaId: "m2" }), null);
 });
 
+await test("structured Jarvis material preserves safe attachment, selection and thread context", () => {
+  const image = deriveQfWhatsAppInboundMaterial({
+    messageType: "image",
+    contentMinimized: {
+      mediaId: "m-image",
+      mimeType: "image/jpeg",
+      caption: "Need this style",
+      replyToProviderMessageId: "wamid.parent",
+      forwarded: true,
+      referralPresent: true,
+      referralSourceType: "ad",
+      referralSourceId: "ad-123",
+    },
+  });
+  assert.equal(image.messageType, "image");
+  assert.equal(image.attachment?.mediaId, "m-image");
+  assert.equal(image.attachment?.caption, "Need this style");
+  assert.equal(image.replyContext?.providerMessageId, "wamid.parent");
+  assert.equal(image.referral?.sourceId, "ad-123");
+  assert.equal(image.forwarded, true);
+  assert.match(image.normalizedText, /content not inspected/);
+
+  const choice = deriveQfWhatsAppInboundMaterial({
+    messageType: "list_reply",
+    contentMinimized: { replyId: "qf.route.client", title: "Find furniture", description: "Riya" },
+  });
+  assert.deepEqual(choice.selection, {
+    id: "qf.route.client",
+    title: "Find furniture",
+    description: "Riya",
+  });
+  assert.equal(choice.normalizedText, "Find furniture");
+
+  const location = deriveQfWhatsAppInboundMaterial({
+    messageType: "location",
+    contentMinimized: { received: true },
+  });
+  assert.equal(location.normalizedText, undefined);
+  assert.equal("latitude" in location, false);
+});
+
 await test("reply buttons and lists render through Meta interactive payloads", () => {
   const buttons = buildMetaInteractivePayload("+919999999999", {
     body: "Choose",
@@ -272,6 +314,7 @@ await test("production adapter exposes presence and rich capabilities while forb
   const rich = read("lib/communication/providers/metaWhatsAppRich.ts");
   const gateway = read("services/jarvisWhatsAppGatewayService.ts");
   const conversational = read("services/conversationalWhatsAppService.ts");
+  const materialRoute = read("app/api/internal/jarvis/whatsapp-turn-material/route.ts");
 
   for (const method of [
     "sendMediaMessage", "sendLocationMessage", "sendContactMessage",
@@ -282,6 +325,8 @@ await test("production adapter exposes presence and rich capabilities while forb
   assert.match(gateway, /signalConversationalWhatsAppPresence/);
   assert.match(conversational, /evaluateMetaOutboundGateForMessage/);
   assert.match(conversational, /source === "SYSTEM"/);
+  assert.match(conversational, /deriveQfWhatsAppInboundMaterial/);
+  assert.match(materialRoute, /inbound: material\.value\.inbound/);
 });
 
 console.log(`SUMMARY assertions=${passed + failed} passed=${passed} failed=${failed}`);

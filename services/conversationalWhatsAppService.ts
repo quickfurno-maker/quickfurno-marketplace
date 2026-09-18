@@ -199,7 +199,7 @@ export async function recordConversationalInbound(input: {
         sealed_destination_auth_tag: sealed.value.authTag,
         encryption_key_id: sealed.value.keyId,
         subject_type: "unknown",
-        assigned_actor: "AAROHI",
+        assigned_actor: account.jarvis_access_mode === "proposal_only" ? "RIYA" : "AAROHI",
         state: "OPEN",
         jarvis_enabled: account.jarvis_access_mode === "proposal_only",
         human_takeover: false,

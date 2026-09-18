@@ -832,24 +832,22 @@ section('J. MIGRATION GOVERNANCE [static]');
     && !pending.some((m) => m.version === '20260816000000'));
   // QF-MVP-50.6 RE-PIN: 17 -> 18 and pending 1 -> 2, adding ONLY the source-only
   // orphan cancellation authority. APPLIED stays ten, RECONCILED stays five.
-  check('J06 the manifest post-anchor count is 29: ten applied, five reconciled, five staging-applied, nine pending',
+  check('J06 the manifest post-anchor count is 29: ten applied, five reconciled, six staging-applied, eight pending',
     manifest.appliedAnchor.postAnchorMigrationCount === 29
     && (manifest.appliedPostAnchorMigrations ?? []).length === 10
     && reconciled.length === 5
-    && pending.length === 9
+    && pending.length === 8
     && pending[0].version === '20260903040000'
     && pending[0].operationalStatus === 'PENDING'
     && pending[1].version === '20260905000000'
     && pending[1].operationalStatus === 'PENDING'
     && pending[7].version === '20260915120000'
     && pending[7].operationalStatus === 'PENDING'
-    && pending[8].version === '20260918180500'
-    && pending[8].operationalStatus === 'PENDING'
     // QF-MVP-82A-R0-S1: R0 was applied to STAGING and moved to its own set, which
     // explicitly refuses any production claim.
     // QF-MVP-40: the canary quiesce authority joined the staging-applied set after its
     // staging history was reconciled. Both members still refuse any production claim.
-    && (manifest.stagingAppliedPostAnchorMigrations ?? []).length === 5
+    && (manifest.stagingAppliedPostAnchorMigrations ?? []).length === 6
     && manifest.stagingAppliedPostAnchorMigrations[0].version === '20260904000000'
     && manifest.stagingAppliedPostAnchorMigrations[0].appliedToProduction === false
     && manifest.stagingAppliedPostAnchorMigrations[1].version === '20260910060000'
@@ -861,7 +859,12 @@ section('J. MIGRATION GOVERNANCE [static]');
     && manifest.stagingAppliedPostAnchorMigrations[4].version === '20260918120000'
     && manifest.stagingAppliedPostAnchorMigrations[4].operationalStatus === 'APPLIED_TO_STAGING'
     && manifest.stagingAppliedPostAnchorMigrations[4].appliedToProduction === true
-    && manifest.stagingAppliedPostAnchorMigrations[4].productionConversationalProviderAccountSeededDisabled === true);
+    && manifest.stagingAppliedPostAnchorMigrations[4].productionConversationalProviderAccountSeededDisabled === true
+    && manifest.stagingAppliedPostAnchorMigrations[5].version === '20260918180500'
+    && manifest.stagingAppliedPostAnchorMigrations[5].appliedToStaging === true
+    && manifest.stagingAppliedPostAnchorMigrations[5].appliedToProduction === true
+    && manifest.stagingAppliedPostAnchorMigrations[5].stagingRemoteHistoryCountAfterApply === 44
+    && manifest.stagingAppliedPostAnchorMigrations[5].productionRemoteHistoryCountAfterApply === 52);
   check('J07 THIS phase still applied nothing: the geo record carries no observed remote-history count',
     geoEntry && geoEntry.remoteVersionStatus === 'PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY'
     && geoEntry.remoteHistoryCountObservedAtApply === false

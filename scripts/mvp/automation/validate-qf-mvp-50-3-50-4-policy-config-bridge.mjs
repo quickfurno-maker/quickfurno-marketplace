@@ -360,7 +360,7 @@ record("G05a the bridge no longer appears as pending",
 // reconciledPostAnchorMigrations set. The APPLIED ten and their 21-30 remote-history
 // counts are UNCHANGED. Re-pinned to the new exact truth, never loosened.
   // QF-MVP-80.14A: exactly ONE pinned pending entry again — the production activation authority.
-record("G06 pending holds exactly nine pinned source-only authorities, five are staging-applied, and the five governed authorities are reconciled as APPLIED",
+record("G06 pending holds exactly eight pinned source-only authorities, six are staging-applied, and the five governed authorities are reconciled as APPLIED",
   // QF-MVP-82A-R0 RE-PIN: the pending set now holds exactly TWO explicitly pinned
   // entries — the 80.14A production activation authority and the 82A-R0 Realtime
   // publication membership. Both are SOURCE-PENDING. Still an exact count, still no `>=`.
@@ -368,7 +368,7 @@ record("G06 pending holds exactly nine pinned source-only authorities, five are 
   // staging-applied set. PENDING is the 80.14A production activation authority alone.
   // Both sets stay exact; APPLIED stays ten and RECONCILED stays five.
   // QF-MVP-50.6 RE-PIN: 1 -> 2, adding the source-only orphan cancellation authority.
-  manifest.pendingPostAnchorMigrations?.length === 9 &&
+  manifest.pendingPostAnchorMigrations?.length === 8 &&
   manifest.pendingPostAnchorMigrations[0].version === "20260903040000" &&
   manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
   manifest.pendingPostAnchorMigrations[1].version === "20260905000000" &&
@@ -380,10 +380,8 @@ record("G06 pending holds exactly nine pinned source-only authorities, five are 
   manifest.pendingPostAnchorMigrations[6].version === "20260912050000" &&
   manifest.pendingPostAnchorMigrations[7].version === "20260915120000" &&
   manifest.pendingPostAnchorMigrations[7].operationalStatus === "PENDING" &&
-  manifest.pendingPostAnchorMigrations[8].version === "20260918180500" &&
-  manifest.pendingPostAnchorMigrations[8].operationalStatus === "PENDING" &&
   manifest.pendingPostAnchorMigrations.every((r) => r.operationalStatus === "PENDING") &&
-  manifest.stagingAppliedPostAnchorMigrations?.length === 5 &&
+  manifest.stagingAppliedPostAnchorMigrations?.length === 6 &&
   manifest.stagingAppliedPostAnchorMigrations[0].version === "20260904000000" &&
   manifest.stagingAppliedPostAnchorMigrations[0].appliedToProduction === false &&
   manifest.stagingAppliedPostAnchorMigrations[2].version === "20260917000000" &&
@@ -397,6 +395,12 @@ record("G06 pending holds exactly nine pinned source-only authorities, five are 
   manifest.stagingAppliedPostAnchorMigrations[4].appliedToStaging === true &&
   manifest.stagingAppliedPostAnchorMigrations[4].appliedToProduction === true &&
   manifest.stagingAppliedPostAnchorMigrations[4].productionConversationalProviderAccountSeededDisabled === true &&
+  manifest.stagingAppliedPostAnchorMigrations[5].version === "20260918180500" &&
+  manifest.stagingAppliedPostAnchorMigrations[5].operationalStatus === "APPLIED_TO_STAGING" &&
+  manifest.stagingAppliedPostAnchorMigrations[5].appliedToStaging === true &&
+  manifest.stagingAppliedPostAnchorMigrations[5].appliedToProduction === true &&
+  manifest.stagingAppliedPostAnchorMigrations[5].stagingRemoteHistoryCountAfterApply === 44 &&
+  manifest.stagingAppliedPostAnchorMigrations[5].productionRemoteHistoryCountAfterApply === 52 &&
   manifest.reconciledPostAnchorMigrations?.length === 5 &&
   same(manifest.reconciledPostAnchorMigrations.map((r) => r.version), PENDING_ORDER) &&
   manifest.reconciledPostAnchorMigrations.every((r) => r.operationalStatus === "APPLIED" &&
@@ -407,12 +411,12 @@ record("G07 the ten applied records read 21 through 30 in exact order",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version), APPLIED_ORDER));
 record("G08 the anchor post-anchor count agrees at 29",
   manifest.appliedAnchor?.postAnchorMigrationCount === POST_ANCHOR_COUNT);
-record("G09 G1 is pinned to 116 / 10 applied / 5 reconciled / 5 staging-applied / 9 pending, not loosened",
+record("G09 G1 is pinned to 116 / 10 applied / 5 reconciled / 6 staging-applied / 8 pending, not loosened",
   /const MIGRATION_COUNT = 116;/.test(g1Source) &&
   g1Source.includes(`version: "${BRIDGE_VERSION}"`) &&
   g1Source.includes(`sha: "${BRIDGE_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 9") &&
-  g1Source.includes("stagingAppliedPins.length === 5") &&
+  g1Source.includes("pendingPins.length === 8") &&
+  g1Source.includes("stagingAppliedPins.length === 6") &&
   g1Source.includes("reconciledPins.length === 5") &&
   g1Source.includes("appliedPins.length === 10") &&
   !/postAnchorLocal\.length\s*>=/.test(g1Source) &&

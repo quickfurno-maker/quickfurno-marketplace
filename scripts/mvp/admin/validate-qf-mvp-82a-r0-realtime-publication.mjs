@@ -321,9 +321,8 @@ check("23 the 80.14A pending record is byte-identical", () => {
   // pending set did not disturb the 80.14A record, and that is still exact.
   eq(MANIFEST.pendingPostAnchorMigrations[0].version, "20260903040000", "and it is the first entry");
   eq(MANIFEST.pendingPostAnchorMigrations[1].version, "20260905000000", "followed by 50.6");
-  eq(MANIFEST.pendingPostAnchorMigrations.length, 9, "the pending set is exactly nine");
+  eq(MANIFEST.pendingPostAnchorMigrations.length, 8, "the pending set is exactly eight");
   eq(MANIFEST.pendingPostAnchorMigrations[7].version, "20260915120000", "service availability is the eighth pending authority");
-  eq(MANIFEST.pendingPostAnchorMigrations[8].version, "20260918180500", "callback replay receipts are the ninth pending authority");
 });
 
 check("24 applied and reconciled records are unchanged", () => {
@@ -335,9 +334,15 @@ check("24 applied and reconciled records are unchanged", () => {
     eq(r.appliedToStaging, true, `${r.version} staging`);
     eq(r.appliedToProduction, true, `${r.version} production`);
   }
-  // Current ledger: ten applied + five reconciled + five staging-applied + nine pending = 29.
+  // Current ledger: ten applied + five reconciled + six staging-applied + eight pending = 29.
   eq(MANIFEST.appliedAnchor.postAnchorMigrationCount, 29, "post-anchor count is twenty-nine");
-  eq((MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length, 5, "five staging-applied");
+  eq((MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length, 6, "six staging-applied");
+  const replay = MANIFEST.stagingAppliedPostAnchorMigrations[5];
+  eq(replay.version, "20260918180500", "callback replay is the sixth staging-applied authority");
+  eq(replay.appliedToStaging, true, "callback replay is applied to staging");
+  eq(replay.appliedToProduction, true, "callback replay is applied to production");
+  eq(replay.stagingRemoteHistoryCountAfterApply, 44, "callback replay staging history count");
+  eq(replay.productionRemoteHistoryCountAfterApply, 52, "callback replay production history count");
   eq(MANIFEST.appliedPostAnchorMigrations.length + MANIFEST.reconciledPostAnchorMigrations.length +
      MANIFEST.stagingAppliedPostAnchorMigrations.length + MANIFEST.pendingPostAnchorMigrations.length,
      29, "and the four sets add up to it");

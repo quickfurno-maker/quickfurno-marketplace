@@ -208,8 +208,8 @@ function validateState(state) {
   // QF-MVP-82A-R0-S1: R0 was applied to STAGING and moved to the staging-applied
   // set, so PENDING is the 80.14A production activation authority alone again.
   // QF-MVP-50.6 RE-PIN: 1 -> 2 pending, both source-only.
-  check("the manifest pending set holds exactly eight pinned source-only authorities, four are staging-applied, and the five governed authorities are reconciled as APPLIED",
-    pending !== null && pending.length === 8 &&
+  check("the manifest pending set holds exactly seven pinned source-only authorities, five are staging-applied, and the five governed authorities are reconciled as APPLIED",
+    pending !== null && pending.length === 7 &&
     pending[0].version === "20260903040000" && pending[0].operationalStatus === "PENDING" &&
     pending[1].version === "20260905000000" && pending[1].operationalStatus === "PENDING" &&
     pending[2].version === "20260906000000" &&
@@ -217,9 +217,8 @@ function validateState(state) {
     pending[4].version === "20260912000000" &&
     pending[5].version === "20260912040000" &&
     pending[6].version === "20260912050000" &&
-    pending[7].version === "20260918120000" &&
     Array.isArray(state.manifest.stagingAppliedPostAnchorMigrations) &&
-    state.manifest.stagingAppliedPostAnchorMigrations.length === 4 &&
+    state.manifest.stagingAppliedPostAnchorMigrations.length === 5 &&
     state.manifest.stagingAppliedPostAnchorMigrations[0].appliedToProduction === false &&
     state.manifest.stagingAppliedPostAnchorMigrations[2].version === "20260917000000" &&
     state.manifest.stagingAppliedPostAnchorMigrations[2].operationalStatus === "APPLIED_TO_STAGING" &&
@@ -229,6 +228,11 @@ function validateState(state) {
     state.manifest.stagingAppliedPostAnchorMigrations[3].operationalStatus === "APPLIED_TO_STAGING" &&
     state.manifest.stagingAppliedPostAnchorMigrations[3].appliedToStaging === true &&
     state.manifest.stagingAppliedPostAnchorMigrations[3].appliedToProduction === true &&
+    state.manifest.stagingAppliedPostAnchorMigrations[4].version === "20260918120000" &&
+    state.manifest.stagingAppliedPostAnchorMigrations[4].operationalStatus === "APPLIED_TO_STAGING" &&
+    state.manifest.stagingAppliedPostAnchorMigrations[4].appliedToStaging === true &&
+    state.manifest.stagingAppliedPostAnchorMigrations[4].appliedToProduction === true &&
+    state.manifest.stagingAppliedPostAnchorMigrations[4].productionConversationalProviderAccountSeededDisabled === true &&
     reconciled !== null && reconciled.length === 5 &&
     reconciled[0].version === "20260813000000" &&
     reconciled[1].version === "20260814000000" &&
@@ -251,8 +255,8 @@ function validateState(state) {
   check("no forensic applied record was demoted into the pending set",
     pending !== null &&
     EXPECTED_APPLIED.every(([version]) => !pending.some((r) => r.version === version)));
-  check("the anchor post-anchor count equals ten applied, five reconciled, four staging-applied and eight pending authorities",
-    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 5 + 4 + 8);
+  check("the anchor post-anchor count equals ten applied, five reconciled, five staging-applied and seven pending authorities",
+    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 5 + 5 + 7);
 
   for (const expected of FORENSIC_MIGRATIONS) {
     const pin = applied.find((record) => record.version === expected.version);

@@ -321,7 +321,7 @@ check("23 the 80.14A pending record is byte-identical", () => {
   // pending set did not disturb the 80.14A record, and that is still exact.
   eq(MANIFEST.pendingPostAnchorMigrations[0].version, "20260903040000", "and it is the first entry");
   eq(MANIFEST.pendingPostAnchorMigrations[1].version, "20260905000000", "followed by 50.6");
-  eq(MANIFEST.pendingPostAnchorMigrations.length, 8, "the pending set is exactly eight");
+  eq(MANIFEST.pendingPostAnchorMigrations.length, 7, "the pending set is exactly seven");
 });
 
 check("24 applied and reconciled records are unchanged", () => {
@@ -333,9 +333,9 @@ check("24 applied and reconciled records are unchanged", () => {
     eq(r.appliedToStaging, true, `${r.version} staging`);
     eq(r.appliedToProduction, true, `${r.version} production`);
   }
-  // Current ledger: ten applied + five reconciled + four staging-applied + eight pending = 27.
+  // Current ledger: ten applied + five reconciled + five staging-applied + seven pending = 27.
   eq(MANIFEST.appliedAnchor.postAnchorMigrationCount, 27, "post-anchor count is twenty-seven");
-  eq((MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length, 4, "four staging-applied");
+  eq((MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length, 5, "five staging-applied");
   eq(MANIFEST.appliedPostAnchorMigrations.length + MANIFEST.reconciledPostAnchorMigrations.length +
      MANIFEST.stagingAppliedPostAnchorMigrations.length + MANIFEST.pendingPostAnchorMigrations.length,
      27, "and the four sets add up to it");

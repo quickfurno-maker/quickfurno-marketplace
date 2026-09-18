@@ -324,14 +324,7 @@ const POST_ANCHOR_PENDING = [
     sha: "45e83f3b9631c24bdfa3860fb42434fdb129ffb3f4e0ce05c6ad269e23d331c5",
     phase: "QF-AOS-V2-BOUNDARY",
   },
-  // Conversational WhatsApp/Jarvis foundation: SOURCE-PENDING until its own
-  // isolated staging and production deployment gates.
-  {
-    version: "20260918120000",
-    name: "whatsapp_conversational_jarvis_foundation",
-    sha: "4d33c0f1fc490b6ca3ba254aea6d5e4ee816bb31292ff3651aaf8f99d075f9f7",
-    phase: "QF-WHATSAPP-JARVIS-CONVERSATIONAL-FOUNDATION",
-  },
+
 ].map((m) => ({
   ...m,
   filename: `${m.version}_${m.name}.sql`,
@@ -401,6 +394,14 @@ const POST_ANCHOR_STAGING_APPLIED = [
     name: "aarohi_anisha_vendor_crm_handoff",
     sha: "d2f071040b004bab3d8589a5f8f56dedec2201e5663806eba320ee7a971c99f9",
     phase: "QF-AAROHI-ANISHA-HANDOFF",
+  },
+  // Conversational WhatsApp/Jarvis foundation: applied and independently
+  // re-listed in BOTH staging and production, while runtime activation remains disabled.
+  {
+    version: "20260918120000",
+    name: "whatsapp_conversational_jarvis_foundation",
+    sha: "4d33c0f1fc490b6ca3ba254aea6d5e4ee816bb31292ff3651aaf8f99d075f9f7",
+    phase: "QF-WHATSAPP-JARVIS-CONVERSATIONAL-FOUNDATION",
   },
 ].map((m) => ({
   ...m,
@@ -677,12 +678,12 @@ function validateState(state) {
   // version/name/path/SHA, and neither may also be claimed applied anywhere.
   // QF-MVP-40.14 RE-PIN: 4 -> 5. The Meta transactional mapping seed + activation
   // authority (20260912000000) is source-only and joins PENDING.
-  check("the explicit PENDING post-anchor set holds exactly the eight pinned entries",
-    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 8,
+  check("the explicit PENDING post-anchor set holds exactly the seven pinned entries",
+    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 7,
     `actual=${pendingPins?.length}`);
-  check("the explicit STAGING-APPLIED post-anchor set holds exactly the four pinned entries",
+  check("the explicit STAGING-APPLIED post-anchor set holds exactly the five pinned entries",
     stagingAppliedPins !== null && stagingAppliedPins.length === POST_ANCHOR_STAGING_APPLIED.length &&
-    stagingAppliedPins.length === 4,
+    stagingAppliedPins.length === 5,
     `actual=${stagingAppliedPins?.length}`);
   check("the staging-applied record claims staging and explicitly refuses production",
     stagingAppliedPins?.[0]?.operationalStatus === "APPLIED_TO_STAGING" &&
@@ -736,6 +737,38 @@ function validateState(state) {
   check("Aarohi to Anisha bridge fabricates NO remote-history count",
     aarohiAnishaPin?.remoteHistoryCountObservedAtApply === false &&
     aarohiAnishaPin?.remoteHistoryCountAfterApply === null);
+  const whatsappJarvisPin = stagingAppliedPins?.find((record) => record.version === "20260918120000");
+  const whatsappJarvisLocal = postAnchorLocal.find((record) => record.version === "20260918120000");
+  const whatsappJarvisDisk = state.postAnchorOnDisk?.["20260918120000"];
+  check("WhatsApp/Jarvis foundation identity and source hash are exact",
+    whatsappJarvisPin?.name === "whatsapp_conversational_jarvis_foundation" &&
+    whatsappJarvisPin?.path === "supabase/migrations/20260918120000_whatsapp_conversational_jarvis_foundation.sql" &&
+    whatsappJarvisPin?.phase === "QF-WHATSAPP-JARVIS-CONVERSATIONAL-FOUNDATION" &&
+    whatsappJarvisLocal?.name === "whatsapp_conversational_jarvis_foundation" &&
+    whatsappJarvisDisk?.exists === true &&
+    whatsappJarvisDisk?.sha === "4d33c0f1fc490b6ca3ba254aea6d5e4ee816bb31292ff3651aaf8f99d075f9f7" &&
+    whatsappJarvisDisk?.canonicalSha === "4d33c0f1fc490b6ca3ba254aea6d5e4ee816bb31292ff3651aaf8f99d075f9f7" &&
+    whatsappJarvisPin?.sha256 === whatsappJarvisLocal?.sha256);
+  check("WhatsApp/Jarvis foundation staging application evidence is exact",
+    whatsappJarvisPin?.operationalStatus === "APPLIED_TO_STAGING" &&
+    whatsappJarvisPin?.appliedToStaging === true &&
+    whatsappJarvisPin?.appliedExactlyOnceToStaging === true &&
+    whatsappJarvisPin?.stagingRemoteVersionStatus === "PRESENT_IN_STAGING_HISTORY" &&
+    whatsappJarvisPin?.independentRemoteRelistVerified === true &&
+    whatsappJarvisPin?.remoteHistoryCountAfterApply === 43);
+  check("WhatsApp/Jarvis foundation production application is independently recorded",
+    whatsappJarvisPin?.appliedToProduction === true &&
+    whatsappJarvisPin?.productionVersionStatus === "PRESENT_IN_PRODUCTION_HISTORY" &&
+    whatsappJarvisPin?.productionHistoryVersionPresent === true &&
+    whatsappJarvisPin?.productionAppliedExactlyOnce === true &&
+    whatsappJarvisPin?.productionIndependentRemoteRelistVerified === true &&
+    whatsappJarvisPin?.productionRemoteHistoryCountAfterApply === 51 &&
+    whatsappJarvisPin?.requiresSeparateProductionDeploymentGate === false);
+  check("WhatsApp/Jarvis foundation deployment evidence and disabled seed are exact",
+    whatsappJarvisPin?.appliedEvidenceMarker === "QF_WHATSAPP_JARVIS_CONVERSATIONAL_FOUNDATION_DATABASE_APPLIED_AND_VERIFIED" &&
+    whatsappJarvisPin?.appliedEvidenceType === "SUPABASE_MCP_APPLY_VERIFIED_AND_CANONICAL_HISTORY_ALIGNED" &&
+    whatsappJarvisPin?.productionConversationalProviderAccountSeededDisabled === true &&
+    whatsappJarvisPin?.evidencePath === "docs/QF-WHATSAPP-JARVIS-CONVERSATIONAL-FOUNDATION-CERTIFICATION.md");
   check("the pending records appear in exact pinned order",
     same(pendingPins?.map((record) => record.version), POST_ANCHOR_PENDING.map((m) => m.version)));
   // The four sets are compared as a SORTED union, not as concatenated blocks. Since

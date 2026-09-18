@@ -265,6 +265,9 @@ jobs:
       - name: WhatsApp essential feature certification
         run: npm run test:mvp:whatsapp-essential
 
+      - name: WhatsApp Human Desk certification
+        run: npm run test:mvp:whatsapp-human-desk
+
       - name: Typecheck
         run: npm run typecheck
 

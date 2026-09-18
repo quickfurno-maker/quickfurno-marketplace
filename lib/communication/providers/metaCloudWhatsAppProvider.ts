@@ -442,7 +442,7 @@ export class MetaCloudWhatsAppProvider implements WhatsAppProvider {
     }
     const result = await this.transport.request({
       url: buildMetaMessagesUrl({ graphApiVersion: this.runtime.graphApiVersion, phoneNumberId: this.runtime.phoneNumberId }),
-      method: typing ? "POST" : "PUT",
+      method: "POST",
       headers: { Authorization: `Bearer ${this.runtime.accessToken}`, "Content-Type": "application/json" },
       body: JSON.stringify(buildMetaReadReceiptPayload(id, typing)),
       timeoutMs: this.runtime.businessHttpTimeoutMs,

@@ -75,6 +75,35 @@ export interface WhatsAppInteractiveMessage {
   readonly menuButtonText?: string;
 }
 
+export type WhatsAppMediaKind = "image" | "document" | "audio" | "video" | "sticker";
+
+export interface WhatsAppMediaMessage {
+  readonly kind: WhatsAppMediaKind;
+  /** Provider-owned uploaded media id. Arbitrary external URLs are deliberately not accepted here. */
+  readonly mediaId: string;
+  readonly caption?: string;
+  readonly filename?: string;
+}
+
+export interface WhatsAppLocationMessage {
+  readonly latitude: number;
+  readonly longitude: number;
+  readonly name?: string;
+  readonly address?: string;
+}
+
+export interface WhatsAppContactPhone {
+  readonly phone: string;
+  readonly type?: "CELL" | "WORK" | "HOME";
+}
+
+export interface WhatsAppContactMessage {
+  readonly formattedName: string;
+  readonly firstName?: string;
+  readonly lastName?: string;
+  readonly phones: readonly WhatsAppContactPhone[];
+}
+
 export interface WhatsAppWebhookEvent {
   readonly providerEventId: string;
   readonly providerMessageId: string;
@@ -154,6 +183,43 @@ export interface WhatsAppProvider {
     to: string,
     message: WhatsAppInteractiveMessage,
     options?: { readonly replyToProviderMessageId?: string | null }
+  ): Promise<WhatsAppSendResult>;
+
+  /**
+   * Optional rich-media capability. Media must already be uploaded to the provider;
+   * QuickFurno never lets Jarvis supply an arbitrary fetch URL.
+   */
+  sendMediaMessage?(
+    to: string,
+    message: WhatsAppMediaMessage,
+    options?: { readonly replyToProviderMessageId?: string | null }
+  ): Promise<WhatsAppSendResult>;
+
+  /** Optional structured location capability for approved QuickFurno experiences. */
+  sendLocationMessage?(
+    to: string,
+    message: WhatsAppLocationMessage,
+    options?: { readonly replyToProviderMessageId?: string | null }
+  ): Promise<WhatsAppSendResult>;
+
+  /** Optional contact-card capability for approved QuickFurno experiences. */
+  sendContactMessage?(
+    to: string,
+    message: WhatsAppContactMessage,
+    options?: { readonly replyToProviderMessageId?: string | null }
+  ): Promise<WhatsAppSendResult>;
+
+  /**
+   * Provider acknowledgement capability. It is deliberately separate from message
+   * sending because a read/typing signal must never create a second conversation row.
+   */
+  markInboundRead?(
+    providerMessageId: string
+  ): Promise<WhatsAppSendResult>;
+
+  /** Mark the inbound message read and show a text typing indicator in one provider call. */
+  markInboundReadWithTyping?(
+    providerMessageId: string
   ): Promise<WhatsAppSendResult>;
 
   /**

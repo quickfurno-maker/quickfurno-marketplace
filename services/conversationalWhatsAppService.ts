@@ -8,6 +8,7 @@ import { FetchHttpTransport } from "../lib/communication/httpTransport";
 import { evaluateMetaOutboundGateForMessage } from "./communicationProviderRuntimeService";
 import { effectiveProviderOutcomeCertainty } from "../lib/communication/providers/providerOutcome";
 import { resolveWhatsAppConciergeRouting } from "../lib/communication/whatsAppConciergeRouting";
+import { deriveJarvisNormalizedText } from "../lib/communication/providers/metaWhatsAppInbound";
 import {
   parseSerializedQfWhatsAppExperience,
   renderQfWhatsAppExperienceFallback,
@@ -76,6 +77,53 @@ async function activeSuppression(destinationHash: string): Promise<boolean> {
     .in("scope", ["global", "transactional"]);
   if (error) return true;
   return (data ?? []).some((row: any) => !row.expires_at || row.expires_at > now);
+}
+
+export async function signalConversationalWhatsAppPresence(input: {
+  readonly conversationId: string;
+  readonly inboundProviderMessageId: string;
+  readonly typing?: boolean;
+}): Promise<"sent" | "skipped"> {
+  const providerMessageId = input.inboundProviderMessageId?.trim();
+  if (!providerMessageId || providerMessageId.length > 512) return "skipped";
+
+  const { data: conversation, error } = await adminClient()
+    .from("communication_conversations")
+    .select("id,provider_account_id,destination_hash,last_inbound_provider_message_id,state")
+    .eq("id", input.conversationId)
+    .maybeSingle();
+  if (
+    error || !conversation ||
+    conversation.last_inbound_provider_message_id !== providerMessageId ||
+    !["OPEN", "HUMAN"].includes(String(conversation.state))
+  ) return "skipped";
+
+  const account = await providerAccount(String(conversation.provider_account_id));
+  if (
+    !account ||
+    account.provider_key !== META_WHATSAPP_CLOUD_PROVIDER_KEY ||
+    account.channel !== CHANNEL ||
+    account.account_role !== "conversational"
+  ) return "skipped";
+
+  const config = resolveConversationalMetaConfig();
+  if (!config.ok) return "skipped";
+  if (
+    account.phone_number_reference !== config.config.phoneNumberId ||
+    account.business_account_reference !== config.config.wabaId
+  ) return "skipped";
+
+  const gate = await evaluateMetaOutboundGateForMessage({
+    config: { phoneNumberId: config.config.phoneNumberId, wabaId: config.config.wabaId },
+    destinationHash: String(conversation.destination_hash),
+  });
+  if (!gate.ok) return "skipped";
+
+  const provider = new MetaCloudWhatsAppProvider(outboundToRuntime(config.config), new FetchHttpTransport());
+  const result = input.typing === false
+    ? await provider.markInboundRead(providerMessageId)
+    : await provider.markInboundReadWithTyping(providerMessageId);
+  return effectiveProviderOutcomeCertainty(result) === "accepted" ? "sent" : "skipped";
 }
 
 export async function recordConversationalInbound(input: {
@@ -346,11 +394,10 @@ export async function readJarvisWhatsAppTurnMaterial(input: {
   if (!["AAROHI", "ANISHA", "RIYA"].includes(actor) || !["prospect", "client", "vendor"].includes(subjectType)) {
     return { ok: false, reason: "conversation_not_sendable" };
   }
-  const normalizedText = inbound.message_type === "text" && typeof inbound.content_minimized?.text === "string"
-    ? inbound.content_minimized.text.slice(0, 4096)
-    : ["button_reply", "list_reply"].includes(String(inbound.message_type)) && typeof inbound.content_minimized?.title === "string"
-      ? inbound.content_minimized.title.slice(0, 4096)
-      : undefined;
+  const normalizedText = deriveJarvisNormalizedText(
+    String(inbound.message_type),
+    (inbound.content_minimized ?? {}) as Record<string, unknown>,
+  ) ?? undefined;
 
   const subjectRef = inbound.identity_confidence === "exact" &&
     inbound.resolved_principal_type === subjectType &&
@@ -747,6 +794,18 @@ export async function dispatchConversationalOutbox(
   if (source === "JARVIS" && experience.actor !== String(conversation.assigned_actor)) {
     await failOutbox(claimed.id, "superseded", "ACTOR_MISMATCH");
     return { ok: false, reason: "conversation_not_sendable" };
+  }
+
+  if (source === "SYSTEM" && typeof conversation.last_inbound_provider_message_id === "string") {
+    try {
+      await signalConversationalWhatsAppPresence({
+        conversationId: conversation.id,
+        inboundProviderMessageId: conversation.last_inbound_provider_message_id,
+        typing: true,
+      });
+    } catch {
+      /* presence is best-effort and can never change outbox delivery authority */
+    }
   }
 
   const provider = new MetaCloudWhatsAppProvider(outboundToRuntime(config.config), new FetchHttpTransport());

@@ -262,6 +262,9 @@ jobs:
       - name: WhatsApp / Jarvis conversational readiness
         run: npm run test:mvp:whatsapp-jarvis
 
+      - name: WhatsApp essential feature certification
+        run: npm run test:mvp:whatsapp-essential
+
       - name: Typecheck
         run: npm run typecheck
 

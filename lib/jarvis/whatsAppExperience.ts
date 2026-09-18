@@ -235,3 +235,13 @@ export function textExperience(
 ): QfWhatsAppExperienceV1 {
   return Object.freeze({ version: 1, actor, kind: "text", body });
 }
+
+export function humanTextExperience(body: string): QfWhatsAppExperienceV1 {
+  return Object.freeze({
+    version: 1,
+    actor: "HUMAN",
+    kind: "text",
+    heading: "QuickFurno Team",
+    body: body.trim(),
+  });
+}

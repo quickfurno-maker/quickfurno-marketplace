@@ -194,6 +194,41 @@ export function buildHumanHandoffExperience(): QfWhatsAppExperienceV1 {
   });
 }
 
+export function buildNonTextGuidanceExperience(messageType: string): QfWhatsAppExperienceV1 {
+  const label = messageType === "image" ? "image"
+    : messageType === "document" ? "document"
+      : messageType === "audio" ? "voice note or audio"
+        : messageType === "video" ? "video"
+          : messageType === "sticker" ? "sticker"
+            : messageType === "location" ? "location"
+              : messageType === "contact" ? "contact card"
+                : messageType === "order" ? "WhatsApp order"
+                  : "message";
+  const detail = ["image", "document", "video"].includes(messageType)
+    ? "If it has a caption, I can use that text. Otherwise, add a short message describing what you want help with."
+    : messageType === "audio"
+      ? "Please add the key details in text, or choose human assistance if you prefer."
+      : messageType === "location"
+        ? "For privacy, please type the city, area or pincode you want us to use."
+        : messageType === "contact"
+          ? "For privacy, please tell us in text what you want us to do with that contact."
+          : messageType === "order"
+            ? "QuickFurno does not infer fulfilment instructions from a WhatsApp catalog order. Add the request in text or ask for human assistance."
+            : "Add a short text message so I can help accurately.";
+  return Object.freeze({
+    version: 1,
+    actor: "SYSTEM",
+    kind: "confirmation",
+    heading: "QuickFurno Concierge",
+    body: `I received your ${label}. ${detail}`,
+    actions: Object.freeze([
+      { id: QF_CONCIERGE_ACTIONS.MENU, title: "Main menu" },
+      { id: QF_CONCIERGE_ACTIONS.HUMAN, title: "Talk to QuickFurno" },
+    ]),
+    nextExpectedIntent: "concierge.non_text_followup",
+  });
+}
+
 export function textExperience(
   actor: Exclude<QfWhatsAppActor, "SYSTEM" | "HUMAN">,
   body: string,

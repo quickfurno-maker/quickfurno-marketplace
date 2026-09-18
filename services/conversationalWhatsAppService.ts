@@ -13,6 +13,7 @@ import {
   parseSerializedQfWhatsAppExperience,
   renderQfWhatsAppExperienceFallback,
   serializeQfWhatsAppExperience,
+  humanTextExperience,
   textExperience,
   type QfWhatsAppExperienceV1,
 } from "../lib/jarvis/whatsAppExperience";
@@ -43,8 +44,13 @@ export type ConversationalResult<T> =
 function destinationAad(id: string, providerAccountId: string, destinationHash: string): string {
   return ["qf.conversation.destination.v1", id, providerAccountId, destinationHash].join("\n");
 }
-function bodyAad(id: string, conversationId: string, expectedRevision: number, bodyDigest: string): string {
-  return ["qf.conversation.outbox.body.v1", id, conversationId, String(expectedRevision), bodyDigest].join("\n");
+export function conversationOutboxBodyAad(
+  id: string,
+  conversationId: string,
+  expectedRevision: number,
+  digest: string,
+): string {
+  return ["qf.conversation.outbox.body.v1", id, conversationId, String(expectedRevision), digest].join("\n");
 }
 function bodyDigest(body: string): string {
   return createHash("sha256").update(body, "utf8").digest("hex");
@@ -484,7 +490,7 @@ async function queueConversationExperience(input: {
 
   const id = randomUUID();
   const digest = bodyDigest(serialized);
-  const sealed = sealConversationValue(serialized, bodyAad(id, input.conversationId, input.expectedRevision, digest));
+  const sealed = sealConversationValue(serialized, conversationOutboxBodyAad(id, input.conversationId, input.expectedRevision, digest));
   if (!sealed.ok) return { ok: false, reason: "seal_unavailable" };
 
   const { data, error: insertError } = await adminClient()
@@ -562,6 +568,146 @@ export async function queueJarvisConversationReply(input: {
     ...(input.actor === undefined ? {} : { actor: input.actor }),
     ...(input.experience === undefined ? {} : { experience: input.experience }),
   });
+}
+
+const HUMAN_OPERATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export async function queueHumanConversationReply(input: {
+  readonly conversationId: string;
+  readonly expectedRevision: number;
+  readonly operationId: string;
+  readonly operatorUserId: string;
+  readonly body: string;
+}): Promise<ConversationalResult<{ outboxId: string }>> {
+  const body = input.body.trim();
+  if (
+    !HUMAN_OPERATION_ID.test(input.operationId) ||
+    !HUMAN_OPERATION_ID.test(input.operatorUserId) ||
+    body.length < 1 ||
+    body.length > 3072
+  ) return { ok: false, reason: "conversation_not_sendable" };
+
+  const { data: conversation, error } = await adminClient()
+    .from("communication_conversations")
+    .select("id,state,human_takeover,assigned_actor,revision")
+    .eq("id", input.conversationId)
+    .maybeSingle();
+  if (
+    error || !conversation ||
+    conversation.state !== "HUMAN" ||
+    conversation.human_takeover !== true ||
+    conversation.assigned_actor !== "HUMAN" ||
+    Number(conversation.revision) !== input.expectedRevision
+  ) return { ok: false, reason: "conversation_not_sendable" };
+
+  const idempotencyKey = createHash("sha256").update([
+    "qf.whatsapp.human.reply.v1",
+    input.conversationId,
+    String(input.expectedRevision),
+    input.operationId,
+    input.operatorUserId,
+    body,
+  ].join("\n"), "utf8").digest("hex");
+
+  const queued = await queueConversationExperience({
+    source: "HUMAN",
+    conversationId: input.conversationId,
+    expectedRevision: input.expectedRevision,
+    proposalId: `human:${input.operationId}`,
+    idempotencyKey,
+    experience: humanTextExperience(body),
+  });
+  if (!queued.ok) return queued;
+
+  await adminClient().from("communication_conversation_events").insert({
+    conversation_id: input.conversationId,
+    event_type: "human.reply_queued",
+    actor_type: "HUMAN",
+    safe_summary: "A QuickFurno operator queued a human WhatsApp reply through the governed conversation outbox.",
+    reference_type: "outbox",
+    reference_id: queued.value.outboxId,
+    event_data: { operatorUserId: input.operatorUserId },
+  });
+  return queued;
+}
+
+function actorForSubject(subjectType: string): AiConversationActor | null {
+  return subjectType === "client" ? "RIYA"
+    : subjectType === "vendor" ? "ANISHA"
+      : subjectType === "prospect" ? "AAROHI"
+        : null;
+}
+
+export async function releaseHumanConversationToAi(input: {
+  readonly conversationId: string;
+  readonly expectedRevision: number;
+  readonly operatorUserId: string;
+}): Promise<ConversationalResult<{ actor: AiConversationActor; revision: number }>> {
+  if (!HUMAN_OPERATION_ID.test(input.operatorUserId)) {
+    return { ok: false, reason: "conversation_not_sendable" };
+  }
+  const { data: conversation, error } = await adminClient()
+    .from("communication_conversations")
+    .select("id,provider_account_id,subject_type,assigned_actor,state,human_takeover,revision")
+    .eq("id", input.conversationId)
+    .maybeSingle();
+  if (
+    error || !conversation ||
+    conversation.state !== "HUMAN" ||
+    conversation.human_takeover !== true ||
+    conversation.assigned_actor !== "HUMAN" ||
+    Number(conversation.revision) !== input.expectedRevision
+  ) return { ok: false, reason: "conversation_not_sendable" };
+
+  const actor = actorForSubject(String(conversation.subject_type));
+  if (!actor) return { ok: false, reason: "conversation_not_sendable" };
+  const account = await providerAccount(String(conversation.provider_account_id));
+  if (!account || account.account_role !== "conversational" || account.jarvis_access_mode !== "proposal_only") {
+    return { ok: false, reason: "provider_account_not_conversational" };
+  }
+
+  const revision = input.expectedRevision + 1;
+  const { data: updated, error: updateError } = await adminClient()
+    .from("communication_conversations")
+    .update({
+      assigned_actor: actor,
+      state: "OPEN",
+      human_takeover: false,
+      jarvis_enabled: true,
+      revision,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.conversationId)
+    .eq("revision", input.expectedRevision)
+    .eq("state", "HUMAN")
+    .eq("human_takeover", true)
+    .select("id");
+  if (updateError || !Array.isArray(updated) || updated.length !== 1) {
+    return { ok: false, reason: "stale_revision" };
+  }
+
+  await adminClient().from("communication_jarvis_turn_outbox").update({
+    status: "cancelled",
+    last_safe_code: "HUMAN_RELEASE_REVISION_ADVANCED",
+    completed_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).eq("conversation_id", input.conversationId).in("status", ["pending", "retry_scheduled"]);
+
+  await adminClient().from("communication_conversation_outbox").update({
+    status: "superseded",
+    failure_code: "HUMAN_RELEASE_REVISION_ADVANCED",
+    completed_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).eq("conversation_id", input.conversationId).eq("proposal_source", "JARVIS").eq("status", "pending");
+
+  await adminClient().from("communication_conversation_events").insert({
+    conversation_id: input.conversationId,
+    event_type: "human.takeover_released",
+    actor_type: "HUMAN",
+    safe_summary: "A QuickFurno operator released human takeover. Future inbound turns may return to the trusted specialist actor.",
+    event_data: { operatorUserId: input.operatorUserId, nextActor: actor, revision },
+  });
+  return { ok: true, value: { actor, revision } };
 }
 
 export type JarvisWhatsAppReplyClaimResult =
@@ -772,7 +918,7 @@ export async function dispatchConversationalOutbox(
     nonce: claimed.sealed_body_nonce,
     authTag: claimed.sealed_body_auth_tag,
     keyId: claimed.encryption_key_id,
-  }, bodyAad(claimed.id, claimed.conversation_id, Number(claimed.expected_revision), claimed.body_digest));
+  }, conversationOutboxBodyAad(claimed.id, claimed.conversation_id, Number(claimed.expected_revision), claimed.body_digest));
   if (!body.ok || bodyDigest(body.value) !== claimed.body_digest) {
     await failOutbox(claimed.id, "failed", "BODY_SEAL_INVALID");
     return { ok: false, reason: "seal_unavailable" };

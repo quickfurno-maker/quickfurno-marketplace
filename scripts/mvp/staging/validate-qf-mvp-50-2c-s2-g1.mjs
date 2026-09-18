@@ -334,13 +334,6 @@ const POST_ANCHOR_PENDING = [
     remoteVersionStatus: "ABSENT_IN_STAGING_AND_PRODUCTION_HISTORY",
     remoteHistoryReadEvidence: "SUPABASE_MCP_LIST_MIGRATIONS_2026-09-18",
   },
-  {
-    version: "20260918180500",
-    name: "jarvis_whatsapp_callback_replay_receipts",
-    sha: "0052d194680be37bc0680200e64a37fd414190cd781c2e802a5bd23d65c8b2a9",
-    phase: "QF-WHATSAPP-JARVIS-CALLBACK-REPLAY",
-  },
-
 ].map((m) => ({
   ...m,
   filename: `${m.version}_${m.name}.sql`,
@@ -418,6 +411,14 @@ const POST_ANCHOR_STAGING_APPLIED = [
     name: "whatsapp_conversational_jarvis_foundation",
     sha: "4d33c0f1fc490b6ca3ba254aea6d5e4ee816bb31292ff3651aaf8f99d075f9f7",
     phase: "QF-WHATSAPP-JARVIS-CONVERSATIONAL-FOUNDATION",
+  },
+  // Callback replay ledger: exact-version apply independently re-listed in BOTH
+  // staging and production; runtime activation remains unchanged/off.
+  {
+    version: "20260918180500",
+    name: "jarvis_whatsapp_callback_replay_receipts",
+    sha: "0052d194680be37bc0680200e64a37fd414190cd781c2e802a5bd23d65c8b2a9",
+    phase: "QF-WHATSAPP-JARVIS-CALLBACK-REPLAY",
   },
 ].map((m) => ({
   ...m,
@@ -694,12 +695,12 @@ function validateState(state) {
   // version/name/path/SHA, and neither may also be claimed applied anywhere.
   // QF-MVP-40.14 RE-PIN: 4 -> 5. The Meta transactional mapping seed + activation
   // authority (20260912000000) is source-only and joins PENDING.
-  check("the explicit PENDING post-anchor set holds exactly the nine pinned entries",
-    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 9,
+  check("the explicit PENDING post-anchor set holds exactly the eight pinned entries",
+    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 8,
     `actual=${pendingPins?.length}`);
-  check("the explicit STAGING-APPLIED post-anchor set holds exactly the five pinned entries",
+  check("the explicit STAGING-APPLIED post-anchor set holds exactly the six pinned entries",
     stagingAppliedPins !== null && stagingAppliedPins.length === POST_ANCHOR_STAGING_APPLIED.length &&
-    stagingAppliedPins.length === 5,
+    stagingAppliedPins.length === 6,
     `actual=${stagingAppliedPins?.length}`);
   check("the staging-applied record claims staging and explicitly refuses production",
     stagingAppliedPins?.[0]?.operationalStatus === "APPLIED_TO_STAGING" &&
@@ -785,6 +786,27 @@ function validateState(state) {
     whatsappJarvisPin?.appliedEvidenceType === "SUPABASE_MCP_APPLY_VERIFIED_AND_CANONICAL_HISTORY_ALIGNED" &&
     whatsappJarvisPin?.productionConversationalProviderAccountSeededDisabled === true &&
     whatsappJarvisPin?.evidencePath === "docs/QF-WHATSAPP-JARVIS-CONVERSATIONAL-FOUNDATION-CERTIFICATION.md");
+  const callbackReplayPin = stagingAppliedPins?.find((record) => record.version === "20260918180500");
+  const callbackReplayLocal = postAnchorLocal.find((record) => record.version === "20260918180500");
+  const callbackReplayDisk = state.postAnchorOnDisk?.["20260918180500"];
+  check("WhatsApp/Jarvis callback replay deployment evidence is exact",
+    callbackReplayPin?.name === "jarvis_whatsapp_callback_replay_receipts" &&
+    callbackReplayPin?.phase === "QF-WHATSAPP-JARVIS-CALLBACK-REPLAY" &&
+    callbackReplayPin?.sha256 === "0052d194680be37bc0680200e64a37fd414190cd781c2e802a5bd23d65c8b2a9" &&
+    callbackReplayLocal?.name === "jarvis_whatsapp_callback_replay_receipts" &&
+    callbackReplayDisk?.exists === true &&
+    callbackReplayDisk?.canonicalSha === callbackReplayPin?.sha256 &&
+    callbackReplayPin?.operationalStatus === "APPLIED_TO_STAGING" &&
+    callbackReplayPin?.appliedToStaging === true &&
+    callbackReplayPin?.appliedExactlyOnceToStaging === true &&
+    callbackReplayPin?.stagingRemoteVersionStatus === "PRESENT_IN_STAGING_HISTORY" &&
+    callbackReplayPin?.stagingRemoteHistoryCountAfterApply === 44 &&
+    callbackReplayPin?.appliedToProduction === true &&
+    callbackReplayPin?.productionVersionStatus === "PRESENT_IN_PRODUCTION_HISTORY" &&
+    callbackReplayPin?.productionRemoteHistoryCountAfterApply === 52 &&
+    callbackReplayPin?.requiresSeparateStagingDeploymentGate === false &&
+    callbackReplayPin?.requiresSeparateProductionDeploymentGate === false &&
+    callbackReplayPin?.runtimeActivationChanged === false);
   check("the pending records appear in exact pinned order",
     same(pendingPins?.map((record) => record.version), POST_ANCHOR_PENDING.map((m) => m.version)));
   // The four sets are compared as a SORTED union, not as concatenated blocks. Since

@@ -42,9 +42,12 @@ export const InboundMessageType = {
   DOCUMENT: "document",
   AUDIO: "audio",
   VIDEO: "video",
+  STICKER: "sticker",
   LOCATION: "location",
   CONTACT: "contact",
+  ORDER: "order",
   REACTION: "reaction",
+  SYSTEM: "system",
   UNSUPPORTED: "unsupported",
 } as const;
 export type InboundMessageTypeValue = (typeof InboundMessageType)[keyof typeof InboundMessageType];
@@ -192,6 +195,12 @@ function classifyAndMinimize(m: Record<string, unknown>): { type: InboundMessage
   if (type === "document") return { type: InboundMessageType.DOCUMENT, content: minimizeMedia(asObject(m.document), ["filename", "caption"]) };
   if (type === "audio") return { type: InboundMessageType.AUDIO, content: minimizeMedia(asObject(m.audio), []) };
   if (type === "video") return { type: InboundMessageType.VIDEO, content: minimizeMedia(asObject(m.video), ["caption"]) };
+  if (type === "sticker") {
+    const sticker = asObject(m.sticker);
+    const content = minimizeMedia(sticker, []);
+    if (sticker && typeof sticker.animated === "boolean") content.animated = sticker.animated;
+    return { type: InboundMessageType.STICKER, content };
+  }
 
   // CONSERVATIVE: sensitive personal data is NOT persisted merely because Meta supplies it.
   // A location's precise coordinates and a contact card's names/numbers are dropped in D1-A;
@@ -200,6 +209,15 @@ function classifyAndMinimize(m: Record<string, unknown>): { type: InboundMessage
   if (type === "contacts") {
     const count = Array.isArray(m.contacts) ? m.contacts.length : 0;
     return { type: InboundMessageType.CONTACT, content: { received: true, count } };
+  }
+
+  if (type === "order") {
+    const order = asObject(m.order) ?? {};
+    const content: Record<string, unknown> = { received: true };
+    const catalogId = readString(order, "catalog_id");
+    if (catalogId && /^[A-Za-z0-9._:-]{1,128}$/.test(catalogId)) content.catalogId = catalogId;
+    if (Array.isArray(order.product_items)) content.itemCount = Math.min(order.product_items.length, 100);
+    return { type: InboundMessageType.ORDER, content };
   }
 
   if (type === "reaction") {
@@ -212,7 +230,16 @@ function classifyAndMinimize(m: Record<string, unknown>): { type: InboundMessage
     return { type: InboundMessageType.REACTION, content };
   }
 
-  // Anything else (sticker, order, system, unknown, …) is safely classified as unsupported,
+  if (type === "system") {
+    const system = asObject(m.system) ?? {};
+    const systemType = safeProviderType(readString(system, "type"));
+    return {
+      type: InboundMessageType.SYSTEM,
+      content: systemType ? { providerSystemType: systemType } : { received: true },
+    };
+  }
+
+  // Anything else (unknown/new provider types, …) is safely classified as unsupported,
   // carrying only an allowlisted identifier-shaped provider type — never arbitrary content.
   const safeType = safeProviderType(type);
   return { type: InboundMessageType.UNSUPPORTED, content: safeType ? { providerType: safeType } : {} };
@@ -274,6 +301,25 @@ export function normalizeMetaInboundWebhook(payload: unknown): NormalizedInbound
 
     // 3) Minimize the content and derive the safe, non-sender provider context.
     const { type, content } = classifyAndMinimize(m);
+
+    // Preserve only bounded conversation context needed for a premium threaded UX.
+    // No quoted message body, ad copy, source URL, contact profile or precise location is copied.
+    const context = asObject(m.context);
+    if (context) {
+      const replyTo = readString(context, "message_id");
+      if (replyTo && replyTo.length <= 512) content.replyToProviderMessageId = replyTo;
+      if (context.forwarded === true) content.forwarded = true;
+      if (context.frequently_forwarded === true) content.frequentlyForwarded = true;
+    }
+    const referral = asObject(m.referral);
+    if (referral) {
+      content.referralPresent = true;
+      const sourceType = safeProviderType(readString(referral, "source_type"));
+      const sourceId = readString(referral, "source_id");
+      if (sourceType) content.referralSourceType = sourceType;
+      if (sourceId && /^[A-Za-z0-9._:-]{1,128}$/.test(sourceId)) content.referralSourceId = sourceId;
+    }
+
     const metadata = asObject(value.metadata);
 
     results.push({

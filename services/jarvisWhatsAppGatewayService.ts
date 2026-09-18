@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { adminClient } from "../lib/supabase";
 import { deriveJarvisNormalizedText } from "../lib/communication/providers/metaWhatsAppInbound";
+import { signalConversationalWhatsAppPresence } from "./conversationalWhatsAppService";
 import {
   QFJ_WHATSAPP_TURN_KEY_ID_HEADER,
   QFJ_WHATSAPP_TURN_PATH,
@@ -91,7 +92,7 @@ export async function dispatchNextJarvisWhatsAppTurn(): Promise<{ processed: boo
   const [{ data: conversation }, { data: inbound }] = await Promise.all([
     adminClient().from("communication_conversations").select("*").eq("id", claimed.conversation_id).maybeSingle(),
     adminClient().from("communication_inbound_messages")
-      .select("id,message_type,content_minimized,received_at")
+      .select("id,provider_message_id,message_type,content_minimized,received_at")
       .eq("id", claimed.inbound_message_id)
       .maybeSingle(),
   ]);
@@ -113,6 +114,18 @@ export async function dispatchNextJarvisWhatsAppTurn(): Promise<{ processed: boo
     String(inbound.message_type),
     (inbound.content_minimized ?? {}) as Record<string, unknown>,
   ) ?? undefined;
+  if (Number(claimed.attempt_count ?? 0) === 0 && typeof inbound.provider_message_id === "string") {
+    try {
+      await signalConversationalWhatsAppPresence({
+        conversationId: conversation.id,
+        inboundProviderMessageId: inbound.provider_message_id,
+        typing: true,
+      });
+    } catch {
+      /* presence is best-effort; it never controls whether an AI turn may execute */
+    }
+  }
+
   const result = await sendJarvisWhatsAppTurn({
     requestId: randomUUID(),
     issuedAt: new Date().toISOString(),

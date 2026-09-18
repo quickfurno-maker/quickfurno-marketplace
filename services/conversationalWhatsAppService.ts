@@ -464,10 +464,20 @@ async function queueConversationExperience(input: {
   if (insertError) {
     const { data: existing } = await adminClient()
       .from("communication_conversation_outbox")
-      .select("id")
+      .select("id,conversation_id,provider_account_id,proposal_source,proposal_id,expected_revision,body_digest")
       .eq("idempotency_key", input.idempotencyKey)
       .maybeSingle();
-    if (existing?.id) return { ok: true, value: { outboxId: existing.id } };
+    if (
+      existing?.id &&
+      existing.conversation_id === input.conversationId &&
+      existing.provider_account_id === conversation.provider_account_id &&
+      existing.proposal_source === input.source &&
+      existing.proposal_id === input.proposalId &&
+      Number(existing.expected_revision) === input.expectedRevision &&
+      existing.body_digest === digest
+    ) {
+      return { ok: true, value: { outboxId: existing.id } };
+    }
     return { ok: false, reason: "conversation_not_sendable" };
   }
 

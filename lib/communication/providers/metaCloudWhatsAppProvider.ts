@@ -1,8 +1,9 @@
 // ============================================================================
 // QuickFurno — lib/communication/providers/metaCloudWhatsAppProvider.ts (Phase 5F-B)
 //
-// Real Meta WhatsApp Cloud API adapter. SERVER-ONLY. Template sends only — no
-// free-form text, no media, no Flows, no bulk/broadcast, and NO retry loop inside
+// Real Meta WhatsApp Cloud API adapter. SERVER-ONLY. Supports approved templates,
+// conversational text/interactive/rich messages and read/typing presence. No Flows,
+// no bulk/broadcast, and NO retry loop inside
 // the adapter (CommunicationService owns retry). DISABLED BY DEFAULT.
 //
 // The provider is built from a purpose-scoped MetaProviderRuntime whose fields are
@@ -29,6 +30,9 @@ import type {
   WhatsAppSendResult,
   WhatsAppWebhookEvent,
   WhatsAppInteractiveMessage,
+  WhatsAppMediaMessage,
+  WhatsAppLocationMessage,
+  WhatsAppContactMessage,
 } from "./whatsappProvider";
 import type { MetaProviderRuntime } from "./metaCloudWhatsAppConfig";
 import {
@@ -40,6 +44,12 @@ import {
 import type { ResolvedTemplateSendOptions, WhatsAppResolvedTemplate } from "../whatsappTemplate";
 import { renderWhatsAppTemplateComponents, type MetaTemplateComponent } from "./whatsappTemplateBinding";
 import { buildMetaInteractivePayload } from "./metaWhatsAppInteractive";
+import {
+  buildMetaContactPayload,
+  buildMetaLocationPayload,
+  buildMetaMediaPayload,
+  buildMetaReadReceiptPayload,
+} from "./metaWhatsAppRich";
 import {
   classifyMetaWebhook,
   deriveMetaWebhookEventId,
@@ -179,6 +189,38 @@ export function interpretMetaSendResult(transport: HttpTransportResult, provider
   };
 }
 
+function interpretMetaControlResult(
+  transport: HttpTransportResult,
+  providerKey: string,
+): WhatsAppSendResult {
+  const base = { provider: providerKey, providerMessageId: null as string | null };
+  if (transport.kind === "aborted") {
+    return { ...base, accepted: false, normalizedStatus: "failed", errorCode: "META_TIMEOUT",
+      errorMessage: "Meta control request timed out; outcome unknown.", retryable: false,
+      outcomeCertainty: "unknown_outcome" };
+  }
+  if (transport.kind === "network_error") {
+    return { ...base, accepted: false, normalizedStatus: "failed", errorCode: "META_NETWORK_ERROR",
+      errorMessage: "Meta control request failed before a response; outcome unknown.", retryable: false,
+      outcomeCertainty: "unknown_outcome" };
+  }
+  const body = safeParseJson(transport.bodyText);
+  if (transport.status >= 200 && transport.status < 300 && body?.success === true) {
+    return { ...base, accepted: true, normalizedStatus: "read", errorCode: null, errorMessage: null,
+      retryable: false, outcomeCertainty: "accepted" };
+  }
+  if (transport.status >= 400 && transport.status < 500) {
+    return { ...base, accepted: false, normalizedStatus: "failed",
+      errorCode: classifyMetaError(transport.status, body),
+      errorMessage: `Meta rejected the control request (HTTP ${transport.status}).`,
+      retryable: false, outcomeCertainty: "definitive_failure" };
+  }
+  return { ...base, accepted: false, normalizedStatus: "failed",
+    errorCode: `META_HTTP_${transport.status}`,
+    errorMessage: "Meta returned an ambiguous control response; outcome unknown.",
+    retryable: false, outcomeCertainty: "unknown_outcome" };
+}
+
 /** A preflight definitive_failure result (config/render/usage error — no network). */
 function preflightFailure(providerKey: string, code: string, message: string): WhatsAppSendResult {
   return {
@@ -274,6 +316,147 @@ export class MetaCloudWhatsAppProvider implements WhatsAppProvider {
       maxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
     });
     return interpretMetaSendResult(result, this.providerKey);
+  }
+
+  async sendMediaMessage(
+    toE164: string,
+    message: WhatsAppMediaMessage,
+    options: { readonly replyToProviderMessageId?: string | null } = {},
+  ): Promise<WhatsAppSendResult> {
+    if (this.runtime.accessToken === null || this.runtime.phoneNumberId === null || this.runtime.graphApiVersion === null) {
+      return preflightFailure(this.providerKey, "META_OUTBOUND_CONFIG_MISSING",
+        "The Meta adapter is not configured for outbound sending.");
+    }
+    const mediaId = message.mediaId?.trim() ?? "";
+    const caption = message.caption?.trim() ?? "";
+    const filename = message.filename?.trim() ?? "";
+    const captionAllowed = ["image", "document", "video"].includes(message.kind);
+    const invalid = !["image", "document", "audio", "video", "sticker"].includes(message.kind) ||
+      !/^[A-Za-z0-9._:-]{1,256}$/.test(mediaId) ||
+      caption.length > 1024 || (!captionAllowed && caption.length > 0) ||
+      filename.length > 240 || (message.kind !== "document" && filename.length > 0);
+    if (invalid) {
+      return preflightFailure(this.providerKey, "META_MEDIA_INVALID",
+        "The rich-media payload is outside the allowed bounds.");
+    }
+    const replyTo = options.replyToProviderMessageId?.trim() || null;
+    if (replyTo && replyTo.length > 512) {
+      return preflightFailure(this.providerKey, "META_REPLY_CONTEXT_INVALID",
+        "The reply context identifier is outside the allowed bounds.");
+    }
+    const result = await this.transport.request({
+      url: buildMetaMessagesUrl({ graphApiVersion: this.runtime.graphApiVersion, phoneNumberId: this.runtime.phoneNumberId }),
+      method: "POST",
+      headers: { Authorization: `Bearer ${this.runtime.accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(buildMetaMediaPayload(toE164, {
+        kind: message.kind,
+        mediaId,
+        ...(caption ? { caption } : {}),
+        ...(filename ? { filename } : {}),
+      }, replyTo)),
+      timeoutMs: this.runtime.businessHttpTimeoutMs,
+      maxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
+    });
+    return interpretMetaSendResult(result, this.providerKey);
+  }
+
+  async sendLocationMessage(
+    toE164: string,
+    message: WhatsAppLocationMessage,
+    options: { readonly replyToProviderMessageId?: string | null } = {},
+  ): Promise<WhatsAppSendResult> {
+    if (this.runtime.accessToken === null || this.runtime.phoneNumberId === null || this.runtime.graphApiVersion === null) {
+      return preflightFailure(this.providerKey, "META_OUTBOUND_CONFIG_MISSING",
+        "The Meta adapter is not configured for outbound sending.");
+    }
+    const name = message.name?.trim() ?? "";
+    const address = message.address?.trim() ?? "";
+    const invalid = !Number.isFinite(message.latitude) || message.latitude < -90 || message.latitude > 90 ||
+      !Number.isFinite(message.longitude) || message.longitude < -180 || message.longitude > 180 ||
+      name.length > 1000 || address.length > 1000;
+    if (invalid) return preflightFailure(this.providerKey, "META_LOCATION_INVALID", "The location payload is invalid.");
+    const replyTo = options.replyToProviderMessageId?.trim() || null;
+    if (replyTo && replyTo.length > 512) {
+      return preflightFailure(this.providerKey, "META_REPLY_CONTEXT_INVALID",
+        "The reply context identifier is outside the allowed bounds.");
+    }
+    const result = await this.transport.request({
+      url: buildMetaMessagesUrl({ graphApiVersion: this.runtime.graphApiVersion, phoneNumberId: this.runtime.phoneNumberId }),
+      method: "POST",
+      headers: { Authorization: `Bearer ${this.runtime.accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(buildMetaLocationPayload(toE164, {
+        latitude: message.latitude, longitude: message.longitude,
+        ...(name ? { name } : {}), ...(address ? { address } : {}),
+      }, replyTo)),
+      timeoutMs: this.runtime.businessHttpTimeoutMs,
+      maxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
+    });
+    return interpretMetaSendResult(result, this.providerKey);
+  }
+
+  async sendContactMessage(
+    toE164: string,
+    message: WhatsAppContactMessage,
+    options: { readonly replyToProviderMessageId?: string | null } = {},
+  ): Promise<WhatsAppSendResult> {
+    if (this.runtime.accessToken === null || this.runtime.phoneNumberId === null || this.runtime.graphApiVersion === null) {
+      return preflightFailure(this.providerKey, "META_OUTBOUND_CONFIG_MISSING",
+        "The Meta adapter is not configured for outbound sending.");
+    }
+    const formattedName = message.formattedName?.trim() ?? "";
+    const firstName = message.firstName?.trim() ?? "";
+    const lastName = message.lastName?.trim() ?? "";
+    const phones = Array.isArray(message.phones) ? [...message.phones] : [];
+    const invalid = formattedName.length < 1 || formattedName.length > 256 ||
+      firstName.length > 128 || lastName.length > 128 || phones.length < 1 || phones.length > 10 ||
+      phones.some((entry) => !/^\+[1-9]\d{7,14}$/.test(entry.phone) ||
+        (entry.type !== undefined && !["CELL", "WORK", "HOME"].includes(entry.type)));
+    if (invalid) return preflightFailure(this.providerKey, "META_CONTACT_INVALID", "The contact payload is invalid.");
+    const replyTo = options.replyToProviderMessageId?.trim() || null;
+    if (replyTo && replyTo.length > 512) {
+      return preflightFailure(this.providerKey, "META_REPLY_CONTEXT_INVALID",
+        "The reply context identifier is outside the allowed bounds.");
+    }
+    const result = await this.transport.request({
+      url: buildMetaMessagesUrl({ graphApiVersion: this.runtime.graphApiVersion, phoneNumberId: this.runtime.phoneNumberId }),
+      method: "POST",
+      headers: { Authorization: `Bearer ${this.runtime.accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(buildMetaContactPayload(toE164, {
+        formattedName, ...(firstName ? { firstName } : {}), ...(lastName ? { lastName } : {}), phones,
+      }, replyTo)),
+      timeoutMs: this.runtime.businessHttpTimeoutMs,
+      maxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
+    });
+    return interpretMetaSendResult(result, this.providerKey);
+  }
+
+  private async sendReadControl(providerMessageId: string, typing: boolean): Promise<WhatsAppSendResult> {
+    if (this.runtime.accessToken === null || this.runtime.phoneNumberId === null || this.runtime.graphApiVersion === null) {
+      return preflightFailure(this.providerKey, "META_OUTBOUND_CONFIG_MISSING",
+        "The Meta adapter is not configured for provider acknowledgements.");
+    }
+    const id = providerMessageId?.trim() ?? "";
+    if (id.length < 1 || id.length > 512) {
+      return preflightFailure(this.providerKey, "META_INBOUND_MESSAGE_ID_INVALID",
+        "The inbound provider message id is outside the allowed bounds.");
+    }
+    const result = await this.transport.request({
+      url: buildMetaMessagesUrl({ graphApiVersion: this.runtime.graphApiVersion, phoneNumberId: this.runtime.phoneNumberId }),
+      method: typing ? "POST" : "PUT",
+      headers: { Authorization: `Bearer ${this.runtime.accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(buildMetaReadReceiptPayload(id, typing)),
+      timeoutMs: this.runtime.businessHttpTimeoutMs,
+      maxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
+    });
+    return interpretMetaControlResult(result, this.providerKey);
+  }
+
+  async markInboundRead(providerMessageId: string): Promise<WhatsAppSendResult> {
+    return this.sendReadControl(providerMessageId, false);
+  }
+
+  async markInboundReadWithTyping(providerMessageId: string): Promise<WhatsAppSendResult> {
+    return this.sendReadControl(providerMessageId, true);
   }
 
   /**

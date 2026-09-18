@@ -73,6 +73,15 @@ await test("reply outbox is one-shot after a provider attempt", () => {
   assert.match(conversationService, /outcome_unknown/);
   assert.doesNotMatch(conversationService, /retry_scheduled/);
 });
+await test("reply outbox idempotency converges only on exact proposal identity", () => {
+  assert.match(conversationService, /select\("id,conversation_id,provider_account_id,proposal_source,proposal_id,expected_revision,body_digest"\)/);
+  assert.match(conversationService, /existing\.conversation_id === input\.conversationId/);
+  assert.match(conversationService, /existing\.provider_account_id === conversation\.provider_account_id/);
+  assert.match(conversationService, /existing\.proposal_source === input\.source/);
+  assert.match(conversationService, /existing\.proposal_id === input\.proposalId/);
+  assert.match(conversationService, /Number\(existing\.expected_revision\) === input\.expectedRevision/);
+  assert.match(conversationService, /existing\.body_digest === digest/);
+});
 await test("24 hour service window is Core-owned and enforced at queue and dispatch", () => {
   assert.match(conversationService, /24 \* 60 \* 60 \* 1000/);
   const occurrences = (conversationService.match(/service_window_closed/g) ?? []).length;

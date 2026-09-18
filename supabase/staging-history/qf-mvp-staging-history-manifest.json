@@ -1048,6 +1048,45 @@
       "productionApplyExecutorProvenance": "SUPABASE_MCP_APPLY_MIGRATION_WITH_POST_APPLY_CANONICAL_HISTORY_ALIGNMENT",
       "productionConversationalProviderAccountSeededDisabled": true,
       "evidencePath": "docs/QF-WHATSAPP-JARVIS-CONVERSATIONAL-FOUNDATION-CERTIFICATION.md"
+    },
+    {
+      "version": "20260918180500",
+      "name": "jarvis_whatsapp_callback_replay_receipts",
+      "path": "supabase/migrations/20260918180500_jarvis_whatsapp_callback_replay_receipts.sql",
+      "sha256": "0052d194680be37bc0680200e64a37fd414190cd781c2e802a5bd23d65c8b2a9",
+      "phase": "QF-WHATSAPP-JARVIS-CALLBACK-REPLAY",
+      "operationalStatus": "APPLIED_TO_STAGING",
+      "purpose": "Durable pre-queue request claim for the Jarvis WhatsApp callback, finalized after the existing idempotent outbox is available. Conflicting request-id reuse is refused and identical unfinished retries may resume.",
+      "appliedExactlyOnce": true,
+      "appliedByThisPhase": true,
+      "appliedToStaging": true,
+      "appliedToProduction": true,
+      "remoteVersionStatus": "PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY",
+      "remoteHistoryCountObservedAtApply": true,
+      "requiresSeparateStagingDeploymentGate": false,
+      "appliedEvidenceMarker": "QF_WHATSAPP_JARVIS_CALLBACK_REPLAY_DATABASE_APPLIED_AND_VERIFIED",
+      "appliedEvidenceType": "SUPABASE_MCP_EXACT_VERSION_ATOMIC_APPLY_AND_INDEPENDENT_RELIST",
+      "appliedExactlyOnceToStaging": true,
+      "stagingRemoteVersionStatus": "PRESENT_IN_STAGING_HISTORY",
+      "independentRemoteRelistVerified": true,
+      "stagingRemoteHistoryCountAfterApply": 44,
+      "productionVersionStatus": "PRESENT_IN_PRODUCTION_HISTORY",
+      "productionHistoryVersionPresent": true,
+      "productionAppliedExactlyOnce": true,
+      "productionIndependentRemoteRelistVerified": true,
+      "productionRemoteHistoryCountAfterApply": 52,
+      "requiresSeparateProductionDeploymentGate": false,
+      "applyExecutorProvenance": "SUPABASE_MCP_ATOMIC_DDL_PLUS_CANONICAL_EXACT_VERSION_HISTORY_RECORD",
+      "productionApplyExecutorProvenance": "SUPABASE_MCP_ATOMIC_DDL_PLUS_CANONICAL_EXACT_VERSION_HISTORY_RECORD",
+      "postApplyRlsEnabled": true,
+      "postApplyAnonSelect": false,
+      "postApplyAuthenticatedSelect": false,
+      "postApplyServiceRolePrivileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE"
+      ],
+      "runtimeActivationChanged": false
     }
   ],
   "pendingPostAnchorMigrations": [
@@ -1177,22 +1216,6 @@
       "appliedToProduction": false,
       "remoteVersionStatus": "ABSENT_IN_STAGING_AND_PRODUCTION_HISTORY",
       "remoteHistoryReadEvidence": "SUPABASE_MCP_LIST_MIGRATIONS_2026-09-18",
-      "remoteHistoryCountObservedAtApply": false,
-      "requiresSeparateStagingDeploymentGate": true
-    },
-    {
-      "version": "20260918180500",
-      "name": "jarvis_whatsapp_callback_replay_receipts",
-      "path": "supabase/migrations/20260918180500_jarvis_whatsapp_callback_replay_receipts.sql",
-      "sha256": "0052d194680be37bc0680200e64a37fd414190cd781c2e802a5bd23d65c8b2a9",
-      "phase": "QF-WHATSAPP-JARVIS-CALLBACK-REPLAY",
-      "operationalStatus": "PENDING",
-      "purpose": "Durable pre-queue request claim for the Jarvis WhatsApp callback, finalized after the existing idempotent outbox is available. Conflicting request-id reuse is refused and identical unfinished retries may resume.",
-      "appliedExactlyOnce": false,
-      "appliedByThisPhase": false,
-      "appliedToStaging": false,
-      "appliedToProduction": false,
-      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
       "remoteHistoryCountObservedAtApply": false,
       "requiresSeparateStagingDeploymentGate": true
     }

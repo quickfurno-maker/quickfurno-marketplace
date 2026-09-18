@@ -8,6 +8,7 @@ import { FetchHttpTransport } from "../lib/communication/httpTransport";
 import { evaluateMetaOutboundGateForMessage } from "./communicationProviderRuntimeService";
 import { effectiveProviderOutcomeCertainty } from "../lib/communication/providers/providerOutcome";
 import { resolveWhatsAppConciergeRouting } from "../lib/communication/whatsAppConciergeRouting";
+import { deriveJarvisNormalizedText } from "../lib/communication/providers/metaWhatsAppInbound";
 import {
   parseSerializedQfWhatsAppExperience,
   renderQfWhatsAppExperienceFallback,
@@ -346,11 +347,10 @@ export async function readJarvisWhatsAppTurnMaterial(input: {
   if (!["AAROHI", "ANISHA", "RIYA"].includes(actor) || !["prospect", "client", "vendor"].includes(subjectType)) {
     return { ok: false, reason: "conversation_not_sendable" };
   }
-  const normalizedText = inbound.message_type === "text" && typeof inbound.content_minimized?.text === "string"
-    ? inbound.content_minimized.text.slice(0, 4096)
-    : ["button_reply", "list_reply"].includes(String(inbound.message_type)) && typeof inbound.content_minimized?.title === "string"
-      ? inbound.content_minimized.title.slice(0, 4096)
-      : undefined;
+  const normalizedText = deriveJarvisNormalizedText(
+    String(inbound.message_type),
+    (inbound.content_minimized ?? {}) as Record<string, unknown>,
+  ) ?? undefined;
 
   const subjectRef = inbound.identity_confidence === "exact" &&
     inbound.resolved_principal_type === subjectType &&

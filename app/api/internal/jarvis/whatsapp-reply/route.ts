@@ -8,7 +8,11 @@ import {
   qfjWhatsAppReplySigningDomain,
 } from "@/lib/jarvis/whatsAppReplyContract";
 import { resolveQfJarvisRuntimePolicy } from "@/lib/jarvis/runtimePolicy";
-import { queueJarvisConversationReply } from "@/services/conversationalWhatsAppService";
+import {
+  claimJarvisWhatsAppReplyReceipt,
+  finalizeJarvisWhatsAppReplyReceipt,
+  queueJarvisConversationReply,
+} from "@/services/conversationalWhatsAppService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +50,25 @@ export async function POST(request: Request): Promise<Response> {
   });
   if (!authenticated) return reply(401, { error: "authentication_failed" });
 
+  const claim = await claimJarvisWhatsAppReplyReceipt({
+    requestId: parsed.requestId,
+    version: parsed.version,
+    issuedAt: parsed.issuedAt,
+    idempotencyKey: parsed.idempotencyKey,
+    rawBody: raw,
+  });
+  if (!claim.ok) {
+    if (claim.reason === "replay" || claim.reason === "conflict") {
+      return reply(409, {
+        protocol: QFJ_WHATSAPP_REPLY_PROTOCOL,
+        version: parsed.version,
+        requestId: parsed.requestId,
+        status: claim.reason === "replay" ? "replay_rejected" : "request_id_conflict",
+      });
+    }
+    return reply(503, { error: "service_unavailable" });
+  }
+
   const queued = await queueJarvisConversationReply({
     conversationId: parsed.conversationId,
     expectedRevision: parsed.expectedRevision,
@@ -66,6 +89,14 @@ export async function POST(request: Request): Promise<Response> {
       status: queued.reason,
     });
   }
+
+  const receipt = await finalizeJarvisWhatsAppReplyReceipt({
+    requestId: parsed.requestId,
+    requestDigest: claim.requestDigest,
+    idempotencyKey: parsed.idempotencyKey,
+    outboxId: queued.value.outboxId,
+  });
+  if (!receipt.ok) return reply(503, { error: "service_unavailable" });
 
   return reply(202, {
     protocol: QFJ_WHATSAPP_REPLY_PROTOCOL,

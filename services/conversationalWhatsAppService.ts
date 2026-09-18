@@ -464,10 +464,20 @@ async function queueConversationExperience(input: {
   if (insertError) {
     const { data: existing } = await adminClient()
       .from("communication_conversation_outbox")
-      .select("id")
+      .select("id,conversation_id,provider_account_id,proposal_source,proposal_id,expected_revision,body_digest")
       .eq("idempotency_key", input.idempotencyKey)
       .maybeSingle();
-    if (existing?.id) return { ok: true, value: { outboxId: existing.id } };
+    if (
+      existing?.id &&
+      existing.conversation_id === input.conversationId &&
+      existing.provider_account_id === conversation.provider_account_id &&
+      existing.proposal_source === input.source &&
+      existing.proposal_id === input.proposalId &&
+      Number(existing.expected_revision) === input.expectedRevision &&
+      existing.body_digest === digest
+    ) {
+      return { ok: true, value: { outboxId: existing.id } };
+    }
     return { ok: false, reason: "conversation_not_sendable" };
   }
 
@@ -505,6 +515,90 @@ export async function queueJarvisConversationReply(input: {
     ...(input.actor === undefined ? {} : { actor: input.actor }),
     ...(input.experience === undefined ? {} : { experience: input.experience }),
   });
+}
+
+export type JarvisWhatsAppReplyClaimResult =
+  | { readonly ok: true; readonly status: "claimed" | "resume"; readonly requestDigest: string }
+  | { readonly ok: false; readonly reason: "replay" | "conflict" | "unavailable" };
+
+export async function claimJarvisWhatsAppReplyReceipt(input: {
+  readonly requestId: string;
+  readonly version: 1 | 2;
+  readonly issuedAt: string;
+  readonly idempotencyKey: string;
+  readonly rawBody: Uint8Array;
+}): Promise<JarvisWhatsAppReplyClaimResult> {
+  const requestDigest = createHash("sha256").update(input.rawBody).digest("hex");
+  const db = adminClient();
+  const { error } = await db.from("communication_jarvis_callback_receipts").insert({
+    request_id: input.requestId,
+    protocol: "qfj.whatsapp.reply",
+    request_version: input.version,
+    request_digest: requestDigest,
+    idempotency_key: input.idempotencyKey,
+    outbox_id: null,
+    issued_at: input.issuedAt,
+    finalized_at: null,
+  });
+  if (!error) return { ok: true, status: "claimed", requestDigest };
+  if (error.code !== "23505") return { ok: false, reason: "unavailable" };
+
+  const { data: prior, error: priorError } = await db
+    .from("communication_jarvis_callback_receipts")
+    .select("request_version,request_digest,idempotency_key,outbox_id")
+    .eq("request_id", input.requestId)
+    .maybeSingle();
+  if (priorError || !prior) return { ok: false, reason: "unavailable" };
+  if (
+    Number(prior.request_version) !== input.version ||
+    prior.request_digest !== requestDigest ||
+    prior.idempotency_key !== input.idempotencyKey
+  ) {
+    return { ok: false, reason: "conflict" };
+  }
+  if (prior.outbox_id) return { ok: false, reason: "replay" };
+  return { ok: true, status: "resume", requestDigest };
+}
+
+export type JarvisWhatsAppReplyFinalizeResult =
+  | { readonly ok: true; readonly status: "finalized" }
+  | { readonly ok: false; readonly reason: "conflict" | "unavailable" };
+
+export async function finalizeJarvisWhatsAppReplyReceipt(input: {
+  readonly requestId: string;
+  readonly requestDigest: string;
+  readonly idempotencyKey: string;
+  readonly outboxId: string;
+}): Promise<JarvisWhatsAppReplyFinalizeResult> {
+  const db = adminClient();
+  const finalizedAt = new Date().toISOString();
+  const { data: rows, error } = await db
+    .from("communication_jarvis_callback_receipts")
+    .update({ outbox_id: input.outboxId, finalized_at: finalizedAt })
+    .eq("request_id", input.requestId)
+    .eq("request_digest", input.requestDigest)
+    .eq("idempotency_key", input.idempotencyKey)
+    .is("outbox_id", null)
+    .select("outbox_id");
+  if (error) return { ok: false, reason: "unavailable" };
+  if (Array.isArray(rows) && rows.length === 1 && rows[0]?.outbox_id === input.outboxId) {
+    return { ok: true, status: "finalized" };
+  }
+
+  const { data: prior, error: priorError } = await db
+    .from("communication_jarvis_callback_receipts")
+    .select("request_digest,idempotency_key,outbox_id")
+    .eq("request_id", input.requestId)
+    .maybeSingle();
+  if (priorError || !prior) return { ok: false, reason: "unavailable" };
+  if (
+    prior.request_digest === input.requestDigest &&
+    prior.idempotency_key === input.idempotencyKey &&
+    prior.outbox_id === input.outboxId
+  ) {
+    return { ok: true, status: "finalized" };
+  }
+  return { ok: false, reason: "conflict" };
 }
 
 async function queueSystemConversationExperience(input: {

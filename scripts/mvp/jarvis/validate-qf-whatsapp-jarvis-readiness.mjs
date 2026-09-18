@@ -26,6 +26,7 @@ import { buildMetaInteractivePayload } from "../../../lib/communication/provider
 
 const read = (p) => fs.readFileSync(p, "utf8");
 const migration = read("supabase/migrations/20260918120000_whatsapp_conversational_jarvis_foundation.sql");
+const callbackReplayMigration = read("supabase/migrations/20260918180500_jarvis_whatsapp_callback_replay_receipts.sql");
 const conversationService = read("services/conversationalWhatsAppService.ts");
 const gatewayService = read("services/jarvisWhatsAppGatewayService.ts");
 const replyRoute = read("app/api/internal/jarvis/whatsapp-reply/route.ts");
@@ -72,6 +73,15 @@ await test("reply outbox is one-shot after a provider attempt", () => {
   assert.match(conversationService, /outcome_unknown/);
   assert.doesNotMatch(conversationService, /retry_scheduled/);
 });
+await test("reply outbox idempotency converges only on exact proposal identity", () => {
+  assert.match(conversationService, /select\("id,conversation_id,provider_account_id,proposal_source,proposal_id,expected_revision,body_digest"\)/);
+  assert.match(conversationService, /existing\.conversation_id === input\.conversationId/);
+  assert.match(conversationService, /existing\.provider_account_id === conversation\.provider_account_id/);
+  assert.match(conversationService, /existing\.proposal_source === input\.source/);
+  assert.match(conversationService, /existing\.proposal_id === input\.proposalId/);
+  assert.match(conversationService, /Number\(existing\.expected_revision\) === input\.expectedRevision/);
+  assert.match(conversationService, /existing\.body_digest === digest/);
+});
 await test("24 hour service window is Core-owned and enforced at queue and dispatch", () => {
   assert.match(conversationService, /24 \* 60 \* 60 \* 1000/);
   const occurrences = (conversationService.match(/service_window_closed/g) ?? []).length;
@@ -111,6 +121,29 @@ await test("Jarvis reply route is signed and feature-gated off by default", () =
   assert.match(replyRoute, /policy\.mode !== "active"/);
   assert.match(replyRoute, /verifyQfjSignedRequestSignature/);
   assert.match(replyRoute, /providerAuthority: "quickfurno-core"/);
+});
+
+await test("Jarvis callback replay identity is claimed before queueing and finalized after", () => {
+  assert.match(callbackReplayMigration, /create table public\.communication_jarvis_callback_receipts/);
+  assert.match(callbackReplayMigration, /request_id uuid primary key/);
+  assert.match(callbackReplayMigration, /outbox_id uuid references public\.communication_conversation_outbox/);
+  assert.doesNotMatch(callbackReplayMigration, /outbox_id uuid not null/);
+  assert.match(callbackReplayMigration, /finalized_at timestamptz/);
+  assert.match(callbackReplayMigration, /communication_jarvis_callback_receipt_finalize_chk/);
+  assert.match(callbackReplayMigration, /alter table public\.communication_jarvis_callback_receipts enable row level security/);
+  assert.match(callbackReplayMigration, /revoke all on public\.communication_jarvis_callback_receipts from public,anon,authenticated/);
+  assert.match(callbackReplayMigration, /grant select,insert,update on public\.communication_jarvis_callback_receipts to service_role/);
+  assert.match(conversationService, /claimJarvisWhatsAppReplyReceipt/);
+  assert.match(conversationService, /finalizeJarvisWhatsAppReplyReceipt/);
+  assert.match(conversationService, /error\.code !== "23505"/);
+  assert.match(conversationService, /prior\.request_digest !== requestDigest/);
+  assert.match(conversationService, /prior\.idempotency_key !== input\.idempotencyKey/);
+  assert.match(conversationService, /status: "resume"/);
+  const claimAt = replyRoute.indexOf("await claimJarvisWhatsAppReplyReceipt");
+  const queuedAt = replyRoute.indexOf("await queueJarvisConversationReply");
+  const finalizeAt = replyRoute.indexOf("await finalizeJarvisWhatsAppReplyReceipt");
+  assert.ok(claimAt >= 0 && queuedAt > claimAt && finalizeAt > queuedAt);
+  assert.match(replyRoute, /status: claim\.reason === "replay" \? "replay_rejected" : "request_id_conflict"/);
 });
 await test("QuickFurno to Jarvis gateway carries conversation facts but no provider secrets", () => {
   assert.match(gatewayService, /QF_JARVIS_BASE_URL/);

@@ -259,6 +259,9 @@ jobs:
       - name: Aarohi Acquisition CRM guard
         run: npm run test:aarohi:crm
 
+      - name: WhatsApp / Jarvis conversational readiness
+        run: npm run test:mvp:whatsapp-jarvis
+
       - name: Typecheck
         run: npm run typecheck
 

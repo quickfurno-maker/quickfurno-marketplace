@@ -33,6 +33,7 @@
 
 import { adminClient } from "../lib/supabase";
 import { isUniqueViolationOn } from "../lib/communication/dbErrors";
+import { isConsentControlMessage } from "../lib/communication/inboundConsentCommandInput";
 import { META_WHATSAPP_CLOUD_PROVIDER_KEY } from "../lib/communication/providers/metaCloudWhatsAppProvider";
 import {
   deriveMetaWebhookEventId,
@@ -220,6 +221,15 @@ export interface InboundWhatsAppDeps {
    * ever invented, and the transient in-flight row is never substituted.
    */
   readonly readStoredInbound: (row: InboundInsertRow) => Promise<StoredInboundRead>;
+  readonly recordConversation?: (input: {
+    readonly providerAccountId: string;
+    readonly inboundMessageId: string;
+    readonly senderPhoneE164: string;
+    readonly providerMessageId: string;
+    readonly occurredAt?: string | null;
+    /** STOP / START / HELP stay auditable but are never eligible for a Jarvis turn. */
+    readonly suppressJarvisTurn: boolean;
+  }) => Promise<unknown>;
 }
 
 export function defaultInboundWhatsAppDeps(): InboundWhatsAppDeps {
@@ -230,6 +240,10 @@ export function defaultInboundWhatsAppDeps(): InboundWhatsAppDeps {
     persistInboundRow: (row) => persistInboundRowViaDb(row),
     finalizeReceipt: (receiptId, status, reason) => finalizeReceiptViaDb(receiptId, status, reason),
     readStoredInbound: (row) => readStoredInboundViaDb(row),
+    recordConversation: async (input) => {
+      const conversation = await import("./conversationalWhatsAppService");
+      return conversation.recordConversationalInbound(input);
+    },
   };
 }
 
@@ -393,6 +407,29 @@ export async function handleInboundWhatsAppMessages(
         providerAccountId: persistedRow.providerAccountId,
       },
     });
+
+    // Conversational lane projection is best-effort and Core-owned. It sees the
+    // request-memory sender only here, immediately after the durable inbound bind.
+    // Transactional provider accounts are ignored by the conversation service, so
+    // the existing Core number remains behaviorally unchanged.
+    try {
+      await deps.recordConversation?.({
+        providerAccountId,
+        inboundMessageId: persistedRow.id,
+        senderPhoneE164: item.senderPhoneE164,
+        providerMessageId: persistedRow.providerMessageId,
+        occurredAt: persistedRow.providerOccurredAt ?? persistedRow.receivedAt,
+        suppressJarvisTurn: isConsentControlMessage({
+          provider: persistedRow.provider,
+          providerMessageId: persistedRow.providerMessageId,
+          messageType: persistedRow.messageType,
+          contentMinimized: persistedRow.contentMinimized,
+          providerOccurredAt: persistedRow.providerOccurredAt,
+        }),
+      });
+    } catch {
+      /* conversation preparation never invalidates canonical inbound persistence */
+    }
   }
   result = { ...result, processed };
 

@@ -132,6 +132,11 @@ export interface MetaOutboundConfig {
   readonly businessHttpTimeoutMs: number;
 }
 
+export const WHATSAPP_CONVERSATIONAL_ACCESS_TOKEN_ENV = "WHATSAPP_CONVERSATIONAL_ACCESS_TOKEN";
+export const WHATSAPP_CONVERSATIONAL_PHONE_NUMBER_ID_ENV = "WHATSAPP_CONVERSATIONAL_PHONE_NUMBER_ID";
+export const WHATSAPP_CONVERSATIONAL_WABA_ID_ENV = "WHATSAPP_CONVERSATIONAL_WABA_ID";
+export const WHATSAPP_CONVERSATIONAL_GRAPH_API_VERSION_ENV = "WHATSAPP_CONVERSATIONAL_GRAPH_API_VERSION";
+
 export function resolveOutboundMetaConfig(env: EnvSource = process.env): ConfigResult<{ config: MetaOutboundConfig }> {
   const missing: string[] = [];
   const invalid: string[] = [];
@@ -148,6 +153,36 @@ export function resolveOutboundMetaConfig(env: EnvSource = process.env): ConfigR
       accessToken: accessToken as string, phoneNumberId: phoneNumberId as string, wabaId: wabaId as string,
       graphApiVersion: graphApiVersion as string,
       authHttpTimeoutMs: authHttpTimeoutMs as number, businessHttpTimeoutMs: businessHttpTimeoutMs as number,
+    },
+  };
+}
+
+export function resolveConversationalMetaConfig(env: EnvSource = process.env): ConfigResult<{ config: MetaOutboundConfig }> {
+  const missing: string[] = [];
+  const invalid: string[] = [];
+  const accessToken = readTrimmed(env, WHATSAPP_CONVERSATIONAL_ACCESS_TOKEN_ENV)
+    ?? (missing.push(WHATSAPP_CONVERSATIONAL_ACCESS_TOKEN_ENV), null);
+  const phoneNumberId = readIdVar(env, WHATSAPP_CONVERSATIONAL_PHONE_NUMBER_ID_ENV, missing, invalid);
+  const wabaId = readIdVar(env, WHATSAPP_CONVERSATIONAL_WABA_ID_ENV, missing, invalid);
+
+  let graphApiVersion = readTrimmed(env, WHATSAPP_CONVERSATIONAL_GRAPH_API_VERSION_ENV);
+  if (graphApiVersion === null) graphApiVersion = readTrimmed(env, "WHATSAPP_GRAPH_API_VERSION");
+  if (graphApiVersion === null) missing.push(WHATSAPP_CONVERSATIONAL_GRAPH_API_VERSION_ENV);
+  else if (!GRAPH_API_VERSION_PATTERN.test(graphApiVersion)) invalid.push(WHATSAPP_CONVERSATIONAL_GRAPH_API_VERSION_ENV);
+
+  const authHttpTimeoutMs = readBoundedInt(env, "WHATSAPP_AUTH_HTTP_TIMEOUT_MS", AUTH_TIMEOUT_MIN_MS, AUTH_TIMEOUT_MAX_MS, missing, invalid);
+  const businessHttpTimeoutMs = readBoundedInt(env, "WHATSAPP_HTTP_TIMEOUT_MS", BUSINESS_TIMEOUT_MIN_MS, BUSINESS_TIMEOUT_MAX_MS, missing, invalid);
+  if (missing.length || invalid.length) return { ok: false, missing, invalid };
+
+  return {
+    ok: true,
+    config: {
+      accessToken: accessToken as string,
+      phoneNumberId: phoneNumberId as string,
+      wabaId: wabaId as string,
+      graphApiVersion: graphApiVersion as string,
+      authHttpTimeoutMs: authHttpTimeoutMs as number,
+      businessHttpTimeoutMs: businessHttpTimeoutMs as number,
     },
   };
 }
@@ -201,6 +236,31 @@ export function resolveWebhookIdentityConfig(env: EnvSource = process.env): Conf
   const phoneNumberId = readIdVar(env, "WHATSAPP_PHONE_NUMBER_ID", missing, invalid);
   if (missing.length || invalid.length) return { ok: false, missing, invalid };
   return { ok: true, config: { wabaId: wabaId as string, phoneNumberId: phoneNumberId as string } };
+}
+
+export function resolveWebhookIdentityRegistryConfig(
+  env: EnvSource = process.env,
+): ConfigResult<{ identities: readonly MetaWebhookIdentityConfig[] }> {
+  const primary = resolveWebhookIdentityConfig(env);
+  if (!primary.ok) return primary;
+
+  const convPhone = readTrimmed(env, WHATSAPP_CONVERSATIONAL_PHONE_NUMBER_ID_ENV);
+  const convWaba = readTrimmed(env, WHATSAPP_CONVERSATIONAL_WABA_ID_ENV);
+  if (convPhone === null && convWaba === null) {
+    return { ok: true, identities: [primary.config] };
+  }
+
+  const missing: string[] = [];
+  const invalid: string[] = [];
+  const phoneNumberId = readIdVar(env, WHATSAPP_CONVERSATIONAL_PHONE_NUMBER_ID_ENV, missing, invalid);
+  const wabaId = readIdVar(env, WHATSAPP_CONVERSATIONAL_WABA_ID_ENV, missing, invalid);
+  if (missing.length || invalid.length) return { ok: false, missing, invalid };
+
+  const identities = [primary.config];
+  if (phoneNumberId !== primary.config.phoneNumberId || wabaId !== primary.config.wabaId) {
+    identities.push({ phoneNumberId: phoneNumberId as string, wabaId: wabaId as string });
+  }
+  return { ok: true, identities };
 }
 
 // ----------------------------------------------------------------------------

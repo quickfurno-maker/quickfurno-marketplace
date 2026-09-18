@@ -80,6 +80,22 @@ export function buildMetaTemplatePayload(
   };
 }
 
+export function buildMetaTextPayload(
+  toE164: string,
+  body: string,
+  replyToProviderMessageId?: string | null,
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to: toMetaRecipient(toE164),
+    type: "text",
+    text: { preview_url: false, body },
+  };
+  if (replyToProviderMessageId) payload.context = { message_id: replyToProviderMessageId };
+  return payload;
+}
+
 function safeParseJson(text: string): Record<string, unknown> | null {
   try {
     const v: unknown = JSON.parse(text);
@@ -187,6 +203,37 @@ export class MetaCloudWhatsAppProvider implements WhatsAppProvider {
   async sendTemplateMessage(): Promise<WhatsAppSendResult> {
     return preflightFailure(this.providerKey, "META_RESOLVED_TEMPLATE_REQUIRED",
       "The Meta adapter requires an approved resolved template descriptor; a bare template key is refused.");
+  }
+
+  async sendTextMessage(
+    toE164: string,
+    body: string,
+    options: { readonly replyToProviderMessageId?: string | null } = {},
+  ): Promise<WhatsAppSendResult> {
+    if (this.runtime.accessToken === null || this.runtime.phoneNumberId === null || this.runtime.graphApiVersion === null) {
+      return preflightFailure(this.providerKey, "META_OUTBOUND_CONFIG_MISSING",
+        "The Meta adapter is not configured for outbound sending.");
+    }
+    const text = typeof body === "string" ? body.trim() : "";
+    if (text.length < 1 || text.length > 4096) {
+      return preflightFailure(this.providerKey, "META_TEXT_BODY_INVALID",
+        "The conversational text body is outside the allowed bounds.");
+    }
+    const replyTo = options.replyToProviderMessageId?.trim() || null;
+    if (replyTo && replyTo.length > 512) {
+      return preflightFailure(this.providerKey, "META_REPLY_CONTEXT_INVALID",
+        "The reply context identifier is outside the allowed bounds.");
+    }
+
+    const result = await this.transport.request({
+      url: buildMetaMessagesUrl({ graphApiVersion: this.runtime.graphApiVersion, phoneNumberId: this.runtime.phoneNumberId }),
+      method: "POST",
+      headers: { Authorization: `Bearer ${this.runtime.accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(buildMetaTextPayload(toE164, text, replyTo)),
+      timeoutMs: this.runtime.businessHttpTimeoutMs,
+      maxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
+    });
+    return interpretMetaSendResult(result, this.providerKey);
   }
 
   /**

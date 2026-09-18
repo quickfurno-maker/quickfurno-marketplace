@@ -39,13 +39,14 @@ import { isWebhookProcessingEnabled, resolveOwningProviderAccount } from "./comm
 // Phase 8B-1B-C — the PURE payload identity extractor + the PURE closed attribution decision. The frozen
 // `decideCallbackIdentity` authority is untouched; the extractor reuses its grammar and is proven equivalent.
 import { extractMetaWebhookAccountIdentity } from "../lib/communication/providers/metaWebhookAccountIdentity";
+import { decideCallbackIdentityRegistry } from "../lib/communication/providers/metaCallbackIdentityRegistry";
 import { decideInboundAttribution } from "../lib/communication/inboundProviderAccountAttribution";
 import type {
   OwnershipResolutionInput,
   ProviderAccountOwnership,
 } from "../lib/communication/providers/providerAccountOwnership";
 import {
-  resolveWebhookIdentityConfig,
+  resolveWebhookIdentityRegistryConfig,
   resolveWebhookSignatureConfig,
   resolveWebhookVerifyConfig,
   webhookSignatureToRuntime,
@@ -57,7 +58,6 @@ import {
 import { FetchHttpTransport } from "../lib/communication/httpTransport";
 import {
   classifyMetaWebhook,
-  decideCallbackIdentity,
   deriveMetaWebhookEventId,
   metaWebhookPayloadHash,
   normalizeMetaDeliveryWebhook,
@@ -472,12 +472,15 @@ export async function handleMetaWhatsAppWebhookPostBytes(
   const payload = safeParse(decoded);
   if (!payload) return { status: 400, code: "unparseable" };
 
-  // Step 6 — callback-identity config (WABA id + phone-number id ONLY).
-  const idConfig = resolveWebhookIdentityConfig();
+  // Step 6 — callback-identity registry. The protected Core number is always
+  // present; a separately configured conversational number may be admitted without
+  // weakening the exact WABA/phone-number identity gate.
+  const idConfig = resolveWebhookIdentityRegistryConfig();
   if (!idConfig.ok) return { status: 503, code: "provider_not_configured" };
 
-  // Step 7 — pure identity authority.
-  const identity = decideCallbackIdentity(payload, idConfig.config);
+  // Step 7 — pure multi-account identity authority. Mixed/foreign callback identities
+  // remain fail-closed; the payload must fully match one configured account.
+  const identity = decideCallbackIdentityRegistry(payload, { identities: idConfig.identities });
 
   // Step 8 — identity rejection OR unsupported acknowledgement. BOTH terminate here,
   // BEFORE the runtime DB gate and before any downstream effect: ZERO database calls,

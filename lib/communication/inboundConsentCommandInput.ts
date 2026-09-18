@@ -38,7 +38,7 @@
 // ============================================================================
 
 import { createHash } from "node:crypto";
-import type { NormalizedConsentCommand } from "./consentCommand";
+import { normalizeConsentCommand, type NormalizedConsentCommand } from "./consentCommand";
 
 // ----------------------------------------------------------------------------
 // Provider vocabulary bridge (EXPLICIT + CLOSED)
@@ -188,6 +188,16 @@ export function readCommandToken(message: CommandCandidateMessage): string | nul
   if (!isCommandEligible(message)) return null;
   const body = message.contentMinimized?.text;
   return typeof body === "string" ? body : null;
+}
+
+/**
+ * True only for the canonical STOP / START / HELP control vocabulary. This is the pure boundary used by
+ * the conversational lane to keep consent/control messages auditable without forwarding them to Jarvis.
+ */
+export function isConsentControlMessage(message: CommandCandidateMessage): boolean {
+  if (!isCommandEligible(message)) return false;
+  const command = normalizeConsentCommand(readCommandToken(message));
+  return command === "stop" || command === "start" || command === "help";
 }
 
 // ----------------------------------------------------------------------------

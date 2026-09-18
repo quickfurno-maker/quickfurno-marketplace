@@ -123,6 +123,17 @@ export interface WhatsAppProvider {
   ): Promise<WhatsAppSendResult>;
 
   /**
+   * Optional conversational text capability. QuickFurno may invoke this only after
+   * its own conversation/service-window/policy authority has approved the send.
+   * A Jarvis proposal never calls this adapter directly.
+   */
+  sendTextMessage?(
+    to: string,
+    body: string,
+    options?: { readonly replyToProviderMessageId?: string | null }
+  ): Promise<WhatsAppSendResult>;
+
+  /**
    * Validates provider webhook signature authenticity against the RAW request
    * body — never a re-serialized object, whose key order the provider did not
    * sign. Implementations must compare in constant time.

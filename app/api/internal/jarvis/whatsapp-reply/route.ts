@@ -4,8 +4,8 @@ import { QFJ_KEY_ID_HEADER, QFJ_SIGNATURE_HEADER, verifyQfjSignedRequestSignatur
 import {
   QFJ_WHATSAPP_REPLY_PATH,
   QFJ_WHATSAPP_REPLY_PROTOCOL,
-  QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN,
   parseQfjWhatsAppReplyRequest,
+  qfjWhatsAppReplySigningDomain,
 } from "@/lib/jarvis/whatsAppReplyContract";
 import { resolveQfJarvisRuntimePolicy } from "@/lib/jarvis/runtimePolicy";
 import { queueJarvisConversationReply } from "@/services/conversationalWhatsAppService";
@@ -35,7 +35,7 @@ export async function POST(request: Request): Promise<Response> {
   if (!keys) return reply(503, { error: "service_unavailable" });
   const authenticated = verifyQfjSignedRequestSignature({
     rawBody: raw,
-    domain: QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN,
+    domain: qfjWhatsAppReplySigningDomain(parsed.version),
     path: QFJ_WHATSAPP_REPLY_PATH,
     requestId: parsed.requestId,
     issuedAt: parsed.issuedAt,
@@ -50,8 +50,10 @@ export async function POST(request: Request): Promise<Response> {
     conversationId: parsed.conversationId,
     expectedRevision: parsed.expectedRevision,
     proposalId: parsed.proposalId,
-    body: parsed.body,
     idempotencyKey: parsed.idempotencyKey,
+    ...(parsed.version === 1
+      ? { body: parsed.body }
+      : { actor: parsed.actor, experience: parsed.experience }),
   });
   if (!queued.ok) {
     const status = queued.reason === "stale_revision" ? 409
@@ -59,7 +61,7 @@ export async function POST(request: Request): Promise<Response> {
       : 503;
     return reply(status, {
       protocol: QFJ_WHATSAPP_REPLY_PROTOCOL,
-      version: 1,
+      version: parsed.version,
       requestId: parsed.requestId,
       status: queued.reason,
     });
@@ -67,7 +69,7 @@ export async function POST(request: Request): Promise<Response> {
 
   return reply(202, {
     protocol: QFJ_WHATSAPP_REPLY_PROTOCOL,
-    version: 1,
+    version: parsed.version,
     requestId: parsed.requestId,
     status: "queued",
     outboxId: queued.value.outboxId,

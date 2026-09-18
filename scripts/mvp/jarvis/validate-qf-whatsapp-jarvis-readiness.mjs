@@ -13,9 +13,16 @@ import {
 import {
   QFJ_WHATSAPP_REPLY_PATH,
   QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN,
+  QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN_V1,
   parseQfjWhatsAppReplyRequest,
 } from "../../../lib/jarvis/whatsAppReplyContract.ts";
 import { isConsentControlMessage } from "../../../lib/communication/inboundConsentCommandInput.ts";
+import { resolveWhatsAppConciergeRouting } from "../../../lib/communication/whatsAppConciergeRouting.ts";
+import {
+  QF_CONCIERGE_ACTIONS,
+  buildQuickFurnoConciergeMenu,
+} from "../../../lib/jarvis/whatsAppExperience.ts";
+import { buildMetaInteractivePayload } from "../../../lib/communication/providers/metaWhatsAppInteractive.ts";
 
 const read = (p) => fs.readFileSync(p, "utf8");
 const migration = read("supabase/migrations/20260918120000_whatsapp_conversational_jarvis_foundation.sql");
@@ -78,20 +85,28 @@ await test("suppression is checked before Jarvis queue and again before Meta sen
   const occurrences = (conversationService.match(/activeSuppression\(/g) ?? []).length;
   assert.ok(occurrences >= 3);
 });
-await test("Jarvis reply contract cannot select phone, provider account, WABA or token", () => {
-  const valid = {
-    protocol: "qfj.whatsapp.reply", version: 1, caller: "qf-jarvis", audience: "quickfurno-core",
+await test("Jarvis reply contracts cannot select phone, provider account, WABA or token", () => {
+  const base = {
+    protocol: "qfj.whatsapp.reply", caller: "qf-jarvis", audience: "quickfurno-core",
     requestId: crypto.randomUUID(), issuedAt: new Date().toISOString(), conversationId: crypto.randomUUID(),
-    expectedRevision: 3, proposalId: "proposal.1", body: "Hello", idempotencyKey: "a".repeat(64),
+    expectedRevision: 3, proposalId: "proposal.1", idempotencyKey: "a".repeat(64),
   };
-  assert.ok(parseQfjWhatsAppReplyRequest(valid));
+  const v1 = { ...base, version: 1, body: "Hello" };
+  const v2 = {
+    ...base, version: 2, actor: "RIYA",
+    experience: { version: 1, actor: "RIYA", kind: "text", body: "Hello" },
+  };
+  assert.ok(parseQfjWhatsAppReplyRequest(v1));
+  assert.ok(parseQfjWhatsAppReplyRequest(v2));
   for (const field of ["phoneNumberId","providerAccountId","wabaId","accessToken","to"]) {
-    assert.equal(parseQfjWhatsAppReplyRequest({ ...valid, [field]: "x" }), null);
+    assert.equal(parseQfjWhatsAppReplyRequest({ ...v1, [field]: "x" }), null);
+    assert.equal(parseQfjWhatsAppReplyRequest({ ...v2, [field]: "x" }), null);
   }
 });
 await test("Jarvis reply route is signed and feature-gated off by default", () => {
   assert.equal(QFJ_WHATSAPP_REPLY_PATH, "/api/internal/jarvis/whatsapp-reply");
-  assert.equal(QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN, "qfj.whatsapp.reply.http.sig.v1");
+  assert.equal(QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN_V1, "qfj.whatsapp.reply.http.sig.v1");
+  assert.equal(QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN, "qfj.whatsapp.reply.http.sig.v2");
   assert.match(replyRoute, /QF_JARVIS_WHATSAPP_ENABLED/);
   assert.match(replyRoute, /policy\.mode !== "active"/);
   assert.match(replyRoute, /verifyQfjSignedRequestSignature/);
@@ -176,10 +191,62 @@ await test("STOP START HELP are persisted controls but never Jarvis turns", () =
   assert.equal(isConsentControlMessage(candidate("hello riya")), false);
   assert.equal(isConsentControlMessage({ ...candidate("STOP"), messageType: "button" }), false);
 });
-await test("proposal-only conversational accounts route new conversations to Riya", () => {
-  assert.match(conversationService, /assigned_actor: account\.jarvis_access_mode === "proposal_only" \? "RIYA" : "AAROHI"/);
-  assert.match(conversationService, /jarvis_enabled: account\.jarvis_access_mode === "proposal_only"/);
+await test("concierge routes exact clients/vendors and explicit prospects deterministically", () => {
+  const base = { messageType: "text", contentMinimized: { text: "hello" }, isNewConversation: true };
+  const client = resolveWhatsAppConciergeRouting({ ...base, identityConfidence: "exact", principalType: "client" });
+  const vendor = resolveWhatsAppConciergeRouting({ ...base, identityConfidence: "exact", principalType: "vendor" });
+  const prospect = resolveWhatsAppConciergeRouting({ ...base, identityConfidence: "unknown", principalType: null, contentMinimized: { text: "I want to become a supplier" } });
+  assert.equal(client.assignedActor, "RIYA");
+  assert.equal(client.subjectType, "client");
+  assert.equal(vendor.assignedActor, "ANISHA");
+  assert.equal(vendor.subjectType, "vendor");
+  assert.equal(prospect.assignedActor, "AAROHI");
+  assert.equal(prospect.subjectType, "prospect");
 });
+await test("unknown greeting receives system-owned Concierge menu without Jarvis turn", () => {
+  const routed = resolveWhatsAppConciergeRouting({
+    identityConfidence: "unknown", principalType: null, messageType: "text",
+    contentMinimized: { text: "Hi" }, isNewConversation: true,
+  });
+  assert.equal(routed.assignedActor, "SYSTEM");
+  assert.equal(routed.jarvisEnabled, false);
+  assert.equal(routed.suppressJarvisTurn, true);
+  assert.equal(routed.systemExperience?.kind, "menu");
+});
+await test("unverified existing-vendor request cannot acquire Anisha", () => {
+  const routed = resolveWhatsAppConciergeRouting({
+    identityConfidence: "unknown", principalType: null, messageType: "button_reply",
+    contentMinimized: { replyId: QF_CONCIERGE_ACTIONS.VENDOR }, isNewConversation: true,
+  });
+  assert.equal(routed.assignedActor, "SYSTEM");
+  assert.notEqual(routed.assignedActor, "ANISHA");
+  assert.equal(routed.suppressJarvisTurn, true);
+});
+await test("human request enters takeover and suppresses Jarvis", () => {
+  const routed = resolveWhatsAppConciergeRouting({
+    identityConfidence: "unknown", principalType: null, messageType: "text",
+    contentMinimized: { text: "talk to a person" }, isNewConversation: true,
+  });
+  assert.equal(routed.assignedActor, "HUMAN");
+  assert.equal(routed.humanTakeover, true);
+  assert.equal(routed.state, "HUMAN");
+  assert.equal(routed.jarvisEnabled, false);
+});
+
+await test("premium Concierge renders a bounded Meta list payload", () => {
+  const experience = buildQuickFurnoConciergeMenu();
+  const payload = buildMetaInteractivePayload("+919999999999", {
+    heading: experience.heading,
+    body: experience.body,
+    actions: experience.actions,
+    menuButtonText: "View options",
+  }, "wamid.reply");
+  assert.equal(payload.type, "interactive");
+  assert.equal(payload.context.message_id, "wamid.reply");
+  assert.equal(payload.interactive.type, "list");
+  assert.equal(payload.interactive.action.sections[0].rows.length, 4);
+});
+
 await test("conversation service gates Jarvis enqueue on consent, state, takeover and feature flags", () => {
   assert.match(conversationService, /input\.suppressJarvisTurn !== true[\s\S]{0,700}communication_jarvis_turn_outbox/);
   assert.match(conversationService, /conversation\.state === "OPEN"/);

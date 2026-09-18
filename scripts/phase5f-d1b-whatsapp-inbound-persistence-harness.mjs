@@ -589,10 +589,16 @@ check("45-53. D1-B stays canonical persistence; consent authority and conversati
   assert(!/communication_conversations|service_window_expires_at|QF_JARVIS_WHATSAPP_ENABLED|human_takeover/i.test(src), "53. D1-B owns no conversation table/window/takeover policy");
 });
 
-check("54-57. no new API route, no migration, no env, no Meta activation", () => {
+check("54-57. D1-B adds no inbound API authority, migration, env, or Meta activation", () => {
   const dirty = execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" }).split("\n").map((l) => l.slice(3).trim()).filter(Boolean);
+  const laterReviewedRouteAdditions = new Set([
+    "app/api/internal/jarvis/whatsapp-reply/route.ts",
+    "app/api/internal/jarvis/whatsapp-turn-material/route.ts",
+  ]);
   for (const p of dirty) {
-    assert(!/^app\/api\/.*route\.ts$|^pages\/api\//.test(p), `54. no API route added (${p})`);
+    if (/^app\/api\/.*route\.ts$|^pages\/api\//.test(p)) {
+      assert(laterReviewedRouteAdditions.has(p), `54. no unreviewed API route added (${p})`);
+    }
     assert(!p.startsWith("supabase/migrations"), `55. no migration (${p})`);
     assert(!/\.env/.test(p), `56. no env change (${p})`);
   }

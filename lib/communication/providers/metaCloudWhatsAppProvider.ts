@@ -28,6 +28,7 @@ import type {
   WhatsAppProviderHealth,
   WhatsAppSendResult,
   WhatsAppWebhookEvent,
+  WhatsAppInteractiveMessage,
 } from "./whatsappProvider";
 import type { MetaProviderRuntime } from "./metaCloudWhatsAppConfig";
 import {
@@ -38,6 +39,7 @@ import {
 } from "../httpTransport";
 import type { ResolvedTemplateSendOptions, WhatsAppResolvedTemplate } from "../whatsappTemplate";
 import { renderWhatsAppTemplateComponents, type MetaTemplateComponent } from "./whatsappTemplateBinding";
+import { buildMetaInteractivePayload } from "./metaWhatsAppInteractive";
 import {
   classifyMetaWebhook,
   deriveMetaWebhookEventId,
@@ -230,6 +232,44 @@ export class MetaCloudWhatsAppProvider implements WhatsAppProvider {
       method: "POST",
       headers: { Authorization: `Bearer ${this.runtime.accessToken}`, "Content-Type": "application/json" },
       body: JSON.stringify(buildMetaTextPayload(toE164, text, replyTo)),
+      timeoutMs: this.runtime.businessHttpTimeoutMs,
+      maxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
+    });
+    return interpretMetaSendResult(result, this.providerKey);
+  }
+
+  async sendInteractiveMessage(
+    toE164: string,
+    message: WhatsAppInteractiveMessage,
+    options: { readonly replyToProviderMessageId?: string | null } = {},
+  ): Promise<WhatsAppSendResult> {
+    if (this.runtime.accessToken === null || this.runtime.phoneNumberId === null || this.runtime.graphApiVersion === null) {
+      return preflightFailure(this.providerKey, "META_OUTBOUND_CONFIG_MISSING",
+        "The Meta adapter is not configured for outbound sending.");
+    }
+    const heading = message.heading?.trim() ?? "";
+    const body = message.body?.trim() ?? "";
+    const actions = Array.isArray(message.actions) ? [...message.actions] : [];
+    const menuButtonText = (message.menuButtonText ?? "View options").trim();
+    const invalid = body.length < 1 || body.length > 1024 || heading.length > 60 ||
+      actions.length < 1 || actions.length > 10 || menuButtonText.length < 1 || menuButtonText.length > 20 ||
+      actions.some((action) => !/^[A-Za-z0-9._:-]{1,200}$/.test(action.id) ||
+        action.title.trim().length < 1 || action.title.trim().length > 24 ||
+        (action.description !== undefined && (action.description.trim().length < 1 || action.description.trim().length > 72)));
+    if (invalid) {
+      return preflightFailure(this.providerKey, "META_INTERACTIVE_INVALID",
+        "The interactive conversational payload is outside the allowed bounds.");
+    }
+    const replyTo = options.replyToProviderMessageId?.trim() || null;
+    if (replyTo && replyTo.length > 512) {
+      return preflightFailure(this.providerKey, "META_REPLY_CONTEXT_INVALID",
+        "The reply context identifier is outside the allowed bounds.");
+    }
+    const result = await this.transport.request({
+      url: buildMetaMessagesUrl({ graphApiVersion: this.runtime.graphApiVersion, phoneNumberId: this.runtime.phoneNumberId }),
+      method: "POST",
+      headers: { Authorization: `Bearer ${this.runtime.accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(buildMetaInteractivePayload(toE164, { ...message, heading: heading || undefined, body, actions, menuButtonText }, replyTo)),
       timeoutMs: this.runtime.businessHttpTimeoutMs,
       maxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
     });

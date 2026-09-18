@@ -110,7 +110,9 @@ export async function dispatchNextJarvisWhatsAppTurn(): Promise<{ processed: boo
 
   const text = inbound.message_type === "text" && typeof inbound.content_minimized?.text === "string"
     ? inbound.content_minimized.text.slice(0, 4096)
-    : undefined;
+    : ["button_reply", "list_reply"].includes(String(inbound.message_type)) && typeof inbound.content_minimized?.title === "string"
+      ? inbound.content_minimized.title.slice(0, 4096)
+      : undefined;
   const result = await sendJarvisWhatsAppTurn({
     requestId: randomUUID(),
     issuedAt: new Date().toISOString(),

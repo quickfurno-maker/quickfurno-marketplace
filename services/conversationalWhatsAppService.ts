@@ -7,6 +7,14 @@ import { MetaCloudWhatsAppProvider, META_WHATSAPP_CLOUD_PROVIDER_KEY } from "../
 import { FetchHttpTransport } from "../lib/communication/httpTransport";
 import { evaluateMetaOutboundGateForMessage } from "./communicationProviderRuntimeService";
 import { effectiveProviderOutcomeCertainty } from "../lib/communication/providers/providerOutcome";
+import { resolveWhatsAppConciergeRouting } from "../lib/communication/whatsAppConciergeRouting";
+import {
+  parseSerializedQfWhatsAppExperience,
+  renderQfWhatsAppExperienceFallback,
+  serializeQfWhatsAppExperience,
+  textExperience,
+  type QfWhatsAppExperienceV1,
+} from "../lib/jarvis/whatsAppExperience";
 
 const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const CHANNEL = "whatsapp";
@@ -76,6 +84,10 @@ export async function recordConversationalInbound(input: {
   readonly senderPhoneE164: string;
   readonly providerMessageId: string;
   readonly occurredAt?: string | null;
+  readonly identityConfidence: "exact" | "ambiguous" | "unknown";
+  readonly principalType: "client" | "vendor" | "admin" | null;
+  readonly messageType: string;
+  readonly contentMinimized: Record<string, unknown>;
   /** Persist/audit the turn but never enqueue it for Jarvis (used for STOP / START / HELP). */
   readonly suppressJarvisTurn?: boolean;
 }): Promise<ConversationalResult<{ conversationId: string; revision: number; jarvisEnabled: boolean }>> {
@@ -155,6 +167,18 @@ export async function recordConversationalInbound(input: {
     }};
   }
 
+  const routing = resolveWhatsAppConciergeRouting({
+    identityConfidence: input.identityConfidence,
+    principalType: input.principalType,
+    messageType: input.messageType,
+    contentMinimized: input.contentMinimized,
+    currentSubjectType: existing?.subject_type,
+    currentActor: existing?.assigned_actor,
+    currentHumanTakeover: existing?.human_takeover === true,
+    isNewConversation: !existing,
+  });
+  const jarvisAllowedByAccount = account.jarvis_access_mode === "proposal_only";
+
   let conversation: any;
   if (existing) {
     const aad = destinationAad(existing.id, input.providerAccountId, destinationHash);
@@ -169,6 +193,11 @@ export async function recordConversationalInbound(input: {
         sealed_destination_auth_tag: sealed.value.authTag,
         encryption_key_id: sealed.value.keyId,
         destination_masked: maskPhoneE164(normalized.e164),
+        subject_type: routing.subjectType,
+        assigned_actor: routing.assignedActor,
+        state: routing.state,
+        jarvis_enabled: jarvisAllowedByAccount && routing.jarvisEnabled,
+        human_takeover: routing.humanTakeover,
         last_inbound_at: occurred.toISOString(),
         service_window_expires_at: serviceWindowExpiresAt,
         last_inbound_provider_message_id: input.providerMessageId,
@@ -198,11 +227,11 @@ export async function recordConversationalInbound(input: {
         sealed_destination_nonce: sealed.value.nonce,
         sealed_destination_auth_tag: sealed.value.authTag,
         encryption_key_id: sealed.value.keyId,
-        subject_type: "unknown",
-        assigned_actor: account.jarvis_access_mode === "proposal_only" ? "RIYA" : "AAROHI",
-        state: "OPEN",
-        jarvis_enabled: account.jarvis_access_mode === "proposal_only",
-        human_takeover: false,
+        subject_type: routing.subjectType,
+        assigned_actor: routing.assignedActor,
+        state: routing.state,
+        jarvis_enabled: jarvisAllowedByAccount && routing.jarvisEnabled,
+        human_takeover: routing.humanTakeover,
         last_inbound_at: occurred.toISOString(),
         service_window_expires_at: serviceWindowExpiresAt,
         last_inbound_provider_message_id: input.providerMessageId,
@@ -245,9 +274,19 @@ export async function recordConversationalInbound(input: {
     event_data: { serviceWindowExpiresAt },
   });
 
+  if (input.suppressJarvisTurn !== true && routing.systemExperience !== undefined) {
+    await queueSystemConversationExperience({
+      conversationId: conversation.id,
+      expectedRevision: Number(conversation.revision),
+      inboundMessageId: input.inboundMessageId,
+      experience: routing.systemExperience,
+    });
+  }
+
   const actor = String(conversation.assigned_actor);
   if (
     input.suppressJarvisTurn !== true &&
+    routing.suppressJarvisTurn !== true &&
     conversation.state === "OPEN" &&
     conversation.human_takeover !== true &&
     conversation.jarvis_enabled === true &&
@@ -271,12 +310,77 @@ export async function recordConversationalInbound(input: {
   }};
 }
 
-export async function queueJarvisConversationReply(input: {
+export async function readJarvisWhatsAppTurnMaterial(input: {
+  readonly conversationId: string;
+  readonly inboundMessageId: string;
+  readonly expectedRevision: number;
+}): Promise<ConversationalResult<{
+  assignedActor: "AAROHI" | "ANISHA" | "RIYA";
+  subjectType: "prospect" | "client" | "vendor";
+  tenantId: "quickfurno.marketplace";
+  dataClass: "HOSTED_ALLOWED";
+  subjectRef?: string;
+  receivedAt: string;
+  normalizedText?: string;
+}>> {
+  const [{ data: conversation, error: conversationError }, { data: inbound, error: inboundError }] = await Promise.all([
+    adminClient().from("communication_conversations").select("*").eq("id", input.conversationId).maybeSingle(),
+    adminClient().from("communication_inbound_messages")
+      .select("id,conversation_id,message_type,content_minimized,received_at,identity_confidence,resolved_principal_type,resolved_principal_id")
+      .eq("id", input.inboundMessageId)
+      .maybeSingle(),
+  ]);
+  if (conversationError || !conversation) return { ok: false, reason: "conversation_not_found" };
+  if (inboundError || !inbound || inbound.conversation_id !== conversation.id) {
+    return { ok: false, reason: "inbound_message_mismatch" };
+  }
+  if (
+    conversation.state !== "OPEN" ||
+    conversation.jarvis_enabled !== true ||
+    conversation.human_takeover === true ||
+    Number(conversation.revision) !== input.expectedRevision
+  ) return { ok: false, reason: "conversation_not_sendable" };
+
+  const actor = String(conversation.assigned_actor);
+  const subjectType = String(conversation.subject_type);
+  if (!["AAROHI", "ANISHA", "RIYA"].includes(actor) || !["prospect", "client", "vendor"].includes(subjectType)) {
+    return { ok: false, reason: "conversation_not_sendable" };
+  }
+  const normalizedText = inbound.message_type === "text" && typeof inbound.content_minimized?.text === "string"
+    ? inbound.content_minimized.text.slice(0, 4096)
+    : ["button_reply", "list_reply"].includes(String(inbound.message_type)) && typeof inbound.content_minimized?.title === "string"
+      ? inbound.content_minimized.title.slice(0, 4096)
+      : undefined;
+
+  const subjectRef = inbound.identity_confidence === "exact" &&
+    inbound.resolved_principal_type === subjectType &&
+    typeof inbound.resolved_principal_id === "string"
+      ? inbound.resolved_principal_id
+      : undefined;
+
+  return { ok: true, value: {
+    assignedActor: actor as "AAROHI" | "ANISHA" | "RIYA",
+    subjectType: subjectType as "prospect" | "client" | "vendor",
+    tenantId: "quickfurno.marketplace",
+    dataClass: "HOSTED_ALLOWED",
+    ...(subjectRef ? { subjectRef } : {}),
+    receivedAt: inbound.received_at,
+    ...(normalizedText ? { normalizedText } : {}),
+  }};
+}
+
+type ConversationProposalSource = "JARVIS" | "SYSTEM" | "HUMAN";
+type AiConversationActor = "AAROHI" | "ANISHA" | "RIYA";
+
+async function queueConversationExperience(input: {
+  readonly source: ConversationProposalSource;
   readonly conversationId: string;
   readonly expectedRevision: number;
   readonly proposalId: string;
-  readonly body: string;
   readonly idempotencyKey: string;
+  readonly experience?: QfWhatsAppExperienceV1;
+  readonly legacyBody?: string;
+  readonly actor?: AiConversationActor;
 }): Promise<ConversationalResult<{ outboxId: string }>> {
   const { data: conversation, error } = await adminClient()
     .from("communication_conversations")
@@ -284,12 +388,18 @@ export async function queueJarvisConversationReply(input: {
     .eq("id", input.conversationId)
     .maybeSingle();
   if (error || !conversation) return { ok: false, reason: "conversation_not_found" };
-  if (
-    conversation.state !== "OPEN" ||
-    conversation.jarvis_enabled !== true ||
-    conversation.human_takeover === true
-  ) return { ok: false, reason: "conversation_not_sendable" };
   if (Number(conversation.revision) !== input.expectedRevision) return { ok: false, reason: "stale_revision" };
+
+  if (input.source === "JARVIS") {
+    if (
+      conversation.state !== "OPEN" ||
+      conversation.jarvis_enabled !== true ||
+      conversation.human_takeover === true ||
+      !["AAROHI", "ANISHA", "RIYA"].includes(String(conversation.assigned_actor))
+    ) return { ok: false, reason: "conversation_not_sendable" };
+  } else if (!["OPEN", "HUMAN"].includes(String(conversation.state))) {
+    return { ok: false, reason: "conversation_not_sendable" };
+  }
 
   const expires = conversation.service_window_expires_at ? Date.parse(conversation.service_window_expires_at) : NaN;
   if (!Number.isFinite(expires) || expires <= Date.now()) return { ok: false, reason: "service_window_closed" };
@@ -300,11 +410,34 @@ export async function queueJarvisConversationReply(input: {
     return { ok: false, reason: "provider_account_not_conversational" };
   }
 
-  const body = input.body.trim();
-  if (body.length < 1 || body.length > 4096) return { ok: false, reason: "conversation_not_sendable" };
+  let experience: QfWhatsAppExperienceV1;
+  if (input.experience !== undefined && input.legacyBody !== undefined) {
+    return { ok: false, reason: "conversation_not_sendable" };
+  }
+  if (input.experience !== undefined) {
+    experience = input.experience;
+  } else if (input.legacyBody !== undefined && input.source === "JARVIS") {
+    const actor = String(conversation.assigned_actor);
+    if (!["AAROHI", "ANISHA", "RIYA"].includes(actor)) return { ok: false, reason: "conversation_not_sendable" };
+    experience = textExperience(actor as AiConversationActor, input.legacyBody.trim());
+  } else {
+    return { ok: false, reason: "conversation_not_sendable" };
+  }
+
+  if (input.source === "JARVIS") {
+    const actor = String(conversation.assigned_actor);
+    if (input.actor !== undefined && input.actor !== actor) return { ok: false, reason: "conversation_not_sendable" };
+    if (experience.actor !== actor) return { ok: false, reason: "conversation_not_sendable" };
+  }
+
+  let serialized: string;
+  try { serialized = serializeQfWhatsAppExperience(experience); }
+  catch { return { ok: false, reason: "conversation_not_sendable" }; }
+  if (serialized.length < 2 || serialized.length > 8_192) return { ok: false, reason: "conversation_not_sendable" };
+
   const id = randomUUID();
-  const digest = bodyDigest(body);
-  const sealed = sealConversationValue(body, bodyAad(id, input.conversationId, input.expectedRevision, digest));
+  const digest = bodyDigest(serialized);
+  const sealed = sealConversationValue(serialized, bodyAad(id, input.conversationId, input.expectedRevision, digest));
   if (!sealed.ok) return { ok: false, reason: "seal_unavailable" };
 
   const { data, error: insertError } = await adminClient()
@@ -313,7 +446,7 @@ export async function queueJarvisConversationReply(input: {
       id,
       conversation_id: input.conversationId,
       provider_account_id: conversation.provider_account_id,
-      proposal_source: "JARVIS",
+      proposal_source: input.source,
       proposal_id: input.proposalId,
       expected_revision: input.expectedRevision,
       body_digest: digest,
@@ -340,15 +473,58 @@ export async function queueJarvisConversationReply(input: {
 
   await adminClient().from("communication_conversation_events").insert({
     conversation_id: input.conversationId,
-    event_type: "jarvis.reply_queued",
-    actor_type: "JARVIS",
-    safe_summary: "Jarvis reply proposal accepted into QuickFurno's governed conversational outbox.",
+    event_type: input.source === "JARVIS" ? "jarvis.reply_queued" : "concierge.experience_queued",
+    actor_type: input.source,
+    safe_summary: input.source === "JARVIS"
+      ? "Jarvis reply proposal accepted into QuickFurno's governed conversational outbox."
+      : "QuickFurno Concierge experience accepted into the governed conversational outbox.",
     reference_type: "outbox",
     reference_id: data.id,
-    event_data: { expectedRevision: input.expectedRevision },
+    event_data: { expectedRevision: input.expectedRevision, experienceKind: experience.kind },
   });
 
   return { ok: true, value: { outboxId: data.id } };
+}
+
+export async function queueJarvisConversationReply(input: {
+  readonly conversationId: string;
+  readonly expectedRevision: number;
+  readonly proposalId: string;
+  readonly idempotencyKey: string;
+  readonly body?: string;
+  readonly actor?: AiConversationActor;
+  readonly experience?: QfWhatsAppExperienceV1;
+}): Promise<ConversationalResult<{ outboxId: string }>> {
+  return queueConversationExperience({
+    source: "JARVIS",
+    conversationId: input.conversationId,
+    expectedRevision: input.expectedRevision,
+    proposalId: input.proposalId,
+    idempotencyKey: input.idempotencyKey,
+    ...(input.body === undefined ? {} : { legacyBody: input.body }),
+    ...(input.actor === undefined ? {} : { actor: input.actor }),
+    ...(input.experience === undefined ? {} : { experience: input.experience }),
+  });
+}
+
+async function queueSystemConversationExperience(input: {
+  readonly conversationId: string;
+  readonly expectedRevision: number;
+  readonly inboundMessageId: string;
+  readonly experience: QfWhatsAppExperienceV1;
+}): Promise<ConversationalResult<{ outboxId: string }>> {
+  const serialized = serializeQfWhatsAppExperience(input.experience);
+  const idempotencyKey = createHash("sha256")
+    .update(["qf.concierge.system.v1", input.inboundMessageId, serialized].join("\n"), "utf8")
+    .digest("hex");
+  return queueConversationExperience({
+    source: "SYSTEM",
+    conversationId: input.conversationId,
+    expectedRevision: input.expectedRevision,
+    proposalId: `concierge:${input.inboundMessageId}`,
+    idempotencyKey,
+    experience: input.experience,
+  });
 }
 
 async function failOutbox(id: string, status: "failed" | "cancelled" | "superseded" | "outcome_unknown", code: string) {
@@ -389,7 +565,11 @@ export async function dispatchConversationalOutbox(
     .select("*")
     .eq("id", claimed.conversation_id)
     .maybeSingle();
-  if (!conversation || conversation.state !== "OPEN" || conversation.human_takeover || !conversation.jarvis_enabled) {
+  const source = String(claimed.proposal_source) as ConversationProposalSource;
+  const sourceAllowed = source === "JARVIS"
+    ? conversation?.state === "OPEN" && conversation?.human_takeover !== true && conversation?.jarvis_enabled === true
+    : !!conversation && ["OPEN", "HUMAN"].includes(String(conversation.state));
+  if (!conversation || !["JARVIS", "SYSTEM", "HUMAN"].includes(source) || !sourceAllowed) {
     await failOutbox(claimed.id, "cancelled", "CONVERSATION_NOT_SENDABLE");
     return { ok: false, reason: "conversation_not_sendable" };
   }
@@ -457,12 +637,43 @@ export async function dispatchConversationalOutbox(
     return { ok: false, reason: "seal_unavailable" };
   }
 
+  let experience = parseSerializedQfWhatsAppExperience(body.value);
+  if (!experience && source === "JARVIS") {
+    const actor = String(conversation.assigned_actor);
+    if (!["AAROHI", "ANISHA", "RIYA"].includes(actor) || body.value.trim().length < 1 || body.value.trim().length > 4096) {
+      await failOutbox(claimed.id, "failed", "EXPERIENCE_INVALID");
+      return { ok: false, reason: "conversation_not_sendable" };
+    }
+    experience = textExperience(actor as AiConversationActor, body.value.trim());
+  }
+  if (!experience) {
+    await failOutbox(claimed.id, "failed", "EXPERIENCE_INVALID");
+    return { ok: false, reason: "conversation_not_sendable" };
+  }
+  if (source === "JARVIS" && experience.actor !== String(conversation.assigned_actor)) {
+    await failOutbox(claimed.id, "superseded", "ACTOR_MISMATCH");
+    return { ok: false, reason: "conversation_not_sendable" };
+  }
+
   const provider = new MetaCloudWhatsAppProvider(outboundToRuntime(config.config), new FetchHttpTransport());
-  const send = await provider.sendTextMessage(
-    destination.value,
-    body.value,
-    { replyToProviderMessageId: conversation.last_inbound_provider_message_id },
-  );
+  const interactiveBody = [experience.body, ...(experience.items ?? []).map((item) => "• " + item)].join("\n");
+  const canSendInteractive = Boolean(experience.actions?.length) && interactiveBody.length <= 1024;
+  const send = canSendInteractive
+    ? await provider.sendInteractiveMessage(
+        destination.value,
+        {
+          ...(experience.heading ? { heading: experience.heading } : {}),
+          body: interactiveBody,
+          actions: experience.actions ?? [],
+          menuButtonText: experience.actions && experience.actions.length > 3 ? "View options" : undefined,
+        },
+        { replyToProviderMessageId: conversation.last_inbound_provider_message_id },
+      )
+    : await provider.sendTextMessage(
+        destination.value,
+        renderQfWhatsAppExperienceFallback(experience),
+        { replyToProviderMessageId: conversation.last_inbound_provider_message_id },
+      );
   const certainty = effectiveProviderOutcomeCertainty(send);
   if (certainty === "unknown_outcome") {
     await failOutbox(claimed.id, "outcome_unknown", send.errorCode ?? "META_OUTCOME_UNKNOWN");

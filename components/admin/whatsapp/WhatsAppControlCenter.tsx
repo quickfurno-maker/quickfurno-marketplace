@@ -12,6 +12,7 @@
 // control, because no such already-authorized Admin action exists to expose.
 // ============================================================================
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader, TabPanel, Tabs, EmptyState } from "../AdminPrimitives";
 import { WhatsAppOverviewTab } from "./WhatsAppOverviewTab";
@@ -88,6 +89,14 @@ export function WhatsAppControlCenter({
       <PageHeader
         title="WhatsApp control center"
         description="Provider readiness, template governance, the message ledger, delivery, consent and automation visibility — read-only over the existing communication authority."
+        actions={
+          <Link
+            href="/admin/whatsapp/human-desk"
+            className="qfa-focus inline-flex h-10 items-center rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Human Desk
+          </Link>
+        }
       />
 
       <Tabs

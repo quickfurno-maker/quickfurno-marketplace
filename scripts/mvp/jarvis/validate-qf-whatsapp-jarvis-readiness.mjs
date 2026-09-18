@@ -26,6 +26,7 @@ import { buildMetaInteractivePayload } from "../../../lib/communication/provider
 
 const read = (p) => fs.readFileSync(p, "utf8");
 const migration = read("supabase/migrations/20260918120000_whatsapp_conversational_jarvis_foundation.sql");
+const callbackReplayMigration = read("supabase/migrations/20260918180500_jarvis_whatsapp_callback_replay_receipts.sql");
 const conversationService = read("services/conversationalWhatsAppService.ts");
 const gatewayService = read("services/jarvisWhatsAppGatewayService.ts");
 const replyRoute = read("app/api/internal/jarvis/whatsapp-reply/route.ts");
@@ -111,6 +112,20 @@ await test("Jarvis reply route is signed and feature-gated off by default", () =
   assert.match(replyRoute, /policy\.mode !== "active"/);
   assert.match(replyRoute, /verifyQfjSignedRequestSignature/);
   assert.match(replyRoute, /providerAuthority: "quickfurno-core"/);
+});
+
+await test("accepted Jarvis callbacks gain durable replay receipts only after outbox queueing", () => {
+  assert.match(callbackReplayMigration, /create table public\.communication_jarvis_callback_receipts/);
+  assert.match(callbackReplayMigration, /request_id uuid primary key/);
+  assert.match(callbackReplayMigration, /alter table public\.communication_jarvis_callback_receipts enable row level security/);
+  assert.match(callbackReplayMigration, /revoke all on public\.communication_jarvis_callback_receipts from public,anon,authenticated/);
+  assert.match(callbackReplayMigration, /grant select,insert on public\.communication_jarvis_callback_receipts to service_role/);
+  assert.match(conversationService, /recordJarvisWhatsAppReplyReceipt/);
+  assert.match(conversationService, /error\.code === "23505"/);
+  const queuedAt = replyRoute.indexOf("await queueJarvisConversationReply");
+  const receiptAt = replyRoute.indexOf("await recordJarvisWhatsAppReplyReceipt");
+  assert.ok(queuedAt >= 0 && receiptAt > queuedAt);
+  assert.match(replyRoute, /status: "replay_rejected"/);
 });
 await test("QuickFurno to Jarvis gateway carries conversation facts but no provider secrets", () => {
   assert.match(gatewayService, /QF_JARVIS_BASE_URL/);

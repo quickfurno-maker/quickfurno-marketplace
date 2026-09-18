@@ -79,6 +79,53 @@ async function activeSuppression(destinationHash: string): Promise<boolean> {
   return (data ?? []).some((row: any) => !row.expires_at || row.expires_at > now);
 }
 
+export async function signalConversationalWhatsAppPresence(input: {
+  readonly conversationId: string;
+  readonly inboundProviderMessageId: string;
+  readonly typing?: boolean;
+}): Promise<"sent" | "skipped"> {
+  const providerMessageId = input.inboundProviderMessageId?.trim();
+  if (!providerMessageId || providerMessageId.length > 512) return "skipped";
+
+  const { data: conversation, error } = await adminClient()
+    .from("communication_conversations")
+    .select("id,provider_account_id,destination_hash,last_inbound_provider_message_id,state")
+    .eq("id", input.conversationId)
+    .maybeSingle();
+  if (
+    error || !conversation ||
+    conversation.last_inbound_provider_message_id !== providerMessageId ||
+    !["OPEN", "HUMAN"].includes(String(conversation.state))
+  ) return "skipped";
+
+  const account = await providerAccount(String(conversation.provider_account_id));
+  if (
+    !account ||
+    account.provider_key !== META_WHATSAPP_CLOUD_PROVIDER_KEY ||
+    account.channel !== CHANNEL ||
+    account.account_role !== "conversational"
+  ) return "skipped";
+
+  const config = resolveConversationalMetaConfig();
+  if (!config.ok) return "skipped";
+  if (
+    account.phone_number_reference !== config.config.phoneNumberId ||
+    account.business_account_reference !== config.config.wabaId
+  ) return "skipped";
+
+  const gate = await evaluateMetaOutboundGateForMessage({
+    config: { phoneNumberId: config.config.phoneNumberId, wabaId: config.config.wabaId },
+    destinationHash: String(conversation.destination_hash),
+  });
+  if (!gate.ok) return "skipped";
+
+  const provider = new MetaCloudWhatsAppProvider(outboundToRuntime(config.config), new FetchHttpTransport());
+  const result = input.typing === false
+    ? await provider.markInboundRead(providerMessageId)
+    : await provider.markInboundReadWithTyping(providerMessageId);
+  return effectiveProviderOutcomeCertainty(result) === "accepted" ? "sent" : "skipped";
+}
+
 export async function recordConversationalInbound(input: {
   readonly providerAccountId: string;
   readonly inboundMessageId: string;

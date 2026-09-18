@@ -245,6 +245,29 @@ function classifyAndMinimize(m: Record<string, unknown>): { type: InboundMessage
   return { type: InboundMessageType.UNSUPPORTED, content: safeType ? { providerType: safeType } : {} };
 }
 
+export function deriveJarvisNormalizedText(
+  messageType: string,
+  content: Record<string, unknown>,
+): string | null {
+  if (messageType === "text" && typeof content.text === "string") {
+    const text = content.text.trim();
+    return text ? text.slice(0, 4096) : null;
+  }
+  if (["button_reply", "list_reply"].includes(messageType) && typeof content.title === "string") {
+    const title = content.title.trim();
+    return title ? title.slice(0, 4096) : null;
+  }
+  if (["image", "document", "video"].includes(messageType) && typeof content.caption === "string") {
+    const caption = content.caption.trim();
+    if (!caption) return null;
+    const filename = messageType === "document" && typeof content.filename === "string"
+      ? `; filename: ${content.filename.trim().slice(0, 180)}`
+      : "";
+    return `[Attachment: ${messageType}; content not inspected${filename}] Caption: ${caption}`.slice(0, 4096);
+  }
+  return null;
+}
+
 // ----------------------------------------------------------------------------
 // The normalizer
 // ----------------------------------------------------------------------------

@@ -45,6 +45,7 @@ export default async function VendorCrmDirectoryPage({
     enabled: one("enabled"),
     onboarding_stage: one("onboarding_stage"),
     relationship_status: one("relationship_status"),
+    source: one("source"),
     tagId: one("tagId"),
     taskState: one("taskState"),
   };

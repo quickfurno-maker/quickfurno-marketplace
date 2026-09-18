@@ -36,6 +36,8 @@ async function main() {
   const runtime = await import("@/services/nativeAutomationRuntimeService");
   const engine = await import("@/services/nativeAutomationEngineService");
   const studio = await import("@/services/automationStudioService");
+  const jarvisWhatsApp = await import("@/services/jarvisWhatsAppGatewayService");
+  const conversationalWhatsApp = await import("@/services/conversationalWhatsAppService");
   const cfg = runtime.getNativeAutomationRuntimeConfig();
   const startedAt = new Date().toISOString();
   let stopping = false;
@@ -161,6 +163,14 @@ async function main() {
         const acknowledgements = await engine.runNativeConsentAckCycle(cfg.workerId, cfg.consentAckBatch);
         markResult("consent_ack", acknowledgements);
         didWork ||= acknowledgements.state !== "idle";
+
+        // QuickFurno remains the transport authority. These two queues are inert
+        // unless the conversational account and Jarvis feature gates are enabled.
+        const jarvisTurn = await jarvisWhatsApp.dispatchNextJarvisWhatsAppTurn();
+        didWork ||= jarvisTurn.processed;
+        const conversationalReply = await conversationalWhatsApp.dispatchNextConversationalOutbox();
+        didWork ||= conversationalReply.processed;
+
         nextSystemLanesAt = now + cfg.systemLaneIntervalMs;
       }
 

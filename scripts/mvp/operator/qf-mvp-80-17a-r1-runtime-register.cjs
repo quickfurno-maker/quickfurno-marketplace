@@ -66,6 +66,7 @@ const NODE_MODULES = `${path.join(REPO_ROOT, "node_modules")}${path.sep}`;
  *   lib/communication/businessTemplateVariables.ts required by the dispatch contract
  *   lib/communication/providers/whatsappTemplateBinding.ts  PURE; required by the above
  *   lib/communication/inboundConsentCommandInput.ts the persisted Meta adapter key
+ *   lib/communication/consentCommand.ts           PURE normalized consent-command vocabulary
  */
 const ALLOWED_R1_REPO_MODULES = Object.freeze([
   "services/leadAssignmentResultService.ts",
@@ -77,6 +78,7 @@ const ALLOWED_R1_REPO_MODULES = Object.freeze([
   "lib/communication/businessTemplateVariables.ts",
   "lib/communication/providers/whatsappTemplateBinding.ts",
   "lib/communication/inboundConsentCommandInput.ts",
+  "lib/communication/consentCommand.ts",
 ]);
 
 const ALLOWED_SET = new Set(ALLOWED_R1_REPO_MODULES);

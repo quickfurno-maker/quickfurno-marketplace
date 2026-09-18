@@ -895,6 +895,7 @@ const R1_REQUIRED_GRAPH = [
   "lib/communication/businessTemplateVariables.ts",
   "lib/communication/providers/whatsappTemplateBinding.ts",
   "lib/communication/inboundConsentCommandInput.ts",
+  "lib/communication/consentCommand.ts",
 ];
 
 check("73 the allowlist names exact files, never directories or wildcards", () => {

@@ -62,6 +62,19 @@ export interface WhatsAppSendResult {
   readonly outcomeCertainty: ProviderOutcomeCertainty;
 }
 
+export interface WhatsAppInteractiveAction {
+  readonly id: string;
+  readonly title: string;
+  readonly description?: string;
+}
+
+export interface WhatsAppInteractiveMessage {
+  readonly heading?: string;
+  readonly body: string;
+  readonly actions: readonly WhatsAppInteractiveAction[];
+  readonly menuButtonText?: string;
+}
+
 export interface WhatsAppWebhookEvent {
   readonly providerEventId: string;
   readonly providerMessageId: string;
@@ -120,6 +133,27 @@ export interface WhatsAppProvider {
     to: string,
     templateKey: string,
     variables: Record<string, string>
+  ): Promise<WhatsAppSendResult>;
+
+  /**
+   * Optional conversational text capability. QuickFurno may invoke this only after
+   * its own conversation/service-window/policy authority has approved the send.
+   * A Jarvis proposal never calls this adapter directly.
+   */
+  sendTextMessage?(
+    to: string,
+    body: string,
+    options?: { readonly replyToProviderMessageId?: string | null }
+  ): Promise<WhatsAppSendResult>;
+
+  /**
+   * Optional premium conversational capability. QuickFurno supplies only bounded,
+   * provider-neutral actions; the adapter chooses the concrete WhatsApp payload.
+   */
+  sendInteractiveMessage?(
+    to: string,
+    message: WhatsAppInteractiveMessage,
+    options?: { readonly replyToProviderMessageId?: string | null }
   ): Promise<WhatsAppSendResult>;
 
   /**

@@ -31,6 +31,9 @@ export const VENDOR_CRM_RELATIONSHIP_STATUSES = [
 ] as const;
 export type VendorCrmRelationshipStatus = (typeof VENDOR_CRM_RELATIONSHIP_STATUSES)[number];
 
+export const VENDOR_CRM_ACQUISITION_SOURCES = ["AAROHI"] as const;
+export type VendorCrmAcquisitionSource = (typeof VENDOR_CRM_ACQUISITION_SOURCES)[number];
+
 export const VENDOR_CRM_RES_COM_SCOPES = ["residential", "commercial", "both"] as const;
 export type VendorCrmResComScope = (typeof VENDOR_CRM_RES_COM_SCOPES)[number];
 

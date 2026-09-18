@@ -11,6 +11,7 @@
 import {
   VENDOR_CRM_ONBOARDING_STAGES,
   VENDOR_CRM_RELATIONSHIP_STATUSES,
+  VENDOR_CRM_ACQUISITION_SOURCES,
   VENDOR_CRM_RES_COM_SCOPES,
   VENDOR_CONTACT_CHANNELS,
   VENDOR_NOTE_CATEGORIES,
@@ -19,6 +20,7 @@ import {
   VENDOR_TASK_STATUSES,
   type VendorCrmOnboardingStage,
   type VendorCrmRelationshipStatus,
+  type VendorCrmAcquisitionSource,
   type VendorTaskType,
   type VendorTaskPriority,
   type VendorTaskStatus,
@@ -298,6 +300,7 @@ export interface VendorCrmDirectoryQuery {
   enabled: string | null;
   onboarding_stage: VendorCrmOnboardingStage | null;
   relationship_status: VendorCrmRelationshipStatus | null;
+  source: VendorCrmAcquisitionSource | null;
   tagId: string | null;
   taskState: "open" | "overdue" | null;
 }
@@ -316,6 +319,7 @@ export function validateDirectoryQuery(input: Record<string, unknown> = {}): Ven
     enabled: optText(input.enabled, "enabled", MAX_SHORT),
     onboarding_stage: optInSet(input.onboarding_stage, VENDOR_CRM_ONBOARDING_STAGES, "onboarding_stage"),
     relationship_status: optInSet(input.relationship_status, VENDOR_CRM_RELATIONSHIP_STATUSES, "relationship_status"),
+    source: optInSet(input.source, VENDOR_CRM_ACQUISITION_SOURCES, "source"),
     tagId: input.tagId ? requireUuid(input.tagId, "tagId") : null,
     taskState: (input.taskState === "open" || input.taskState === "overdue") ? input.taskState : null,
   };

@@ -21,6 +21,8 @@ const TS_FILES = [
   "lib/errors.ts",
   "lib/communication/phone.ts",
   "lib/communication/dbErrors.ts",
+  "lib/communication/consentCommand.ts",
+  "lib/communication/inboundConsentCommandInput.ts",
   "lib/communication/providers/providerError.ts",
   "lib/communication/providers/providerOutcome.ts",
   "lib/communication/providers/whatsappProvider.ts",
@@ -574,21 +576,29 @@ check("R11-R13. partial batch: A persists, B lookup fails → 500; retry → A d
 // ============================================================================
 // BOUNDARIES (45-57) — static + git
 // ============================================================================
-check("45-53. no consent / command / event / n8n / send / AI / conversation / window", () => {
+check("45-53. D1-B stays canonical persistence; consent authority and conversational send authority remain delegated", () => {
   const src = readCode(SERVICE_SRC);
-  assert(!/communication_preferences|communication_suppressions|consent/i.test(src), "45. no consent read/write");
-  assert(!/\bSTOP\b|\bSTART\b|\bUNSUBSCRIBE\b|opt_out|opt_in/.test(src), "46. no STOP/START command handling");
-  assert(!/domain_events|outbox_events|emitEvent|dispatchEvent/i.test(src), "47-48. no domain/outbox event");
+  assert(!/communication_preferences|communication_suppressions|writeConsentCommand|processInboundConsentCommands|communicationConsentWriterService/i.test(src), "45. no consent authority read/write");
+  assert(/isConsentControlMessage/.test(src), "46. the only consent seam is the pure control classifier used to suppress Jarvis turns");
+  assert(!/\bSTOP\b|\bSTART\b|\bUNSUBSCRIBE\b|opt_out|opt_in/.test(src), "46b. no raw STOP/START command handling lives in D1-B");
+  assert(!/domain_events|outbox_events|emitEvent|dispatchEvent/i.test(src), "47-48. no domain/outbox event authority");
   assert(!/\bn8n\b/i.test(src), "49. no n8n");
-  assert(!/CommunicationService|sendTemplateMessage|sendAuthenticationMessage|sendResolvedAuthenticationSms|sendResolvedTemplate|\.send\(/.test(src), "50. no send method");
-  assert(!/\bjarvis\b|openai|anthropic|\bllm\b|ai_reply/i.test(src), "51. no AI/Jarvis");
-  assert(!/communication_conversations|conversation_id|last_inbound_at|24.?hour|service_window|human_handoff/i.test(src), "52-53. no conversation / 24h-window");
+  assert(!/CommunicationService|sendTemplateMessage|sendAuthenticationMessage|sendResolvedAuthenticationSms|sendResolvedTemplate|\.send\(/.test(src), "50. no provider send method");
+  assert(!/sendJarvisWhatsAppTurn|queueJarvisConversationReply|dispatchConversationalOutbox|openai|anthropic|\bllm\b|ai_reply/i.test(src), "51. no Jarvis/model/send authority");
+  assert(/recordConversation/.test(src), "52. the approved conversational seam is dependency-injected");
+  assert(!/communication_conversations|service_window_expires_at|QF_JARVIS_WHATSAPP_ENABLED|human_takeover/i.test(src), "53. D1-B owns no conversation table/window/takeover policy");
 });
 
-check("54-57. no new API route, no migration, no env, no Meta activation", () => {
+check("54-57. D1-B adds no inbound API authority, migration, env, or Meta activation", () => {
   const dirty = execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" }).split("\n").map((l) => l.slice(3).trim()).filter(Boolean);
+  const laterReviewedRouteAdditions = new Set([
+    "app/api/internal/jarvis/whatsapp-reply/route.ts",
+    "app/api/internal/jarvis/whatsapp-turn-material/route.ts",
+  ]);
   for (const p of dirty) {
-    assert(!/^app\/api\/.*route\.ts$|^pages\/api\//.test(p), `54. no API route added (${p})`);
+    if (/^app\/api\/.*route\.ts$|^pages\/api\//.test(p)) {
+      assert(laterReviewedRouteAdditions.has(p), `54. no unreviewed API route added (${p})`);
+    }
     assert(!p.startsWith("supabase/migrations"), `55. no migration (${p})`);
     assert(!/\.env/.test(p), `56. no env change (${p})`);
   }
@@ -632,18 +642,20 @@ check("wiring: the d1b script + doc exist; the webhook route is unchanged", () =
   const PHASE_8B1A_SERVICE_BLOB = "454bb9195e68e481c190f8aa12ef1c19a09b8936"; // 8B-1A history (recorded, not the active baseline)
   const PHASE_8B1BC_IMPLEMENTATION_HEAD = "e742bb149b635f63b00975fa93be0a5fc14a2e24";
   const PHASE_8B1BC_SERVICE_BLOB = "58250b722b147f3673dedf37e5f3346dad17b03d";
+  // QF-WHATSAPP-JARVIS-CONVERSATIONAL-FOUNDATION authority transfer. The implementation commit is
+  // immutable and separate from this governance commit, so the active byte freeze never points at HEAD.
+  const CONVERSATIONAL_IMPLEMENTATION_HEAD = "2ebade8d665688afe2bff7f2c4139331a2b3f426";
+  const CONVERSATIONAL_SERVICE_BLOB = "442118946e54feb4dc2fbb5a1cfe40a2b3e57b50";
 
-  // The Phase 7/8A history commit still exists; the Phase 8B-1A commits exist; base → implementation head →
-  // HEAD ancestry (FIXED endpoints, never a moving HEAD).
-  for (const sha of [PHASE_8A_AUTHORITY_BASE, PHASE_8B1A_AUTHORITY_BASE, PHASE_8B1A_IMPLEMENTATION_HEAD, PHASE_8B1BC_IMPLEMENTATION_HEAD]) {
+  // Every historical authority endpoint remains present. The new transfer is forward-only:
+  // 8B-1A → 8B-1B-C → conversational implementation → governance HEAD.
+  for (const sha of [PHASE_8A_AUTHORITY_BASE, PHASE_8B1A_AUTHORITY_BASE, PHASE_8B1A_IMPLEMENTATION_HEAD, PHASE_8B1BC_IMPLEMENTATION_HEAD, CONVERSATIONAL_IMPLEMENTATION_HEAD]) {
     assert(execFileSync("git", ["cat-file", "-t", sha], { encoding: "utf8" }).trim() === "commit", `the commit ${sha.slice(0, 12)} must exist`);
   }
-  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1A_AUTHORITY_BASE, PHASE_8B1A_IMPLEMENTATION_HEAD]); // throws if not
-  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1A_IMPLEMENTATION_HEAD, "HEAD"]);                   // throws if not
-  // The transfer is FORWARD-ONLY: the 8B-1A implementation head must be an ancestor of the 8B-1B-C one, and
-  // that one an ancestor of HEAD. FIXED endpoints throughout — never a moving HEAD as a baseline.
-  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1A_IMPLEMENTATION_HEAD, PHASE_8B1BC_IMPLEMENTATION_HEAD]); // throws if not
-  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1BC_IMPLEMENTATION_HEAD, "HEAD"]);                        // throws if not
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1A_AUTHORITY_BASE, PHASE_8B1A_IMPLEMENTATION_HEAD]);
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1A_IMPLEMENTATION_HEAD, PHASE_8B1BC_IMPLEMENTATION_HEAD]);
+  execFileSync("git", ["merge-base", "--is-ancestor", PHASE_8B1BC_IMPLEMENTATION_HEAD, CONVERSATIONAL_IMPLEMENTATION_HEAD]);
+  execFileSync("git", ["merge-base", "--is-ancestor", CONVERSATIONAL_IMPLEMENTATION_HEAD, "HEAD"]);
 
   // THE ACTIVE SERVICE BYTE-FREEZE — Commit 1 resolves the service to its reviewed blob, and the on-disk service
   // is byte-identical to it. A future dirty OR committed service edit fails until another EXPLICIT authority
@@ -653,16 +665,20 @@ check("wiring: the d1b script + doc exist; the webhook route is unchanged", () =
   const commit1ServiceBlob = execFileSync("git", ["rev-parse", `${PHASE_8B1A_IMPLEMENTATION_HEAD}:${WEBHOOK_SVC_SRC}`], { encoding: "utf8" }).trim();
   assert(commit1ServiceBlob === PHASE_8B1A_SERVICE_BLOB, `Commit 1 must resolve the webhook service to its reviewed blob (got ${commit1ServiceBlob.slice(0, 12)})`);
 
-  // THE ACTIVE SERVICE BYTE-FREEZE (Phase 8B-1B-C). The reviewed implementation commit resolves the service
-  // to its approved blob, and the on-disk service is byte-identical to it. Enforcement is UNWEAKENED: any
-  // later edit — dirty OR committed — fails until the next EXPLICIT authority transfer.
+  // Phase 8B-1B-C remains permanently pinned as history.
   const c8b1bcServiceBlob = execFileSync("git", ["rev-parse", `${PHASE_8B1BC_IMPLEMENTATION_HEAD}:${WEBHOOK_SVC_SRC}`], { encoding: "utf8" }).trim();
   assert(c8b1bcServiceBlob === PHASE_8B1BC_SERVICE_BLOB,
     `the C8B-1B-C implementation commit must resolve the webhook service to its reviewed blob (got ${c8b1bcServiceBlob.slice(0, 12)})`);
+
+  // ACTIVE byte freeze: the conversational implementation commit is the sole current service authority.
+  // Any later dirty OR committed webhook edit fails until another explicit forward authority transfer.
+  const conversationalServiceBlob = execFileSync("git", ["rev-parse", `${CONVERSATIONAL_IMPLEMENTATION_HEAD}:${WEBHOOK_SVC_SRC}`], { encoding: "utf8" }).trim();
+  assert(conversationalServiceBlob === CONVERSATIONAL_SERVICE_BLOB,
+    `the conversational implementation commit must resolve the webhook service to its reviewed blob (got ${conversationalServiceBlob.slice(0, 12)})`);
   const onDiskServiceBlob = execFileSync("git", ["hash-object", WEBHOOK_SVC_SRC], { encoding: "utf8" }).trim();
-  assert(onDiskServiceBlob === PHASE_8B1BC_SERVICE_BLOB,
-    `the webhook service is not byte-identical to its Phase 8B-1B-C baseline (commit ${PHASE_8B1BC_IMPLEMENTATION_HEAD.slice(0, 12)}). ` +
-    `A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER (on-disk ${onDiskServiceBlob.slice(0, 12)} != pinned ${PHASE_8B1BC_SERVICE_BLOB.slice(0, 12)}).`);
+  assert(onDiskServiceBlob === CONVERSATIONAL_SERVICE_BLOB,
+    `the webhook service is not byte-identical to its conversational baseline (commit ${CONVERSATIONAL_IMPLEMENTATION_HEAD.slice(0, 12)}). ` +
+    `A change — dirty OR committed — requires an EXPLICIT AUTHORITY TRANSFER (on-disk ${onDiskServiceBlob.slice(0, 12)} != pinned ${CONVERSATIONAL_SERVICE_BLOB.slice(0, 12)}).`);
 
   // The webhook's use of CommunicationService is still exactly one operation, and still no send.
   const hook = readCode(WEBHOOK_SVC_SRC);
@@ -694,8 +710,8 @@ check("wiring: the d1b script + doc exist; the webhook route is unchanged", () =
   const iVerify = at("verifyMetaWebhookSignatureBytes(input.rawBytes");
   const iDecode = at("META_UTF8_DECODER.decode(input.rawBytes)");
   const iParse = at("safeParse(decoded)");
-  const iIdCfg = at("resolveWebhookIdentityConfig()");
-  const iDecide = at("decideCallbackIdentity(payload");
+  const iIdCfg = at("resolveWebhookIdentityRegistryConfig()");
+  const iDecide = at("decideCallbackIdentityRegistry(payload");
   const iReject = at("rejected_foreign_identity");
   const iUnsupported = at("acknowledged_unsupported_identity_shape");
   const iDownstream = at("return processVerifiedExpectedMetaWebhook(");

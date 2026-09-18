@@ -176,6 +176,10 @@ await test("STOP START HELP are persisted controls but never Jarvis turns", () =
   assert.equal(isConsentControlMessage(candidate("hello riya")), false);
   assert.equal(isConsentControlMessage({ ...candidate("STOP"), messageType: "button" }), false);
 });
+await test("proposal-only conversational accounts route new conversations to Riya", () => {
+  assert.match(conversationService, /assigned_actor: account\.jarvis_access_mode === "proposal_only" \? "RIYA" : "AAROHI"/);
+  assert.match(conversationService, /jarvis_enabled: account\.jarvis_access_mode === "proposal_only"/);
+});
 await test("conversation service gates Jarvis enqueue on consent, state, takeover and feature flags", () => {
   assert.match(conversationService, /input\.suppressJarvisTurn !== true[\s\S]{0,700}communication_jarvis_turn_outbox/);
   assert.match(conversationService, /conversation\.state === "OPEN"/);

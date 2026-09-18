@@ -265,6 +265,9 @@ function RecordHeader({ core, profile }: { core: VendorCoreFacts; profile: Vendo
             <StatusBadge value={core.status ?? "Verification not set"} />
             <StatusBadge value={enabled} tone={core.is_active === false ? "rose" : core.is_active === true ? "emerald" : "slate"} />
             <StatusBadge value={availability} tone={core.accepting_leads === true ? "cyan" : "amber"} />
+            {profile?.acquisition_source ? <StatusBadge value={`Source: ${profile.acquisition_source}`} tone="cyan" /> : null}
+            {profile?.acquisition_channel ? <StatusBadge value={`Channel: ${profile.acquisition_channel}`} tone="slate" /> : null}
+            {profile?.acquisition_owner ? <StatusBadge value={`Owner: ${profile.acquisition_owner}`} tone="emerald" /> : null}
           </div>
         </div>
 

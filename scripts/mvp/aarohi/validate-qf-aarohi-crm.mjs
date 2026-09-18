@@ -24,6 +24,7 @@ function test(name, fn) {
 
 const read = (p) => fs.readFileSync(path.join(ROOT, p), "utf8");
 const migration = read(MIGRATION);
+const handoffBridge = read("supabase/migrations/20260918093000_aarohi_anisha_vendor_crm_handoff.sql");
 const manifest = JSON.parse(read(MANIFEST));
 const stagingCertification = read("docs/QF-AAROHI-ACQUISITION-CRM-STAGING-CERTIFICATION.md");
 const route = read("app/api/internal/jarvis/aarohi-projection/route.ts");
@@ -118,6 +119,20 @@ test("Core handoff requires confirmed package payment", () => {
   assert.match(migration, /canonical_package_payment_not_confirmed/);
   assert.match(migration, /agent_owner='ANISHA'/);
 });
+test("Aarohi completion starts the Anisha Vendor CRM relationship", () => {
+  assert.match(handoffBridge, /insert into public\.vendor_crm_profiles/);
+  assert.match(handoffBridge, /acquisition_source='AAROHI'/);
+  assert.match(handoffBridge, /acquisition_owner='ANISHA'/);
+  assert.match(handoffBridge, /aarohi_prospect_id/);
+  assert.match(handoffBridge, /aarohi_handoff_id/);
+  assert.match(handoffBridge, /insert into public\.vendor_internal_notes/);
+  assert.match(handoffBridge, /agent_owner='ANISHA'/);
+});
+test("Aarohi to Anisha bridge does not create Core vendors or payments", () => {
+  assert.match(handoffBridge, /canonical_package_payment_not_confirmed/);
+  assert.doesNotMatch(handoffBridge, /insert\s+into\s+public\.vendors\b/i);
+  assert.doesNotMatch(handoffBridge, /insert\s+into\s+public\.payments\b/i);
+});
 test("identity merge requires human review and is forbidden after handoff", () => {
   assert.match(migration, /status <> 'RECOMMENDED'/);
   assert.match(migration, /identity_merge_after_handoff_forbidden/);
@@ -176,17 +191,30 @@ test("all Aarohi admin surfaces exist", () => {
   ]) assert.equal(fs.existsSync(path.join(ROOT, p)), true, p);
 });
 
-test("migration is certified staging-applied and production remains untouched", () => {
+test("foundation migration is certified on staging and production", () => {
   const pin = manifest.stagingAppliedPostAnchorMigrations.find((x) => x.version === "20260917000000");
   assert.ok(pin);
   assert.equal(pin.operationalStatus, "APPLIED_TO_STAGING");
   assert.equal(pin.appliedToStaging, true);
   assert.equal(pin.appliedExactlyOnceToStaging, true);
   assert.equal(pin.independentRemoteRelistVerified, true);
-  assert.equal(pin.appliedToProduction, false);
-  assert.equal(pin.productionVersionStatus, "NOT_APPLIED_VERIFIED_ABSENT");
-  assert.equal(pin.requiresSeparateProductionDeploymentGate, true);
+  assert.equal(pin.appliedToProduction, true);
+  assert.equal(pin.productionVersionStatus, "PRESENT_IN_PRODUCTION_HISTORY");
+  assert.equal(pin.productionHistoryVersionPresent, true);
+  assert.equal(pin.productionAarohiSchemaPresent, true);
+  assert.equal(pin.requiresSeparateProductionDeploymentGate, false);
   assert.equal(manifest.pendingPostAnchorMigrations.some((x) => x.version === "20260917000000"), false);
+});
+test("Aarohi to Anisha handoff migration is pinned pending its deployment gate", () => {
+  const pin = manifest.pendingPostAnchorMigrations.find((x) => x.version === "20260918093000");
+  assert.ok(pin);
+  assert.equal(pin.operationalStatus, "PENDING");
+  assert.equal(pin.appliedToStaging, false);
+  assert.equal(pin.appliedToProduction, false);
+  assert.equal(pin.requiresSeparateStagingDeploymentGate, true);
+  const canonical = handoffBridge.replace(/\r\n/g,"\n").replace(/\r/g,"\n");
+  const hash = crypto.createHash("sha256").update(Buffer.from(canonical,"utf8")).digest("hex");
+  assert.equal(pin.sha256, hash);
 });
 test("staging certification evidence is pinned", () => {
   const pin = manifest.stagingAppliedPostAnchorMigrations.find((x) => x.version === "20260917000000");

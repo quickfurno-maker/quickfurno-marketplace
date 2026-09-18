@@ -69,6 +69,10 @@ export interface VendorCrmDirectoryRow {
   total_credits: number | null;
   onboarding_stage: string | null;  // CRM
   relationship_status: string | null;
+  acquisition_source: string | null;
+  acquisition_channel: string | null;
+  acquisition_owner: string | null;
+  acquisition_completed_at: string | null;
   next_follow_up_at: string | null;
   last_interaction_at: string | null;
   active_tags: { id: string; name: string }[];
@@ -91,10 +95,11 @@ export async function listVendorCrmDirectory(rawQuery: Record<string, unknown>):
 
   // 1. resolve CRM-filter vendor-id sets (batch, not per-row) when a CRM filter is set.
   let crmIdFilter: string[] | null = null;
-  if (q.onboarding_stage || q.relationship_status) {
+  if (q.onboarding_stage || q.relationship_status || q.source) {
     let pq = c.from(CRM_PROFILES).select("vendor_id");
     if (q.onboarding_stage) pq = pq.eq("onboarding_stage", q.onboarding_stage);
     if (q.relationship_status) pq = pq.eq("relationship_status", q.relationship_status);
+    if (q.source) pq = pq.eq("acquisition_source", q.source);
     const { data } = await pq;
     crmIdFilter = (data ?? []).map((r: { vendor_id: string }) => r.vendor_id);
     if (crmIdFilter.length === 0) return { rows: [], page: q.page, pageSize: q.pageSize, total: 0 };
@@ -142,7 +147,7 @@ export async function listVendorCrmDirectory(rawQuery: Record<string, unknown>):
 
   // 3. batch-load CRM extensions for exactly this page's vendor ids (no N+1).
   const [{ data: profs }, { data: asgs }, { data: tasks }, { data: contacts }] = await Promise.all([
-    c.from(CRM_PROFILES).select("vendor_id, onboarding_stage, relationship_status, next_follow_up_at, last_interaction_at").in("vendor_id", ids),
+    c.from(CRM_PROFILES).select("vendor_id, onboarding_stage, relationship_status, acquisition_source, acquisition_channel, acquisition_owner, acquisition_completed_at, next_follow_up_at, last_interaction_at").in("vendor_id", ids),
     c.from(CRM_TAG_ASSIGNMENTS).select("vendor_id, tag_id, vendor_tags(id, name, is_active)").in("vendor_id", ids).is("removed_at", null),
     c.from(CRM_TASKS).select("vendor_id, status, due_at").in("vendor_id", ids).in("status", ["open", "in_progress"]),
     c.from(CRM_CONTACTS).select("vendor_id, name").in("vendor_id", ids).eq("is_primary", true).eq("is_active", true),
@@ -176,6 +181,10 @@ export async function listVendorCrmDirectory(rawQuery: Record<string, unknown>):
       total_credits: (v.total_credits as number) ?? null,
       onboarding_stage: p.onboarding_stage ?? null,
       relationship_status: p.relationship_status ?? null,
+      acquisition_source: p.acquisition_source ?? null,
+      acquisition_channel: p.acquisition_channel ?? null,
+      acquisition_owner: p.acquisition_owner ?? null,
+      acquisition_completed_at: p.acquisition_completed_at ?? null,
       next_follow_up_at: p.next_follow_up_at ?? null,
       last_interaction_at: p.last_interaction_at ?? null,
       active_tags: tagsById.get(v.id as string) ?? [],
@@ -212,7 +221,7 @@ export async function getVendorCoreFacts(vendorId: string): Promise<VendorCoreFa
 export async function getVendorCrmProfile(vendorId: string): Promise<VendorCrmProfileRecord | null> {
   const id = requireUuid(vendorId, "vendorId");
   const { data, error } = await db().from(CRM_PROFILES)
-    .select("vendor_id, onboarding_stage, relationship_status, account_manager_profile_id, next_follow_up_at, last_interaction_at, inactive_reason, company_type, years_in_business, team_size, capability_notes, residential_commercial_scope, budget_band, monthly_capacity_notes, material_notes, warranty_notes, preferred_localities, excluded_localities, travel_radius_km, campaign_notes, created_at, updated_at, created_by, updated_by")
+    .select("vendor_id, onboarding_stage, relationship_status, acquisition_source, acquisition_channel, acquisition_owner, aarohi_prospect_id, aarohi_handoff_id, acquisition_completed_at, account_manager_profile_id, next_follow_up_at, last_interaction_at, inactive_reason, company_type, years_in_business, team_size, capability_notes, residential_commercial_scope, budget_band, monthly_capacity_notes, material_notes, warranty_notes, preferred_localities, excluded_localities, travel_radius_km, campaign_notes, created_at, updated_at, created_by, updated_by")
     .eq("vendor_id", id).maybeSingle();
   assertCrmRead(error, "profile");
   return (data as VendorCrmProfileRecord | null) ?? null;

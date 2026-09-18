@@ -24,7 +24,7 @@ import {
   Toolbar,
 } from "../AdminPrimitives";
 import type { VendorCrmDirectoryResult, VendorCrmDirectoryRow } from "@/services/vendorCrmService";
-import { VENDOR_CRM_ONBOARDING_STAGES, VENDOR_CRM_RELATIONSHIP_STATUSES } from "@/lib/crm/vendorCrmContracts";
+import { VENDOR_CRM_ACQUISITION_SOURCES, VENDOR_CRM_ONBOARDING_STAGES, VENDOR_CRM_RELATIONSHIP_STATUSES } from "@/lib/crm/vendorCrmContracts";
 
 type Query = Record<string, string | undefined>;
 
@@ -44,6 +44,7 @@ const FILTER_LABELS: Record<string, string> = {
   enabled: "Enabled",
   onboarding_stage: "Stage",
   relationship_status: "Relationship",
+  source: "Source",
   tagId: "Tag",
   taskState: "Tasks",
 };
@@ -126,6 +127,15 @@ export function VendorCrmDirectory({
       },
     },
     {
+      header: "Source",
+      cell: (r: VendorCrmDirectoryRow) => (
+        <span className="flex flex-col items-start gap-1">
+          {r.acquisition_source ? <StatusBadge value={r.acquisition_source} tone="cyan" /> : <Muted>Not attributed</Muted>}
+          {r.acquisition_channel ? <Muted>{r.acquisition_channel}</Muted> : null}
+        </span>
+      ),
+    },
+    {
       header: "CRM stage",
       cell: (r: VendorCrmDirectoryRow) => (
         <span className="flex flex-col items-start gap-1">
@@ -189,7 +199,7 @@ export function VendorCrmDirectory({
     },
   ];
 
-  const hasActiveFilter = ["search", "category", "city", "verification", "enabled", "onboarding_stage", "relationship_status", "tagId", "taskState"].some((k) => query[k]);
+  const hasActiveFilter = ["search", "category", "city", "verification", "enabled", "onboarding_stage", "relationship_status", "source", "tagId", "taskState"].some((k) => query[k]);
 
   const activeFilters = Object.keys(FILTER_LABELS)
     .filter((key) => query[key])
@@ -226,6 +236,7 @@ export function VendorCrmDirectory({
             <SelectFilter label="Enabled" value={query.enabled === "true" ? "Enabled" : query.enabled === "false" ? "Disabled" : "All"} options={["All", "Enabled", "Disabled"]} onChange={(v) => apply({ enabled: v === "Enabled" ? "true" : v === "Disabled" ? "false" : undefined })} />
             <SelectFilter label="Stage" value={selectVal("onboarding_stage")} options={["All", ...VENDOR_CRM_ONBOARDING_STAGES]} onChange={(v) => apply({ onboarding_stage: v })} />
             <SelectFilter label="Relationship" value={selectVal("relationship_status")} options={["All", ...VENDOR_CRM_RELATIONSHIP_STATUSES]} onChange={(v) => apply({ relationship_status: v })} />
+            <SelectFilter label="Source" value={selectVal("source")} options={["All", ...VENDOR_CRM_ACQUISITION_SOURCES]} onChange={(v) => apply({ source: v })} />
             <SelectFilter label="Tag" value={tags.find((t) => t.id === query.tagId)?.name ?? "All"} options={["All", ...tags.map((t) => t.name)]} onChange={(name) => apply({ tagId: tags.find((t) => t.name === name)?.id })} />
             <SelectFilter label="Tasks" value={query.taskState === "open" ? "Open" : query.taskState === "overdue" ? "Overdue" : "All"} options={["All", "Open", "Overdue"]} onChange={(v) => apply({ taskState: v === "Open" ? "open" : v === "Overdue" ? "overdue" : undefined })} />
             {hasActiveFilter ? <SecondaryButton onClick={() => startTransition(() => router.push("/admin/vendor-crm"))}>Reset</SecondaryButton> : null}

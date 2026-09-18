@@ -9,6 +9,7 @@
 import type { DirectoryPage } from "@/lib/adminPaging";
 import type {
   VendorContactChannel,
+  VendorCrmAcquisitionSource,
   VendorCrmOnboardingStage,
   VendorCrmRelationshipStatus,
   VendorCrmResComScope,
@@ -52,6 +53,12 @@ export interface VendorCrmProfileRecord {
   vendor_id: string;
   onboarding_stage: VendorCrmOnboardingStage;
   relationship_status: VendorCrmRelationshipStatus;
+  acquisition_source: VendorCrmAcquisitionSource | null;
+  acquisition_channel: string | null;
+  acquisition_owner: string | null;
+  aarohi_prospect_id: string | null;
+  aarohi_handoff_id: string | null;
+  acquisition_completed_at: string | null;
   account_manager_profile_id: string | null;
   next_follow_up_at: string | null;
   last_interaction_at: string | null;

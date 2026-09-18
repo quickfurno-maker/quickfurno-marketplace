@@ -970,9 +970,9 @@
       "independentRemoteRelistVerified": true,
       "remoteHistoryCountObservedAtApply": false,
       "remoteHistoryCountAfterApply": null,
-      "appliedToProduction": false,
-      "productionVersionStatus": "NOT_APPLIED_VERIFIED_ABSENT",
-      "requiresSeparateProductionDeploymentGate": true,
+      "appliedToProduction": true,
+      "productionVersionStatus": "PRESENT_IN_PRODUCTION_HISTORY",
+      "requiresSeparateProductionDeploymentGate": false,
       "applyExecutorProvenance": "SUPABASE_CLI_DB_PUSH_ISOLATED_TEMP_WORKSPACE_LINKED_TO_STAGING",
       "isolatedWorkspaceLocalMigrationCount": 41,
       "isolatedWorkspaceRemoteMigrationCountBeforeApply": 40,
@@ -981,8 +981,11 @@
       ],
       "stagingSchemaTablesVerified": 13,
       "stagingSchemaRpcsVerified": 4,
-      "productionHistoryVersionPresent": false,
-      "productionAarohiSchemaPresent": false,
+      "productionHistoryVersionPresent": true,
+      "productionAarohiSchemaPresent": true,
+      "productionAppliedExactlyOnce": true,
+      "productionSchemaTablesVerified": 13,
+      "productionSchemaRpcsVerified": 4,
       "evidencePath": "docs/QF-AAROHI-ACQUISITION-CRM-STAGING-CERTIFICATION.md"
     }
   ],
@@ -1097,6 +1100,17 @@
       "appliedToProduction": false,
       "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
       "remoteHistoryCountObservedAtApply": false,
+      "requiresSeparateStagingDeploymentGate": true
+    },
+    {
+      "version": "20260918093000",
+      "name": "aarohi_anisha_vendor_crm_handoff",
+      "path": "supabase/migrations/20260918093000_aarohi_anisha_vendor_crm_handoff.sql",
+      "sha256": "d2f071040b004bab3d8589a5f8f56dedec2201e5663806eba320ee7a971c99f9",
+      "phase": "QF-AAROHI-ANISHA-HANDOFF",
+      "operationalStatus": "PENDING",
+      "appliedToStaging": false,
+      "appliedToProduction": false,
       "requiresSeparateStagingDeploymentGate": true
     }
   ],

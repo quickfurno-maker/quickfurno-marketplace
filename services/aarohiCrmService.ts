@@ -15,13 +15,13 @@ export async function listActiveAarohiCities(){
 
 export async function getAarohiOverview(days=7){
   const db=adminClient(); const since=new Date(Date.now()-Math.max(1,Math.min(days,365))*86400000).toISOString();
-  const count=(q:any)=>q.select("id",{count:"exact",head:true}).gte("created_at",since).then((r:any)=>{if(r.error) throw r.error; return r.count??0;});
+  const count=(q:any,timestampColumn="created_at")=>q.select("id",{count:"exact",head:true}).gte(timestampColumn,since).then((r:any)=>{if(r.error) throw r.error; return r.count??0;});
   const stageCount=(stage:string)=>db.from("aarohi_prospects").select("id",{count:"exact",head:true}).eq("prospect_stage",stage).gte("created_at",since).then(r=>{if(r.error) throw r.error; return r.count??0;});
   const [newProspects,qualified,outreachReady,interested,won,followupsDue,activeConversations,handoffs] = await Promise.all([
     count(db.from("aarohi_prospects")), stageCount("QUALIFIED"), stageCount("OUTREACH_READY"), stageCount("INTERESTED"), stageCount("WON"),
     db.from("aarohi_tasks").select("id",{count:"exact",head:true}).in("status",["OPEN","IN_PROGRESS"]).lt("due_at",now()).then(r=>{if(r.error)throw r.error;return r.count??0;}),
     db.from("aarohi_conversations").select("id",{count:"exact",head:true}).in("state",["OPEN","HUMAN"]).then(r=>{if(r.error)throw r.error;return r.count??0;}),
-    count(db.from("aarohi_handoffs")),
+    count(db.from("aarohi_handoffs"),"completed_at"),
   ]);
   const stages=["DISCOVERED","ENRICHED","QUALIFIED","CONTACTED","ENGAGED","INTERESTED","CONVERSION","WON"];
   const funnel=await Promise.all(stages.map(async stage=>({stage,count:await stageCount(stage)})));

@@ -155,6 +155,9 @@ test("projection service has no vendor, payment, package, send, or provider muta
   assert.doesNotMatch(projectionService, /from\("vendor_package_orders"\).*\.(?:insert|upsert|update|delete)/s);
   assert.doesNotMatch(projectionService, /META_ACCESS_TOKEN|WHATSAPP_TOKEN|sendWhatsApp|provider.*send/i);
 });
+test("overview uses the handoff completion timestamp", () => {
+  assert.match(crmService, /count\(db\.from\("aarohi_handoffs"\),"completed_at"\)/);
+});
 test("CRM service reads Core truth instead of writing vendor/payment authority", () => {
   assert.match(crmService, /from\("vendors"\)\.select/);
   assert.match(crmService, /from\("vendor_packages"\)\.select/);

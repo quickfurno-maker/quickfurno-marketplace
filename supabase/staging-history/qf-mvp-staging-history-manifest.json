@@ -613,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 25,
+    "postAnchorMigrationCount": 26,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -927,7 +927,7 @@
       "sha256": "6c495d1eb0262fd18eea6309f2ad01dd5ef9c091fa6d9d9da47e58abb1155796",
       "phase": "QF-MVP-40",
       "operationalStatus": "APPLIED_TO_STAGING",
-      "purpose": "Creates public.qf_quiesce_meta_canary_v1 — the closure-only de-escalation that takes the Meta WhatsApp runtime policy from canary (or an already-exact readiness posture) down to the existing readiness posture, leaving outbound OFF while webhook processing stays ON so a late delivery-status callback is still accepted, and deactivating every active canary destination and template mapping. It can never reach active or canary, never enables outbound, never creates a policy row, never writes communication_provider_accounts and refuses every other prior state including disabled. Grants no direct table mutation and seeds no data. Applying it arms nothing.",
+      "purpose": "Creates public.qf_quiesce_meta_canary_v1 \u2014 the closure-only de-escalation that takes the Meta WhatsApp runtime policy from canary (or an already-exact readiness posture) down to the existing readiness posture, leaving outbound OFF while webhook processing stays ON so a late delivery-status callback is still accepted, and deactivating every active canary destination and template mapping. It can never reach active or canary, never enables outbound, never creates a policy row, never writes communication_provider_accounts and refuses every other prior state including disabled. Grants no direct table mutation and seeds no data. Applying it arms nothing.",
       "appliedExactlyOnce": false,
       "appliedByThisPhase": false,
       "appliedToStaging": true,
@@ -987,6 +987,28 @@
       "productionSchemaTablesVerified": 13,
       "productionSchemaRpcsVerified": 4,
       "evidencePath": "docs/QF-AAROHI-ACQUISITION-CRM-STAGING-CERTIFICATION.md"
+    },
+    {
+      "version": "20260918093000",
+      "name": "aarohi_anisha_vendor_crm_handoff",
+      "path": "supabase/migrations/20260918093000_aarohi_anisha_vendor_crm_handoff.sql",
+      "sha256": "d2f071040b004bab3d8589a5f8f56dedec2201e5663806eba320ee7a971c99f9",
+      "phase": "QF-AAROHI-ANISHA-HANDOFF",
+      "operationalStatus": "APPLIED_TO_STAGING",
+      "appliedEvidenceMarker": "QF_AAROHI_ANISHA_HANDOFF_STAGING_MIGRATION_APPLIED_AND_VERIFIED",
+      "appliedEvidenceType": "FIRST_PARTY_EXACT_ONE_DRY_RUN_VERIFIED_ISOLATED_WORKSPACE_STAGING_EXECUTION",
+      "appliedToStaging": true,
+      "appliedExactlyOnceToStaging": true,
+      "stagingRemoteVersionStatus": "PRESENT_IN_STAGING_HISTORY",
+      "independentRemoteRelistVerified": true,
+      "remoteHistoryCountObservedAtApply": false,
+      "remoteHistoryCountAfterApply": null,
+      "appliedToProduction": false,
+      "productionVersionStatus": "NOT_APPLIED_VERIFIED_ABSENT",
+      "productionHistoryVersionPresent": false,
+      "requiresSeparateProductionDeploymentGate": true,
+      "stagingBridgeColumnsVerified": 6,
+      "stagingHandoffRpcVerified": true
     }
   ],
   "pendingPostAnchorMigrations": [
@@ -997,7 +1019,7 @@
       "sha256": "b3bd351c61c81b02aced5257507412d45ad2d77075265f644633c699384d42e2",
       "phase": "QF-MVP-80.14A",
       "operationalStatus": "PENDING",
-      "purpose": "Creates public.qf_activate_meta_lead_assignment_v1 — the ONLY authority that can assign activation_status=active, scoped to meta_whatsapp_cloud/whatsapp/lead_assignment_alert/en. Applying it arms nothing.",
+      "purpose": "Creates public.qf_activate_meta_lead_assignment_v1 \u2014 the ONLY authority that can assign activation_status=active, scoped to meta_whatsapp_cloud/whatsapp/lead_assignment_alert/en. Applying it arms nothing.",
       "appliedExactlyOnce": false,
       "appliedByThisPhase": false,
       "appliedToStaging": false,
@@ -1013,7 +1035,7 @@
       "sha256": "07cab7d17940be3c4ad47eae01b02d6bd9409bc1a8e215b171bea086578e6e63",
       "phase": "QF-MVP-50.6",
       "operationalStatus": "PENDING",
-      "purpose": "Creates public.qf_automation_entity_state_v1, public.qf_cancel_orphan_automation_job_v1 and public.qf_cancel_orphan_automation_job_transport_v1 — the only authority that may move an orphan automation job to the existing terminal cancelled status. Grants no direct table mutation and seeds no data.",
+      "purpose": "Creates public.qf_automation_entity_state_v1, public.qf_cancel_orphan_automation_job_v1 and public.qf_cancel_orphan_automation_job_transport_v1 \u2014 the only authority that may move an orphan automation job to the existing terminal cancelled status. Grants no direct table mutation and seeds no data.",
       "appliedExactlyOnce": false,
       "appliedByThisPhase": false,
       "appliedToStaging": false,
@@ -1029,7 +1051,7 @@
       "sha256": "e71e8739a5d776c75edcb0ae10470d7d9589eb7949326411ea26540de1baa809",
       "phase": "QF-MVP-50.7",
       "operationalStatus": "PENDING",
-      "purpose": "Creates public.qf_automation_vendor_business_state_v1, public.qf_cancel_stale_automation_job_v1 and public.qf_cancel_stale_automation_job_transport_v1 — the only authority that may terminalize a queued job whose entity still exists but whose current business truth is provably stale. Grants no direct table mutation and seeds no data.",
+      "purpose": "Creates public.qf_automation_vendor_business_state_v1, public.qf_cancel_stale_automation_job_v1 and public.qf_cancel_stale_automation_job_transport_v1 \u2014 the only authority that may terminalize a queued job whose entity still exists but whose current business truth is provably stale. Grants no direct table mutation and seeds no data.",
       "appliedExactlyOnce": false,
       "appliedByThisPhase": false,
       "appliedToStaging": false,
@@ -1061,7 +1083,7 @@
       "sha256": "f1f03dfe265fbbe245bcf4a53bb91f8b144f1b99aafa9de9f3108e8a244c8cf5",
       "phase": "QF-MVP-40.14",
       "operationalStatus": "PENDING",
-      "purpose": "Seeds exactly four APPROVED but INACTIVE Meta/WhatsApp provider template mappings (lead_received, client_lead_status_update, client_matching_update, vendor_onboarding_reminder) and creates public.qf_activate_meta_transactional_mapping_v1 — the only authority that can activate one of them, one key per call, from a closed four-key vocabulary with every provider/category/language/version/schema value hard-coded. Ensures the four communication_templates catalogue rows the mapping foreign key requires, creating only on proven absence and never modifying an existing row. Refuses drift on any existing mapping rather than overwriting it. After its own seed completes, REVOKES direct INSERT and UPDATE on communication_provider_template_mappings from service_role — preserving SELECT and granting no table privilege — so the SECURITY DEFINER RPC is the EXCLUSIVE activation route rather than one route beside an unguarded direct write; proves at apply time that service_role holds SELECT but not INSERT/UPDATE/DELETE, and that qf_activate_meta_lead_assignment_v1, qf_activate_meta_transactional_mapping_v1 and qf_disable_meta_canary_v1 are all still SECURITY DEFINER and still executable by service_role. Applying it activates nothing, writes no runtime policy, no canary destination and no provider account, and creates zero send authority.",
+      "purpose": "Seeds exactly four APPROVED but INACTIVE Meta/WhatsApp provider template mappings (lead_received, client_lead_status_update, client_matching_update, vendor_onboarding_reminder) and creates public.qf_activate_meta_transactional_mapping_v1 \u2014 the only authority that can activate one of them, one key per call, from a closed four-key vocabulary with every provider/category/language/version/schema value hard-coded. Ensures the four communication_templates catalogue rows the mapping foreign key requires, creating only on proven absence and never modifying an existing row. Refuses drift on any existing mapping rather than overwriting it. After its own seed completes, REVOKES direct INSERT and UPDATE on communication_provider_template_mappings from service_role \u2014 preserving SELECT and granting no table privilege \u2014 so the SECURITY DEFINER RPC is the EXCLUSIVE activation route rather than one route beside an unguarded direct write; proves at apply time that service_role holds SELECT but not INSERT/UPDATE/DELETE, and that qf_activate_meta_lead_assignment_v1, qf_activate_meta_transactional_mapping_v1 and qf_disable_meta_canary_v1 are all still SECURITY DEFINER and still executable by service_role. Applying it activates nothing, writes no runtime policy, no canary destination and no provider account, and creates zero send authority.",
       "appliedExactlyOnce": false,
       "appliedByThisPhase": false,
       "appliedToStaging": false,
@@ -1100,17 +1122,6 @@
       "appliedToProduction": false,
       "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
       "remoteHistoryCountObservedAtApply": false,
-      "requiresSeparateStagingDeploymentGate": true
-    },
-    {
-      "version": "20260918093000",
-      "name": "aarohi_anisha_vendor_crm_handoff",
-      "path": "supabase/migrations/20260918093000_aarohi_anisha_vendor_crm_handoff.sql",
-      "sha256": "d2f071040b004bab3d8589a5f8f56dedec2201e5663806eba320ee7a971c99f9",
-      "phase": "QF-AAROHI-ANISHA-HANDOFF",
-      "operationalStatus": "PENDING",
-      "appliedToStaging": false,
-      "appliedToProduction": false,
       "requiresSeparateStagingDeploymentGate": true
     }
   ],
@@ -1207,9 +1218,9 @@
       "directReadPerformedByThisPhase": false,
       "directReadBlockedBy": "POOLER_PASSWORD_AUTHENTICATION_REJECTED_28P01",
       "corroboratingReadOnlyObjectProbes": [
-        "public.audit_logs present — created only by 20260817000000",
-        "public.vendors.geo_point present — created only by 20260816000000",
-        "public.leads.geo_point present — created only by 20260816000000"
+        "public.audit_logs present \u2014 created only by 20260817000000",
+        "public.vendors.geo_point present \u2014 created only by 20260816000000",
+        "public.leads.geo_point present \u2014 created only by 20260816000000"
       ]
     },
     "production": {

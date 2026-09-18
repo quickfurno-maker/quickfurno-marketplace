@@ -205,13 +205,18 @@ test("foundation migration is certified on staging and production", () => {
   assert.equal(pin.requiresSeparateProductionDeploymentGate, false);
   assert.equal(manifest.pendingPostAnchorMigrations.some((x) => x.version === "20260917000000"), false);
 });
-test("Aarohi to Anisha handoff migration is pinned pending its deployment gate", () => {
-  const pin = manifest.pendingPostAnchorMigrations.find((x) => x.version === "20260918093000");
+test("Aarohi to Anisha handoff migration is staging-applied and production-gated", () => {
+  const pin = manifest.stagingAppliedPostAnchorMigrations.find((x) => x.version === "20260918093000");
   assert.ok(pin);
-  assert.equal(pin.operationalStatus, "PENDING");
-  assert.equal(pin.appliedToStaging, false);
+  assert.equal(pin.operationalStatus, "APPLIED_TO_STAGING");
+  assert.equal(pin.appliedToStaging, true);
+  assert.equal(pin.appliedExactlyOnceToStaging, true);
+  assert.equal(pin.stagingRemoteVersionStatus, "PRESENT_IN_STAGING_HISTORY");
+  assert.equal(pin.independentRemoteRelistVerified, true);
   assert.equal(pin.appliedToProduction, false);
-  assert.equal(pin.requiresSeparateStagingDeploymentGate, true);
+  assert.equal(pin.productionVersionStatus, "NOT_APPLIED_VERIFIED_ABSENT");
+  assert.equal(pin.requiresSeparateProductionDeploymentGate, true);
+  assert.equal(manifest.pendingPostAnchorMigrations.some((x) => x.version === "20260918093000"), false);
   const canonical = handoffBridge.replace(/\r\n/g,"\n").replace(/\r/g,"\n");
   const hash = crypto.createHash("sha256").update(Buffer.from(canonical,"utf8")).digest("hex");
   assert.equal(pin.sha256, hash);

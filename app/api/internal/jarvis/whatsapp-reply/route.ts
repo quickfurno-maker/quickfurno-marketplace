@@ -8,7 +8,10 @@ import {
   qfjWhatsAppReplySigningDomain,
 } from "@/lib/jarvis/whatsAppReplyContract";
 import { resolveQfJarvisRuntimePolicy } from "@/lib/jarvis/runtimePolicy";
-import { queueJarvisConversationReply } from "@/services/conversationalWhatsAppService";
+import {
+  queueJarvisConversationReply,
+  recordJarvisWhatsAppReplyReceipt,
+} from "@/services/conversationalWhatsAppService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,6 +68,26 @@ export async function POST(request: Request): Promise<Response> {
       requestId: parsed.requestId,
       status: queued.reason,
     });
+  }
+
+  const receipt = await recordJarvisWhatsAppReplyReceipt({
+    requestId: parsed.requestId,
+    version: parsed.version,
+    issuedAt: parsed.issuedAt,
+    idempotencyKey: parsed.idempotencyKey,
+    outboxId: queued.value.outboxId,
+    rawBody: raw,
+  });
+  if (!receipt.ok) {
+    if (receipt.reason === "replay") {
+      return reply(409, {
+        protocol: QFJ_WHATSAPP_REPLY_PROTOCOL,
+        version: parsed.version,
+        requestId: parsed.requestId,
+        status: "replay_rejected",
+      });
+    }
+    return reply(503, { error: "service_unavailable" });
   }
 
   return reply(202, {

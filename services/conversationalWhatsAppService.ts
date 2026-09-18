@@ -8,7 +8,6 @@ import { FetchHttpTransport } from "../lib/communication/httpTransport";
 import { evaluateMetaOutboundGateForMessage } from "./communicationProviderRuntimeService";
 import { effectiveProviderOutcomeCertainty } from "../lib/communication/providers/providerOutcome";
 import { resolveWhatsAppConciergeRouting } from "../lib/communication/whatsAppConciergeRouting";
-import { deriveJarvisNormalizedText } from "../lib/communication/providers/metaWhatsAppInbound";
 import {
   parseSerializedQfWhatsAppExperience,
   renderQfWhatsAppExperienceFallback,
@@ -17,6 +16,10 @@ import {
   textExperience,
   type QfWhatsAppExperienceV1,
 } from "../lib/jarvis/whatsAppExperience";
+import {
+  deriveQfWhatsAppInboundMaterial,
+  type QfWhatsAppInboundMaterialV1,
+} from "../lib/jarvis/whatsAppInboundMaterial";
 
 const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const CHANNEL = "whatsapp";
@@ -375,6 +378,7 @@ export async function readJarvisWhatsAppTurnMaterial(input: {
   dataClass: "HOSTED_ALLOWED";
   subjectRef?: string;
   receivedAt: string;
+  inbound: QfWhatsAppInboundMaterialV1;
   normalizedText?: string;
 }>> {
   const [{ data: conversation, error: conversationError }, { data: inbound, error: inboundError }] = await Promise.all([
@@ -400,10 +404,11 @@ export async function readJarvisWhatsAppTurnMaterial(input: {
   if (!["AAROHI", "ANISHA", "RIYA"].includes(actor) || !["prospect", "client", "vendor"].includes(subjectType)) {
     return { ok: false, reason: "conversation_not_sendable" };
   }
-  const normalizedText = deriveJarvisNormalizedText(
-    String(inbound.message_type),
-    (inbound.content_minimized ?? {}) as Record<string, unknown>,
-  ) ?? undefined;
+  const inboundMaterial = deriveQfWhatsAppInboundMaterial({
+    messageType: inbound.message_type,
+    contentMinimized: (inbound.content_minimized ?? {}) as Record<string, unknown>,
+  });
+  const normalizedText = inboundMaterial.normalizedText;
 
   const subjectRef = inbound.identity_confidence === "exact" &&
     inbound.resolved_principal_type === subjectType &&
@@ -418,6 +423,7 @@ export async function readJarvisWhatsAppTurnMaterial(input: {
     dataClass: "HOSTED_ALLOWED",
     ...(subjectRef ? { subjectRef } : {}),
     receivedAt: inbound.received_at,
+    inbound: inboundMaterial,
     ...(normalizedText ? { normalizedText } : {}),
   }};
 }

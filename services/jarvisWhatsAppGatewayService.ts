@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { adminClient } from "../lib/supabase";
+import { deriveJarvisNormalizedText } from "../lib/communication/providers/metaWhatsAppInbound";
 import {
   QFJ_WHATSAPP_TURN_KEY_ID_HEADER,
   QFJ_WHATSAPP_TURN_PATH,
@@ -108,11 +109,10 @@ export async function dispatchNextJarvisWhatsAppTurn(): Promise<{ processed: boo
     return { processed: true, status: "cancelled" };
   }
 
-  const text = inbound.message_type === "text" && typeof inbound.content_minimized?.text === "string"
-    ? inbound.content_minimized.text.slice(0, 4096)
-    : ["button_reply", "list_reply"].includes(String(inbound.message_type)) && typeof inbound.content_minimized?.title === "string"
-      ? inbound.content_minimized.title.slice(0, 4096)
-      : undefined;
+  const text = deriveJarvisNormalizedText(
+    String(inbound.message_type),
+    (inbound.content_minimized ?? {}) as Record<string, unknown>,
+  ) ?? undefined;
   const result = await sendJarvisWhatsAppTurn({
     requestId: randomUUID(),
     issuedAt: new Date().toISOString(),

@@ -10,6 +10,7 @@ import {
   adminPackagesPage,
   adminPaymentsPage,
   adminReportsPage,
+  adminReviewsPage,
   adminSettingsPage,
   adminSubscriptionsPage,
   adminUsersPage,
@@ -63,6 +64,12 @@ async function loadSectionPayload(section: AdminSectionKey, searchParams: Search
       return adminUsersPage({ page: param(searchParams, "page") });
     case "audit-logs":
       return adminAuditLogsPage({ page: param(searchParams, "page"), search: param(searchParams, "search") });
+    case "reviews":
+      return adminReviewsPage({
+        page: param(searchParams, "page"),
+        status: param(searchParams, "status"),
+        search: param(searchParams, "search"),
+      });
     case "reports":
       return adminReportsPage();
     case "analytics":
@@ -71,7 +78,7 @@ async function loadSectionPayload(section: AdminSectionKey, searchParams: Search
       return adminCrmBase();
     default:
       // Sections with no server data (aos, automations,
-      // website-content, reviews) and self-fetching tabbed sections
+      // website-content) and self-fetching tabbed sections
       // (lead-distribution) load nothing here.
       return { ok: true as const, data: null };
   }

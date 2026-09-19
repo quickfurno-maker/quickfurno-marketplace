@@ -16,6 +16,7 @@ import * as vendorPackageOrders from "../services/vendorPackageOrderService";
 import * as vendorProfileChanges from "../services/vendorProfileChangeService";
 import * as vendorNotifications from "../services/vendorNotificationService";
 import * as vendorSupport from "../services/vendorSupportService";
+import * as vendorReviews from "../services/vendorReviewService";
 import * as admin from "../services/adminService";
 import * as adminDirectory from "../services/adminDirectoryService";
 import * as adminSections from "../services/adminSectionService";
@@ -310,6 +311,15 @@ export async function submitVendorRegistration(input: VendorRegistrationInput) {
 
 export async function submitFreeVendorProfileInterest(input: CaptureFreeVendorInterestInput) {
   return captureFreeVendorInterest(input);
+}
+
+export async function submitVendorReview(input: vendorReviews.SubmitVendorReviewInput) {
+  const result = await vendorReviews.submitVerifiedVendorReview(input);
+  if (result.ok) {
+    revalidatePath(`/vendors/${input.vendorId}`);
+    revalidatePath("/admin/reviews");
+  }
+  return result;
 }
 
 export async function submitVendorAccountRegistration(input: VendorRegistrationInput & { password: string }) {
@@ -620,6 +630,7 @@ export const adminSettingsPage    = async () => asAdmin(() => adminSections.getA
 export const adminNotificationsPage = async () => asAdmin(() => adminSections.getAdminNotificationsPage());
 export const adminUsersPage       = async (query: { page?: unknown }) => asAdmin(() => adminSections.getAdminUsersPage(query));
 export const adminAuditLogsPage   = async (query: adminSections.AdminAuditLogsQuery) => asAdmin(() => adminSections.getAdminAuditLogsPage(query));
+export const adminReviewsPage     = async (query: vendorReviews.AdminReviewsQuery) => asAdmin(() => vendorReviews.getAdminReviewsPage(query));
 export const adminReportsPage     = async () => asAdmin(() => adminSections.getAdminReportsPage());
 export const adminAnalyticsPage   = async () => asAdmin(() => adminSections.getAdminAnalyticsPage());
 export const adminCrmBase         = async () => asAdmin(() => adminSections.getAdminCrmBase());
@@ -764,6 +775,17 @@ export const adminProcessDueLeadAssignmentQueue = async (limit?: number) =>
 
 export const adminMarkFreeVendorInterestStatus = async (interestId: string, status: string, note?: string) =>
   asAdmin(() => markInterestStatus(interestId, status, note));
+
+export const adminModerateVendorReview = async (reviewId: string, status: string, note?: string) =>
+  asAdmin(async (actor) => {
+    const result = await vendorReviews.moderateVendorReview(reviewId, status, actor, note);
+    revalidatePath("/admin/reviews");
+    if (result.ok) {
+      const { data } = await adminClient().from("vendor_reviews").select("vendor_id").eq("id", reviewId).maybeSingle();
+      if (data?.vendor_id) revalidatePath(`/vendors/${data.vendor_id}`);
+    }
+    return result;
+  });
 
 export const adminCreatePayment = async (vendorId: string, packageId: string, amount: number, method: string, txn?: string) =>
   asAdmin(() => packages.createManualPayment(vendorId, packageId, amount, method, txn));

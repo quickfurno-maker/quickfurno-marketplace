@@ -9,14 +9,28 @@ export type QuickFurnoCategory =
 
 export type QualityLevel = "Budget" | "Standard" | "Premium";
 
+export type VendorReviewItem = {
+  id: string;
+  reviewerDisplayName: string;
+  rating: number;
+  reviewText: string;
+  createdAt: string;
+  category: string | null;
+  city: string | null;
+};
+
 export type Vendor = {
   slug: string;
   businessName: string;
   city: "Pune";
   category: QuickFurnoCategory;
   subCategory: string;
+  /** Approved-review average only. 0 means no approved reviews. */
   rating: number;
+  /** Count of approved reviews only. */
   reviews: number;
+  /** Approved public reviews, loaded on profile reads. */
+  reviewItems?: VendorReviewItem[];
   rate: string;
   experience: string;
   responseTime: string;

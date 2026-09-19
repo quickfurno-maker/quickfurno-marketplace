@@ -101,6 +101,14 @@ export function VendorListingCard({
             <p className="qf-vl-card-services">{vendor.services.slice(0, 3).join(" · ")}</p>
           ) : null}
 
+          {vendor.reviewCount > 0 && vendor.averageRating !== null ? (
+            <p className="qf-vl-card-rating" aria-label={`${vendor.averageRating.toFixed(1)} out of 5 from ${vendor.reviewCount} reviews`}>
+              <strong>{vendor.averageRating.toFixed(1)} ★</strong>
+              <span>·</span>
+              <span>{vendor.reviewCount} {vendor.reviewCount === 1 ? "review" : "reviews"}</span>
+            </p>
+          ) : null}
+
           <p className="qf-vl-card-desc">{vendor.description}</p>
 
           {facts.length > 0 ? (

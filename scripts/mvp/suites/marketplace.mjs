@@ -340,7 +340,7 @@ export const suite = {
 
     // --- QF-UI-V2-07: public vendor profile truth model --------------------
     {
-      name: 'profile view drops defaulted rating / reviews / experience / response',
+      name: 'profile view exposes no rating without approved reviews and drops legacy defaults',
       run: () => {
         const view = toProfileView({
           slug: 'v-1', businessName: 'Shree Balaji Interiors', city: 'Pune',
@@ -349,11 +349,15 @@ export const suite = {
           verified: true, activePaidPlan: true, source: 'supabase',
         });
         const keys = Object.keys(view);
-        const banned = ['rating', 'reviews', 'responseTime', 'experience',
+        const banned = ['rating', 'responseTime', 'experience',
                         'distance', 'openStatus', 'premium', 'warranty'];
         for (const key of banned) {
-          assertFalse(keys.includes(key), 'profile view must not expose ' + key);
+          assertFalse(keys.includes(key), 'profile view must not expose legacy field ' + key);
         }
+        assertEqual(view.averageRating, null, 'no approved reviews means no average rating');
+        assertEqual(view.reviewCount, 0, 'no approved reviews means zero count');
+        assertEqual(view.reviews.length, 0, 'no approved reviews means no review rows');
+        assertEqual(view.hasReviews, false, 'no approved reviews means hasReviews false');
         const blob = JSON.stringify(view);
         assertFalse(blob.includes('4.2'), 'no defaulted rating');
         assertFalse(blob.includes('Quick response expected'), 'no invented response text');
@@ -421,8 +425,8 @@ export const suite = {
           slug: 'v-4', businessName: 'Nova Interiors', city: 'Pune',
           category: 'Carpenters', rate: 'Price on request', description: 'd',
         });
-        assertEqual(profileSections(sparse).map((x) => x.id).join(','), 'overview',
-          'sparse profile shows only Overview');
+        assertEqual(profileSections(sparse).map((x) => x.id).join(','), 'overview,reviews',
+          'sparse profile keeps the verified review submission section without inventing rating facts');
         assertEqual(profileQuickFacts(sparse).length, 0, 'no invented quick facts');
 
         const rich = toProfileView({
@@ -432,10 +436,50 @@ export const suite = {
           portfolioImages: ['/a.png', '/b.png'],
         });
         assertEqual(profileSections(rich).map((x) => x.id).join(','),
-          'overview,services,portfolio,details', 'rich profile shows all four');
+          'overview,services,portfolio,details,reviews', 'rich profile includes factual sections plus reviews');
         const facts = profileQuickFacts(rich);
         assertTrue(facts.length > 0 && facts.length <= 4, 'between 1 and 4 quick facts');
         assertFalse(JSON.stringify(facts).includes('rating'), 'no rating fact');
+      },
+    },
+    {
+      name: 'approved reviews map exactly into the public profile and rating fact',
+      run: () => {
+        const view = toProfileView({
+          slug: 'v-reviewed', businessName: 'Reviewed Interiors', city: 'Pune',
+          category: 'Interior Designers', description: 'd',
+          rating: 4.5, reviews: 2,
+          reviewItems: [
+            { id: 'r1', reviewerDisplayName: 'Asha K.', rating: 5, reviewText: 'Excellent project execution and communication.', createdAt: '2026-09-01T00:00:00Z', category: 'Interior Designers', city: 'Pune' },
+            { id: 'r2', reviewerDisplayName: 'Rahul M.', rating: 4, reviewText: 'Good work and clear coordination throughout.', createdAt: '2026-09-02T00:00:00Z', category: 'Interior Designers', city: 'Pune' },
+          ],
+        });
+        assertEqual(view.averageRating, 4.5, 'approved average carried exactly');
+        assertEqual(view.reviewCount, 2, 'approved count carried exactly');
+        assertEqual(view.reviews.length, 2, 'approved public rows carried exactly');
+        assertEqual(view.hasReviews, true, 'approved reviews activate review truth');
+        assertTrue(profileSections(view).some((x) => x.id === 'reviews' && x.label === 'Reviews (2)'),
+          'review nav includes approved count');
+        assertTrue(profileQuickFacts(view).some((fact) => fact.label === 'Client rating' && fact.value === '4.5 ★ · 2 reviews'),
+          'quick facts show the approved aggregate only');
+      },
+    },
+    {
+      name: 'vendor review system is server-written, assignment-verified and approval-gated',
+      run: () => {
+        const service = readFileSync('services/vendorReviewService.ts', 'utf8');
+        const publicService = readFileSync('services/publicVendorService.ts', 'utf8');
+        const migration = readFileSync('supabase/migrations/20260919010000_vendor_review_system.sql', 'utf8');
+        assertTrue(service.includes('.from("lead_assignments")'), 'submission verifies a real vendor assignment');
+        assertTrue(service.includes('status: "pending"'), 'new public submissions enter pending moderation');
+        assertTrue(service.includes('.eq("status", "approved")'), 'public review reads are approval-gated');
+        assertTrue(publicService.includes('getApprovedReviewStatsForVendors'), 'public listing uses approved review aggregates');
+        assertFalse(publicService.includes('ratingNum > 0 ? ratingNum : 4.2'), 'legacy 4.2 fallback cannot return');
+        assertTrue(migration.includes('revoke all on table public.vendor_reviews from public, anon, authenticated'),
+          'direct public table access is revoked');
+        assertTrue(migration.includes('grant select, insert, update on table public.vendor_reviews to service_role'),
+          'review writes remain server-side');
+        assertTrue(migration.includes('unique (vendor_id, lead_id)'), 'one review per vendor interaction');
       },
     },
     {

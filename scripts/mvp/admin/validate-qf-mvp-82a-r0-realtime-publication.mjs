@@ -48,7 +48,7 @@ const MIGRATION_COUNT_WITH_R0 = 104;
 // phase — the tree was 103 before it and 104 after it — and must not move. The LIVE
 // tree is a separate, current fact, pinned exactly and separately for the same reason
 // G1 keeps RECONCILIATION_MIGRATION_COUNT apart from MIGRATION_COUNT.
-const LIVE_MIGRATION_COUNT = 116;
+const LIVE_MIGRATION_COUNT = 117;
 
 const rawOf = (p) => readFileSync(resolve(p), "utf8");
 /**
@@ -221,8 +221,8 @@ check("11 no application, UI or inbox source file is part of this phase", () => 
 
 // ---- 12-14. the count truth ------------------------------------------------
 
-check("12-13 R0 grew the tree by exactly one, from 103 to 104; the live tree is 116", () => {
-  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "the live tree is 116");
+check("12-13 R0 grew the tree by exactly one, from 103 to 104; the live tree is 117", () => {
+  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "the live tree is 117");
   // Equivalent offline proof of R0's own contribution: remove this phase's single
   // migration AND every migration added after it, and what remains is exactly the 103
   // that were on main when R0 was written.
@@ -239,7 +239,7 @@ check("12-13 R0 grew the tree by exactly one, from 103 to 104; the live tree is 
 
 check("14 the G1 live pin is the truthful current count", () => {
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
-  assert(/const MIGRATION_COUNT = 116;/.test(g1), "G1 pins the live tree at 116");
+  assert(/const MIGRATION_COUNT = 117;/.test(g1), "G1 pins the live tree at 117");
   // The 80.05 reconciliation count is a HISTORICAL observation and must NOT move:
   // G1 says so itself, and the pending accounting depends on the difference.
   assert(/const RECONCILIATION_MIGRATION_COUNT = 102;/.test(g1),
@@ -322,7 +322,7 @@ check("23 the 80.14A pending record is byte-identical", () => {
   eq(MANIFEST.pendingPostAnchorMigrations[0].version, "20260903040000", "and it is the first entry");
   eq(MANIFEST.pendingPostAnchorMigrations[1].version, "20260905000000", "followed by 50.6");
   eq(MANIFEST.pendingPostAnchorMigrations.length, 8, "the pending set is exactly eight");
-  eq(MANIFEST.pendingPostAnchorMigrations[7].version, "20260915120000", "service availability is the eighth pending authority");
+  eq(MANIFEST.pendingPostAnchorMigrations[7].version, "20260915120000", "service availability remains the eighth pending authority");
 });
 
 check("24 applied and reconciled records are unchanged", () => {
@@ -334,9 +334,9 @@ check("24 applied and reconciled records are unchanged", () => {
     eq(r.appliedToStaging, true, `${r.version} staging`);
     eq(r.appliedToProduction, true, `${r.version} production`);
   }
-  // Current ledger: ten applied + five reconciled + six staging-applied + eight pending = 29.
-  eq(MANIFEST.appliedAnchor.postAnchorMigrationCount, 29, "post-anchor count is twenty-nine");
-  eq((MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length, 6, "six staging-applied");
+  // Current ledger: ten applied + five reconciled + seven staging-applied + eight pending = 30.
+  eq(MANIFEST.appliedAnchor.postAnchorMigrationCount, 30, "post-anchor count is thirty");
+  eq((MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length, 7, "seven staging-applied");
   const replay = MANIFEST.stagingAppliedPostAnchorMigrations[5];
   eq(replay.version, "20260918180500", "callback replay is the sixth staging-applied authority");
   eq(replay.appliedToStaging, true, "callback replay is applied to staging");
@@ -345,7 +345,7 @@ check("24 applied and reconciled records are unchanged", () => {
   eq(replay.productionRemoteHistoryCountAfterApply, 52, "callback replay production history count");
   eq(MANIFEST.appliedPostAnchorMigrations.length + MANIFEST.reconciledPostAnchorMigrations.length +
      MANIFEST.stagingAppliedPostAnchorMigrations.length + MANIFEST.pendingPostAnchorMigrations.length,
-     29, "and the four sets add up to it");
+     30, "and the four sets add up to it");
 });
 
 // ---- 25-26. this phase reaches nothing --------------------------------------
@@ -432,7 +432,7 @@ check("M7 mutant: a manifest SHA that does not match the file", () => {
 check("M8 mutant: leaving the migration count stale", () => {
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
   assert(!/const MIGRATION_COUNT = 103;/.test(g1), "the stale pin is gone");
-  assert(/const MIGRATION_COUNT = 116;/.test(g1), "and replaced by the truthful one");
+  assert(/const MIGRATION_COUNT = 117;/.test(g1), "and replaced by the truthful one");
   // No pin was loosened to an inequality to make this pass.
   assert(!/MIGRATION_COUNT\s*>=|migrations\.length\s*>=/.test(g1), "no `>=` was introduced");
   assert(!/postAnchorLocal\.length\s*>=/.test(g1), "nor on the post-anchor set");

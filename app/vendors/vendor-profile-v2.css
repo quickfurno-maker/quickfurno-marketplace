@@ -568,3 +568,124 @@
   .qf-vprofile-nav a,
   .qf-vprofile-shot { transition-duration: 0.01ms !important; }
 }
+
+/* ==========================================================================
+   Vendor reviews — verified, moderated, evidence-backed
+   ========================================================================== */
+.qf-vreviews { display: grid; gap: 0.9rem; }
+
+.qf-vreviews-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.9rem;
+}
+
+.qf-vreviews-heading h2 { margin-bottom: 0.2rem; }
+
+.qf-vreviews-summary {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 0.05rem;
+  min-width: 112px;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-inset);
+  text-align: right;
+}
+
+.qf-vreviews-summary strong {
+  color: var(--qf-brand-ink);
+  font-size: 1rem;
+}
+
+.qf-vreviews-summary span {
+  color: var(--qf-brand-muted);
+  font-size: 0.75rem;
+}
+
+.qf-vreviews-list { display: grid; gap: 0.55rem; }
+
+.qf-vreview-card {
+  padding: 0.8rem;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  background: var(--qf-brand-inset);
+}
+
+.qf-vreview-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.7rem;
+  align-items: flex-start;
+}
+
+.qf-vreview-card-top > div { display: grid; gap: 0.12rem; }
+.qf-vreview-card-top time { color: var(--qf-brand-faint); font-size: 0.734rem; white-space: nowrap; }
+.qf-vreview-stars { color: #a86200; font-size: 0.812rem; letter-spacing: 0.04em; }
+
+.qf-vreview-card > p:not(.qf-vprofile-note) {
+  margin: 0.55rem 0 0;
+  color: var(--qf-brand-ink-2);
+  font-size: 0.844rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.qf-vreviews-empty {
+  padding: 0.85rem;
+  border: 1px dashed var(--qf-brand-line);
+  border-radius: var(--qf-radius-md);
+  color: var(--qf-brand-muted);
+}
+
+.qf-vreviews-empty p { margin: 0.2rem 0 0; font-size: 0.812rem; line-height: 1.5; }
+
+.qf-vreview-form {
+  display: grid;
+  gap: 0.75rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--qf-brand-line);
+}
+
+.qf-vreview-form h3 { margin: 0; font-size: 0.95rem; color: var(--qf-brand-ink); }
+.qf-vreview-form > div > p { margin: 0.25rem 0 0; font-size: 0.797rem; line-height: 1.5; color: var(--qf-brand-muted); }
+
+.qf-vreview-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.65rem;
+}
+
+.qf-vreview-fields label { display: grid; gap: 0.3rem; }
+.qf-vreview-fields label > span { font-size: 0.766rem; font-weight: 650; color: var(--qf-brand-ink-2); }
+
+.qf-vreview-fields input,
+.qf-vreview-fields select,
+.qf-vreview-fields textarea {
+  width: 100%;
+  border: 1px solid var(--qf-brand-line);
+  border-radius: var(--qf-radius-sm);
+  background: var(--qf-brand-surface);
+  color: var(--qf-brand-ink);
+  font: inherit;
+  font-size: 0.844rem;
+  padding: 0.65rem 0.7rem;
+}
+
+.qf-vreview-fields textarea { resize: vertical; min-height: 110px; }
+.qf-vreview-fields input:focus,
+.qf-vreview-fields select:focus,
+.qf-vreview-fields textarea:focus { outline: 2px solid var(--qf-brand-blue); outline-offset: 1px; }
+
+.qf-vreview-text { grid-column: 1 / -1; }
+.qf-vreview-text small { justify-self: end; color: var(--qf-brand-faint); }
+
+.qf-vreview-message { margin: 0; font-size: 0.797rem; font-weight: 600; }
+.qf-vreview-message.is-success { color: var(--qf-brand-success); }
+.qf-vreview-message.is-error { color: #b42318; }
+
+@media (min-width: 620px) {
+  .qf-vreview-fields { grid-template-columns: minmax(0, 1fr) minmax(160px, 0.55fr); }
+}

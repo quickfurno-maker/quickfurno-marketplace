@@ -6,9 +6,9 @@ export const metadata: Metadata = {
   description:
     "Find verified interior, carpentry, modular, painting, sofa and civil-work professionals in Pune with QuickFurno.",
   openGraph: {
-    title: "QuickFurno | Better Spaces, Happier Lives",
+    title: "QuickFurno | Find the Right Team for Your Home",
     description:
-      "Tell QuickFurno what your home needs and get matched with relevant verified professionals in Pune.",
+      "Tell QuickFurno what you're planning and get matched with up to 3 relevant home professionals in Pune.",
     url: "https://quickfurno.in",
     siteName: "QuickFurno",
     type: "website",

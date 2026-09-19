@@ -57,6 +57,10 @@ export type ListingVendorInput = {
   serviceAreaSummary?: string | null;
   businessHours?: string | null;
   portfolioImages?: string[];
+  /** Approved-review average only; zero means no approved reviews. */
+  rating?: number;
+  /** Approved review count only. */
+  reviews?: number;
 };
 
 /** A vendor reduced to facts we can actually stand behind. */
@@ -81,6 +85,9 @@ export type VendorListingView = {
   initials: string;
   description: string;
   verified: boolean;
+  /** Approved-review truth only. */
+  averageRating: number | null;
+  reviewCount: number;
   /** Drives the contact path. Preserved exactly from upstream authority. */
   activePaidPlan: boolean;
 };
@@ -143,6 +150,11 @@ export function toListingView(vendor: ListingVendorInput): VendorListingView {
     initials: vendorInitials(vendor.businessName),
     description: vendor.description,
     verified: Boolean(vendor.verified),
+    averageRating:
+      Number(vendor.reviews ?? 0) > 0 && Number(vendor.rating ?? 0) > 0
+        ? Number(vendor.rating)
+        : null,
+    reviewCount: Math.max(0, Number(vendor.reviews ?? 0) || 0),
     activePaidPlan: Boolean(vendor.activePaidPlan),
   };
 }
@@ -165,8 +177,8 @@ export const emptyListingFilters: ListingFilters = {
   hasPrice: false,
 };
 
-/** Sort modes backed by real data. No rating / reviews / response sorts exist. */
-export type ListingSort = "recommended" | "name";
+/** Sort modes backed by real data. Rating/reviews are approved-review aggregates only. */
+export type ListingSort = "recommended" | "name" | "rating" | "reviews";
 
 /** Free-text match over fields the vendor actually supplied. */
 export function matchesListingQuery(view: VendorListingView, query: string): boolean {
@@ -216,6 +228,10 @@ export function selectListingVendors<T extends ListingVendorInput>(
   const views = ordered.map(toListingView).filter((view) => matchesListingFilters(view, filters));
   if (sort === "name") {
     views.sort((a, b) => a.businessName.localeCompare(b.businessName));
+  } else if (sort === "rating") {
+    views.sort((a, b) => (b.averageRating ?? 0) - (a.averageRating ?? 0) || b.reviewCount - a.reviewCount);
+  } else if (sort === "reviews") {
+    views.sort((a, b) => b.reviewCount - a.reviewCount || (b.averageRating ?? 0) - (a.averageRating ?? 0));
   }
   return views;
 }

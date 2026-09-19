@@ -107,6 +107,8 @@ export function VendorDiscovery({
             <label htmlFor={sortId}>Sort</label>
             <select id={sortId} value={sort} onChange={(event) => setSort(event.target.value as ListingSort)}>
               <option value="recommended">Recommended</option>
+              <option value="rating">Highest rated</option>
+              <option value="reviews">Most reviewed</option>
               <option value="name">Name A–Z</option>
             </select>
           </div>

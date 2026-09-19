@@ -36,6 +36,11 @@ import { getVendorPublicVisibility } from "@/lib/vendors/vendorVisibility";
 import { normalizeStatus } from "@/lib/vendors/vendorEligibility";
 import { type QuickFurnoCategory, type Vendor } from "@/lib/quickfurno-data";
 import { LAUNCH_CITY, normalizeLaunchCity } from "@/lib/locations/launchCityPolicy";
+import {
+  getApprovedReviewsForVendor,
+  getApprovedReviewStatsForVendors,
+  type VendorReviewSummary,
+} from "@/services/vendorReviewService";
 
 type VendorRow = Record<string, unknown>;
 
@@ -155,14 +160,21 @@ export async function getPublicVendorsForCategory(
     }
 
     const rows = data as VendorRow[];
-    const mapped = rows
+    const candidates = rows
       .filter((row) => matchesPublicCategory(row, category))
       .flatMap((row) => {
         const visibility = getVendorPublicVisibility(row, runtimeSettings);
-        if (!visibility.isPubliclyVisible) return [];
-        const vendor = mapToPublicVendor(row, category, visibility.visibilityType);
-        return vendor ? [vendor] : [];
+        return visibility.isPubliclyVisible ? [{ row, visibilityType: visibility.visibilityType }] : [];
       });
+    const reviewStats = await getApprovedReviewStatsForVendors(
+      candidates.map(({ row }) => asText(row.id)).filter((id): id is string => Boolean(id)),
+    );
+    const mapped = candidates.flatMap(({ row, visibilityType }) => {
+      const id = asText(row.id);
+      const stats = id ? reviewStats.get(id) : undefined;
+      const vendor = mapToPublicVendor(row, category, visibilityType, stats ? { ...stats, reviews: [] } : undefined);
+      return vendor ? [vendor] : [];
+    });
 
     // Temporary safe debug aid (no phone/email/secrets/private notes).
     console.info("[public vendors] category match", {
@@ -220,7 +232,10 @@ export async function getPublicVendorProfileBySlugOrId(
       if (!normalizeCity(row)) return null;
       const visibility = getVendorPublicVisibility(row, runtimeSettings);
       if (!visibility.isPubliclyVisible) return null;
-      return mapToPublicVendor(row, resolveVendorCategory(row), visibility.visibilityType);
+      const id = asText(row.id);
+      if (!id) return null;
+      const reviewSummary = await getApprovedReviewsForVendor(id);
+      return mapToPublicVendor(row, resolveVendorCategory(row), visibility.visibilityType, reviewSummary);
     }
   } catch (error) {
     console.warn("[public vendor profile] unexpected error; failing closed (404)", {
@@ -257,6 +272,7 @@ function mapToPublicVendor(
   row: VendorRow,
   category: QuickFurnoCategory,
   visibilityType: string,
+  reviewSummary?: VendorReviewSummary,
 ): Vendor | null {
   const id = asText(row.id);
   if (!id) return null;
@@ -269,8 +285,10 @@ function mapToPublicVendor(
   // decided separately and free vendors stay ineligible there.
   const activePaidPlan = visibilityType === "paid" || visibilityType === "trial";
 
-  const ratingNum = Number(row.rating);
-  const rating = Number.isFinite(ratingNum) && ratingNum > 0 ? ratingNum : 4.2;
+  // Public rating truth comes only from APPROVED vendor_reviews rows.
+  // The legacy vendors.rating column is not treated as evidence.
+  const rating = reviewSummary?.averageRating ?? 0;
+  const reviewCount = reviewSummary?.reviewCount ?? 0;
 
   const startingPrice = asText(row.starting_price);
   const publicDescription = asText(row.public_description);
@@ -291,7 +309,8 @@ function mapToPublicVendor(
     category,
     subCategory,
     rating,
-    reviews: 0,
+    reviews: reviewCount,
+    reviewItems: reviewSummary?.reviews ?? [],
     rate: startingPrice ?? "Price on request",
     experience,
     responseTime: "Quick response expected",

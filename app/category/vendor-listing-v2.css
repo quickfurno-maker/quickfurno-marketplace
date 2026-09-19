@@ -883,3 +883,17 @@
     margin-inline: 0;
   }
 }
+
+.qf-vl-card-rating {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.32rem 0 0;
+  font-size: 0.797rem;
+  color: var(--qf-brand-muted);
+}
+
+.qf-vl-card-rating strong {
+  color: #8a5600;
+  font-weight: 700;
+}

@@ -420,6 +420,14 @@ const POST_ANCHOR_STAGING_APPLIED = [
     sha: "0052d194680be37bc0680200e64a37fd414190cd781c2e802a5bd23d65c8b2a9",
     phase: "QF-WHATSAPP-JARVIS-CALLBACK-REPLAY",
   },
+  // Vendor reviews: exact-one isolated apply, independently re-listed in BOTH
+  // staging and production. New submissions remain moderation-pending by design.
+  {
+    version: "20260919010000",
+    name: "vendor_review_system",
+    sha: "30f85cf0cee2b0b1b3cbd825194af586fd44950f0a56e009750f1308161edb65",
+    phase: "QF-VENDOR-REVIEWS",
+  },
 ].map((m) => ({
   ...m,
   filename: `${m.version}_${m.name}.sql`,
@@ -467,7 +475,7 @@ const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD
 // QF-MVP-40.14 RE-PIN: 108 -> 109, adding ONLY the SOURCE-PENDING Meta
 // transactional mapping seed + activation authority (20260912000000). No existing
 // migration was changed, renamed, deleted or reordered. Still exact equality.
-const MIGRATION_COUNT = 116;
+const MIGRATION_COUNT = 117;
 // The tree size AT THE MOMENT QF-MVP-80.05 reconciled history. It is a historical
 // fact about that reconciliation, not a live count, and it must never track
 // MIGRATION_COUNT: a later slice that legitimately ADDS a migration does not
@@ -681,9 +689,9 @@ function validateState(state) {
   const stagingAppliedPins = Array.isArray(manifest.stagingAppliedPostAnchorMigrations) ? manifest.stagingAppliedPostAnchorMigrations : null;
   const appliedTruth = [...(appliedPins ?? []), ...(reconciledPins ?? [])];
 
-  check("exactly twenty-nine local migrations are newer than the anchor", postAnchorLocal.length === 29, `actual=${postAnchorLocal.length}`);
+  check("exactly thirty local migrations are newer than the anchor", postAnchorLocal.length === 30, `actual=${postAnchorLocal.length}`);
   check("the post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
-  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 29);
+  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 30);
   check("manifest declares exactly ten APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 10, `actual=${appliedPins?.length}`);
   check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
   check("manifest declares exactly five RECONCILED post-anchor migrations", reconciledPins !== null && reconciledPins.length === 5, `actual=${reconciledPins?.length}`);
@@ -695,12 +703,12 @@ function validateState(state) {
   // version/name/path/SHA, and neither may also be claimed applied anywhere.
   // QF-MVP-40.14 RE-PIN: 4 -> 5. The Meta transactional mapping seed + activation
   // authority (20260912000000) is source-only and joins PENDING.
-  check("the explicit PENDING post-anchor set holds exactly the eight pinned entries",
+  check("the explicit PENDING post-anchor set holds exactly the nine pinned entries",
     pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 8,
     `actual=${pendingPins?.length}`);
   check("the explicit STAGING-APPLIED post-anchor set holds exactly the six pinned entries",
     stagingAppliedPins !== null && stagingAppliedPins.length === POST_ANCHOR_STAGING_APPLIED.length &&
-    stagingAppliedPins.length === 6,
+    stagingAppliedPins.length === 7,
     `actual=${stagingAppliedPins?.length}`);
   check("the staging-applied record claims staging and explicitly refuses production",
     stagingAppliedPins?.[0]?.operationalStatus === "APPLIED_TO_STAGING" &&
@@ -807,6 +815,35 @@ function validateState(state) {
     callbackReplayPin?.requiresSeparateStagingDeploymentGate === false &&
     callbackReplayPin?.requiresSeparateProductionDeploymentGate === false &&
     callbackReplayPin?.runtimeActivationChanged === false);
+  const reviewPin = stagingAppliedPins?.find((record) => record.version === "20260919010000");
+  const reviewLocal = postAnchorLocal.find((record) => record.version === "20260919010000");
+  const reviewDisk = state.postAnchorOnDisk?.["20260919010000"];
+  check("vendor review system deployment evidence is exact",
+    reviewPin?.name === "vendor_review_system" &&
+    reviewPin?.phase === "QF-VENDOR-REVIEWS" &&
+    reviewPin?.sha256 === "30f85cf0cee2b0b1b3cbd825194af586fd44950f0a56e009750f1308161edb65" &&
+    reviewLocal?.name === "vendor_review_system" &&
+    reviewDisk?.exists === true &&
+    reviewDisk?.canonicalSha === reviewPin?.sha256 &&
+    reviewPin?.operationalStatus === "APPLIED_TO_STAGING" &&
+    reviewPin?.appliedToStaging === true &&
+    reviewPin?.appliedExactlyOnceToStaging === true &&
+    reviewPin?.stagingRemoteVersionStatus === "PRESENT_IN_STAGING_HISTORY" &&
+    reviewPin?.stagingRemoteHistoryCountAfterApply === 45 &&
+    reviewPin?.appliedToProduction === true &&
+    reviewPin?.productionVersionStatus === "PRESENT_IN_PRODUCTION_HISTORY" &&
+    reviewPin?.productionRemoteHistoryCountBeforeApply === 52 &&
+    reviewPin?.productionRemoteHistoryCountAfterApply === 53 &&
+    reviewPin?.requiresSeparateStagingDeploymentGate === false &&
+    reviewPin?.requiresSeparateProductionDeploymentGate === false &&
+    reviewPin?.postApplyRlsEnabled === true &&
+    reviewPin?.postApplyAnonSelect === false &&
+    reviewPin?.postApplyAnonInsert === false &&
+    reviewPin?.postApplyAuthenticatedSelect === false &&
+    reviewPin?.postApplyAuthenticatedInsert === false &&
+    same(reviewPin?.postApplyServiceRolePrivileges, ["SELECT", "INSERT", "UPDATE"]) &&
+    reviewPin?.reviewRowsAtProductionApply === 0 &&
+    reviewPin?.evidencePath === "docs/QF-VENDOR-REVIEWS-CERTIFICATION.md");
   check("the pending records appear in exact pinned order",
     same(pendingPins?.map((record) => record.version), POST_ANCHOR_PENDING.map((m) => m.version)));
   // The four sets are compared as a SORTED union, not as concatenated blocks. Since

@@ -136,7 +136,7 @@ function renderSection(
     case "website-content":
       return <WebsiteContentPage />;
     case "reviews":
-      return <ReviewsPage />;
+      return <ReviewsPage data={payload} ask={helpers.ask} runAction={helpers.runAction} />;
     case "notifications":
       return <NotificationsPage data={payload} />;
     case "users":

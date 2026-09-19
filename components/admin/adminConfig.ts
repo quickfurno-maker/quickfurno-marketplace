@@ -85,7 +85,7 @@ export const adminSections: AdminSectionConfig[] = [
   { key: "analytics", href: "/admin/analytics", label: "Analytics", description: "Sources, lead quality, services, revenue", icon: "analytics", addLabel: "Export Analytics" },
   { key: "automations", href: "/admin/automations", label: "Automations", description: "Webhooks and workflows", icon: "automations", addLabel: "Create Automation" },
   { key: "website-content", href: "/admin/website-content", label: "Website Content", description: "CMS-ready content blocks", icon: "content", addLabel: "Save Content" },
-  { key: "reviews", href: "/admin/reviews", label: "Reviews & Ratings", description: "Moderation and trust signals", icon: "reviews", addLabel: "Add Review" },
+  { key: "reviews", href: "/admin/reviews", label: "Reviews & Ratings", description: "Verified client reviews and moderation", icon: "reviews", addLabel: "" },
   { key: "notifications", href: "/admin/notifications", label: "Notifications", description: "Admin alerts and inbox", icon: "notifications", addLabel: "Mark All Read" },
   { key: "users", href: "/admin/users", label: "Admin Users", description: "Roles and access control", icon: "users", addLabel: "Add Admin" },
   { key: "settings", href: "/admin/settings", label: "Settings", description: "Global marketplace controls", icon: "settings", addLabel: "Save Settings" },

@@ -47,7 +47,7 @@ const PRODUCTION_REF = "yqpgcsduqbxulrlzwzap";
 
 const PUBLISHED_TABLES = ["public.communication_inbound_messages", "public.communication_messages"];
 
-const LIVE_MIGRATION_COUNT = 116;
+const LIVE_MIGRATION_COUNT = 117;
 const FROZEN_RECONCILIATION_COUNT = 102;
 
 const rawOf = (p) => readFileSync(resolve(p), "utf8");
@@ -264,7 +264,7 @@ check("17-18 no application or inbox source belongs to this phase", () => {
 });
 
 check("19-20 S1 changed no migration and added none", () => {
-  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "the tree is 116");
+  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "the tree is 117");
   eq(canonicalSha256(R0_PATH), R0_SHA, "R0 is byte-identical");
   // Exactly one R0 migration, and no S1 migration at all — which is the whole point
   // of this check: S1 was a certification phase and contributed no SQL of its own.
@@ -279,10 +279,10 @@ check("19-20 S1 changed no migration and added none", () => {
 
 // ---- 21-22. the two counts -------------------------------------------------
 
-check("21 the live source migration count is 116", () => {
+check("21 the live source migration count is 117", () => {
   eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "tree");
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
-  assert(/const MIGRATION_COUNT = 116;/.test(g1), "and G1 still pins 116");
+  assert(/const MIGRATION_COUNT = 117;/.test(g1), "and G1 still pins 117");
 });
 
 check("22 the frozen 80.05 reconciliation count is still 102", () => {
@@ -294,7 +294,7 @@ check("22 the frozen 80.05 reconciliation count is still 102", () => {
   eq(MIGRATIONS.length - MANIFEST.historyReconciliation.migrationCount,
     (MANIFEST.pendingPostAnchorMigrations ?? []).length +
     (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length,
-    "116 - 102 = 14 = eight pending + six staging-applied");
+    "117 - 102 = 15 = eight pending + seven staging-applied");
 });
 
 // ---- 23-26. the new vocabulary, and what it may not become -----------------
@@ -302,9 +302,9 @@ check("22 the frozen 80.05 reconciliation count is still 102", () => {
 check("23 the partial-deployment vocabulary is exact and fail-closed", () => {
   const set = MANIFEST.stagingAppliedPostAnchorMigrations;
   assert(Array.isArray(set), "the set exists");
-  // QF-MVP-40: the canary quiesce authority joined this set; Aarohi later joined after its staging gate. R0 remains exactly one
-  // member of it, which is what assertion 22 above pins.
-  eq(set.length, 6, "with exactly six members");
+  // The set has grown through separately certified staging gates. R0 remains
+  // exactly one member of it; later entries do not rewrite R0's evidence.
+  eq(set.length, 7, "with exactly seven members");
   // Every field that could be read as a deployment claim is stated explicitly —
   // nothing is left absent to be inferred generously by a later reader.
   for (const field of [
@@ -336,11 +336,11 @@ check("24 no historical applied or reconciled record was rewritten", () => {
     eq(r.appliedToStaging, true, `${r.version} staging`);
     eq(r.appliedToProduction, true, `${r.version} production`);
   }
-  // Current ledger totals 29. The applied ten and reconciled five — which is what
+  // Current ledger totals 30. The applied ten and reconciled five — which is what
   // this check is actually about — are untouched.
-  eq(MANIFEST.appliedAnchor.postAnchorMigrationCount, 29, "the anchor totals twenty-nine");
+  eq(MANIFEST.appliedAnchor.postAnchorMigrationCount, 30, "the anchor totals thirty");
   eq(10 + 5 + (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length +
-     (MANIFEST.pendingPostAnchorMigrations ?? []).length, 29, "and the four sets add up");
+     (MANIFEST.pendingPostAnchorMigrations ?? []).length, 30, "and the four sets add up");
 });
 
 check("25 no production-applied claim exists for R0 anywhere", () => {

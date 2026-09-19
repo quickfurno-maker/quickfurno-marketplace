@@ -48,6 +48,17 @@ export type ProfileVendorInput = {
   serviceAreaSummary?: string | null;
   businessHours?: string | null;
   portfolioImages?: string[];
+  rating?: number;
+  reviews?: number;
+  reviewItems?: Array<{
+    id: string;
+    reviewerDisplayName: string;
+    rating: number;
+    reviewText: string;
+    createdAt: string;
+    category: string | null;
+    city: string | null;
+  }>;
   source?: "supabase" | "static";
 };
 
@@ -77,6 +88,19 @@ export type VendorPublicProfileView = {
   verified: boolean;
   /** Drives action authority ONLY. Never surfaced as a quality badge. */
   activePaidPlan: boolean;
+  /** Approved-review truth only. */
+  averageRating: number | null;
+  reviewCount: number;
+  reviews: Array<{
+    id: string;
+    reviewerDisplayName: string;
+    rating: number;
+    reviewText: string;
+    createdAt: string;
+    category: string | null;
+    city: string | null;
+  }>;
+  hasReviews: boolean;
   /** Convenience flags so sections and nav can be hidden when empty. */
   hasStartingPrice: boolean;
   hasBusinessHours: boolean;
@@ -153,6 +177,10 @@ export function toProfileView(vendor: ProfileVendorInput): VendorPublicProfileVi
   const coverImage = safePublicImageUrl(vendor.coverImageUrl);
   const startingPrice = formatStartingPrice(vendor.rate);
   const businessHours = cleanText(vendor.businessHours);
+  const reviewItems = Array.isArray(vendor.reviewItems) ? vendor.reviewItems : [];
+  const reviewCount = Math.max(0, Number(vendor.reviews ?? reviewItems.length) || 0);
+  const ratingValue = Number(vendor.rating ?? 0);
+  const averageRating = reviewCount > 0 && Number.isFinite(ratingValue) && ratingValue > 0 ? ratingValue : null;
 
   const description =
     cleanText(vendor.description) ??
@@ -175,6 +203,10 @@ export function toProfileView(vendor: ProfileVendorInput): VendorPublicProfileVi
     description,
     verified: Boolean(vendor.verified),
     activePaidPlan: Boolean(vendor.activePaidPlan),
+    averageRating,
+    reviewCount,
+    reviews: reviewItems,
+    hasReviews: reviewCount > 0,
     hasStartingPrice: startingPrice !== null,
     hasBusinessHours: businessHours !== null,
     hasServiceArea: serviceAreas.length > 0,
@@ -185,7 +217,7 @@ export function toProfileView(vendor: ProfileVendorInput): VendorPublicProfileVi
   };
 }
 
-export type ProfileSectionId = "overview" | "services" | "portfolio" | "details";
+export type ProfileSectionId = "overview" | "services" | "portfolio" | "details" | "reviews";
 
 /**
  * Section anchors, with empty sections omitted so a sparse profile does not
@@ -198,6 +230,7 @@ export function profileSections(view: VendorPublicProfileView): { id: ProfileSec
   if (view.hasStartingPrice || view.hasBusinessHours || view.hasServiceArea) {
     sections.push({ id: "details", label: "Details" });
   }
+  sections.push({ id: "reviews", label: view.hasReviews ? `Reviews (${view.reviewCount})` : "Reviews" });
   return sections;
 }
 
@@ -207,6 +240,9 @@ export function profileQuickFacts(view: VendorPublicProfileView): { label: strin
   if (view.startingPrice) facts.push({ label: "Starting from", value: view.startingPrice });
   if (view.hasServiceArea) facts.push({ label: "Service area", value: view.serviceAreas.join(", ") });
   if (view.businessHours) facts.push({ label: "Business hours", value: view.businessHours });
+  if (view.hasReviews && view.averageRating !== null) {
+    facts.push({ label: "Client rating", value: `${view.averageRating.toFixed(1)} ★ · ${view.reviewCount} ${view.reviewCount === 1 ? "review" : "reviews"}` });
+  }
   if (view.hasPortfolio) {
     facts.push({
       label: "Project photos",

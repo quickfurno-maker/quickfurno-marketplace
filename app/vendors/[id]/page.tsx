@@ -6,6 +6,7 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { StickyMobileCTA } from "@/components/StickyMobileCTA";
 import { VendorProfileActionCard } from "@/components/public-vendor/VendorProfileActions";
+import { VendorReviews } from "@/components/public-vendor/VendorReviews";
 import {
   VendorProfileCompareMore,
   VendorProfileDetails,
@@ -41,13 +42,16 @@ export async function generateMetadata({ params }: VendorPageProps): Promise<Met
 
   const view = toProfileView(vendor);
 
-  // Title intent, OG shape and URL are unchanged. The description no longer
-  // promises "pricing ... reviews": QuickFurno has no public review system, and
-  // pricing is only mentioned when the vendor actually published a rate.
+  // Title intent, OG shape and URL are unchanged. Review claims are included
+  // only when approved review evidence exists; pricing is mentioned only when
+  // the vendor actually published a rate.
   const title = `${vendor.businessName} | QuickFurno Verified Vendor`;
+  const reviewPhrase = view.hasReviews
+    ? `, ${view.reviewCount} approved client ${view.reviewCount === 1 ? "review" : "reviews"}`
+    : "";
   const description = view.hasStartingPrice
-    ? `View ${vendor.businessName} services, service areas, starting price, portfolio and enquiry options on QuickFurno.`
-    : `View ${vendor.businessName} services, service areas, portfolio and enquiry options on QuickFurno.`;
+    ? `View ${vendor.businessName} services, service areas, starting price, portfolio${reviewPhrase} and enquiry options on QuickFurno.`
+    : `View ${vendor.businessName} services, service areas, portfolio${reviewPhrase} and enquiry options on QuickFurno.`;
 
   return {
     title,
@@ -112,6 +116,13 @@ export default async function VendorProfilePage({ params }: VendorPageProps) {
               <VendorProfileServices vendor={view} />
               <VendorProfilePortfolio vendor={view} />
               <VendorProfileDetails vendor={view} />
+              <VendorReviews
+                vendorId={view.id}
+                vendorName={view.businessName}
+                averageRating={view.averageRating}
+                reviewCount={view.reviewCount}
+                reviews={view.reviews}
+              />
               <VendorProfileFaq />
               <VendorProfileCompareMore vendor={view} categoryHref={categoryHref} />
             </div>

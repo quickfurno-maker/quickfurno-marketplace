@@ -613,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 29,
+    "postAnchorMigrationCount": 30,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -1087,6 +1087,43 @@
         "UPDATE"
       ],
       "runtimeActivationChanged": false
+    },
+    {
+      "version": "20260919010000",
+      "name": "vendor_review_system",
+      "path": "supabase/migrations/20260919010000_vendor_review_system.sql",
+      "sha256": "30f85cf0cee2b0b1b3cbd825194af586fd44950f0a56e009750f1308161edb65",
+      "phase": "QF-VENDOR-REVIEWS",
+      "operationalStatus": "APPLIED_TO_STAGING",
+      "purpose": "Creates the server-written verified vendor review authority. Public submissions require a real QuickFurno lead assignment, enter pending moderation, store no phone number, and only approved reviews may be read into public rating/count/profile surfaces.",
+      "appliedToStaging": true,
+      "appliedExactlyOnceToStaging": true,
+      "stagingRemoteVersionStatus": "PRESENT_IN_STAGING_HISTORY",
+      "stagingRemoteHistoryCountAfterApply": 45,
+      "independentRemoteRelistVerified": true,
+      "appliedToProduction": true,
+      "productionVersionStatus": "PRESENT_IN_PRODUCTION_HISTORY",
+      "productionHistoryVersionPresent": true,
+      "productionAppliedExactlyOnce": true,
+      "productionIndependentRemoteRelistVerified": true,
+      "productionRemoteHistoryCountBeforeApply": 52,
+      "productionRemoteHistoryCountAfterApply": 53,
+      "requiresSeparateStagingDeploymentGate": false,
+      "requiresSeparateProductionDeploymentGate": false,
+      "applyExecutorProvenance": "SUPABASE_CLI_DB_PUSH_ISOLATED_VERSION_ALIGNED_WORKSPACE_LINKED_TO_STAGING",
+      "productionApplyExecutorProvenance": "SUPABASE_CLI_DB_PUSH_ISOLATED_VERSION_ALIGNED_WORKSPACE_LINKED_TO_PRODUCTION",
+      "postApplyRlsEnabled": true,
+      "postApplyAnonSelect": false,
+      "postApplyAnonInsert": false,
+      "postApplyAuthenticatedSelect": false,
+      "postApplyAuthenticatedInsert": false,
+      "postApplyServiceRolePrivileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE"
+      ],
+      "reviewRowsAtProductionApply": 0,
+      "evidencePath": "docs/QF-VENDOR-REVIEWS-CERTIFICATION.md"
     }
   ],
   "pendingPostAnchorMigrations": [

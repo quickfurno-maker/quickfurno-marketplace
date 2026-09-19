@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash, generateKeyPairSync, verify } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -15,6 +16,11 @@ import {
 } from "../../../lib/communication/providers/metaWhatsAppRich.ts";
 import { resolveWhatsAppConciergeRouting } from "../../../lib/communication/whatsAppConciergeRouting.ts";
 import { deriveQfWhatsAppInboundMaterial } from "../../../lib/jarvis/whatsAppInboundMaterial.ts";
+import {
+  buildQfjWhatsAppTurn,
+  qfjWhatsAppTurnSigningInput,
+  signQfjWhatsAppTurn,
+} from "../../../lib/jarvis/whatsAppTurnContract.ts";
 
 const root = process.cwd();
 const read = (path) => readFileSync(resolve(root, path), "utf8");
@@ -307,6 +313,68 @@ await test("non-text routing never creates a blank AI turn", () => {
   assert.equal(unknownLocation.assignedActor, "SYSTEM");
   assert.equal(unknownLocation.suppressJarvisTurn, true);
   assert.ok(unknownLocation.systemExperience);
+});
+
+await test("exact client Meta turn becomes a signed Riya Jarvis turn without changing provider authority", () => {
+  const inbound = normalizeMetaInboundWebhook(payloadFor({
+    type: "text",
+    text: { body: "I need a modular kitchen in Pune" },
+  }))[0];
+  assert.equal(inbound.ok, true);
+
+  const routing = resolveWhatsAppConciergeRouting({
+    identityConfidence: "exact",
+    principalType: "client",
+    messageType: inbound.message.messageType,
+    contentMinimized: inbound.message.contentMinimized,
+  });
+  assert.equal(routing.subjectType, "client");
+  assert.equal(routing.assignedActor, "RIYA");
+  assert.equal(routing.jarvisEnabled, true);
+  assert.equal(routing.suppressJarvisTurn, false);
+  assert.equal(routing.humanTakeover, false);
+
+  const normalizedText = deriveJarvisNormalizedText(
+    inbound.message.messageType,
+    inbound.message.contentMinimized,
+  );
+  assert.equal(normalizedText, "I need a modular kitchen in Pune");
+
+  const turn = buildQfjWhatsAppTurn({
+    requestId: "11111111-1111-4111-8111-111111111111",
+    issuedAt: "2026-09-19T00:30:00.000Z",
+    conversationId: "22222222-2222-4222-8222-222222222222",
+    conversationRevision: 7,
+    inboundMessageId: "33333333-3333-4333-8333-333333333333",
+    receivedAt: "2026-09-19T00:29:59.000Z",
+    assignedActor: routing.assignedActor,
+    subjectType: routing.subjectType,
+    normalizedText,
+  });
+  assert.equal(turn.assignedActor, "RIYA");
+  assert.equal(turn.subjectType, "client");
+  assert.equal(turn.normalizedText, normalizedText);
+
+  const keys = generateKeyPairSync("ed25519");
+  const keyId = "quickfurno-riya-e2e-test";
+  const privateKeyPem = keys.privateKey.export({ format: "pem", type: "pkcs8" }).toString();
+  const raw = Buffer.from(JSON.stringify(turn), "utf8");
+  const signature = signQfjWhatsAppTurn(raw, turn.requestId, turn.issuedAt, keyId, privateKeyPem);
+  const bodyDigest = createHash("sha256").update(raw).digest("base64url");
+  assert.equal(
+    verify(
+      null,
+      Buffer.from(qfjWhatsAppTurnSigningInput({
+        requestId: turn.requestId,
+        issuedAt: turn.issuedAt,
+        keyId,
+        bodyDigest,
+      }), "utf8"),
+      keys.publicKey,
+      Buffer.from(signature, "base64url"),
+    ),
+    true,
+  );
 });
 
 await test("production adapter exposes presence and rich capabilities while forbidding arbitrary media links", () => {

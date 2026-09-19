@@ -1,0 +1,65 @@
+server:
+  transport: "http"
+  host: "0.0.0.0"
+  port: 8000
+
+llm:
+  provider: "gemini"
+  model: ${MODEL_NAME:gemini-3.5-flash-lite}
+  max_tokens: 4096
+  structured_output_mode: "json_schema"
+  providers:
+    gemini:
+      api_key: ${GOOGLE_API_KEY}
+      project_id: ${GOOGLE_PROJECT_ID:}
+      location: ${GOOGLE_LOCATION:us-central1}
+
+embedder:
+  provider: "gemini"
+  model: ${EMBEDDER_MODEL:gemini-embedding-001}
+  dimensions: 768
+  providers:
+    gemini:
+      api_key: ${GOOGLE_API_KEY}
+      project_id: ${GOOGLE_PROJECT_ID:}
+      location: ${GOOGLE_LOCATION:us-central1}
+
+database:
+  provider: "neo4j"
+  providers:
+    neo4j:
+      uri: ${NEO4J_URI:bolt://neo4j:7687}
+      username: ${NEO4J_USER:neo4j}
+      password: ${NEO4J_PASSWORD}
+      database: ${NEO4J_DATABASE:neo4j}
+      use_parallel_runtime: false
+
+graphiti:
+  group_id: ${GRAPHITI_GROUP_ID:quickfurno-marketplace}
+  episode_id_prefix: "qf-"
+  user_id: "quickfurno-project-brain"
+  entity_types:
+    - name: "Requirement"
+      description: "A QuickFurno product, engineering, business, or operational requirement."
+    - name: "Procedure"
+      description: "A QuickFurno implementation, deployment, certification, or operating procedure."
+    - name: "Event"
+      description: "A time-bound QuickFurno merge, deployment, migration, incident, or operational event."
+    - name: "Organization"
+      description: "An external or internal organization or platform integrated with QuickFurno."
+    - name: "Document"
+      description: "A QuickFurno source-of-truth document, pull request, migration, report, or specification."
+    - name: "Topic"
+      description: "A QuickFurno domain, subsystem, feature, or technical topic."
+    - name: "Decision"
+      description: "A reviewed QuickFurno decision, including decisions that supersede earlier choices."
+    - name: "BusinessRule"
+      description: "A durable QuickFurno business or authority rule that constrains behavior."
+    - name: "Deployment"
+      description: "A verified QuickFurno deployment or environment rollout event."
+    - name: "Incident"
+      description: "A reviewed QuickFurno operational or production incident and its durable lesson."
+    - name: "Integration"
+      description: "A QuickFurno integration boundary such as n8n, Supabase, Meta, Graphify, or Graphiti."
+    - name: "Service"
+      description: "A QuickFurno service, subsystem, agent, workflow, or runtime component."

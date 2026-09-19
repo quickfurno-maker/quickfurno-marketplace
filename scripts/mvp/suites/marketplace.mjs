@@ -1099,7 +1099,7 @@ export const suite = {
         // using the shared StickyMobileCTA wrapper.
         const homePage = readFileSync('app/page.tsx', 'utf8');
         const finalHome = readFileSync('components/home/FinalHomepage.tsx', 'utf8');
-        assertTrue(homePage.includes('<FinalHomepage />'), 'app/page.tsx mounts the final homepage');
+        assertTrue(/<FinalHomepage(?:\s|[^>])*\/>/.test(homePage), 'app/page.tsx mounts the final homepage');
         assertTrue(finalHome.includes('<HomeMobileBottomNav />'),
           'final homepage still renders its public bottom nav');
         for (const file of ['app/vendors/page.tsx', 'app/category/[slug]/page.tsx']) {

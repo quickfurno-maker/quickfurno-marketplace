@@ -190,7 +190,7 @@ check("08 no other live modal keys a focus/scroll effect to typed values", () =>
 // 2. Final homepage architecture + canonical taxonomy
 // ---------------------------------------------------------------------------
 check("09 the final homepage is the single active homepage surface", () => {
-  assert(/<FinalHomepage\s*\/>/.test(PAGE_FLAT), "app/page.tsx does not mount FinalHomepage");
+  assert(/<FinalHomepage(?:\s|[^>])*\/>/.test(PAGE_FLAT), "app/page.tsx does not mount FinalHomepage");
   assert(!/<HomeHeroSlider|<HomeServiceLauncher|<TrustStripV2/.test(PAGE_FLAT),
     "a retired homepage surface is still mounted beside FinalHomepage");
   assert(/\.qfh-hero-grid/.test(FINAL_HOME_CSS_FLAT) && /\.qfh-category-grid/.test(FINAL_HOME_CSS_FLAT),
@@ -212,8 +212,10 @@ check("11 hero and canonical category strip render exactly once", () => {
 });
 
 check("12 homepage category UI is derived directly from the canonical registry", () => {
-  assert(/import \{ categories, categorySlug, type QuickFurnoCategory \}/.test(FINAL_HOME_SRC),
-    "FinalHomepage no longer imports the canonical categories registry");
+  assert(
+    /import\s*\{[\s\S]*categories,[\s\S]*categorySlug,[\s\S]*type QuickFurnoCategory,[\s\S]*\}\s*from\s*"@\/lib\/quickfurno-data"/.test(FINAL_HOME_SRC),
+    "FinalHomepage no longer imports the canonical categories registry",
+  );
   assert(/categories\.map\(\(category\)/.test(FINAL_HOME_SRC),
     "homepage categories are no longer rendered from the canonical registry");
   assert(/const CATEGORY_ICONS:\s*Record<QuickFurnoCategory/.test(FINAL_HOME_SRC),

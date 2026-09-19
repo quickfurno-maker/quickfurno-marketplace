@@ -28,6 +28,7 @@ import {
   getWhatsAppProviderReadiness,
   getWhatsAppTemplatePage,
 } from "@/services/adminWhatsAppService";
+import { getWhatsAppInboxPage } from "@/services/adminWhatsAppInboxService";
 import type { WhatsAppControlCenterPayload, WhatsAppTab } from "@/components/admin/whatsapp/whatsappAdminTypes";
 import { WHATSAPP_TABS } from "@/components/admin/whatsapp/whatsappAdminTypes";
 
@@ -87,6 +88,9 @@ export default async function AdminWhatsAppPage({
     family: one("family"),
     message: one("message"),
     template: one("template"),
+    // QF-MVP-82A inbox selectors.
+    filter: one("filter"),
+    conversation: one("conversation"),
   };
 
   let payload: WhatsAppControlCenterPayload = { tab };
@@ -95,6 +99,16 @@ export default async function AdminWhatsAppPage({
   try {
     if (tab === "overview") {
       payload = { tab, overview: await getWhatsAppAdminOverview() };
+    } else if (tab === "inbox") {
+      // QF-MVP-82A. One bounded read for the conversation page, plus the open
+      // thread when — and only when — a conversation is selected in the URL.
+      const inbox = await getWhatsAppInboxPage({
+        page,
+        filter: query.filter,
+        search: query.search,
+        conversation: query.conversation,
+      });
+      payload = { tab, inbox: { state: inbox.state, ...inbox.data } };
     } else if (tab === "templates") {
       payload = {
         tab,

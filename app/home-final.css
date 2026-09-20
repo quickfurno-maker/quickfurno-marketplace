@@ -190,14 +190,18 @@
 
 /* Hero */
 .qfh-hero {
+  position: relative;
+  overflow: hidden;
   border-bottom: 1px solid var(--qfh-line);
-  background: var(--qfh-wash);
+  background:
+    radial-gradient(circle at 12% 10%, rgba(184, 75, 39, 0.06), transparent 25rem),
+    #fbf8f2;
 }
 
 .qfh-hero-grid {
-  min-height: 540px;
+  min-height: 530px;
   display: grid;
-  grid-template-columns: minmax(0, 0.98fr) minmax(0, 1.02fr);
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
   align-items: stretch;
 }
 
@@ -206,8 +210,8 @@
   z-index: 3;
   display: grid;
   align-content: center;
-  gap: 0.95rem;
-  padding: 2.7rem 2rem 2.5rem 0;
+  gap: 1rem;
+  padding: 3rem 1.25rem 3rem 0;
 }
 
 .qfh-kicker,
@@ -220,12 +224,14 @@
 }
 
 .qfh-hero h1 {
-  max-width: 700px;
-  color: #111824;
+  max-width: 760px;
+  display: grid;
+  gap: 0.02em;
+  color: #111815;
   font-family: var(--font-playfair), Georgia, serif;
-  font-size: clamp(3.45rem, 5vw, 4.85rem);
+  font-size: clamp(3.1rem, 4.45vw, 4.55rem);
   font-weight: 650;
-  line-height: 0.96;
+  line-height: 0.97;
   letter-spacing: -0.05em;
   text-wrap: balance;
 }
@@ -294,17 +300,19 @@
 
 .qfh-hero-media {
   position: relative;
+  z-index: 1;
   min-width: 0;
-  margin-left: -90px;
-  background:
-    linear-gradient(90deg, var(--qfh-wash) 0%, rgba(248,244,237,.86) 8%, rgba(248,244,237,.32) 24%, transparent 43%),
-    url("/assets/quickfurno/images/hero/qf-family-hero.jpg") center 55% / cover no-repeat;
+  margin-left: -5.5rem;
+  overflow: hidden;
 }
 
 .qfh-hero-photo-shade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 62%, rgba(12, 17, 20, 0.32) 100%);
+  z-index: 1;
+  background:
+    linear-gradient(90deg, #fbf8f2 0%, rgba(251, 248, 242, 0.94) 5%, rgba(251, 248, 242, 0.56) 17%, rgba(251, 248, 242, 0.12) 35%, transparent 52%),
+    linear-gradient(180deg, transparent 64%, rgba(12, 18, 15, 0.34) 100%);
 }
 
 .qfh-hero-media-note {

@@ -2,12 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { QFIcon } from "@/components/QuickFurnoIcons";
-import {
-  categories,
-  categorySlug,
-  type QuickFurnoCategory,
-  type Vendor,
-} from "@/lib/quickfurno-data";
+import { categories, categorySlug, type QuickFurnoCategory } from "@/lib/quickfurno-data";
+import type { Vendor } from "@/lib/quickfurno-data";
 import { HomeMobileBottomNav } from "@/components/home/HomeMobileBottomNav";
 import {
   AreasWeServe,
@@ -19,6 +15,10 @@ import {
 } from "@/components/home/LaunchSections";
 import { getPublicVendorsForCategory } from "@/services/publicVendorService";
 import { loadMarketplaceRuntimeSettings } from "@/lib/lead-assignment/runtimeSettings";
+// Real-photo slots: illustrated fallbacks are swapped for real project photos
+// the moment they exist in public/assets/quickfurno/images/real/ (see the
+// README in that folder). No code change needed to adopt photos.
+import { categoryImage, heroImage } from "@/lib/homepage-images";
 
 // Launch homepage: pull a handful of REAL approved vendors for the featured
 // strip. Any failure (or an empty marketplace) renders no strip at all — the
@@ -146,7 +146,10 @@ function Hero() {
             Connect with verified professionals for your home interior, renovation and maintenance
             needs — all in one place.
           </p>
-          <div className="qfh-quote-bar" aria-label="Start a free quote">
+          {/* data-quote-bar: the trigger inside reads this bar's select at
+              click time and opens the modal with the service pre-filled
+              (see EnquiryModalTrigger's quote-bar convention). */}
+          <div className="qfh-quote-bar" aria-label="Start a free quote" data-quote-bar>
             <label className="qfh-select-field">
               <QFIcon name="grid" />
               <select defaultValue="" aria-label="Select service">
@@ -170,7 +173,7 @@ function Hero() {
         </div>
         <div className="qfh-hero-media" aria-hidden="true">
           <Image
-            src="/assets/quickfurno/images/vendors/premium-living-room.svg"
+            src={heroImage("/assets/quickfurno/images/vendors/premium-living-room.svg").src}
             alt=""
             fill
             priority
@@ -222,7 +225,9 @@ function Services() {
         </div>
         <div className="qfh-services-headline-row">
           <h3>Popular Services in Pune</h3>
-          <Link href="#services" className="qfh-view-all">View All <QFIcon name="arrow" /></Link>
+          {/* Launch fix: the old "View All" here linked to #services — i.e. to
+              itself. All seven services are already on this grid, so the link
+              was a dead end and is gone. */}
         </div>
         <div className="qfh-service-grid">
           {SERVICES.map((service) => (
@@ -232,7 +237,12 @@ function Services() {
               className="qfh-service-card"
             >
               <div className="qfh-service-media">
-                <Image src={service.image} alt="" fill sizes="(max-width: 760px) 150px, 14vw" />
+                <Image
+                  src={categoryImage(categorySlug(service.category), service.image).src}
+                  alt=""
+                  fill
+                  sizes="(max-width: 760px) 150px, 14vw"
+                />
               </div>
               <div className="qfh-service-copy">
                 <strong>{service.title}</strong>

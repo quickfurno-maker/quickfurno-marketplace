@@ -39,25 +39,26 @@ export const VERIFY_STEPS: VerifyStep[] = [
 
 // Localities QuickFurno serves across Pune & PCMC. Display text only.
 export const PUNE_AREAS: string[] = [
+  // First 11 are shown by default on the homepage (see PuneLaunchHomepage).
   "Kharadi",
   "Viman Nagar",
-  "Kalyani Nagar",
   "Koregaon Park",
-  "Hadapsar",
-  "Magarpatta",
-  "Wagholi",
   "Baner",
-  "Aundh",
   "Wakad",
   "Hinjewadi",
-  "Pimple Saudagar",
+  "Magarpatta",
   "Kothrud",
+  "Aundh",
+  "Hadapsar",
+  "Pimpri-Chinchwad",
+  "Kalyani Nagar",
+  "Wagholi",
+  "Pimple Saudagar",
   "Bavdhan",
   "Warje",
   "Sinhagad Road",
   "Undri",
   "NIBM",
-  "Pimpri-Chinchwad",
   "Ravet",
 ];
 
@@ -96,7 +97,7 @@ export type Testimonial = { quote: string; name: string; detail: string };
 export const TESTIMONIALS: Testimonial[] = [
   {
     quote: "QuickFurno made it easy to compare relevant local professionals for our home project.",
-    name: "Priya S.",
-    detail: "Pune homeowner",
+    name: "Priya Singh",
+    detail: "Homeowner · Megapolis, Hinjewadi, Pune",
   },
 ];

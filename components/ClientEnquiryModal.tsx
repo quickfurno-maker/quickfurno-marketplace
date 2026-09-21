@@ -369,11 +369,18 @@ export function EnquiryModalTrigger({
         // An explicit serviceCategory prop always wins; an empty select leaves
         // the options exactly as before.
         let resolvedOptions = modalOptions;
-        if (!resolvedOptions.serviceCategory) {
-          const bar = event.currentTarget.closest("[data-quote-bar]");
-          const select = bar?.querySelector("select");
+        const bar = event.currentTarget.closest("[data-quote-bar]");
+        if (bar && !resolvedOptions.serviceCategory) {
+          const select = bar.querySelector("select");
           const picked = select instanceof HTMLSelectElement ? select.value : "";
           if (picked) resolvedOptions = { ...resolvedOptions, serviceCategory: picked };
+        }
+        // Same convention for the locality: an optional [data-quote-area] text
+        // input inside the bar pre-fills the area field (Pune launch hero).
+        if (bar && !resolvedOptions.area) {
+          const areaInput = bar.querySelector("input[data-quote-area]");
+          const typed = areaInput instanceof HTMLInputElement ? areaInput.value.trim() : "";
+          if (typed) resolvedOptions = { ...resolvedOptions, area: typed };
         }
 
         if (context) {

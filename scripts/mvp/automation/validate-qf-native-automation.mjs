@@ -18,6 +18,7 @@ const read = (rel) => fs.readFileSync(path.resolve(rel), "utf8");
 const worker = read("worker/nativeAutomationWorker.ts");
 const runtime = read("services/nativeAutomationRuntimeService.ts");
 const engine = read("services/nativeAutomationEngineService.ts");
+const delayedFill = read("services/delayedLeadFillService.ts");
 const authority = read("services/nativeAutomationAuthorityService.ts");
 const studio = read("components/admin/AutomationStudio.tsx");
 const studioService = read("services/automationStudioService.ts");
@@ -117,6 +118,12 @@ test("native system lane batches stay bounded", () => {
   assert.match(runtime, /QF_NATIVE_AUTOMATION_LEAD_DISPATCH_BATCH, 3, 1, 25/);
   assert.match(runtime, /QF_NATIVE_AUTOMATION_CONSENT_ACK_BATCH, 25, 1, 25/);
   assert.match(runtime, /QF_NATIVE_AUTOMATION_DELAYED_FILL_BATCH, 25, 1, 100/);
+});
+test("delayed-fill retries remain selectable after the processor rewrites the queue reason", () => {
+  assert.match(delayedFill, /queue_reason\.like\.delayed_fill_%/);
+  assert.match(delayedFill, /\.or\(PROCESSOR_QUEUE_REASON_FILTER\)/);
+  assert.match(delayedFill, /delayed_fill_waiting_no_eligible_vendors/);
+  assert.match(delayedFill, /delayed_fill_partial_waiting_more_vendors/);
 });
 
 test("external production cron scheduler is retired", () => {

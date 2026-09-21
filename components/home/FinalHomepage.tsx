@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { QFIcon } from "@/components/QuickFurnoIcons";
@@ -18,17 +19,17 @@ const HOW_IT_WORKS = [
   {
     icon: "request" as const,
     title: "Tell us what you need",
-    body: "Share your project details in a few minutes.",
+    body: "Share your project requirement in a few simple steps.",
   },
   {
     icon: "compare" as const,
-    title: "Compare matched pros",
-    body: "Get up to 3 relevant professional profiles.",
+    title: "Compare relevant professionals",
+    body: "Review up to 3 relevant professional profiles and their available details.",
   },
   {
     icon: "shield" as const,
     title: "Choose with confidence",
-    body: "Review profiles, approved reviews and project details.",
+    body: "Ask questions, compare your options and decide who fits your project.",
   },
 ];
 
@@ -41,22 +42,18 @@ const TRUST_POINTS = [
   {
     icon: "compare" as const,
     title: "Up to 3 relevant matches",
-    body: "A focused shortlist designed to reduce unnecessary calls.",
+    body: "A smaller shortlist designed to reduce unnecessary calls.",
   },
   {
     icon: "shield" as const,
     title: "Verified-review profiles",
-    body: "Approved reviews appear only after a verified QuickFurno interaction.",
+    body: "Approved client reviews appear only after a verified QuickFurno interaction.",
   },
 ];
 
 function Wordmark({ footer = false }: { footer?: boolean }) {
   return (
-    <Link
-      href="/"
-      className={footer ? "qfh-wordmark qfh-wordmark--footer" : "qfh-wordmark"}
-      aria-label="QuickFurno home"
-    >
+    <Link href="/" className={footer ? "qfh-wordmark qfh-wordmark--footer" : "qfh-wordmark"} aria-label="QuickFurno home">
       <strong>QuickFurno</strong>
       <span>Homes. Handled Better.</span>
     </Link>
@@ -82,21 +79,17 @@ function Header() {
         <Wordmark />
 
         <nav className="qfh-desktop-nav" aria-label="Homepage navigation">
-          <Link href="#services">Services <span aria-hidden="true">⌄</span></Link>
+          <Link href="#services">Services</Link>
           <Link href="#how-it-works">How it works</Link>
           <Link href="/vendors">For Professionals</Link>
           <Link href="#why-quickfurno">About</Link>
         </nav>
 
         <div className="qfh-header-actions">
-          <span className="qfh-location-pill"><QFIcon name="pin" /> Pune <span aria-hidden="true">⌄</span></span>
-          <Link href="/vendors" className="qfh-header-search" aria-label="Browse professionals">
-            <QFIcon name="search" />
-          </Link>
+          <span className="qfh-location-pill"><QFIcon name="pin" /> Pune</span>
           <EnquiryModalTrigger className="qfh-primary-btn qfh-header-quote" source="Homepage header">
             Find My Team
           </EnquiryModalTrigger>
-          <Link href="/login" className="qfh-signin"><QFIcon name="user" /> Sign In</Link>
         </div>
       </div>
     </header>
@@ -125,22 +118,23 @@ function Hero() {
           </div>
 
           <div className="qfh-mini-trust" aria-label="QuickFurno marketplace facts">
-            <span><QFIcon name="noFee" /><b>Free for homeowners</b></span>
-            <span><QFIcon name="compare" /><b>Up to 3 relevant matches</b></span>
-            <span><QFIcon name="shield" /><b>Verified-review profiles</b></span>
-          </div>
-
-          <div className="qfh-hero-script" aria-hidden="true">
-            <em>A more beautiful home<br />is a happier you</em>
-            <i />
+            <span><QFIcon name="noFee" />Free for homeowners</span>
+            <span><QFIcon name="compare" />Up to 3 relevant matches</span>
+            <span><QFIcon name="shield" />Verified-review profiles</span>
           </div>
         </div>
 
-        <div className="qfh-hero-media" aria-hidden="true">
-          <span className="qfh-hero-photo-shade" />
-          <p className="qfh-hero-media-note">
-            Real homes. Relevant professionals. Better choices. <QFIcon name="arrow" />
-          </p>
+        <div className="qfh-hero-media">
+          <Image
+            src="/assets/quickfurno/images/hero/qf-family-hero.jpg"
+            alt="Family spending time together in a warm living room"
+            fill
+            priority
+            sizes="(max-width: 760px) 100vw, 52vw"
+            className="qfh-hero-room"
+          />
+          <span className="qfh-hero-photo-shade" aria-hidden="true" />
+          <p className="qfh-hero-media-note">Real homes. Relevant professionals. Better choices.</p>
         </div>
       </div>
     </section>
@@ -163,7 +157,9 @@ function CategoryStrip() {
               href={`/category/${categorySlug(category.name)}`}
               className="qfh-category-item"
             >
-              <span className="qfh-category-icon"><QFIcon name={CATEGORY_ICONS[category.name]} /></span>
+              <span className="qfh-category-icon">
+                <QFIcon name={CATEGORY_ICONS[category.name]} />
+              </span>
               <strong>{category.name}</strong>
             </Link>
           ))}
@@ -228,7 +224,7 @@ function DualCTA() {
   return (
     <section className="qfh-dual-cta">
       <div className="qfh-shell qfh-dual-cta-grid">
-        <div className="qfh-dual-panel">
+        <div className="qfh-dual-panel qfh-dual-panel--homeowner">
           <p>For homeowners</p>
           <h2>From ideas to a clearer shortlist.</h2>
           <span>Tell us what you need and compare relevant professionals.</span>
@@ -266,7 +262,9 @@ function Footer() {
         <div className="qfh-footer-col">
           <h3>Categories</h3>
           {categories.map((category) => (
-            <Link key={category.name} href={`/category/${categorySlug(category.name)}`}>{category.name}</Link>
+            <Link key={category.name} href={`/category/${categorySlug(category.name)}`}>
+              {category.name}
+            </Link>
           ))}
         </div>
         <div className="qfh-footer-col qfh-footer-contact">

@@ -2,8 +2,55 @@ import Image from "next/image";
 import Link from "next/link";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { QFIcon } from "@/components/QuickFurnoIcons";
-import { categories, categorySlug, type QuickFurnoCategory } from "@/lib/quickfurno-data";
+import {
+  categories,
+  categorySlug,
+  type QuickFurnoCategory,
+  type Vendor,
+} from "@/lib/quickfurno-data";
 import { HomeMobileBottomNav } from "@/components/home/HomeMobileBottomNav";
+import {
+  AreasWeServe,
+  FeaturedVendors,
+  HomeFAQ,
+  HowWeVerify,
+  Testimonials,
+  VendorJoinCTA,
+} from "@/components/home/LaunchSections";
+import { getPublicVendorsForCategory } from "@/services/publicVendorService";
+import { loadMarketplaceRuntimeSettings } from "@/lib/lead-assignment/runtimeSettings";
+
+// Launch homepage: pull a handful of REAL approved vendors for the featured
+// strip. Any failure (or an empty marketplace) renders no strip at all — the
+// homepage never shows demo/fictional vendors (QF-UI-V2-06 principle).
+const FEATURED_CATEGORIES: QuickFurnoCategory[] = [
+  "Interior Designers",
+  "Modular Factory",
+  "Carpenters",
+  "Painter",
+];
+const FEATURED_LIMIT = 6;
+
+async function getFeaturedVendors(): Promise<Vendor[]> {
+  try {
+    const settings = await loadMarketplaceRuntimeSettings();
+    const seen = new Set<string>();
+    const featured: Vendor[] = [];
+    for (const category of FEATURED_CATEGORIES) {
+      const vendors = await getPublicVendorsForCategory(category, settings);
+      if (!vendors) continue;
+      for (const vendor of vendors) {
+        if (seen.has(vendor.slug)) continue;
+        seen.add(vendor.slug);
+        featured.push(vendor);
+        if (featured.length >= FEATURED_LIMIT) return featured;
+      }
+    }
+    return featured;
+  } catch {
+    return [];
+  }
+}
 
 const SERVICE_META: Record<QuickFurnoCategory, { subtitle: string; image: string }> = {
   "Interior Designers": { subtitle: "Complete home interiors", image: "/assets/quickfurno/images/categories/interior-designers.svg" },
@@ -65,7 +112,7 @@ function HomeHeader() {
           </nav>
         </details>
         <Link href="/" className="qfh-logo" aria-label="QuickFurno home">
-          <Image src="/assets/quickfurno/logos/quickfurno-logo.svg" alt="QuickFurno" width={260} height={70} priority />
+          <Image src="/assets/quickfurno/logos/quickfurno-logo.svg" alt="QuickFurno" width={310} height={70} priority />
         </Link>
         <nav className="qfh-desktop-nav" aria-label="Homepage navigation">
           <Link href="/">Home</Link>
@@ -241,15 +288,7 @@ function WhyQuickFurno() {
               ))}
             </div>
           </div>
-          <article className="qfh-testimonial">
-            <div className="qfh-avatar" aria-hidden="true">PS</div>
-            <div className="qfh-testimonial-copy">
-              <p>“QuickFurno made it easy to compare relevant local professionals for our home project.”</p>
-              <strong>Priya S.</strong>
-              <small>Pune homeowner</small>
-            </div>
-            <div className="qfh-stars" aria-label="Five star testimonial">★★★★★</div>
-          </article>
+          <Testimonials />
         </div>
       </div>
     </section>
@@ -285,7 +324,7 @@ function HomeFooter() {
     <footer className="qfh-footer" id="contact">
       <div className="qfh-shell qfh-footer-grid">
         <div className="qfh-footer-brand">
-          <Image src="/assets/quickfurno/logos/quickfurno-logo.svg" alt="QuickFurno" width={260} height={70} />
+          <Image src="/assets/quickfurno/logos/quickfurno-logo.svg" alt="QuickFurno" width={310} height={70} />
           <p>Verified home-service professionals for Pune homeowners.</p>
         </div>
         <div className="qfh-footer-col">
@@ -309,9 +348,6 @@ function HomeFooter() {
           <a href="tel:+917447863602">+91 74478 63602</a>
           <a href="mailto:support@quickfurno.in">support@quickfurno.in</a>
           <span>Pune, Maharashtra</span>
-          <div className="qfh-socials" aria-label="QuickFurno social channels">
-            <span aria-hidden="true">f</span><span aria-hidden="true">ig</span><span aria-hidden="true">in</span>
-          </div>
         </div>
         <div className="qfh-footer-pune">
           <span><QFIcon name="home" /></span>
@@ -324,7 +360,6 @@ function HomeFooter() {
         <nav aria-label="Legal links">
           <Link href="/privacy">Privacy Policy</Link>
           <Link href="/terms">Terms & Conditions</Link>
-          <Link href="/terms">Vendor Policy</Link>
         </nav>
         <span>Made with ♥ for a Better Pune</span>
       </div>
@@ -332,7 +367,8 @@ function HomeFooter() {
   );
 }
 
-export function FinalHomepage() {
+export async function FinalHomepage() {
+  const featuredVendors = await getFeaturedVendors();
   return (
     <div className="qfh-page">
       <HomeHeader />
@@ -340,8 +376,13 @@ export function FinalHomepage() {
         <Hero />
         <StatsStrip />
         <Services />
+        <FeaturedVendors vendors={featuredVendors} />
         <HowItWorks />
+        <HowWeVerify />
         <WhyQuickFurno />
+        <AreasWeServe />
+        <HomeFAQ />
+        <VendorJoinCTA />
         <PuneCTA />
       </main>
       <HomeFooter />

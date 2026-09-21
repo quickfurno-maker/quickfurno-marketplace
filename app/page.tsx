@@ -15,6 +15,10 @@ export const metadata: Metadata = {
   },
 };
 
+// Featured vendors are fetched server-side; refresh the static homepage every
+// 5 minutes instead of forcing a dynamic render on every request.
+export const revalidate = 300;
+
 export default function HomePage() {
   return <FinalHomepage />;
 }

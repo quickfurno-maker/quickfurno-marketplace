@@ -193,31 +193,31 @@ check("09 the final homepage is the single active homepage surface", () => {
   assert(/<FinalHomepage\s*\/>/.test(PAGE_FLAT), "app/page.tsx does not mount FinalHomepage");
   assert(!/<HomeHeroSlider|<HomeServiceLauncher|<TrustStripV2/.test(PAGE_FLAT),
     "a retired homepage surface is still mounted beside FinalHomepage");
-  assert(/\.qfh-hero-grid/.test(FINAL_HOME_CSS_FLAT) && /\.qfh-category-grid/.test(FINAL_HOME_CSS_FLAT),
-    "the approved qfh hero/category layout CSS is missing");
+  assert(/\.qfh-hero-grid/.test(FINAL_HOME_CSS_FLAT) && /\.qfh-service-grid/.test(FINAL_HOME_CSS_FLAT),
+    "the locked qfh homepage layout CSS is missing");
 });
 
-check("10 DOM order is hero -> categories -> how it works", () => {
+check("10 DOM order is hero -> stats -> services", () => {
   const hero = FINAL_HOME_FLAT.indexOf("<Hero");
-  const categories = FINAL_HOME_FLAT.indexOf("<CategoryStrip");
-  const how = FINAL_HOME_FLAT.indexOf("<HowItWorks");
-  assert(hero !== -1 && categories !== -1 && how !== -1, "hero/categories/how-it-works is missing from FinalHomepage");
-  assert(hero < categories && categories < how, "FinalHomepage order must remain hero -> categories -> how it works");
+  const stats = FINAL_HOME_FLAT.indexOf("<StatsStrip");
+  const services = FINAL_HOME_FLAT.indexOf("<Services");
+  assert(hero !== -1 && stats !== -1 && services !== -1, "hero/stats/services is missing from FinalHomepage");
+  assert(hero < stats && stats < services, "FinalHomepage order must remain hero -> stats -> services");
 });
 
-check("11 hero and canonical category strip render exactly once", () => {
+check("11 hero and services render exactly once", () => {
   const count = (needle) => FINAL_HOME_FLAT.split(needle).length - 1;
   assert(count("<Hero") === 1, "the final hero is rendered more than once");
-  assert(count("<CategoryStrip") === 1, "the canonical category strip is rendered more than once");
+  assert(count("<Services") === 1, "the final services section is rendered more than once");
 });
 
-check("12 homepage category UI is derived directly from the canonical registry", () => {
+check("12 homepage service UI is derived from the canonical category registry", () => {
   assert(/import \{ categories, categorySlug, type QuickFurnoCategory \}/.test(FINAL_HOME_SRC),
     "FinalHomepage no longer imports the canonical categories registry");
-  assert(/categories\.map\(\(category\)/.test(FINAL_HOME_SRC),
-    "homepage categories are no longer rendered from the canonical registry");
-  assert(/const CATEGORY_ICONS:\s*Record<QuickFurnoCategory/.test(FINAL_HOME_SRC),
-    "category icon metadata is no longer exhaustively typed to QuickFurnoCategory");
+  assert(/const SERVICES = categories\.map/.test(FINAL_HOME_FLAT),
+    "homepage services are no longer derived from canonical categories");
+  assert(/Record<QuickFurnoCategory/.test(FINAL_HOME_SRC),
+    "service display metadata is no longer exhaustively typed to QuickFurnoCategory");
 });
 
 check("13 Wardrobe/Storage cannot return as UI taxonomy and legacy category links still resolve", () => {
@@ -349,17 +349,15 @@ mutant("M21 [mutant] reject: the submit button stops being disabled while submit
 // ---------------------------------------------------------------------------
 // 5. Final homepage conversion contract
 // ---------------------------------------------------------------------------
-check("24 [semantic] the approved hero has one CTA and no search bar", () => {
-  const hits = FINAL_HOME_SRC.match(/source="Homepage hero"/g) || [];
-  assert(hits.length === 1, `expected one homepage hero CTA, found ${hits.length}`);
-  assert(/qfh-hero-actions/.test(FINAL_HOME_SRC), "the approved hero CTA container is gone");
-  assert(!/qfh-quote-bar|qfh-select-field|source="Homepage hero quote bar"/.test(FINAL_HOME_SRC),
-    "the retired hero search/quote bar returned");
+check("24 [semantic] the approved hero quote entry point is present exactly once", () => {
+  const hits = FINAL_HOME_SRC.match(/source="Homepage hero quote bar"/g) || [];
+  assert(hits.length === 1, `expected one homepage hero quote entry point, found ${hits.length}`);
+  assert(/qfh-quote-bar/.test(FINAL_HOME_SRC), "the approved hero quote bar is gone");
 });
 
 check("25 [semantic] homepage CTAs all use the shared enquiry modal authority", () => {
   assert(/EnquiryModalTrigger/.test(FINAL_HOME_SRC), "FinalHomepage no longer uses EnquiryModalTrigger");
-  for (const source of ["Homepage header", "Homepage hero", "Homepage homeowner CTA"]) {
+  for (const source of ["Homepage header", "Homepage hero quote bar", "Homepage Pune CTA"]) {
     assert(FINAL_HOME_SRC.includes(`source="${source}"`), `missing approved conversion entry point: ${source}`);
   }
 });
@@ -375,14 +373,14 @@ check("26 [semantic] the approved mobile bottom navigation remains mounted", () 
 check("27 [semantic] homepage keeps multiple non-duplicate conversion entry points", () => {
   const hits = FINAL_HOME_SRC.match(/<EnquiryModalTrigger/g) || [];
   assert(hits.length >= 3, `expected at least 3 enquiry entry points, found ${hits.length}`);
-  assert(/Find My Team/.test(FINAL_HOME_SRC), "primary Find My Team CTA copy is gone");
-  assert(/Start Your Project/.test(FINAL_HOME_SRC), "homeowner follow-up CTA copy is gone");
+  assert(/Get a Free Quote/.test(FINAL_HOME_SRC), "free-quote CTA copy is gone");
+  assert(/Get Started Today/.test(FINAL_HOME_SRC), "Pune final CTA copy is gone");
 });
 
-mutant("M24 [mutant] reject: the approved hero CTA entry point is removed",
+mutant("M24 [mutant] reject: the approved hero quote entry point is removed",
   FINAL_HOME_SRC,
-  (src) => src.replace('source="Homepage hero"', 'source="Removed hero CTA"'),
-  (src) => (src.match(/source="Homepage hero"/g) || []).length === 1);
+  (src) => src.replace('source="Homepage hero quote bar"', 'source="Removed hero quote"'),
+  (src) => (src.match(/source="Homepage hero quote bar"/g) || []).length === 1);
 
 // ---------------------------------------------------------------------------
 // 6. QF-MVP-80.16A — dispatch refusal observability stays sanitized

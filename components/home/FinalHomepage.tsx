@@ -5,62 +5,50 @@ import { QFIcon } from "@/components/QuickFurnoIcons";
 import { categories, categorySlug, type QuickFurnoCategory } from "@/lib/quickfurno-data";
 import { HomeMobileBottomNav } from "@/components/home/HomeMobileBottomNav";
 
-const CATEGORY_ICONS: Record<QuickFurnoCategory, Parameters<typeof QFIcon>[0]["name"]> = {
-  "Interior Designers": "home",
-  Carpenters: "hammer",
-  "Modular Factory": "kitchen",
-  "Premium Interiors": "star",
-  Sofa: "sofa",
-  Painter: "paint",
-  "Civil Work": "civil",
+const SERVICE_META: Record<QuickFurnoCategory, { subtitle: string; image: string }> = {
+  "Interior Designers": { subtitle: "Complete home interiors", image: "/assets/quickfurno/images/categories/interior-designers.svg" },
+  Carpenters: { subtitle: "Custom furniture & woodwork", image: "/assets/quickfurno/images/categories/carpenters.svg" },
+  "Modular Factory": { subtitle: "Factory-finish modular work", image: "/assets/quickfurno/images/categories/modular-factory.svg" },
+  "Premium Interiors": { subtitle: "Premium design & execution", image: "/assets/quickfurno/images/categories/premium-interiors.svg" },
+  Sofa: { subtitle: "Custom sofas & upholstery", image: "/assets/quickfurno/images/categories/sofa.svg" },
+  Painter: { subtitle: "Interior & exterior painting", image: "/assets/quickfurno/images/categories/painter.svg" },
+  "Civil Work": { subtitle: "Renovation, masonry & repairs", image: "/assets/quickfurno/images/categories/civil-work.svg" },
 };
+
+// Homepage discovery is derived from the canonical marketplace category registry.
+// No UI-only category/subcategory is allowed here.
+const SERVICES = categories.map(({ name }) => ({
+  title: name,
+  category: name,
+  ...SERVICE_META[name],
+}));
 
 const HOW_IT_WORKS = [
   {
     icon: "request" as const,
-    title: "Tell us what you need",
-    body: "Share your project requirement in a few simple steps.",
+    title: "Tell Us What You Need",
+    body: "Select your service and share a few details about your project.",
   },
   {
-    icon: "compare" as const,
-    title: "Compare relevant professionals",
-    body: "Review up to 3 relevant professional profiles and their available details.",
-  },
-  {
-    icon: "shield" as const,
-    title: "Choose with confidence",
-    body: "Ask questions, compare your options and decide who fits your project.",
-  },
-];
-
-const TRUST_POINTS = [
-  {
-    icon: "noFee" as const,
-    title: "Free for homeowners",
-    body: "Submit a requirement without paying QuickFurno.",
-  },
-  {
-    icon: "compare" as const,
-    title: "Up to 3 relevant matches",
-    body: "A smaller shortlist designed to reduce unnecessary calls.",
+    icon: "user" as const,
+    title: "Get Matched with Experts",
+    body: "We connect you with up to 3 relevant verified professionals in Pune.",
   },
   {
     icon: "shield" as const,
-    title: "Verified-review profiles",
-    body: "Approved client reviews appear only after a verified QuickFurno interaction.",
+    title: "Sit Back & Get It Done",
+    body: "Compare profiles, choose your vendor and deal with them directly.",
   },
 ];
+const TRUST_ITEMS = [
+  ["shield", "Verified professionals"],
+  ["compare", "Transparent matching"],
+  ["star", "Quality-focused profiles"],
+  ["chat", "Local support team"],
+  ["pin", "Pune focused community"],
+] as const;
 
-function Wordmark({ footer = false }: { footer?: boolean }) {
-  return (
-    <Link href="/" className={footer ? "qfh-wordmark qfh-wordmark--footer" : "qfh-wordmark"} aria-label="QuickFurno home">
-      <strong>QuickFurno</strong>
-      <span>Homes. Handled Better.</span>
-    </Link>
-  );
-}
-
-function Header() {
+function HomeHeader() {
   return (
     <header className="qfh-header">
       <div className="qfh-shell qfh-header-inner">
@@ -69,26 +57,27 @@ function Header() {
             <span className="qfh-mobile-menu-lines" aria-hidden="true"><i /><i /><i /></span>
           </summary>
           <nav className="qfh-mobile-menu-panel" aria-label="Mobile menu">
+            <Link href="/">Home</Link>
             <Link href="#services">Services</Link>
-            <Link href="#how-it-works">How it works</Link>
-            <Link href="/vendors">For Professionals</Link>
+            <Link href="#how-it-works">How It Works</Link>
+            <Link href="/vendors">For Vendors</Link>
             <Link href="#why-quickfurno">About</Link>
           </nav>
         </details>
-
-        <Wordmark />
-
+        <Link href="/" className="qfh-logo" aria-label="QuickFurno home">
+          <Image src="/assets/quickfurno/logos/quickfurno-logo.svg" alt="QuickFurno" width={260} height={70} priority />
+        </Link>
         <nav className="qfh-desktop-nav" aria-label="Homepage navigation">
+          <Link href="/">Home</Link>
           <Link href="#services">Services</Link>
-          <Link href="#how-it-works">How it works</Link>
-          <Link href="/vendors">For Professionals</Link>
+          <Link href="#how-it-works">How It Works</Link>
+          <Link href="/vendors">For Vendors</Link>
           <Link href="#why-quickfurno">About</Link>
         </nav>
-
         <div className="qfh-header-actions">
           <span className="qfh-location-pill"><QFIcon name="pin" /> Pune</span>
           <EnquiryModalTrigger className="qfh-primary-btn qfh-header-quote" source="Homepage header">
-            Find My Team
+            Get a Free Quote
           </EnquiryModalTrigger>
         </div>
       </div>
@@ -101,66 +90,108 @@ function Hero() {
     <section className="qfh-hero" aria-labelledby="qfh-hero-title">
       <div className="qfh-shell qfh-hero-grid">
         <div className="qfh-hero-copy">
-          <p className="qfh-kicker">Home projects, matched better</p>
+          <p className="qfh-kicker">Pune&apos;s trusted home-services marketplace</p>
           <h1 id="qfh-hero-title">
-            Find the right team.
-            <span>Build the home you want.</span>
+            <span>Better Spaces</span>
+            <span className="qfh-hero-accent"><b>Happier</b> <em>Lives</em></span>
           </h1>
           <p className="qfh-hero-lead">
-            Tell us what you&apos;re planning. QuickFurno matches you with up to 3 relevant home
-            professionals, so you can compare clearly and choose with confidence.
+            Connect with verified professionals for your home interior, renovation and maintenance
+            needs — all in one place.
           </p>
-
-          <div className="qfh-hero-actions">
-            <EnquiryModalTrigger className="qfh-primary-btn qfh-hero-quote" source="Homepage hero">
-              Find My Team <QFIcon name="arrow" />
+          <div className="qfh-quote-bar" aria-label="Start a free quote">
+            <label className="qfh-select-field">
+              <QFIcon name="grid" />
+              <select defaultValue="" aria-label="Select service">
+                <option value="" disabled>Select Service</option>
+                {SERVICES.map((service) => (
+                  <option key={service.title} value={service.title}>{service.title}</option>
+                ))}
+              </select>
+            </label>
+            <div className="qfh-location-field"><QFIcon name="pin" /><span>Pune</span></div>
+            <EnquiryModalTrigger className="qfh-primary-btn qfh-hero-quote" source="Homepage hero quote bar">
+              Get a Free Quote <QFIcon name="arrow" />
             </EnquiryModalTrigger>
           </div>
-
-          <div className="qfh-mini-trust" aria-label="QuickFurno marketplace facts">
-            <span><QFIcon name="noFee" />Free for homeowners</span>
-            <span><QFIcon name="compare" />Up to 3 relevant matches</span>
-            <span><QFIcon name="shield" />Verified-review profiles</span>
+          <div className="qfh-mini-trust" aria-label="QuickFurno benefits">
+            <span><QFIcon name="shield" />Verified Professionals</span>
+            <span><QFIcon name="compare" />Best-fit Match</span>
+            <span><QFIcon name="noFee" />Free for Homeowners</span>
+            <span><QFIcon name="pin" />Local Pune Experts</span>
           </div>
         </div>
-
-        <div className="qfh-hero-media">
+        <div className="qfh-hero-media" aria-hidden="true">
           <Image
-            src="/assets/quickfurno/images/hero/qf-family-hero.jpg"
-            alt="Family spending time together in a warm living room"
+            src="/assets/quickfurno/images/vendors/premium-living-room.svg"
+            alt=""
             fill
             priority
-            sizes="(max-width: 760px) 100vw, 52vw"
+            sizes="(max-width: 760px) 62vw, 48vw"
             className="qfh-hero-room"
           />
-          <span className="qfh-hero-photo-shade" aria-hidden="true" />
-          <p className="qfh-hero-media-note">Real homes. Relevant professionals. Better choices.</p>
+          <p className="qfh-dream-note">Your Dream Home<br />Starts Here!</p>
+          <div className="qfh-pune-card">
+            <span className="qfh-pune-card-icon"><QFIcon name="home" /></span>
+            <div><strong>Serving Pune Homes</strong><small>Local experts · Real people · Lasting spaces</small></div>
+          </div>
         </div>
       </div>
     </section>
   );
 }
 
-function CategoryStrip() {
+function StatsStrip() {
+  const stats = [
+    ["user", "Verified", "Professionals"],
+    ["compare", "Up to 3", "Relevant Matches"],
+    ["star", "Profile-led", "Comparison"],
+    ["pin", "100%", "Pune Focused"],
+    ["noFee", "₹0", "For Homeowners"],
+  ] as const;
   return (
-    <section className="qfh-category-section" id="services" aria-labelledby="qfh-category-title">
+    <section className="qfh-stats" aria-label="QuickFurno marketplace facts">
+      <div className="qfh-shell qfh-stats-grid">
+        {stats.map(([icon, value, label]) => (
+          <div className="qfh-stat" key={`${value}-${label}`}>
+            <span className="qfh-stat-icon"><QFIcon name={icon} /></span>
+            <span><strong>{value}</strong><small>{label}</small></span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Services() {
+  return (
+    <section className="qfh-section qfh-services" id="services">
       <span id="categories" className="qfh-anchor-alias" aria-hidden="true" />
       <div className="qfh-shell">
-        <div className="qfh-category-head">
-          <h2 id="qfh-category-title">Explore by category</h2>
-          <Link href="#services" className="qfh-view-all">View all services <QFIcon name="arrow" /></Link>
+        <div className="qfh-section-head qfh-section-head--center">
+          <p className="qfh-section-label">Our services</p>
+          <h2>Everything for a More Beautiful Home</h2>
+          <p>From design to execution, find trusted experts for every home need in Pune.</p>
         </div>
-        <div className="qfh-category-grid">
-          {categories.map((category) => (
+        <div className="qfh-services-headline-row">
+          <h3>Popular Services in Pune</h3>
+          <Link href="#services" className="qfh-view-all">View All <QFIcon name="arrow" /></Link>
+        </div>
+        <div className="qfh-service-grid">
+          {SERVICES.map((service) => (
             <Link
-              key={category.name}
-              href={`/category/${categorySlug(category.name)}`}
-              className="qfh-category-item"
+              key={service.title}
+              href={`/category/${categorySlug(service.category)}`}
+              className="qfh-service-card"
             >
-              <span className="qfh-category-icon">
-                <QFIcon name={CATEGORY_ICONS[category.name]} />
-              </span>
-              <strong>{category.name}</strong>
+              <div className="qfh-service-media">
+                <Image src={service.image} alt="" fill sizes="(max-width: 760px) 150px, 14vw" />
+              </div>
+              <div className="qfh-service-copy">
+                <strong>{service.title}</strong>
+                <small>{service.subtitle}</small>
+                <span aria-hidden="true"><QFIcon name="arrow" /></span>
+              </div>
             </Link>
           ))}
         </div>
@@ -171,11 +202,11 @@ function CategoryStrip() {
 
 function HowItWorks() {
   return (
-    <section className="qfh-how" id="how-it-works">
-      <div className="qfh-shell qfh-how-grid">
-        <div className="qfh-how-title">
-          <h2>How it works</h2>
-          <p>Get started in minutes</p>
+    <section className="qfh-section qfh-how" id="how-it-works">
+      <div className="qfh-shell">
+        <div className="qfh-section-head qfh-section-head--center">
+          <p className="qfh-section-label">How it works</p>
+          <h2>Get Your Home Project Done in 3 Simple Steps</h2>
         </div>
         <ol className="qfh-steps">
           {HOW_IT_WORKS.map((step, index) => (
@@ -196,74 +227,80 @@ function HowItWorks() {
 
 function WhyQuickFurno() {
   return (
-    <section className="qfh-proof" id="why-quickfurno">
+    <section className="qfh-section qfh-why" id="why-quickfurno">
       <div className="qfh-shell">
-        <div className="qfh-proof-head">
-          <p className="qfh-section-label">A simpler way to compare</p>
-          <h2>Fewer calls. Better choices.</h2>
-          <p>
-            QuickFurno is designed around a focused shortlist instead of sending your requirement
-            everywhere. You stay in control of who you choose.
-          </p>
-        </div>
-        <div className="qfh-proof-grid">
-          {TRUST_POINTS.map((point) => (
-            <article className="qfh-proof-card" key={point.title}>
-              <span><QFIcon name={point.icon} /></span>
-              <h3>{point.title}</h3>
-              <p>{point.body}</p>
-            </article>
-          ))}
+        <div className="qfh-why-grid">
+          <div>
+            <h2>Why Pune Homeowners Trust QuickFurno</h2>
+            <div className="qfh-trust-points">
+              {TRUST_ITEMS.map(([icon, label]) => (
+                <div className="qfh-trust-point" key={label}>
+                  <span><QFIcon name={icon} /></span>
+                  <strong>{label}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+          <article className="qfh-testimonial">
+            <div className="qfh-avatar" aria-hidden="true">PS</div>
+            <div className="qfh-testimonial-copy">
+              <p>“QuickFurno made it easy to compare relevant local professionals for our home project.”</p>
+              <strong>Priya S.</strong>
+              <small>Pune homeowner</small>
+            </div>
+            <div className="qfh-stars" aria-label="Five star testimonial">★★★★★</div>
+          </article>
         </div>
       </div>
     </section>
   );
 }
-
-function DualCTA() {
+function PuneCTA() {
   return (
-    <section className="qfh-dual-cta">
-      <div className="qfh-shell qfh-dual-cta-grid">
-        <div className="qfh-dual-panel qfh-dual-panel--homeowner">
-          <p>For homeowners</p>
-          <h2>From ideas to a clearer shortlist.</h2>
-          <span>Tell us what you need and compare relevant professionals.</span>
-          <EnquiryModalTrigger className="qfh-light-btn" source="Homepage homeowner CTA">
-            Start Your Project <QFIcon name="arrow" />
-          </EnquiryModalTrigger>
+    <section className="qfh-pune-cta">
+      <div className="qfh-shell qfh-pune-cta-inner">
+        <Image
+          src="/assets/quickfurno/images/city/pune-line-art.svg"
+          alt=""
+          width={700}
+          height={260}
+          className="qfh-pune-lineart"
+          aria-hidden="true"
+        />
+        <div className="qfh-pune-cta-copy">
+          <h2>Building a Better Pune</h2>
+          <p>One Home at a Time.</p>
+          <small>Local Homes. Local Professionals. A Brighter Pune.</small>
         </div>
-        <div className="qfh-dual-panel">
-          <p>For professionals</p>
-          <h2>Put your work in front of the right homeowners.</h2>
-          <span>Build your QuickFurno profile and grow through relevant enquiries.</span>
-          <Link className="qfh-light-btn" href="/vendors">
-            Join as a Professional <QFIcon name="arrow" />
-          </Link>
-        </div>
+        <EnquiryModalTrigger className="qfh-primary-btn qfh-pune-cta-btn" source="Homepage Pune CTA">
+          Get Started Today <QFIcon name="arrow" />
+        </EnquiryModalTrigger>
       </div>
     </section>
   );
 }
 
-function Footer() {
+function HomeFooter() {
   return (
     <footer className="qfh-footer" id="contact">
       <div className="qfh-shell qfh-footer-grid">
         <div className="qfh-footer-brand">
-          <Wordmark footer />
-          <p>A focused home-services marketplace for Pune homeowners and local professionals.</p>
+          <Image src="/assets/quickfurno/logos/quickfurno-logo.svg" alt="QuickFurno" width={260} height={70} />
+          <p>Verified home-service professionals for Pune homeowners.</p>
         </div>
         <div className="qfh-footer-col">
-          <h3>Explore</h3>
+          <h3>Quick Links</h3>
+          <Link href="/">Home</Link>
           <Link href="#services">Services</Link>
-          <Link href="#how-it-works">How it works</Link>
-          <Link href="/vendors">For Professionals</Link>
+          <Link href="#how-it-works">How It Works</Link>
+          <Link href="/vendors">For Vendors</Link>
+          <Link href="#why-quickfurno">About</Link>
         </div>
         <div className="qfh-footer-col">
-          <h3>Categories</h3>
-          {categories.map((category) => (
-            <Link key={category.name} href={`/category/${categorySlug(category.name)}`}>
-              {category.name}
+          <h3>Popular Services</h3>
+          {SERVICES.map((service) => (
+            <Link key={service.category} href={`/category/${categorySlug(service.category)}`}>
+              {service.title}
             </Link>
           ))}
         </div>
@@ -272,14 +309,24 @@ function Footer() {
           <a href="tel:+917447863602">+91 74478 63602</a>
           <a href="mailto:support@quickfurno.in">support@quickfurno.in</a>
           <span>Pune, Maharashtra</span>
+          <div className="qfh-socials" aria-label="QuickFurno social channels">
+            <span aria-hidden="true">f</span><span aria-hidden="true">ig</span><span aria-hidden="true">in</span>
+          </div>
+        </div>
+        <div className="qfh-footer-pune">
+          <span><QFIcon name="home" /></span>
+          <strong>Pune&apos;s Home Transformation Partner</strong>
+          <small>Trusted. Local. Reliable.</small>
         </div>
       </div>
       <div className="qfh-shell qfh-footer-bottom">
         <span>© 2026 QuickFurno. All rights reserved.</span>
         <nav aria-label="Legal links">
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
+          <Link href="/privacy">Privacy Policy</Link>
+          <Link href="/terms">Terms & Conditions</Link>
+          <Link href="/terms">Vendor Policy</Link>
         </nav>
+        <span>Made with ♥ for a Better Pune</span>
       </div>
     </footer>
   );
@@ -288,15 +335,16 @@ function Footer() {
 export function FinalHomepage() {
   return (
     <div className="qfh-page">
-      <Header />
+      <HomeHeader />
       <main>
         <Hero />
-        <CategoryStrip />
+        <StatsStrip />
+        <Services />
         <HowItWorks />
         <WhyQuickFurno />
-        <DualCTA />
+        <PuneCTA />
       </main>
-      <Footer />
+      <HomeFooter />
       <HomeMobileBottomNav />
     </div>
   );

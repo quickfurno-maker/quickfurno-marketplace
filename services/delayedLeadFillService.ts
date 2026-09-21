@@ -58,13 +58,23 @@ import { queueLeadForAssignment } from "../lib/lead-assignment/leadQueueService"
 // CHECK constraint), so no migration is needed to introduce them.
 export const DELAYED_FILL_AFTER_PREFERRED = "delayed_fill_after_preferred_vendor";
 export const PREFERRED_NO_CREDITS_PENDING_FALLBACK = "preferred_vendor_no_credits_pending_fallback";
-export const PROCESSOR_QUEUE_REASONS = [DELAYED_FILL_AFTER_PREFERRED, PREFERRED_NO_CREDITS_PENDING_FALLBACK] as const;
+export const DELAYED_FILL_WAITING_CONSENT = "delayed_fill_waiting_consent_withdrawn";
+export const DELAYED_FILL_WAITING_NO_VENDORS = "delayed_fill_waiting_no_eligible_vendors";
+export const DELAYED_FILL_PARTIAL_WAITING = "delayed_fill_partial_waiting_more_vendors";
+export const DELAYED_FILL_RETRY_PREFIX = "delayed_fill_retry_";
+// Every queued reason written by this processor must remain selectable on the
+// next retry. The delayed_fill_* prefix is owned exclusively by this service;
+// the preferred-vendor no-credits reason is the one legacy entry point that
+// does not carry that prefix.
+export const PROCESSOR_QUEUE_REASON_FILTER =
+  `queue_reason.eq.${PREFERRED_NO_CREDITS_PENDING_FALLBACK},queue_reason.like.delayed_fill_%` as const;
 
 // The 1-hour delayed-fill window and the between-retry cadence when no eligible
 // vendor is available yet.
 export const DELAYED_FILL_WINDOW_MINUTES = 60;
 const RETRY_INTERVAL_MINUTES = 60;
-// After this many empty attempts, stop auto-retrying (keep queued for admin).
+// After this many empty attempts, slow retries to once per day so the row
+// stays recoverable without hot-looping.
 const MAX_MATCHING_ATTEMPTS = 24;
 
 const ASSIGNMENT_SOURCE = "preferred_delayed_fill";
@@ -178,7 +188,7 @@ export async function processDueLeadAssignmentQueue(limit = 25): Promise<Result<
       .from("lead_assignment_queue")
       .select("*")
       .eq("queue_status", "queued")
-      .in("queue_reason", [...PROCESSOR_QUEUE_REASONS])
+      .or(PROCESSOR_QUEUE_REASON_FILTER)
       .lte("next_retry_at", nowIso)
       .order("next_retry_at", { ascending: true })
       .limit(limit);
@@ -232,7 +242,7 @@ async function processOneDelayedFillRow(row: Record<string, unknown>): Promise<D
     // Never share client contact without consent (defensive — routing already
     // required consent, but the lead could have been redacted meanwhile).
     if (lead.share_consent === false) {
-      await keepQueuedWaiting(queueId, attemptCount, "delayed_fill_waiting_consent_withdrawn");
+      await keepQueuedWaiting(queueId, attemptCount, DELAYED_FILL_WAITING_CONSENT);
       return { ...base, status: "waiting_no_consent", message: "Lead consent withdrawn; delayed fill paused." };
     }
 
@@ -294,7 +304,7 @@ async function processOneDelayedFillRow(row: Record<string, unknown>): Promise<D
 
     const candidateIds = await selectBestFillCandidates(lead, excluded, remainingSlots);
     if (candidateIds.length === 0) {
-      await keepQueuedWaiting(queueId, attemptCount, "delayed_fill_waiting_no_eligible_vendors");
+      await keepQueuedWaiting(queueId, attemptCount, DELAYED_FILL_WAITING_NO_VENDORS);
       return {
         ...base,
         status: preferredAssignedNow ? "preferred_assigned_then_filled" : "waiting_no_vendors",
@@ -318,7 +328,7 @@ async function processOneDelayedFillRow(row: Record<string, unknown>): Promise<D
         return { ...base, status: "resolved_already_full", total_assigned_after: assignedVendorIds.size, message: "Lead reached 3 vendors concurrently." };
       }
       // Transient RPC failure (incl. missing migration): keep queued for retry.
-      await keepQueuedWaiting(queueId, attemptCount, `delayed_fill_retry_${assign.code.toLowerCase()}`);
+      await keepQueuedWaiting(queueId, attemptCount, `${DELAYED_FILL_RETRY_PREFIX}${assign.code.toLowerCase()}`);
       return { ...base, status: "waiting_no_vendors", total_assigned_after: assignedVendorIds.size, message: `Fill RPC failed (${assign.code}); kept queued.` };
     }
 
@@ -346,7 +356,7 @@ async function processOneDelayedFillRow(row: Record<string, unknown>): Promise<D
 
     // Partial fill — some slots remain but no more candidates were assignable this
     // round. Keep queued so later recharges can top it up (never beyond 3).
-    await keepQueuedWaiting(queueId, attemptCount, "delayed_fill_partial_waiting_more_vendors", assignedVendorIds);
+    await keepQueuedWaiting(queueId, attemptCount, DELAYED_FILL_PARTIAL_WAITING, assignedVendorIds);
     return {
       ...base,
       status: "resolved_partial",

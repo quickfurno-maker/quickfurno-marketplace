@@ -27,14 +27,14 @@ const SIGNUP_HREF = "/vendor?mode=signup";
 const LOGIN_HREF = "/vendor?mode=login";
 
 export const metadata: Metadata = {
-  title: "Only 3 pros per enquiry | Join QuickFurno in Pune",
+  title: "Up to 3 pros per enquiry | Join QuickFurno in Pune",
   description:
-    "Every Pune homeowner enquiry goes to at most 3 verified pros nearby, in the right trade. Free to apply, verified by our Pune team, 24×7 support from your dashboard.",
+    "Apply free to QuickFurno in Pune. Approved vendors can receive Client Matching assignments while their account remains eligible, including sufficient matching credits.",
   alternates: { canonical: "https://quickfurno.in/vendors" },
   openGraph: {
-    title: "Only 3 pros per enquiry | Join QuickFurno in Pune",
+    title: "Up to 3 pros per enquiry | Join QuickFurno in Pune",
     description:
-      "Checked enquiries from homeowners near your base, shared with at most 3 verified pros. Free to apply.",
+      "Free to apply. Eligible assignments are capped at 3 active pros at a time and follow QuickFurno's category, geography and fairness rules.",
     url: "https://quickfurno.in/vendors",
     siteName: "QuickFurno",
     type: "website",
@@ -48,36 +48,36 @@ const TRADES = categories.map((category) => category.name);
 const STEPS = [
   {
     no: "STEP 1",
-    title: "Homeowner shares the job",
-    body: "Service, locality, budget and timeline, in about a minute.",
+    title: "Homeowner shares the requirement",
+    body: "Service, locality and the project details they choose to provide.",
     icon: "home" as const,
   },
   {
     no: "STEP 2",
-    title: "We check the details",
-    body: "Missing or unclear details? We ask the homeowner before anyone is matched.",
+    title: "Quality and consent checks",
+    body: "Incomplete or unclear requests can be held for clarification before assignment.",
     icon: "search" as const,
   },
   {
     no: "STEP 3",
-    title: "3 nearby verified pros",
-    body: "Right trade first, then the pros closest to the homeowner.",
+    title: "Up to 3 eligible pros",
+    body: "Category fit comes first; geography and the approved ranking rules help order eligible vendors.",
     icon: "pin" as const,
     on: true,
   },
   {
     no: "STEP 4",
-    title: "You call and quote",
-    body: "The enquiry reaches your dashboard with the homeowner’s details. You take it from there.",
+    title: "Assigned in your dashboard",
+    body: "If you receive an assignment, the permitted client details and requirement appear in Client Matching.",
     icon: "phone" as const,
   },
 ];
 
 const FIXES = [
-  { fix: "We bring the homeowner to you", pain: "Pay a marketing agency every month" },
-  { fix: "No ad account, no budget to watch", pain: "Run your own ads and hope they work" },
-  { fix: "Enquiries wait in your dashboard, checked", pain: "Miss calls while you are on a site" },
-  { fix: "Trade and distance first, then who has waited longest", pain: "Big names take every job" },
+  { fix: "Marketplace matching instead of running your own ads", pain: "Manage a separate ad account for every enquiry" },
+  { fix: "Assignments appear in your Client Matching dashboard", pain: "Depend on missed calls as the only intake channel" },
+  { fix: "Category and geography are explicit ranking signals", pain: "Treat every enquiry as equally relevant" },
+  { fix: "Assignment fairness is part of the approved order", pain: "Let one vendor dominate solely because of profile size" },
 ];
 
 const NIGHT_ROWS = [
@@ -87,64 +87,64 @@ const NIGHT_ROWS = [
 ];
 
 const COMPARE = [
-  ["Your enquiry goes to a long list of pros", "At most 3 pros at a time"],
-  ["Vague details, fake numbers", "Checked for budget, timeline and locality"],
-  ["Jobs from across the city", "Matched close to your base"],
-  ["Calling people who never asked", "Homeowners who agreed to hear from you"],
-  ["Anyone can post a review", "Reviews only from homeowners matched with you"],
-  ["Unverified listings everywhere", "Verified pros only"],
+  ["Assignment cap", "At most 3 active pros at a time"],
+  ["Quality handling", "Unclear requests can be held for clarification"],
+  ["Geography", "A ranking signal when authoritative route/geography data is available"],
+  ["Consent", "Client contact sharing requires the governed consent path"],
+  ["Reviews", "Only matched homeowners can submit vendor reviews"],
+  ["Eligibility", "Approval, active status and sufficient matching credits are required"],
 ];
 
 const GETS = [
   {
-    title: "Verified profile page",
-    body: "A public page with your services, areas, work photos and the verified badge.",
+    title: "Approved public profile",
+    body: "After approval, your published services, areas and portfolio facts can appear on your public profile.",
     icon: "shield" as const,
   },
   {
     title: "Client Matching dashboard",
-    body: "Every match with what the homeowner needs, where, and when they want to start.",
+    body: "Eligible assignments show the requirement facts that QuickFurno is permitted to share with you.",
     icon: "list" as const,
   },
   {
-    title: "Verified reviews",
-    body: "Only homeowners matched with you can review you. No fake reviews from strangers.",
+    title: "Assignment-verified reviews",
+    body: "Only homeowners with a real QuickFurno assignment can submit a review for that vendor.",
     icon: "star" as const,
   },
   {
-    title: "24×7 support",
-    body: "WhatsApp us or raise a ticket any time, right from your dashboard.",
+    title: "Vendor support workspace",
+    body: "Raise a tracked support ticket from your dashboard or use the WhatsApp contact channel.",
     icon: "chat" as const,
   },
 ];
 
 const SUPPORT_POINTS = [
-  { title: "Any hour, every day", body: "Day or night, weekends and holidays included.", icon: "clock" as const },
-  { title: "WhatsApp or a ticket", body: "Pick whatever is quickest for you at that moment.", icon: "chat" as const },
+  { title: "Dashboard support", body: "Raise a tracked ticket from the vendor support workspace.", icon: "ticket" as const },
+  { title: "WhatsApp contact", body: "Use the configured QuickFurno WhatsApp channel when that is more convenient.", icon: "chat" as const },
   {
-    title: "Every reply saved",
-    body: "Your support conversations stay in your dashboard, so nothing gets lost.",
+    title: "Conversation history",
+    body: "Support threads and replies remain available in the dashboard.",
     icon: "save" as const,
   },
   {
-    title: "One tap from any screen",
-    body: "Help sits at the top of every dashboard screen, and in the bottom menu.",
+    title: "Clear support entry point",
+    body: "The vendor dashboard includes a dedicated Support destination.",
     icon: "shield" as const,
   },
 ];
 
 const PROMISE_PRO = [
-  ["At most 3 pros per enquiry", "Never a broadcast to everyone in town"],
-  ["Only your trade, near your base", "No enquiries for work you don’t do"],
-  ["Reviews from real clients only", "Only homeowners matched with you can review you"],
-  ["Free to apply", "Verified by our team in Pune"],
+  ["Up to 3 active pros per enquiry", "Replacement rules can apply, but the active assignment cap stays bounded"],
+  ["Category and geography matter", "Matching uses governed eligibility and ranking signals, not a proximity promise"],
+  ["Reviews require a real match", "Only homeowners matched to you can submit a vendor review"],
+  ["Free to apply", "Client Matching still requires approval, account eligibility and sufficient matching credits"],
 ];
 
 const PROMISE_HOME = [
-  ["Every pro is verified first", "Pending or rejected profiles never appear"],
-  ["Up to 3 matches, not a crowd", "Only the most relevant pros near you"],
-  ["Your details stay private", "Shared only with the pros matched to you"],
-  ["Free to enquire", "No fee to enquire or compare"],
+  ["Public profiles pass listing controls", "Pending, rejected, suspended or hidden vendors are not active public listings"],
+  ["Up to 3 active assignments", "QuickFurno keeps the active vendor set bounded"],
+  ["Contact sharing is governed", "Client details are shared only through the assignment and consent authorities"],
+  ["Free to enquire", "There is no homeowner fee to submit an enquiry"],
 ];
 
 const ZONES = [
@@ -219,45 +219,40 @@ const ZONES = [
 
 const CITIES = [
   { name: "Pune", image: "/assets/quickfurno/images/launch/cities/pune.jpg", live: true },
-  { name: "Delhi NCR", image: "/assets/quickfurno/images/launch/cities/delhi-ncr.jpg" },
-  { name: "Mumbai", image: "/assets/quickfurno/images/launch/cities/mumbai.jpg" },
-  { name: "Hyderabad", image: "/assets/quickfurno/images/launch/cities/hyderabad.jpg" },
-  { name: "Kolkata", image: "/assets/quickfurno/images/launch/cities/kolkata.jpg" },
-  { name: "Bengaluru", image: "/assets/quickfurno/images/launch/cities/bengaluru.jpg" },
 ];
 
 const FAQ = [
   {
     q: "Is it free to apply?",
-    a: "Yes. Applying and verification are free. Our team talks you through how the partnership works once your business is approved.",
+    a: "Yes. Applying is free. Approval does not by itself activate Client Matching: the account must also remain eligible, including having sufficient matching credits when an assignment is made.",
   },
   {
     q: "How many pros get the same enquiry?",
-    a: "At most 3 at a time. If one of them steps away, that spot can go to another pro, but an enquiry is never broadcast to a long list.",
+    a: "QuickFurno caps active assignments at 3 pros at a time. Replacement and recovery rules can apply, so this is an active-assignment cap rather than a promise that only three vendors can ever be considered.",
   },
   {
     q: "How do you decide who gets an enquiry?",
-    a: "Trade first, then how close you are to the homeowner, then who has waited longest since their last match. Ratings only break a tie.",
+    a: "Category compatibility comes first. Authoritative geography or route signals, area affinity, assignment fairness, rating and deterministic tie-breakers can then affect order under the approved matching rules.",
   },
   {
-    q: "I’m new, with no reviews. Will I still be matched?",
-    a: "Yes. Reviews don’t decide who gets matched. A verified profile in the right trade, near the homeowner, is what counts — and pros who haven’t been matched recently come first.",
+    q: "I'm new, with no reviews. Can I still be matched?",
+    a: "There is no review-count minimum. You still need an approved and active vendor account, the right category eligibility, acceptance of Client Matching, no assignment suspension and sufficient matching credits.",
   },
   {
-    q: "Are the enquiries genuine?",
-    a: "Every enquiry is checked for real details — service, locality, budget and timeline — and the homeowner agrees to be contacted before any pro sees it.",
+    q: "Do you guarantee every enquiry is genuine?",
+    a: "No marketplace can guarantee that. QuickFurno records structured requirement details and applies quality and consent controls; unclear or incomplete requests can be held instead of assigned.",
   },
   {
     q: "Can I choose where I work?",
-    a: "Yes. Set your base area when you apply and we match homeowners around it, or choose to cover all of Pune.",
+    a: "Your profile records your base and covered areas. Geography is used as a ranking signal when authoritative data is available, but a listed area is not a guarantee of assignments.",
   },
   {
     q: "Do you guarantee a number of enquiries?",
-    a: "No. Matches depend on what homeowners near you ask for, so we never promise a fixed number.",
+    a: "No. Matches depend on homeowner demand, your category, marketplace eligibility, current credits and the approved matching order.",
   },
   {
     q: "What do I need to apply?",
-    a: "Your business details, the trades you do, the areas you cover and a few photos of your work. Our Pune team tells you if anything else is needed to finish verification.",
+    a: "Your business details, the trades you do, the areas you cover and the profile information requested during signup. QuickFurno reviews the submission before an account can become an active public vendor.",
   },
 ];
 
@@ -431,12 +426,12 @@ export default function VendorsPage() {
               <h1>
                 One enquiry.
                 <br />
-                Only <span>3 pros.</span>
+                Up to <span>3 pros.</span>
                 <br />
                 No crowd.
               </h1>
               <div className="qfv-slots">
-                <span className="qfv-slots-label">EACH ENQUIRY</span>
+                <span className="qfv-slots-label">ACTIVE ASSIGNMENT CAP</span>
                 <div className="qfv-slots-row">
                   <span className="qfv-slot">
                     <Icon name="check" size={13} color="#5EBE8B" width={3} />
@@ -450,8 +445,8 @@ export default function VendorsPage() {
                 </div>
               </div>
               <p className="qfv-hero-body">
-                Each enquiry goes to at most 3 verified pros in the right trade, close to the homeowner. It’s checked
-                for real details, and the homeowner has agreed to hear from you.
+                Eligible enquiries can be assigned to up to 3 active pros at a time. Category fit comes first;
+                geography and other approved ranking signals help order the eligible pool.
               </p>
               <div>
                 <span className="qfv-trade-label">WHAT’S YOUR TRADE?</span>
@@ -471,9 +466,9 @@ export default function VendorsPage() {
                   Vendor login
                 </Link>
                 <span className="qfv-note qfv-note--light">
-                  Free · 6 short steps
+                  Free to apply ? 6 short steps
                   <br />
-                  Verified by our Pune team
+                  Matching requires approval, eligibility and available credits
                 </span>
               </div>
               <EnquiryModalTrigger
@@ -482,7 +477,7 @@ export default function VendorsPage() {
                 source="Vendors page hero — homeowner switch"
               >
                 <Icon name="home" size={16} color="#B9B1A3" width={2} />
-                Looking to hire a pro instead? <strong>Get matched with 3 near you →</strong>
+                Looking to hire a pro instead? <strong>Get up to 3 matches ?</strong>
               </EnquiryModalTrigger>
             </div>
           </div>
@@ -496,7 +491,7 @@ export default function VendorsPage() {
                 <span className="qfv-kicker">How matching works</span>
                 <h2 className="qfv-h2">From a homeowner’s need to your phone</h2>
                 <p className="qfv-lede">
-                  The same simple rules for every enquiry. No bidding, no auctions. Just the right trade, close by.
+                  Matching follows one governed order: eligibility and category fit first, then approved ranking signals such as geography and fairness.
                 </p>
               </div>
               <ol className="qfv-steps">
@@ -518,9 +513,9 @@ export default function VendorsPage() {
               </p>
             </div>
 
-            {/* map: an example of one enquiry finding the nearest verified pros */}
+            {/* Illustrative geography example only; distance is a ranking signal, not an eligibility promise. */}
             <div className="qfv-map-wrap">
-              <div className="qfv-map" role="img" aria-label="Example map: a homeowner in Baner and the three nearest verified pros, 2.1 km, 3.4 km and 4.0 km away">
+              <div className="qfv-map" role="img" aria-label="Illustrative map showing geography as one possible ranking signal for up to three eligible pros. Not live demand data.">
                 <svg viewBox="0 0 500 470" preserveAspectRatio="none" aria-hidden="true">
                   <path d="M-20 141 C 150 103, 300 188, 520 132" stroke="#E9DEC9" strokeWidth="14" fill="none" strokeLinecap="round" />
                   <path d="M110 -20 C 150 188, 90 329, 150 490" stroke="#E9DEC9" strokeWidth="10" fill="none" strokeLinecap="round" />
@@ -530,7 +525,7 @@ export default function VendorsPage() {
                 </svg>
                 <span className="qfv-map-chip">
                   <i />
-                  Up to 3 verified pros nearby
+                  Illustrative geography example
                 </span>
                 <span className="qfv-map-home">
                   <Icon name="home" size={26} color="#FFFFFF" width={2.2} />
@@ -565,11 +560,11 @@ export default function VendorsPage() {
 
               <div className="qfv-checked">
                 <span className="qfv-checked-head">
-                  ENQUIRY CHECKED
+                  EXAMPLE QUALITY CHECK
                   <span className="qfv-tag-example">EXAMPLE</span>
                 </span>
                 <ul>
-                  {["Budget looks realistic", "Timeline shared", "Locality confirmed", "Agreed to be contacted"].map((line) => (
+                  {["Service captured", "Locality captured", "Project details reviewed", "Consent path checked before contact sharing"].map((line) => (
                     <li key={line}>
                       <span className="qfv-tick">
                         <Icon name="check" size={12} color="#1F9D5B" width={3} />
@@ -591,15 +586,15 @@ export default function VendorsPage() {
           <div className="qfv-shell qfv-night-grid">
             <div>
               <div className="qfv-head">
-                <span className="qfv-kicker qfv-kicker--amber">No agency. No ads.</span>
+                <span className="qfv-kicker qfv-kicker--amber">Always-available dashboard</span>
                 <h2 className="qfv-h2">
-                  We’re live 24×7,
+                  Your dashboard is available
                   <br />
-                  so you don’t have to be.
+                  whenever you need it.
                 </h2>
                 <p className="qfv-lede">
-                  Homeowners look for pros late at night, on Sundays, from the office. QuickFurno takes the enquiry,
-                  checks the details and lines up the match while you are on a site, with a client, or asleep.
+                  Client Matching keeps assignments, requirement details and support access in one place. Automation
+                  remains subject to QuickFurno&apos;s live launch controls and eligibility rules.
                 </p>
               </div>
               <ul className="qfv-fixes">
@@ -623,7 +618,7 @@ export default function VendorsPage() {
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFB13D" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z" />
                   </svg>
-                  WHILE YOU WERE OFF THE CLOCK
+                  ILLUSTRATIVE DASHBOARD ACTIVITY
                 </span>
                 <span className="qfv-tag-example--dark">EXAMPLE</span>
               </div>
@@ -639,7 +634,7 @@ export default function VendorsPage() {
                   </div>
                 ))}
               </div>
-              <footer>Checked through the night and waiting in your dashboard when you opened it.</footer>
+              <footer>Illustrative examples only. These rows are not live demand data.</footer>
             </div>
           </div>
         </section>
@@ -657,13 +652,13 @@ export default function VendorsPage() {
                 <h2 className="qfv-h2">Everything that wastes a pro’s time, fixed.</h2>
               </div>
               <p className="qfv-lede" style={{ maxWidth: 400 }}>
-                Built around one idea: fewer, better-matched enquiries beat a long list of strangers.
+                The page describes the same eligibility, assignment and review controls enforced by the marketplace.
               </p>
             </div>
             <div className="qfv-compare-card">
               <div className="qfv-compare-row qfv-compare-row--head">
-                <span>Typical enquiry sites</span>
-                <span>QuickFurno</span>
+                <span>QuickFurno rule</span>
+                <span>What it means</span>
               </div>
               {COMPARE.map(([old, now]) => (
                 <div className="qfv-compare-row" key={now}>
@@ -710,8 +705,8 @@ export default function VendorsPage() {
               </ul>
             </div>
 
-            {/* dashboard, with example data */}
-            <div className="qfv-browser">
+            {/* Illustrative product preview; deliberately not live demand data. */}
+            <div className="qfv-browser" role="img" aria-label="Illustrative Client Matching product preview. Not live demand data.">
               <div className="qfv-browser-bar">
                 <i />
                 <i />
@@ -741,7 +736,7 @@ export default function VendorsPage() {
                   </span>
                   <span className="qfv-dash-nav">
                     <Icon name="headset" size={16} color="#8A847A" width={1.9} />
-                    24×7 Support
+                    Support
                     <i />
                   </span>
                   <span className="qfv-dash-vendor">
@@ -761,7 +756,7 @@ export default function VendorsPage() {
                       <small>Kulkarni Interiors · Interior Designers, Carpenters · Baner</small>
                       <h3>Client Matching</h3>
                     </span>
-                    <span className="qfv-tag-example">EXAMPLE DATA</span>
+                    <span className="qfv-tag-example">ILLUSTRATIVE EXAMPLE</span>
                   </div>
                   <div className="qfv-dash-stats">
                     <div className="qfv-dash-stat">
@@ -804,7 +799,7 @@ export default function VendorsPage() {
           </div>
         </section>
 
-        {/* ========================= 24×7 SUPPORT ========================= */}
+        {/* ========================= VENDOR SUPPORT ========================= */}
         <section className="qfv-support qfv-section" id="support">
           <div className="qfv-deco">
             <div className="qfv-glow" style={{ right: "-160px", top: "-220px", width: 760, height: 760, background: "radial-gradient(closest-side, rgba(255,177,61,0.3), rgba(240,74,26,0) 74%)" }} />
@@ -815,15 +810,15 @@ export default function VendorsPage() {
           </div>
           <div className="qfv-shell qfv-support-grid">
             <div className="qfv-support-copy">
-              <span className="qfv-kicker">24×7 support</span>
+              <span className="qfv-kicker">Vendor support</span>
               <h2>
-                Stuck at 11 pm?
+                Need help?
                 <br />
-                <span>We’re still here.</span>
+                <span>Use your support workspace.</span>
               </h2>
               <p className="qfv-lede" style={{ color: "#5E5950" }}>
-                Profile stuck in review? A question about a match? Reach the QuickFurno team any hour, any day,
-                straight from your dashboard.
+                Profile question or matching issue? Raise a tracked dashboard ticket or use the configured WhatsApp
+                contact channel. No round-the-clock human response-time guarantee is claimed.
               </p>
               <ul className="qfv-support-points">
                 {SUPPORT_POINTS.map((point) => (
@@ -839,9 +834,9 @@ export default function VendorsPage() {
                 ))}
               </ul>
               <div className="qfv-support-band">
-                <strong>24×7</strong>
+                <strong>HELP</strong>
                 <i />
-                <span>Support for every verified pro, from the day you join.</span>
+                <span>Tracked support for vendors through the dashboard workspace.</span>
               </div>
             </div>
 
@@ -855,7 +850,7 @@ export default function VendorsPage() {
                       </span>
                       <span className="qfv-help-pill">
                         <Icon name="headset" size={14} color="#FFFFFF" width={2.1} />
-                        24×7 Help
+                        Help
                       </span>
                     </div>
                     <div className="qfv-phone-body">
@@ -885,7 +880,7 @@ export default function VendorsPage() {
                         <h5>How can we help?</h5>
                         <span className="qfv-sheet-live">
                           <i className="qfv-dot" style={{ width: 7, height: 7 }} />
-                          Our team is available 24×7
+                          Support workspace
                         </span>
                       </span>
                       <span className="qfv-sheet-opt">
@@ -932,7 +927,7 @@ export default function VendorsPage() {
               <div className="qfv-support-person">
                 <Image
                   src="/assets/quickfurno/images/vendors/support-person.png"
-                  alt="A QuickFurno support team member"
+                  alt=""
                   width={311}
                   height={1100}
                   sizes="(max-width: 979px) 120px, 180px"
@@ -1039,11 +1034,11 @@ export default function VendorsPage() {
             <div className="qfv-areas-head">
               <div className="qfv-head">
                 <span className="qfv-kicker">Where we match</span>
-                <h2 className="qfv-h2">Homeowners across Pune, matched near you.</h2>
+                <h2 className="qfv-h2">Serving the Pune marketplace.</h2>
               </div>
               <p className="qfv-lede" style={{ maxWidth: 400 }}>
-                Set your base area when you apply. We match you with homeowners around it, or you can choose to cover
-                all of Pune.
+                Set your base and covered areas when you apply. Geography can influence ranking when authoritative
+                data is available; it does not create a guaranteed radius or assignment.
               </p>
             </div>
             <div className="qfv-zones">
@@ -1063,7 +1058,7 @@ export default function VendorsPage() {
             </div>
             <p className="qfv-areas-note">
               <Icon name="pin" size={16} width={2} />
-              Locality not listed? We match homeowners across all of Pune.
+              Pune coverage is recorded on vendor profiles and used by the governed matching system.
             </p>
           </div>
         </section>
@@ -1075,9 +1070,9 @@ export default function VendorsPage() {
               <span className="qfv-kicker" style={{ color: "#FF8A5C" }}>
                 Our journey
               </span>
-              <h2 className="qfv-h2">Made in Pune. Coming to your city next.</h2>
+              <h2 className="qfv-h2">Made in Pune. Focused on Pune.</h2>
               <p>
-                We are building QuickFurno where we live — then bringing verified home professionals to more of India.
+                QuickFurno is launching as a Pune-only marketplace so supply, matching and support can stay focused.
               </p>
             </div>
             <div className="qfv-city-grid">
@@ -1087,14 +1082,10 @@ export default function VendorsPage() {
                     <Image src={city.image} alt={city.name} width={104} height={104} sizes="104px" />
                   </span>
                   <b>{city.name}</b>
-                  {city.live ? (
-                    <span className="qfv-city-live">
-                      <i className="qfv-dot" style={{ width: 7, height: 7 }} />
-                      Live now
-                    </span>
-                  ) : (
-                    <span className="qfv-city-soon">Coming soon</span>
-                  )}
+                  <span className="qfv-city-live">
+                    <i className="qfv-dot" style={{ width: 7, height: 7 }} />
+                    Live now
+                  </span>
                 </div>
               ))}
             </div>
@@ -1118,7 +1109,7 @@ export default function VendorsPage() {
             <div className="qfv-faq-side">
               <span className="qfv-kicker">Questions</span>
               <h2 className="qfv-h2">What pros ask before they apply</h2>
-              <p>Something else? Our Pune team answers on WhatsApp and email.</p>
+              <p>Something else? Use the configured QuickFurno WhatsApp contact channel.</p>
               <a
                 className="qfv-btn qfv-btn--ghost"
                 href={whatsappLink(
@@ -1152,10 +1143,10 @@ export default function VendorsPage() {
           <div className="qfv-shell">
             <div className="qfv-final-card">
               <div className="qfv-final-copy">
-                <h2>Be one of the 3.</h2>
+                <h2>Apply to join QuickFurno.</h2>
                 <p>
-                  When a homeowner near you needs your trade, they hear from at most 3 verified pros. Make sure you’re
-                  one of them.
+                  Applying is free. Active Client Matching starts only when your vendor account is approved and
+                  remains eligible, including having sufficient matching credits.
                 </p>
                 <div className="qfv-final-trades">
                   {TRADES.map((trade) => (
@@ -1187,7 +1178,7 @@ export default function VendorsPage() {
               </span>
               <div>
                 <b>Here to hire, not to apply?</b>
-                <span>Tell us what your home needs. We’ll match you with up to 3 verified pros near you. It’s free.</span>
+                <span>Tell us what your home needs. QuickFurno can connect you with up to 3 relevant eligible pros. It is free to enquire.</span>
               </div>
               <EnquiryModalTrigger
                 className="qfv-btn qfv-btn--primary"

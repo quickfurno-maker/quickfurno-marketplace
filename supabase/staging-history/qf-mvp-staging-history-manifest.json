@@ -613,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 30,
+    "postAnchorMigrationCount": 32,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -1253,6 +1253,40 @@
       "appliedToProduction": false,
       "remoteVersionStatus": "ABSENT_IN_STAGING_AND_PRODUCTION_HISTORY",
       "remoteHistoryReadEvidence": "SUPABASE_MCP_LIST_MIGRATIONS_2026-09-18",
+      "remoteHistoryCountObservedAtApply": false,
+      "requiresSeparateStagingDeploymentGate": true
+    },
+    {
+      "version": "20260921100000",
+      "name": "qf_lead_drafts",
+      "path": "supabase/migrations/20260921100000_qf_lead_drafts.sql",
+      "sha256": "2ff8e5ed82dda69ea46426a19bab35bd2d96667eb00e029333399b71d9901d49",
+      "phase": "QF-PUNE-LAUNCH-LEAD-DRAFTS",
+      "operationalStatus": "PENDING",
+      "purpose": "Creates a service-role-only, RLS-protected non-PII lead_drafts table for anonymous funnel-stage analytics. The application remains fail-silent if it is absent.",
+      "appliedExactlyOnce": false,
+      "appliedByThisPhase": false,
+      "appliedToStaging": false,
+      "appliedToProduction": false,
+      "remoteVersionStatus": "ABSENT_IN_STAGING_AND_PRODUCTION_HISTORY",
+      "remoteHistoryReadEvidence": "SUPABASE_MCP_LIST_MIGRATIONS_2026-09-23",
+      "remoteHistoryCountObservedAtApply": false,
+      "requiresSeparateStagingDeploymentGate": true
+    },
+    {
+      "version": "20260922120000",
+      "name": "false_ceiling_category",
+      "path": "supabase/migrations/20260922120000_false_ceiling_category.sql",
+      "sha256": "775794173a6f463e03a38af9f822dd61756765be3860370837d63026c268e540",
+      "phase": "QF-PUNE-LAUNCH-FALSE-CEILING",
+      "operationalStatus": "PENDING",
+      "purpose": "Activates the canonical False Ceiling marketplace category using the deployed four-column service_categories schema and updates the server-side category/parent-group helper functions with pinned search_path and service-role-only execution.",
+      "appliedExactlyOnce": false,
+      "appliedByThisPhase": false,
+      "appliedToStaging": false,
+      "appliedToProduction": false,
+      "remoteVersionStatus": "ABSENT_IN_STAGING_AND_PRODUCTION_HISTORY",
+      "remoteHistoryReadEvidence": "SUPABASE_MCP_LIST_MIGRATIONS_2026-09-23",
       "remoteHistoryCountObservedAtApply": false,
       "requiresSeparateStagingDeploymentGate": true
     }

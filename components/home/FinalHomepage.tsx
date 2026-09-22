@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { QFIcon } from "@/components/QuickFurnoIcons";
-import { whatsappLink } from "@/lib/config";
+import { CONTACT, whatsappLink } from "@/lib/config";
 import { categories, categorySlug, type QuickFurnoCategory } from "@/lib/quickfurno-data";
 import type { Vendor } from "@/lib/quickfurno-data";
 import { HomeMobileBottomNav } from "@/components/home/HomeMobileBottomNav";
@@ -358,7 +358,7 @@ function HomeFooter() {
         <div className="qfh-footer-col qfh-footer-contact">
           <h3>Contact</h3>
           <a href={whatsappLink()} target="_blank" rel="noopener noreferrer">WhatsApp us</a>
-          <a href="mailto:support@quickfurno.in">support@quickfurno.in</a>
+          <a href={"mailto:" + CONTACT.email}>{CONTACT.email}</a>
           <span>Pune, Maharashtra</span>
         </div>
         <div className="qfh-footer-pune">

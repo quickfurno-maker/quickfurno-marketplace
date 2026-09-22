@@ -3,8 +3,9 @@
 --
 -- WHAT THIS DOES
 --   1. public.service_categories: re-activates the existing 'false-ceiling' row
---      (soft-deactivated in Phase 14C) as a top-level category "False Ceiling"
---      (sort_order 50, after Civil Work). Inserts it if it is missing.
+--      (soft-deactivated in Phase 14C) as "False Ceiling". Production currently
+--      exposes only id/name/slug/is_active on this table, so this migration
+--      intentionally writes no undeployed hierarchy/audit columns.
 --   2. Matching helpers, mirroring lib/vendors/categoryMatching.ts exactly:
 --        - public.qf_category_groups_for_label (synonym groups)
 --        - public.qf_parent_category_group     (parent groups, max 3 per group)
@@ -29,15 +30,11 @@ begin;
 -- ----------------------------------------------------------------------------
 -- 1. Category row.
 -- ----------------------------------------------------------------------------
-insert into public.service_categories (name, slug, is_active, parent_id, sort_order, updated_by, updated_at)
-values ('False Ceiling', 'false-ceiling', true, null, 50, 'system_seed', now())
+insert into public.service_categories (name, slug, is_active)
+values ('False Ceiling', 'false-ceiling', true)
 on conflict (slug) do update
   set name = excluded.name,
-      is_active = true,
-      parent_id = null,
-      sort_order = excluded.sort_order,
-      updated_by = excluded.updated_by,
-      updated_at = now();
+      is_active = true;
 
 -- ----------------------------------------------------------------------------
 -- 2a. Synonym groups (was 20260702000034_fix_auto_match_category_mapping).
@@ -46,6 +43,7 @@ create or replace function public.qf_category_groups_for_label(p_value text)
 returns text[]
 language sql
 immutable
+set search_path = pg_catalog, public, pg_temp
 as $$
   select coalesce(array_agg(group_name order by group_name), '{}'::text[])
   from (
@@ -88,6 +86,12 @@ as $$
     select public.qf_normalize_category_label(label_value) from unnest(labels) as label(label_value)
   );
 $$;
+
+-- Keep this helper server-side like the legacy category-mapping authority.
+revoke all on function public.qf_category_groups_for_label(text) from public;
+revoke all on function public.qf_category_groups_for_label(text) from anon;
+revoke all on function public.qf_category_groups_for_label(text) from authenticated;
+grant execute on function public.qf_category_groups_for_label(text) to service_role;
 
 -- ----------------------------------------------------------------------------
 -- 2b. Parent groups (was 20260705000130_distance_category_matching_rpc).
@@ -145,7 +149,7 @@ do $verify$
 begin
   if not exists (
     select 1 from public.service_categories
-    where slug = 'false-ceiling' and name = 'False Ceiling' and is_active and parent_id is null
+    where slug = 'false-ceiling' and name = 'False Ceiling' and is_active
   ) then
     raise exception 'False Ceiling migration aborted: category row is not active.';
   end if;
@@ -178,6 +182,12 @@ begin
         from pg_proc p where p.oid = to_regprocedure('public.qf_parent_category_group(text)'))
        not like '%search_path=pg_catalog, public, pg_temp%' then
     raise exception 'False Ceiling migration aborted: qf_parent_category_group lost its pinned search_path.';
+  end if;
+
+  if (select array_to_string(coalesce(p.proconfig, array[]::text[]), ',')
+        from pg_proc p where p.oid = to_regprocedure('public.qf_category_groups_for_label(text)'))
+       not like '%search_path=pg_catalog, public, pg_temp%' then
+    raise exception 'False Ceiling migration aborted: qf_category_groups_for_label lost its pinned search_path.';
   end if;
 end
 $verify$;

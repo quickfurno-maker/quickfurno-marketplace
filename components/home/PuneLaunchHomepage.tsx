@@ -5,7 +5,7 @@ import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { categories, categorySlug, type QuickFurnoCategory } from "@/lib/quickfurno-data";
 import { HOME_FAQ, PUNE_AREAS, TESTIMONIALS } from "@/lib/homepage-content";
 import { categoryImage, heroImage } from "@/lib/homepage-images";
-import { whatsappLink } from "@/lib/config";
+import { CONTACT, whatsappLink } from "@/lib/config";
 
 // ============================================================================
 // QuickFurno — Pune launch homepage
@@ -252,19 +252,14 @@ const HOW_IT_WORKS = [
 // Verification steps — same four checks as lib/homepage-content VERIFY_STEPS,
 // with the tighter one-line copy from the approved mockup.
 const VERIFY_POINTS = [
-  { title: "Business identity check", body: "Real business details, reviewed before the profile goes public." },
-  { title: "Work profile review", body: "Services, experience and work photos checked against reality." },
-  { title: "Approved before listing", body: "Pending, rejected or suspended vendors never appear in matches." },
-  { title: "Local support team", body: "A Pune-based team on WhatsApp and email throughout." },
+  { title: "Business profile review", body: "Business details are reviewed before an approved profile is listed." },
+  { title: "Service information review", body: "Services, coverage and submitted profile information are reviewed before listing." },
+  { title: "Approved before listing", body: "Pending, rejected, suspended or hidden profiles are not shown as active public vendors." },
+  { title: "Support channels", body: "Vendors can use WhatsApp and the dashboard support workspace when they need help." },
 ];
 
 const CITIES = [
   { name: "Pune", file: "pune", live: true },
-  { name: "Delhi NCR", file: "delhi-ncr", live: false },
-  { name: "Mumbai", file: "mumbai", live: false },
-  { name: "Hyderabad", file: "hyderabad", live: false },
-  { name: "Kolkata", file: "kolkata", live: false },
-  { name: "Bengaluru", file: "bengaluru", live: false },
 ];
 
 // Areas: the mockup shows 11 pills + "+ N more" on desktop, 7 + "+ N more" on
@@ -304,7 +299,7 @@ function Header() {
           ))}
         </nav>
         <EnquiryModalTrigger className="qfp-btn qfp-btn--primary qfp-header-cta" source="Homepage header">
-          Get three teams
+          Get up to 3 matches
         </EnquiryModalTrigger>
         <details className="qfp-menu">
           <summary className="qfp-menu-button" aria-label="Open navigation">
@@ -315,7 +310,7 @@ function Header() {
               <Link key={link.href} href={link.href}>{link.label}</Link>
             ))}
             <EnquiryModalTrigger className="qfp-btn qfp-btn--primary" source="Homepage mobile menu">
-              Get three teams
+              Get up to 3 matches
             </EnquiryModalTrigger>
           </nav>
         </details>
@@ -346,26 +341,26 @@ function Hero() {
       <div className="qfp-shell qfp-hero-inner">
         <div className="qfp-hero-copy">
           <h1 id="qfp-hero-title">
-            Pune&apos;s finest home professionals.<br />{" "}
+            Pune home professionals.<br />{" "}
             <span>One enquiry away.</span>
           </h1>
           <div className="qfp-hero-badges" aria-label="Why QuickFurno">
             <span className="qfp-hero-badge">
               <ShieldIcon />
-              <span className="qfp-badge-full">Aadhaar + GST verified<b>*</b></span>
-              <span className="qfp-badge-short">Aadhaar + GST<b>*</b></span>
+              <span className="qfp-badge-full">Profiles reviewed</span>
+              <span className="qfp-badge-short">Reviewed</span>
             </span>
             <span className="qfp-hero-badge">
               <PinIcon />
-              <span className="qfp-badge-full">Nearby vendors</span>
-              <span className="qfp-badge-short">Nearby</span>
+              <span className="qfp-badge-full">Relevant Pune pros</span>
+              <span className="qfp-badge-short">Relevant</span>
             </span>
             <span className="qfp-hero-badge">
               <BoltIcon />
-              Instant service
+              Free to enquire
             </span>
           </div>
-          <small className="qfp-hero-note">*Verification level varies by vendor.</small>
+          <small className="qfp-hero-note">Matches depend on category fit, eligibility and marketplace availability.</small>
           {/* data-quote-bar: the trigger reads this bar's <select> (service) and
               [data-quote-area] input at click time and opens the modal pre-filled. */}
           <div className="qfp-quote" aria-label="Start an enquiry" data-quote-bar>
@@ -383,7 +378,7 @@ function Hero() {
               <input type="text" placeholder="Kharadi, Baner…" aria-label="Your locality" autoComplete="off" data-quote-area />
             </label>
             <EnquiryModalTrigger className="qfp-btn qfp-btn--primary qfp-quote-btn" source="Homepage hero quote bar">
-              Get three teams <ArrowIcon size={16} stroke="#fff" />
+              Get up to 3 matches <ArrowIcon size={16} stroke="#fff" />
             </EnquiryModalTrigger>
           </div>
         </div>
@@ -428,7 +423,6 @@ function FeaturedServiceCard() {
     <Link href={`/category/${slug}`} className="qfp-card qfp-card--featured">
       <div className="qfp-card-media">
         <Image src={image.src} alt={meta.alt} fill priority sizes="(max-width: 760px) 100vw, (max-width: 1100px) 100vw, 588px" />
-        <span className="qfp-card-tag">MOST BOOKED</span>
       </div>
       <div className="qfp-card-body">
         <span className="qfp-card-accent" aria-hidden="true" />
@@ -618,7 +612,7 @@ function MadeInPune() {
       <div className="qfp-shell">
         <div className="qfp-head-center" data-reveal>
           <span className="qfp-kicker qfp-kicker--coral">Our journey</span>
-          <h2 id="qfp-cities-title">Made in Pune. Coming to your city next.</h2>
+          <h2 id="qfp-cities-title">Made in Pune. Focused on Pune.</h2>
           <p className="qfp-cities-lead">We are building QuickFurno where we live — then bringing verified home professionals to more of India.</p>
         </div>
         <ul className="qfp-city-grid" data-reveal-group>
@@ -628,16 +622,11 @@ function MadeInPune() {
                 <Image src={`${LAUNCH_IMG}/cities/${city.file}.jpg`} alt="" fill sizes="104px" />
               </span>
               <strong>{city.name}</strong>
-              {city.live ? (
-                <span className="qfp-city-status qfp-city-status--live"><i aria-hidden="true" />Live now</span>
-              ) : (
-                <span className="qfp-city-status">Coming soon</span>
-              )}
+              <span className="qfp-city-status qfp-city-status--live"><i aria-hidden="true" />Live now</span>
             </li>
           ))}
         </ul>
-        {/* Decorative skyline of Indian landmarks: the "coming to your city"
-            promise, sitting on the bottom edge of the section like a horizon. */}
+        {/* Decorative skyline retained as artwork; the launch itself remains Pune-only. */}
         <div className="qfp-cities-skyline" aria-hidden="true">
           <Image src={`${LAUNCH_IMG}/india-skyline.png`} alt="" width={2200} height={415} sizes="(max-width: 760px) 100vw, 1100px" />
         </div>
@@ -664,7 +653,7 @@ function TrustAndSafety() {
           <span className="qfp-kicker">Trust &amp; safety</span>
           <h2>Listed only after we say yes.</h2>
           <p className="qfp-trust-lead">
-            No anonymous listings, no pay-to-appear. Every profile on QuickFurno has been reviewed and approved by our Pune team.
+            Public profiles must pass QuickFurno&apos;s listing controls before they appear. Approval and active status are rechecked by the marketplace.
           </p>
           <ul className="qfp-verify-list">
             {VERIFY_POINTS.map((point) => (
@@ -680,7 +669,7 @@ function TrustAndSafety() {
         </div>
         <div className="qfp-trust-visual" data-reveal>
           <div className="qfp-trust-photo">
-            <Image src={`${LAUNCH_IMG}/team-pune.jpg`} alt="QuickFurno team reviewing a vendor profile" fill sizes="(max-width: 760px) 100vw, 564px" />
+            <Image src={`${LAUNCH_IMG}/team-pune.jpg`} alt="" fill sizes="(max-width: 760px) 100vw, 564px" />
             <span className="qfp-trust-pill-label">PUNE HOMES, DONE RIGHT</span>
           </div>
           {testimonial ? (
@@ -820,7 +809,7 @@ function Footer() {
           <div className="qfp-footer-col qfp-footer-col--contact">
             <h3>CONTACT</h3>
             <a href={whatsappLink()} target="_blank" rel="noopener noreferrer"><FooterChatIcon />WhatsApp us</a>
-            <a href="mailto:support@quickfurno.in"><MailIcon />support@quickfurno.in</a>
+            <a href={"mailto:" + CONTACT.email}><MailIcon />{CONTACT.email}</a>
             <span><PinIcon size={15} stroke="#FF8A5C" width={2} />Kharadi, Pune, Maharashtra</span>
           </div>
         </div>

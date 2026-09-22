@@ -94,10 +94,4 @@ export const HOME_FAQ: FaqItem[] = [
 export type Testimonial = { quote: string; name: string; detail: string };
 
 // Real homeowner quotes only — see honesty rules above.
-export const TESTIMONIALS: Testimonial[] = [
-  {
-    quote: "QuickFurno made it easy to compare relevant local professionals for our home project.",
-    name: "Priya Singh",
-    detail: "Homeowner · Megapolis, Hinjewadi, Pune",
-  },
-];
+export const TESTIMONIALS: Testimonial[] = [];

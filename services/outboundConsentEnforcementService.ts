@@ -160,6 +160,68 @@ const deny = (code: OutboundConsentDenyCode): OutboundConsentOutcome => ({ kind:
 const unavailable = (): OutboundConsentOutcome => ({ kind: "unavailable", code: "CONSENT_AUTHORITY_UNAVAILABLE", retryable: true });
 const invalid = (code: OutboundConsentInvalidCode): OutboundConsentOutcome => ({ kind: "invalid", code, retryable: false });
 
+export interface ConversationalWhatsAppConsentInput {
+  /** sha256(canonical E.164), never the plaintext destination. */
+  readonly destinationHash: string;
+  readonly subjectType: "unknown" | "prospect" | "client" | "vendor";
+  /** Present only when QuickFurno has an exact durable client/vendor identity. */
+  readonly subjectId: string | null;
+}
+
+/**
+ * Canonical consent enforcement for an in-window conversational WhatsApp reply.
+ *
+ * This deliberately bypasses the template registry because a free-form reply is
+ * not a template send. It does NOT bypass D2-C: transactional scope is fixed by
+ * this coordinator, destination suppressions are still authoritative, and an
+ * exact principal is used only when the conversation carries a durable Core
+ * subject id. Any authority failure fails closed.
+ */
+export async function authorizeConversationalWhatsAppConsent(
+  input: ConversationalWhatsAppConsentInput,
+  deps: OutboundConsentEnforcementDeps = defaultOutboundConsentEnforcementDeps()
+): Promise<OutboundConsentOutcome> {
+  if (!input || typeof input.destinationHash !== "string" || !HEX64.test(input.destinationHash)) {
+    return invalid("CONSENT_ENFORCEMENT_INVALID");
+  }
+  if (!["unknown", "prospect", "client", "vendor"].includes(input.subjectType)) {
+    return invalid("CONSENT_ENFORCEMENT_INVALID");
+  }
+
+  const exactPrincipal =
+    (input.subjectType === "client" || input.subjectType === "vendor") &&
+    typeof input.subjectId === "string" &&
+    UUID_SHAPE.test(input.subjectId)
+      ? { type: input.subjectType, id: input.subjectId }
+      : null;
+
+  let outcome: ConsentDecisionOutcome;
+  try {
+    outcome = await deps.decide({
+      channel: "whatsapp",
+      scope: "transactional",
+      destinationHash: input.destinationHash,
+      identityConfidence: exactPrincipal ? "exact" : "unknown",
+      principal: exactPrincipal,
+    });
+  } catch {
+    return unavailable();
+  }
+
+  if (!outcome.ok) {
+    if (outcome.code === "AUTHORITY_LOOKUP_FAILED") return unavailable();
+    if (outcome.code === "AUTHORITY_INTEGRITY_VIOLATION") {
+      return invalid("CONSENT_AUTHORITY_INTEGRITY");
+    }
+    return invalid("CONSENT_ENFORCEMENT_INVALID");
+  }
+  if (outcome.disposition === "blocked") return deny("CONSENT_SUPPRESSED");
+  if (outcome.disposition === "no_consent_objection") {
+    return { kind: "allow", scope: "transactional" };
+  }
+  return invalid("CONSENT_ENFORCEMENT_INVALID");
+}
+
 /**
  * Authorize ONE outbound send against the consent layer. Order: resolve the scope from the closed
  * registry (no DB call for an unclassified/mismatched message) → derive the identity → ask D2-C →

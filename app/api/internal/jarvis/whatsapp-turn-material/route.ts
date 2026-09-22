@@ -5,16 +5,45 @@ import {
   QFJ_WHATSAPP_TURN_MATERIAL_PATH,
   QFJ_WHATSAPP_TURN_MATERIAL_PROTOCOL,
   QFJ_WHATSAPP_TURN_MATERIAL_SIGNING_DOMAIN,
+  QFJ_WHATSAPP_TURN_MATERIAL_VERSION,
+  isQfjWhatsAppBoundTurnMaterialRequest,
   parseQfjWhatsAppTurnMaterialRequest,
 } from "@/lib/jarvis/whatsAppTurnMaterialContract";
 import { resolveQfJarvisRuntimePolicy } from "@/lib/jarvis/runtimePolicy";
-import { readJarvisWhatsAppTurnMaterial } from "@/services/conversationalWhatsAppService";
+import {
+  readJarvisWhatsAppAuthorityState,
+  readJarvisWhatsAppTurnMaterial,
+  type JarvisWhatsAppAuthorityState,
+} from "@/services/conversationalWhatsAppService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const MAX_BODY_BYTES = 4_096;
 const reply = (status: number, body: unknown) =>
   NextResponse.json(body, { status, headers: { "cache-control": "no-store" } });
+
+function authorityResponse(requestId: string, value: JarvisWhatsAppAuthorityState) {
+  return {
+    protocol: QFJ_WHATSAPP_TURN_MATERIAL_PROTOCOL,
+    version: QFJ_WHATSAPP_TURN_MATERIAL_VERSION,
+    requestId,
+    tenantId: value.tenantId,
+    conversationId: value.conversationId,
+    revision: value.revision,
+    assignedActor: value.assignedActor,
+    subjectType: value.subjectType,
+    partyType: value.partyType,
+    conversationState: value.conversationState,
+    jarvisAllowed: value.jarvisAllowed,
+    dataClass: value.dataClass,
+    humanTakeover: value.humanTakeover,
+    aiPaused: value.aiPaused,
+    cancelled: value.cancelled,
+    subjectStatus: value.subjectStatus,
+    ...(value.subjectRef === undefined ? {} : { subjectRef: value.subjectRef }),
+    observedAt: value.observedAt,
+  };
+}
 
 export async function POST(request: Request): Promise<Response> {
   const policy = resolveQfJarvisRuntimePolicy();
@@ -46,37 +75,46 @@ export async function POST(request: Request): Promise<Response> {
     now: new Date().toISOString(),
   });
   if (!authenticated) return reply(401, { error: "authentication_failed" });
-  const material = await readJarvisWhatsAppTurnMaterial({
-    conversationId: parsed.conversationId,
-    inboundMessageId: parsed.inboundMessageId,
-    expectedRevision: parsed.expectedRevision,
-  });
-  if (!material.ok) {
-    const status = material.reason === "conversation_not_found" || material.reason === "inbound_message_mismatch" ? 404
-      : material.reason === "conversation_not_sendable" || material.reason === "stale_revision" ? 409
-      : 503;
-    return reply(status, {
-      protocol: QFJ_WHATSAPP_TURN_MATERIAL_PROTOCOL,
-      version: 1,
-      requestId: parsed.requestId,
-      status: material.reason,
+
+  if (isQfjWhatsAppBoundTurnMaterialRequest(parsed)) {
+    const material = await readJarvisWhatsAppTurnMaterial({
+      tenantId: parsed.tenantId,
+      conversationId: parsed.conversationId,
+      inboundMessageId: parsed.inboundMessageId,
+      expectedRevision: parsed.expectedRevision,
+    });
+    if (!material.ok) {
+      const status = material.reason === "conversation_not_found" || material.reason === "inbound_message_mismatch" ? 404
+        : material.reason === "stale_revision" ? 409
+        : 503;
+      return reply(status, {
+        protocol: QFJ_WHATSAPP_TURN_MATERIAL_PROTOCOL,
+        version: QFJ_WHATSAPP_TURN_MATERIAL_VERSION,
+        requestId: parsed.requestId,
+        status: material.reason,
+      });
+    }
+    return reply(200, {
+      ...authorityResponse(parsed.requestId, material.value),
+      inboundMessageId: material.value.inboundMessageId,
+      receivedAt: material.value.receivedAt,
+      inbound: material.value.inbound,
+      ...(material.value.normalizedText === undefined ? {} : { normalizedText: material.value.normalizedText }),
     });
   }
 
-  return reply(200, {
-    protocol: QFJ_WHATSAPP_TURN_MATERIAL_PROTOCOL,
-    version: 1,
-    requestId: parsed.requestId,
+  const authority = await readJarvisWhatsAppAuthorityState({
+    tenantId: parsed.tenantId,
     conversationId: parsed.conversationId,
-    inboundMessageId: parsed.inboundMessageId,
-    conversationRevision: parsed.expectedRevision,
-    assignedActor: material.value.assignedActor,
-    subjectType: material.value.subjectType,
-    tenantId: material.value.tenantId,
-    dataClass: material.value.dataClass,
-    ...(material.value.subjectRef === undefined ? {} : { subjectRef: material.value.subjectRef }),
-    receivedAt: material.value.receivedAt,
-    inbound: material.value.inbound,
-    ...(material.value.normalizedText === undefined ? {} : { normalizedText: material.value.normalizedText }),
   });
+  if (!authority.ok) {
+    const status = authority.reason === "conversation_not_found" ? 404 : 503;
+    return reply(status, {
+      protocol: QFJ_WHATSAPP_TURN_MATERIAL_PROTOCOL,
+      version: QFJ_WHATSAPP_TURN_MATERIAL_VERSION,
+      requestId: parsed.requestId,
+      status: authority.reason,
+    });
+  }
+  return reply(200, authorityResponse(parsed.requestId, authority.value));
 }

@@ -6,8 +6,15 @@ import { resolveConversationalMetaConfig, outboundToRuntime } from "../lib/commu
 import { MetaCloudWhatsAppProvider, META_WHATSAPP_CLOUD_PROVIDER_KEY } from "../lib/communication/providers/metaCloudWhatsAppProvider";
 import { FetchHttpTransport } from "../lib/communication/httpTransport";
 import { evaluateMetaOutboundGateForMessage } from "./communicationProviderRuntimeService";
+import { authorizeConversationalWhatsAppConsent } from "./outboundConsentEnforcementService";
 import { effectiveProviderOutcomeCertainty } from "../lib/communication/providers/providerOutcome";
 import { resolveWhatsAppConciergeRouting } from "../lib/communication/whatsAppConciergeRouting";
+import {
+  classifyQfWhatsAppDataClass,
+  deriveQfJarvisSubjectStatus,
+  type QfJarvisDataClass,
+  type QfJarvisSubjectStatus,
+} from "../lib/jarvis/whatsAppAuthorityPolicy";
 import {
   parseSerializedQfWhatsAppExperience,
   renderQfWhatsAppExperienceFallback,
@@ -31,6 +38,7 @@ type ClosedReason =
   | "stale_revision"
   | "service_window_closed"
   | "suppressed"
+  | "consent_unavailable"
   | "seal_unavailable"
   | "provider_not_configured"
   | "provider_account_mismatch"
@@ -75,17 +83,66 @@ async function providerAccount(providerAccountId: string) {
   return error || !data ? null : data as any;
 }
 
-async function activeSuppression(destinationHash: string): Promise<boolean> {
-  const now = new Date().toISOString();
-  const { data, error } = await adminClient()
-    .from("communication_suppressions")
-    .select("id,scope,expires_at")
-    .eq("destination_hash", destinationHash)
-    .eq("channel", CHANNEL)
-    .eq("is_active", true)
-    .in("scope", ["global", "transactional"]);
-  if (error) return true;
-  return (data ?? []).some((row: any) => !row.expires_at || row.expires_at > now);
+const SUBJECT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+type JarvisAuthorityActor = "AAROHI" | "ANISHA" | "RIYA" | "HUMAN" | "SYSTEM";
+type JarvisPartyType = "CLIENT" | "VENDOR" | "PROSPECT" | "UNKNOWN";
+
+function partyTypeForSubject(subjectType: string): JarvisPartyType {
+  return subjectType === "client" ? "CLIENT"
+    : subjectType === "vendor" ? "VENDOR"
+      : subjectType === "prospect" ? "PROSPECT"
+        : "UNKNOWN";
+}
+
+async function readSubjectAuthority(conversation: any): Promise<{
+  subjectRef?: string;
+  subjectStatus: QfJarvisSubjectStatus;
+  aiPaused: boolean;
+  humanTakeover: boolean;
+  cancelled: boolean;
+}> {
+  const subjectType = String(conversation.subject_type);
+  const subjectRefRaw = subjectType === "prospect"
+    ? conversation.aarohi_prospect_id
+    : conversation.subject_id;
+  const subjectRef = typeof subjectRefRaw === "string" && SUBJECT_UUID.test(subjectRefRaw)
+    ? subjectRefRaw
+    : undefined;
+
+  let subjectEligible: boolean | undefined;
+  let aiPaused = conversation.state === "PAUSED";
+  let humanTakeover = conversation.human_takeover === true || conversation.state === "HUMAN";
+  let cancelled = conversation.state === "CLOSED";
+
+  if (subjectRef && subjectType === "client") {
+    const { data, error } = await adminClient().from("client_accounts")
+      .select("id,status").eq("id", subjectRef).maybeSingle();
+    subjectEligible = !error && !!data && String(data.status).toLowerCase() === "active";
+  } else if (subjectRef && subjectType === "vendor") {
+    const { data, error } = await adminClient().from("vendors")
+      .select("id,status,is_active").eq("id", subjectRef).maybeSingle();
+    const blocked = ["rejected", "disabled", "suspended"].includes(String(data?.status ?? "").toLowerCase());
+    subjectEligible = !error && !!data && data.is_active !== false && !blocked;
+  } else if (subjectRef && subjectType === "prospect") {
+    const { data, error } = await adminClient().from("aarohi_prospects")
+      .select("id,prospect_stage,do_not_contact,ai_paused,human_takeover,merged_into_prospect_id")
+      .eq("id", subjectRef).eq("tenant_id", String(conversation.tenant_id)).maybeSingle();
+    subjectEligible = !error && !!data && !data.merged_into_prospect_id;
+    aiPaused = aiPaused || data?.ai_paused === true;
+    humanTakeover = humanTakeover || data?.human_takeover === true;
+    cancelled = cancelled || data?.do_not_contact === true ||
+      String(data?.prospect_stage ?? "").toUpperCase() === "SUPPRESSED" ||
+      Boolean(data?.merged_into_prospect_id);
+  }
+
+  return {
+    ...(subjectRef ? { subjectRef } : {}),
+    subjectStatus: deriveQfJarvisSubjectStatus({ subjectRef, subjectEligible }),
+    aiPaused,
+    humanTakeover,
+    cancelled,
+  };
 }
 
 export async function signalConversationalWhatsAppPresence(input: {
@@ -143,6 +200,7 @@ export async function recordConversationalInbound(input: {
   readonly occurredAt?: string | null;
   readonly identityConfidence: "exact" | "ambiguous" | "unknown";
   readonly principalType: "client" | "vendor" | "admin" | null;
+  readonly principalId: string | null;
   readonly messageType: string;
   readonly contentMinimized: Record<string, unknown>;
   /** Persist/audit the turn but never enqueue it for Jarvis (used for STOP / START / HELP). */
@@ -231,9 +289,22 @@ export async function recordConversationalInbound(input: {
     contentMinimized: input.contentMinimized,
     currentSubjectType: existing?.subject_type,
     currentActor: existing?.assigned_actor,
+    currentState: existing?.state,
     currentHumanTakeover: existing?.human_takeover === true,
     isNewConversation: !existing,
   });
+  const exactSubjectId = input.identityConfidence === "exact" &&
+    input.principalType === routing.subjectType &&
+    typeof input.principalId === "string" &&
+    SUBJECT_UUID.test(input.principalId)
+      ? input.principalId
+      : null;
+  const preservedSubjectId = existing?.subject_type === routing.subjectType &&
+    typeof existing?.subject_id === "string" &&
+    SUBJECT_UUID.test(existing.subject_id)
+      ? existing.subject_id
+      : null;
+  const subjectId = exactSubjectId ?? preservedSubjectId;
   const jarvisAllowedByAccount = account.jarvis_access_mode === "proposal_only";
 
   let conversation: any;
@@ -251,6 +322,7 @@ export async function recordConversationalInbound(input: {
         encryption_key_id: sealed.value.keyId,
         destination_masked: maskPhoneE164(normalized.e164),
         subject_type: routing.subjectType,
+        subject_id: subjectId,
         assigned_actor: routing.assignedActor,
         state: routing.state,
         jarvis_enabled: jarvisAllowedByAccount && routing.jarvisEnabled,
@@ -285,6 +357,7 @@ export async function recordConversationalInbound(input: {
         sealed_destination_auth_tag: sealed.value.authTag,
         encryption_key_id: sealed.value.keyId,
         subject_type: routing.subjectType,
+        subject_id: subjectId,
         assigned_actor: routing.assignedActor,
         state: routing.state,
         jarvis_enabled: jarvisAllowedByAccount && routing.jarvisEnabled,
@@ -367,62 +440,127 @@ export async function recordConversationalInbound(input: {
   }};
 }
 
+export interface JarvisWhatsAppAuthorityState {
+  readonly tenantId: string;
+  readonly conversationId: string;
+  readonly revision: number;
+  readonly assignedActor: JarvisAuthorityActor;
+  readonly subjectType: "unknown" | "prospect" | "client" | "vendor";
+  readonly partyType: JarvisPartyType;
+  readonly conversationState: "OPEN" | "PAUSED" | "HUMAN" | "CLOSED";
+  readonly jarvisAllowed: boolean;
+  readonly dataClass: QfJarvisDataClass;
+  readonly humanTakeover: boolean;
+  readonly aiPaused: boolean;
+  readonly cancelled: boolean;
+  readonly subjectStatus: QfJarvisSubjectStatus;
+  readonly subjectRef?: string;
+  readonly observedAt: string;
+}
+
+export async function readJarvisWhatsAppAuthorityState(input: {
+  readonly tenantId: string;
+  readonly conversationId: string;
+}): Promise<ConversationalResult<JarvisWhatsAppAuthorityState>> {
+  const { data: conversation, error } = await adminClient()
+    .from("communication_conversations")
+    .select("*")
+    .eq("id", input.conversationId)
+    .maybeSingle();
+  if (error || !conversation || String(conversation.tenant_id) !== input.tenantId) {
+    return { ok: false, reason: "conversation_not_found" };
+  }
+
+  let messageType: string | null = null;
+  if (typeof conversation.last_inbound_provider_message_id === "string") {
+    const { data: currentInbound, error: inboundError } = await adminClient()
+      .from("communication_inbound_messages")
+      .select("message_type")
+      .eq("conversation_id", conversation.id)
+      .eq("provider_message_id", conversation.last_inbound_provider_message_id)
+      .maybeSingle();
+    if (inboundError) return { ok: false, reason: "inbound_message_mismatch" };
+    messageType = typeof currentInbound?.message_type === "string" ? currentInbound.message_type : null;
+  }
+
+  const actor = String(conversation.assigned_actor) as JarvisAuthorityActor;
+  const subjectType = String(conversation.subject_type) as JarvisWhatsAppAuthorityState["subjectType"];
+  const subject = await readSubjectAuthority(conversation);
+  const conversationState = String(conversation.state) as JarvisWhatsAppAuthorityState["conversationState"];
+  const jarvisAllowed = conversationState === "OPEN" &&
+    conversation.jarvis_enabled === true &&
+    subject.humanTakeover !== true &&
+    subject.aiPaused !== true &&
+    subject.cancelled !== true;
+
+  return { ok: true, value: {
+    tenantId: String(conversation.tenant_id),
+    conversationId: String(conversation.id),
+    revision: Number(conversation.revision),
+    assignedActor: actor,
+    subjectType,
+    partyType: partyTypeForSubject(subjectType),
+    conversationState,
+    jarvisAllowed,
+    dataClass: classifyQfWhatsAppDataClass(messageType),
+    humanTakeover: subject.humanTakeover,
+    aiPaused: subject.aiPaused,
+    cancelled: subject.cancelled,
+    subjectStatus: subject.subjectStatus,
+    ...(subject.subjectRef ? { subjectRef: subject.subjectRef } : {}),
+    observedAt: String(conversation.updated_at),
+  }};
+}
+
 export async function readJarvisWhatsAppTurnMaterial(input: {
+  readonly tenantId: string;
   readonly conversationId: string;
   readonly inboundMessageId: string;
   readonly expectedRevision: number;
-}): Promise<ConversationalResult<{
-  assignedActor: "AAROHI" | "ANISHA" | "RIYA";
-  subjectType: "prospect" | "client" | "vendor";
-  tenantId: "quickfurno.marketplace";
-  dataClass: "HOSTED_ALLOWED";
-  subjectRef?: string;
-  receivedAt: string;
-  inbound: QfWhatsAppInboundMaterialV1;
-  normalizedText?: string;
+}): Promise<ConversationalResult<JarvisWhatsAppAuthorityState & {
+  readonly inboundMessageId: string;
+  readonly receivedAt: string;
+  readonly inbound: QfWhatsAppInboundMaterialV1;
+  readonly normalizedText?: string;
 }>> {
-  const [{ data: conversation, error: conversationError }, { data: inbound, error: inboundError }] = await Promise.all([
-    adminClient().from("communication_conversations").select("*").eq("id", input.conversationId).maybeSingle(),
-    adminClient().from("communication_inbound_messages")
-      .select("id,conversation_id,message_type,content_minimized,received_at,identity_confidence,resolved_principal_type,resolved_principal_id")
-      .eq("id", input.inboundMessageId)
-      .maybeSingle(),
-  ]);
-  if (conversationError || !conversation) return { ok: false, reason: "conversation_not_found" };
-  if (inboundError || !inbound || inbound.conversation_id !== conversation.id) {
-    return { ok: false, reason: "inbound_message_mismatch" };
+  const authority = await readJarvisWhatsAppAuthorityState({
+    tenantId: input.tenantId,
+    conversationId: input.conversationId,
+  });
+  if (!authority.ok) return authority;
+  if (authority.value.revision !== input.expectedRevision) {
+    return { ok: false, reason: "stale_revision" };
   }
-  if (
-    conversation.state !== "OPEN" ||
-    conversation.jarvis_enabled !== true ||
-    conversation.human_takeover === true ||
-    Number(conversation.revision) !== input.expectedRevision
-  ) return { ok: false, reason: "conversation_not_sendable" };
 
-  const actor = String(conversation.assigned_actor);
-  const subjectType = String(conversation.subject_type);
-  if (!["AAROHI", "ANISHA", "RIYA"].includes(actor) || !["prospect", "client", "vendor"].includes(subjectType)) {
-    return { ok: false, reason: "conversation_not_sendable" };
-  }
+  const [{ data: conversation }, { data: inbound, error: inboundError }, { data: turn, error: turnError }] = await Promise.all([
+    adminClient().from("communication_conversations")
+      .select("last_inbound_provider_message_id").eq("id", input.conversationId).maybeSingle(),
+    adminClient().from("communication_inbound_messages")
+      .select("id,conversation_id,provider_message_id,message_type,content_minimized,received_at")
+      .eq("id", input.inboundMessageId).maybeSingle(),
+    adminClient().from("communication_jarvis_turn_outbox")
+      .select("conversation_id,inbound_message_id,conversation_revision,assigned_actor")
+      .eq("inbound_message_id", input.inboundMessageId).maybeSingle(),
+  ]);
+  if (
+    inboundError || turnError || !conversation || !inbound || !turn ||
+    inbound.conversation_id !== input.conversationId ||
+    inbound.provider_message_id !== conversation.last_inbound_provider_message_id ||
+    turn.conversation_id !== input.conversationId ||
+    turn.inbound_message_id !== input.inboundMessageId ||
+    Number(turn.conversation_revision) !== input.expectedRevision
+  ) return { ok: false, reason: "inbound_message_mismatch" };
+
   const inboundMaterial = deriveQfWhatsAppInboundMaterial({
     messageType: inbound.message_type,
     contentMinimized: (inbound.content_minimized ?? {}) as Record<string, unknown>,
   });
   const normalizedText = inboundMaterial.normalizedText;
 
-  const subjectRef = inbound.identity_confidence === "exact" &&
-    inbound.resolved_principal_type === subjectType &&
-    typeof inbound.resolved_principal_id === "string"
-      ? inbound.resolved_principal_id
-      : undefined;
-
   return { ok: true, value: {
-    assignedActor: actor as "AAROHI" | "ANISHA" | "RIYA",
-    subjectType: subjectType as "prospect" | "client" | "vendor",
-    tenantId: "quickfurno.marketplace",
-    dataClass: "HOSTED_ALLOWED",
-    ...(subjectRef ? { subjectRef } : {}),
-    receivedAt: inbound.received_at,
+    ...authority.value,
+    inboundMessageId: input.inboundMessageId,
+    receivedAt: String(inbound.received_at),
     inbound: inboundMaterial,
     ...(normalizedText ? { normalizedText } : {}),
   }};
@@ -462,7 +600,15 @@ async function queueConversationExperience(input: {
 
   const expires = conversation.service_window_expires_at ? Date.parse(conversation.service_window_expires_at) : NaN;
   if (!Number.isFinite(expires) || expires <= Date.now()) return { ok: false, reason: "service_window_closed" };
-  if (await activeSuppression(conversation.destination_hash)) return { ok: false, reason: "suppressed" };
+  const consent = await authorizeConversationalWhatsAppConsent({
+    destinationHash: String(conversation.destination_hash),
+    subjectType: ["prospect", "client", "vendor"].includes(String(conversation.subject_type))
+      ? String(conversation.subject_type) as "prospect" | "client" | "vendor"
+      : "unknown",
+    subjectId: typeof conversation.subject_id === "string" ? conversation.subject_id : null,
+  });
+  if (consent.kind === "deny") return { ok: false, reason: "suppressed" };
+  if (consent.kind !== "allow") return { ok: false, reason: "consent_unavailable" };
 
   const account = await providerAccount(conversation.provider_account_id);
   if (!account || account.account_role !== "conversational" || account.jarvis_access_mode !== "proposal_only") {
@@ -871,9 +1017,20 @@ export async function dispatchConversationalOutbox(
     await failOutbox(claimed.id, "cancelled", "SERVICE_WINDOW_CLOSED");
     return { ok: false, reason: "service_window_closed" };
   }
-  if (await activeSuppression(conversation.destination_hash)) {
-    await failOutbox(claimed.id, "cancelled", "DESTINATION_SUPPRESSED");
+  const consent = await authorizeConversationalWhatsAppConsent({
+    destinationHash: String(conversation.destination_hash),
+    subjectType: ["prospect", "client", "vendor"].includes(String(conversation.subject_type))
+      ? String(conversation.subject_type) as "prospect" | "client" | "vendor"
+      : "unknown",
+    subjectId: typeof conversation.subject_id === "string" ? conversation.subject_id : null,
+  });
+  if (consent.kind === "deny") {
+    await failOutbox(claimed.id, "cancelled", "CONSENT_SUPPRESSED");
     return { ok: false, reason: "suppressed" };
+  }
+  if (consent.kind !== "allow") {
+    await failOutbox(claimed.id, "failed", "CONSENT_AUTHORITY_UNAVAILABLE");
+    return { ok: false, reason: "consent_unavailable" };
   }
 
   const account = await providerAccount(conversation.provider_account_id);

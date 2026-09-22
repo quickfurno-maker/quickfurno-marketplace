@@ -23,6 +23,17 @@ import {
   buildQuickFurnoConciergeMenu,
 } from "../../../lib/jarvis/whatsAppExperience.ts";
 import { buildMetaInteractivePayload } from "../../../lib/communication/providers/metaWhatsAppInteractive.ts";
+import {
+  classifyQfWhatsAppDataClass,
+  deriveQfJarvisSubjectStatus,
+} from "../../../lib/jarvis/whatsAppAuthorityPolicy.ts";
+import {
+  QFJ_WHATSAPP_TURN_MATERIAL_SIGNING_DOMAIN,
+  QFJ_WHATSAPP_TURN_MATERIAL_VERSION,
+  isQfjWhatsAppBoundTurnMaterialRequest,
+  parseQfjWhatsAppTurnMaterialRequest,
+} from "../../../lib/jarvis/whatsAppTurnMaterialContract.ts";
+
 
 const read = (p) => fs.readFileSync(p, "utf8");
 const migration = read("supabase/migrations/20260918120000_whatsapp_conversational_jarvis_foundation.sql");
@@ -30,6 +41,9 @@ const callbackReplayMigration = read("supabase/migrations/20260918180500_jarvis_
 const conversationService = read("services/conversationalWhatsAppService.ts");
 const gatewayService = read("services/jarvisWhatsAppGatewayService.ts");
 const replyRoute = read("app/api/internal/jarvis/whatsapp-reply/route.ts");
+const materialRoute = read("app/api/internal/jarvis/whatsapp-turn-material/route.ts");
+const authorityPolicy = read("lib/jarvis/whatsAppAuthorityPolicy.ts");
+const consentEnforcement = read("services/outboundConsentEnforcementService.ts");
 const webhookService = read("services/metaWhatsAppWebhookService.ts");
 const metaProviderSource = read("lib/communication/providers/metaCloudWhatsAppProvider.ts");
 
@@ -91,9 +105,19 @@ await test("human takeover and optimistic revision are rechecked before send", (
   assert.match(conversationService, /conversation\.human_takeover/);
   assert.match(conversationService, /Number\(conversation\.revision\) !== Number\(claimed\.expected_revision\)/);
 });
-await test("suppression is checked before Jarvis queue and again before Meta send", () => {
-  const occurrences = (conversationService.match(/activeSuppression\(/g) ?? []).length;
-  assert.ok(occurrences >= 3);
+await test("canonical consent authority is checked before queue and again before Meta send", () => {
+  const occurrences = (conversationService.match(/authorizeConversationalWhatsAppConsent\(/g) ?? []).length;
+  assert.ok(occurrences >= 2);
+  assert.doesNotMatch(conversationService, /activeSuppression\(/);
+  assert.match(conversationService, /CONSENT_SUPPRESSED/);
+  assert.match(conversationService, /CONSENT_AUTHORITY_UNAVAILABLE/);
+});
+await test("free-form conversational consent delegates to D2-C with fixed transactional scope", () => {
+  assert.match(consentEnforcement, /export async function authorizeConversationalWhatsAppConsent/);
+  assert.match(consentEnforcement, /channel:\s*"whatsapp"/);
+  assert.match(consentEnforcement, /scope:\s*"transactional"/);
+  assert.match(consentEnforcement, /deps\.decide/);
+  assert.doesNotMatch(consentEnforcement, /authorizeConversationalWhatsAppConsent[\s\S]{0,1800}resolveOutboundConsentScope/);
 });
 await test("Jarvis reply contracts cannot select phone, provider account, WABA or token", () => {
   const base = {
@@ -113,6 +137,48 @@ await test("Jarvis reply contracts cannot select phone, provider account, WABA o
     assert.equal(parseQfjWhatsAppReplyRequest({ ...v2, [field]: "x" }), null);
   }
 });
+await test("WhatsApp authority/material v2 supports live state reads and exact turn-bound reads", () => {
+  assert.equal(QFJ_WHATSAPP_TURN_MATERIAL_VERSION, 2);
+  assert.equal(QFJ_WHATSAPP_TURN_MATERIAL_SIGNING_DOMAIN, "qfj.whatsapp.turn-material.http.sig.v2");
+  const base = {
+    protocol: "qfj.whatsapp.turn-material", version: 2, caller: "qf-jarvis", audience: "quickfurno-core",
+    requestId: crypto.randomUUID(), issuedAt: new Date().toISOString(), tenantId: "quickfurno",
+    conversationId: crypto.randomUUID(),
+  };
+  const authority = parseQfjWhatsAppTurnMaterialRequest(base);
+  assert.ok(authority);
+  assert.equal(isQfjWhatsAppBoundTurnMaterialRequest(authority), false);
+  const bound = parseQfjWhatsAppTurnMaterialRequest({
+    ...base, inboundMessageId: crypto.randomUUID(), expectedRevision: 7,
+  });
+  assert.ok(bound);
+  assert.equal(isQfjWhatsAppBoundTurnMaterialRequest(bound), true);
+  assert.equal(parseQfjWhatsAppTurnMaterialRequest({ ...base, tenantId: "other" }), null);
+  assert.equal(parseQfjWhatsAppTurnMaterialRequest({ ...base, dataClass: "HOSTED_ALLOWED" }), null);
+});
+await test("authority material is derived from live QuickFurno state rather than permissive constants", () => {
+  assert.match(materialRoute, /readJarvisWhatsAppAuthorityState/);
+  assert.match(materialRoute, /tenantId: value\.tenantId/);
+  assert.match(materialRoute, /revision: value\.revision/);
+  assert.match(materialRoute, /subjectStatus: value\.subjectStatus/);
+  assert.match(materialRoute, /jarvisAllowed: value\.jarvisAllowed/);
+  assert.doesNotMatch(conversationService, /tenantId:\s*"quickfurno\.marketplace"/);
+  assert.doesNotMatch(conversationService, /dataClass:\s*"HOSTED_ALLOWED"/);
+  assert.match(conversationService, /communication_jarvis_turn_outbox/);
+  assert.match(conversationService, /inbound\.provider_message_id !== conversation\.last_inbound_provider_message_id/);
+});
+await test("hosted-processing and subject status fail closed outside proven eligible text subjects", () => {
+  assert.equal(classifyQfWhatsAppDataClass("text"), "HOSTED_ALLOWED");
+  assert.equal(classifyQfWhatsAppDataClass("button_reply"), "HOSTED_ALLOWED");
+  for (const type of ["image", "document", "audio", "location", "contact", "order", "unsupported", null]) {
+    assert.equal(classifyQfWhatsAppDataClass(type), "HUMAN_ONLY");
+  }
+  assert.equal(deriveQfJarvisSubjectStatus({}), "in-progress");
+  assert.equal(deriveQfJarvisSubjectStatus({ subjectRef: crypto.randomUUID() }), "in-progress");
+  assert.equal(deriveQfJarvisSubjectStatus({ subjectRef: crypto.randomUUID(), subjectEligible: true }), "clear");
+  assert.doesNotMatch(authorityPolicy, /subjectRef === undefined\) return "clear"/);
+});
+
 await test("Jarvis reply route is signed and feature-gated off by default", () => {
   assert.equal(QFJ_WHATSAPP_REPLY_PATH, "/api/internal/jarvis/whatsapp-reply");
   assert.equal(QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN_V1, "qfj.whatsapp.reply.http.sig.v1");
@@ -255,6 +321,19 @@ await test("unverified existing-vendor request cannot acquire Anisha", () => {
   assert.notEqual(routed.assignedActor, "ANISHA");
   assert.equal(routed.suppressJarvisTurn, true);
 });
+await test("paused specialist conversations remain paused on ordinary inbound", () => {
+  const routed = resolveWhatsAppConciergeRouting({
+    identityConfidence: "exact", principalType: "client", messageType: "text",
+    contentMinimized: { text: "Any update?" }, currentSubjectType: "client",
+    currentActor: "RIYA", currentState: "PAUSED", currentHumanTakeover: false,
+    isNewConversation: false,
+  });
+  assert.equal(routed.assignedActor, "RIYA");
+  assert.equal(routed.state, "PAUSED");
+  assert.equal(routed.jarvisEnabled, false);
+  assert.equal(routed.suppressJarvisTurn, true);
+});
+
 await test("human request enters takeover and suppresses Jarvis", () => {
   const routed = resolveWhatsAppConciergeRouting({
     identityConfidence: "unknown", principalType: null, messageType: "text",

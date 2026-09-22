@@ -139,7 +139,7 @@ const SERVICE_META: Record<QuickFurnoCategory, ServiceMeta> = {
     desc: "Complete home interiors — design to handover.",
     short: "Complete home interiors — design to handover.",
     cta: "Explore Designers",
-    alt: "Interior designers reviewing materials in a modern living room",
+    alt: "Two interior designers in their studio with material samples, colour swatches and floor plans",
     mark: null,
   },
   "Modular Factory": {

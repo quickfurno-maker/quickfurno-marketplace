@@ -340,7 +340,7 @@
   box-shadow: 0 26px 56px -22px rgba(20, 24, 29, 0.26);
 }
 .qfp-card--featured .qfp-card-media { height: 336px; }
-.qfp-card--featured .qfp-card-media img { object-position: center 30%; }
+.qfp-card--featured .qfp-card-media img { object-position: center 22%; }
 .qfp-card--featured .qfp-card-body {
   justify-content: center;
   gap: 0;

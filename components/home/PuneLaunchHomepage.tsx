@@ -71,14 +71,6 @@ function ShieldCheckIcon({ size = 18, stroke = "#F04A1A", width = 2 }: IconProps
     </svg>
   );
 }
-function GearIcon({ size = 18, stroke = "#F04A1A" }: IconProps) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="3.2" />
-      <path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.4 1z" />
-    </svg>
-  );
-}
 function HomeIcon({ size = 18, stroke = "#F04A1A" }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -458,23 +450,94 @@ function NotSureCard() {
   );
 }
 
+// --------------------------------------------------------------------------
+// Services heading — "blueprint" concept (chosen on the design canvas).
+// A light architect's grid + a line-drawn floor plan labelled "Your home",
+// with the three trust points pinned to it like design notes. On tablets and
+// phones the plan becomes a faint corner sketch and the notes a simple list.
+// --------------------------------------------------------------------------
+const BLUEPRINT_NOTES = [
+  { title: "Verified professionals", body: "Every profile reviewed before listing" },
+  { title: "Quality assurance", body: "Work photos & experience checked" },
+  { title: "Hassle-free experience", body: "One enquiry, up to 3 matches" },
+];
+
+function BlueprintPlan() {
+  const line = "#CDBB9B";
+  return (
+    <svg className="qfp-bp-svg" viewBox="0 0 640 350" fill="none" aria-hidden="true" focusable="false">
+      <rect x="60" y="50" width="500" height="230" fill="rgba(255,255,255,0.55)" stroke={line} strokeWidth="2" />
+      <line x1="300" y1="50" x2="300" y2="150" stroke={line} strokeWidth="2" />
+      <line x1="60" y1="170" x2="200" y2="170" stroke={line} strokeWidth="2" />
+      <line x1="250" y1="170" x2="300" y2="170" stroke={line} strokeWidth="2" />
+      <line x1="200" y1="170" x2="200" y2="120" stroke={line} strokeWidth="1.5" />
+      <path d="M200 120 A50 50 0 0 1 250 170" stroke={line} strokeWidth="1.2" strokeDasharray="4 4" />
+      <line x1="380" y1="46" x2="480" y2="46" stroke={line} strokeWidth="1.5" />
+      <line x1="380" y1="54" x2="480" y2="54" stroke={line} strokeWidth="1.5" />
+      <rect x="370" y="200" width="150" height="44" rx="8" stroke={line} strokeWidth="1.5" />
+      <line x1="420" y1="206" x2="420" y2="238" stroke={line} strokeWidth="1.2" />
+      <line x1="470" y1="206" x2="470" y2="238" stroke={line} strokeWidth="1.2" />
+      <rect x="410" y="150" width="70" height="30" rx="6" stroke={line} strokeWidth="1.2" />
+      <rect x="90" y="72" width="110" height="76" rx="6" stroke={line} strokeWidth="1.5" />
+      <line x1="90" y1="92" x2="200" y2="92" stroke={line} strokeWidth="1.2" />
+      <path d="M60 250 L160 250 L160 280" stroke={line} strokeWidth="1.5" />
+      <line x1="60" y1="300" x2="560" y2="300" stroke={line} strokeWidth="1.2" />
+      <line x1="60" y1="294" x2="60" y2="306" stroke={line} strokeWidth="1.2" />
+      <line x1="560" y1="294" x2="560" y2="306" stroke={line} strokeWidth="1.2" />
+      <g className="qfp-bp-leaders">
+        {[
+          [145, 110, 118, 24],
+          [430, 50, 520, 24],
+          [445, 222, 470, 312],
+        ].map(([x1, y1, x2, y2]) => (
+          <g key={`${x1}-${y1}`}>
+            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#F04A1A" strokeWidth="1.4" />
+            <circle cx={x1} cy={y1} r="10" fill="rgba(240,74,26,0.15)" />
+            <circle cx={x1} cy={y1} r="5" fill="#F04A1A" />
+          </g>
+        ))}
+      </g>
+    </svg>
+  );
+}
+
+function ServicesHeading() {
+  return (
+    <div className="qfp-bp" data-reveal>
+      <div className="qfp-bp-copy">
+        <span className="qfp-bp-kicker">
+          <i className="t" aria-hidden="true" /><i className="l" aria-hidden="true" />
+          Our services
+          <i className="l" aria-hidden="true" /><i className="t" aria-hidden="true" />
+        </span>
+        <h2>One home.<br />Every expert.</h2>
+        <p>From full interiors to a fresh coat of paint — every trade, one trusted marketplace.</p>
+      </div>
+      <div className="qfp-bp-plan">
+        <BlueprintPlan />
+        <span className="qfp-bp-home" aria-hidden="true">YOUR HOME</span>
+        <ol className="qfp-bp-notes" aria-label="Why homeowners choose QuickFurno">
+          {BLUEPRINT_NOTES.map((note, index) => (
+            <li className={`qfp-bp-note qfp-bp-note--${index + 1}`} key={note.title}>
+              <b aria-hidden="true">0{index + 1}</b>
+              <div>
+                <strong>{note.title}</strong>
+                <span>{note.body}</span>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
 function Services() {
   return (
     <section className="qfp-section qfp-services" id="services">
       <span id="categories" aria-hidden="true" />
       <div className="qfp-shell">
-        <div className="qfp-services-head" data-reveal>
-          <div className="qfp-services-title">
-            <span className="qfp-kicker">Our services</span>
-            <h2>One home. Every expert.</h2>
-            <p>From full interiors to a fresh coat of paint — every trade, one trusted marketplace.</p>
-          </div>
-          <div className="qfp-trust-pill" aria-label="QuickFurno promise">
-            <span><ShieldCheckIcon /><b>Verified <em>Professionals</em></b></span>
-            <span><GearIcon /><b>Quality <em>Assurance</em></b></span>
-            <span><HomeIcon /><b>Hassle-free <em>Experience</em></b></span>
-          </div>
-        </div>
+        <ServicesHeading />
         <div className="qfp-service-grid" data-reveal-group>
           <FeaturedServiceCard />
           {OTHER_SERVICES.map((category) => (

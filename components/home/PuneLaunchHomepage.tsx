@@ -465,10 +465,15 @@ function NotSureCard() {
 // with the three trust points pinned to it like design notes. On tablets and
 // phones the plan becomes a faint corner sketch and the notes a simple list.
 // --------------------------------------------------------------------------
-const BLUEPRINT_NOTES = [
+// The first three are pinned to the floor plan on desktop. The two "phone"
+// points are extra trust points shown only in the phone's swipeable badge
+// row (both are true today: free for homeowners, Pune-based support team).
+const BLUEPRINT_NOTES: { title: string; body: string; phoneOnly?: boolean }[] = [
   { title: "Verified professionals", body: "Every profile reviewed before listing" },
   { title: "Quality assurance", body: "Work photos & experience checked" },
   { title: "Hassle-free experience", body: "One enquiry, up to 3 matches" },
+  { title: "Free for homeowners", body: "No fee to enquire or compare", phoneOnly: true },
+  { title: "Local Pune support", body: "Phone, WhatsApp & email help", phoneOnly: true },
 ];
 
 function BlueprintPlan() {
@@ -527,8 +532,12 @@ function ServicesHeading() {
         <span className="qfp-bp-home" aria-hidden="true">YOUR HOME</span>
         <ol className="qfp-bp-notes" aria-label="Why homeowners choose QuickFurno">
           {BLUEPRINT_NOTES.map((note, index) => (
-            <li className={`qfp-bp-note qfp-bp-note--${index + 1}`} key={note.title}>
+            <li
+              className={`qfp-bp-note qfp-bp-note--${index + 1}${note.phoneOnly ? " qfp-bp-note--phone" : ""}`}
+              key={note.title}
+            >
               <b aria-hidden="true">0{index + 1}</b>
+              <span className="qfp-bp-badge" aria-hidden="true"><VerifiedRosette size={22} /></span>
               <div>
                 <strong>{note.title}</strong>
                 <span>{note.body}</span>

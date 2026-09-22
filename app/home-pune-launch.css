@@ -275,6 +275,7 @@
 .qfp-bp-note--1 { left: 0; top: -44px; }
 .qfp-bp-note--2 { left: 420px; top: -44px; }
 .qfp-bp-note--3 { left: 400px; top: 318px; }
+.qfp-bp-badge, .qfp-bp-note--phone { display: none; }
 
 .qfp-service-grid {
   display: grid;
@@ -860,9 +861,37 @@
   .qfp-bp-copy h2 { margin-top: 12px; font-size: 32px; line-height: 36px; }
   .qfp-bp-copy p { margin-top: 10px; font-size: 13.5px; line-height: 20px; }
   .qfp-bp-svg { right: -74px; top: -26px; width: 269px; height: 147px; opacity: 0.7; }
-  .qfp-bp-notes { display: flex; flex-direction: column; gap: 10px; padding-left: 14px; border-left: 1.5px dashed #d9c8aa; }
-  .qfp-bp-note strong { font-size: 13.5px; }
-  .qfp-bp-note span { font-size: 12px; }
+  /* Phone: trust points become a swipeable row of verified-badge cards. */
+  .qfp-bp-notes {
+    display: flex;
+    gap: 10px;
+    margin: 2px -20px 0;
+    padding: 4px 20px 10px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-left: 20px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .qfp-bp-notes::-webkit-scrollbar { display: none; }
+  .qfp-bp-note, .qfp-bp-note--phone {
+    display: flex;
+    flex: 0 0 150px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 12px 13px;
+    background: #fff;
+    border: 1px solid #ebe3d4;
+    border-radius: 14px;
+    box-shadow: 0 10px 22px -16px rgba(20, 24, 29, 0.3);
+    scroll-snap-align: start;
+  }
+  .qfp-bp-note b { display: none; }
+  .qfp-bp-note .qfp-bp-badge { display: block; line-height: 0; }
+  .qfp-bp-note div { gap: 3px; }
+  .qfp-bp-note strong { font-size: 13px; line-height: 1.25; }
+  .qfp-bp-note span { font-size: 11.5px; line-height: 1.35; }
   .qfp-service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; gap: 14px; }
   .qfp-card { border-radius: 16px; box-shadow: 0 10px 24px -12px rgba(20, 24, 29, 0.18); }
   .qfp-card-media { height: 150px; }

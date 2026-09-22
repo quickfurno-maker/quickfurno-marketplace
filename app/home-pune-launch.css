@@ -511,7 +511,7 @@
 .qfp-cities {
   position: relative;
   overflow: hidden;
-  padding: 88px 0;
+  padding: 88px 0 0;
   background: radial-gradient(130% 150% at 85% -10%, #2c2214 0%, #1a1e25 46%, #111419 100%);
   color: #f7f1e6;
 }
@@ -551,6 +551,8 @@
 }
 .qfp-city-status--live { background: rgba(94, 190, 139, 0.16); color: #7fe0ac; font-weight: 800; }
 .qfp-city-status--live i { width: 7px; height: 7px; border-radius: 999px; background: #5ebe8b; box-shadow: 0 0 0 3px rgba(94, 190, 139, 0.2); }
+.qfp-cities-skyline { margin: 56px auto 0; max-width: 1100px; }
+.qfp-cities-skyline img { display: block; width: 100%; height: auto; }
 
 /* ==========================================================================
    TRUST & SAFETY
@@ -957,7 +959,8 @@
   .qfp-step-next { display: none; }
 
   /* cities */
-  .qfp-cities { padding: 44px 0; background: radial-gradient(140% 130% at 88% -12%, #2c2214 0%, #1a1e25 48%, #111419 100%); }
+  .qfp-cities-skyline { margin: 32px -20px 0; max-width: none; }
+  .qfp-cities { padding: 44px 0 0; background: radial-gradient(140% 130% at 88% -12%, #2c2214 0%, #1a1e25 48%, #111419 100%); }
   .qfp-cities-glow { right: -30px; top: -50px; width: 240px; height: 190px; }
   .qfp-cities h2 { font-size: 26px; }
   .qfp-cities-lead { display: none; }

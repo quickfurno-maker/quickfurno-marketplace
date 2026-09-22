@@ -625,6 +625,11 @@ function MadeInPune() {
             </li>
           ))}
         </ul>
+        {/* Decorative skyline of Indian landmarks: the "coming to your city"
+            promise, sitting on the bottom edge of the section like a horizon. */}
+        <div className="qfp-cities-skyline" aria-hidden="true">
+          <Image src={`${LAUNCH_IMG}/india-skyline.png`} alt="" width={2200} height={415} sizes="(max-width: 760px) 100vw, 1100px" />
+        </div>
       </div>
     </section>
   );

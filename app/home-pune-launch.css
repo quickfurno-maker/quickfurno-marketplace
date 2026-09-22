@@ -306,7 +306,7 @@
   padding: 16px 18px 17px;
   overflow: hidden;
 }
-.qfp-card-accent { display: block; width: 26px; height: 3px; border-radius: 2px; background: var(--qfp-orange); }
+.qfp-card-accent { display: block; flex-shrink: 0; width: 26px; height: 3px; border-radius: 2px; background: var(--qfp-orange); }
 .qfp-card h3 { font-size: 18px; letter-spacing: -0.01em; line-height: 1.2; }
 .qfp-card p { font-size: 13px; line-height: 1.4; color: var(--qfp-muted); }
 .qfp-card-cta {

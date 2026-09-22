@@ -130,6 +130,8 @@ type ServiceMeta = {
   cta: string;
   alt: string;
   mark: ReactNode;
+  /** Optional per-photo crop focus (CSS object-position), e.g. "center 30%". */
+  pos?: string;
 };
 
 const markProps = { width: 40, height: 40, viewBox: "0 0 48 48", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
@@ -146,7 +148,8 @@ const SERVICE_META: Record<QuickFurnoCategory, ServiceMeta> = {
     desc: "Factory-finish kitchens & wardrobes.",
     short: "Kitchens & wardrobes",
     cta: "Explore Modular",
-    alt: "Modern modular kitchen with walnut cabinets",
+    alt: "Technician inspecting a sage-green cabinet shutter in a modular furniture factory",
+    pos: "center 30%",
     mark: (
       <svg {...markProps}><rect x="10" y="12" width="28" height="24" rx="2" /><line x1="24" y1="12" x2="24" y2="36" /><line x1="19" y1="18" x2="19" y2="20" /><line x1="29" y1="18" x2="29" y2="20" /></svg>
     ),
@@ -382,7 +385,13 @@ function ServiceCard({ name }: { name: QuickFurnoCategory }) {
   return (
     <Link href={`/category/${slug}`} className="qfp-card">
       <div className="qfp-card-media">
-        <Image src={image.src} alt={meta.alt} fill sizes="(max-width: 760px) 50vw, (max-width: 1100px) 50vw, 282px" />
+        <Image
+          src={image.src}
+          alt={meta.alt}
+          fill
+          sizes="(max-width: 760px) 50vw, (max-width: 1100px) 50vw, 282px"
+          style={meta.pos ? { objectPosition: meta.pos } : undefined}
+        />
       </div>
       <div className="qfp-card-body">
         <span className="qfp-card-accent" aria-hidden="true" />

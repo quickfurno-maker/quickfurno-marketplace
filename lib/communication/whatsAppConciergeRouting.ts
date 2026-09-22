@@ -19,6 +19,7 @@ export interface ConciergeRoutingInput {
   readonly contentMinimized: Record<string, unknown>;
   readonly currentSubjectType?: ConciergeSubjectType;
   readonly currentActor?: ConciergeActor;
+  readonly currentState?: ConciergeState;
   readonly currentHumanTakeover?: boolean;
   readonly isNewConversation?: boolean;
 }
@@ -70,15 +71,16 @@ function route(
   subjectType: ConciergeSubjectType,
   assignedActor: ConciergeActor,
   source: ConciergeRoutingDecision["source"],
-  options: { suppress?: boolean; experience?: QfWhatsAppExperienceV1; human?: boolean } = {},
+  options: { suppress?: boolean; experience?: QfWhatsAppExperienceV1; human?: boolean; state?: ConciergeState } = {},
 ): ConciergeRoutingDecision {
   const human = options.human === true;
+  const state: ConciergeState = human ? "HUMAN" : (options.state ?? "OPEN");
   return Object.freeze({
     subjectType,
     assignedActor,
-    jarvisEnabled: !human && assignedActor !== "SYSTEM",
+    jarvisEnabled: !human && state === "OPEN" && assignedActor !== "SYSTEM",
     humanTakeover: human,
-    state: human ? "HUMAN" : "OPEN",
+    state,
     suppressJarvisTurn: options.suppress === true || human || assignedActor === "SYSTEM",
     ...(options.experience === undefined ? {} : { systemExperience: options.experience }),
     source,
@@ -100,9 +102,10 @@ function existingDecision(input: ConciergeRoutingInput): ConciergeRoutingDecisio
   }
   const subject = input.currentSubjectType ?? "unknown";
   const actor = input.currentActor;
-  if (subject === "client" && actor === "RIYA") return route("client", "RIYA", "existing");
-  if (subject === "vendor" && actor === "ANISHA") return route("vendor", "ANISHA", "existing");
-  if (subject === "prospect" && actor === "AAROHI") return route("prospect", "AAROHI", "existing");
+  const paused = input.currentState === "PAUSED";
+  if (subject === "client" && actor === "RIYA") return route("client", "RIYA", "existing", paused ? { state: "PAUSED", suppress: true } : {});
+  if (subject === "vendor" && actor === "ANISHA") return route("vendor", "ANISHA", "existing", paused ? { state: "PAUSED", suppress: true } : {});
+  if (subject === "prospect" && actor === "AAROHI") return route("prospect", "AAROHI", "existing", paused ? { state: "PAUSED", suppress: true } : {});
   return null;
 }
 
@@ -161,6 +164,11 @@ export function resolveWhatsAppConciergeRouting(input: ConciergeRoutingInput): C
       human: true,
       experience: buildHumanHandoffExperience(),
     });
+  }
+
+  if (input.currentState === "PAUSED") {
+    const paused = existingDecision(input);
+    if (paused) return paused;
   }
 
   const nonText = nonTextDecision(input);

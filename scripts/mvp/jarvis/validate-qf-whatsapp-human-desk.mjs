@@ -37,7 +37,9 @@ await test("human replies still use encrypted idempotent conversation outbox", (
   assert.match(service, /sealConversationValue/);
   assert.match(service, /communication_conversation_outbox/);
   assert.match(service, /service_window_closed/);
-  assert.match(service, /activeSuppression/);
+  assert.match(service, /authorizeConversationalWhatsAppConsent/);
+  assert.match(service, /CONSENT_SUPPRESSED/);
+  assert.doesNotMatch(service, /activeSuppression/);
 });
 
 await test("return-to-AI derives actor only from trusted subject type", () => {

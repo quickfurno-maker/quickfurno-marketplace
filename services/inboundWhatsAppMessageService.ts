@@ -229,6 +229,7 @@ export interface InboundWhatsAppDeps {
     readonly occurredAt?: string | null;
     readonly identityConfidence: "exact" | "ambiguous" | "unknown";
     readonly principalType: "client" | "vendor" | "admin" | null;
+    readonly principalId: string | null;
     readonly messageType: string;
     readonly contentMinimized: Record<string, unknown>;
     /** STOP / START / HELP stay auditable but are never eligible for a Jarvis turn. */
@@ -425,6 +426,7 @@ export async function handleInboundWhatsAppMessages(
         occurredAt: persistedRow.providerOccurredAt ?? persistedRow.receivedAt,
         identityConfidence: persistedRow.identityConfidence as "exact" | "ambiguous" | "unknown",
         principalType: persistedRow.principalType as "client" | "vendor" | "admin" | null,
+        principalId: persistedRow.principalId,
         messageType: persistedRow.messageType,
         contentMinimized: persistedRow.contentMinimized,
         suppressJarvisTurn: isConsentControlMessage({

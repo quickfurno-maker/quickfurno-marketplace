@@ -804,8 +804,11 @@
   .qfp-hero-media { top: -24%; height: 124%; bottom: auto; }
   .qfp-hero-media img { object-position: 92% 50%; }
   .qfp-hero-shade { background: linear-gradient(180deg, rgba(18, 15, 12, 0.3) 0%, rgba(18, 15, 12, 0) 26%, rgba(18, 15, 12, 0.08) 52%, rgba(18, 15, 12, 0.88) 84%, rgba(18, 15, 12, 0.96) 100%); }
-  .qfp-hero-inner { padding: 0 0 20px; width: 100%; }
-  .qfp-hero-copy { width: 100%; gap: 14px; }
+  /* Keep .qfp-shell's own width (20px side margin) — do NOT set width here,
+     or the hero loses its margin on phones wider than 400px. */
+  .qfp-hero-inner { padding: 0 0 20px; }
+  /* Cap the copy + button so they don't stretch on large phones/tablets. */
+  .qfp-hero-copy { width: 100%; max-width: 480px; gap: 14px; }
   .qfp-hero h1 { font-size: 30px; line-height: 1.15; color: #fff; }
   .qfp-hero h1 br { display: none; }
   .qfp-hero-badges { gap: 8px; }
@@ -1018,7 +1021,6 @@
 }
 
 @media (max-width: 400px) {
-  .qfp-shell { width: calc(100% - 32px); }
   .qfp-hero h1 { font-size: 28px; }
   .qfp-city { width: 92px; }
 }

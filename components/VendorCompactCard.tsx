@@ -5,7 +5,7 @@ import Link from "next/link";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { FreeVendorInterestButton } from "@/components/FreeVendorInterestButton";
 import { useVendorCompare } from "@/components/VendorCompare";
-import { CONTACT_TEL, whatsappLink } from "@/lib/config";
+import { whatsappLink } from "@/lib/config";
 import {
   enquiryServiceForCategory,
   getVendorListingMeta,
@@ -129,9 +129,6 @@ export function VendorCompactCard({
         <div className="qf-vcard-main-buttons">
           {isPaidOrTrialEligible ? (
             <>
-              <a className="qf-vcard-action-btn qf-vcard-action-btn--call" href={CONTACT_TEL}>
-                Call Now
-              </a>
               <EnquiryModalTrigger
                 className="qf-vcard-action-btn qf-vcard-action-btn--enquiry"
                 modalTitle={`Get quote from ${vendor.businessName}`}

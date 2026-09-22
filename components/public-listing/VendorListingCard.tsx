@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { FreeVendorInterestButton } from "@/components/FreeVendorInterestButton";
-import { CONTACT_TEL } from "@/lib/config";
 import { enquiryServiceForCategory, type QuickFurnoCategory } from "@/lib/quickfurno-data";
 import type { VendorListingView } from "./listingModel";
 
@@ -21,11 +20,10 @@ import type { VendorListingView } from "./listingModel";
  *     avatar. Stock category imagery is never presented as this vendor's work.
  *
  * CONTACT AUTHORITY (unchanged from VendorCompactCard):
- *   paid/trial (activePaidPlan true)  -> Send Enquiry (preferred_vendor) +
- *                                        Call QuickFurno (CONTACT_TEL) + profile
+ *   paid/trial (activePaidPlan true)  -> Send Enquiry (preferred_vendor) + profile
  *   free/unpaid (activePaidPlan false)-> FreeVendorInterestButton only + profile
- * The vendor's own phone / WhatsApp / email are never rendered; the tel: link is
- * QuickFurno's own switchboard number, exactly as before.
+ * No phone number is rendered on this card: not the vendor's, and not
+ * QuickFurno's own. Contact happens through the enquiry flow.
  */
 export function VendorListingCard({
   vendor,
@@ -156,14 +154,6 @@ export function VendorListingCard({
         <Link href={profileHref} className="qf-pub-btn qf-pub-btn--secondary qf-pub-btn--sm">
           View profile
         </Link>
-
-        {/* Contacting QuickFurno, never the vendor directly. Paid/trial only,
-            matching the previous card's authority. */}
-        {vendor.activePaidPlan ? (
-          <a className="qf-vl-card-tel" href={CONTACT_TEL}>
-            Call QuickFurno
-          </a>
-        ) : null}
 
         {onToggleCompare ? (
           <button

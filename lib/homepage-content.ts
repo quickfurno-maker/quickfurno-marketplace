@@ -33,7 +33,7 @@ export const VERIFY_STEPS: VerifyStep[] = [
   {
     icon: "chat",
     title: "Local support team",
-    body: "A Pune-based team stays reachable on phone, WhatsApp and email throughout your project.",
+    body: "A Pune-based team stays reachable on WhatsApp and email throughout your project.",
   },
 ];
 

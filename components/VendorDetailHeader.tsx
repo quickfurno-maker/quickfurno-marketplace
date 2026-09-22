@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { FreeVendorInterestButton } from "@/components/FreeVendorInterestButton";
-import { CONTACT_TEL, whatsappLink } from "@/lib/config";
+import { whatsappLink } from "@/lib/config";
 import { categoryImage } from "@/lib/images";
 import {
   enquiryServiceForCategory,
@@ -87,9 +87,6 @@ export function VendorDetailHeader({ vendor }: { vendor: Vendor }) {
             <>
               {showDirectContact ? (
                 <>
-                  <a className="qf-action-btn qf-action-btn--call" href={CONTACT_TEL}>
-                    Call Now
-                  </a>
                   <a
                     className="qf-action-btn qf-action-btn--whatsapp"
                     href={whatsappLink(`Hi QuickFurno, I want a quote from ${vendor.businessName}.`)}

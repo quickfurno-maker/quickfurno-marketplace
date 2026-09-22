@@ -5,6 +5,7 @@ import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { categories, categorySlug, type QuickFurnoCategory } from "@/lib/quickfurno-data";
 import { HOME_FAQ, PUNE_AREAS, TESTIMONIALS } from "@/lib/homepage-content";
 import { categoryImage, heroImage } from "@/lib/homepage-images";
+import { whatsappLink } from "@/lib/config";
 
 // ============================================================================
 // QuickFurno — Pune launch homepage
@@ -105,13 +106,16 @@ function VerifiedRosette({ size = 26 }: IconProps) {
     </svg>
   );
 }
-function PhoneIcon() {
+function FooterChatIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FF8A5C" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
+      <path d="M20 11.5a8 8 0 0 1-11.7 7.1L4 19.8l1.2-4.1A8 8 0 1 1 20 11.5Z" />
+      <path d="M8.5 10.5h7" />
+      <path d="M8.5 13.5h4.5" />
     </svg>
   );
 }
+
 function MailIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FF8A5C" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
@@ -251,7 +255,7 @@ const VERIFY_POINTS = [
   { title: "Business identity check", body: "Real business details, reviewed before the profile goes public." },
   { title: "Work profile review", body: "Services, experience and work photos checked against reality." },
   { title: "Approved before listing", body: "Pending, rejected or suspended vendors never appear in matches." },
-  { title: "Local support team", body: "A Pune-based team on phone, WhatsApp and email throughout." },
+  { title: "Local support team", body: "A Pune-based team on WhatsApp and email throughout." },
 ];
 
 const CITIES = [
@@ -815,7 +819,7 @@ function Footer() {
           </div>
           <div className="qfp-footer-col qfp-footer-col--contact">
             <h3>CONTACT</h3>
-            <a href="tel:+917447863602"><PhoneIcon />+91 74478 63602</a>
+            <a href={whatsappLink()} target="_blank" rel="noopener noreferrer"><FooterChatIcon />WhatsApp us</a>
             <a href="mailto:support@quickfurno.in"><MailIcon />support@quickfurno.in</a>
             <span><PinIcon size={15} stroke="#FF8A5C" width={2} />Kharadi, Pune, Maharashtra</span>
           </div>

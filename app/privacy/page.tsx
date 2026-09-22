@@ -105,7 +105,7 @@ export default function PrivacyPage() {
             <section className="qf-legal-section">
               <h2>6. Contact</h2>
               <p>
-                QuickFurno · {CONTACT.address} · {CONTACT.phone} ·{" "}
+                QuickFurno · {CONTACT.address} ·{" "}
                 <a href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a>
               </p>
             </section>

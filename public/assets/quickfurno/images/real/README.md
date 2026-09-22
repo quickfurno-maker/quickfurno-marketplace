@@ -17,6 +17,7 @@ photos only — no watermarked stock images.
 | `categories/sofa.jpg`                  | Sofa service card                 | 400×300, < 60KB   |
 | `categories/painter.jpg`               | Painter service card              | 400×300, < 60KB   |
 | `categories/civil-work.jpg`            | Civil Work service card           | 400×300, < 60KB   |
+| `categories/false-ceiling.jpg`         | False Ceiling service card        | 400×300, < 60KB   |
 
 Partial is fine: add only `hero.jpg` and the hero becomes a photo while the
 cards keep their illustrations. Delete a file to go back to the illustration.

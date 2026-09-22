@@ -176,7 +176,7 @@ const SERVICE_META: Record<QuickFurnoCategory, ServiceMeta> = {
     desc: "Custom sofas & upholstery.",
     short: "Sofas & upholstery",
     cta: "Explore Sofas",
-    alt: "Custom beige fabric sofa",
+    alt: "Sofa maker welcoming you to a showroom of fabric and leather sofas",
     mark: (
       <svg {...markProps}><path d="M13 27 v-4 a3 3 0 0 1 3 -3 h16 a3 3 0 0 1 3 3 v4" /><path d="M10 27 a3 3 0 0 1 3 -3 h22 a3 3 0 0 1 3 3 v7 h-28 z" /><path d="M14 34 v3 M34 34 v3" /></svg>
     ),
@@ -203,7 +203,8 @@ const SERVICE_META: Record<QuickFurnoCategory, ServiceMeta> = {
     desc: "POP & gypsum ceilings, cove lighting.",
     short: "POP & gypsum ceilings",
     cta: "Explore Ceilings",
-    alt: "Layered false ceiling with warm cove lighting",
+    alt: "Installer finishing a layered POP false ceiling with warm cove lighting",
+    pos: "center 30%",
     mark: (
       <svg {...markProps}><path d="M8 13 H40" /><path d="M13 13 V19 H35 V13" /><path d="M17 23 H31" /><path d="M24 19 V27" /><path d="M20 27 H28 L26 32 H22 Z" /></svg>
     ),

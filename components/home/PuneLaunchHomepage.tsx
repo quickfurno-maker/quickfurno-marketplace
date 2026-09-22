@@ -465,15 +465,15 @@ function NotSureCard() {
 // with the three trust points pinned to it like design notes. On tablets and
 // phones the plan becomes a faint corner sketch and the notes a simple list.
 // --------------------------------------------------------------------------
-// The first three are pinned to the floor plan on desktop. The two "phone"
-// points are extra trust points shown only in the phone's swipeable badge
-// row (both are true today: free for homeowners, Pune-based support team).
-const BLUEPRINT_NOTES: { title: string; body: string; phoneOnly?: boolean }[] = [
+// Trust points shown as a row of verified-badge cards under the heading on
+// every screen size (swipeable on tablets and phones). All five are true
+// today — see lib/homepage-content.ts and the FAQ.
+const TRUST_POINTS: { title: string; body: string }[] = [
   { title: "Verified professionals", body: "Every profile reviewed before listing" },
   { title: "Quality assurance", body: "Work photos & experience checked" },
   { title: "Hassle-free experience", body: "One enquiry, up to 3 matches" },
-  { title: "Free for homeowners", body: "No fee to enquire or compare", phoneOnly: true },
-  { title: "Local Pune support", body: "Phone, WhatsApp & email help", phoneOnly: true },
+  { title: "Free for homeowners", body: "No fee to enquire or compare" },
+  { title: "Local Pune support", body: "Phone, WhatsApp & email help" },
 ];
 
 function BlueprintPlan() {
@@ -500,12 +500,11 @@ function BlueprintPlan() {
       <line x1="560" y1="294" x2="560" y2="306" stroke={line} strokeWidth="1.2" />
       <g className="qfp-bp-leaders">
         {[
-          [145, 110, 118, 24],
-          [430, 50, 520, 24],
-          [445, 222, 470, 312],
-        ].map(([x1, y1, x2, y2]) => (
+          [145, 110],
+          [430, 50],
+          [445, 222],
+        ].map(([x1, y1]) => (
           <g key={`${x1}-${y1}`}>
-            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#F04A1A" strokeWidth="1.4" />
             <circle cx={x1} cy={y1} r="10" fill="rgba(240,74,26,0.15)" />
             <circle cx={x1} cy={y1} r="5" fill="#F04A1A" />
           </g>
@@ -517,36 +516,34 @@ function BlueprintPlan() {
 
 function ServicesHeading() {
   return (
-    <div className="qfp-bp" data-reveal>
-      <div className="qfp-bp-copy">
-        <span className="qfp-bp-kicker">
-          <i className="t" aria-hidden="true" /><i className="l" aria-hidden="true" />
-          Our services
-          <i className="l" aria-hidden="true" /><i className="t" aria-hidden="true" />
-        </span>
-        <h2>One home.<br />Every expert.</h2>
-        <p>From full interiors to a fresh coat of paint — every trade, one trusted marketplace.</p>
+    <>
+      <div className="qfp-bp" data-reveal>
+        <div className="qfp-bp-copy">
+          <span className="qfp-bp-kicker">
+            <i className="t" aria-hidden="true" /><i className="l" aria-hidden="true" />
+            Our services
+            <i className="l" aria-hidden="true" /><i className="t" aria-hidden="true" />
+          </span>
+          <h2>One home.<br />Every expert.</h2>
+          <p>From full interiors to a fresh coat of paint — every trade, one trusted marketplace.</p>
+        </div>
+        <div className="qfp-bp-plan" aria-hidden="true">
+          <BlueprintPlan />
+          <span className="qfp-bp-home">YOUR HOME</span>
+        </div>
       </div>
-      <div className="qfp-bp-plan">
-        <BlueprintPlan />
-        <span className="qfp-bp-home" aria-hidden="true">YOUR HOME</span>
-        <ol className="qfp-bp-notes" aria-label="Why homeowners choose QuickFurno">
-          {BLUEPRINT_NOTES.map((note, index) => (
-            <li
-              className={`qfp-bp-note qfp-bp-note--${index + 1}${note.phoneOnly ? " qfp-bp-note--phone" : ""}`}
-              key={note.title}
-            >
-              <b aria-hidden="true">0{index + 1}</b>
-              <span className="qfp-bp-badge" aria-hidden="true"><VerifiedRosette size={22} /></span>
-              <div>
-                <strong>{note.title}</strong>
-                <span>{note.body}</span>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </div>
+      <ol className="qfp-trust-row" aria-label="Why homeowners choose QuickFurno" data-reveal-group>
+        {TRUST_POINTS.map((point) => (
+          <li className="qfp-trust-card" key={point.title}>
+            <VerifiedRosette size={26} />
+            <div>
+              <strong>{point.title}</strong>
+              <span>{point.body}</span>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </>
   );
 }
 

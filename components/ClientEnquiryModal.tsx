@@ -47,7 +47,7 @@ import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
 // Category structure is the single source of truth in lib/categories.ts so the
 // homepage cards, vendor registration and this form never drift apart:
 //   Interior (Interior Designers · Carpenters · Modular Factory · Premium
-//   Interiors) · Sofa · Painter · Civil Work.
+//   Interiors) · Sofa · Painter · Civil Work · False Ceiling.
 // ---------------------------------------------------------------------------
 
 type IconName = Parameters<typeof QFIcon>[0]["name"];
@@ -255,7 +255,7 @@ const EnquiryModalContext = createContext<EnquiryModalContextValue | null>(null)
 
 /**
  * Best-effort map of an incoming category/service string (passed by triggers
- * across the site) to one of the four approved main categories — and, for
+ * across the site) to one of the approved main categories — and, for
  * Interior, the closest subcategory — so the modal opens pre-filled.
  */
 function presetFromCategory(value?: string): { categoryId: string; sub?: string } | null {
@@ -263,12 +263,13 @@ function presetFromCategory(value?: string): { categoryId: string; sub?: string 
   const v = value.toLowerCase();
   if (v.includes("paint")) return { categoryId: "painter" };
   if (v.includes("sofa") || v.includes("uphol")) return { categoryId: "sofa" };
+  if (v.includes("ceiling") || v.includes("gypsum") || /\bpop\b/.test(v)) return { categoryId: "false-ceiling" };
   if (v.includes("civil") || v.includes("renovat") || v.includes("masonry")) return { categoryId: "civil-work" };
   if (v.includes("modular") || v.includes("kitchen") || v.includes("wardrobe"))
     return { categoryId: INTERIOR_ID, sub: "Modular Factory" };
   if (v.includes("carpen") || v.includes("furniture")) return { categoryId: INTERIOR_ID, sub: "Carpenters" };
   if (v.includes("premium")) return { categoryId: INTERIOR_ID, sub: "Premium Interiors" };
-  if (v.includes("interior") || v.includes("ceiling") || v.includes("turnkey") || v.includes("design"))
+  if (v.includes("interior") || v.includes("turnkey") || v.includes("design"))
     return { categoryId: INTERIOR_ID, sub: "Interior Designers" };
   return null;
 }
@@ -276,9 +277,9 @@ function presetFromCategory(value?: string): { categoryId: string; sub?: string 
 /**
  * Resolve a client-picked vendor's canonical category into the modal's own
  * category structure (parent id/label + interior subcategory + enquiry service).
- * `targetVendorCategory` is one of the seven QuickFurnoCategory leaves: the four
- * interior leaves fold under the "interior" parent; Sofa / Painter / Civil Work
- * are their own main category. Returns null when the label can't be resolved, so
+ * `targetVendorCategory` is one of the eight QuickFurnoCategory leaves: the four
+ * interior leaves fold under the "interior" parent; Sofa / Painter / Civil Work /
+ * False Ceiling are their own main category. Returns null when the label can't be resolved, so
  * the caller safely falls back to the normal category picker.
  */
 function resolvePreferredSelection(targetVendorCategory?: string): {
@@ -290,7 +291,7 @@ function resolvePreferredSelection(targetVendorCategory?: string): {
   const wanted = targetVendorCategory?.trim().toLowerCase();
   if (!wanted) return null;
 
-  // Leaf that is its own main category (Sofa / Painter / Civil Work).
+  // Leaf that is its own main category (Sofa / Painter / Civil Work / False Ceiling).
   const leafMain = mainCategories.find((c) => c.category && c.category.toLowerCase() === wanted);
   if (leafMain && leafMain.category) {
     const leafCategory = leafMain.category;
@@ -569,7 +570,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
             categoryId: cat.id,
             categoryLabel: cat.label,
             // Interior needs a subcategory before the canonical service is known;
-            // the other three map straight to their service.
+            // the other main categories map straight to their service.
             subcategory: "",
             serviceRequired: cat.category ? enquiryServiceForCategory(cat.category) : "",
           },

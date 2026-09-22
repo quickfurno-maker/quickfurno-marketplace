@@ -63,7 +63,7 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: "QuickFurno | Verified Home-Service Marketplace",
   description:
-    "QuickFurno helps clients in Pune compare verified interior designers, carpenters, modular factories, painters, sofa and civil-work vendors.",
+    "QuickFurno helps clients in Pune compare verified interior designers, carpenters, modular factories, painters, sofa, civil-work and false ceiling vendors.",
   metadataBase: new URL("https://quickfurno.in"),
   openGraph: {
     title: "QuickFurno | Verified Home-Service Marketplace",

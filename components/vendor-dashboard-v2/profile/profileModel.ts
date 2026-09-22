@@ -28,6 +28,7 @@ export const ALLOWED_PROFILE_CATEGORIES: readonly string[] = [
   "Sofa",
   "Painter",
   "Civil Work",
+  "False Ceiling",
 ];
 
 /** Mirrors the server sanitizer's slice() lengths. Advisory in the UI only. */

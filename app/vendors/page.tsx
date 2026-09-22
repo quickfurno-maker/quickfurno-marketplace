@@ -33,6 +33,7 @@ const CATEGORY_META: Record<QuickFurnoCategory, { subtitle: string; image: strin
   Sofa: { subtitle: "Custom sofas & upholstery", image: "/assets/quickfurno/images/categories/sofa.svg" },
   Painter: { subtitle: "Interior & exterior painting", image: "/assets/quickfurno/images/categories/painter.svg" },
   "Civil Work": { subtitle: "Renovation & civil work", image: "/assets/quickfurno/images/categories/civil-work.svg" },
+  "False Ceiling": { subtitle: "POP & gypsum ceilings", image: "/assets/quickfurno/images/categories/false-ceiling.svg" },
 };
 
 const SERVICE_CARDS = categories.map(({ name }) => ({ name, ...CATEGORY_META[name] }));

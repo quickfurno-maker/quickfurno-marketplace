@@ -34,7 +34,7 @@ const faqs = [
   },
   {
     question: "Which categories are currently supported?",
-    answer: "QuickFurno currently supports Interior Designers, Carpenters, Modular Factory, Premium Interiors, Sofa, Painter, and Civil Work vendors.",
+    answer: "QuickFurno currently supports Interior Designers, Carpenters, Modular Factory, Premium Interiors, Sofa, Painter, Civil Work, and False Ceiling vendors.",
   },
   {
     question: "When can matched enquiries appear?",

@@ -4,7 +4,7 @@ import { PuneLaunchHomepage } from "@/components/home/PuneLaunchHomepage";
 export const metadata: Metadata = {
   title: "QuickFurno | Verified Home-Service Professionals in Pune",
   description:
-    "Find verified interior, carpentry, modular, painting, sofa and civil-work professionals in Pune with QuickFurno.",
+    "Find verified interior, carpentry, modular, painting, sofa, civil-work and false ceiling professionals in Pune with QuickFurno.",
   openGraph: {
     title: "QuickFurno | Pune's finest home professionals, one enquiry away",
     description:

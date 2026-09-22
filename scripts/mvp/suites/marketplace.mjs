@@ -1531,7 +1531,8 @@ export const suite = {
         // The map must cover the EXISTING taxonomy exactly - no invented
         // categories, none missing.
         const taxonomy = ['Interior Designers', 'Carpenters', 'Modular Factory',
-                          'Premium Interiors', 'Sofa', 'Painter', 'Civil Work'];
+                          'Premium Interiors', 'Sofa', 'Painter', 'Civil Work',
+                          'False Ceiling'];
         assertEqual(categoriesWithArtwork().slice().sort().join('|'),
           taxonomy.slice().sort().join('|'), 'artwork map matches the taxonomy');
         const seen = new Set();

@@ -60,6 +60,7 @@ const SERVICE_META: Record<QuickFurnoCategory, { subtitle: string; image: string
   Sofa: { subtitle: "Custom sofas & upholstery", image: "/assets/quickfurno/images/categories/sofa.svg" },
   Painter: { subtitle: "Interior & exterior painting", image: "/assets/quickfurno/images/categories/painter.svg" },
   "Civil Work": { subtitle: "Renovation, masonry & repairs", image: "/assets/quickfurno/images/categories/civil-work.svg" },
+  "False Ceiling": { subtitle: "POP & gypsum ceilings", image: "/assets/quickfurno/images/categories/false-ceiling.svg" },
 };
 
 // Homepage discovery is derived from the canonical marketplace category registry.

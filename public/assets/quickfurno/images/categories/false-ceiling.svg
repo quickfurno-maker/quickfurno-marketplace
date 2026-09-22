@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="presentation" aria-hidden="true" focusable="false">
+  <!-- QuickFurno category artwork - false ceiling.
+       Original abstract vector art on the approved V2 public palette.
+       Deliberately NEUTRAL: it depicts the SERVICE, never a specific
+       vendor project, office, workshop or logo. No text, no people,
+       no price, no rating, no photography. -->
+  <defs>
+    <linearGradient id="false-ceiling-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef2f8"/><stop offset="1" stop-color="#f8fafc"/>
+    </linearGradient>
+    <linearGradient id="false-ceiling-glow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c8dcff"/><stop offset="1" stop-color="#c8dcff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="480" height="360" rx="14" fill="url(#false-ceiling-bg)"/>
+
+  <rect x="44" y="40" width="392" height="236" rx="8" fill="#dde5f0"/>
+  <rect x="44" y="40" width="392" height="40" rx="8" fill="#ffffff" stroke="#b9c6d8" stroke-width="5"/>
+  <path d="M84 80v28h312V80" fill="#ffffff" stroke="#b9c6d8" stroke-width="5" stroke-linejoin="round"/>
+  <rect x="148" y="80" width="184" height="12" fill="#c8dcff"/>
+  <path d="M148 92h184" stroke="#2563eb" stroke-width="5" stroke-linecap="round"/>
+  <rect x="148" y="108" width="184" height="46" fill="url(#false-ceiling-glow)"/>
+  <circle cx="114" cy="96" r="6" fill="#2563eb"/>
+  <circle cx="366" cy="96" r="6" fill="#2563eb"/>
+  <path d="M240 108v44" stroke="#33465f" stroke-width="4" stroke-linecap="round"/>
+  <path d="M220 152h40l-8 22h-24Z" fill="#33465f"/>
+  <rect x="140" y="226" width="200" height="50" rx="8" fill="#ffffff" stroke="#b9c6d8" stroke-width="4"/>
+  <path d="M190 251h20M270 251h20" stroke="#5f6b7d" stroke-width="5" stroke-linecap="round"/>
+  <ellipse cx="240" cy="292" rx="170" ry="12" fill="#8fa0b8" opacity="0.28"/>
+</svg>

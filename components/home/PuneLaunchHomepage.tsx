@@ -199,6 +199,15 @@ const SERVICE_META: Record<QuickFurnoCategory, ServiceMeta> = {
       <svg {...markProps}><rect x="10" y="14" width="28" height="20" rx="1" /><line x1="10" y1="24" x2="38" y2="24" /><line x1="24" y1="14" x2="24" y2="24" /><line x1="17" y1="24" x2="17" y2="34" /><line x1="31" y1="24" x2="31" y2="34" /></svg>
     ),
   },
+  "False Ceiling": {
+    desc: "POP & gypsum ceilings, cove lighting.",
+    short: "POP & gypsum ceilings",
+    cta: "Explore Ceilings",
+    alt: "Layered false ceiling with warm cove lighting",
+    mark: (
+      <svg {...markProps}><path d="M8 13 H40" /><path d="M13 13 V19 H35 V13" /><path d="M17 23 H31" /><path d="M24 19 V27" /><path d="M20 27 H28 L26 32 H22 Z" /></svg>
+    ),
+  },
 };
 
 const FEATURED_CATEGORY: QuickFurnoCategory = "Interior Designers";
@@ -206,7 +215,7 @@ const FEATURED = categories.find((c) => c.name === FEATURED_CATEGORY) ?? categor
 // Display order from the approved mockup. Only used for SORTING the registry:
 // a category missing from this list still renders (at the end), and nothing
 // here can add a category the registry does not have.
-const DISPLAY_ORDER: QuickFurnoCategory[] = ["Modular Factory", "Carpenters", "Premium Interiors", "Sofa", "Painter", "Civil Work"];
+const DISPLAY_ORDER: QuickFurnoCategory[] = ["Modular Factory", "Carpenters", "Premium Interiors", "False Ceiling", "Sofa", "Painter", "Civil Work"];
 const orderOf = (name: QuickFurnoCategory) => {
   const index = DISPLAY_ORDER.indexOf(name);
   return index === -1 ? DISPLAY_ORDER.length : index;

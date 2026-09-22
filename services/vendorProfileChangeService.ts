@@ -70,6 +70,7 @@ const ALLOWED_CATEGORIES = new Set([
   "Sofa",
   "Painter",
   "Civil Work",
+  "False Ceiling",
 ]);
 
 export async function getVendorApprovedProfileSummary(vendorId: string): Promise<Result<VendorApprovedProfileSummary>> {

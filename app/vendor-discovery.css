@@ -1041,7 +1041,8 @@
 
   .vendor-compact-actions,
   .vendor-detail-actions {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    /* auto-fit so the row stays full width now that the Call button is gone */
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 
   .qf-action-btn--whatsapp {

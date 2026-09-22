@@ -11,7 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { submitLead } from "@/app/actions";
+import { saveLeadDraft, submitLead } from "@/app/actions";
 import { isIndianLeadMobile } from "@/lib/leads/indianMobile";
 import {
   DISCARD_CONFIRM_BODY,
@@ -47,7 +47,7 @@ import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
 // Category structure is the single source of truth in lib/categories.ts so the
 // homepage cards, vendor registration and this form never drift apart:
 //   Interior (Interior Designers · Carpenters · Modular Factory · Premium
-//   Interiors) · Sofa · Painter · Civil Work.
+//   Interiors) · Sofa · Painter · Civil Work · False Ceiling.
 // ---------------------------------------------------------------------------
 
 type IconName = Parameters<typeof QFIcon>[0]["name"];
@@ -255,7 +255,7 @@ const EnquiryModalContext = createContext<EnquiryModalContextValue | null>(null)
 
 /**
  * Best-effort map of an incoming category/service string (passed by triggers
- * across the site) to one of the four approved main categories — and, for
+ * across the site) to one of the approved main categories — and, for
  * Interior, the closest subcategory — so the modal opens pre-filled.
  */
 function presetFromCategory(value?: string): { categoryId: string; sub?: string } | null {
@@ -263,12 +263,13 @@ function presetFromCategory(value?: string): { categoryId: string; sub?: string 
   const v = value.toLowerCase();
   if (v.includes("paint")) return { categoryId: "painter" };
   if (v.includes("sofa") || v.includes("uphol")) return { categoryId: "sofa" };
+  if (v.includes("ceiling") || v.includes("gypsum") || /\bpop\b/.test(v)) return { categoryId: "false-ceiling" };
   if (v.includes("civil") || v.includes("renovat") || v.includes("masonry")) return { categoryId: "civil-work" };
   if (v.includes("modular") || v.includes("kitchen") || v.includes("wardrobe"))
     return { categoryId: INTERIOR_ID, sub: "Modular Factory" };
   if (v.includes("carpen") || v.includes("furniture")) return { categoryId: INTERIOR_ID, sub: "Carpenters" };
   if (v.includes("premium")) return { categoryId: INTERIOR_ID, sub: "Premium Interiors" };
-  if (v.includes("interior") || v.includes("ceiling") || v.includes("turnkey") || v.includes("design"))
+  if (v.includes("interior") || v.includes("turnkey") || v.includes("design"))
     return { categoryId: INTERIOR_ID, sub: "Interior Designers" };
   return null;
 }
@@ -276,9 +277,9 @@ function presetFromCategory(value?: string): { categoryId: string; sub?: string 
 /**
  * Resolve a client-picked vendor's canonical category into the modal's own
  * category structure (parent id/label + interior subcategory + enquiry service).
- * `targetVendorCategory` is one of the seven QuickFurnoCategory leaves: the four
- * interior leaves fold under the "interior" parent; Sofa / Painter / Civil Work
- * are their own main category. Returns null when the label can't be resolved, so
+ * `targetVendorCategory` is one of the eight QuickFurnoCategory leaves: the four
+ * interior leaves fold under the "interior" parent; Sofa / Painter / Civil Work /
+ * False Ceiling are their own main category. Returns null when the label can't be resolved, so
  * the caller safely falls back to the normal category picker.
  */
 function resolvePreferredSelection(targetVendorCategory?: string): {
@@ -290,7 +291,7 @@ function resolvePreferredSelection(targetVendorCategory?: string): {
   const wanted = targetVendorCategory?.trim().toLowerCase();
   if (!wanted) return null;
 
-  // Leaf that is its own main category (Sofa / Painter / Civil Work).
+  // Leaf that is its own main category (Sofa / Painter / Civil Work / False Ceiling).
   const leafMain = mainCategories.find((c) => c.category && c.category.toLowerCase() === wanted);
   if (leafMain && leafMain.category) {
     const leafCategory = leafMain.category;
@@ -362,12 +363,33 @@ export function EnquiryModalTrigger({
         onClick?.(event);
         if (event.defaultPrevented) return;
 
+        // Quote-bar convention (launch fix): a trigger rendered inside a
+        // [data-quote-bar] container picks up that bar's <select> value as the
+        // service preset at CLICK time, so a server-rendered hero bar needs no
+        // client state and the visitor's selection is no longer thrown away.
+        // An explicit serviceCategory prop always wins; an empty select leaves
+        // the options exactly as before.
+        let resolvedOptions = modalOptions;
+        const bar = event.currentTarget.closest("[data-quote-bar]");
+        if (bar && !resolvedOptions.serviceCategory) {
+          const select = bar.querySelector("select");
+          const picked = select instanceof HTMLSelectElement ? select.value : "";
+          if (picked) resolvedOptions = { ...resolvedOptions, serviceCategory: picked };
+        }
+        // Same convention for the locality: an optional [data-quote-area] text
+        // input inside the bar pre-fills the area field (Pune launch hero).
+        if (bar && !resolvedOptions.area) {
+          const areaInput = bar.querySelector("input[data-quote-area]");
+          const typed = areaInput instanceof HTMLInputElement ? areaInput.value.trim() : "";
+          if (typed) resolvedOptions = { ...resolvedOptions, area: typed };
+        }
+
         if (context) {
-          context.openModal(modalOptions);
+          context.openModal(resolvedOptions);
           return;
         }
 
-        window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: modalOptions }));
+        window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: resolvedOptions }));
       }}
     >
       {children}
@@ -397,6 +419,12 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   const [minStep, setMinStep] = useState(0);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  // ── Partial lead capture (launch) ─────────────────────────────────────────
+  // One anonymous draft row per modal open (see services/leadDraftService.ts).
+  // draftIdRef is the row key the browser generates; draftStageRef remembers
+  // the highest stage already banked so the effect below never re-sends.
+  const draftIdRef = useRef<string>("");
+  const draftStageRef = useRef<"" | "project" | "details" | "converted">("");
   // QF-UI-HOTFIX-01: the Escape handler needs the LATEST requestClose (which
   // reads `success` and the form) without those values becoming effect
   // dependencies. A ref keeps the listener stable, so typing can never tear the
@@ -466,6 +494,10 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setMinStep(preferredSelection ? startStep : 0);
     setStep(startStep);
     setModalOptions(options);
+    // New modal open = new anonymous draft row (no PII; see leadDraftService).
+    draftIdRef.current =
+      typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : "";
+    draftStageRef.current = "";
     setForm({
       ...initialState,
       city: options.city ?? "",
@@ -538,7 +570,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
             categoryId: cat.id,
             categoryLabel: cat.label,
             // Interior needs a subcategory before the canonical service is known;
-            // the other three map straight to their service.
+            // the other main categories map straight to their service.
             subcategory: "",
             serviceRequired: cat.category ? enquiryServiceForCategory(cat.category) : "",
           },
@@ -940,6 +972,59 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     }
   }, [step, open]);
 
+  /** Bank the current PROJECT-ONLY facts as an anonymous draft. Never PII. */
+  function sendLeadDraft(stage: "project" | "details" | "converted") {
+    if (!draftIdRef.current) return;
+    draftStageRef.current = stage;
+    void saveLeadDraft({
+      draft_id: draftIdRef.current,
+      stage,
+      service_category: form.serviceRequired || undefined,
+      subcategory: form.subcategory || undefined,
+      city: form.city || undefined,
+      area: form.area.trim() || undefined,
+      budget_range: budgetSummary() || undefined,
+      timeline: form.timeline || undefined,
+      property_type: form.propertyType || undefined,
+      source: modalOptions.source ?? "Requirement flow",
+    }).catch(() => {
+      /* fail-silent by contract — draft capture must never disturb the flow */
+    });
+  }
+
+  // PARTIAL LEAD CAPTURE. Once the "Your project" section (service + city +
+  // area) validates, bank an anonymous draft after a short settle delay;
+  // upgrade it to "details" when budget + timeline validate too. handleSubmit
+  // marks it "converted". Debounced so typing never spams the server, and
+  // draftStageRef guarantees each stage is sent at most once per modal open.
+  //
+  // SAFE BY DESIGN wrt QF-UI-HOTFIX-01: this effect touches no focus, no
+  // scroll lock and no DOM — it only schedules a network call — so depending
+  // on `form` here cannot reintroduce the mobile keyboard bug (the CI guard in
+  // scripts/ui/validate-mobile-form-focus.mjs only constrains focus/scroll
+  // effects, and this is neither).
+  useEffect(() => {
+    if (!open || success) return;
+    if (draftStageRef.current === "details" || draftStageRef.current === "converted") return;
+    const projectDone =
+      stepError(0) === null && (!isInterior || stepError(1) === null) && stepError(2) === null;
+    if (!projectDone) return;
+    const detailsDone = stepError(3) === null && stepError(4) === null;
+    const stage: "project" | "details" = detailsDone ? "details" : "project";
+    if (draftStageRef.current === stage) return;
+    const timer = window.setTimeout(() => {
+      trackEvent("enquiry_section_completed", {
+        section: stage,
+        source: modalOptions.source ?? "Requirement flow",
+      });
+      sendLeadDraft(stage);
+    }, 1000);
+    return () => window.clearTimeout(timer);
+    // stepError/isInterior/sendLeadDraft are stable per render and derive from
+    // `form`; keying on `form` (+ open/success) is exactly the re-run we want.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, success, form]);
+
   async function handleSubmit() {
     if (submitting) return;
     setError("");
@@ -1063,6 +1148,9 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         setSuccessMessage("Your requirement has been submitted. QuickFurno will connect you with up to 3 relevant verified vendors.");
       }
       setSuccess(true);
+      // Close the funnel loop: the draft row (if the table exists) is no
+      // longer a drop-off. Fire-and-forget like every other draft write.
+      sendLeadDraft("converted");
     } catch (err) {
       console.error("[requirement flow] submission error", {
         message: err instanceof Error ? err.message : "Unknown error",
@@ -1128,12 +1216,27 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
    * wizard already used, so the payload, consent, preferred-vendor routing,
    * location metadata and tracking are unchanged.
    *
-   * Field order is fixed and mobile-first:
-   *   service -> city -> area -> name -> phone -> whatsapp -> budget ->
-   *   property type -> timeline -> message -> consent -> submit.
+   * Field order is fixed and mobile-first, grouped under three numbered
+   * section headings (visual grouping ONLY — no step gating, no Back/Next,
+   * per the QF-MOBILE-FORM contract) with contact details LAST so the form
+   * asks for a phone number only after the project is described:
+   *   [1 Your project]     service -> city -> area
+   *   [2 Project details]  budget -> property type -> timeline -> message
+   *   [3 Your contact]     name -> phone -> whatsapp -> consent -> submit.
    * Desktop pairs related fields into two columns purely with CSS, so the wide
    * layout never dictates the mobile structure.
    */
+  function sectionHead(n: number, title: string, hint: string) {
+    return (
+      <div className="qf-sf-sechead qf-sf-field--full">
+        <span className="qf-sf-sechead-n" aria-hidden="true">{n}</span>
+        <div>
+          <h4>{title}</h4>
+          <small>{hint}</small>
+        </div>
+      </div>
+    );
+  }
   function renderSingleForm() {
     const cityUi = fieldUi("city", { valid: Boolean(form.city), value: form.city, error: "Please select your city." });
     const hasCoordinates =
@@ -1166,6 +1269,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
 
     return (
       <div className="qf-sf">
+        {sectionHead(1, "Your project", "What you need done, and where")}
         {/* Service. The category source of truth is unchanged — these are the
             same mainCategories the tile grid used, rendered as a select. In the
             preferred-vendor flow the category is fixed by the vendor, so the
@@ -1284,67 +1388,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
           ) : null}
         </div>
 
-        <label className={`qf-sf-field${nameUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-name">
-          <span className="qf-sf-label">Your name</span>
-          <div className="qf-rf-input-wrapper">
-            <input
-              id="qf-sf-name"
-              ref={nameInputRef}
-              value={form.name}
-              onChange={(e) => {
-                set("name", e.target.value);
-                markTouched("name");
-              }}
-              onBlur={() => markTouched("name")}
-              placeholder="e.g. Rahul Sharma"
-              autoComplete="name"
-            />
-            <ValidationIcon state={nameUi.iconState} />
-          </div>
-          {nameUi.showError ? <span className="qf-rf-field-err">{nameUi.error}</span> : null}
-        </label>
-
-        <label className={`qf-sf-field${phoneUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-phone">
-          <span className="qf-sf-label">Phone number</span>
-          <div className="qf-rf-input-wrapper">
-            <input
-              id="qf-sf-phone"
-              value={form.phone}
-              onChange={(e) => onPhoneChange(e.target.value)}
-              onBlur={() => markTouched("phone")}
-              placeholder="10-digit mobile number"
-              inputMode="numeric"
-              autoComplete="tel"
-              maxLength={10}
-            />
-            <ValidationIcon state={phoneUi.iconState} />
-          </div>
-          {phoneUi.showError ? <span className="qf-rf-field-err">{phoneUi.error}</span> : null}
-        </label>
-
-        <label className="qf-sf-check qf-sf-field--full">
-          <input type="checkbox" checked={form.whatsappSame} onChange={(e) => onWhatsappSameChange(e.target.checked)} />
-          <span>WhatsApp number same as phone</span>
-        </label>
-
-        {!form.whatsappSame ? (
-          <label className={`qf-sf-field${whatsappUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-wa">
-            <span className="qf-sf-label">WhatsApp number</span>
-            <div className="qf-rf-input-wrapper">
-              <input
-                id="qf-sf-wa"
-                value={form.whatsapp}
-                onChange={(e) => onWhatsappChange(e.target.value)}
-                onBlur={() => markTouched("whatsapp")}
-                placeholder="10-digit WhatsApp number"
-                inputMode="numeric"
-                maxLength={10}
-              />
-              <ValidationIcon state={whatsappUi.iconState} />
-            </div>
-            {whatsappUi.showError ? <span className="qf-rf-field-err">{whatsappUi.error}</span> : null}
-          </label>
-        ) : null}
+        {sectionHead(2, "Project details", "Budget and timing — rough estimates are fine")}
 
         {/* Budget — ONE band select that writes the canonical
             budgetMin / budgetMax / budgetNotSure fields, so budgetSummary() and
@@ -1418,6 +1462,70 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
             rows={3}
           />
         </label>
+
+        {sectionHead(3, "Your contact", "Where the matched vendors' quotes should reach you")}
+
+        <label className={`qf-sf-field${nameUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-name">
+          <span className="qf-sf-label">Your name</span>
+          <div className="qf-rf-input-wrapper">
+            <input
+              id="qf-sf-name"
+              ref={nameInputRef}
+              value={form.name}
+              onChange={(e) => {
+                set("name", e.target.value);
+                markTouched("name");
+              }}
+              onBlur={() => markTouched("name")}
+              placeholder="e.g. Rahul Sharma"
+              autoComplete="name"
+            />
+            <ValidationIcon state={nameUi.iconState} />
+          </div>
+          {nameUi.showError ? <span className="qf-rf-field-err">{nameUi.error}</span> : null}
+        </label>
+
+        <label className={`qf-sf-field${phoneUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-phone">
+          <span className="qf-sf-label">Phone number</span>
+          <div className="qf-rf-input-wrapper">
+            <input
+              id="qf-sf-phone"
+              value={form.phone}
+              onChange={(e) => onPhoneChange(e.target.value)}
+              onBlur={() => markTouched("phone")}
+              placeholder="10-digit mobile number"
+              inputMode="numeric"
+              autoComplete="tel"
+              maxLength={10}
+            />
+            <ValidationIcon state={phoneUi.iconState} />
+          </div>
+          {phoneUi.showError ? <span className="qf-rf-field-err">{phoneUi.error}</span> : null}
+        </label>
+
+        <label className="qf-sf-check qf-sf-field--full">
+          <input type="checkbox" checked={form.whatsappSame} onChange={(e) => onWhatsappSameChange(e.target.checked)} />
+          <span>WhatsApp number same as phone</span>
+        </label>
+
+        {!form.whatsappSame ? (
+          <label className={`qf-sf-field${whatsappUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-wa">
+            <span className="qf-sf-label">WhatsApp number</span>
+            <div className="qf-rf-input-wrapper">
+              <input
+                id="qf-sf-wa"
+                value={form.whatsapp}
+                onChange={(e) => onWhatsappChange(e.target.value)}
+                onBlur={() => markTouched("whatsapp")}
+                placeholder="10-digit WhatsApp number"
+                inputMode="numeric"
+                maxLength={10}
+              />
+              <ValidationIcon state={whatsappUi.iconState} />
+            </div>
+            {whatsappUi.showError ? <span className="qf-rf-field-err">{whatsappUi.error}</span> : null}
+          </label>
+        ) : null}
 
         {/* Consent — the SAME legal text and the same share_consent semantics,
             in a compact row instead of a large card. Never pre-checked. */}

@@ -88,7 +88,7 @@ export function Footer() {
           </Link>
           <p className="qf-foot-tagline">
             QuickFurno connects homeowners with verified interior, carpentry, modular, painting,
-            sofa and civil-work vendors in Pune.
+            sofa, civil-work and false ceiling vendors in Pune.
           </p>
         </div>
 

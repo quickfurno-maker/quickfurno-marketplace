@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
-import { CONTACT_TEL, MAX_COMPARE_VENDORS, whatsappLink } from "@/lib/config";
+import { MAX_COMPARE_VENDORS, whatsappLink } from "@/lib/config";
 import {
   getVendorListingMeta,
   getVendorPortfolio,
@@ -262,9 +262,6 @@ function CompareModal({
             <div className="qf-compare-cell qf-compare-cell--rowhead">Contact</div>
             {rows.map(({ vendor }) => (
               <div className="qf-compare-cell qf-compare-cell--cta" key={`cta-${vendor.slug}`}>
-                <a className="qf-compare-cta qf-compare-cta--call" href={CONTACT_TEL}>
-                  Call
-                </a>
                 <a
                   className="qf-compare-cta qf-compare-cta--wa"
                   href={whatsappLink(`Hi QuickFurno, I want a quote from ${vendor.businessName}.`)}

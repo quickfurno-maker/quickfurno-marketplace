@@ -26,6 +26,7 @@ const ARTWORK_BY_CATEGORY: Record<string, string> = {
   Sofa: `${ART_DIR}/sofa.svg`,
   Painter: `${ART_DIR}/painter.svg`,
   "Civil Work": `${ART_DIR}/civil-work.svg`,
+  "False Ceiling": `${ART_DIR}/false-ceiling.svg`,
 };
 
 /**

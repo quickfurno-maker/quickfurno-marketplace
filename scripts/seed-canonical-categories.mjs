@@ -1,7 +1,7 @@
 // ============================================================================
 // QuickFurno — Phase 14C (governance): seed the canonical category taxonomy
 //
-//   Parents:  Interior, Sofa, Painter, Civil Work
+//   Parents:  Interior, Sofa, Painter, Civil Work, False Ceiling
 //   Interior subcategories: Interior Designers, Carpenters, Modular Factory,
 //                           Premium Interiors
 //
@@ -43,7 +43,7 @@ const supabase = createClient(
 
 const OLD_SLUGS = [
   "full-home-interior", "modular-kitchen", "wardrobe", "carpentry",
-  "false-ceiling", "painting", "home-renovation", "custom-furniture",
+  "painting", "home-renovation", "custom-furniture",
   "interior-design", "renovation",
 ];
 
@@ -64,6 +64,7 @@ const PARENTS = [
   { name: "Sofa", slug: "sofa", is_active: true, parent_id: null, sort_order: 20 },
   { name: "Painter", slug: "painter", is_active: true, parent_id: null, sort_order: 30 },
   { name: "Civil Work", slug: "civil-work", is_active: true, parent_id: null, sort_order: 40 },
+  { name: "False Ceiling", slug: "false-ceiling", is_active: true, parent_id: null, sort_order: 50 },
 ];
 
 const up1 = await supabase.from("service_categories").upsert(decorate(PARENTS), { onConflict: "slug" });

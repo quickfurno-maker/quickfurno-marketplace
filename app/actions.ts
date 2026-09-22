@@ -10,6 +10,7 @@ import { redirect } from "next/navigation";
 import { adminClient, serverClient } from "../lib/supabase";
 import { appError, fail, ok, type Result } from "../lib/errors";
 import * as leads from "../services/leadService";
+import * as leadDrafts from "../services/leadDraftService";
 import * as vendors from "../services/vendorService";
 import * as packages from "../services/packageService";
 import * as vendorPackageOrders from "../services/vendorPackageOrderService";
@@ -183,6 +184,15 @@ export async function getMyVendor(): Promise<Result<import("../lib/types").Vendo
 // --------------------------------------------------------------------------
 export async function submitLead(input: CreateLeadInput) {
   return leads.createLead(input);
+}
+
+/**
+ * PUBLIC (no auth) — anonymous partial-enquiry capture for the 3-step modal.
+ * Carries NO PII by design and is fail-silent end to end; see
+ * services/leadDraftService.ts for the full rules.
+ */
+export async function saveLeadDraft(input: leadDrafts.LeadDraftInput) {
+  return leadDrafts.upsertLeadDraft(input);
 }
 
 export async function fetchEligibleVendors(leadId: string) {

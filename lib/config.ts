@@ -21,10 +21,12 @@ export const CONTACT = {
   address: "Kharadi Annex, Pune, Maharashtra 411014",
 };
 
-// Derived, ready-to-use contact links so Call / WhatsApp buttons never ship a
-// placeholder number. Edit CONTACT.phone above and these update everywhere.
+// Derived WhatsApp link so the button never ships a placeholder number. Edit
+// CONTACT.phone above and every WhatsApp link updates.
+//
+// The public site deliberately renders NO tel: link to this number: homeowners
+// and vendors reach us on WhatsApp, by email, or through the dashboard.
 export const CONTACT_PHONE_DIGITS = CONTACT.phone.replace(/\D/g, ""); // e.g. "917720000553"
-export const CONTACT_TEL = `tel:+${CONTACT_PHONE_DIGITS}`;
 export function whatsappLink(message: string = WHATSAPP_DEFAULT_MSG) {
   return `https://wa.me/${CONTACT_PHONE_DIGITS}?text=${encodeURIComponent(message)}`;
 }
@@ -52,13 +54,14 @@ export const ENQUIRY_SERVICES = [...SERVICES, "Other"] as const;
 // marketplace categories shown across the site. Option values stay aligned with
 // SERVICES above (plus two natural additions) so lead↔vendor matching keeps working.
 export const ENQUIRY_SERVICE_GROUPS: { category: string; options: string[] }[] = [
-  { category: "Interior Designers", options: ["Full Home Interior", "False Ceiling"] },
+  { category: "Interior Designers", options: ["Full Home Interior"] },
   { category: "Premium Interiors", options: ["Premium Interior Design"] },
   { category: "Modular Factory", options: ["Modular Kitchen", "Wardrobe"] },
   { category: "Carpenters", options: ["Carpentry", "Custom Furniture"] },
   { category: "Sofa", options: ["Custom Sofa & Upholstery"] },
   { category: "Painter", options: ["Painting"] },
   { category: "Civil Work", options: ["Home Renovation"] },
+  { category: "False Ceiling", options: ["False Ceiling"] },
 ];
 
 // ---- Budget & timeline options (stored as text on the lead) ----------------

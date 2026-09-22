@@ -162,6 +162,7 @@ export const CLARIFICATION_QUESTION_LABELS: Readonly<Record<string, string>> = O
   sofa_work_type: "the sofa work you need",
   painting_work_type: "the painting work you need",
   civil_work_type: "the civil work you need",
+  ceiling_work_type: "the ceiling work you need",
   property_type: "your property type",
   property_size: "your property size",
   site_type: "your site type",

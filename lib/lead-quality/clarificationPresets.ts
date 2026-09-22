@@ -59,6 +59,7 @@ const CANONICAL_CATEGORIES = new Set<QuickFurnoCategory>([
   "Sofa",
   "Painter",
   "Civil Work",
+  "False Ceiling",
 ]);
 
 const INTERIOR_LEAVES: QuickFurnoCategory[] = mainCategories
@@ -103,13 +104,14 @@ export function detectMissingClarificationFields(lead: ClarificationLeadLike): s
   if (category === "Sofa" && !subcategory) missing.push("sofa_work_type");
   if (category === "Painter" && !subcategory) missing.push("painting_work_type");
   if (category === "Civil Work" && !subcategory) missing.push("civil_work_type");
+  if (category === "False Ceiling" && !subcategory) missing.push("ceiling_work_type");
   if (!text(lead.budget, lead.budget_range, lead.budgetRange)) missing.push("budget");
   if (!text(lead.timeline)) missing.push("timeline");
   // Location clarity asks for area/locality only (never pincode). Uses the new
   // `area_location` key; no dependency on lead.pincode or 6-digit message text.
   if (!text(lead.area, lead.locality)) missing.push("area_location");
 
-  if ((parent === "Interior" || category === "Painter") && !text(lead.property_type, lead.project_size)) {
+  if ((parent === "Interior" || category === "Painter" || category === "False Ceiling") && !text(lead.property_type, lead.project_size)) {
     missing.push(category === "Painter" ? "property_size" : "property_type");
   }
   if ((category === "Sofa" || category === "Civil Work") && !mentionsPhoto(text(lead.message, lead.requirement))) {
@@ -161,16 +163,23 @@ export function buildClarificationQuestions(lead: ClarificationLeadLike): Clarif
       "Home Renovation",
       "Tiling",
       "Waterproofing",
-      "False Ceiling",
       "Bathroom Work",
       "Wall Breaking",
       "Flooring",
       "Repair Work",
       "Other Civil Work",
     ], "subcategory"));
+  } else if (category === "False Ceiling" && missing.includes("ceiling_work_type")) {
+    questions.push(choice("ceiling_work_type", "What ceiling work do you need?", [
+      "POP False Ceiling",
+      "Gypsum False Ceiling",
+      "Cove / Profile Lighting",
+      "Ceiling Repair",
+      "Other Ceiling Work",
+    ], "subcategory"));
   }
 
-  if (parent === "Interior" && missing.includes("property_type")) {
+  if ((parent === "Interior" || category === "False Ceiling") && missing.includes("property_type")) {
     questions.push(choice("property_type", "Property type?", ["1 BHK", "2 BHK", "3 BHK", "Villa / bungalow", "Commercial"], "property_type"));
   }
   if (category === "Painter" && missing.includes("property_size")) {
@@ -245,6 +254,7 @@ export function mapClarificationAnswerToLeadField(questionKey: string, answerVal
   if (questionKey === "sofa_work_type") return categoryWorkTypePatch("Sofa", value);
   if (questionKey === "painting_work_type") return categoryWorkTypePatch("Painter", value);
   if (questionKey === "civil_work_type") return categoryWorkTypePatch("Civil Work", value);
+  if (questionKey === "ceiling_work_type") return categoryWorkTypePatch("False Ceiling", value);
   if (questionKey === "budget") return simplePatch("budget", value);
   if (questionKey === "timeline") return simplePatch("timeline", value);
   if (questionKey === "property_type" || questionKey === "property_size" || questionKey === "site_type") return simplePatch("property_type", value);
@@ -267,9 +277,10 @@ export function normalizeClarificationCategory(value: string | null | undefined)
   if (/modular|kitchen/.test(raw)) return "Modular Factory";
   if (/carpentry|carpenter|custom furniture|wardrobe/.test(raw) && !/modular/.test(raw)) return "Carpenters";
   if (/premium interior|luxury/.test(raw)) return "Premium Interiors";
-  if (/full home interior|interior design|false ceiling|interior/.test(raw)) return "Interior Designers";
+  if (/full home interior|interior design|interior/.test(raw)) return "Interior Designers";
   if (/sofa|upholstery|recliner/.test(raw)) return "Sofa";
   if (/paint|painting|repaint|texture/.test(raw)) return "Painter";
+  if (/false ceiling|ceiling|gypsum|\bpop\b/.test(raw)) return "False Ceiling";
   if (/renovation|civil|tiling|waterproofing|masonry|flooring|bathroom|wall breaking/.test(raw)) return "Civil Work";
   return null;
 }

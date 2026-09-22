@@ -800,13 +800,19 @@
   .qfp-menu { display: block; }
 
   /* hero */
-  .qfp-hero { min-height: 0; height: 560px; align-items: flex-end; }
-  .qfp-hero-media { top: -24%; height: 124%; bottom: auto; }
-  .qfp-hero-media img { object-position: 92% 50%; }
-  .qfp-hero-shade { background: linear-gradient(180deg, rgba(18, 15, 12, 0.3) 0%, rgba(18, 15, 12, 0) 26%, rgba(18, 15, 12, 0.08) 52%, rgba(18, 15, 12, 0.88) 84%, rgba(18, 15, 12, 0.96) 100%); }
+  /* Phone hero = photo band on top + copy below it (overlapping the photo's
+     lower edge). The photo band shows the RIGHT HALF of the picture at full
+     height, so the whole family fits instead of a face close-up.
+     --qfp-hero-img-h: band height. 111.7vw = aspect of half the photo
+     (0.5 x 1024 / 572); capped so tablets don't get a giant band. */
+  .qfp-hero { --qfp-hero-img-h: min(111.7vw, 520px); min-height: 0; height: auto; display: block; }
+  .qfp-hero-media { top: 0; bottom: auto; height: var(--qfp-hero-img-h); }
+  .qfp-hero-media img { object-position: right center; }
+  .qfp-hero-shade { background: linear-gradient(180deg, rgba(18, 15, 12, 0.18) 0, rgba(18, 15, 12, 0) 80px, rgba(18, 15, 12, 0) calc(var(--qfp-hero-img-h) - 210px), rgba(18, 15, 12, 0.88) calc(var(--qfp-hero-img-h) - 70px), #16130f var(--qfp-hero-img-h)); }
   /* Keep .qfp-shell's own width (20px side margin) — do NOT set width here,
      or the hero loses its margin on phones wider than 400px. */
-  .qfp-hero-inner { padding: 0 0 20px; }
+  /* Copy starts 150px above the bottom of the photo band. */
+  .qfp-hero-inner { padding: calc(var(--qfp-hero-img-h) - 150px) 0 22px; }
   /* Cap the copy + button so they don't stretch on large phones/tablets. */
   .qfp-hero-copy { width: 100%; max-width: 480px; gap: 14px; }
   .qfp-hero h1 { font-size: 30px; line-height: 1.15; color: #fff; }

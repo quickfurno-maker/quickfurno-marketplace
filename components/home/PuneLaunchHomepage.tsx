@@ -321,16 +321,16 @@ function Hero() {
     <section className="qfp-hero" aria-labelledby="qfp-hero-title">
       <div className="qfp-hero-media" aria-hidden="true">
         {/* sizes = the width the photo is actually DRAWN at. On phones the
-            hero is 560px tall and the photo covers it by height, so it renders
-            ~1250px wide (not 100vw) — telling the browser "100vw" made it
-            fetch a small file and stretch it, which looked blurry. */}
+            band shows half the picture, so the photo renders ~2x the screen
+            width (not 100vw) — telling the browser "100vw" made it fetch a
+            small file and stretch it, which looked blurry. */}
         <Image
           src={hero.src}
           alt=""
           fill
           priority
           quality={85}
-          sizes="(max-width: 760px) 1250px, (max-width: 1160px) 1160px, 100vw"
+          sizes="(max-width: 760px) 200vw, (max-width: 1160px) 1160px, 100vw"
         />
       </div>
       <div className="qfp-hero-shade" aria-hidden="true" />

@@ -93,6 +93,13 @@ export function CategoryListing({ vendors, categoryName, enquiryService }: Categ
 
   return (
     <div className="qfc-listing">
+      {/* The page h1 is "<Category> in Pune" and each card name is an h3, so
+          without this the outline jumps 1 -> 3 and a screen-reader user loses
+          the results as a navigable section. There is no visible section title
+          to promote: the toolbar's count is role="status" (it re-announces on
+          every filter change, which a heading must never do), so the heading
+          is carried for assistive tech only. */}
+      <h2 className="qfd-sr">Verified {categoryName.toLowerCase()} in Pune</h2>
       <div className="qfc-toolbar">
         <div className="qfc-search">
           <span className="qfc-search-ic" aria-hidden="true"><IconSearch size={17} width={2.2} /></span>
@@ -121,7 +128,9 @@ export function CategoryListing({ vendors, categoryName, enquiryService }: Categ
 
       {shown.length === 0 ? (
         <div className="qfc-nomatch" role="status">
-          <p className="qfd-h3">Nothing matches those filters</p>
+          {/* Styled as a heading and now actually one — it sits under the
+              section h2 above, so h3 keeps the outline unbroken. */}
+          <h3 className="qfd-h3">Nothing matches those filters</h3>
           <p className="qfd-lede">
             All {vendors.length} verified {categoryName.toLowerCase()} in Pune are still here — widen
             the filters to see them.

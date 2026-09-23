@@ -294,7 +294,7 @@ check("22 the frozen 80.05 reconciliation count is still 102", () => {
   eq(MIGRATIONS.length - MANIFEST.historyReconciliation.migrationCount,
     (MANIFEST.pendingPostAnchorMigrations ?? []).length +
     (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length,
-    "118 - 102 = 16 = nine pending + seven staging-applied");
+    "118 - 102 = 16 = eight pending + eight staging-applied");
 });
 
 // ---- 23-26. the new vocabulary, and what it may not become -----------------
@@ -304,7 +304,7 @@ check("23 the partial-deployment vocabulary is exact and fail-closed", () => {
   assert(Array.isArray(set), "the set exists");
   // The set has grown through separately certified staging gates. R0 remains
   // exactly one member of it; later entries do not rewrite R0's evidence.
-  eq(set.length, 7, "with exactly seven members");
+  eq(set.length, 8, "with exactly eight members");
   // Every field that could be read as a deployment claim is stated explicitly —
   // nothing is left absent to be inferred generously by a later reader.
   for (const field of [

@@ -56,7 +56,7 @@ function BoltIcon({ size = 17, stroke = "#FFB13D", width = 2.4 }: IconProps) {
     </svg>
   );
 }
-function GridIcon({ size = 18, stroke = "#8A8474" }: IconProps) {
+function GridIcon({ size = 18, stroke = "#746D61" }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={2} strokeLinecap="round" aria-hidden="true">
       <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
@@ -64,7 +64,7 @@ function GridIcon({ size = 18, stroke = "#8A8474" }: IconProps) {
     </svg>
   );
 }
-function ShieldCheckIcon({ size = 18, stroke = "#F04A1A", width = 2 }: IconProps) {
+function ShieldCheckIcon({ size = 18, stroke = "#C93A0E", width = 2 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 3l7 3v5c0 4.6-3.1 7.7-7 9-3.9-1.3-7-4.4-7-9V6l7-3z" />
@@ -72,7 +72,7 @@ function ShieldCheckIcon({ size = 18, stroke = "#F04A1A", width = 2 }: IconProps
     </svg>
   );
 }
-function HomeIcon({ size = 18, stroke = "#F04A1A" }: IconProps) {
+function HomeIcon({ size = 18, stroke = "#C93A0E" }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M4 11.5 12 5l8 6.5" /><path d="M6 10.5V19h12v-8.5" /><path d="M9.5 19v-4.5h5V19" />
@@ -379,7 +379,7 @@ function Hero() {
               </select>
             </label>
             <label className="qfp-quote-field qfp-quote-field--area">
-              <PinIcon size={18} stroke="#8A8474" width={2} />
+              <PinIcon size={18} stroke="#746D61" width={2} />
               <input type="text" placeholder="Kharadi, Baner…" aria-label="Your locality" autoComplete="off" data-quote-area />
             </label>
             <EnquiryModalTrigger className="qfp-btn qfp-btn--primary qfp-quote-btn" source="Homepage hero quote bar">
@@ -412,7 +412,7 @@ function ServiceCard({ name }: { name: QuickFurnoCategory }) {
         <h3>{name}</h3>
         <p className="qfp-card-desc-long">{meta.desc}</p>
         <p className="qfp-card-desc-short">{meta.short}</p>
-        <span className="qfp-card-cta"><i><ArrowIcon stroke="#F04A1A" /></i>{meta.cta}</span>
+        <span className="qfp-card-cta"><i><ArrowIcon stroke="#C93A0E" /></i>{meta.cta}</span>
         {meta.mark ? <span className="qfp-card-mark" aria-hidden="true">{meta.mark}</span> : null}
       </div>
     </Link>
@@ -437,15 +437,15 @@ function FeaturedServiceCard() {
         <span className="qfp-card-cta"><i><ArrowIcon stroke="#fff" /></i>{meta.cta}</span>
         <div className="qfp-card-perks" aria-label="What interior designers cover">
           <span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F04A1A" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="1.5" /><line x1="3" y1="10" x2="14" y2="10" /><line x1="14" y1="3" x2="14" y2="21" /></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C93A0E" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="1.5" /><line x1="3" y1="10" x2="14" y2="10" /><line x1="14" y1="3" x2="14" y2="21" /></svg>
             Space Planning
           </span>
           <span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F04A1A" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 l8 4.5 v9 L12 21 4 16.5 v-9 z" /><path d="M4 7.5 L12 12 l8 -4.5 M12 12 V21" /></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C93A0E" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 l8 4.5 v9 L12 21 4 16.5 v-9 z" /><path d="M4 7.5 L12 12 l8 -4.5 M12 12 V21" /></svg>
             3D Designs
           </span>
           <span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F04A1A" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8.5 12.2 l2.4 2.4 4.6 -5" /></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C93A0E" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8.5 12.2 l2.4 2.4 4.6 -5" /></svg>
             End-to-End Execution
           </span>
         </div>
@@ -520,7 +520,7 @@ function BlueprintPlan() {
         ].map(([x1, y1]) => (
           <g key={`${x1}-${y1}`}>
             <circle cx={x1} cy={y1} r="10" fill="rgba(240,74,26,0.15)" />
-            <circle cx={x1} cy={y1} r="5" fill="#F04A1A" />
+            <circle cx={x1} cy={y1} r="5" fill="#C93A0E" />
           </g>
         ))}
       </g>
@@ -601,7 +601,7 @@ function HowItWorks() {
                 <p>{step.body}</p>
               </div>
               {index < HOW_IT_WORKS.length - 1 ? (
-                <span className="qfp-step-next" aria-hidden="true"><ArrowIcon size={13} stroke="#F04A1A" width={2.6} /></span>
+                <span className="qfp-step-next" aria-hidden="true"><ArrowIcon size={13} stroke="#C93A0E" width={2.6} /></span>
               ) : null}
             </li>
           ))}
@@ -685,7 +685,7 @@ function TrustAndSafety() {
           </div>
           {testimonial ? (
             <figure className="qfp-quote-card">
-              <svg width="30" height="24" viewBox="0 0 30 24" fill="#F04A1A" opacity="0.25" aria-hidden="true">
+              <svg width="30" height="24" viewBox="0 0 30 24" fill="#C93A0E" opacity="0.25" aria-hidden="true">
                 <path d="M0 24 L6 0 L14 0 L9 24 Z M16 24 L22 0 L30 0 L25 24 Z" />
               </svg>
               <blockquote>{testimonial.quote}</blockquote>

@@ -10,7 +10,7 @@
 .qfp-page {
   --qfp-ink: #14181d;
   --qfp-ivory: #f7f4ee;
-  --qfp-orange: #f04a1a;
+  --qfp-orange: #c93a0e;
   --qfp-orange-dark: #d63f12;
   --qfp-amber: #ffb13d;
   --qfp-coral: #ff8a5c;
@@ -210,7 +210,7 @@
   align-items: center;
   gap: 10px;
   padding: 0 14px;
-  color: #8a8474;
+  color: #746d61;
 }
 .qfp-quote-field--service { flex: 1 1 auto; min-width: 0; border-right: 1px solid #ece7dd; }
 .qfp-quote-field--area { flex: 0 0 186px; }
@@ -232,7 +232,7 @@
   line-height: 1.4;
 }
 .qfp-quote-field select { cursor: pointer; }
-.qfp-quote-field input::placeholder { color: #8a8474; opacity: 1; }
+.qfp-quote-field input::placeholder { color: #746d61; opacity: 1; }
 .qfp-quote-field select:focus-visible, .qfp-quote-field input:focus-visible { outline: 2px solid rgba(240, 74, 26, 0.35); outline-offset: 4px; border-radius: 4px; }
 .qfp-quote-btn { font-size: 16px; padding: 16px 26px; }
 
@@ -494,7 +494,7 @@
   width: 58px;
   height: 58px;
   border-radius: 16px;
-  background: linear-gradient(135deg, #f04a1a 0%, #ff8a3d 100%);
+  background: linear-gradient(135deg, #c93a0e 0%, #ff8a3d 100%);
   display: grid;
   place-items: center;
   flex-shrink: 0;

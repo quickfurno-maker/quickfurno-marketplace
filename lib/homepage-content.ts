@@ -66,28 +66,28 @@ export type FaqItem = { q: string; a: string };
 
 export const HOME_FAQ: FaqItem[] = [
   {
-    q: "Is QuickFurno really free for homeowners?",
-    a: "Yes. Sending an enquiry and getting matched costs you nothing. You pay your chosen vendor directly for the work — QuickFurno does not add any charge on top.",
+    q: "Is it free to send an enquiry?",
+    a: "Yes. QuickFurno does not charge a homeowner fee to submit an enquiry.",
   },
   {
     q: "How does the matching work?",
-    a: "You tell us your service, area and budget once. We connect you with up to 3 relevant verified professionals in Pune, and you compare their profiles and deal with them directly.",
+    a: "QuickFurno can assign up to 3 active pros at a time. Category eligibility comes first; approved ranking signals such as geography and fairness determine order when authoritative data is available.",
   },
   {
-    q: "How are vendors verified?",
-    a: "Every vendor's business details and work profile are reviewed by the QuickFurno team, and only approved, active vendors appear publicly. Pending or suspended vendors are never shown.",
+    q: "Which vendors appear publicly?",
+    a: "Only approved, active vendors that pass QuickFurno's public-listing controls appear as active listings. Pending, rejected, suspended or hidden profiles are not shown as active public vendors.",
   },
   {
-    q: "Which areas of Pune do you cover?",
-    a: "QuickFurno covers localities across Pune and PCMC — including Kharadi, Baner, Wakad, Hinjewadi, Kothrud, Viman Nagar, Hadapsar and more.",
+    q: "Which Pune localities can I select?",
+    a: "The launch surface lists common Pune-area localities for enquiry context. A listed locality is not a guarantee of matching supply.",
   },
   {
     q: "Am I obligated to hire someone after enquiring?",
-    a: "No. You compare the matched profiles and quotes, and you decide. If none fits, you are free to walk away — there is no fee and no obligation.",
+    a: "No. You can review any profiles or quotes you receive and decide whether to proceed. Submitting an enquiry does not obligate you to hire.",
   },
   {
-    q: "What kind of work can I get done?",
-    a: "Complete home interiors, modular kitchens and wardrobes, custom carpentry, sofas and upholstery, painting, and civil or renovation work — all through verified Pune professionals.",
+    q: "What kind of work can I enquire about?",
+    a: "QuickFurno's launch categories include interiors, modular work, carpentry, sofas and upholstery, painting, civil work and false ceilings. Availability varies by marketplace supply and eligibility.",
   },
 ];
 

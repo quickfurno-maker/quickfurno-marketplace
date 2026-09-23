@@ -1353,7 +1353,7 @@ export const suite = {
         const footer = readFileSync('components/Footer.tsx', 'utf8');
         const footerCode = footer.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
         assertFalse(footerCode.includes('id="contact"'), 'footer no longer duplicates the id');
-        const finalHome = readFileSync('components/home/FinalHomepage.tsx', 'utf8');
+        const finalHome = readFileSync('components/home/PuneLaunchHomepage.tsx', 'utf8');
         assertTrue(finalHome.includes('id="contact"'), 'the homepage anchor target is kept');
         // Every header anchor must exist in the homepage composition.
         for (const [href, id] of [['/#services', 'services'], ['/#how-it-works', 'how-it-works'],
@@ -1649,7 +1649,7 @@ export const suite = {
         assertFalse(/href=""/.test(all), 'no empty href');
         // Header anchors must point at ids the homepage actually renders.
         const home = readFileSync('app/page.tsx', 'utf8')
-          + readFileSync('components/home/FinalHomepage.tsx', 'utf8');
+          + readFileSync('components/home/PuneLaunchHomepage.tsx', 'utf8');
         for (const id of ['categories', 'how-it-works', 'why-quickfurno', 'services']) {
           if (!all.includes('/#' + id) && !all.includes('#' + id)) continue;
           assertTrue(home.includes('id="' + id + '"'), 'anchor #' + id + ' exists on the homepage');
@@ -1659,9 +1659,10 @@ export const suite = {
     {
       name: 'public surfaces keep the approved claims and add no new ones',
       run: () => {
-        const files = ['app/page.tsx', 'components/home/HomeSectionsV2.tsx',
-                       'components/home/HomeHeroSlider.tsx', 'components/home/HomeServiceLauncher.tsx',
-                       'app/category/[slug]/page.tsx', 'app/enquiry/page.tsx', 'components/Footer.tsx'];
+        const files = ['app/page.tsx', 'components/home/PuneLaunchHomepage.tsx', 'lib/homepage-content.ts',
+                       'components/home/HomeSectionsV2.tsx', 'components/home/HomeHeroSlider.tsx',
+                       'components/home/HomeServiceLauncher.tsx', 'app/category/[slug]/page.tsx',
+                       'app/enquiry/page.tsx', 'components/Footer.tsx'];
         for (const file of files) {
           // Strip comments so a note ABOUT a banned phrase cannot fail the scan.
           const src = readFileSync(file, 'utf8')
@@ -1675,10 +1676,10 @@ export const suite = {
           assertFalse(/\d[\d,+]*\s*(customers|projects completed|reviews|happy clients)/.test(src),
             file + ' must not invent counts');
         }
-        // The approved promises are still present on the homepage.
-        const hero = readFileSync('components/home/HomeHeroSlider.tsx', 'utf8').toLowerCase();
-        assertTrue(hero.includes('up to 3 relevant'), 'keeps the up-to-3 claim');
-        assertTrue(hero.includes('free for homeowners'), 'keeps the free-for-homeowners claim');
+        // The approved bounded promises are still present on the active homepage.
+        const hero = readFileSync('components/home/PuneLaunchHomepage.tsx', 'utf8').toLowerCase();
+        assertTrue(hero.includes('up to 3 active'), 'keeps the bounded up-to-3 claim');
+        assertTrue(hero.includes('free to enquire'), 'keeps the no-homeowner-enquiry-fee claim');
       },
     },
     {

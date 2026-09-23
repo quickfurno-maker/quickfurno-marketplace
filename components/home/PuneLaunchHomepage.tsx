@@ -235,12 +235,12 @@ const HOW_IT_WORKS = [
   {
     icon: <ChatIcon />,
     title: "Tell us what you need",
-    body: "Pick the service, your locality and a rough budget. Takes about a minute — no phone number until the end.",
+    body: "Pick the service, your locality and the project details you want to share. Your phone number is requested at the contact step.",
   },
   {
     icon: <ShieldCheckIcon size={26} stroke="#fff" width={2} />,
-    title: "We match verified experts",
-    body: "Up to 3 relevant, verified Pune professionals — matched to your trade, area and budget, not a broadcast list.",
+    title: "We find eligible pros",
+    body: "QuickFurno can assign up to 3 active pros at a time after category and marketplace eligibility checks; approved ranking signals determine order.",
   },
   {
     icon: <CheckCircleIcon />,
@@ -455,8 +455,8 @@ function NotSureCard() {
       <span className="qfp-notsure-copy">
         <span className="qfp-notsure-kicker">LET&apos;S BUILD TOGETHER</span>
         <span className="qfp-notsure-title">Not sure where to start?</span>
-        <span className="qfp-notsure-desc">Tell us about your home — we&apos;ll route you to the right verified experts.</span>
-        <span className="qfp-notsure-desc qfp-notsure-desc--short">We&apos;ll route you to the right expert.</span>
+        <span className="qfp-notsure-desc">Tell us about your home - we&apos;ll route your request to the right service.</span>
+        <span className="qfp-notsure-desc qfp-notsure-desc--short">We&apos;ll route your request.</span>
         <span className="qfp-notsure-btn">Get Matched <ArrowIcon stroke="#fff" /></span>
       </span>
       <span className="qfp-notsure-arrow" aria-hidden="true"><ArrowIcon size={17} stroke="#fff" /></span>
@@ -477,11 +477,11 @@ function NotSureCard() {
 // every screen size (swipeable on tablets and phones). All five are true
 // today — see lib/homepage-content.ts and the FAQ.
 const TRUST_POINTS: { title: string; body: string }[] = [
-  { title: "Verified professionals", body: "Every profile reviewed before listing" },
-  { title: "Quality assurance", body: "Work photos & experience checked" },
-  { title: "Hassle-free experience", body: "One enquiry, up to 3 matches" },
-  { title: "Free for homeowners", body: "No fee to enquire or compare" },
-  { title: "Local Pune support", body: "Phone, WhatsApp & email help" },
+  { title: "Profiles reviewed", body: "Active public listings must pass marketplace controls" },
+  { title: "Bounded matching", body: "Up to 3 active pros can be assigned at a time" },
+  { title: "Free to enquire", body: "No homeowner fee to submit an enquiry" },
+  { title: "Pune launch", body: "The marketplace launch is focused on Pune" },
+  { title: "Governed contact sharing", body: "Client details follow assignment and consent controls" },
 ];
 
 function BlueprintPlan() {
@@ -532,8 +532,8 @@ function ServicesHeading() {
             Our services
             <i className="l" aria-hidden="true" /><i className="t" aria-hidden="true" />
           </span>
-          <h2>One home.<br />Every expert.</h2>
-          <p>From full interiors to a fresh coat of paint — every trade, one trusted marketplace.</p>
+          <h2>Home services.<br />One marketplace.</h2>
+          <p>From interiors to painting, browse the Pune launch categories in one marketplace.</p>
         </div>
         <div className="qfp-bp-plan" aria-hidden="true">
           <BlueprintPlan />
@@ -613,7 +613,7 @@ function MadeInPune() {
         <div className="qfp-head-center" data-reveal>
           <span className="qfp-kicker qfp-kicker--coral">Our journey</span>
           <h2 id="qfp-cities-title">Made in Pune. Focused on Pune.</h2>
-          <p className="qfp-cities-lead">We are building QuickFurno where we live — then bringing verified home professionals to more of India.</p>
+          <p className="qfp-cities-lead">QuickFurno is launching as a Pune-only marketplace so supply, matching and support can stay focused.</p>
         </div>
         <ul className="qfp-city-grid" data-reveal-group>
           {CITIES.map((city) => (
@@ -670,7 +670,7 @@ function TrustAndSafety() {
         <div className="qfp-trust-visual" data-reveal>
           <div className="qfp-trust-photo">
             <Image src={`${LAUNCH_IMG}/team-pune.jpg`} alt="" fill sizes="(max-width: 760px) 100vw, 564px" />
-            <span className="qfp-trust-pill-label">PUNE HOMES, DONE RIGHT</span>
+            <span className="qfp-trust-pill-label">PUNE LAUNCH</span>
           </div>
           {testimonial ? (
             <figure className="qfp-quote-card">
@@ -718,7 +718,7 @@ function Areas() {
             <label htmlFor="qfp-areas-toggle" className="qfp-area-pill qfp-area-more qfp-area-more--mobile">+ {mobileHidden} more</label>
           ) : null}
         </div>
-        <p className="qfp-areas-note">Your locality not listed? Send an enquiry anyway — we cover most of Pune.</p>
+        <p className="qfp-areas-note">Your locality not listed? You can still submit an enquiry; assignment depends on marketplace eligibility and available supply.</p>
       </div>
     </section>
   );
@@ -768,7 +768,7 @@ function VendorCTA() {
           <div className="qfp-vendor-copy">
             <span className="qfp-kicker">For professionals</span>
             <h2 id="qfp-vendor-title">Run a home-services business in Pune?</h2>
-            <p>Get a verified public profile and receive relevant homeowner enquiries in your trade and area. Free to apply.</p>
+            <p>Apply for a reviewed public profile and Client Matching eligibility. Assignments depend on approval, account eligibility, matching credits and demand.</p>
           </div>
           <Link href="/vendors" className="qfp-vendor-btn">
             Join as a vendor <ArrowIcon size={15} stroke="#14181D" />
@@ -786,7 +786,7 @@ function Footer() {
         <div className="qfp-footer-grid">
           <div className="qfp-footer-brand">
             <Logo light />
-            <p>Pune&apos;s trusted marketplace for verified home-service professionals. Better spaces, happier lives.</p>
+            <p>A Pune-focused marketplace for homeowners and home-service professionals.</p>
             <span className="qfp-footer-made">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9A876" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="M3 9.5 L12 3 L21 9.5 L21 21 L3 21 Z" /></svg>
               Made with care for a better Pune
@@ -815,7 +815,7 @@ function Footer() {
         </div>
         <div className="qfp-footer-bottom">
           <span>© 2026 QuickFurno. All rights reserved.</span>
-          <span className="qfp-footer-tagline">Verified professionals · Up to 3 matches · Free for homeowners</span>
+          <span className="qfp-footer-tagline">Reviewed profiles | Up to 3 active matches | Free to enquire</span>
           <nav className="qfp-footer-legal" aria-label="Legal links">
             <Link href="/privacy">Privacy</Link> · <Link href="/terms">Terms</Link> · <Link href="/vendors">Vendor policy</Link>
           </nav>

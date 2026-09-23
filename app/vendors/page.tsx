@@ -435,11 +435,11 @@ export default function VendorsPage() {
                 <div className="qfv-slots-row">
                   <span className="qfv-slot">
                     <Icon name="check" size={13} color="#5EBE8B" width={3} />
-                    Verified pro
+                    Assigned pro
                   </span>
                   <span className="qfv-slot">
                     <Icon name="check" size={13} color="#5EBE8B" width={3} />
-                    Verified pro
+                    Assigned pro
                   </span>
                   <span className="qfv-slot qfv-slot--open">+ Your spot</span>
                 </div>
@@ -466,7 +466,7 @@ export default function VendorsPage() {
                   Vendor login
                 </Link>
                 <span className="qfv-note qfv-note--light">
-                  Free to apply ? 6 short steps
+                  Free to apply, 6 short steps
                   <br />
                   Matching requires approval, eligibility and available credits
                 </span>
@@ -477,7 +477,7 @@ export default function VendorsPage() {
                 source="Vendors page hero — homeowner switch"
               >
                 <Icon name="home" size={16} color="#B9B1A3" width={2} />
-                Looking to hire a pro instead? <strong>Get up to 3 matches ?</strong>
+                Looking to hire a pro instead? <strong>Get up to 3 matches</strong>
               </EnquiryModalTrigger>
             </div>
           </div>
@@ -509,7 +509,7 @@ export default function VendorsPage() {
                 ))}
               </ol>
               <p className="qfv-note" style={{ marginTop: 22 }}>
-                Matches depend on what homeowners near you ask for. We don’t promise a fixed number.
+                Matches depend on homeowner demand, account eligibility, available credits and the approved ranking order. No fixed volume is promised.
               </p>
             </div>
 
@@ -538,21 +538,21 @@ export default function VendorsPage() {
                   <Icon name="check" size={17} color="#FFFFFF" width={3} />
                 </span>
                 <span className="qfv-map-label" style={{ left: "35%", top: "28%" }}>
-                  <strong>Verified pro</strong>
+                  <strong>Example pro</strong>
                   <span>2.1 km away</span>
                 </span>
                 <span className="qfv-map-pin" style={{ left: "69%", top: "37%" }}>
                   <Icon name="check" size={17} color="#FFFFFF" width={3} />
                 </span>
                 <span className="qfv-map-label" style={{ left: "77%", top: "36%" }}>
-                  <strong>Verified pro</strong>
+                  <strong>Example pro</strong>
                   <span>3.4 km away</span>
                 </span>
                 <span className="qfv-map-pin" style={{ left: "52%", top: "70%" }}>
                   <Icon name="check" size={17} color="#FFFFFF" width={3} />
                 </span>
                 <span className="qfv-map-label" style={{ left: "60%", top: "69%" }}>
-                  <strong>Verified pro</strong>
+                  <strong>Example pro</strong>
                   <span>4.0 km away</span>
                 </span>
                 <span className="qfv-tag-example qfv-map-example">EXAMPLE</span>
@@ -745,7 +745,7 @@ export default function VendorsPage() {
                       <b>Kulkarni Interiors</b>
                       <span>
                         <Icon name="shield" size={12} color="#1F7A45" width={2.4} />
-                        Verified vendor
+                        Approved vendor
                       </span>
                     </span>
                   </span>
@@ -771,7 +771,7 @@ export default function VendorsPage() {
                       <small>Profile</small>
                       <em>
                         <Icon name="shield" size={15} color="#1F7A45" width={2.2} />
-                        Verified
+                        Approved
                       </em>
                     </div>
                   </div>
@@ -865,7 +865,7 @@ export default function VendorsPage() {
                         </div>
                         <div>
                           <small>Profile</small>
-                          <em>Verified</em>
+                          <em>Approved</em>
                         </div>
                       </div>
                       <div style={{ background: "#fff", border: "1px solid #EFE8DC", borderRadius: 12, padding: "11px 12px" }}>
@@ -941,9 +941,9 @@ export default function VendorsPage() {
         <section className="qfv-midcta qfv-section">
           <div className="qfv-shell qfv-midcta-inner">
             <div>
-              <h2>Ready to be one of the 3?</h2>
+              <h2>Ready to apply?</h2>
               <p>
-                Applying is free. Our Pune team verifies your business before any homeowner sees your profile.
+                Applying is free. QuickFurno reviews your business submission before an approved profile can become public.
               </p>
             </div>
             <div className="qfv-midcta-act">
@@ -1113,7 +1113,7 @@ export default function VendorsPage() {
               <a
                 className="qfv-btn qfv-btn--ghost"
                 href={whatsappLink(
-                  "Hi QuickFurno, I run a home-services business in Pune and I have a question about applying as a verified pro.",
+                  "Hi QuickFurno, I run a home-services business in Pune and I have a question about applying to QuickFurno.",
                 )}
                 target="_blank"
                 rel="noopener noreferrer"

@@ -19,13 +19,18 @@ import {
 } from "@/lib/quickfurno-data";
 import "../category-v3.css";
 
-type CategoryPageProps = { params: { slug: string } };
+// Next 15 made route params asynchronous. Read synchronously, `params.slug` is
+// undefined at runtime, getCategoryBySlug() misses and every category page
+// 404s — while still type-checking and building clean, which is how this
+// survived the Next 16 migration unnoticed.
+type CategoryPageProps = { params: Promise<{ slug: string }> };
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export function generateMetadata({ params }: CategoryPageProps): Metadata {
-  const category = getCategoryBySlug(params.slug);
+export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const category = getCategoryBySlug(slug);
   if (!category) return { title: "Category not found | QuickFurno" };
 
   // No "ratings" or "transparent rates" claims: there is no review system and
@@ -41,7 +46,8 @@ export function generateMetadata({ params }: CategoryPageProps): Metadata {
 }
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
-  const category = getCategoryBySlug(params.slug);
+  const { slug } = await params;
+  const category = getCategoryBySlug(slug);
   if (!category) notFound();
 
   const settings = await loadMarketplaceRuntimeSettings();

@@ -15,4 +15,9 @@
 .qf-aarohi-conversion{display:grid;gap:8px}.qf-aarohi-convrow{display:flex;justify-content:space-between;border-bottom:1px solid #eef0f3;padding-bottom:7px;font-size:11px}.qf-aarohi-convrow:last-child{border:0}.qf-aarohi-sourcebars{display:grid;gap:8px}.qf-aarohi-sourcebar{display:grid;grid-template-columns:110px 1fr 40px;gap:8px;align-items:center;font-size:10px}
 .qf-aarohi-note{font-size:10px;color:#6f7684;background:#f8f8fb;border:1px solid #ececf2;border-radius:8px;padding:9px}.qf-aarohi-danger-note{font-size:10px;color:#8f271d;background:#fff3f1;border:1px solid #f4d6d1;border-radius:8px;padding:9px}
 @media(max-width:1100px){.qf-aarohi-metrics{grid-template-columns:repeat(3,1fr)}.qf-aarohi-grid2,.qf-aarohi-360{grid-template-columns:1fr}.qf-aarohi-intelligence{position:static}.qf-aarohi-360>.qf-aarohi-panel:first-child{order:1}.qf-aarohi-360>.qf-aarohi-panel:nth-child(2){order:3}.qf-aarohi-360>.qf-aarohi-panel:nth-child(3){order:2}}
+/* iOS Safari zooms the whole page when a focused control's text is under 16px
+   and does not zoom back, so every field tap on a phone needs a pinch to
+   recover. This console is desktop-first and the dense 12px type is correct
+   there, so the floor applies only where the bug exists. */
+@media(max-width:767px){.qf-aarohi-input,.qf-aarohi-select,.qf-aarohi-textarea{font-size:16px}}
 @media(max-width:680px){.qf-aarohi-content{padding:16px 12px 70px}.qf-aarohi-identity{padding:13px 14px;gap:9px}.qf-aarohi-identity p{display:none}.qf-aarohi-nav{padding:6px 10px}.qf-aarohi-pagehead{display:block}.qf-aarohi-pagehead>*+*{margin-top:10px}.qf-aarohi-metrics{grid-template-columns:1fr 1fr}.qf-aarohi-formgrid{grid-template-columns:1fr}.qf-aarohi-formgrid .wide{grid-column:auto}}

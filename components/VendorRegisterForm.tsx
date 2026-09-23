@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { submitVendorAccountRegistration } from "@/app/actions";
 import { trackEvent, whatsappLink } from "@/lib/config";
 import { QFIcon } from "@/components/QuickFurnoIcons";
-import { mainCategories, type MainCategory } from "@/lib/categories";
+import { mainCategories, signupSelectionForCategory, type MainCategory } from "@/lib/categories";
 import { type QuickFurnoCategory } from "@/lib/quickfurno-data";
 import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useActiveCities";
 // Phase 1: reuse the SAME Google autocomplete the client form uses (no second
@@ -150,9 +150,18 @@ function readTracking() {
   };
 }
 
-export function VendorRegisterForm() {
+export function VendorRegisterForm({
+  initialCategory = null,
+}: { initialCategory?: QuickFurnoCategory | null } = {}) {
   const [step, setStep] = useState(0);
-  const [f, setF] = useState<WizardState>(initialState);
+  // Seeded once via the lazy initialiser, never via an effect: an effect that
+  // wrote form state would re-run on the wizard's own updates, and
+  // validate-mobile-form-focus.mjs exists because exactly that pattern once
+  // blurred the field being typed into on every keystroke.
+  const [f, setF] = useState<WizardState>(() => {
+    const preset = signupSelectionForCategory(initialCategory);
+    return preset ? { ...initialState, ...preset } : initialState;
+  });
   // Phase 14B: city chips come only from admin-managed active cities.
   const { cities: activeCities, loading: citiesLoading } = useActiveCities();
   const [error, setError] = useState("");

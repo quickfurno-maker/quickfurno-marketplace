@@ -934,8 +934,17 @@ export const suite = {
         assertTrue(page.includes('searchParams?.mode === "signup" ? "signup" : "login"'),
           '?mode=signup maps signup, everything else maps login');
         const portal = readFileSync('components/vendor/VendorPortal.tsx', 'utf8');
-        assertTrue(portal.includes('router.replace(`/vendor?mode=${next}`, { scroll: false })'),
-          'switchMode keeps the exact router.replace target');
+        // This pinned the literal replace target. switchMode now composes the
+        // query so the ?trade= carried by every "Become a Vendor" link survives
+        // a tab switch, so the rule is stated as the invariant it was really
+        // protecting — /vendor, mode=<next>, no scroll — and both branches are
+        // pinned, which is stricter than the single literal was.
+        assertTrue(portal.includes('router.replace(`/vendor${query}`, { scroll: false })'),
+          'switchMode replaces to /vendor without scrolling');
+        assertTrue(portal.includes('`?mode=${next}&trade=${encodeURIComponent(tradeSlug)}`'),
+          'a switch carries the trade param through');
+        assertTrue(portal.includes('`?mode=${next}`'),
+          'a switch with no trade keeps the bare ?mode= deep link');
         assertTrue(portal.includes('role="tablist"'), 'tablist preserved');
         assertTrue(portal.includes('role="tab"'), 'tab role preserved');
         assertTrue(portal.includes('aria-selected={active}'), 'aria-selected preserved');

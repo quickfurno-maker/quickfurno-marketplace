@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LoginForm } from "@/components/LoginForm";
 import { VendorRegisterForm } from "@/components/VendorRegisterForm";
+import { type QuickFurnoCategory } from "@/lib/quickfurno-data";
 
 type Mode = "login" | "signup";
 
@@ -18,14 +19,28 @@ type Mode = "login" | "signup";
 // a V2 blue segmented control defined in app/vendor-auth-v2.css. switchMode, the
 // router.replace target and the tablist/tab/aria-selected semantics are
 // unchanged, so deep links still work exactly as before.
-export function VendorPortal({ initialMode = "login" }: { initialMode?: Mode }) {
+export function VendorPortal({
+  initialMode = "login",
+  initialCategory = null,
+  tradeSlug = null,
+}: {
+  initialMode?: Mode;
+  /** Trade to pre-select in signup, resolved from ?trade= on the server. */
+  initialCategory?: QuickFurnoCategory | null;
+  /** The raw ?trade= slug, kept so switching tabs does not discard it. */
+  tradeSlug?: string | null;
+}) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>(initialMode);
 
   function switchMode(next: Mode) {
     if (next === mode) return;
     setMode(next);
-    router.replace(`/vendor?mode=${next}`, { scroll: false });
+    // Carry ?trade= across the switch. Without it, a carpenter who lands on
+    // signup, taps "Vendor Login" to check, then comes back, loses the trade
+    // the link selected for them.
+    const query = tradeSlug ? `?mode=${next}&trade=${encodeURIComponent(tradeSlug)}` : `?mode=${next}`;
+    router.replace(`/vendor${query}`, { scroll: false });
   }
 
   return (
@@ -58,7 +73,7 @@ export function VendorPortal({ initialMode = "login" }: { initialMode?: Mode }) 
           <LoginForm signupHref="/vendor?mode=signup" signupLabel="Create a vendor account" />
         ) : (
           <div className="qf-vendor-form-wrap">
-            <VendorRegisterForm />
+            <VendorRegisterForm initialCategory={initialCategory} />
           </div>
         )}
       </div>

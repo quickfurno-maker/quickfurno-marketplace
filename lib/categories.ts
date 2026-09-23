@@ -70,3 +70,25 @@ export const mainCategories: MainCategory[] = [
     subcategories: [],
   },
 ];
+
+/**
+ * Where a marketplace category sits in the Step 2 picker: the main category to
+ * open, and the leaf to select inside it (empty when the main IS the leaf).
+ *
+ * Every "Become a vendor" link in the footer carries ?trade=<category-slug>,
+ * and until now nothing read it — a carpenter following "Become a Vendor" from
+ * the carpenters page landed on an empty picker and had to find their own trade
+ * again. Returns null for an unknown category so the wizard simply starts blank
+ * rather than guessing a trade on the vendor's behalf.
+ */
+export function signupSelectionForCategory(
+  category: QuickFurnoCategory | null | undefined,
+): { categoryId: string; subCategory: string } | null {
+  if (!category) return null;
+  for (const main of mainCategories) {
+    if (main.category === category) return { categoryId: main.id, subCategory: "" };
+    const sub = main.subcategories.find((item) => item.category === category);
+    if (sub) return { categoryId: main.id, subCategory: sub.label };
+  }
+  return null;
+}

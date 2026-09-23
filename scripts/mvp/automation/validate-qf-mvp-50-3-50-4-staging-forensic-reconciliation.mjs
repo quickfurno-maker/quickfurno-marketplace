@@ -178,8 +178,8 @@ function validateState(state) {
   // QF-MVP-40.14 RE-PIN: the tail grows from sixteen to seventeen, adding ONLY the
   // source-only Meta transactional mapping seed + activation authority. Still an
   // EXACT ordered comparison.
-  check("the exact final four forensic migration filenames are frozen, followed only by the later governed migrations through the vendor review system",
-    same(state.migrationFiles.slice(-27),
+  check("the exact final four forensic migration filenames are frozen, followed only by the later governed migrations through False Ceiling",
+    same(state.migrationFiles.slice(-26),
       [...FORENSIC_MIGRATIONS.map((migration) => migration.filename), RECOVERY_FILENAME,
        CANARY_AUTHORITY_FILENAME, MARKETING_CONSENT_FILENAME, MATCHCORE_RANK_ORDER_FILENAME,
        GEO_POSTGIS_SHORTLIST_FILENAME, AUDIT_LOG_REPAIR_FILENAME,

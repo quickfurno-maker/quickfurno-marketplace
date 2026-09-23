@@ -1,0 +1,474 @@
+/* ============================================================================
+   QuickFurno — shared primitives
+
+   The pieces every redesigned page is built from, so a button is defined once
+   instead of five times. Built entirely on --qfd-* tokens: change a token and
+   every page that has migrated follows.
+
+   Rules this file keeps to:
+     - qfd-* class selectors only. No bare element rules, no resets. Importing
+       it must not move a single pixel on a page that has not opted in.
+     - Every pressable thing is at least var(--qfd-tap) = 44px (WCAG 2.5.5).
+     - Every focusable thing has a visible focus ring (WCAG 2.4.7).
+     - No flat light surface: pale blocks carry a gradient (house rule).
+   ========================================================================= */
+
+/* --- Focus ---------------------------------------------------------------
+   One ring for everything. :focus-visible so a mouse click never shows it but
+   a Tab always does. */
+.qfd-btn:focus-visible,
+.qfd-chip:focus-visible,
+.qfd-input:focus-visible,
+.qfd-textarea:focus-visible,
+.qfd-check:focus-visible + .qfd-check-box,
+.qfd-iconbtn:focus-visible,
+.qfd-link:focus-visible {
+  outline: 3px solid var(--qfd-orange);
+  outline-offset: 2px;
+  border-radius: var(--qfd-r-sm);
+}
+
+/* --- Layout --------------------------------------------------------------- */
+.qfd-wrap {
+  width: 100%;
+  max-width: calc(var(--qfd-max) + var(--qfd-gutter) * 2);
+  margin-inline: auto;
+  padding-inline: var(--qfd-gutter);
+  box-sizing: border-box;
+}
+
+.qfd-section {
+  position: relative;
+  overflow: hidden;
+  padding-block: var(--qfd-section-y);
+  background: var(--qfd-grad-section);
+}
+.qfd-section--page { background: var(--qfd-grad-page); }
+.qfd-section--band { background: var(--qfd-grad-band); }
+.qfd-section--cta { background: var(--qfd-grad-cta); }
+.qfd-section--dark {
+  background: var(--qfd-grad-dark);
+  color: var(--qfd-on-dark);
+}
+.qfd-section--flush { padding-block: 0; }
+.qfd-section > * { position: relative; }
+
+/* Radial glows. Decorative, so aria-hidden and pointer-events off. */
+.qfd-glow {
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  background-image: var(--qfd-glow-clay);
+}
+.qfd-glow--amber { background-image: var(--qfd-glow-amber); }
+.qfd-glow--on-dark { background-image: var(--qfd-glow-clay-dark); }
+.qfd-glow--tr { right: -140px; top: -120px; width: 620px; height: 460px; }
+.qfd-glow--bl { left: -160px; bottom: -80px; width: 580px; height: 520px; }
+@media (max-width: 720px) {
+  .qfd-glow--tr { right: -110px; top: -90px; width: 300px; height: 280px; }
+  .qfd-glow--bl { left: -120px; bottom: -70px; width: 300px; height: 300px; }
+}
+
+/* --- Type ----------------------------------------------------------------- */
+.qfd-kicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--qfd-font-mono);
+  font-size: var(--qfd-t-kicker);
+  font-weight: 700;
+  letter-spacing: var(--qfd-track-kicker);
+  text-transform: uppercase;
+  color: var(--qfd-orange-text);
+  margin: 0 0 14px;
+}
+.qfd-kicker::before {
+  content: "";
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.qfd-section--dark .qfd-kicker { color: var(--qfd-amber); }
+
+.qfd-hero, .qfd-h1, .qfd-h2, .qfd-h3 {
+  font-family: var(--qfd-font-head);
+  font-weight: 800;
+  letter-spacing: var(--qfd-track-head);
+  line-height: var(--qfd-lead-head);
+  color: var(--qfd-ink);
+  margin: 0;
+  text-wrap: balance;
+}
+.qfd-hero { font-size: var(--qfd-t-hero); line-height: var(--qfd-lead-tight); }
+.qfd-h1 { font-size: var(--qfd-t-h1); }
+.qfd-h2 { font-size: var(--qfd-t-h2); }
+.qfd-h3 { font-size: var(--qfd-t-h3); letter-spacing: -0.025em; }
+.qfd-section--dark :is(.qfd-hero, .qfd-h1, .qfd-h2, .qfd-h3) { color: var(--qfd-on-dark); }
+
+.qfd-lede {
+  font-family: var(--qfd-font-body);
+  font-size: var(--qfd-t-body);
+  line-height: var(--qfd-lead-body);
+  color: var(--qfd-muted);
+  margin: 0;
+  max-width: 62ch;
+}
+.qfd-section--dark .qfd-lede { color: var(--qfd-on-dark-muted); }
+
+.qfd-meta {
+  font-size: var(--qfd-t-small);
+  line-height: 1.45;
+  color: var(--qfd-faint);
+  margin: 0;
+}
+.qfd-label {
+  display: block;
+  font-family: var(--qfd-font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--qfd-muted);
+  margin-bottom: 7px;
+}
+.qfd-label-opt {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--qfd-faint);
+  margin-left: 8px;
+}
+.qfd-req { color: var(--qfd-orange-text); margin-left: 3px; }
+
+.qfd-link {
+  color: var(--qfd-orange-text);
+  font-weight: 700;
+  text-decoration: none;
+}
+.qfd-link:hover { text-decoration: underline; }
+
+/* --- Buttons -------------------------------------------------------------- */
+.qfd-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: var(--qfd-tap);
+  padding: 0 26px;
+  border: 0;
+  border-radius: var(--qfd-r-md);
+  font-family: var(--qfd-font-body);
+  font-size: 0.9375rem;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--qfd-fast) var(--qfd-ease),
+              transform var(--qfd-fast) var(--qfd-ease);
+  box-sizing: border-box;
+}
+.qfd-btn:active { transform: translateY(1px); }
+.qfd-btn[disabled], .qfd-btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.qfd-btn--primary {
+  background: var(--qfd-orange);
+  color: #fff;
+  box-shadow: var(--qfd-shadow-orange);
+}
+.qfd-btn--primary:hover { background: var(--qfd-orange-hover); color: #fff; }
+
+.qfd-btn--dark { background: var(--qfd-ink); color: #fff; }
+.qfd-btn--dark:hover { background: var(--qfd-night); color: #fff; }
+
+.qfd-btn--ghost {
+  background: var(--qfd-card);
+  color: var(--qfd-ink);
+  border: 1.5px solid var(--qfd-line-input);
+}
+.qfd-btn--ghost:hover { background: var(--qfd-ivory); }
+
+.qfd-btn--quiet {
+  background: transparent;
+  color: var(--qfd-orange-text);
+  padding-inline: 12px;
+}
+.qfd-btn--quiet:hover { background: var(--qfd-tint-orange); }
+
+.qfd-btn--onphoto {
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--qfd-ink);
+  backdrop-filter: blur(4px);
+}
+
+.qfd-btn--lg { min-height: 56px; padding: 0 32px; font-size: 1rem; }
+.qfd-btn--sm { min-height: var(--qfd-tap); padding: 0 18px; font-size: 0.875rem; }
+.qfd-btn--block { width: 100%; }
+
+/* Icon-only. Still 44px even when the glyph is 16px. */
+.qfd-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--qfd-tap);
+  min-height: var(--qfd-tap);
+  padding: 0;
+  border-radius: var(--qfd-r-sm);
+  border: 1px solid var(--qfd-line);
+  background: var(--qfd-card);
+  color: var(--qfd-muted);
+  cursor: pointer;
+}
+.qfd-iconbtn:hover { background: var(--qfd-ivory); color: var(--qfd-ink); }
+.qfd-iconbtn--onphoto {
+  background: rgba(12, 16, 22, 0.66);
+  border-color: rgba(255, 255, 255, 0.26);
+  color: #fff;
+  backdrop-filter: blur(5px);
+}
+
+/* --- Chips (single-select filters, budget, timeline) ---------------------- */
+.qfd-chips { display: flex; flex-wrap: wrap; gap: 9px; }
+.qfd-chips--grid {
+  display: grid;
+  grid-template-columns: repeat(var(--qfd-chip-cols, 2), minmax(0, 1fr));
+  gap: 9px;
+}
+.qfd-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--qfd-tap);
+  padding: 0 14px;
+  border-radius: var(--qfd-r-sm);
+  border: 1.5px solid var(--qfd-line-2);
+  background: var(--qfd-card);
+  color: var(--qfd-ink);
+  font-family: var(--qfd-font-body);
+  font-size: 0.84375rem;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  cursor: pointer;
+  transition: background var(--qfd-fast) var(--qfd-ease);
+  box-sizing: border-box;
+}
+.qfd-chip:hover { background: var(--qfd-ivory); }
+.qfd-chip[aria-pressed="true"], .qfd-chip--on {
+  background: var(--qfd-orange);
+  border-color: var(--qfd-orange);
+  color: #fff;
+  box-shadow: 0 10px 20px -12px rgba(201, 58, 14, 0.75);
+}
+
+/* --- Pills (status) ------------------------------------------------------- */
+.qfd-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--qfd-r-pill);
+  font-size: 0.71875rem;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.qfd-pill--green {
+  color: var(--qfd-green-text);
+  background: rgba(40, 110, 80, 0.1);
+  border-color: rgba(40, 110, 80, 0.26);
+}
+.qfd-pill--amber {
+  color: #8a5e10;
+  background: rgba(255, 177, 61, 0.16);
+  border-color: rgba(255, 177, 61, 0.44);
+}
+.qfd-pill--orange {
+  color: var(--qfd-orange-text);
+  background: rgba(201, 58, 14, 0.09);
+  border-color: rgba(201, 58, 14, 0.26);
+}
+.qfd-pill--slate {
+  color: var(--qfd-muted);
+  background: rgba(94, 89, 80, 0.09);
+  border-color: rgba(94, 89, 80, 0.22);
+}
+/* A tinted pill vanishes on a photo. These are solid. */
+.qfd-pill--onphoto {
+  background: rgba(12, 16, 22, 0.66);
+  border-color: rgba(255, 255, 255, 0.26);
+  color: #fff;
+  backdrop-filter: blur(5px);
+}
+.qfd-pill--cover {
+  background: var(--qfd-amber);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #3a2708;
+}
+
+/* --- Cards ---------------------------------------------------------------- */
+.qfd-card {
+  position: relative;
+  box-sizing: border-box;
+  background: var(--qfd-grad-card);
+  border: 1px solid var(--qfd-line);
+  border-radius: var(--qfd-r-xl);
+  padding: clamp(1rem, 0.6rem + 1.4vw, 1.5rem);
+  box-shadow: var(--qfd-shadow-card);
+  overflow: hidden;
+}
+.qfd-card--flat { box-shadow: none; }
+.qfd-card--dark {
+  background: var(--qfd-grad-dark);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--qfd-on-dark);
+}
+.qfd-card--tight { padding: clamp(0.75rem, 0.5rem + 1vw, 1.125rem); }
+
+/* Icon tile */
+.qfd-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--qfd-r-md);
+  background: var(--qfd-tint-orange);
+  color: var(--qfd-orange-text);
+  flex-shrink: 0;
+}
+.qfd-tile--lg { width: 52px; height: 52px; border-radius: var(--qfd-r-lg); }
+.qfd-tile--on-dark {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  color: var(--qfd-amber);
+}
+
+/* --- Form fields ---------------------------------------------------------- */
+.qfd-field { display: block; }
+.qfd-input, .qfd-textarea, .qfd-select {
+  width: 100%;
+  min-height: var(--qfd-tap);
+  box-sizing: border-box;
+  padding: 0 14px;
+  border: 1.5px solid var(--qfd-line-input);
+  border-radius: var(--qfd-r-md);
+  background: var(--qfd-card);
+  font-family: var(--qfd-font-body);
+  font-size: 1rem; /* 16px — anything smaller makes iOS Safari zoom on focus */
+  font-weight: 500;
+  color: var(--qfd-ink);
+  outline: none;
+}
+.qfd-textarea { padding: 13px 14px; line-height: 1.5; resize: vertical; min-height: 88px; }
+.qfd-input::placeholder, .qfd-textarea::placeholder {
+  color: var(--qfd-faint);
+  opacity: 1; /* Firefox dims placeholders by default, which drops contrast */
+}
+.qfd-input[aria-invalid="true"], .qfd-textarea[aria-invalid="true"] {
+  border-color: var(--qfd-orange);
+  box-shadow: 0 0 0 3px rgba(201, 58, 14, 0.12);
+}
+
+.qfd-input-group {
+  display: flex;
+  align-items: center;
+  min-height: var(--qfd-tap);
+  border: 1.5px solid var(--qfd-line-input);
+  border-radius: var(--qfd-r-md);
+  background: var(--qfd-card);
+  overflow: hidden;
+}
+.qfd-input-group .qfd-input { border: 0; border-radius: 0; }
+.qfd-input-prefix {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  padding: 0 12px 0 14px;
+  border-right: 1px solid var(--qfd-line);
+  font-weight: 700;
+  color: var(--qfd-muted);
+  flex-shrink: 0;
+}
+
+.qfd-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+  font-size: 0.78125rem;
+  font-weight: 600;
+  color: var(--qfd-orange-text);
+}
+.qfd-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+  font-size: 0.75rem;
+  color: var(--qfd-faint);
+}
+
+/* Checkbox. The visible box is 20px but the hit area is the whole row, and
+   the row is never shorter than 44px. */
+.qfd-check-row {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  min-height: var(--qfd-tap);
+  padding: 13px 14px;
+  border-radius: var(--qfd-r-md);
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid var(--qfd-line);
+  cursor: pointer;
+}
+.qfd-check {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  margin: 0;
+}
+.qfd-check-box {
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: var(--qfd-r-xs);
+  border: 1.5px solid var(--qfd-line-input);
+  background: var(--qfd-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: transparent;
+}
+.qfd-check:checked + .qfd-check-box {
+  background: var(--qfd-orange);
+  border-color: var(--qfd-orange);
+  color: #fff;
+}
+.qfd-check-row[data-invalid="true"] { border-color: var(--qfd-orange); }
+
+/* --- Utility -------------------------------------------------------------- */
+.qfd-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.qfd-stack { display: flex; flex-direction: column; gap: var(--qfd-gap); }
+.qfd-row { display: flex; align-items: center; gap: var(--qfd-gap); flex-wrap: wrap; }
+.qfd-grid { display: grid; gap: var(--qfd-gap); }
+.qfd-divider { height: 1px; background: var(--qfd-line); border: 0; margin: 0; }
+.qfd-section--dark .qfd-divider { background: rgba(255, 255, 255, 0.1); }

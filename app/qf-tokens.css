@@ -1,0 +1,144 @@
+/* ============================================================================
+   QuickFurno — design tokens (single source of truth)
+
+   This is the design system from the approved canvases, expressed as CSS
+   variables. It is the FIFTH token layer in this codebase and it exists to
+   replace the other four, not to sit beside them:
+
+     app/globals.css        --color-*        gold + teal      (legacy)
+     app/qf-public-v2.css   --qf-brand-*     green + slate    (legacy)
+     app/qf-redesign.css    --qf-*           copper + charcoal(legacy)
+     app/home-pune-launch.css --qfp-*        page-local       (migrating)
+
+   Namespace is --qfd-* so nothing here collides with any of them. A page is
+   "migrated" when its stylesheet references only --qfd-* colours; until then
+   the legacy layers keep it rendering exactly as it does today.
+
+   EVERY COLOUR BELOW IS MEASURED, NOT CHOSEN BY EYE. The ratio in each comment
+   is the WORST case across every surface this palette actually puts it on:
+   cream #FFFDFA, ivory #F7F4EE, warm card #F1E8D6, orange tint #FBEEE7,
+   green tint #EAF5EE and white. Do not edit a value without re-running the
+   check — a colour that passes on ivory can still fail on a warm card, which
+   is exactly how the first pass at this shipped a failing orange.
+
+   WCAG 2.1 AA: 4.5:1 normal text, 3:1 large text (>=24px, or >=18.7px bold)
+   and non-text UI boundaries.
+   ========================================================================= */
+
+:root {
+  /* --- Text ------------------------------------------------------------ */
+  --qfd-ink: #14181d;          /* primary text          worst 14.64:1  AAA  */
+  --qfd-muted: #5e5950;        /* secondary text        worst  5.71:1  AA   */
+  --qfd-faint: #655f54;        /* labels, captions      worst  5.20:1  AA   */
+  --qfd-orange-text: #a82f0a;  /* orange TEXT only      worst  5.61:1  AA   */
+  --qfd-green-text: #286e50;   /* green TEXT only       worst  5.02:1  AA   */
+
+  /* On dark surfaces */
+  --qfd-on-dark: #ffffff;                       /* on --qfd-night 18.2:1   */
+  --qfd-on-dark-muted: rgba(255, 255, 255, 0.68);
+  --qfd-on-dark-faint: rgba(255, 255, 255, 0.46); /* decorative only       */
+
+  /* --- Fills ----------------------------------------------------------- */
+  /* Orange splits in two on purpose. The fill is the lighter one because
+     white sits ON it; the text one is darker because it sits on cream.
+     One value cannot do both jobs and pass. */
+  --qfd-orange: #c93a0e;       /* button/badge fill  white on it 5.13:1 AA  */
+  --qfd-orange-hover: #a82f0a; /* pressed / hover    white on it 6.83:1     */
+  --qfd-green: #286e50;        /* success fill       white on it 6.11:1 AA  */
+  --qfd-night: #12161b;        /* dark sections                            */
+  --qfd-ink-2: #1b2027;        /* dark panels, raised                      */
+
+  /* Amber is a DARK-SURFACE accent. On cream it is 1.78:1 — never text
+     there, never a boundary there. On --qfd-night it is 10.04:1. */
+  --qfd-amber: #ffb13d;
+
+  /* --- Surfaces -------------------------------------------------------- */
+  --qfd-cream: #fffdfa;
+  --qfd-ivory: #f7f4ee;
+  --qfd-card: #ffffff;
+  --qfd-card-warm: #f1e8d6;
+  --qfd-tint-orange: #fbeee7;
+  --qfd-tint-green: #eaf5ee;
+
+  /* --- Lines ----------------------------------------------------------- */
+  /* Two kinds, and the difference is legal not cosmetic. Decorative rules
+     between sections are exempt from 1.4.11. A border that tells someone
+     where an input begins is not — it needs 3:1. */
+  --qfd-line: #efe2d5;         /* dividers, card edges     decorative       */
+  --qfd-line-2: #e2d8c6;       /* stronger divider         decorative       */
+  --qfd-line-input: #8f8168;   /* form borders, focus ring   3.76:1  AA     */
+
+  /* --- Gradients -------------------------------------------------------
+     House rule: no flat light section anywhere. Every pale band carries a
+     warm gradient; large bands also get a radial glow (see .qfd-glow-*). */
+  --qfd-grad-page: linear-gradient(126deg, #fffdfa 0%, #faf4eb 46%, #f6ede0 100%);
+  --qfd-grad-section: linear-gradient(118deg, #fffdfa 0%, #f9f3ea 54%, #f6eee2 100%);
+  --qfd-grad-card: linear-gradient(150deg, #ffffff 0%, #fffcf7 58%, #fdf6ee 100%);
+  --qfd-grad-header: linear-gradient(100deg, #ffffff 0%, #fffcf7 58%, #fff8f0 100%);
+  --qfd-grad-band: linear-gradient(160deg, #fffdfa 0%, #fcf7ef 58%, #f9f1e6 100%);
+  --qfd-grad-cta: linear-gradient(118deg, #fffdfa 0%, #faf4eb 46%, #f6ede0 100%);
+  --qfd-grad-dark: linear-gradient(150deg, #12161b 0%, #171c23 60%, #12161b 100%);
+
+  /* Radial glows, as background-image on a ::before or a bare div */
+  --qfd-glow-clay: radial-gradient(closest-side, rgba(201, 58, 14, 0.11), rgba(201, 58, 14, 0) 72%);
+  --qfd-glow-amber: radial-gradient(closest-side, rgba(255, 177, 61, 0.14), rgba(255, 177, 61, 0) 72%);
+  --qfd-glow-clay-dark: radial-gradient(closest-side, rgba(201, 58, 14, 0.34), rgba(201, 58, 14, 0) 72%);
+
+  /* --- Type ------------------------------------------------------------
+     Poppins and Plus Jakarta Sans are already loaded by app/layout.tsx.
+     The canvases use JetBrains Mono for kickers; a system mono stack is
+     used instead so the build keeps its no-Google-Fonts-fetch property. */
+  --qfd-font-head: var(--font-manrope), "Poppins", ui-sans-serif, system-ui, sans-serif;
+  --qfd-font-body: var(--font-jakarta), "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --qfd-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Display sizes clamp between the 390 and 1440 canvases */
+  --qfd-t-hero: clamp(2rem, 1.2rem + 3.4vw, 3.5rem);
+  --qfd-t-h1: clamp(1.75rem, 1.2rem + 2.3vw, 2.75rem);
+  --qfd-t-h2: clamp(1.375rem, 1.05rem + 1.4vw, 2rem);
+  --qfd-t-h3: clamp(1.125rem, 0.98rem + 0.6vw, 1.375rem);
+  --qfd-t-body: clamp(0.9375rem, 0.9rem + 0.15vw, 1rem);
+  --qfd-t-small: 0.875rem;
+  --qfd-t-kicker: 0.6875rem;
+
+  --qfd-lead-tight: 1.1;
+  --qfd-lead-head: 1.18;
+  --qfd-lead-body: 1.55;
+  --qfd-track-head: -0.035em;
+  --qfd-track-kicker: 0.16em;
+
+  /* --- Geometry -------------------------------------------------------- */
+  --qfd-r-xs: 8px;
+  --qfd-r-sm: 11px;
+  --qfd-r-md: 13px;
+  --qfd-r-lg: 18px;
+  --qfd-r-xl: 22px;
+  --qfd-r-2xl: 26px;
+  --qfd-r-pill: 999px;
+
+  --qfd-gutter: clamp(1rem, 0.3rem + 3vw, 7.5rem); /* 16px phone, 120px desk */
+  --qfd-max: 1200px;
+  --qfd-gap: clamp(0.75rem, 0.5rem + 1vw, 1.5rem);
+  --qfd-section-y: clamp(2.5rem, 1.5rem + 4vw, 4.5rem);
+
+  /* WCAG 2.5.5. Anything a finger presses is at least this. */
+  --qfd-tap: 44px;
+
+  /* --- Shadow ---------------------------------------------------------- */
+  --qfd-shadow-card: 0 20px 40px -28px rgba(20, 24, 29, 0.3);
+  --qfd-shadow-raise: 0 24px 48px -28px rgba(20, 24, 29, 0.38);
+  --qfd-shadow-modal: 0 60px 120px -40px rgba(12, 16, 22, 0.62);
+  --qfd-shadow-orange: 0 14px 28px -14px rgba(201, 58, 14, 0.7);
+
+  /* --- Motion ---------------------------------------------------------- */
+  --qfd-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --qfd-fast: 140ms;
+  --qfd-slow: 260ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --qfd-fast: 0ms;
+    --qfd-slow: 0ms;
+  }
+}

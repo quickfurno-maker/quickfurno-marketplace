@@ -22,12 +22,12 @@ function logSegmentRouteFailure(scope: string, e: unknown) {
 }
 
 // Admin-only segment definition editor + dynamic preview.
-export default async function VendorSegmentEditorPage({ params }: { params: { segmentId: string } }) {
+export default async function VendorSegmentEditorPage({ params }: { params: Promise<{ segmentId: string }> }) {
   const session = await getAdminSession();
   if (!session.isLoggedIn) redirect("/admin/login");
   if (!session.isSuperadmin) redirect("/admin/login?error=unauthorized");
 
-  const segmentId = params.segmentId;
+  const segmentId = (await params).segmentId;
   const isNew = segmentId === "new";
   if (!isNew && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segmentId)) {
     notFound();

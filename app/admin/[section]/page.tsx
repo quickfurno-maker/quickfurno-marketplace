@@ -84,14 +84,17 @@ async function loadSectionPayload(section: AdminSectionKey, searchParams: Search
   }
 }
 
-export default async function AdminDynamicSectionPage({
-  params,
-  searchParams,
-}: {
-  params: { section: string };
-  searchParams: SearchParams;
+// Next 15 made params and searchParams asynchronous. They are awaited here and
+// rebound to the same names the body already uses, so every param(searchParams,
+// …) call below is unchanged — and loadSectionPayload's own SearchParams
+// argument, which is a plain object, stays as it was.
+export default async function AdminDynamicSectionPage(props: {
+  params: Promise<{ section: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
-  const section = getAdminSectionBySlug(params.section);
+  const { section: sectionSlug } = await props.params;
+  const searchParams = await props.searchParams;
+  const section = getAdminSectionBySlug(sectionSlug);
   if (!section || section.key === "dashboard") redirect("/admin/dashboard");
 
   const session = await getAdminSession();

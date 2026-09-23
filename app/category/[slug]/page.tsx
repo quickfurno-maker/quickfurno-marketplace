@@ -5,15 +5,18 @@ import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { StickyMobileCTA } from "@/components/StickyMobileCTA";
-import { categoryArtwork } from "@/components/public-listing/categoryArtwork";
-import { VendorDiscovery } from "@/components/public-listing/VendorDiscovery";
+import { CategoryHero } from "@/components/category/CategoryHero";
+import { CategoryListing } from "@/components/category/CategoryListing";
+import { IconArrow, IconCheck } from "@/components/category/icons";
 import { loadMarketplaceRuntimeSettings } from "@/lib/lead-assignment/runtimeSettings";
 import { getPublicVendorsForCategory } from "@/services/publicVendorService";
 import {
+  categories,
+  categorySlug,
   enquiryServiceForCategory,
   getCategoryBySlug,
 } from "@/lib/quickfurno-data";
-import "../vendor-listing-v2.css";
+import "../category-v3.css";
 
 type CategoryPageProps = { params: { slug: string } };
 
@@ -24,9 +27,8 @@ export function generateMetadata({ params }: CategoryPageProps): Metadata {
   const category = getCategoryBySlug(params.slug);
   if (!category) return { title: "Category not found | QuickFurno" };
 
-  // Same SEO intent and title shape as before. The old description promised
-  // "ratings" and "transparent rates" — QuickFurno has no review system and
-  // vendors are not required to publish rates, so both claims are removed.
+  // No "ratings" or "transparent rates" claims: there is no review system and
+  // vendors are not required to publish a rate.
   const title = `${category.name} in Pune | QuickFurno`;
   const description = `Find verified ${category.name.toLowerCase()} in Pune on QuickFurno. Browse vendor profiles or send one free enquiry and get matched with up to 3 relevant vendors.`;
 
@@ -45,133 +47,128 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   const enquiryService = enquiryServiceForCategory(category.name);
 
   // `null` = the vendors table could not be read. `[]` = read succeeded and no
-  // vendor is publicly visible in this category.
-  //
-  // QF-UI-V2-06: these two are now told apart. Previously both collapsed into
-  // `publicVendors ?? undefined`, which made <VendorCards /> fall back to the
-  // STATIC DEMO CATALOG — so a database outage silently published fictional
-  // vendors with invented ratings, distances and prices as if they were live
-  // verified businesses. A read failure now shows an honest unavailable state.
+  // vendor is publicly visible in this category. These stay distinct: a read
+  // failure must never render as "no vendors", and must never fall back to the
+  // static demo catalogue, which would publish fictional businesses as live
+  // verified ones.
   const publicVendors = await getPublicVendorsForCategory(category.name, settings);
   const listingUnavailable = publicVendors === null;
-  // QF-UI-V2-16: neutral SERVICE artwork for this category. Decorative only
-  // (aria-hidden, alt="") and never attached to a vendor, so it cannot read
-  // as any vendor's project. null when the category has no artwork.
-  const artwork = categoryArtwork(category.name);
+  const vendors = publicVendors ?? [];
+
+  // Areas that a LISTED vendor actually covers. The hero's area select is
+  // built from this rather than from every Pune locality, so choosing one
+  // always leads somewhere.
+  const areas = [...new Set(vendors.flatMap((v) => v.areas ?? []))].sort();
+
+  const otherTrades = categories.filter((c) => c.name !== category.name).slice(0, 7);
 
   return (
     <>
       <Header />
 
-      <main className="qf-category-page">
-        <section className="qf-cat-intro">
-          <div className="qf-pub-container qf-cat-intro-shell">
-            <div className="qf-cat-intro-copy">
-              <Link href="/#services" className="qf-cat-back">
-                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
-                  <path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Back to services
-              </Link>
+      <main className="qfc-page">
+        <CategoryHero
+          categoryName={category.name}
+          description={category.description}
+          enquiryService={enquiryService}
+          vendorCount={vendors.length}
+          areas={areas}
+        />
 
-              <h1 className="qf-cat-title">{category.name} in Pune</h1>
-              <p className="qf-cat-copy">{category.description}</p>
+        <section className="qfc-body" aria-label={`${category.name} in Pune`}>
+          <span className="qfd-glow qfd-glow--tr" aria-hidden="true" />
+          <span className="qfd-glow qfd-glow--amber qfd-glow--bl" aria-hidden="true" />
 
-              <ul className="qf-cat-truths">
-                <li>Verified public vendor profiles</li>
-                <li>Up to 3 matched vendors through one enquiry</li>
-                <li>Free for homeowners</li>
-              </ul>
-            </div>
-
-            {artwork ? (
-              <div className="qf-cat-art" aria-hidden="true">
-                {/* eslint-disable-next-line @next/next/no-img-element -- local decorative SVG, sized by its slot. */}
-                <img src={artwork} alt="" loading="lazy" />
-              </div>
-            ) : null}
-          </div>
-        </section>
-
-        <section className="qf-cat-listing" aria-label={`${category.name} vendors`}>
-          <div className="qf-pub-container qf-cat-layout">
-            <div className="qf-cat-results">
-              {/* No artwork in this state on purpose: the page header already
-                  carries this category's visual, and repeating it stacked two
-                  identical illustrations into one viewport on phones. */}
+          <div className="qfd-wrap qfc-layout">
+            <div>
               {listingUnavailable ? (
-                <div className="qf-vl-empty" role="status">
-                  <h2>Vendor listings are temporarily unavailable.</h2>
-                  <p>
-                    We could not load vendor profiles just now. You can still tell QuickFurno what you
-                    need and we will match you with up to 3 relevant verified vendors.
+                <div className="qfc-empty qfd-card" role="status">
+                  <h2 className="qfd-h2">Listings are temporarily unavailable</h2>
+                  <p className="qfd-lede">
+                    We could not load vendor profiles just now. You can still tell QuickFurno what
+                    you need and we will match you with up to 3 relevant verified vendors.
                   </p>
-                  <div className="qf-vl-empty-actions">
-                    <EnquiryModalTrigger
-                      className="qf-pub-btn qf-pub-btn--primary"
-                      modalTitle={`Get matched with verified ${category.name}`}
-                      serviceCategory={enquiryService}
-                      source={`Category listing unavailable: ${category.name}`}
-                    >
-                      Get Matched
-                    </EnquiryModalTrigger>
-                    <Link href="/#services" className="qf-pub-btn qf-pub-btn--secondary">
-                      Browse services
-                    </Link>
-                  </div>
+                  <EnquiryModalTrigger
+                    className="qfd-btn qfd-btn--primary qfd-btn--lg"
+                    modalTitle={`Get matched with verified ${category.name}`}
+                    serviceCategory={enquiryService}
+                    source={`Category listing unavailable: ${category.name}`}
+                  >
+                    Get matched free
+                  </EnquiryModalTrigger>
                 </div>
               ) : (
-                <VendorDiscovery
-                  vendors={publicVendors}
+                <CategoryListing
+                  vendors={vendors}
                   categoryName={category.name}
                   enquiryService={enquiryService}
                 />
               )}
             </div>
 
-            {/* The single assistance surface on this page. The old build had two
-                (a sticky rail card AND an inline banner injected between cards). */}
-            <aside className="qf-cat-assist" aria-label="QuickFurno assistance">
-              <div className="qf-cat-assist-card">
-                <span className="qf-pub-eyebrow">Not sure who to pick?</span>
-                <h2>Let QuickFurno match you</h2>
-                <p>
-                  Tell QuickFurno what you need and get matched with up to 3 relevant verified vendors.
+            <aside className="qfc-rail" aria-label="QuickFurno assistance">
+              <div className="qfd-card qfc-rail-card">
+                <h2 className="qfd-h3">Let QuickFurno match you</h2>
+                <p className="qfd-lede">
+                  Tell us what your home needs and we will line up at most 3 verified{" "}
+                  {category.name.toLowerCase()} near you.
                 </p>
                 <EnquiryModalTrigger
-                  className="qf-pub-btn qf-pub-btn--primary qf-pub-btn--block"
+                  className="qfd-btn qfd-btn--primary qfd-btn--block"
                   modalTitle={`Get matched with verified ${category.name}`}
                   serviceCategory={enquiryService}
-                  source={`Category assistance: ${category.name}`}
+                  source={`Category rail: ${category.name}`}
                 >
-                  Get Matched
+                  Get matched free
+                  <IconArrow size={17} width={2.5} />
                 </EnquiryModalTrigger>
-                <ul>
-                  <li>Free for homeowners</li>
-                  <li>Up to 3 relevant vendors</li>
-                  <li>Your details stay private</li>
+                <ul className="qfc-rail-list">
+                  <li><IconCheck size={14} width={3} /> At most 3 relevant businesses</li>
+                  <li><IconCheck size={14} width={3} /> Checked before anyone is matched</li>
+                  <li><IconCheck size={14} width={3} /> Shared only with those 3</li>
+                  <li><IconCheck size={14} width={3} /> Free, with no obligation</li>
                 </ul>
+              </div>
+
+              <div className="qfd-card qfc-rail-card">
+                <h2 className="qfd-h3">Other trades in Pune</h2>
+                <p className="qfd-lede">
+                  Only need one part of the job? The same matching rules apply on every one of these.
+                </p>
+                <nav className="qfc-trades" aria-label="Other service categories">
+                  {otherTrades.map((trade) => (
+                    <Link key={trade.name} href={`/category/${categorySlug(trade.name)}`} className="qfc-trade">
+                      <span>
+                        <span className="qfc-trade-name">{trade.name}</span>
+                        <span className="qfc-trade-note">{trade.description}</span>
+                      </span>
+                      <span className="qfc-trade-go" aria-hidden="true"><IconArrow size={16} width={2.4} /></span>
+                    </Link>
+                  ))}
+                </nav>
               </div>
             </aside>
           </div>
         </section>
 
-        <section className="qf-final-cta">
-          <div className="qf-pub-container">
-            <span className="qf-pub-eyebrow">Ready to start?</span>
-            <h2>Get matched with verified {category.name.toLowerCase()}.</h2>
-            <p>One free enquiry, up to 3 relevant vendors in Pune.</p>
-            <div className="qf-final-cta-actions">
+        <section className="qfd-section qfd-section--cta qfc-cta">
+          <span className="qfd-glow qfd-glow--tr" aria-hidden="true" />
+          <div className="qfd-wrap">
+            <p className="qfd-kicker">Ready to start?</p>
+            <h2 className="qfd-h1">Get matched with verified {category.name.toLowerCase()}.</h2>
+            <p className="qfd-lede">One free enquiry, up to 3 relevant businesses in Pune.</p>
+            <div className="qfc-cta-actions">
               <EnquiryModalTrigger
-                className="qf-pub-btn qf-pub-btn--primary"
+                className="qfd-btn qfd-btn--primary qfd-btn--lg"
                 modalTitle={`Get matched with verified ${category.name}`}
                 serviceCategory={enquiryService}
                 source={`Category final CTA: ${category.name}`}
               >
-                Get Matched
+                Get matched free
+                <IconArrow size={17} width={2.5} />
               </EnquiryModalTrigger>
-              <Link href="/#services" className="qf-pub-btn qf-pub-btn--secondary">
-                Browse services
+              <Link href="/#services" className="qfd-btn qfd-btn--ghost qfd-btn--lg">
+                Browse all services
               </Link>
             </div>
           </div>

@@ -669,7 +669,7 @@ function TrustAndSafety() {
         </div>
         <div className="qfp-trust-visual" data-reveal>
           <div className="qfp-trust-photo">
-            <Image src={`${LAUNCH_IMG}/team-pune.jpg`} alt="" fill sizes="(max-width: 760px) 100vw, 564px" />
+            <Image src="/assets/quickfurno/images/vendors/premium-living-room.svg" alt="" fill sizes="(max-width: 760px) 100vw, 564px" />
             <span className="qfp-trust-pill-label">PUNE LAUNCH</span>
           </div>
           {testimonial ? (

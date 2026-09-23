@@ -5,11 +5,12 @@ import { AdminLoginForm } from "@/components/AdminLoginForm";
 export const metadata = { title: "Superadmin Login - QuickFurno" };
 export const dynamic = "force-dynamic";
 
-export default async function AdminLoginPage({
-  searchParams,
-}: {
-  searchParams?: { error?: string };
+export default async function AdminLoginPage(props: {
+  searchParams?: Promise<{ error?: string }>;
 }) {
+  // Next 16: searchParams is a Promise. Read synchronously it type-checks,
+  // builds clean, then returns undefined at runtime.
+  const searchParams = await props.searchParams;
   const session = await getAdminSession();
 
   if (session.isSuperadmin) redirect("/admin/dashboard");

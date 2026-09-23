@@ -56,11 +56,12 @@ export const metadata: Metadata = {
     "Log in to your QuickFurno vendor dashboard or create a vendor account to submit your business profile for review and manage matched home-service enquiries when eligible.",
 };
 
-export default function VendorPortalPage({
-  searchParams,
-}: {
-  searchParams?: { mode?: string };
+export default async function VendorPortalPage(props: {
+  searchParams?: Promise<{ mode?: string }>;
 }) {
+  // Next 16: searchParams is a Promise. Read synchronously it type-checks,
+  // builds clean, then returns undefined at runtime.
+  const searchParams = await props.searchParams;
   const initialMode = searchParams?.mode === "signup" ? "signup" : "login";
 
   return (

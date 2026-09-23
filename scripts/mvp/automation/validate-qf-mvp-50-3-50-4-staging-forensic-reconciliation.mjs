@@ -51,7 +51,7 @@ const UNKNOWN_PROVENANCE = "UNKNOWN";
 // renamed, deleted or reordered. Still exact equality.
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority. Still exact equality.
-const MIGRATION_COUNT = 119;
+const MIGRATION_COUNT = 118;
 const PRODUCTION_ACTIVATION_FILENAME =
   "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql";
 // QF-MVP-82A-R0: the newest SOURCE-PENDING migration — Realtime publication
@@ -172,7 +172,7 @@ function validateState(state) {
     ? manifest.reconciledPostAnchorMigrations
     : null;
 
-  check("migration count is exactly 119", state.migrationFiles.length === MIGRATION_COUNT);
+  check("migration count is exactly 118", state.migrationFiles.length === MIGRATION_COUNT);
   // QF-MVP-50.6 RE-PIN: the tail grows from twelve to thirteen, adding ONLY the
   // source-only orphan cancellation authority. Still an EXACT ordered comparison.
   // QF-MVP-40.14 RE-PIN: the tail grows from sixteen to seventeen, adding ONLY the
@@ -197,7 +197,6 @@ function validateState(state) {
         "20260918120000_whatsapp_conversational_jarvis_foundation.sql",
         "20260918180500_jarvis_whatsapp_callback_replay_receipts.sql",
         "20260919010000_vendor_review_system.sql",
-        "20260921100000_qf_lead_drafts.sql",
         "20260922120000_false_ceiling_category.sql"]));
   check("all four accepted source hashes are exact",
     FORENSIC_MIGRATIONS.every((migration) => state.sourceHashes[migration.version] === migration.sha));
@@ -213,8 +212,8 @@ function validateState(state) {
   // QF-MVP-82A-R0-S1: R0 was applied to STAGING and moved to the staging-applied
   // set, so PENDING is the 80.14A production activation authority alone again.
   // QF-MVP-50.6 RE-PIN: 1 -> 2 pending, both source-only.
-  check("the manifest pending set holds exactly ten pinned source-only authorities, seven are staging-applied, and the five governed authorities are reconciled as APPLIED",
-    pending !== null && pending.length === 10 &&
+  check("the manifest pending set holds exactly nine pinned source-only authorities, seven are staging-applied, and the five governed authorities are reconciled as APPLIED",
+    pending !== null && pending.length === 9 &&
     pending[0].version === "20260903040000" && pending[0].operationalStatus === "PENDING" &&
     pending[1].version === "20260905000000" && pending[1].operationalStatus === "PENDING" &&
     pending[2].version === "20260906000000" &&
@@ -223,8 +222,7 @@ function validateState(state) {
     pending[5].version === "20260912040000" &&
     pending[6].version === "20260912050000" &&
     pending[7].version === "20260915120000" && pending[7].operationalStatus === "PENDING" &&
-    pending[8].version === "20260921100000" && pending[8].operationalStatus === "PENDING" &&
-    pending[9].version === "20260922120000" && pending[9].operationalStatus === "PENDING" &&
+    pending[8].version === "20260922120000" && pending[8].operationalStatus === "PENDING" &&
     Array.isArray(state.manifest.stagingAppliedPostAnchorMigrations) &&
     state.manifest.stagingAppliedPostAnchorMigrations.length === 7 &&
     state.manifest.stagingAppliedPostAnchorMigrations[0].appliedToProduction === false &&
@@ -274,8 +272,8 @@ function validateState(state) {
   check("no forensic applied record was demoted into the pending set",
     pending !== null &&
     EXPECTED_APPLIED.every(([version]) => !pending.some((r) => r.version === version)));
-  check("the anchor post-anchor count equals ten applied, five reconciled, seven staging-applied and ten pending authorities",
-    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 5 + 7 + 10);
+  check("the anchor post-anchor count equals ten applied, five reconciled, seven staging-applied and nine pending authorities",
+    manifest.appliedAnchor?.postAnchorMigrationCount === EXPECTED_APPLIED.length + 5 + 7 + 9);
 
   for (const expected of FORENSIC_MIGRATIONS) {
     const pin = applied.find((record) => record.version === expected.version);

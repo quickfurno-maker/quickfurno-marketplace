@@ -87,7 +87,7 @@ export function Footer() {
             <span className="qf-foot-logo-f">Furno</span>
           </Link>
           <p className="qf-foot-tagline">
-            QuickFurno connects homeowners with verified interior, carpentry, modular, painting,
+            QuickFurno helps homeowners discover approved, active interior, carpentry, modular, painting,
             sofa, civil-work and false ceiling vendors in Pune.
           </p>
         </div>
@@ -127,7 +127,7 @@ export function Footer() {
 
       <div className="qf-foot-bottom">
         <span>© 2026 QuickFurno · Pune</span>
-        <span>Verified vendors · Up to 3 matches · Free for homeowners</span>
+        <span>Approved active vendors · Up to 3 active matches · Free to enquire</span>
       </div>
     </footer>
   );

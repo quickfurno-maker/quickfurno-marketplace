@@ -394,3 +394,23 @@
   gap: 10px;
   margin-top: 1.25rem;
 }
+
+/* --- Hero artwork ---------------------------------------------------------
+   Generic per-trade illustration, decorative only. It sits behind the copy on
+   desktop and is hidden on phones, where it would either crowd the match bar
+   or sit behind the title and hurt its contrast. */
+.qfc-hero-art {
+  position: absolute;
+  right: clamp(-2rem, -1rem + 2vw, 2rem);
+  top: 50%;
+  transform: translateY(-50%);
+  width: min(30vw, 340px);
+  pointer-events: none;
+  opacity: 0.34;
+  z-index: 0;
+  display: none;
+}
+.qfc-hero-art img { width: 100%; height: auto; display: block; }
+@media (min-width: 1100px) {
+  .qfc-hero-art { display: block; }
+}

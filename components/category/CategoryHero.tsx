@@ -34,10 +34,24 @@ export type CategoryHeroProps = {
   vendorCount: number;
   /** Localities that at least one listed vendor actually covers. */
   areas: string[];
+  /**
+   * The page's <h1>, passed in rather than rendered here. The route owns its
+   * heading: it is the page's one h1, and the launch guard in
+   * scripts/mvp/suites/marketplace.mjs counts h1s by reading page.tsx, so a
+   * heading hidden inside this component reads as zero even when the rendered
+   * page is correct.
+   */
+  heading: React.ReactNode;
+  /**
+   * Decorative category artwork, rendered by the route for the same reason as
+   * the heading. Never a vendor's work — see components/public-listing/
+   * categoryArtwork.
+   */
+  artwork?: React.ReactNode;
 };
 
 export function CategoryHero({
-  categoryName, description, enquiryService, vendorCount, areas,
+  categoryName, description, enquiryService, vendorCount, areas, heading, artwork,
 }: CategoryHeroProps) {
   const [area, setArea] = useState("");
 
@@ -53,6 +67,8 @@ export function CategoryHero({
       <span className="qfd-glow qfd-glow--on-dark qfd-glow--tr" aria-hidden="true" />
       <span className="qfd-glow qfd-glow--amber qfd-glow--bl" aria-hidden="true" />
 
+      {artwork}
+
       <div className="qfd-wrap">
         <nav className="qfc-crumb" aria-label="Breadcrumb">
           <Link href="/">Home</Link>
@@ -62,7 +78,7 @@ export function CategoryHero({
           <span aria-current="page">{categoryName}</span>
         </nav>
 
-        <h1 className="qfd-hero qfc-title">{categoryName} in Pune</h1>
+        {heading}
 
         <p className="qfc-sub">
           {description}

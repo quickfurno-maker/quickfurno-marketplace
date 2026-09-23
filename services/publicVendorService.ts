@@ -435,7 +435,15 @@ function extractVendorServiceValues(row: VendorRow): string[] {
     ...coerceServiceValues(row.services),
     ...coerceServiceValues(row.selected_subcategories),
   ];
-  for (const key of ["business_type", "category", "subcategory", "selected_category"]) {
+  // `business_type` is NOT in this list, and must not be added back. It
+  // describes the vendor's PREMISES — "Factory", "Showroom",
+  // "Home-based / On-site" — not the trade they practise. Feeding it to a
+  // matcher that compares substrings bidirectionally made every vendor whose
+  // business_type is "Factory" match the "Modular Factory" category, because
+  // that category lists "Factory Finish" as an alias and
+  // "factory finish".includes("factory") is true. Two interior designers were
+  // being listed on /category/modular-factory as verified modular factories.
+  for (const key of ["category", "subcategory", "selected_category"]) {
     const single = asText(row[key]);
     if (single) values.push(single);
   }

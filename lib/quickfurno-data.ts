@@ -58,6 +58,22 @@ export type Vendor = {
   serviceAreaSummary?: string | null;
   /** Real vendor-uploaded portfolio image URLs (Supabase only; may be []). */
   portfolioImages?: string[];
+
+  // --- Operating facts the vendor entered at signup (Supabase only) --------
+  // These live in the vendors table and were never mapped to the public shape,
+  // so the listing card had nothing to show beyond a name and a price. They
+  // are all optional: a vendor who left one blank simply does not get that
+  // line, and no placeholder is invented for them.
+  /** Canonical localities from areas_covered, de-duplicated. May be []. */
+  areas?: string[];
+  /** "Factory" | "Showroom" | "Home-based / On-site" | "Studio" | vendor text. */
+  businessType?: string | null;
+  /** Head-count band as the vendor picked it, e.g. "1–5", "6–10". */
+  teamSize?: string | null;
+  /** How far they travel, in km. null when they never set it. */
+  serviceRadiusKm?: number | null;
+  /** Projects a month they can take, e.g. "1–5 projects". */
+  monthlyCapacity?: string | null;
 };
 
 export type VendorServiceChip = {

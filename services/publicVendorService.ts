@@ -35,6 +35,7 @@ import {
 import { getVendorPublicVisibility } from "@/lib/vendors/vendorVisibility";
 import { normalizeStatus } from "@/lib/vendors/vendorEligibility";
 import { type QuickFurnoCategory, type Vendor } from "@/lib/quickfurno-data";
+import { normalizeLocalities } from "@/lib/locality";
 import { LAUNCH_CITY, normalizeLaunchCity } from "@/lib/locations/launchCityPolicy";
 import {
   getApprovedReviewsForVendor,
@@ -342,6 +343,15 @@ function mapToPublicVendor(
     source: "supabase",
     serviceCategories,
     portfolioImages: realPortfolioImages(row),
+    // Operating facts the vendor entered themselves. Previously dropped here,
+    // which is why the listing card could only show a name and a price while
+    // the data sat in the row. Localities are normalised because the same area
+    // arrives spelled three ways ("Kharadi" / "kharadi" / "khardi").
+    areas: normalizeLocalities(row.areas_covered),
+    businessType: asText(row.business_type) ?? null,
+    teamSize: asText(row.team_size) ?? null,
+    serviceRadiusKm: typeof row.service_radius_km === "number" ? row.service_radius_km : null,
+    monthlyCapacity: asText(row.monthly_capacity) ?? null,
   };
 }
 

@@ -19,10 +19,10 @@
 
 :root {
   /* Ink */
-  --qf-brand-ink: #0f172a;
-  --qf-brand-ink-2: #334155;
-  --qf-brand-muted: #4d5768;
-  --qf-brand-faint: #5e6673;
+  --qf-brand-ink: var(--qfd-ink);
+  --qf-brand-ink-2: var(--qfd-ink-2);
+  --qf-brand-muted: var(--qfd-muted);
+  --qf-brand-faint: var(--qfd-faint);
 
   /* Primary action — the same blue the approved vendor portal uses */
   --qf-brand-blue: var(--qfd-green-text);
@@ -35,11 +35,11 @@
   --qf-brand-orange-deep: var(--qfd-orange-text);
 
   /* Surfaces */
-  --qf-brand-bg: #f6f8fb;
-  --qf-brand-surface: #ffffff;
-  --qf-brand-inset: #f8fafc;
-  --qf-brand-line: #e5e9f0;
-  --qf-brand-line-soft: #eef1f6;
+  --qf-brand-bg: var(--qfd-ivory);
+  --qf-brand-surface: var(--qfd-card);
+  --qf-brand-inset: var(--qfd-cream);
+  --qf-brand-line: var(--qfd-line);
+  --qf-brand-line-soft: #f3ece2;
 
   /* Semantics */
   --qf-brand-success: #0f7a51;

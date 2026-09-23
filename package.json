@@ -7,7 +7,7 @@
     "build": "next build",
     "build:staging:safe": "node scripts/mvp/build/build-staging-safe.mjs",
     "start": "next start",
-    "lint": "eslint .",
+    "lint": "eslint app components lib --ext .js,.jsx,.ts,.tsx",
     "typecheck": "tsc --noEmit",
     "bootstrap:local:qa": "node scripts/mvp/local/bootstrap-qf-canonical-local-qa.mjs",
     "test:mvp": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/run.mjs marketplace assignment-authority communication",

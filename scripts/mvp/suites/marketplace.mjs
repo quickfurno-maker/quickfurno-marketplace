@@ -778,11 +778,11 @@ export const suite = {
         assertTrue(src.includes('sanitizePhone('), 'phone input is sanitized to digits');
         assertFalse(src.includes('replace(/\\D/g, "").length < 10'),
           'the old length-only rule (which accepted 11+ digits) must not return');
-        assertTrue(src.includes('Please accept sharing your details with up to 3 verified vendors to continue.'),
-          'consent gate message unchanged');
+        assertTrue(src.includes('Please accept sharing your details with up to 3 eligible vendors to continue.'),
+          'consent gate uses governed eligible-vendor terminology');
         // The governed consent paragraph is preserved verbatim.
-        assertTrue(src.includes('up to 3 verified vendors initially'), 'consent: initial cap');
-        assertTrue(src.includes('may manually connect me with additional verified vendors'),
+        assertTrue(src.includes('up to 3 eligible vendors initially'), 'consent: initial cap');
+        assertTrue(src.includes('may manually connect me with additional eligible vendors'),
           'consent: limited manual additional matching');
       },
     },
@@ -801,7 +801,7 @@ export const suite = {
           assertFalse(/vendors near you/i.test(body), file + ': no "vendors near you"');
           assertFalse(/nearby leads/i.test(body), file + ': no "nearby leads"');
           // Matching semantics mirror the consent checkbox.
-          assertTrue(body.includes('up to 3 verified vendors initially'),
+          assertTrue(body.includes('up to 3 eligible vendors initially'),
             file + ': states the initial cap');
           assertTrue(/manually connect/i.test(body),
             file + ': states the limited manual additional matching');
@@ -810,7 +810,7 @@ export const suite = {
           for (const cls of ['text-ivory', 'text-muted', 'text-gold']) {
             assertFalse(body.includes(cls), file + ': legacy class removed ' + cls);
           }
-          assertTrue(body.includes('Last updated: 4 September 2026'), file + ': last-updated refreshed');
+          assertTrue(body.includes('Last updated: 23 September 2026'), file + ': last-updated refreshed');
         }
         // Terms keeps the commercial model intact.
         const terms = readFileSync('app/terms/page.tsx', 'utf8').replace(/\s+/g, ' ');

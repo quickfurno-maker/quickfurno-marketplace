@@ -511,12 +511,12 @@ export const portfolioProjects = [
 
 export const whyChooseQuickFurno: { title: string; body: string }[] = [
   {
-    title: "Verified vendors only",
-    body: "Every listed vendor is checked for service category, location, response quality and profile completeness.",
+    title: "Approved vendor profiles",
+    body: "Public vendor profiles are shown only after QuickFurno review and approval, subject to marketplace eligibility.",
   },
   {
     title: "Maximum 3 quotes",
-    body: "We do not send your number to 20 vendors. You get a limited set of relevant verified vendors.",
+    body: "We do not send your number to 20 vendors. You get a limited set of relevant eligible vendors.",
   },
   {
     title: "Transparent rates",
@@ -562,15 +562,15 @@ export const clientTestimonials = [
 export const clientFaqs = [
   {
     question: "Is QuickFurno free for clients?",
-    answer: "Yes. Clients can submit requirements and get matched with verified vendors without paying QuickFurno.",
+    answer: "Yes. Clients can submit requirements and get matched with eligible vendors without paying QuickFurno.",
   },
   {
     question: "How many vendors will contact me?",
-    answer: "QuickFurno is designed to match you with up to 3 relevant verified vendors, so you can compare without getting spammed.",
+    answer: "QuickFurno is designed to match you with up to 3 relevant eligible vendors, so you can compare without getting spammed.",
   },
   {
-    question: "Are vendors verified?",
-    answer: "Vendors are reviewed for business details, category fit, project work and response quality before they are shown to clients.",
+    question: "How are vendor profiles reviewed?",
+    answer: "Vendor submissions are reviewed before approved profiles are shown to clients; marketplace eligibility still applies when matching.",
   },
   {
     question: "Can I compare per sq.ft rates?",

@@ -45,7 +45,7 @@ export async function generateMetadata({ params }: VendorPageProps): Promise<Met
   // Title intent, OG shape and URL are unchanged. Review claims are included
   // only when approved review evidence exists; pricing is mentioned only when
   // the vendor actually published a rate.
-  const title = `${vendor.businessName} | QuickFurno Verified Vendor`;
+  const title = `${vendor.businessName} | QuickFurno Approved Vendor`;
   const reviewPhrase = view.hasReviews
     ? `, ${view.reviewCount} approved client ${view.reviewCount === 1 ? "review" : "reviews"}`
     : "";

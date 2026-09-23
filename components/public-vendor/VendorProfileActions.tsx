@@ -110,7 +110,7 @@ export function VendorProfileActionCard({
       <ul className="qf-vprofile-actioncard-points">
         <li>Free for homeowners</li>
         <li>Your contact details are shared only through the enquiry process</li>
-        <li>QuickFurno may match up to 3 relevant verified vendors</li>
+        <li>QuickFurno may match up to 3 relevant eligible vendors</li>
       </ul>
     </div>
   );

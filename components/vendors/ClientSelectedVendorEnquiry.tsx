@@ -109,8 +109,8 @@ export function ClientSelectedVendorEnquiry({
           Send enquiry to this vendor
         </button>
         <p className="qf-cs-enquiry-hint">
-          You can connect with up to 3 verified vendors for this requirement. After you send this enquiry, you will have
-          1 hour to choose more vendors. If you do not, QuickFurno will connect you with suitable verified vendors
+          You can connect with up to 3 eligible vendors for this requirement. After you send this enquiry, you will have
+          1 hour to choose more vendors. If you do not, QuickFurno will connect you with suitable eligible vendors
           automatically.
         </p>
       </div>
@@ -190,9 +190,9 @@ export function ClientSelectedVendorEnquiry({
       <label className="qf-cs-enquiry-consent">
         <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
         <span>
-          I agree that QuickFurno may share my enquiry and contact details with up to 3 verified vendors for this
+          I agree that QuickFurno may share my enquiry and contact details with up to 3 eligible vendors for this
           requirement within 3 days. If I select a specific vendor, that vendor will be prioritised first, and QuickFurno
-          may fill remaining slots with suitable verified vendors.
+          may fill remaining slots with suitable eligible vendors.
         </span>
       </label>
       <button type="button" className={className} disabled={busy} onClick={submit}>
@@ -200,7 +200,7 @@ export function ClientSelectedVendorEnquiry({
       </button>
       <p className="qf-cs-enquiry-multi">
         You can create separate requests for other services like sofa, painting, or civil work, each with up to 3
-        verified vendors.
+        eligible vendors.
       </p>
     </div>
   );

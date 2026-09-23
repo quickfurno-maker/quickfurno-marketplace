@@ -104,12 +104,12 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
                   <h2>Vendor listings are temporarily unavailable.</h2>
                   <p>
                     We could not load vendor profiles just now. You can still tell QuickFurno what you
-                    need and we will match you with up to 3 relevant verified vendors.
+                    need and we will match you with up to 3 relevant eligible vendors.
                   </p>
                   <div className="qf-vl-empty-actions">
                     <EnquiryModalTrigger
                       className="qf-pub-btn qf-pub-btn--primary"
-                      modalTitle={`Get matched with verified ${category.name}`}
+                      modalTitle={`Get matched with eligible ${category.name}`}
                       serviceCategory={enquiryService}
                       source={`Category listing unavailable: ${category.name}`}
                     >
@@ -136,11 +136,11 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
                 <span className="qf-pub-eyebrow">Not sure who to pick?</span>
                 <h2>Let QuickFurno match you</h2>
                 <p>
-                  Tell QuickFurno what you need and get matched with up to 3 relevant verified vendors.
+                  Tell QuickFurno what you need and get matched with up to 3 relevant eligible vendors.
                 </p>
                 <EnquiryModalTrigger
                   className="qf-pub-btn qf-pub-btn--primary qf-pub-btn--block"
-                  modalTitle={`Get matched with verified ${category.name}`}
+                  modalTitle={`Get matched with eligible ${category.name}`}
                   serviceCategory={enquiryService}
                   source={`Category assistance: ${category.name}`}
                 >
@@ -164,7 +164,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
             <div className="qf-final-cta-actions">
               <EnquiryModalTrigger
                 className="qf-pub-btn qf-pub-btn--primary"
-                modalTitle={`Get matched with verified ${category.name}`}
+                modalTitle={`Get matched with eligible ${category.name}`}
                 serviceCategory={enquiryService}
                 source={`Category final CTA: ${category.name}`}
               >

@@ -221,11 +221,11 @@ export function VendorProfileFaq() {
     ["Is sending an enquiry free?", "Yes. Homeowner enquiries on QuickFurno are free."],
     [
       "What happens when I choose this vendor?",
-      "QuickFurno prioritises your selected vendor first. Depending on eligibility and your selection window, QuickFurno may also match suitable verified vendors up to the current lead limit.",
+      "QuickFurno prioritises your selected vendor first. Depending on eligibility and your selection window, QuickFurno may also match suitable eligible vendors up to the current lead limit.",
     ],
     [
       "Can I compare other vendors?",
-      "Yes. Return to the category listing to compare available verified vendor profiles.",
+      "Yes. Return to the category listing to compare available approved vendor profiles.",
     ],
   ];
 
@@ -258,7 +258,7 @@ export function VendorProfileCompareMore({
   return (
     <section className="qf-vprofile-comparemore">
       <h2>Want to compare more {vendor.category.toLowerCase()}?</h2>
-      <p>Browse every verified vendor published in this category.</p>
+      <p>Browse every approved vendor published in this category.</p>
       <Link href={categoryHref} className="qf-pub-btn qf-pub-btn--secondary">
         Back to {vendor.category}
       </Link>

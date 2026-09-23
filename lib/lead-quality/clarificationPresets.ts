@@ -222,7 +222,7 @@ export function buildClarificationPreviewMessage(lead: ClarificationLeadLike, qu
   return [
     `Hi ${clientName}, thanks for contacting QuickFurno.`,
     "",
-    "To connect you with the right verified vendor, please complete these details:",
+    "To connect you with the right eligible vendor, please complete these details:",
     "",
     body || "1. Please share a few more details about your requirement.\nOptions: Free text",
     "",

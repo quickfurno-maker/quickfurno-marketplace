@@ -7,7 +7,7 @@ import { CONTACT } from "@/lib/config";
 export const metadata: Metadata = {
   title: "Privacy Policy | QuickFurno",
   description:
-    "How QuickFurno collects, uses and shares your enquiry details with verified home-service vendors.",
+    "How QuickFurno collects, uses and shares your enquiry details with eligible home-service vendors.",
 };
 
 /*
@@ -18,8 +18,8 @@ export const metadata: Metadata = {
     "verified home-service vendors near you"  -> matching is by service +
         city/area eligibility, not measured proximity.
     "One enquiry is shared with up to 3 ..."  -> the consent the client actually
-        accepts says up to 3 verified vendors INITIALLY, and allows QuickFurno to
-        manually connect additional verified vendors where vendors are
+        accepts says up to 3 eligible vendors INITIALLY, and allows QuickFurno to
+        manually connect additional eligible vendors where vendors are
         unavailable, non-responsive or unable to serve the requirement. The old
         wording implied a hard ceiling the consent does not set.
     "used only for matching nearby leads"     -> same unsupported proximity claim.
@@ -35,17 +35,17 @@ export default function PrivacyPage() {
         <div className="qf-legal-shell">
           <span className="qf-legal-eyebrow">Legal</span>
           <h1 className="qf-legal-title">Privacy Policy</h1>
-          <p className="qf-legal-updated">Last updated: 4 September 2026</p>
+          <p className="qf-legal-updated">Last updated: 23 September 2026</p>
 
           <div className="qf-legal-body">
             <div className="qf-legal-note">
               <h2>How matching works</h2>
               <ul>
                 <li>Vendors are matched using the service you need and your city and area.</li>
-                <li>Your enquiry is shared with up to 3 verified vendors initially.</li>
+                <li>Your enquiry is shared with up to 3 eligible vendors initially.</li>
                 <li>
                   If those vendors are unavailable, non-responsive or unable to serve your
-                  requirement, QuickFurno may manually connect you with additional verified vendors.
+                  requirement, QuickFurno may manually connect you with additional eligible vendors.
                 </li>
                 <li>We never sell your details or list them on an open marketplace.</li>
               </ul>
@@ -64,11 +64,11 @@ export default function PrivacyPage() {
             <section className="qf-legal-section">
               <h2>2. How we use your details</h2>
               <p>
-                We use your enquiry to connect you with verified home-service vendors that match
+                We use your enquiry to connect you with eligible home-service vendors that match
                 the service you need and your city and area. One enquiry is shared with up to 3
-                verified vendors initially so they can contact you with quotes. If those vendors
+                eligible vendors initially so they can contact you with quotes. If those vendors
                 are unavailable, non-responsive or unable to serve your requirement, we may
-                manually connect you with additional verified vendors. We never sell your details
+                manually connect you with additional eligible vendors. We never sell your details
                 or share them with an open marketplace.
               </p>
             </section>
@@ -77,10 +77,10 @@ export default function PrivacyPage() {
               <h2>3. Lead sharing consent</h2>
               <p>
                 By submitting an enquiry and accepting our consent checkbox, you agree that your
-                contact details may be shared with up to 3 verified vendors matched to your
+                contact details may be shared with up to 3 eligible vendors matched to your
                 requirement, so they can reach out to you by phone, WhatsApp or call. You also
                 agree that, where those vendors are unavailable, non-responsive or unable to serve
-                your requirement, QuickFurno may manually connect you with additional verified
+                your requirement, QuickFurno may manually connect you with additional eligible
                 vendors to fulfil your request.
               </p>
             </section>

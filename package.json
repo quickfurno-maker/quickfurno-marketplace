@@ -153,6 +153,7 @@
     "test:mvp:80-15c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/qf-mvp-80-15c-assigned-contact-entitlement-harness.mjs",
     "test:mvp:80-15c-local": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/local/qf-mvp-80-15c-local-contact-entitlement-integration.mjs",
     "test:ui:mobile-form-focus": "node scripts/ui/validate-mobile-form-focus.mjs",
+    "test:ui:vendor-media-exif": "node scripts/ui/validate-vendor-media-exif.mjs",
     "test:mvp:50-8": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/communication/validate-qf-mvp-50-8-lead-destination.mjs",
     "test:mvp:80-16b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/communication/validate-qf-mvp-80-16b-vendor-destination.mjs",
     "test:mvp:80-16c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-qf-mvp-80-16c-delivery-safety.mjs",
@@ -183,6 +184,7 @@
     "next": "16.3.6",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "sharp": "^0.35.4",
     "standardwebhooks": "^1.0.0",
     "ws": "^8.21.3"
   },

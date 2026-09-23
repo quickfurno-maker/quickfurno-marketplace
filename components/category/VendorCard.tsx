@@ -19,9 +19,12 @@ import {
 //   1. `rating` is 0 for every vendor in the table today, because the reviews
 //      system has never had a row. Rendering "0.0 ★" would read as a terrible
 //      score rather than an absent one, so no-reviews gets its own honest line.
-//   2. No vendor has uploaded a photo (there is no upload path in the product),
-//      so the monogram is the normal case, not the fallback. It is designed to
-//      look deliberate rather than broken.
+//   2. The monogram is always rendered and a real photo sits ON TOP of it.
+//      Vendors can now upload (app/api/vendor/media), but most have not, so
+//      the monogram is still the common case and is designed to look
+//      deliberate. Layering rather than branching means a photo that 404s
+//      reveals that designed tile instead of a broken-image icon, and it needs
+//      no JavaScript to do it.
 //   3. A fact the vendor left blank is omitted. Nothing is invented to fill
 //      the row out, and the card stays level when facts are missing.
 // ============================================================================
@@ -72,6 +75,10 @@ export function VendorCard({ vendor, compareOn, onCompare, compareFull, category
     facts.push({ key: "cap", icon: <IconStar size={12} />, label: `${capacity}/month` });
   }
 
+  // Their own profile image, else their first project photo. Never stock art:
+  // a generic interior would read as this vendor's work.
+  const photo = vendor.imageUrl ?? vendor.portfolioImages?.[0] ?? null;
+
   return (
     <article className="qfd-card qfc-card">
       <div className="qfc-card-media">
@@ -82,6 +89,12 @@ export function VendorCard({ vendor, compareOn, onCompare, compareFull, category
         >
           {initials(vendor.businessName)}
         </span>
+        {photo ? (
+          // alt="" on purpose: the business name is the card's heading right
+          // below, so describing the picture again is noise to a screen reader.
+          // eslint-disable-next-line @next/next/no-img-element -- vendor images come from arbitrary hosts; plain img avoids the next/image allowlist, as app/vendors/[id] already does.
+          <img className="qfc-card-photo" src={photo} alt="" loading="lazy" decoding="async" />
+        ) : null}
         {vendor.verified ? (
           <span className="qfc-mono-tick" aria-hidden="true">
             <IconCheck size={13} width={3} />

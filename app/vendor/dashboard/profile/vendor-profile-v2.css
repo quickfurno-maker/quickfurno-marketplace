@@ -736,3 +736,26 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* --- Photo upload ---------------------------------------------------------
+   The file input itself is visually hidden and the <label> is the control, so
+   the button can be styled like every other button here while the input keeps
+   its native keyboard and screen-reader behaviour. ria-disabled rather than
+   disabled on the label, because a disabled label is not announced.        */
+.qf-vendor-v2-profile-upload {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: start;
+  margin-top: 0.6rem;
+}
+.qf-vendor-v2-profile-upload-btn {
+  cursor: pointer;
+  min-height: var(--qfd-tap, 44px);
+}
+.qf-vendor-v2-profile-upload input:focus-visible + .qf-vendor-v2-profile-upload-btn {
+  outline: 2px solid var(--qfd-orange, #c93a0e);
+  outline-offset: 2px;
+}
+.qf-vendor-v2-profile-upload-btn[data-busy] { opacity: 0.75; cursor: progress; }
+.qf-vendor-v2-profile-upload-btn[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }
+.qf-vendor-v2-profile-hint[data-tone="error"] { color: var(--qfd-orange-text, #a82f0a); font-weight: 600; }

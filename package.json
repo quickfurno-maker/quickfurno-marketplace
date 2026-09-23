@@ -204,7 +204,7 @@
   },
   "overrides": {
     "nanoid": "3.3.19",
-    "next": {
+    "next@15.5.26": {
       "postcss": "8.5.23"
     }
   }

@@ -962,59 +962,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     }
   }, [step, open]);
 
-  /** Bank the current PROJECT-ONLY facts as an anonymous draft. Never PII. */
-  function sendLeadDraft(stage: "project" | "details" | "converted") {
-    if (!draftIdRef.current) return;
-    draftStageRef.current = stage;
-    void saveLeadDraft({
-      draft_id: draftIdRef.current,
-      stage,
-      service_category: form.serviceRequired || undefined,
-      subcategory: form.subcategory || undefined,
-      city: form.city || undefined,
-      area: form.area.trim() || undefined,
-      budget_range: budgetSummary() || undefined,
-      timeline: form.timeline || undefined,
-      property_type: form.propertyType || undefined,
-      source: modalOptions.source ?? "Requirement flow",
-    }).catch(() => {
-      /* fail-silent by contract — draft capture must never disturb the flow */
-    });
-  }
-
-  // PARTIAL LEAD CAPTURE. Once the "Your project" section (service + city +
-  // area) validates, bank an anonymous draft after a short settle delay;
-  // upgrade it to "details" when budget + timeline validate too. handleSubmit
-  // marks it "converted". Debounced so typing never spams the server, and
-  // draftStageRef guarantees each stage is sent at most once per modal open.
-  //
-  // SAFE BY DESIGN wrt QF-UI-HOTFIX-01: this effect touches no focus, no
-  // scroll lock and no DOM — it only schedules a network call — so depending
-  // on `form` here cannot reintroduce the mobile keyboard bug (the CI guard in
-  // scripts/ui/validate-mobile-form-focus.mjs only constrains focus/scroll
-  // effects, and this is neither).
-  useEffect(() => {
-    if (!open || success) return;
-    if (draftStageRef.current === "details" || draftStageRef.current === "converted") return;
-    const projectDone =
-      stepError(0) === null && (!isInterior || stepError(1) === null) && stepError(2) === null;
-    if (!projectDone) return;
-    const detailsDone = stepError(3) === null && stepError(4) === null;
-    const stage: "project" | "details" = detailsDone ? "details" : "project";
-    if (draftStageRef.current === stage) return;
-    const timer = window.setTimeout(() => {
-      trackEvent("enquiry_section_completed", {
-        section: stage,
-        source: modalOptions.source ?? "Requirement flow",
-      });
-      sendLeadDraft(stage);
-    }, 1000);
-    return () => window.clearTimeout(timer);
-    // stepError/isInterior/sendLeadDraft are stable per render and derive from
-    // `form`; keying on `form` (+ open/success) is exactly the re-run we want.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, success, form]);
-
   async function handleSubmit() {
     if (submitting) return;
     setError("");

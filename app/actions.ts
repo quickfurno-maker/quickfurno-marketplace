@@ -226,7 +226,7 @@ export async function sendClientSelectedVendorEnquiry(
     const vendorId = String(input.vendor_id ?? "").trim();
     if (!vendorId) return fail(appError("VALIDATION"));
     if (!input.share_consent) {
-      return { ok: false, code: "CONSENT_REQUIRED", error: "Please accept the consent to share your enquiry with verified vendors." };
+      return { ok: false, code: "CONSENT_REQUIRED", error: "Please accept the consent to share your enquiry with eligible vendors." };
     }
     const serviceCategory = input.service_category ?? input.serviceCategory ?? input.service_required ?? "";
     const parentGroup = getParentCategoryGroup(serviceCategory);
@@ -273,7 +273,7 @@ export async function sendClientSelectedVendorEnquiry(
           lead_id: leadId,
           assigned: false,
           status: "captured_no_group",
-          message: "Your enquiry has been received. QuickFurno will connect you with verified vendors shortly.",
+          message: "Your enquiry has been received. QuickFurno may connect you with eligible vendors under the marketplace matching rules.",
           pending_primary_slots: 3,
           preferred_vendor_not_eligible: false,
         });

@@ -11,7 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { saveLeadDraft, submitLead } from "@/app/actions";
+import { submitLead } from "@/app/actions";
 import { isIndianLeadMobile } from "@/lib/leads/indianMobile";
 import {
   DISCARD_CONFIRM_BODY,
@@ -419,12 +419,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   const [minStep, setMinStep] = useState(0);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
-  // ── Partial lead capture (launch) ─────────────────────────────────────────
-  // One anonymous draft row per modal open (see services/leadDraftService.ts).
-  // draftIdRef is the row key the browser generates; draftStageRef remembers
-  // the highest stage already banked so the effect below never re-sends.
-  const draftIdRef = useRef<string>("");
-  const draftStageRef = useRef<"" | "project" | "details" | "converted">("");
   // QF-UI-HOTFIX-01: the Escape handler needs the LATEST requestClose (which
   // reads `success` and the form) without those values becoming effect
   // dependencies. A ref keeps the listener stable, so typing can never tear the
@@ -494,10 +488,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setMinStep(preferredSelection ? startStep : 0);
     setStep(startStep);
     setModalOptions(options);
-    // New modal open = new anonymous draft row (no PII; see leadDraftService).
-    draftIdRef.current =
-      typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : "";
-    draftStageRef.current = "";
     setForm({
       ...initialState,
       city: options.city ?? "",
@@ -691,7 +681,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         if (!form.whatsappSame && !isPhoneValid(form.whatsapp))
           return "Enter a valid 10-digit WhatsApp number.";
         if (!form.shareConsent)
-          return "Please accept sharing your details with up to 3 verified vendors to continue.";
+          return "Please accept sharing your details with up to 3 eligible vendors to continue.";
         return null;
       default:
         return null;
@@ -1051,7 +1041,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     }
 
     if (!form.shareConsent) {
-      setError("Please accept sharing your details with up to 3 verified vendors to continue.");
+      setError("Please accept sharing your details with up to 3 eligible vendors to continue.");
       return;
     }
 
@@ -1141,16 +1131,13 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         const vendorName = modalOptions.targetVendorName || result.data.preferred_vendor?.vendor_name || "this vendor";
         setSuccessMessage(
           result.data.preferred_vendor?.assigned
-            ? `Your enquiry has been sent to ${vendorName}. If needed, QuickFurno may connect you with up to 2 more suitable verified vendors after some time.`
-            : `Your request for ${vendorName} has been received. QuickFurno will check this vendor's availability first. If they are unavailable, we will connect you with better matching verified vendors.`,
+            ? `Your enquiry has been sent to ${vendorName}. If needed, QuickFurno may connect you with up to 2 more suitable eligible vendors after some time.`
+            : `Your request for ${vendorName} has been received. QuickFurno will check this vendor's availability first. If they are unavailable, we may connect you with other eligible vendors under the matching rules.`,
         );
       } else {
-        setSuccessMessage("Your requirement has been submitted. QuickFurno will connect you with up to 3 relevant verified vendors.");
+        setSuccessMessage("Your requirement has been submitted. QuickFurno may connect you with up to 3 relevant eligible vendors.");
       }
       setSuccess(true);
-      // Close the funnel loop: the draft row (if the table exists) is no
-      // longer a drop-off. Fire-and-forget like every other draft write.
-      sendLeadDraft("converted");
     } catch (err) {
       console.error("[requirement flow] submission error", {
         message: err instanceof Error ? err.message : "Unknown error",
@@ -1378,7 +1365,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
             {locStatus === "locating" ? "Getting location…" : "Use my current location"}
           </button>
           {locStatus === "captured" ? (
-            <p className="qf-sf-note qf-sf-note--ok">Location captured — we&apos;ll use this to match relevant verified vendors.</p>
+            <p className="qf-sf-note qf-sf-note--ok">Location captured — we&apos;ll use this as one matching signal for eligible vendors.</p>
           ) : null}
           {locStatus === "denied" ? (
             <p className="qf-sf-note">No problem — your city and area above are enough.</p>
@@ -1539,7 +1526,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
             }}
           />
           <span>
-            I agree that QuickFurno may share my enquiry and contact details with up to 3 verified vendors initially. If vendors are unavailable, non-responsive, or unable to serve my requirement, QuickFurno may manually connect me with additional verified vendors to fulfil my request.{" "}
+            I agree that QuickFurno may share my enquiry and contact details with up to 3 eligible vendors initially. If vendors are unavailable, non-responsive, or unable to serve my requirement, QuickFurno may manually connect me with additional eligible vendors under the marketplace matching rules.{" "}
             <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
             {" · "}
             <a href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>
@@ -1547,7 +1534,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         </label>
         {consentError ? (
           <span className="qf-rf-field-err qf-rf-field-err--block">
-            Please accept sharing your details with up to 3 verified vendors to continue.
+            Please accept sharing your details with up to 3 eligible vendors to continue.
           </span>
         ) : null}
       </div>
@@ -1577,7 +1564,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
           >
             <header className="qf-rf-top">
               <div className="qf-rf-top-row">
-                <span className="qf-rf-flow-name">Get Matched With Verified Teams</span>
+                <span className="qf-rf-flow-name">Get Matched With Eligible Pros</span>
                 <button type="button" className="qf-rf-close" aria-label="Close" onClick={requestClose}>
                   ×
                 </button>
@@ -1592,7 +1579,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                   <h3 id="qf-rf-title">Tell us about your project</h3>
                   <p>
                     Share your requirement once. QuickFurno will match you with up to 3 relevant
-                    verified vendors.
+                    eligible vendors.
                   </p>
                 </div>
               ) : null}
@@ -1611,7 +1598,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                     ✓
                   </span>
                   <h3 id="qf-rf-title">Requirement submitted</h3>
-                  <p>{successMessage || "Your requirement has been submitted. QuickFurno will connect you with up to 3 relevant verified vendors."}</p>
+                  <p>{successMessage || "Your requirement has been submitted. QuickFurno may connect you with up to 3 relevant eligible vendors."}</p>
                 </div>
               ) : (
                 <>
@@ -1671,7 +1658,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                 >
                   {submitting ? "Submitting…" : "Get Free Team Matches"}
                 </button>
-                <p className="qf-sf-trust">Free for homeowners · Up to 3 verified vendors · Your details stay private</p>
+                <p className="qf-sf-trust">Free to enquire · Up to 3 eligible vendors · Contact sharing follows your consent</p>
               </footer>
             )}
 

@@ -2,8 +2,7 @@
 
 The homepage automatically switches from illustrations to real photos when
 files with these exact names appear in this folder (next deploy picks them up).
-Use `.webp` or `.jpg`. Landscape, well-lit, real QuickFurno/One Decore project
-photos only — no watermarked stock images.
+Use `.webp` or `.jpg`. Landscape, well-lit, photos only when QuickFurno has documented ownership or publication rights. Do not use watermarked, watermark-removed, scraped, or provenance-unknown images.
 
 ## File list
 

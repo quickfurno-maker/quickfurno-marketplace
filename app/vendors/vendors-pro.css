@@ -702,7 +702,7 @@
 }
 .qfv-phone-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .qfv-phone-body small { font-size: 11.5px; font-weight: 700; color: #655f54; }
-.qfv-phone-body h4 { font-family: var(--qfv-head); font-weight: 700; font-size: 18px; letter-spacing: -0.02em; }
+.qfv-phone-title { font-family: var(--qfv-head); font-weight: 700; font-size: 18px; letter-spacing: -0.02em; }
 .qfv-phone-cards { display: flex; gap: 8px; }
 .qfv-phone-cards div { flex: 1; background: #fff; border: 1px solid #efe8dc; border-radius: 12px; padding: 9px 11px; }
 .qfv-phone-cards small { font-size: 10.5px; }
@@ -723,7 +723,7 @@
   box-shadow: 0 -18px 40px -24px rgba(20, 24, 29, 0.6);
 }
 .qfv-sheet-grip { align-self: center; width: 38px; height: 4px; border-radius: 999px; background: #e2d8c6; }
-.qfv-sheet h5 { margin: 0; font-family: var(--qfv-head); font-weight: 700; font-size: 16px; letter-spacing: -0.02em; }
+.qfv-sheet-title { margin: 0; font-family: var(--qfv-head); font-weight: 700; font-size: 16px; letter-spacing: -0.02em; }
 .qfv-sheet-live { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 800; color: var(--qfv-green); }
 .qfv-sheet-opt {
   display: flex;

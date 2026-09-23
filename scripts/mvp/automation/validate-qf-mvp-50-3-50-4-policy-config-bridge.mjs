@@ -99,7 +99,7 @@ const TRANSACTIONAL_MAPPING_NAME =
 const FALSE_CEILING_NAME =
   "20260922120000_false_ceiling_category.sql";
 // QF-MVP-50.6 RE-PIN: 17 -> 18. QF-MVP-40.14 RE-PIN: 21 -> 22.
-const POST_ANCHOR_COUNT = 32;
+const POST_ANCHOR_COUNT = 31;
 const PENDING_ORDER = ["20260813000000", "20260814000000", "20260815000000", "20260816000000", "20260817000000"];
 const RECOVERY_NAME =
   "20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql";
@@ -154,8 +154,8 @@ record("V05 the bridge sorts immediately after the fresh-claim wedge repair",
 // QF-MVP-50.5 RE-PIN: the bridge and the three frozen 50.3/50.4 migrations still sit
 // in exactly this order; they are now followed by the 50.5 recovery transport, which is
 // named explicitly rather than allowed as "anything newer".
-record("V07a the final twenty-seven versions are in exact chronological order",
-  same(migrationFiles.slice(-27),
+record("V07a the final twenty-six versions are in exact chronological order",
+  same(migrationFiles.slice(-26),
     [BRIDGE_NAME, ...FROZEN.map(([f]) => f), RECOVERY_NAME, CANARY_AUTHORITY_NAME,
      MARKETING_CONSENT_NAME, MATCHCORE_RANK_ORDER_NAME, GEO_POSTGIS_SHORTLIST_NAME,
      AUDIT_LOG_REPAIR_NAME, PRODUCTION_ACTIVATION_NAME, REALTIME_PUBLICATION_NAME,
@@ -422,7 +422,7 @@ record("G07 the ten applied records read 21 through 30 in exact order",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version), APPLIED_ORDER));
 record("G08 the anchor post-anchor count agrees at 31",
   manifest.appliedAnchor?.postAnchorMigrationCount === POST_ANCHOR_COUNT);
-record("G09 G1 is pinned to 118 / 10 applied / 5 reconciled / 7 staging-applied / 10 pending, not loosened",
+record("G09 G1 is pinned to 118 / 10 applied / 5 reconciled / 7 staging-applied / 9 pending, not loosened",
   /const MIGRATION_COUNT = 118;/.test(g1Source) &&
   g1Source.includes(`version: "${BRIDGE_VERSION}"`) &&
   g1Source.includes(`sha: "${BRIDGE_SHA}"`) &&

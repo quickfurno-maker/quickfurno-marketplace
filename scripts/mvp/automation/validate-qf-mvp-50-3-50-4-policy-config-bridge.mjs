@@ -372,7 +372,7 @@ record("G06 pending holds exactly nine pinned source-only authorities, seven are
   // staging-applied set. PENDING is the 80.14A production activation authority alone.
   // Both sets stay exact; APPLIED stays ten and RECONCILED stays five.
   // QF-MVP-50.6 RE-PIN: 1 -> 2, adding the source-only orphan cancellation authority.
-  manifest.pendingPostAnchorMigrations?.length === 10 &&
+  manifest.pendingPostAnchorMigrations?.length === 9 &&
   manifest.pendingPostAnchorMigrations[0].version === "20260903040000" &&
   manifest.pendingPostAnchorMigrations[0].operationalStatus === "PENDING" &&
   manifest.pendingPostAnchorMigrations[1].version === "20260905000000" &&

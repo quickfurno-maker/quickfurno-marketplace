@@ -279,10 +279,10 @@ check("19-20 S1 changed no migration and added none", () => {
 
 // ---- 21-22. the two counts -------------------------------------------------
 
-check("21 the live source migration count is 119", () => {
+check("21 the live source migration count is 118", () => {
   eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "tree");
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
-  assert(/const MIGRATION_COUNT = 118;/.test(g1), "and G1 still pins 119");
+  assert(/const MIGRATION_COUNT = 118;/.test(g1), "and G1 still pins 118");
 });
 
 check("22 the frozen 80.05 reconciliation count is still 102", () => {
@@ -294,7 +294,7 @@ check("22 the frozen 80.05 reconciliation count is still 102", () => {
   eq(MIGRATIONS.length - MANIFEST.historyReconciliation.migrationCount,
     (MANIFEST.pendingPostAnchorMigrations ?? []).length +
     (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length,
-    "119 - 102 = 17 = nine pending + seven staging-applied");
+    "118 - 102 = 16 = nine pending + seven staging-applied");
 });
 
 // ---- 23-26. the new vocabulary, and what it may not become -----------------
@@ -338,7 +338,7 @@ check("24 no historical applied or reconciled record was rewritten", () => {
   }
   // Current ledger totals 30. The applied ten and reconciled five — which is what
   // this check is actually about — are untouched.
-  eq(MANIFEST.appliedAnchor.postAnchorMigrationCount, 32, "the anchor totals thirty-one");
+  eq(MANIFEST.appliedAnchor.postAnchorMigrationCount, 31, "the anchor totals thirty-one");
   eq(10 + 5 + (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length +
      (MANIFEST.pendingPostAnchorMigrations ?? []).length, 31, "and the four sets add up");
 });

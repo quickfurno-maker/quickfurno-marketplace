@@ -28,6 +28,14 @@ import "./home-final.css";
 // Pune launch homepage (approved Desktop 1440 / Mobile 390 mockup). qfp-* scoped
 // only; loaded last so it wins over home-final.css on the homepage.
 import "./home-pune-launch.css";
+// Design tokens from the approved canvases — the system the four legacy token
+// layers above are being replaced by. Variables only (--qfd-*), so importing it
+// changes nothing on its own; a page moves over when its stylesheet starts
+// referencing them. Loaded last so a migrated page always reads these values.
+import "./qf-tokens.css";
+// Shared primitives built on those tokens: buttons, chips, fields, cards,
+// pills, gradient sections. qfd-* scoped; nothing here styles a bare element.
+import "./qf-primitives.css";
 
 // Type system: Poppins (geometric sans) for the logo, headlines, body and UI;
 // Playfair Display italic only for the gold accent words.

@@ -438,6 +438,7 @@
 
 /* Consent */
 .qf-rf-consent.qf-rf-consent {
+  min-height: 44px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 0.55rem;
@@ -451,7 +452,7 @@
   color: var(--qf-brand-ink-2);
 }
 
-.qf-rf-consent input[type="checkbox"] { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--qf-brand-blue); }
+.qf-rf-consent input[type="checkbox"] { width: 22px; height: 22px; margin-top: 1px; flex-shrink: 0; accent-color: var(--qf-brand-blue); }
 
 /* Every checkbox in the flow (including "WhatsApp number same as phone", which
    kept the legacy amber accent) uses the brand blue. */
@@ -1079,7 +1080,7 @@
   height: 1.55rem;
   border-radius: 999px;
   background: #fff1ec;
-  color: #ef4723;
+  color: #c93a0e;
   font-size: 0.82rem;
   font-weight: 750;
 }
@@ -1309,13 +1310,13 @@
 /* Final conversion-action lock: orange for homeowner submission, green for trust/selection. */
 .qf-rf-btn--primary.qf-rf-btn--primary,
 .qf-free-interest-actions button:last-child {
-  background:linear-gradient(135deg,#ff552f,#ef4723);
-  border-color:#ff552f;
+  background:linear-gradient(135deg,#a82f0a,#c93a0e);
+  border-color:#a82f0a;
   color:#fff;
   box-shadow:0 10px 22px rgba(255,85,47,.18);
 }
 .qf-rf-btn--primary:hover,
-.qf-free-interest-actions button:last-child:hover { background:#ef4723; border-color:#ef4723; }
+.qf-free-interest-actions button:last-child:hover { background:#c93a0e; border-color:#c93a0e; }
 
 /* Launch polish: qf-redesign.css ships a navy .qf-rf-btn--primary:hover:not(:disabled)
    whose specificity beats the orange lock above, so the submit CTA flashed dark

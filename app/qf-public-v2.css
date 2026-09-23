@@ -21,18 +21,18 @@
   /* Ink */
   --qf-brand-ink: #0f172a;
   --qf-brand-ink-2: #334155;
-  --qf-brand-muted: #5f6b7d;
-  --qf-brand-faint: #8d97a8;
+  --qf-brand-muted: #4d5768;
+  --qf-brand-faint: #5e6673;
 
   /* Primary action — the same blue the approved vendor portal uses */
-  --qf-brand-blue: #07965f;
+  --qf-brand-blue: var(--qfd-green-text);
   --qf-brand-blue-deep: #075645;
   --qf-brand-blue-tint: #e9f7f0;
   --qf-brand-blue-line: #cfe9dd;
 
   /* Brand warmth — wordmark and small accents only, never a button colour */
-  --qf-brand-orange: #ff552f;
-  --qf-brand-orange-deep: #ef4723;
+  --qf-brand-orange: var(--qfd-orange-text);
+  --qf-brand-orange-deep: var(--qfd-orange-text);
 
   /* Surfaces */
   --qf-brand-bg: #f6f8fb;
@@ -1198,16 +1198,16 @@
 /* Final public UI lock — align all non-home public routes with the approved homepage. */
 .qf-pub-btn--primary,
 .qf-site-header .qf-header-cta {
-  background: linear-gradient(135deg, #ff552f, #ef4723);
-  border-color: #ff552f;
+  background: linear-gradient(135deg, #a82f0a, #c93a0e);
+  border-color: #a82f0a;
   color: #fff;
   box-shadow: 0 10px 24px rgba(255,85,47,.20);
 }
 .qf-pub-btn--primary:hover,
-.qf-site-header .qf-header-cta:hover { background:#ef4723; border-color:#ef4723; }
+.qf-site-header .qf-header-cta:hover { background:#c93a0e; border-color:#c93a0e; }
 .qf-final-cta { background:linear-gradient(135deg,#064e3e,#075645 65%,#086b50); }
-.qf-final-cta .qf-pub-btn--primary { background:linear-gradient(135deg,#ff552f,#ef4723); border-color:#ff552f; color:#fff; }
-.qf-final-cta .qf-pub-btn--primary:hover { background:#ef4723; border-color:#ef4723; }
+.qf-final-cta .qf-pub-btn--primary { background:linear-gradient(135deg,#a82f0a,#c93a0e); border-color:#a82f0a; color:#fff; }
+.qf-final-cta .qf-pub-btn--primary:hover { background:#c93a0e; border-color:#c93a0e; }
 
 .qf-site-header .qf-brand { display:inline-flex; align-items:center; }
 .qf-site-header .qf-brand img { width:176px; height:auto; display:block; }
@@ -1247,11 +1247,11 @@
 
 .qf-bottom-nav.qf-bottom-nav--five { grid-template-columns:repeat(5,minmax(0,1fr)); padding-top:.38rem; }
 .qf-bottom-nav .qf-bottom-nav-item { min-width:0; font-weight:700; }
-.qf-bottom-nav .qf-bottom-nav-item--active { background:transparent; color:#07965f; }
-.qf-bottom-nav .qf-bottom-nav-item--quote { position:relative; color:#ff552f; font-weight:800; }
+.qf-bottom-nav .qf-bottom-nav-item--active { background:transparent; color:#286e50; }
+.qf-bottom-nav .qf-bottom-nav-item--quote { position:relative; color:#a82f0a; font-weight:800; }
 .qf-bottom-nav .qf-bottom-nav-quote-icon {
   width:36px; height:36px; margin-top:-13px; display:grid; place-items:center;
-  border-radius:50%; background:linear-gradient(135deg,#ff552f,#ef4723); color:#fff;
+  border-radius:50%; background:linear-gradient(135deg,#a82f0a,#c93a0e); color:#fff;
   box-shadow:0 8px 18px rgba(255,85,47,.28); border:3px solid #fff;
 }
 .qf-bottom-nav .qf-bottom-nav-quote-icon svg { width:17px; height:17px; }

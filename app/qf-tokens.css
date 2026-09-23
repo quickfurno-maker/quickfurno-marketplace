@@ -28,7 +28,7 @@
 :root {
   /* --- Text ------------------------------------------------------------ */
   --qfd-ink: #14181d;          /* primary text          worst 14.64:1  AAA  */
-  --qfd-muted: #5e5950;        /* secondary text        worst  5.71:1  AA   */
+  --qfd-muted: #575249;        /* secondary text        worst  5.71:1  AA   */
   --qfd-faint: #655f54;        /* labels, captions      worst  5.20:1  AA   */
   --qfd-orange-text: #a82f0a;  /* orange TEXT only      worst  5.61:1  AA   */
   --qfd-green-text: #286e50;   /* green TEXT only       worst  5.02:1  AA   */

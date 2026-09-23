@@ -86,8 +86,11 @@
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  /* WCAG 2.5.5: 44x44 minimum. This was 34x34 — the dismiss control on the
+     one dialog every "Get Matched" button in the product opens, and the
+     easiest thing on the page to miss with a thumb. */
+  width: var(--qfd-tap, 44px);
+  height: var(--qfd-tap, 44px);
   border: 1px solid var(--qf-brand-line);
   border-radius: var(--qf-radius-sm);
   background: var(--qf-brand-surface);
@@ -375,7 +378,10 @@
   border-radius: var(--qf-radius-md);
   background: var(--qf-brand-surface);
   font-family: inherit;
-  font-size: 0.938rem;
+  /* 16px is a hard floor, not a type choice: iOS Safari zooms the whole page
+     when a focused control's text is under 16px, and the visitor then has to
+     pinch back out between every field. This was 0.938rem (15.008px). */
+  font-size: 1rem;
   color: var(--qf-brand-ink);
 }
 
@@ -780,7 +786,8 @@
   border-radius: var(--qf-radius-md);
   background: var(--qf-brand-surface);
   font-family: inherit;
-  font-size: 0.938rem;
+  /* 16px floor — see the note on .qf-rf-field input. */
+  font-size: 1rem;
   color: var(--qf-brand-ink);
 }
 
@@ -1108,7 +1115,9 @@
 }
 
 /* Inputs reuse the modal primitives; only the touch target grows so every
-   control clears the 48px guidance on a phone. */
+   control clears the 48px guidance on a phone. The target was never the whole
+   story though: a 48px-tall control with 15px text still triggers the iOS
+   focus zoom, so the font floor below matters as much as the height. */
 .qf-sf-field input,
 .qf-sf-field select,
 .qf-sf-field textarea,
@@ -1120,7 +1129,7 @@
   border-radius: var(--qf-radius-md);
   background: var(--qf-brand-surface);
   font-family: inherit;
-  font-size: 0.938rem;
+  font-size: 1rem;
   color: var(--qf-brand-ink);
 }
 

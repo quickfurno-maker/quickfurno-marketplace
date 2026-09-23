@@ -547,11 +547,11 @@ export const suite = {
       name: 'enquiry success copy claims relevance, not unsupported proximity',
       run: () => {
         const src = readFileSync('components/ClientEnquiryModal.tsx', 'utf8');
-        assertTrue(src.includes('up to 3 relevant verified vendors'), 'relevance wording present');
+        assertTrue(src.includes('up to 3 relevant eligible vendors'), 'bounded eligible-vendor wording present');
         assertFalse(src.includes('verified vendors near you'), 'no "near you" match claim');
         assertFalse(src.includes('Verified Teams near your area'), 'no near-area claim');
         // The governed consent + cap wording must survive untouched.
-        assertTrue(src.includes('up to 3 verified vendors initially'), 'consent cap wording intact');
+        assertTrue(src.includes('up to 3 eligible vendors initially'), 'consent cap wording intact');
       },
     },
     {
@@ -1098,7 +1098,7 @@ export const suite = {
         assertTrue(header.includes('Get a Free Quote'), 'public header keeps the approved quote CTA');
         assertTrue(header.includes('Toggle navigation menu'), 'public header keeps its menu toggle');
         const footer = readFileSync('components/Footer.tsx', 'utf8');
-        assertTrue(footer.includes('Free for homeowners'), 'public footer keeps its summary');
+        assertTrue(footer.includes('Approved active vendors · Up to 3 active matches · Free to enquire'), 'public footer keeps its truthful summary');
         const sticky = readFileSync('components/StickyMobileCTA.tsx', 'utf8');
         assertTrue(sticky.includes('MobileBottomNav'), 'public bottom nav wrapper intact');
         // The Pune launch homepage owns its five-item bottom nav directly.

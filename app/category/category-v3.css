@@ -98,7 +98,7 @@
   border: 0;
   background: transparent;
   font-family: var(--qfd-font-body);
-  font-size: 0.9375rem;
+  font-size: 1rem; /* 16px floor: iOS zooms the page on focus below this */
   font-weight: 600;
   color: var(--qfd-ink);
   appearance: none;

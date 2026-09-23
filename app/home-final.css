@@ -86,7 +86,7 @@
 }
 .qfh-select-field, .qfh-location-field {
   min-height: 48px; border: 1px solid #edf0ef; border-radius: 10px; display: flex; align-items: center; gap: 0.55rem; padding: 0 0.8rem;
-  color: var(--qfh-navy); background: #fff; font-size: 0.83rem; font-weight: 650;
+  color: var(--qfh-navy); background: #fff; font-size: 1rem; font-weight: 650; /* 16px floor: iOS zooms the page on focus below this */
 }
 .qfh-select-field svg, .qfh-location-field svg { width: 16px; height: 16px; flex: 0 0 auto; }
 .qfh-select-field select { width: 100%; border: 0; outline: 0; color: var(--qfh-navy); background: transparent; font: inherit; cursor: pointer; }

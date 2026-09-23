@@ -685,7 +685,7 @@
   background: var(--qf-brand-surface);
   color: var(--qf-brand-ink);
   font: inherit;
-  font-size: 0.844rem;
+  font-size: 1rem; /* 16px floor: iOS zooms the page on focus below this */
   padding: 0.65rem 0.7rem;
 }
 

@@ -241,7 +241,7 @@
   border-radius: var(--v2-radius-sm);
   background: var(--v2-surface);
   font-family: inherit;
-  font-size: 0.891rem;
+  font-size: 1rem; /* 16px floor: iOS zooms the page on focus below this */
   color: var(--v2-ink);
 }
 

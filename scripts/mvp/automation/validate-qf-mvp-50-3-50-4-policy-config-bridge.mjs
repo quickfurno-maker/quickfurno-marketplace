@@ -169,7 +169,7 @@ record("V07a the final twenty-seven versions are in exact chronological order",
      "20260918120000_whatsapp_conversational_jarvis_foundation.sql",
      "20260918180500_jarvis_whatsapp_callback_replay_receipts.sql",
      "20260919010000_vendor_review_system.sql",
-     LEAD_DRAFTS_NAME, FALSE_CEILING_NAME]));
+     FALSE_CEILING_NAME]));
 record("V07 the local migration set is exactly 118",
   migrationFiles.length === MIGRATION_COUNT);
 

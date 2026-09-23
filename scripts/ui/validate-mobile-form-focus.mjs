@@ -336,8 +336,8 @@ check("22 [static] the client modal imports no server/business authority", () =>
 
 check("23 [semantic] the consent legal text and share_consent semantics are intact", () => {
   const body = MODAL_SRC.slice(MODAL_SRC.indexOf("function renderSingleForm"));
-  assert(/up to 3 verified vendors initially/.test(body), "the consent cap sentence changed");
-  assert(/may manually connect me with additional verified vendors/.test(body),
+  assert(/up to 3 eligible vendors initially/.test(body), "the consent cap sentence changed");
+  assert(/may manually connect me with additional eligible vendors/.test(body),
     "the replacement-vendor consent sentence was dropped");
   assert(/href="\/privacy"/.test(body) && /href="\/terms"/.test(body), "a consent policy link was dropped");
   assert(!/shareConsent: true/.test(MODAL_SRC), "consent is pre-checked somewhere");

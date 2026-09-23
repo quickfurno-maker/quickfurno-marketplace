@@ -384,8 +384,8 @@ record("G06 pending holds exactly nine pinned source-only authorities, seven are
   manifest.pendingPostAnchorMigrations[6].version === "20260912050000" &&
   manifest.pendingPostAnchorMigrations[7].version === "20260915120000" &&
   manifest.pendingPostAnchorMigrations[7].operationalStatus === "PENDING" &&
-  manifest.pendingPostAnchorMigrations[9].version === "20260922120000" &&
-  manifest.pendingPostAnchorMigrations[9].operationalStatus === "PENDING" &&
+  manifest.pendingPostAnchorMigrations[8].version === "20260922120000" &&
+  manifest.pendingPostAnchorMigrations[8].operationalStatus === "PENDING" &&
   manifest.pendingPostAnchorMigrations.every((r) => r.operationalStatus === "PENDING") &&
   manifest.stagingAppliedPostAnchorMigrations?.length === 7 &&
   manifest.stagingAppliedPostAnchorMigrations[0].version === "20260904000000" &&

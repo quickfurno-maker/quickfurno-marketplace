@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "QuickFurno | Pune Home-Service Marketplace",
   description:
     "Explore home-service professionals and categories in Pune. Submit a free enquiry for Client Matching, subject to marketplace eligibility and availability.",
+  alternates: { canonical: "/" },
   openGraph: {
     title: "QuickFurno | Pune home services, one enquiry away",
     description:

@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   title: "Get free quotes — QuickFurno",
   description:
     "Tell QuickFurno about your project and get matched with up to 3 relevant eligible vendors in Pune. Free for homeowners.",
+  // ?service= prefills the form but does not change the page, so every
+  // category's enquiry link would otherwise look like a separate page.
+  alternates: { canonical: "/enquiry" },
 };
 
 export default async function EnquiryPage({ searchParams }: { searchParams: Promise<{ service?: string }> }) {

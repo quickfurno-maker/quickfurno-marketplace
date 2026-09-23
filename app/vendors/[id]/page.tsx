@@ -60,6 +60,10 @@ export async function generateMetadata({ params }: VendorPageProps): Promise<Met
   return {
     title,
     description,
+    // The OG url already pointed at the slug form; the canonical now says the
+    // same thing to a crawler, so a profile reached by id and by slug is one
+    // page rather than two competing ones.
+    alternates: { canonical: `/vendors/${vendor.slug}` },
     openGraph: {
       title,
       description,

@@ -41,6 +41,10 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   return {
     title,
     description,
+    // Without this, /category/interiors/carpenters (a legacy path that
+    // redirects here) and any tracking query can each look like a separate
+    // page to a crawler. Relative, so it resolves against metadataBase.
+    alternates: { canonical: `/category/${slug}` },
     openGraph: { title, description, siteName: "QuickFurno", type: "website" },
   };
 }

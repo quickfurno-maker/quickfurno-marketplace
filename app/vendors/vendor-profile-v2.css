@@ -704,3 +704,11 @@
 @media (min-width: 620px) {
   .qf-vreview-fields { grid-template-columns: minmax(0, 1fr) minmax(160px, 0.55fr); }
 }
+
+/* The "Back to <category>" link was 20px tall, under the 24x24 minimum of
+   WCAG 2.2 SC 2.5.8 (AA). It is the only way back to the listing on a phone. */
+.qf-vprofile-breadcrumb a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}

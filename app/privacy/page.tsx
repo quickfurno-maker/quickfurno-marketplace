@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   title: "Privacy Policy | QuickFurno",
   description:
     "How QuickFurno collects, uses and shares your enquiry details with eligible home-service vendors.",
+  alternates: { canonical: "/privacy" },
 };
 
 /*

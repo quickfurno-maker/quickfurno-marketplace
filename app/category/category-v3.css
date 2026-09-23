@@ -428,3 +428,12 @@
   object-fit: cover;
   display: block;
 }
+
+/* Breadcrumb links were 20px tall - their line-height and nothing else - which
+   is under the 24x24 minimum of WCAG 2.2 SC 2.5.8 (AA). "Home" and "Services"
+   also sit next to each other, so the spacing exception does not apply. */
+.qfc-crumb a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}

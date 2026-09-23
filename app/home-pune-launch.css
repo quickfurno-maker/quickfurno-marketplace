@@ -1099,3 +1099,28 @@
 @media (prefers-reduced-motion: reduce) {
   .qfp-page * { transition: none !important; }
 }
+
+/* --- Target size, WCAG 2.2 SC 2.5.8 (AA) ----------------------------------
+   The bar is 24x24, not the 44x44 of SC 2.5.5 (which is AAA). These links had
+   no padding at all, so their height was just their line-height: the wordmark
+   at 22px, the contact links at 21-23px, and the legal row at 18px. The legal
+   row is the clearest failure - three links side by side with a 6px gap, so
+   the spacing exception cannot rescue them either, because a 24px circle on
+   each overlaps its neighbour.
+
+   min-height rather than padding, so nothing reflows: these elements are
+   already flex, and centring the content means the extra pixels are added
+   around the text instead of pushing it. */
+.qfp-logo {
+  min-height: 24px;
+  align-items: center;
+}
+.qfp-footer-col--contact a,
+.qfp-footer-col--contact span {
+  min-height: 24px;
+}
+.qfp-footer-legal a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}

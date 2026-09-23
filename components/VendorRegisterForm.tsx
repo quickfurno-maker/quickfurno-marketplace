@@ -210,7 +210,7 @@ export function VendorRegisterForm() {
     inputMode?: "search" | "text" | "none" | "tel" | "url" | "email" | "numeric" | "decimal";
     maxLength?: number;
     customOnChange?: (val: string) => void;
-    ref?: React.RefObject<HTMLInputElement>;
+    ref?: React.RefObject<HTMLInputElement | null>;
   }) {
     const val = fieldKey === "state" ? f.stateName : f[fieldKey as keyof WizardState];
     const valStr = typeof val === "string" ? val : "";

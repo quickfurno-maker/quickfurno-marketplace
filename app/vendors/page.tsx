@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
@@ -275,7 +276,7 @@ type IconName =
   | "ticket";
 
 function Icon({ name, size = 22, color = "#F04A1A", width = 1.9 }: { name: IconName; size?: number; color?: string; width?: number }) {
-  const paths: Record<IconName, JSX.Element> = {
+  const paths: Record<IconName, ReactNode> = {
     home: (
       <>
         <path d="M4 11.5 12 5l8 6.5" />

@@ -316,7 +316,7 @@
   border-radius: var(--qf-radius-md);
   background: var(--qf-brand-surface);
   font-family: inherit;
-  font-size: 0.938rem;
+  font-size: 1rem; /* 16px floor: iOS zooms the page on focus below this */
   color: var(--qf-brand-ink);
 }
 
@@ -611,7 +611,7 @@
   border: 0;
   background: transparent;
   font-family: inherit;
-  font-size: 0.938rem;
+  font-size: 1rem; /* 16px floor: iOS zooms the page on focus below this */
   color: var(--qf-brand-ink);
   outline: none;
 }
@@ -749,10 +749,10 @@
 .qf-vendor-public-page,
 .qf-vauth-footer,
 .qf-vauth-page {
-  --qf-brand-blue: #07965f;
+  --qf-brand-blue: #286e50;
   --qf-brand-blue-deep: #006b43;
   --qf-brand-blue-tint: #eaf8f1;
-  --qf-brand-orange: #ff4f2f;
+  --qf-brand-orange: #c93a0e;
 }
 
 .qf-vauth-brand-link {
@@ -773,8 +773,8 @@
 
 .qf-vauth-btn,
 .qf-vendor-public-page .qf-rf-btn--primary {
-  border-color: #ff4f2f;
-  background: #ff4f2f;
+  border-color: #c93a0e;
+  background: #c93a0e;
   box-shadow: 0 8px 20px -14px rgba(255, 79, 47, 0.75);
 }
 

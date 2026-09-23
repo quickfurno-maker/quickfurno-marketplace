@@ -10,12 +10,12 @@
 .qfp-page {
   --qfp-ink: #14181d;
   --qfp-ivory: #f7f4ee;
-  --qfp-orange: #f04a1a;
+  --qfp-orange: var(--qfd-orange);
   --qfp-orange-dark: #d63f12;
   --qfp-amber: #ffb13d;
   --qfp-coral: #ff8a5c;
   --qfp-green: #1f9d5b;
-  --qfp-muted: #7a756c;
+  --qfp-muted: #655f54;
   --qfp-muted-2: #8b94a0;
   --qfp-line: #e9e4da;
   --qfp-card-line: #eae1ce;
@@ -57,7 +57,7 @@
   font-weight: 800;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--qfp-orange);
+  color: var(--qfd-orange-text);
 }
 .qfp-kicker--coral { color: var(--qfp-coral); }
 .qfp-head-center { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
@@ -92,7 +92,7 @@
   line-height: 1;
   color: var(--qfp-ink);
 }
-.qfp-logo em { font-style: normal; color: var(--qfp-orange); }
+.qfp-logo em { font-style: normal; color: var(--qfd-orange-text); }
 .qfp-logo--light { color: #f7f1e6; }
 
 /* ==========================================================================
@@ -129,8 +129,15 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  justify-content: center;
   gap: 5px;
   padding: 8px 0 8px 12px;
+  /* The bars stay exactly where they were; only the hit area grows. This was
+     34x32 — it clears WCAG 2.5.8's 24px AA minimum either way, but it is the
+     only navigation control on a phone, so it gets the 44px comfort target
+     rather than the compliance one. */
+  min-width: var(--qfd-tap, 44px);
+  min-height: var(--qfd-tap, 44px);
 }
 .qfp-menu-button i { display: block; height: 2px; width: 22px; background: var(--qfp-ink); border-radius: 2px; }
 .qfp-menu-button i:last-child { width: 15px; }
@@ -210,7 +217,7 @@
   align-items: center;
   gap: 10px;
   padding: 0 14px;
-  color: #8a8474;
+  color: #746d61;
 }
 .qfp-quote-field--service { flex: 1 1 auto; min-width: 0; border-right: 1px solid #ece7dd; }
 .qfp-quote-field--area { flex: 0 0 186px; }
@@ -222,7 +229,7 @@
   outline: none;
   background: transparent;
   font-family: var(--qfp-body);
-  font-size: 15px;
+  font-size: 1rem; /* 16px floor: iOS zooms the page on focus below this */
   font-weight: 600;
   color: var(--qfp-ink);
   padding: 0;
@@ -232,7 +239,7 @@
   line-height: 1.4;
 }
 .qfp-quote-field select { cursor: pointer; }
-.qfp-quote-field input::placeholder { color: #8a8474; opacity: 1; }
+.qfp-quote-field input::placeholder { color: #746d61; opacity: 1; }
 .qfp-quote-field select:focus-visible, .qfp-quote-field input:focus-visible { outline: 2px solid rgba(240, 74, 26, 0.35); outline-offset: 4px; border-radius: 4px; }
 .qfp-quote-btn { font-size: 16px; padding: 16px 26px; }
 
@@ -258,7 +265,7 @@
 .qfp-services .qfp-shell { position: relative; }
 .qfp-bp { display: flex; align-items: center; justify-content: space-between; gap: 40px; min-height: 350px; margin-top: -24px; margin-bottom: 8px; }
 .qfp-bp-copy { position: relative; z-index: 1; max-width: 480px; display: flex; flex-direction: column; }
-.qfp-bp-kicker { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase; color: var(--qfp-orange); }
+.qfp-bp-kicker { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase; color: var(--qfd-orange-text); }
 .qfp-bp-kicker i { display: block; flex-shrink: 0; background: var(--qfp-orange); }
 .qfp-bp-kicker i.t { width: 1.5px; height: 12px; }
 .qfp-bp-kicker i.l { width: 28px; height: 1.5px; }
@@ -266,7 +273,7 @@
 .qfp-bp-copy p { margin-top: 16px; font-size: 16px; line-height: 26px; color: var(--qfp-muted); }
 .qfp-bp-plan { position: relative; width: 640px; height: 350px; flex-shrink: 0; }
 .qfp-bp-svg { position: absolute; left: 0; top: 0; width: 640px; height: 350px; display: block; }
-.qfp-bp-home { position: absolute; left: 250px; top: 292px; padding: 0 8px; background: var(--qfp-ivory); font-size: 11px; font-weight: 800; letter-spacing: 0.18em; color: #b5a487; }
+.qfp-bp-home { position: absolute; left: 250px; top: 292px; padding: 0 8px; background: var(--qfp-ivory); font-size: 11px; font-weight: 800; letter-spacing: 0.18em; color: #655f54; }
 .qfp-trust-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin: 0 0 44px; }
 .qfp-trust-card {
   display: flex;
@@ -323,7 +330,7 @@
   gap: 9px;
   font-size: 13px;
   font-weight: 800;
-  color: var(--qfp-orange);
+  color: var(--qfd-orange-text);
 }
 .qfp-card-cta i {
   width: 30px;
@@ -494,7 +501,7 @@
   width: 58px;
   height: 58px;
   border-radius: 16px;
-  background: linear-gradient(135deg, #f04a1a 0%, #ff8a3d 100%);
+  background: linear-gradient(135deg, #a82f0a 0%, #c93a0e 100%);
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -664,9 +671,9 @@
 }
 .qfp-area-more {
   cursor: pointer;
-  border-color: var(--qfp-orange);
+  border-color: var(--qfd-orange-text);
   background: #fff2ec;
-  color: var(--qfp-orange);
+  color: var(--qfd-orange-text);
   font-weight: 800;
 }
 .qfp-area-more--mobile { display: none; }
@@ -712,7 +719,7 @@
   background: #fbeee7;
   display: grid;
   place-items: center;
-  color: var(--qfp-orange);
+  color: var(--qfd-orange-text);
   transition: transform 0.2s ease;
 }
 .qfp-faq-item[open] summary i { transform: rotate(45deg); }
@@ -764,7 +771,7 @@
 .qfp-footer-brand p { font-size: 15px; line-height: 1.65; color: var(--qfp-muted-2); max-width: 300px; }
 .qfp-footer-made { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: #c9a876; }
 .qfp-footer-col { display: flex; flex-direction: column; gap: 12px; }
-.qfp-footer-col h3 { font-family: var(--qfp-body); font-size: 13px; font-weight: 800; letter-spacing: 0.16em; color: #6e7683; }
+.qfp-footer-col h3 { font-family: var(--qfp-body); font-size: 13px; font-weight: 800; letter-spacing: 0.16em; color: #9aa3b0; }
 .qfp-footer-col a { font-size: 14px; color: #c3c9d2; transition: color 0.15s ease; }
 .qfp-footer-col a:hover { color: #fff; }
 .qfp-footer-col--contact { gap: 14px; }
@@ -780,10 +787,10 @@
   gap: 16px;
   flex-wrap: wrap;
   font-size: 13px;
-  color: #6e7683;
+  color: #9aa3b0;
 }
 .qfp-footer-legal { display: none; gap: 6px; }
-.qfp-footer-legal a { color: #6e7683; }
+.qfp-footer-legal a { color: #9aa3b0; }
 
 /* ==========================================================================
    MOBILE BOTTOM NAV
@@ -1069,8 +1076,8 @@
     cursor: pointer;
   }
   .qfp-bottom-item svg { width: 20px; height: 20px; }
-  .qfp-bottom-item--active { color: var(--qfp-orange); }
-  .qfp-bottom-quote { align-self: start; margin-top: -24px; color: var(--qfp-orange); }
+  .qfp-bottom-item--active { color: var(--qfd-orange-text); }
+  .qfp-bottom-quote { align-self: start; margin-top: -24px; color: var(--qfd-orange-text); }
   .qfp-bottom-quote-icon {
     width: 48px;
     height: 48px;
@@ -1091,4 +1098,29 @@
 
 @media (prefers-reduced-motion: reduce) {
   .qfp-page * { transition: none !important; }
+}
+
+/* --- Target size, WCAG 2.2 SC 2.5.8 (AA) ----------------------------------
+   The bar is 24x24, not the 44x44 of SC 2.5.5 (which is AAA). These links had
+   no padding at all, so their height was just their line-height: the wordmark
+   at 22px, the contact links at 21-23px, and the legal row at 18px. The legal
+   row is the clearest failure - three links side by side with a 6px gap, so
+   the spacing exception cannot rescue them either, because a 24px circle on
+   each overlaps its neighbour.
+
+   min-height rather than padding, so nothing reflows: these elements are
+   already flex, and centring the content means the extra pixels are added
+   around the text instead of pushing it. */
+.qfp-logo {
+  min-height: 24px;
+  align-items: center;
+}
+.qfp-footer-col--contact a,
+.qfp-footer-col--contact span {
+  min-height: 24px;
+}
+.qfp-footer-legal a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
 }

@@ -5587,3 +5587,23 @@ h1, h2 {
   background: rgb(248 250 252);
   color: rgb(100 116 139);
 }
+/* iOS Safari zooms the whole page when a focused control's text is under 16px
+   and does not zoom back. Automation Studio is a desktop console and 0.75rem
+   is right there, so the floor applies only at phone widths. */
+@media (max-width: 767px) {
+  .qfas-input { font-size: 16px; }
+}
+
+/* iOS Safari zooms the whole page when a focused control's text is under 16px
+   and does not zoom back. .qfa-control is 13px, which is right for a dense
+   desktop console but makes the ADMIN LOGIN unusable on a phone - and an admin
+   signing in from their phone is the one admin task that genuinely happens
+   away from a desk. Scoped to phone widths so the desktop console is unchanged;
+   the control height already grows to 44px at this breakpoint. */
+@media (max-width: 767px) {
+  input.qfa-control,
+  select.qfa-control,
+  textarea.qfa-control {
+    font-size: 16px;
+  }
+}

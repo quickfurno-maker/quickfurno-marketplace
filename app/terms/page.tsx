@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   title: "Terms of Service | QuickFurno",
   description:
     "The terms that apply when you use QuickFurno to get matched with eligible home-service vendors.",
+  alternates: { canonical: "/terms" },
 };
 
 /*

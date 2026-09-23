@@ -35,6 +35,7 @@ import {
 import { getVendorPublicVisibility } from "@/lib/vendors/vendorVisibility";
 import { normalizeStatus } from "@/lib/vendors/vendorEligibility";
 import { type QuickFurnoCategory, type Vendor } from "@/lib/quickfurno-data";
+import { normalizeLocalities } from "@/lib/locality";
 import { LAUNCH_CITY, normalizeLaunchCity } from "@/lib/locations/launchCityPolicy";
 import {
   getApprovedReviewsForVendor,
@@ -342,6 +343,15 @@ function mapToPublicVendor(
     source: "supabase",
     serviceCategories,
     portfolioImages: realPortfolioImages(row),
+    // Operating facts the vendor entered themselves. Previously dropped here,
+    // which is why the listing card could only show a name and a price while
+    // the data sat in the row. Localities are normalised because the same area
+    // arrives spelled three ways ("Kharadi" / "kharadi" / "khardi").
+    areas: normalizeLocalities(row.areas_covered),
+    businessType: asText(row.business_type) ?? null,
+    teamSize: asText(row.team_size) ?? null,
+    serviceRadiusKm: typeof row.service_radius_km === "number" ? row.service_radius_km : null,
+    monthlyCapacity: asText(row.monthly_capacity) ?? null,
   };
 }
 
@@ -405,6 +415,44 @@ function resolveVendorCategory(row: VendorRow): QuickFurnoCategory {
  * names ("Full Home Interior", "Modular Kitchen", …) surface on the right pages.
  */
 function matchesPublicCategory(row: VendorRow, publicCategory: QuickFurnoCategory): boolean {
+  // Premium Interiors is a PRICE TIER, not a trade.
+  //
+  // It used to share the aliases "Interior" and "Interiors" with Interior
+  // Designers, so the two pages returned an identical list of vendors. A
+  // category that answers exactly the same as another category is not a
+  // category, it is a second door into the same room — and a homeowner who
+  // picks "Premium Interiors" is telling you something about budget, not about
+  // trade. So membership is decided by the vendor's own published rate.
+  if (publicCategory === "Premium Interiors") {
+    const rate = startingRatePerSqft(row);
+    if (rate === null || rate < PREMIUM_MIN_RATE_PER_SQFT) return false;
+    // Still has to be interior work — a premium-priced painter is not this.
+    return matchesByAlias(row, "Interior Designers") || matchesByAlias(row, "Modular Factory");
+  }
+  return matchesByAlias(row, publicCategory);
+}
+
+/** The per-sqft floor for the Premium Interiors page. */
+const PREMIUM_MIN_RATE_PER_SQFT = 1200;
+
+/**
+ * A vendor's published rate as a plain per-sqft number, or null.
+ *
+ * Only a per-sqft rate can be compared: "Under ₹50,000" and "₹50,000 – ₹1 lakh"
+ * are project budgets, not rates, and treating "50,000" as a sqft price would
+ * put a budget vendor at the top of the premium page.
+ */
+function startingRatePerSqft(row: VendorRow): number | null {
+  const raw = asText(row.starting_price);
+  if (!raw || !/sq\s*\.?\s*ft/i.test(raw)) return null;
+  const digits = raw.replace(/[^\d]/g, "");
+  if (!digits) return null;
+  const value = Number(digits);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/** The original alias matcher, unchanged, now reachable on its own. */
+function matchesByAlias(row: VendorRow, publicCategory: QuickFurnoCategory): boolean {
   const aliases = PUBLIC_CATEGORY_SERVICE_ALIASES[publicCategory].map(normalizeText).filter(Boolean);
   const values = extractVendorServiceValues(row).map(normalizeText).filter(Boolean);
   if (values.length === 0 || aliases.length === 0) return false;
@@ -425,7 +473,15 @@ function extractVendorServiceValues(row: VendorRow): string[] {
     ...coerceServiceValues(row.services),
     ...coerceServiceValues(row.selected_subcategories),
   ];
-  for (const key of ["business_type", "category", "subcategory", "selected_category"]) {
+  // `business_type` is NOT in this list, and must not be added back. It
+  // describes the vendor's PREMISES — "Factory", "Showroom",
+  // "Home-based / On-site" — not the trade they practise. Feeding it to a
+  // matcher that compares substrings bidirectionally made every vendor whose
+  // business_type is "Factory" match the "Modular Factory" category, because
+  // that category lists "Factory Finish" as an alias and
+  // "factory finish".includes("factory") is true. Two interior designers were
+  // being listed on /category/modular-factory as verified modular factories.
+  for (const key of ["category", "subcategory", "selected_category"]) {
     const single = asText(row[key]);
     if (single) values.push(single);
   }

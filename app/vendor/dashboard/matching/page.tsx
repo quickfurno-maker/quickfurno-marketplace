@@ -17,14 +17,17 @@ export const metadata = { title: "Client Matching - QuickFurno" };
 export const dynamic = "force-dynamic";
 
 type VendorLeadsPageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     match?: string;
     lead?: string;
     code?: string;
-  };
+  }>;
 };
 
-export default async function VendorLeadsPage({ searchParams }: VendorLeadsPageProps) {
+export default async function VendorLeadsPage(props: VendorLeadsPageProps) {
+  // Next 16: searchParams is a Promise. Read synchronously it type-checks,
+  // builds clean, then returns undefined at runtime.
+  const searchParams = await props.searchParams;
   const me = await getMyVendor();
   const vendor = me.ok ? me.data : null;
 

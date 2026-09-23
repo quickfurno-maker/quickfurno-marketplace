@@ -2,11 +2,12 @@
 
 export const dynamic = "force-dynamic";
 
-export default function LegacyVendorMatchingRedirect({
-  searchParams,
-}: {
-  searchParams?: { lead?: string; match?: string; code?: string };
+export default async function LegacyVendorMatchingRedirect(props: {
+  searchParams?: Promise<{ lead?: string; match?: string; code?: string }>;
 }) {
+  // Next 16: searchParams is a Promise. Read synchronously it type-checks,
+  // builds clean, then returns undefined at runtime.
+  const searchParams = await props.searchParams;
   const params = new URLSearchParams();
   const feedback = searchParams?.match ?? searchParams?.lead;
   if (feedback) params.set("match", feedback);

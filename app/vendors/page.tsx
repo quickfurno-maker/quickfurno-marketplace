@@ -857,7 +857,7 @@ export default function VendorsPage() {
                     <div className="qfv-phone-body">
                       <span>
                         <small>Welcome back</small>
-                        <h4>Kulkarni Interiors</h4>
+                        <p className="qfv-phone-title">Kulkarni Interiors</p>
                       </span>
                       <div className="qfv-phone-cards">
                         <div>
@@ -878,7 +878,7 @@ export default function VendorsPage() {
                     <div className="qfv-sheet">
                       <span className="qfv-sheet-grip" />
                       <span>
-                        <h5>How can we help?</h5>
+                        <p className="qfv-sheet-title">How can we help?</p>
                         <span className="qfv-sheet-live">
                           <i className="qfv-dot" style={{ width: 7, height: 7 }} />
                           Support workspace

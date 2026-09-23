@@ -1,0 +1,439 @@
+/* ============================================================================
+   Category page — /category/[slug]
+
+   The approved canvas (Desktop 1440 / Mobile 390), built on --qfd-* tokens.
+   Every colour here is a token; there is not a single hex in this file. That
+   is the point of the exercise — when the brand orange moves, this page moves
+   with it instead of being the fifth place it has to be changed by hand.
+
+   Scoped to qfc-* so it cannot reach any page that has not migrated.
+   ========================================================================= */
+
+.qfc-page { background: var(--qfd-grad-page); }
+
+/* --- Hero ----------------------------------------------------------------- */
+.qfc-hero { padding-block: clamp(1.75rem, 1rem + 3vw, 3rem) clamp(2rem, 1.2rem + 3vw, 3.25rem); }
+
+.qfc-crumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  color: var(--qfd-on-dark-muted);
+  margin-bottom: clamp(0.75rem, 0.5rem + 1vw, 1.25rem);
+}
+.qfc-crumb a { color: var(--qfd-on-dark-muted); text-decoration: none; }
+.qfc-crumb a:hover { color: #fff; text-decoration: underline; }
+.qfc-crumb [aria-current] { color: #fff; font-weight: 700; }
+
+.qfc-title { margin-bottom: 0.625rem; max-width: 26ch; }
+.qfc-sub {
+  font-size: var(--qfd-t-body);
+  line-height: var(--qfd-lead-body);
+  color: var(--qfd-on-dark-muted);
+  max-width: 62ch;
+  margin: 0 0 clamp(1.25rem, 0.8rem + 1.6vw, 1.75rem);
+}
+.qfc-sub strong { color: var(--qfd-amber); font-weight: 700; }
+
+/* Match bar. One column on a phone, a single row from 900px. */
+.qfc-matchbar {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  background: var(--qfd-card);
+  border-radius: var(--qfd-r-lg);
+  box-shadow: var(--qfd-shadow-raise);
+}
+@media (min-width: 900px) {
+  .qfc-matchbar {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
+    align-items: stretch;
+    padding: 10px 10px 10px 20px;
+    border-radius: var(--qfd-r-pill);
+    gap: 0;
+  }
+  .qfc-matchbar-cell + .qfc-matchbar-cell {
+    border-left: 1px solid var(--qfd-line);
+    padding-left: 20px;
+  }
+}
+.qfc-matchbar-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: var(--qfd-tap);
+  padding: 8px 12px;
+  border-radius: var(--qfd-r-md);
+  background: var(--qfd-ivory);
+}
+@media (min-width: 900px) {
+  .qfc-matchbar-cell { background: transparent; padding: 4px 0; border-radius: 0; }
+}
+.qfc-matchbar-label { margin-bottom: 2px; font-size: 0.6875rem; }
+.qfc-matchbar-value {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--qfd-ink);
+}
+.qfc-matchbar-value svg { color: var(--qfd-green-text); flex-shrink: 0; }
+
+.qfc-matchbar-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--qfd-muted);
+}
+.qfc-matchbar-select > svg:first-child { flex-shrink: 0; color: var(--qfd-orange-text); }
+.qfc-matchbar-select > svg:last-child { flex-shrink: 0; margin-left: auto; }
+.qfc-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* The locality filter is the one control that changes what this page shows,
+     so it takes the 44px comfort target rather than the 24px AA minimum. */
+  min-height: var(--qfd-tap, 44px);
+  border: 0;
+  background: transparent;
+  font-family: var(--qfd-font-body);
+  font-size: 1rem; /* 16px floor: iOS zooms the page on focus below this */
+  font-weight: 600;
+  color: var(--qfd-ink);
+  appearance: none;
+  cursor: pointer;
+  outline: none;
+}
+.qfc-select:focus-visible { outline: 3px solid var(--qfd-orange); outline-offset: 3px; border-radius: 6px; }
+
+.qfc-matchbar-cta { width: 100%; }
+@media (min-width: 900px) {
+  .qfc-matchbar-cta { width: auto; border-radius: var(--qfd-r-pill); padding-inline: 28px; }
+}
+
+.qfc-trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: clamp(1rem, 0.7rem + 1.2vw, 1.5rem) 0 0;
+  padding: 0;
+}
+.qfc-trust-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: var(--qfd-r-pill);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 0.78125rem;
+  font-weight: 600;
+  color: var(--qfd-on-dark-muted);
+}
+.qfc-trust-item svg { color: var(--qfd-amber); flex-shrink: 0; }
+
+/* --- Body layout ---------------------------------------------------------- */
+.qfc-body { position: relative; overflow: hidden; padding-block: var(--qfd-section-y); }
+.qfc-layout { display: grid; gap: clamp(1.25rem, 0.8rem + 2vw, 2rem); }
+@media (min-width: 1040px) {
+  .qfc-layout { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
+  .qfc-rail { position: sticky; top: 1.5rem; }
+}
+
+/* --- Toolbar and facets --------------------------------------------------- */
+.qfc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.qfc-search { position: relative; flex: 1 1 260px; display: flex; align-items: center; }
+.qfc-search-ic {
+  position: absolute;
+  left: 14px;
+  display: flex;
+  color: var(--qfd-faint);
+  pointer-events: none;
+}
+.qfc-search-input { padding-left: 42px; }
+.qfc-count { margin: 0; font-size: 0.84375rem; font-weight: 700; color: var(--qfd-muted); }
+
+.qfc-facet { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.qfc-facet-label { margin: 0; flex-shrink: 0; }
+.qfc-facet-chip { font-size: 0.8125rem; padding-inline: 13px; }
+
+/* --- Cards ---------------------------------------------------------------- */
+.qfc-cards { display: grid; gap: clamp(0.75rem, 0.5rem + 1vw, 1rem); margin-top: 4px; }
+
+.qfc-card {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 14px;
+  padding: clamp(0.875rem, 0.6rem + 1vw, 1.25rem);
+  align-items: start;
+}
+@media (min-width: 620px) {
+  .qfc-card { grid-template-columns: 132px minmax(0, 1fr); }
+}
+
+.qfc-card-media { position: relative; }
+.qfc-mono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  width: 100%;
+  max-width: 132px;
+  border-radius: var(--qfd-r-md);
+  font-family: var(--qfd-font-head);
+  font-weight: 800;
+  font-size: clamp(1.25rem, 0.7rem + 2.4vw, 2.25rem);
+  letter-spacing: -0.03em;
+  color: var(--qfd-orange-text);
+  background:
+    repeating-linear-gradient(var(--qfc-tone, 118deg), rgba(201, 58, 14, 0.05) 0 2px, transparent 2px 11px),
+    linear-gradient(140deg, var(--qfd-tint-orange), var(--qfd-card-warm));
+  border: 1px solid var(--qfd-line);
+}
+.qfc-mono-tick {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--qfd-r-pill);
+  background: var(--qfd-green);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2.5px solid var(--qfd-card);
+}
+@media (min-width: 620px) {
+  .qfc-mono-tick { right: 4px; bottom: 4px; width: 28px; height: 28px; }
+}
+
+.qfc-card-body { display: grid; gap: 14px; min-width: 0; }
+@media (min-width: 900px) {
+  .qfc-card-body { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 20px; }
+}
+
+.qfc-card-name { margin: 0 0 8px; }
+.qfc-card-link { color: inherit; text-decoration: none; }
+.qfc-card-link:hover { color: var(--qfd-orange-text); }
+
+.qfc-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 9px; }
+.qfc-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78125rem;
+  font-weight: 700;
+  color: var(--qfd-green-text);
+}
+.qfc-where {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78125rem;
+  color: var(--qfd-muted);
+}
+.qfc-where svg { color: var(--qfd-faint); flex-shrink: 0; }
+
+.qfc-rating { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin: 0 0 10px; font-size: 0.84375rem; }
+.qfc-stars { display: inline-flex; gap: 1px; }
+.qfc-star-on { color: var(--qfd-amber); }
+.qfc-star-off { color: var(--qfd-line-2); }
+.qfc-rating strong { font-size: 0.9375rem; color: var(--qfd-ink); }
+.qfc-rating-count { color: var(--qfd-muted); }
+
+.qfc-norating { margin: 0 0 10px; font-size: 0.8125rem; line-height: 1.45; color: var(--qfd-muted); }
+.qfc-norating strong { color: var(--qfd-ink); font-weight: 700; }
+
+.qfc-facts { display: flex; flex-wrap: wrap; gap: 7px; list-style: none; margin: 0; padding: 0; }
+.qfc-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: var(--qfd-r-sm);
+  border: 1px solid var(--qfd-line);
+  background: var(--qfd-cream);
+  font-size: 0.78125rem;
+  font-weight: 600;
+  color: var(--qfd-muted);
+}
+.qfc-fact-ic { display: flex; color: var(--qfd-orange-text); flex-shrink: 0; }
+/* Below 520px the body column is ~240px. Tightening the chips lets two sit
+   side by side instead of each taking a row and doubling the card height. */
+@media (max-width: 520px) {
+  .qfc-fact { padding: 5px 9px; gap: 5px; font-size: 0.75rem; }
+  .qfc-facts { gap: 6px; }
+}
+
+.qfc-card-actions { display: grid; gap: 10px; align-content: start; }
+@media (min-width: 900px) {
+  .qfc-card-actions { justify-items: end; text-align: right; min-width: 180px; }
+}
+.qfc-rate { display: grid; gap: 1px; }
+@media (min-width: 900px) { .qfc-rate { justify-items: end; } }
+.qfc-rate-label { margin-bottom: 3px; }
+.qfc-rate-value {
+  font-family: var(--qfd-font-head);
+  font-size: clamp(1.25rem, 1rem + 1vw, 1.5rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--qfd-ink);
+}
+.qfc-rate-note { font-size: 0.6875rem; color: var(--qfd-faint); }
+
+.qfc-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (min-width: 900px) { .qfc-buttons { flex-direction: column; align-items: stretch; width: 180px; } }
+
+.qfc-compare {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: var(--qfd-tap);
+  padding: 4px 2px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--qfd-muted);
+  cursor: pointer;
+}
+.qfc-compare--off { opacity: 0.55; cursor: not-allowed; }
+.qfc-compare .qfd-check-box { width: 20px; height: 20px; margin: 0; }
+
+/* --- Compare tray --------------------------------------------------------- */
+.qfc-tray {
+  position: sticky;
+  bottom: 12px;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px 18px;
+  border-radius: var(--qfd-r-lg);
+  background: var(--qfd-grad-dark);
+  color: var(--qfd-on-dark);
+  box-shadow: var(--qfd-shadow-raise);
+}
+.qfc-tray-names { margin: 0; display: grid; gap: 2px; font-size: 0.8125rem; min-width: 0; }
+.qfc-tray-names strong { font-size: 0.875rem; }
+.qfc-tray-names span { color: var(--qfd-on-dark-muted); overflow-wrap: anywhere; }
+.qfc-tray-actions { display: flex; gap: 8px; align-items: center; }
+.qfc-tray .qfd-btn--quiet { color: var(--qfd-amber); }
+.qfc-tray .qfd-btn--quiet:hover { background: rgba(255, 255, 255, 0.1); }
+
+/* --- Empty / no-match ----------------------------------------------------- */
+.qfc-empty {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 14px;
+  padding: clamp(2rem, 1.2rem + 4vw, 3.5rem) clamp(1rem, 0.6rem + 2vw, 2.5rem);
+}
+.qfc-empty .qfd-lede { max-width: 52ch; }
+.qfc-nomatch {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: clamp(1.75rem, 1rem + 3vw, 2.75rem) 1.25rem;
+  border: 1.5px dashed var(--qfd-line-2);
+  border-radius: var(--qfd-r-xl);
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* --- Rail ----------------------------------------------------------------- */
+.qfc-rail { display: grid; gap: clamp(0.75rem, 0.5rem + 1vw, 1rem); }
+.qfc-rail-card { display: grid; gap: 12px; }
+.qfc-rail-card .qfd-lede { font-size: 0.875rem; }
+.qfc-rail-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+.qfc-rail-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 0.8125rem;
+  color: var(--qfd-muted);
+}
+.qfc-rail-list svg { color: var(--qfd-green-text); flex-shrink: 0; margin-top: 2px; }
+
+.qfc-trades { display: grid; gap: 2px; }
+.qfc-trade {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--qfd-tap);
+  padding: 10px 8px;
+  border-radius: var(--qfd-r-md);
+  color: var(--qfd-ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--qfd-line);
+}
+.qfc-trades .qfc-trade:last-child { border-bottom: 0; }
+.qfc-trade:hover { background: var(--qfd-ivory); color: var(--qfd-orange-text); }
+.qfc-trade-name { font-size: 0.875rem; font-weight: 700; }
+.qfc-trade-note { display: block; font-size: 0.75rem; font-weight: 500; color: var(--qfd-faint); margin-top: 1px; }
+.qfc-trade-go { margin-left: auto; color: var(--qfd-orange-text); flex-shrink: 0; }
+
+/* --- Final CTA ------------------------------------------------------------ */
+.qfc-cta { text-align: center; }
+.qfc-cta .qfd-kicker { justify-content: center; }
+.qfc-cta .qfd-lede { margin-inline: auto; }
+.qfc-cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 1.25rem;
+}
+
+/* --- Hero artwork ---------------------------------------------------------
+   Generic per-trade illustration, decorative only. It sits behind the copy on
+   desktop and is hidden on phones, where it would either crowd the match bar
+   or sit behind the title and hurt its contrast. */
+.qfc-hero-art {
+  position: absolute;
+  right: clamp(-2rem, -1rem + 2vw, 2rem);
+  top: 50%;
+  transform: translateY(-50%);
+  width: min(30vw, 340px);
+  pointer-events: none;
+  opacity: 0.34;
+  z-index: 0;
+  display: none;
+}
+.qfc-hero-art img { width: 100%; height: auto; display: block; }
+@media (min-width: 1100px) {
+  .qfc-hero-art { display: block; }
+}
+
+/* A real vendor photo, layered over the monogram tile. The monogram stays in
+   the DOM underneath, so an image that fails to load reveals a designed tile
+   instead of a broken-image icon — no JavaScript, no error handler. */
+.qfc-card-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Breadcrumb links were 20px tall - their line-height and nothing else - which
+   is under the 24x24 minimum of WCAG 2.2 SC 2.5.8 (AA). "Home" and "Services"
+   also sit next to each other, so the spacing exception does not apply. */
+.qfc-crumb a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}

@@ -2,7 +2,7 @@
 /* QuickFurno Vendor Portal ? final green/orange application skin.
    Imported after vendor-portal-v2.css; authority/layout semantics stay unchanged. */
 .qf-vendor-v2-shell {
-  --v2-blue: #07965f;
+  --v2-blue: #286e50;
   --v2-blue-deep: #075645;
   --v2-blue-tint: #e9f7f0;
   --v2-blue-line: #cfe9dd;
@@ -25,8 +25,8 @@
   --v2-danger: #b53a32;
   --v2-danger-tint: #fff3f1;
   --v2-danger-line: #f3d4d0;
-  --v2-orange: #ff552f;
-  --v2-orange-deep: #ef4723;
+  --v2-orange: #a82f0a;
+  --v2-orange-deep: #c93a0e;
   --v2-radius-sm: 10px;
   --v2-radius: 16px;
   --v2-radius-lg: 20px;
@@ -73,8 +73,8 @@
   color:#075645;
   font-weight:800;
 }
-.qf-vendor-v2-navlink[data-active="true"] svg { color:#07965f; }
-.qf-vendor-v2-navlink[data-active="true"]::before { background:#ff552f; height:24px; }
+.qf-vendor-v2-navlink[data-active="true"] svg { color:#286e50; }
+.qf-vendor-v2-navlink[data-active="true"]::before { background:#a82f0a; height:24px; }
 .qf-vendor-v2-sidebar-foot { border-top-color:#edf2ef; }
 
 .qf-vendor-v2-topbar {
@@ -99,7 +99,7 @@
 .qf-vendor-v2-overview { gap:1.15rem; }
 .qf-vendor-v2-overview-head { padding:.25rem .1rem 0; align-items:center; }
 .qf-vendor-v2-greeting { color:#082b3b; font-weight:800; font-size:clamp(1.55rem,3vw,2rem); }
-.qf-vendor-v2-greeting span { color:#07965f; }
+.qf-vendor-v2-greeting span { color:#286e50; }
 .qf-vendor-v2-greeting-sub { color:#66747c; font-size:.9rem; }
 
 .qf-vendor-v2-panel,
@@ -130,11 +130,11 @@
 a.qf-vendor-v2-metric:hover { border-color:#bcdccc; box-shadow:0 14px 34px rgba(8,43,59,.08); }
 
 .qf-vendor-v2-btn--primary {
-  background:linear-gradient(135deg,#ff552f,#ef4723);
-  border-color:#ff552f;
+  background:linear-gradient(135deg,#a82f0a,#c93a0e);
+  border-color:#a82f0a;
   box-shadow:0 8px 18px rgba(255,85,47,.18);
 }
-.qf-vendor-v2-btn--primary:hover { background:#ef4723;border-color:#ef4723; }
+.qf-vendor-v2-btn--primary:hover { background:#c93a0e;border-color:#c93a0e; }
 .qf-vendor-v2-btn--quiet { border-color:#dfe8e4;color:#29434e; }
 .qf-vendor-v2-btn--quiet:hover { background:#f3f8f5;border-color:#cce0d6;color:#075645; }
 
@@ -159,7 +159,7 @@ a.qf-vendor-v2-metric:hover { border-color:#bcdccc; box-shadow:0 14px 34px rgba(
 .qf-vendor-v2-fact { border-bottom-color:#eef3f1; }
 .qf-vendor-v2-fact dt { color:#6f7e83; }
 .qf-vendor-v2-fact dd { color:#183a47; font-weight:750; }
-.qf-vendor-v2-progress-fill { background:linear-gradient(90deg,#07965f,#19ad72); }
+.qf-vendor-v2-progress-fill { background:linear-gradient(90deg,#286e50,#19ad72); }
 
 .qf-vendor-v2-pill[data-tone="ok"] { background:#e8f7ef;border-color:#c9e7d8;color:#06784d; }
 .qf-vendor-v2-pill[data-tone="pending"] { background:#fff8ec;border-color:#f1ddbb;color:#a45b08; }
@@ -191,8 +191,8 @@ a.qf-vendor-v2-metric:hover { border-color:#bcdccc; box-shadow:0 14px 34px rgba(
   .qf-vendor-v2-overview-headmeta { width:100%; }
   .qf-vendor-v2-overview-headmeta .qf-vendor-v2-btn { min-height:36px; }
   .qf-vendor-v2-panel { border-radius:15px;padding:.9rem; }
-  .qf-vendor-v2-bottomnav-item[data-active="true"] { background:transparent;color:#07965f; }
-  .qf-vendor-v2-bottomnav-item:nth-child(2)[data-active="true"] { color:#ff552f; }
+  .qf-vendor-v2-bottomnav-item[data-active="true"] { background:transparent;color:#286e50; }
+  .qf-vendor-v2-bottomnav-item:nth-child(2)[data-active="true"] { color:#a82f0a; }
 }
 
 
@@ -234,7 +234,7 @@ a.qf-vendor-v2-metric:hover { border-color:#bcdccc; box-shadow:0 14px 34px rgba(
 .qf-vendor-v2-leads-phone svg { color:#078758; }
 .qf-vendor-v2-leads-search:focus-within,
 .qf-vendor-v2-profile-input:focus-visible,
-.qf-vendor-v2-support-input:focus-visible { border-color:#9fd1ba; outline-color:#07965f; }
+.qf-vendor-v2-support-input:focus-visible { border-color:#9fd1ba; outline-color:#286e50; }
 
 .qf-vendor-v2-profile-chip {
   border-color:#c9e8d9;
@@ -250,16 +250,16 @@ a.qf-vendor-v2-metric:hover { border-color:#bcdccc; box-shadow:0 14px 34px rgba(
 .qf-vendor-v2-package-balance-value { color:#082b3b; }
 .qf-vendor-v2-package-card { background:#fbfdfc; }
 .qf-vendor-v2-package-card:hover { border-color:#c6e2d4; }
-.qf-vendor-v2-package-bar .qf-vendor-v2-progress-fill { background:linear-gradient(90deg,#07965f,#19ad72); }
+.qf-vendor-v2-package-bar .qf-vendor-v2-progress-fill { background:linear-gradient(90deg,#286e50,#19ad72); }
 .qf-vendor-v2-package-card .qf-vendor-v2-btn--primary { min-height:42px; }
 
 .qf-vendor-v2-notice-tab[data-active="true"] { background:#006b43; border-color:#006b43; }
 .qf-vendor-v2-notice-item[data-unread="true"] {
   border-color:#c9e6d8;
-  border-left-color:#07965f;
+  border-left-color:#286e50;
   background:#f0faf5;
 }
-.qf-vendor-v2-notice-unread { background:#07965f; }
+.qf-vendor-v2-notice-unread { background:#286e50; }
 .qf-vendor-v2-notice-markread { color:#006b43; }
 
 .qf-vendor-v2-support-message[data-side="vendor"] {

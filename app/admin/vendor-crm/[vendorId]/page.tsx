@@ -71,19 +71,20 @@ export default async function VendorCrmProfilePage({
   params,
   searchParams,
 }: {
-  params: { vendorId: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: Promise<{ vendorId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const session = await getAdminSession();
   if (!session.isLoggedIn) redirect("/admin/login");
   if (!session.isSuperadmin) redirect("/admin/login?error=unauthorized");
 
-  const vendorId = params.vendorId;
+  const vendorId = (await params).vendorId;
+  const sp = await searchParams;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vendorId)) notFound();
 
-  const activeTab = parseTab(first(searchParams?.tab));
-  const page = first(searchParams?.page);
-  const taskStatus = parseTaskStatus(first(searchParams?.status));
+  const activeTab = parseTab(first(sp?.tab));
+  const page = first(sp?.page);
+  const taskStatus = parseTaskStatus(first(sp?.status));
 
   let core: VendorCoreFacts | null = null;
   let profile: VendorCrmProfileRecord | null = null;

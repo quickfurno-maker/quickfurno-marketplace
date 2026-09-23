@@ -24,7 +24,10 @@ import { getPublicVendorProfileBySlugOrId } from "@/services/publicVendorService
 import { categorySlug, enquiryServiceForCategory } from "@/lib/quickfurno-data";
 import "../vendor-profile-v2.css";
 
-type VendorPageProps = { params: { id: string } };
+// Next 15 made route params asynchronous. Read synchronously, params.id is
+// undefined at runtime and every vendor profile 404s — while still type-checking
+// and building clean.
+type VendorPageProps = { params: Promise<{ id: string }> };
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -37,7 +40,8 @@ const loadVendorProfile = cache(async (slugOrId: string) => {
 });
 
 export async function generateMetadata({ params }: VendorPageProps): Promise<Metadata> {
-  const { vendor } = await loadVendorProfile(params.id);
+  const { id } = await params;
+  const { vendor } = await loadVendorProfile(id);
   if (!vendor) return { title: "Vendor not found | QuickFurno" };
 
   const view = toProfileView(vendor);
@@ -56,6 +60,10 @@ export async function generateMetadata({ params }: VendorPageProps): Promise<Met
   return {
     title,
     description,
+    // The OG url already pointed at the slug form; the canonical now says the
+    // same thing to a crawler, so a profile reached by id and by slug is one
+    // page rather than two competing ones.
+    alternates: { canonical: `/vendors/${vendor.slug}` },
     openGraph: {
       title,
       description,
@@ -67,10 +75,11 @@ export async function generateMetadata({ params }: VendorPageProps): Promise<Met
 }
 
 export default async function VendorProfilePage({ params }: VendorPageProps) {
+  const { id } = await params;
   // Supabase-only resolution. A hidden vendor, an unknown id and a read failure
   // all return null and 404 here — the static demo catalog is no longer a
   // fallback, so a fictional vendor can never be served as a real profile.
-  const { vendor } = await loadVendorProfile(params.id);
+  const { vendor } = await loadVendorProfile(id);
   if (!vendor) notFound();
 
   const view = toProfileView(vendor);

@@ -29,12 +29,12 @@ function logCampaignRouteFailure(scope: string, e: unknown) {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Admin-only campaign editor + frozen-audience review.
-export default async function VendorCampaignEditorPage({ params }: { params: { campaignId: string } }) {
+export default async function VendorCampaignEditorPage({ params }: { params: Promise<{ campaignId: string }> }) {
   const session = await getAdminSession();
   if (!session.isLoggedIn) redirect("/admin/login");
   if (!session.isSuperadmin) redirect("/admin/login?error=unauthorized");
 
-  const campaignId = params.campaignId;
+  const campaignId = (await params).campaignId;
   const isNew = campaignId === "new";
   if (!isNew && !UUID_RE.test(campaignId)) notFound();
 

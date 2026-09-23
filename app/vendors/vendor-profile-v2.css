@@ -60,7 +60,9 @@
 .qf-vprofile-cover {
   position: relative;
   height: 116px;
-  background: var(--qf-brand-blue-tint);
+  background:
+    repeating-linear-gradient(118deg, rgba(201, 58, 14, 0.045) 0 2px, transparent 2px 13px),
+    linear-gradient(118deg, #fffdfa 0%, #faf4eb 46%, #f4e7d6 100%);
 }
 
 /*
@@ -84,8 +86,13 @@
   display: block;
   width: 100%;
   height: 100%;
+  /* No vendor has uploaded a cover — there is no upload path in the product —
+     so this is the normal case, not an edge case, and it should look designed
+     rather than like a failed image. Warm to match the rest of the site, with
+     a faint weave so it is not a flat pale band. */
   background:
-    linear-gradient(135deg, var(--qf-brand-blue-tint) 0%, #e9eef8 55%, #f3f6fb 100%);
+    repeating-linear-gradient(118deg, rgba(201, 58, 14, 0.05) 0 2px, transparent 2px 13px),
+    linear-gradient(118deg, #fffdfa 0%, #faf4eb 46%, #f4e7d6 100%);
 }
 
 .qf-vprofile-media-fallback {
@@ -93,8 +100,12 @@
   place-items: center;
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, var(--qf-brand-blue-tint) 0%, #e9eef8 100%);
-  color: var(--qf-brand-blue-deep);
+  /* The initials tile is what every vendor shows today, so it carries the
+     brand rather than reading as a missing photo. */
+  background:
+    repeating-linear-gradient(140deg, rgba(201, 58, 14, 0.05) 0 2px, transparent 2px 11px),
+    linear-gradient(140deg, var(--qfd-tint-orange) 0%, var(--qfd-card-warm) 100%);
+  color: var(--qfd-orange-text);
   font-size: 0.766rem;
   font-weight: 650;
   text-align: center;
@@ -135,8 +146,12 @@
   place-items: center;
   border: 3px solid var(--qf-brand-surface);
   border-radius: var(--qf-radius-md);
-  background: var(--qf-brand-blue-tint);
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
+  /* Every vendor shows initials today, so this tile is the profile's face.
+     Warm to match the cover and the rest of the site. */
+  background:
+    repeating-linear-gradient(140deg, rgba(201, 58, 14, 0.05) 0 2px, transparent 2px 11px),
+    linear-gradient(140deg, var(--qfd-tint-orange) 0%, var(--qfd-card-warm) 100%);
+  box-shadow: 0 2px 8px rgba(20, 24, 29, 0.1);
 }
 
 .qf-vprofile-avatar > .qf-vprofile-avatar-img {
@@ -150,7 +165,7 @@
   font-size: 1.35rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: var(--qf-brand-blue-deep);
+  color: var(--qfd-orange-text);
 }
 
 .qf-vprofile-identity-text { min-width: 0; padding-bottom: 0.15rem; }
@@ -670,7 +685,7 @@
   background: var(--qf-brand-surface);
   color: var(--qf-brand-ink);
   font: inherit;
-  font-size: 0.844rem;
+  font-size: 1rem; /* 16px floor: iOS zooms the page on focus below this */
   padding: 0.65rem 0.7rem;
 }
 
@@ -688,4 +703,12 @@
 
 @media (min-width: 620px) {
   .qf-vreview-fields { grid-template-columns: minmax(0, 1fr) minmax(160px, 0.55fr); }
+}
+
+/* The "Back to <category>" link was 20px tall, under the 24x24 minimum of
+   WCAG 2.2 SC 2.5.8 (AA). It is the only way back to the listing on a phone. */
+.qf-vprofile-breadcrumb a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
 }

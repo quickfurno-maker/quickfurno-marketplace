@@ -3,6 +3,7 @@ import { FAQ } from "@/components/FAQ";
 import { VendorPortal } from "@/components/vendor/VendorPortal";
 import { VendorPortalFooter } from "@/components/vendor/VendorPortalFooter";
 import { VendorPortalHeader } from "@/components/vendor/VendorPortalHeader";
+import { getCategoryBySlug } from "@/lib/quickfurno-data";
 
 const steps = [
   {
@@ -56,12 +57,22 @@ export const metadata: Metadata = {
     "Log in to your QuickFurno vendor dashboard or create a vendor account to submit your business profile for review and manage matched home-service enquiries when eligible.",
 };
 
-export default function VendorPortalPage({
-  searchParams,
-}: {
-  searchParams?: { mode?: string };
+export default async function VendorPortalPage(props: {
+  searchParams?: Promise<{ mode?: string; trade?: string }>;
 }) {
+  // Next 16: searchParams is a Promise. Read synchronously it type-checks,
+  // builds clean, then returns undefined at runtime.
+  const searchParams = await props.searchParams;
   const initialMode = searchParams?.mode === "signup" ? "signup" : "login";
+
+  // Every "Become a Vendor" link in the footer already carries
+  // ?trade=<category-slug>, and nothing read it — a carpenter arriving from the
+  // carpenters page met an empty trade picker. Resolved here, on the server,
+  // against the same slug table the category pages use, so an unknown or
+  // hand-edited slug simply yields null and the wizard starts blank rather
+  // than guessing a trade on the vendor's behalf.
+  const tradeSlug = searchParams?.trade?.trim() || null;
+  const initialCategory = tradeSlug ? getCategoryBySlug(tradeSlug)?.name ?? null : null;
 
   return (
     <>
@@ -75,7 +86,11 @@ export default function VendorPortalPage({
       <VendorPortalHeader />
       <main className="qf-home-page qf-vendor-public-page">
         <div className="qf-home-app-shell">
-          <VendorPortal initialMode={initialMode} />
+          <VendorPortal
+            initialMode={initialMode}
+            initialCategory={initialCategory}
+            tradeSlug={tradeSlug}
+          />
 
           <section className="qf-home-section">
             <div className="qf-section-head">

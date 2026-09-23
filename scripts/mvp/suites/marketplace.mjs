@@ -702,7 +702,7 @@ export const suite = {
         // The canonical page is untouched and still reads real vendors.
         const canonical = readFileSync('app/category/[slug]/page.tsx', 'utf8');
         assertTrue(canonical.includes('getPublicVendorsForCategory'), 'canonical still reads Supabase');
-        assertTrue(canonical.includes('VendorDiscovery'), 'canonical still renders the V2 listing');
+        assertTrue(canonical.includes('CategoryListing'), 'canonical still renders the real listing');
       },
     },
     {
@@ -934,8 +934,17 @@ export const suite = {
         assertTrue(page.includes('searchParams?.mode === "signup" ? "signup" : "login"'),
           '?mode=signup maps signup, everything else maps login');
         const portal = readFileSync('components/vendor/VendorPortal.tsx', 'utf8');
-        assertTrue(portal.includes('router.replace(`/vendor?mode=${next}`, { scroll: false })'),
-          'switchMode keeps the exact router.replace target');
+        // This pinned the literal replace target. switchMode now composes the
+        // query so the ?trade= carried by every "Become a Vendor" link survives
+        // a tab switch, so the rule is stated as the invariant it was really
+        // protecting — /vendor, mode=<next>, no scroll — and both branches are
+        // pinned, which is stricter than the single literal was.
+        assertTrue(portal.includes('router.replace(`/vendor${query}`, { scroll: false })'),
+          'switchMode replaces to /vendor without scrolling');
+        assertTrue(portal.includes('`?mode=${next}&trade=${encodeURIComponent(tradeSlug)}`'),
+          'a switch carries the trade param through');
+        assertTrue(portal.includes('`?mode=${next}`'),
+          'a switch with no trade keeps the bare ?mode= deep link');
         assertTrue(portal.includes('role="tablist"'), 'tablist preserved');
         assertTrue(portal.includes('role="tab"'), 'tab role preserved');
         assertTrue(portal.includes('aria-selected={active}'), 'aria-selected preserved');
@@ -1581,10 +1590,14 @@ export const suite = {
     {
       name: 'generic artwork is never presented as a vendor photo or project',
       run: () => {
-        // Listing thumbnail: the vendor's OWN image, else initials. No stock.
-        const card = readFileSync('components/public-listing/VendorListingCard.tsx', 'utf8');
-        assertTrue(card.includes('vendor.imageUrl ?'), 'real vendor image wins');
-        assertTrue(card.includes('qf-vl-card-initials'), 'initials are the fallback');
+        // Listing thumbnail: the vendor's OWN identity, never stock art.
+        // The category card draws a monogram from the business name and shows
+        // nothing else — no vendor has ever uploaded an image and the product
+        // has no upload path, so there is no real photo for it to prefer. The
+        // invariant that matters is unchanged: generic category artwork must
+        // never stand in for a vendor's own work.
+        const card = readFileSync('components/category/VendorCard.tsx', 'utf8');
+        assertTrue(card.includes('initials(vendor.businessName)'), 'card identity is a monogram from the vendor name');
         assertFalse(card.includes('categoryArtwork'), 'no category art on listing cards');
         assertFalse(card.includes('images/categories'), 'no category art path on cards');
 
@@ -1781,23 +1794,30 @@ export const suite = {
         // Latent until QF-UI-V2-18 put real vendors on the page: the card name
         // and the empty-state heading both sit directly under the category h1
         // with no intervening section heading, so an h3 measured as "1->3".
-        const card = readFileSync('components/public-listing/VendorListingCard.tsx', 'utf8');
-        assertTrue(card.includes('<h2 className="qf-vl-card-name">'), 'card name is an h2');
-        assertFalse(/<h3 className="qf-vl-card-name">/.test(card), 'no h3 regression on the card name');
+        // Retargeted from the retired VendorDiscovery / VendorListingCard pair
+        // to the components that actually render. Reading the dead files is
+        // precisely how this rule kept passing while the live page skipped a
+        // level: the listing was rebuilt, the old files stayed on disk, and the
+        // guard went on inspecting markup no visitor could reach.
+        const card = readFileSync('components/category/VendorCard.tsx', 'utf8');
+        assertTrue(/<h3 className="qfd-h3 qfc-card-name">/.test(card), 'card name is a real heading');
+        assertFalse(/<h1/.test(card), 'a listing card never declares an h1');
 
-        const discovery = readFileSync('components/public-listing/VendorDiscovery.tsx', 'utf8');
-        const emptyBlock = discovery.slice(discovery.indexOf('qf-vl-empty'));
-        assertTrue(/<h2>/.test(emptyBlock.slice(0, 600)), 'empty-state heading is an h2');
+        const listing = readFileSync('components/category/CategoryListing.tsx', 'utf8');
+        // The results need their own h2: the page h1 is the category name and
+        // every card name is an h3, so without one the outline runs 1 -> 3.
+        assertTrue(/<h2 className="qfd-sr">/.test(listing), 'results section carries an h2');
+        assertTrue(/<h2 className="qfd-h2">No /.test(listing), 'empty-state heading is an h2');
+        // A paragraph wearing a heading class is not a heading.
+        assertFalse(/<p className="qfd-h3">/.test(listing), 'no paragraph styled as a heading');
 
         // The category page keeps exactly one h1 and does not add another.
         const page = readFileSync('app/category/[slug]/page.tsx', 'utf8');
         assertEqual((page.match(/<h1/g) || []).length, 1, 'category page declares exactly one h1');
-        assertFalse(/<h1/.test(card), 'a listing card never declares an h1');
 
         // The level change must stay semantic: styling is class-based.
-        const css = readFileSync('app/category/vendor-listing-v2.css', 'utf8');
-        assertTrue(css.includes('.qf-vl-card-name {'), 'card name styled by class, not tag');
-        assertTrue(css.includes('.qf-vl-empty h2,'), 'empty rule covers h2');
+        const css = readFileSync('app/category/category-v3.css', 'utf8');
+        assertTrue(css.includes('.qfc-card-name'), 'card name styled by class, not tag');
       },
     },
 

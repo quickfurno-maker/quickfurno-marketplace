@@ -1,18 +1,106 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { VendorIcon } from "../icons";
 import { PROFILE_LIMITS, isSafeMediaUrl } from "./profileModel";
 
 /**
- * URL-based media manager.
+ * Sends one file to /api/vendor/media and hands back the hosted URL it
+ * returns. It publishes nothing by itself — the caller drops the URL into the
+ * same field a pasted link uses, so the normal approval still applies.
  *
- * THERE IS NO UPLOAD BUTTON HERE ON PURPOSE. The repository has no vendor media
- * upload path — no Supabase Storage call, no signed-upload endpoint, no media
- * API route, no file input anywhere in the app. Rendering an "Upload" control
- * would be a button that cannot work, so the vendor gets an honest image-link
- * manager with real previews instead. Direct file upload needs a backend phase
- * of its own.
+ * Every state is announced in words, never by colour alone, and the server's
+ * own message is shown rather than a generic failure: "Photos must be under
+ * 8MB. Yours is 12.4MB" tells a vendor what to do next; "Upload failed" does
+ * not.
+ */
+function PhotoUploadButton({
+  id,
+  label,
+  disabled,
+  onUploaded,
+}: {
+  id: string;
+  label: string;
+  disabled?: boolean;
+  onUploaded: (url: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function pick(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Reset first, so picking the SAME file again still fires a change event.
+    event.target.value = "";
+    if (!file) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/vendor/media", { method: "POST", body });
+      const json = (await res.json().catch(() => null)) as
+        | { ok?: boolean; url?: string; error?: string }
+        | null;
+
+      if (!res.ok || !json?.ok || !json.url) {
+        setError(json?.error ?? "That photo could not be uploaded. Please try again.");
+        return;
+      }
+      onUploaded(json.url);
+    } catch {
+      setError("Upload failed. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const blocked = Boolean(disabled) || busy;
+
+  return (
+    <div className="qf-vendor-v2-profile-upload">
+      <input
+        id={id}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="qf-vendor-v2-sr-only"
+        onChange={pick}
+        disabled={blocked}
+      />
+      <label
+        htmlFor={id}
+        className="qf-vendor-v2-btn qf-vendor-v2-btn--quiet qf-vendor-v2-profile-upload-btn"
+        data-busy={busy || undefined}
+        aria-disabled={blocked || undefined}
+      >
+        <VendorIcon name={busy ? "clock" : "profile"} size={16} />
+        {busy ? "Uploading…" : label}
+      </label>
+      <p
+        className="qf-vendor-v2-profile-hint"
+        role="status"
+        data-tone={error ? "error" : undefined}
+      >
+        {error ?? "JPEG, PNG or WebP, up to 8MB. Location data is removed from every photo."}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Media manager: upload a file, or paste a link.
+ *
+ * This file used to carry a note saying there was no upload button on purpose,
+ * because no upload path existed — no bucket, no endpoint, no storage call
+ * anywhere in the repo — and a button that cannot work is worse than none.
+ * That backend now exists (app/api/vendor/media/route.ts, bucket
+ * `vendor-media`), so the button is real and the note is gone.
+ *
+ * Uploading does NOT publish anything. It returns a hosted URL and drops it
+ * into the same field a pasted link goes into, so the photo still travels
+ * through the normal profile-change approval an admin signs off. The upload is
+ * a way to GET a URL, not a way around the review.
  *
  * `src` is only ever set from a value that passes isSafeMediaUrl(), which
  * mirrors the server's setSafeUrl(): a relative path or http(s), nothing else.
@@ -67,6 +155,12 @@ export function VendorProfileImageField({
         <p className="qf-vendor-v2-profile-hint" id={`${inputId}-hint`}>
           {invalid ? "Use a link starting with https:// or /." : hint}
         </p>
+
+        <PhotoUploadButton
+          id={`${inputId}-upload`}
+          label={`Upload ${shape === "avatar" ? "a logo or photo" : "a cover photo"}`}
+          onUploaded={(uploaded) => setUrl(uploaded)}
+        />
         {trimmed ? (
           <button
             type="button"
@@ -229,6 +323,22 @@ export function VendorProfilePortfolioField({
           ))}
         </ul>
       )}
+
+      <PhotoUploadButton
+        id={`qf-portfolio-upload-${name}`}
+        label="Upload a project photo"
+        disabled={full}
+        onUploaded={(uploaded) => {
+          // Same guards a pasted link goes through, so an upload cannot slip
+          // past the duplicate or limit rules by another door.
+          setUrls((current) => {
+            if (current.includes(uploaded)) return current;
+            if (current.length >= PROFILE_LIMITS.maxPortfolio) return current;
+            return [...current, uploaded];
+          });
+          setError(null);
+        }}
+      />
 
       <div className="qf-vendor-v2-profile-portfolio-add">
         <label className="qf-vendor-v2-profile-field">

@@ -72,7 +72,7 @@ const FROZEN = [
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority. No existing migration was changed, renamed, deleted or
 // reordered. Still exact equality.
-const MIGRATION_COUNT = 119;
+const MIGRATION_COUNT = 118;
 const PRODUCTION_ACTIVATION_NAME =
   "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql";
 // QF-MVP-82A-R0: the newest SOURCE-PENDING migration — Realtime publication
@@ -96,8 +96,6 @@ const LAUNCH_SECURITY_CLOSEOUT_NAME =
 // plus its one-at-a-time activation RPC.
 const TRANSACTIONAL_MAPPING_NAME =
   "20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql";
-const LEAD_DRAFTS_NAME =
-  "20260921100000_qf_lead_drafts.sql";
 const FALSE_CEILING_NAME =
   "20260922120000_false_ceiling_category.sql";
 // QF-MVP-50.6 RE-PIN: 17 -> 18. QF-MVP-40.14 RE-PIN: 21 -> 22.
@@ -172,7 +170,7 @@ record("V07a the final twenty-seven versions are in exact chronological order",
      "20260918180500_jarvis_whatsapp_callback_replay_receipts.sql",
      "20260919010000_vendor_review_system.sql",
      LEAD_DRAFTS_NAME, FALSE_CEILING_NAME]));
-record("V07 the local migration set is exactly 119",
+record("V07 the local migration set is exactly 118",
   migrationFiles.length === MIGRATION_COUNT);
 
 // ---------------------------------------------------------------------------
@@ -366,7 +364,7 @@ record("G05a the bridge no longer appears as pending",
 // reconciledPostAnchorMigrations set. The APPLIED ten and their 21-30 remote-history
 // counts are UNCHANGED. Re-pinned to the new exact truth, never loosened.
   // QF-MVP-80.14A: exactly ONE pinned pending entry again — the production activation authority.
-record("G06 pending holds exactly ten pinned source-only authorities, seven are staging-applied, and the five governed authorities are reconciled as APPLIED",
+record("G06 pending holds exactly nine pinned source-only authorities, seven are staging-applied, and the five governed authorities are reconciled as APPLIED",
   // QF-MVP-82A-R0 RE-PIN: the pending set now holds exactly TWO explicitly pinned
   // entries — the 80.14A production activation authority and the 82A-R0 Realtime
   // publication membership. Both are SOURCE-PENDING. Still an exact count, still no `>=`.
@@ -386,8 +384,6 @@ record("G06 pending holds exactly ten pinned source-only authorities, seven are 
   manifest.pendingPostAnchorMigrations[6].version === "20260912050000" &&
   manifest.pendingPostAnchorMigrations[7].version === "20260915120000" &&
   manifest.pendingPostAnchorMigrations[7].operationalStatus === "PENDING" &&
-  manifest.pendingPostAnchorMigrations[8].version === "20260921100000" &&
-  manifest.pendingPostAnchorMigrations[8].operationalStatus === "PENDING" &&
   manifest.pendingPostAnchorMigrations[9].version === "20260922120000" &&
   manifest.pendingPostAnchorMigrations[9].operationalStatus === "PENDING" &&
   manifest.pendingPostAnchorMigrations.every((r) => r.operationalStatus === "PENDING") &&
@@ -424,13 +420,13 @@ record("G07 the ten applied records read 21 through 30 in exact order",
   same(manifest.appliedPostAnchorMigrations.map((r) => r.remoteHistoryCountAfterApply),
     [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]) &&
   same(manifest.appliedPostAnchorMigrations.map((r) => r.version), APPLIED_ORDER));
-record("G08 the anchor post-anchor count agrees at 32",
+record("G08 the anchor post-anchor count agrees at 31",
   manifest.appliedAnchor?.postAnchorMigrationCount === POST_ANCHOR_COUNT);
-record("G09 G1 is pinned to 119 / 10 applied / 5 reconciled / 7 staging-applied / 10 pending, not loosened",
-  /const MIGRATION_COUNT = 119;/.test(g1Source) &&
+record("G09 G1 is pinned to 118 / 10 applied / 5 reconciled / 7 staging-applied / 10 pending, not loosened",
+  /const MIGRATION_COUNT = 118;/.test(g1Source) &&
   g1Source.includes(`version: "${BRIDGE_VERSION}"`) &&
   g1Source.includes(`sha: "${BRIDGE_SHA}"`) &&
-  g1Source.includes("pendingPins.length === 10") &&
+  g1Source.includes("pendingPins.length === 9") &&
   g1Source.includes("stagingAppliedPins.length === 7") &&
   g1Source.includes("reconciledPins.length === 5") &&
   g1Source.includes("appliedPins.length === 10") &&

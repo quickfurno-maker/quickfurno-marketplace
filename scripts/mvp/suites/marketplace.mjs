@@ -702,7 +702,7 @@ export const suite = {
         // The canonical page is untouched and still reads real vendors.
         const canonical = readFileSync('app/category/[slug]/page.tsx', 'utf8');
         assertTrue(canonical.includes('getPublicVendorsForCategory'), 'canonical still reads Supabase');
-        assertTrue(canonical.includes('VendorDiscovery'), 'canonical still renders the V2 listing');
+        assertTrue(canonical.includes('CategoryListing'), 'canonical still renders the real listing');
       },
     },
     {

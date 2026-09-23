@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 const ALLOWED_ACTIONS: VendorStatusAction[] = ["approve", "reject", "suspend", "activate", "deactivate"];
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getAdminSession();
   if (!session.isSuperadmin) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 403 });
@@ -35,7 +35,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ ok: false, error: "Invalid action." }, { status: 400 });
   }
 
-  const result = await setVendorStatusAction(params.id, action as VendorStatusAction, session.adminRole ?? "Superadmin", session.userId);
+  const result = await setVendorStatusAction((await params).id, action as VendorStatusAction, session.adminRole ?? "Superadmin", session.userId);
   if (!result.ok) {
     const status = result.code === "VALIDATION" ? 400 : result.code === "NOT_FOUND" ? 404 : 500;
     return NextResponse.json({ ok: false, error: result.error }, { status });

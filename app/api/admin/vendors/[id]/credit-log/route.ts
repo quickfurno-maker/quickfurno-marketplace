@@ -9,13 +9,13 @@ import { getVendorCreditLog } from "@/services/vendorAdminService";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getAdminSession();
   if (!session.isSuperadmin) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 403 });
   }
 
-  const result = await getVendorCreditLog(params.id);
+  const result = await getVendorCreditLog((await params).id);
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
   }

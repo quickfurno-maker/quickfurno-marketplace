@@ -9,7 +9,7 @@ import { updateCategory } from "@/services/categoryAdminService";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getAdminSession();
   if (!session.isSuperadmin) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 403 });
@@ -23,7 +23,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   const record = isRecord(body) ? body : {};
-  const result = await updateCategory(params.id, {
+  const result = await updateCategory((await params).id, {
     name: typeof record.name === "string" ? record.name : undefined,
     parentId: record.parentId === null || typeof record.parentId === "string" ? (record.parentId as string | null) : undefined,
     sortOrder: typeof record.sortOrder === "number" ? record.sortOrder : undefined,

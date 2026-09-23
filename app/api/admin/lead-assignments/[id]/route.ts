@@ -10,13 +10,13 @@ import { getAssignmentById } from "@/lib/aos/runtime/assignmentLedgerService";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getAdminSession();
   if (!session.isSuperadmin) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 403 });
   }
 
-  const assignment = await getAssignmentById(params.id);
+  const assignment = await getAssignmentById((await params).id);
   if (!assignment) {
     return NextResponse.json({ ok: false, error: "Assignment record not found." }, { status: 404 });
   }

@@ -11,7 +11,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 403 });
   }
 
-  const { id } = params;
+  const { id } = await params;
   const result = await proposeAosRecommendationToCore(id);
   if (!result.ok) {
     const status = result.code.endsWith("DISABLED") ? 409 : 400;

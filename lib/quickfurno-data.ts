@@ -5,7 +5,8 @@ export type QuickFurnoCategory =
   | "Premium Interiors"
   | "Sofa"
   | "Painter"
-  | "Civil Work";
+  | "Civil Work"
+  | "False Ceiling";
 
 export type QualityLevel = "Budget" | "Standard" | "Premium";
 
@@ -113,8 +114,14 @@ export const categories: Array<{
   {
     name: "Civil Work",
     icon: "CW",
-    description: "Renovation, false ceiling, POP, tiling and repair work.",
+    description: "Renovation, tiling, masonry and repair work.",
     startingPrice: "Starting site inspection",
+  },
+  {
+    name: "False Ceiling",
+    icon: "FC",
+    description: "POP and gypsum false ceilings, cove lighting and ceiling repair.",
+    startingPrice: "Quote after site visit",
   },
 ];
 
@@ -313,7 +320,11 @@ const serviceChipMap: Record<QuickFurnoCategory, VendorServiceChip[]> = {
     { label: "Home Renovation", price: "Project based" },
     { label: "Tiling", price: "Site based" },
     { label: "Waterproofing", price: "Visit based" },
-    { label: "False Ceiling", price: "Price on request" },
+  ],
+  "False Ceiling": [
+    { label: "POP False Ceiling", price: "Site based" },
+    { label: "Gypsum Ceiling", price: "Site based" },
+    { label: "Cove Lighting", price: "Price on request" },
   ],
 };
 
@@ -399,7 +410,7 @@ const portfolioByCategory: Record<QuickFurnoCategory, string[]> = {
   Carpenters: [`${VENDOR_IMG}/wood-shelving.svg`, `${VENDOR_IMG}/wardrobe-interior.svg`, `${VENDOR_IMG}/modular-kitchen.svg`],
   Sofa: [`${VENDOR_IMG}/premium-living-room.svg`, `${VENDOR_IMG}/office-interior.svg`, `${VENDOR_IMG}/wardrobe-interior.svg`],
   Painter: [`${VENDOR_IMG}/premium-living-room.svg`, `${VENDOR_IMG}/office-interior.svg`, `${VENDOR_IMG}/civil-work-site.svg`],
-  "Civil Work": [`${VENDOR_IMG}/civil-work-site.svg`, `${VENDOR_IMG}/modular-kitchen.svg`, `${VENDOR_IMG}/wood-shelving.svg`],
+  "Civil Work": [`${VENDOR_IMG}/civil-work-site.svg`, `${VENDOR_IMG}/modular-kitchen.svg`, `${VENDOR_IMG}/wood-shelving.svg`],  "False Ceiling": [`${VENDOR_IMG}/premium-living-room.svg`, `${VENDOR_IMG}/office-interior.svg`],
 };
 
 /** Up to 3 local portfolio thumbnails for a vendor's category (safe fallback: []). */
@@ -458,11 +469,14 @@ export function enquiryServiceForCategory(category: QuickFurnoCategory) {
     Sofa: "Custom Sofa & Upholstery",
     Painter: "Painting",
     "Civil Work": "Home Renovation",
+    "False Ceiling": "False Ceiling",
   };
   return map[category];
 }
 
-export const pricingMatrix: Record<Exclude<QuickFurnoCategory, "Sofa">, Record<QualityLevel, number>> = {
+// Sofa and False Ceiling are quoted per job, not per sq.ft of home, so they
+// have no per-sq.ft estimate here.
+export const pricingMatrix: Record<Exclude<QuickFurnoCategory, "Sofa" | "False Ceiling">, Record<QualityLevel, number>> = {
   "Interior Designers": { Budget: 950, Standard: 1250, Premium: 1800 },
   Carpenters: { Budget: 750, Standard: 950, Premium: 1300 },
   "Modular Factory": { Budget: 1000, Standard: 1250, Premium: 1650 },
@@ -497,12 +511,12 @@ export const portfolioProjects = [
 
 export const whyChooseQuickFurno: { title: string; body: string }[] = [
   {
-    title: "Verified vendors only",
-    body: "Every listed vendor is checked for service category, location, response quality and profile completeness.",
+    title: "Approved vendor profiles",
+    body: "Public vendor profiles are shown only after QuickFurno review and approval, subject to marketplace eligibility.",
   },
   {
     title: "Maximum 3 quotes",
-    body: "We do not send your number to 20 vendors. You get a limited set of relevant verified vendors.",
+    body: "We do not send your number to 20 vendors. You get a limited set of relevant eligible vendors.",
   },
   {
     title: "Transparent rates",
@@ -548,15 +562,15 @@ export const clientTestimonials = [
 export const clientFaqs = [
   {
     question: "Is QuickFurno free for clients?",
-    answer: "Yes. Clients can submit requirements and get matched with verified vendors without paying QuickFurno.",
+    answer: "Yes. Clients can submit requirements and get matched with eligible vendors without paying QuickFurno.",
   },
   {
     question: "How many vendors will contact me?",
-    answer: "QuickFurno is designed to match you with up to 3 relevant verified vendors, so you can compare without getting spammed.",
+    answer: "QuickFurno is designed to match you with up to 3 relevant eligible vendors, so you can compare without getting spammed.",
   },
   {
-    question: "Are vendors verified?",
-    answer: "Vendors are reviewed for business details, category fit, project work and response quality before they are shown to clients.",
+    question: "How are vendor profiles reviewed?",
+    answer: "Vendor submissions are reviewed before approved profiles are shown to clients; marketplace eligibility still applies when matching.",
   },
   {
     question: "Can I compare per sq.ft rates?",
@@ -568,7 +582,7 @@ export const clientFaqs = [
   },
   {
     question: "Can I book interior designer and carpenter separately?",
-    answer: "Yes. You can choose individual categories such as Interior Designers, Carpenters, Modular Factory, Painter, Sofa and Civil Work.",
+    answer: "Yes. You can choose individual categories such as Interior Designers, Carpenters, Modular Factory, Painter, Sofa, Civil Work and False Ceiling.",
   },
 ];
 

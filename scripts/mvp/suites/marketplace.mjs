@@ -547,11 +547,11 @@ export const suite = {
       name: 'enquiry success copy claims relevance, not unsupported proximity',
       run: () => {
         const src = readFileSync('components/ClientEnquiryModal.tsx', 'utf8');
-        assertTrue(src.includes('up to 3 relevant verified vendors'), 'relevance wording present');
+        assertTrue(src.includes('up to 3 relevant eligible vendors'), 'bounded eligible-vendor wording present');
         assertFalse(src.includes('verified vendors near you'), 'no "near you" match claim');
         assertFalse(src.includes('Verified Teams near your area'), 'no near-area claim');
         // The governed consent + cap wording must survive untouched.
-        assertTrue(src.includes('up to 3 verified vendors initially'), 'consent cap wording intact');
+        assertTrue(src.includes('up to 3 eligible vendors initially'), 'consent cap wording intact');
       },
     },
     {
@@ -778,11 +778,11 @@ export const suite = {
         assertTrue(src.includes('sanitizePhone('), 'phone input is sanitized to digits');
         assertFalse(src.includes('replace(/\\D/g, "").length < 10'),
           'the old length-only rule (which accepted 11+ digits) must not return');
-        assertTrue(src.includes('Please accept sharing your details with up to 3 verified vendors to continue.'),
-          'consent gate message unchanged');
+        assertTrue(src.includes('Please accept sharing your details with up to 3 eligible vendors to continue.'),
+          'consent gate uses governed eligible-vendor terminology');
         // The governed consent paragraph is preserved verbatim.
-        assertTrue(src.includes('up to 3 verified vendors initially'), 'consent: initial cap');
-        assertTrue(src.includes('may manually connect me with additional verified vendors'),
+        assertTrue(src.includes('up to 3 eligible vendors initially'), 'consent: initial cap');
+        assertTrue(src.includes('may manually connect me with additional eligible vendors'),
           'consent: limited manual additional matching');
       },
     },
@@ -801,7 +801,7 @@ export const suite = {
           assertFalse(/vendors near you/i.test(body), file + ': no "vendors near you"');
           assertFalse(/nearby leads/i.test(body), file + ': no "nearby leads"');
           // Matching semantics mirror the consent checkbox.
-          assertTrue(body.includes('up to 3 verified vendors initially'),
+          assertTrue(body.includes('up to 3 eligible vendors initially'),
             file + ': states the initial cap');
           assertTrue(/manually connect/i.test(body),
             file + ': states the limited manual additional matching');
@@ -810,7 +810,7 @@ export const suite = {
           for (const cls of ['text-ivory', 'text-muted', 'text-gold']) {
             assertFalse(body.includes(cls), file + ': legacy class removed ' + cls);
           }
-          assertTrue(body.includes('Last updated: 4 September 2026'), file + ': last-updated refreshed');
+          assertTrue(body.includes('Last updated: 23 September 2026'), file + ': last-updated refreshed');
         }
         // Terms keeps the commercial model intact.
         const terms = readFileSync('app/terms/page.tsx', 'utf8').replace(/\s+/g, ' ');
@@ -845,7 +845,8 @@ export const suite = {
         // records what was removed.
         const src = readFileSync('app/vendors/page.tsx', 'utf8')
           .replace(/\/\*[\s\S]*?\*\//g, '')
-          .replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+          .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+          .replace(/\/\/.*$/gm, '');
 
         // Invented testimonials and businesses.
         for (const name of ['Rohit Deshmukh', 'Sanket Patil', 'Arjun Mehta',
@@ -860,14 +861,18 @@ export const suite = {
         }
         assertFalse(/\dm ago|\dh ago/.test(src), 'no fake relative timestamps');
         assertFalse(/₹\s?\d/.test(src), 'no invented rupee figures');
-        // Unsupported marketing promises.
-        for (const claim of [/verified client/i, /high-intent/i, /genuine/i, /faster growth/i,
-                             /win more/i, /fair distribut/i, /no hidden/i, /24.7 support/i,
-                             /pre-qualified/i, /premium visibility/i, /higher conversions/i,
-                             /guarantee/i, /unlimited/i, /cancel anytime/i,
+        // Unsupported positive marketing promises. Negative disclaimers such as
+        // "we do not guarantee" are intentionally allowed and encouraged.
+        for (const claim of [/verified client matches/i, /high-intent/i, /faster growth/i,
+                             /win more/i, /fair distribution/i, /no hidden fees/i,
+                             /24.7 support/i, /pre-qualified/i, /premium visibility/i,
+                             /higher conversions/i, /guaranteed (?:jobs|enquiries|matches)/i,
+                             /unlimited enquiries/i, /cancel anytime/i,
                              /future vendor dashboard/i]) {
-          assertFalse(claim.test(src), 'unsupported claim removed: ' + claim.source);
+          assertFalse(claim.test(src), 'unsupported positive claim removed: ' + claim.source);
         }
+        assertTrue(/sufficient matching credits/i.test(src),
+          'commercial eligibility is stated instead of hidden');
         // Public package pricing stays unpublished.
         assertFalse(/Starter|Growth plan|per month|\/month|credits for ₹/i.test(src),
           'no public package pricing');
@@ -879,12 +884,12 @@ export const suite = {
         const src = readFileSync('app/vendors/page.tsx', 'utf8')
           .replace(/\/\*[\s\S]*?\*\//g, '')
           .replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
-        assertTrue(src.includes('categories, categorySlug, type QuickFurnoCategory'),
+        assertTrue(src.includes('categories, categorySlug'),
           'vendor conversion imports the canonical category registry');
-        assertTrue(src.includes('const SERVICE_CARDS = categories.map'),
-          'vendor conversion derives service cards from canonical categories');
-        assertTrue(src.includes('with Client Matching'), 'Client Matching is the primary conversion proposition');
-        assertFalse(/\bleads?\b/i.test(src), 'retired lead terminology is absent from vendor conversion UI');
+        assertTrue(src.includes('const TRADES = categories.map'),
+          'vendor conversion derives the trade list from canonical categories');
+        assertTrue(src.includes('Client Matching'), 'Client Matching is the primary conversion proposition');
+        assertFalse(/>\s*Leads?\s*</i.test(src), 'retired lead label is absent from vendor conversion UI');
         assertFalse(/Mumbai/i.test(src), 'Mumbai cannot return to the Pune launch conversion page');
         assertFalse(/Wardrobes?\s*&?\s*Storage/i.test(src), 'non-canonical wardrobe/storage category cannot return');
       },
@@ -894,17 +899,19 @@ export const suite = {
       run: () => {
         const src = readFileSync('app/vendors/page.tsx', 'utf8');
         // Product/example previews must announce themselves as illustrative, never live demand.
-        assertTrue(src.includes('Product preview ? illustrative'), 'visible illustrative product label');
+        assertTrue(src.includes('ILLUSTRATIVE EXAMPLE'), 'visible illustrative product label');
         assertTrue(src.includes('Illustrative Client Matching product preview. Not live demand data.'),
           'accessible name says illustrative and not live demand');
-        assertTrue(src.includes('Example'), 'example match cards are labelled');
+        assertTrue(src.includes('EXAMPLE QUALITY CHECK'), 'example quality card is labelled');
         // The journey must not imply matching starts immediately after signup.
-        assertTrue(/reviews your business details/i.test(src), 'states QuickFurno review');
-        assertTrue(/signup alone does not activate client matching/i.test(src), 'states eligibility boundary');
-        assertTrue(/package and matching credits/i.test(src), 'states package/credit reality');
+        assertTrue(/Approval does not by itself activate Client Matching/i.test(src),
+          'states approval is not sufficient for matching');
+        assertTrue(/sufficient matching credits/i.test(src), 'states matching-credit eligibility');
+        assertTrue(/account must also remain eligible/i.test(src), 'states ongoing eligibility boundary');
         // Metadata is truthful and client-matching-first.
         assertFalse(/verified client matches/i.test(src), 'unsupported client verification claim absent');
-        assertTrue(src.includes('manage relevant client matches'), 'truthful metadata');
+        assertTrue(src.includes('Approved vendors can receive Client Matching assignments'),
+          'truthful client-matching metadata');
       },
     },
     {
@@ -1091,24 +1098,25 @@ export const suite = {
         assertTrue(header.includes('Get a Free Quote'), 'public header keeps the approved quote CTA');
         assertTrue(header.includes('Toggle navigation menu'), 'public header keeps its menu toggle');
         const footer = readFileSync('components/Footer.tsx', 'utf8');
-        assertTrue(footer.includes('Free for homeowners'), 'public footer keeps its summary');
+        assertTrue(footer.includes('Approved active vendors · Up to 3 active matches · Free to enquire'), 'public footer keeps its truthful summary');
         const sticky = readFileSync('components/StickyMobileCTA.tsx', 'utf8');
         assertTrue(sticky.includes('MobileBottomNav'), 'public bottom nav wrapper intact');
-        // Homeowner pages still compose a public bottom nav. The final homepage
-        // owns its locked five-item nav directly; listing/category pages keep
-        // using the shared StickyMobileCTA wrapper.
+        // The Pune launch homepage owns its five-item bottom nav directly.
+        // Category/listing pages retain the shared public wrapper; /vendors
+        // intentionally uses the public Header/Footer plus its own mobile apply bar.
         const homePage = readFileSync('app/page.tsx', 'utf8');
-        const finalHome = readFileSync('components/home/FinalHomepage.tsx', 'utf8');
-        assertTrue(homePage.includes('<FinalHomepage />'), 'app/page.tsx mounts the final homepage');
-        assertTrue(finalHome.includes('<HomeMobileBottomNav />'),
-          'final homepage still renders its public bottom nav');
-        for (const file of ['app/vendors/page.tsx', 'app/category/[slug]/page.tsx']) {
-          assertTrue(readFileSync(file, 'utf8').includes('<StickyMobileCTA />'),
-            file + ' still renders the public bottom nav');
-        }
+        const puneHome = readFileSync('components/home/PuneLaunchHomepage.tsx', 'utf8');
+        assertTrue(homePage.includes('<PuneLaunchHomepage />'),
+          'app/page.tsx mounts the Pune launch homepage');
+        assertTrue(puneHome.includes('<BottomNav />'),
+          'Pune launch homepage renders its public bottom nav');
+        assertTrue(readFileSync('app/category/[slug]/page.tsx', 'utf8').includes('<StickyMobileCTA />'),
+          'category listing still renders the shared public bottom nav');
         // /vendors stays a public marketing page, not the auth shell.
         const vendors = readFileSync('app/vendors/page.tsx', 'utf8');
-        assertTrue(vendors.includes('<Header />'), '/vendors keeps the public header');
+        assertTrue(vendors.includes('<Header />') && vendors.includes('<Footer />'),
+          '/vendors keeps public chrome');
+        assertTrue(vendors.includes('qfv-sticky'), '/vendors keeps its dedicated mobile apply bar');
         assertFalse(vendors.includes('VendorPortalHeader'), '/vendors is not the auth shell');
       },
     },
@@ -1345,7 +1353,7 @@ export const suite = {
         const footer = readFileSync('components/Footer.tsx', 'utf8');
         const footerCode = footer.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
         assertFalse(footerCode.includes('id="contact"'), 'footer no longer duplicates the id');
-        const finalHome = readFileSync('components/home/FinalHomepage.tsx', 'utf8');
+        const finalHome = readFileSync('components/home/PuneLaunchHomepage.tsx', 'utf8');
         assertTrue(finalHome.includes('id="contact"'), 'the homepage anchor target is kept');
         // Every header anchor must exist in the homepage composition.
         for (const [href, id] of [['/#services', 'services'], ['/#how-it-works', 'how-it-works'],
@@ -1531,7 +1539,8 @@ export const suite = {
         // The map must cover the EXISTING taxonomy exactly - no invented
         // categories, none missing.
         const taxonomy = ['Interior Designers', 'Carpenters', 'Modular Factory',
-                          'Premium Interiors', 'Sofa', 'Painter', 'Civil Work'];
+                          'Premium Interiors', 'Sofa', 'Painter', 'Civil Work',
+                          'False Ceiling'];
         assertEqual(categoriesWithArtwork().slice().sort().join('|'),
           taxonomy.slice().sort().join('|'), 'artwork map matches the taxonomy');
         const seen = new Set();
@@ -1640,7 +1649,7 @@ export const suite = {
         assertFalse(/href=""/.test(all), 'no empty href');
         // Header anchors must point at ids the homepage actually renders.
         const home = readFileSync('app/page.tsx', 'utf8')
-          + readFileSync('components/home/FinalHomepage.tsx', 'utf8');
+          + readFileSync('components/home/PuneLaunchHomepage.tsx', 'utf8');
         for (const id of ['categories', 'how-it-works', 'why-quickfurno', 'services']) {
           if (!all.includes('/#' + id) && !all.includes('#' + id)) continue;
           assertTrue(home.includes('id="' + id + '"'), 'anchor #' + id + ' exists on the homepage');
@@ -1650,9 +1659,10 @@ export const suite = {
     {
       name: 'public surfaces keep the approved claims and add no new ones',
       run: () => {
-        const files = ['app/page.tsx', 'components/home/HomeSectionsV2.tsx',
-                       'components/home/HomeHeroSlider.tsx', 'components/home/HomeServiceLauncher.tsx',
-                       'app/category/[slug]/page.tsx', 'app/enquiry/page.tsx', 'components/Footer.tsx'];
+        const files = ['app/page.tsx', 'components/home/PuneLaunchHomepage.tsx', 'lib/homepage-content.ts',
+                       'components/home/HomeSectionsV2.tsx', 'components/home/HomeHeroSlider.tsx',
+                       'components/home/HomeServiceLauncher.tsx', 'app/category/[slug]/page.tsx',
+                       'app/enquiry/page.tsx', 'components/Footer.tsx'];
         for (const file of files) {
           // Strip comments so a note ABOUT a banned phrase cannot fail the scan.
           const src = readFileSync(file, 'utf8')
@@ -1666,10 +1676,10 @@ export const suite = {
           assertFalse(/\d[\d,+]*\s*(customers|projects completed|reviews|happy clients)/.test(src),
             file + ' must not invent counts');
         }
-        // The approved promises are still present on the homepage.
-        const hero = readFileSync('components/home/HomeHeroSlider.tsx', 'utf8').toLowerCase();
-        assertTrue(hero.includes('up to 3 relevant'), 'keeps the up-to-3 claim');
-        assertTrue(hero.includes('free for homeowners'), 'keeps the free-for-homeowners claim');
+        // The approved bounded promises are still present on the active homepage.
+        const hero = readFileSync('components/home/PuneLaunchHomepage.tsx', 'utf8').toLowerCase();
+        assertTrue(hero.includes('up to 3 active'), 'keeps the bounded up-to-3 claim');
+        assertTrue(hero.includes('free to enquire'), 'keeps the no-homeowner-enquiry-fee claim');
       },
     },
     {

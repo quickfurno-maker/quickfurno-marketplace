@@ -1,20 +1,24 @@
 import type { Metadata } from "next";
-import { FinalHomepage } from "@/components/home/FinalHomepage";
+import { PuneLaunchHomepage } from "@/components/home/PuneLaunchHomepage";
 
 export const metadata: Metadata = {
-  title: "QuickFurno | Verified Home-Service Professionals in Pune",
+  title: "QuickFurno | Pune Home-Service Marketplace",
   description:
-    "Find verified interior, carpentry, modular, painting, sofa and civil-work professionals in Pune with QuickFurno.",
+    "Explore home-service professionals and categories in Pune. Submit a free enquiry for Client Matching, subject to marketplace eligibility and availability.",
   openGraph: {
-    title: "QuickFurno | Better Spaces, Happier Lives",
+    title: "QuickFurno | Pune home services, one enquiry away",
     description:
-      "Tell QuickFurno what your home needs and get matched with relevant verified professionals in Pune.",
+      "Tell QuickFurno what your home needs. Up to 3 active pros can be assigned at a time under the marketplace eligibility and matching rules.",
     url: "https://quickfurno.in",
     siteName: "QuickFurno",
     type: "website",
   },
 };
 
+// The launch homepage is fully static (no per-request data); keep a periodic
+// revalidation so any future server-side content refreshes without a deploy.
+export const revalidate = 300;
+
 export default function HomePage() {
-  return <FinalHomepage />;
+  return <PuneLaunchHomepage />;
 }

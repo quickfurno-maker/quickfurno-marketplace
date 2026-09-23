@@ -91,7 +91,7 @@ export const CLIENT_SELECTED_BLOCK_REASON =
 
 /** Client-facing wording for a blocked client-selected selection. */
 export const CLIENT_SELECTED_BLOCK_CLIENT_MESSAGE =
-  "Your enquiry is safe with QuickFurno. Our team will connect you with suitable verified vendors shortly.";
+  "Your enquiry is safe with QuickFurno. Our team will connect you with suitable eligible vendors shortly.";
 
 /** Invalid-request code. Always fail-closed: nothing is sent to the authority. */
 export const CANONICAL_ASSIGNMENT_INVALID_REQUEST = "CANONICAL_ASSIGNMENT_INVALID_REQUEST";

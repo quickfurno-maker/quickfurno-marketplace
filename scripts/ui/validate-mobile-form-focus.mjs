@@ -32,8 +32,8 @@ import { readFileSync } from "node:fs";
 const MODAL = "components/ClientEnquiryModal.tsx";
 const PAGE = "app/page.tsx";
 const CSS = "app/qf-public-v2.css";
-const FINAL_HOME = "components/home/FinalHomepage.tsx";
-const FINAL_HOME_CSS = "app/home-final.css";
+const FINAL_HOME = "components/home/PuneLaunchHomepage.tsx";
+const FINAL_HOME_CSS = "app/home-pune-launch.css";
 
 /** Strip block and line comments, then collapse whitespace runs. */
 function code(path) {
@@ -189,32 +189,40 @@ check("08 no other live modal keys a focus/scroll effect to typed values", () =>
 // ---------------------------------------------------------------------------
 // 2. Final homepage architecture + canonical taxonomy
 // ---------------------------------------------------------------------------
-check("09 the final homepage is the single active homepage surface", () => {
-  assert(/<FinalHomepage\s*\/>/.test(PAGE_FLAT), "app/page.tsx does not mount FinalHomepage");
-  assert(!/<HomeHeroSlider|<HomeServiceLauncher|<TrustStripV2/.test(PAGE_FLAT),
-    "a retired homepage surface is still mounted beside FinalHomepage");
-  assert(/\.qfh-hero-grid/.test(FINAL_HOME_CSS_FLAT) && /\.qfh-service-grid/.test(FINAL_HOME_CSS_FLAT),
-    "the locked qfh homepage layout CSS is missing");
+check("09 the Pune launch homepage is the single active homepage surface", () => {
+  assert(/<PuneLaunchHomepage\s*\/>/.test(PAGE_FLAT), "app/page.tsx does not mount PuneLaunchHomepage");
+  assert(!/<FinalHomepage|<HomeHeroSlider|<HomeServiceLauncher|<TrustStripV2/.test(PAGE_FLAT),
+    "a retired homepage surface is still mounted beside PuneLaunchHomepage");
+  assert(/\.qfp-hero/.test(FINAL_HOME_CSS_FLAT) && /\.qfp-service-grid/.test(FINAL_HOME_CSS_FLAT),
+    "the active qfp homepage layout CSS is missing");
 });
 
-check("10 DOM order is hero -> stats -> services", () => {
-  const hero = FINAL_HOME_FLAT.indexOf("<Hero");
-  const stats = FINAL_HOME_FLAT.indexOf("<StatsStrip");
-  const services = FINAL_HOME_FLAT.indexOf("<Services");
-  assert(hero !== -1 && stats !== -1 && services !== -1, "hero/stats/services is missing from FinalHomepage");
-  assert(hero < stats && stats < services, "FinalHomepage order must remain hero -> stats -> services");
+check("10 DOM order is hero -> services -> how-it-works -> trust", () => {
+  const start = FINAL_HOME_FLAT.indexOf("export function PuneLaunchHomepage");
+  const composition = start >= 0 ? FINAL_HOME_FLAT.slice(start) : "";
+  const hero = composition.indexOf("<Hero />");
+  const services = composition.indexOf("<Services />");
+  const how = composition.indexOf("<HowItWorks />");
+  const trust = composition.indexOf("<TrustAndSafety />");
+  assert(hero !== -1 && services !== -1 && how !== -1 && trust !== -1,
+    "hero/services/how-it-works/trust is missing from PuneLaunchHomepage");
+  assert(hero < services && services < how && how < trust,
+    "PuneLaunchHomepage order must remain hero -> services -> how-it-works -> trust");
 });
 
 check("11 hero and services render exactly once", () => {
-  const count = (needle) => FINAL_HOME_FLAT.split(needle).length - 1;
-  assert(count("<Hero") === 1, "the final hero is rendered more than once");
-  assert(count("<Services") === 1, "the final services section is rendered more than once");
+  const start = FINAL_HOME_FLAT.indexOf("export function PuneLaunchHomepage");
+  const composition = start >= 0 ? FINAL_HOME_FLAT.slice(start) : "";
+  assert((composition.match(/<Hero\s*\/>/g) || []).length === 1,
+    "the active hero is rendered more than once");
+  assert((composition.match(/<Services\s*\/>/g) || []).length === 1,
+    "the active services section is rendered more than once");
 });
 
 check("12 homepage service UI is derived from the canonical category registry", () => {
   assert(/import \{ categories, categorySlug, type QuickFurnoCategory \}/.test(FINAL_HOME_SRC),
-    "FinalHomepage no longer imports the canonical categories registry");
-  assert(/const SERVICES = categories\.map/.test(FINAL_HOME_FLAT),
+    "PuneLaunchHomepage no longer imports the canonical categories registry");
+  assert(/const OTHER_SERVICES = categories/.test(FINAL_HOME_FLAT),
     "homepage services are no longer derived from canonical categories");
   assert(/Record<QuickFurnoCategory/.test(FINAL_HOME_SRC),
     "service display metadata is no longer exhaustively typed to QuickFurnoCategory");
@@ -328,8 +336,8 @@ check("22 [static] the client modal imports no server/business authority", () =>
 
 check("23 [semantic] the consent legal text and share_consent semantics are intact", () => {
   const body = MODAL_SRC.slice(MODAL_SRC.indexOf("function renderSingleForm"));
-  assert(/up to 3 verified vendors initially/.test(body), "the consent cap sentence changed");
-  assert(/may manually connect me with additional verified vendors/.test(body),
+  assert(/up to 3 eligible vendors initially/.test(body), "the consent cap sentence changed");
+  assert(/may manually connect me with additional eligible vendors/.test(body),
     "the replacement-vendor consent sentence was dropped");
   assert(/href="\/privacy"/.test(body) && /href="\/terms"/.test(body), "a consent policy link was dropped");
   assert(!/shareConsent: true/.test(MODAL_SRC), "consent is pre-checked somewhere");
@@ -347,24 +355,27 @@ mutant("M21 [mutant] reject: the submit button stops being disabled while submit
   (s) => /disabled=\{submitting\}/.test(s));
 
 // ---------------------------------------------------------------------------
-// 5. Final homepage conversion contract
+// 5. Pune launch homepage conversion contract
 // ---------------------------------------------------------------------------
 check("24 [semantic] the approved hero quote entry point is present exactly once", () => {
   const hits = FINAL_HOME_SRC.match(/source="Homepage hero quote bar"/g) || [];
   assert(hits.length === 1, `expected one homepage hero quote entry point, found ${hits.length}`);
-  assert(/qfh-quote-bar/.test(FINAL_HOME_SRC), "the approved hero quote bar is gone");
+  assert(/className="qfp-quote"/.test(FINAL_HOME_SRC) && /data-quote-bar/.test(FINAL_HOME_SRC),
+    "the approved Pune hero quote bar is gone");
 });
 
 check("25 [semantic] homepage CTAs all use the shared enquiry modal authority", () => {
-  assert(/EnquiryModalTrigger/.test(FINAL_HOME_SRC), "FinalHomepage no longer uses EnquiryModalTrigger");
-  for (const source of ["Homepage header", "Homepage hero quote bar", "Homepage Pune CTA"]) {
+  assert(/EnquiryModalTrigger/.test(FINAL_HOME_SRC), "PuneLaunchHomepage no longer uses EnquiryModalTrigger");
+  for (const source of ["Homepage header", "Homepage hero quote bar", "Homepage bottom navigation"]) {
     assert(FINAL_HOME_SRC.includes(`source="${source}"`), `missing approved conversion entry point: ${source}`);
   }
 });
 
 check("26 [semantic] the approved mobile bottom navigation remains mounted", () => {
-  assert(/<HomeMobileBottomNav\s*\/>/.test(FINAL_HOME_FLAT), "HomeMobileBottomNav is no longer mounted");
-  const nav = code("components/home/HomeMobileBottomNav.tsx");
+  assert(/<BottomNav\s*\/>/.test(FINAL_HOME_FLAT), "Pune homepage BottomNav is no longer mounted");
+  const navStart = FINAL_HOME_SRC.indexOf("function BottomNav");
+  const navEnd = FINAL_HOME_SRC.indexOf("export function PuneLaunchHomepage");
+  const nav = navStart >= 0 && navEnd > navStart ? FINAL_HOME_SRC.slice(navStart, navEnd) : "";
   for (const label of ["Home", "Services", "Quote", "Vendors", "More"]) {
     assert(nav.includes(`>${label}<`) || nav.includes(`>${label}</span>`), `mobile nav lost ${label}`);
   }
@@ -372,9 +383,9 @@ check("26 [semantic] the approved mobile bottom navigation remains mounted", () 
 
 check("27 [semantic] homepage keeps multiple non-duplicate conversion entry points", () => {
   const hits = FINAL_HOME_SRC.match(/<EnquiryModalTrigger/g) || [];
-  assert(hits.length >= 3, `expected at least 3 enquiry entry points, found ${hits.length}`);
-  assert(/Get a Free Quote/.test(FINAL_HOME_SRC), "free-quote CTA copy is gone");
-  assert(/Get Started Today/.test(FINAL_HOME_SRC), "Pune final CTA copy is gone");
+  assert(hits.length >= 5, `expected at least 5 enquiry entry points, found ${hits.length}`);
+  assert(/Get up to 3 matches/.test(FINAL_HOME_SRC), "bounded matching CTA copy is gone");
+  assert(/Homepage not-sure card/.test(FINAL_HOME_SRC), "the alternate homeowner entry point is gone");
 });
 
 mutant("M24 [mutant] reject: the approved hero quote entry point is removed",

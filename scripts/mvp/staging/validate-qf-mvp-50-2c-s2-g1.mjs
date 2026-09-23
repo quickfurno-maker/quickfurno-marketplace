@@ -428,6 +428,14 @@ const POST_ANCHOR_STAGING_APPLIED = [
     sha: "30f85cf0cee2b0b1b3cbd825194af586fd44950f0a56e009750f1308161edb65",
     phase: "QF-VENDOR-REVIEWS",
   },
+  // False Ceiling: exact-one isolated staging apply, independently re-listed.
+  // Production remains absent and requires its own deployment gate.
+  {
+    version: "20260922120000",
+    name: "false_ceiling_category",
+    sha: "775794173a6f463e03a38af9f822dd61756765be3860370837d63026c268e540",
+    phase: "QF-PUNE-LAUNCH-FALSE-CEILING",
+  },
 ].map((m) => ({
   ...m,
   filename: `${m.version}_${m.name}.sql`,
@@ -475,7 +483,7 @@ const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD
 // QF-MVP-40.14 RE-PIN: 108 -> 109, adding ONLY the SOURCE-PENDING Meta
 // transactional mapping seed + activation authority (20260912000000). No existing
 // migration was changed, renamed, deleted or reordered. Still exact equality.
-const MIGRATION_COUNT = 117;
+const MIGRATION_COUNT = 118;
 // The tree size AT THE MOMENT QF-MVP-80.05 reconciled history. It is a historical
 // fact about that reconciliation, not a live count, and it must never track
 // MIGRATION_COUNT: a later slice that legitimately ADDS a migration does not
@@ -681,7 +689,7 @@ function validateState(state) {
 
   // Exact post-anchor pin: ten APPLIED (remote history 21-30), five RECONCILED
   // (QF-MVP-80.05: already applied to BOTH staging and production, proved read-only),
-  // and ZERO pending.
+  // plus the explicitly pinned pending and staging-applied sets.
   const postAnchorLocal = validMigrations.filter((record) => record.version > TARGET_VERSION);
   const appliedPins = Array.isArray(manifest.appliedPostAnchorMigrations) ? manifest.appliedPostAnchorMigrations : null;
   const reconciledPins = Array.isArray(manifest.reconciledPostAnchorMigrations) ? manifest.reconciledPostAnchorMigrations : null;
@@ -689,9 +697,9 @@ function validateState(state) {
   const stagingAppliedPins = Array.isArray(manifest.stagingAppliedPostAnchorMigrations) ? manifest.stagingAppliedPostAnchorMigrations : null;
   const appliedTruth = [...(appliedPins ?? []), ...(reconciledPins ?? [])];
 
-  check("exactly thirty local migrations are newer than the anchor", postAnchorLocal.length === 30, `actual=${postAnchorLocal.length}`);
+  check("exactly thirty-one local migrations are newer than the anchor", postAnchorLocal.length === 31, `actual=${postAnchorLocal.length}`);
   check("the post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
-  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 30);
+  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 31);
   check("manifest declares exactly ten APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 10, `actual=${appliedPins?.length}`);
   check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
   check("manifest declares exactly five RECONCILED post-anchor migrations", reconciledPins !== null && reconciledPins.length === 5, `actual=${reconciledPins?.length}`);
@@ -703,12 +711,12 @@ function validateState(state) {
   // version/name/path/SHA, and neither may also be claimed applied anywhere.
   // QF-MVP-40.14 RE-PIN: 4 -> 5. The Meta transactional mapping seed + activation
   // authority (20260912000000) is source-only and joins PENDING.
-  check("the explicit PENDING post-anchor set holds exactly the nine pinned entries",
+  check("the explicit PENDING post-anchor set holds exactly the eight pinned entries",
     pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 8,
     `actual=${pendingPins?.length}`);
-  check("the explicit STAGING-APPLIED post-anchor set holds exactly the six pinned entries",
+  check("the explicit STAGING-APPLIED post-anchor set holds exactly the eight pinned entries",
     stagingAppliedPins !== null && stagingAppliedPins.length === POST_ANCHOR_STAGING_APPLIED.length &&
-    stagingAppliedPins.length === 7,
+    stagingAppliedPins.length === 8,
     `actual=${stagingAppliedPins?.length}`);
   check("the staging-applied record claims staging and explicitly refuses production",
     stagingAppliedPins?.[0]?.operationalStatus === "APPLIED_TO_STAGING" &&
@@ -844,6 +852,35 @@ function validateState(state) {
     same(reviewPin?.postApplyServiceRolePrivileges, ["SELECT", "INSERT", "UPDATE"]) &&
     reviewPin?.reviewRowsAtProductionApply === 0 &&
     reviewPin?.evidencePath === "docs/QF-VENDOR-REVIEWS-CERTIFICATION.md");
+  const falseCeilingPin = stagingAppliedPins?.find((record) => record.version === "20260922120000");
+  const falseCeilingLocal = postAnchorLocal.find((record) => record.version === "20260922120000");
+  const falseCeilingDisk = state.postAnchorOnDisk?.["20260922120000"];
+  check("False Ceiling staging deployment evidence is exact",
+    falseCeilingPin?.name === "false_ceiling_category" &&
+    falseCeilingPin?.phase === "QF-PUNE-LAUNCH-FALSE-CEILING" &&
+    falseCeilingPin?.sha256 === "775794173a6f463e03a38af9f822dd61756765be3860370837d63026c268e540" &&
+    falseCeilingLocal?.name === "false_ceiling_category" &&
+    falseCeilingDisk?.exists === true &&
+    falseCeilingDisk?.canonicalSha === falseCeilingPin?.sha256 &&
+    falseCeilingPin?.operationalStatus === "APPLIED_TO_STAGING" &&
+    falseCeilingPin?.appliedToStaging === true &&
+    falseCeilingPin?.appliedExactlyOnceToStaging === true &&
+    falseCeilingPin?.stagingRemoteVersionStatus === "PRESENT_IN_STAGING_HISTORY" &&
+    falseCeilingPin?.stagingRemoteHistoryCountAfterApply === 48 &&
+    falseCeilingPin?.independentRemoteRelistVerified === true &&
+    falseCeilingPin?.appliedToProduction === false &&
+    falseCeilingPin?.productionVersionStatus === "ABSENT_IN_PRODUCTION_HISTORY" &&
+    falseCeilingPin?.requiresSeparateStagingDeploymentGate === false &&
+    falseCeilingPin?.requiresSeparateProductionDeploymentGate === true &&
+    falseCeilingPin?.postApplyFalseCeilingActiveRows === 1 &&
+    falseCeilingPin?.postApplyPopParentGroup === "False Ceiling" &&
+    falseCeilingPin?.postApplyCeilingToPopCompatible === true &&
+    falseCeilingPin?.postApplyCeilingToInteriorCompatible === false &&
+    falseCeilingPin?.postApplyAnonExecute === false &&
+    falseCeilingPin?.postApplyAuthenticatedExecute === false &&
+    falseCeilingPin?.postApplyServiceRoleExecute === true &&
+    falseCeilingPin?.appliedEvidenceMarker === "QF_PUNE_LAUNCH_FALSE_CEILING_STAGING_MIGRATION_APPLIED_AND_VERIFIED" &&
+    falseCeilingPin?.evidencePath === "docs/QF-PUNE-LAUNCH-FALSE-CEILING-STAGING-CERTIFICATION.md");
   check("the pending records appear in exact pinned order",
     same(pendingPins?.map((record) => record.version), POST_ANCHOR_PENDING.map((m) => m.version)));
   // The four sets are compared as a SORTED union, not as concatenated blocks. Since

@@ -23,6 +23,9 @@ export const CATEGORY_MIN_REALISTIC_BUDGET_INR: Record<QuickFurnoCategory, numbe
   "Sofa": 8000,
   "Painter": 8000,
   "Civil Work": 20000,
+  // One room of POP/gypsum ceiling can be a small job, so the floor stays at
+  // the same conservative level as the unknown-category default.
+  "False Ceiling": 10000,
 };
 
 /** Fallback floor when the category genuinely cannot be resolved. */

@@ -233,7 +233,7 @@ export function LeadDistributionPage({
           </NoteBar>
           <SectionCard title="Distribution rules applied by Core">
             <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-3">
-              {["Auto assignment", "Match by city", "Match by locality", "Verified vendors only", "Paid vendors only", "Remaining leads required", "Duplicate protection", "Fair rotation"].map((rule) => (
+              {["Auto assignment", "Match by city", "Match by locality", "Approved vendors only", "Paid vendors only", "Remaining leads required", "Duplicate protection", "Fair rotation"].map((rule) => (
                 <li key={rule} className="flex items-center gap-2 text-[13px] text-slate-700">
                   <span aria-hidden="true" className="h-1 w-1 shrink-0 rounded-full bg-slate-400" />
                   {rule}

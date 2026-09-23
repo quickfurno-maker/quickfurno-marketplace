@@ -9,7 +9,7 @@ import { updateVendorCredits } from "@/services/vendorAdminService";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getAdminSession();
   if (!session.isSuperadmin) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 403 });
@@ -38,7 +38,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   // Optional idempotency key (backward-compatible): same reference grants once.
   const reference = typeof record.reference === "string" ? record.reference : null;
 
-  const result = await updateVendorCredits(params.id, {
+  const result = await updateVendorCredits((await params).id, {
     mode,
     amount,
     reason,

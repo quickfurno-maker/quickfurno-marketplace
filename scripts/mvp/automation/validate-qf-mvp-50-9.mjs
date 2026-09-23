@@ -316,6 +316,7 @@ const EXPECTED_LABELS = {
   sofa_work_type: "the sofa work you need",
   painting_work_type: "the painting work you need",
   civil_work_type: "the civil work you need",
+  ceiling_work_type: "the ceiling work you need",
   property_type: "your property type",
   property_size: "your property size",
   site_type: "your site type",
@@ -326,7 +327,7 @@ const EXPECTED_LABELS = {
   area_location: "your area or locality",
 };
 
-check("17 [pure] the label map is EXACTLY the twelve governed keys and phrases", () => {
+check("17 [pure] the label map is EXACTLY the thirteen governed keys and phrases", () => {
   assert(JSON.stringify(CLARIFICATION_QUESTION_LABELS) === JSON.stringify(EXPECTED_LABELS),
     "the client-safe label registry changed");
   assert(Object.isFrozen(CLARIFICATION_QUESTION_LABELS), "the label registry is not frozen");

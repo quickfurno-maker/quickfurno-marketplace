@@ -31,7 +31,7 @@ export function VendorOverviewHeader({ vendor }: { vendor: VendorProfileSummary 
 
       <div className="qf-vendor-v2-overview-headmeta">
         <VendorStatusPill tone={verified ? "ok" : "pending"} icon={verified ? "shield" : "clock"}>
-          {verified ? "Verified vendor" : "Profile under review"}
+          {verified ? "Approved vendor" : "Profile under review"}
         </VendorStatusPill>
         {publicProfileHref ? (
           <Link

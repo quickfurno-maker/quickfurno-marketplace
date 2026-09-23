@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { submitLead } from "@/app/actions";
 import { BUDGETS } from "@/lib/config";
@@ -103,7 +104,7 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
       return;
     }
     if (!consent) {
-      setError("Please accept sharing your details with up to 3 verified vendors to continue.");
+      setError("Please accept sharing your details with up to 3 eligible vendors to continue.");
       return;
     }
     setBusy(true);
@@ -151,12 +152,12 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
         </span>
         <h2>Your enquiry is submitted</h2>
         <p>
-          QuickFurno will share your requirement with up to 3 relevant verified vendors that match
+          QuickFurno will share your requirement with up to 3 relevant eligible vendors that match
           your service and area.
         </p>
-        <a href="/" className="qf-pub-btn qf-pub-btn--secondary">
+        <Link href="/" className="qf-pub-btn qf-pub-btn--secondary">
           Back to home
-        </a>
+        </Link>
       </div>
     );
   }
@@ -222,7 +223,7 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
       <label className="qf-enqpage-consent">
         <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
         <span>
-          I agree that QuickFurno may share my enquiry and contact details with up to 3 verified vendors initially. If vendors are unavailable, non-responsive, or unable to serve my requirement, QuickFurno may manually connect me with additional verified vendors to fulfil my request. See our{" "}
+          I agree that QuickFurno may share my enquiry and contact details with up to 3 eligible vendors initially. If vendors are unavailable, non-responsive, or unable to serve my requirement, QuickFurno may manually connect me with additional eligible vendors to fulfil my request. See our{" "}
           <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{" "}
           and{" "}
           <a href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>.

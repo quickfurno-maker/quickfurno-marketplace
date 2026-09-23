@@ -47,7 +47,7 @@ import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
 // Category structure is the single source of truth in lib/categories.ts so the
 // homepage cards, vendor registration and this form never drift apart:
 //   Interior (Interior Designers · Carpenters · Modular Factory · Premium
-//   Interiors) · Sofa · Painter · Civil Work.
+//   Interiors) · Sofa · Painter · Civil Work · False Ceiling.
 // ---------------------------------------------------------------------------
 
 type IconName = Parameters<typeof QFIcon>[0]["name"];
@@ -255,7 +255,7 @@ const EnquiryModalContext = createContext<EnquiryModalContextValue | null>(null)
 
 /**
  * Best-effort map of an incoming category/service string (passed by triggers
- * across the site) to one of the four approved main categories — and, for
+ * across the site) to one of the approved main categories — and, for
  * Interior, the closest subcategory — so the modal opens pre-filled.
  */
 function presetFromCategory(value?: string): { categoryId: string; sub?: string } | null {
@@ -263,12 +263,13 @@ function presetFromCategory(value?: string): { categoryId: string; sub?: string 
   const v = value.toLowerCase();
   if (v.includes("paint")) return { categoryId: "painter" };
   if (v.includes("sofa") || v.includes("uphol")) return { categoryId: "sofa" };
+  if (v.includes("ceiling") || v.includes("gypsum") || /\bpop\b/.test(v)) return { categoryId: "false-ceiling" };
   if (v.includes("civil") || v.includes("renovat") || v.includes("masonry")) return { categoryId: "civil-work" };
   if (v.includes("modular") || v.includes("kitchen") || v.includes("wardrobe"))
     return { categoryId: INTERIOR_ID, sub: "Modular Factory" };
   if (v.includes("carpen") || v.includes("furniture")) return { categoryId: INTERIOR_ID, sub: "Carpenters" };
   if (v.includes("premium")) return { categoryId: INTERIOR_ID, sub: "Premium Interiors" };
-  if (v.includes("interior") || v.includes("ceiling") || v.includes("turnkey") || v.includes("design"))
+  if (v.includes("interior") || v.includes("turnkey") || v.includes("design"))
     return { categoryId: INTERIOR_ID, sub: "Interior Designers" };
   return null;
 }
@@ -276,9 +277,9 @@ function presetFromCategory(value?: string): { categoryId: string; sub?: string 
 /**
  * Resolve a client-picked vendor's canonical category into the modal's own
  * category structure (parent id/label + interior subcategory + enquiry service).
- * `targetVendorCategory` is one of the seven QuickFurnoCategory leaves: the four
- * interior leaves fold under the "interior" parent; Sofa / Painter / Civil Work
- * are their own main category. Returns null when the label can't be resolved, so
+ * `targetVendorCategory` is one of the eight QuickFurnoCategory leaves: the four
+ * interior leaves fold under the "interior" parent; Sofa / Painter / Civil Work /
+ * False Ceiling are their own main category. Returns null when the label can't be resolved, so
  * the caller safely falls back to the normal category picker.
  */
 function resolvePreferredSelection(targetVendorCategory?: string): {
@@ -290,7 +291,7 @@ function resolvePreferredSelection(targetVendorCategory?: string): {
   const wanted = targetVendorCategory?.trim().toLowerCase();
   if (!wanted) return null;
 
-  // Leaf that is its own main category (Sofa / Painter / Civil Work).
+  // Leaf that is its own main category (Sofa / Painter / Civil Work / False Ceiling).
   const leafMain = mainCategories.find((c) => c.category && c.category.toLowerCase() === wanted);
   if (leafMain && leafMain.category) {
     const leafCategory = leafMain.category;
@@ -362,12 +363,33 @@ export function EnquiryModalTrigger({
         onClick?.(event);
         if (event.defaultPrevented) return;
 
+        // Quote-bar convention (launch fix): a trigger rendered inside a
+        // [data-quote-bar] container picks up that bar's <select> value as the
+        // service preset at CLICK time, so a server-rendered hero bar needs no
+        // client state and the visitor's selection is no longer thrown away.
+        // An explicit serviceCategory prop always wins; an empty select leaves
+        // the options exactly as before.
+        let resolvedOptions = modalOptions;
+        const bar = event.currentTarget.closest("[data-quote-bar]");
+        if (bar && !resolvedOptions.serviceCategory) {
+          const select = bar.querySelector("select");
+          const picked = select instanceof HTMLSelectElement ? select.value : "";
+          if (picked) resolvedOptions = { ...resolvedOptions, serviceCategory: picked };
+        }
+        // Same convention for the locality: an optional [data-quote-area] text
+        // input inside the bar pre-fills the area field (Pune launch hero).
+        if (bar && !resolvedOptions.area) {
+          const areaInput = bar.querySelector("input[data-quote-area]");
+          const typed = areaInput instanceof HTMLInputElement ? areaInput.value.trim() : "";
+          if (typed) resolvedOptions = { ...resolvedOptions, area: typed };
+        }
+
         if (context) {
-          context.openModal(modalOptions);
+          context.openModal(resolvedOptions);
           return;
         }
 
-        window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: modalOptions }));
+        window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: resolvedOptions }));
       }}
     >
       {children}
@@ -538,7 +560,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
             categoryId: cat.id,
             categoryLabel: cat.label,
             // Interior needs a subcategory before the canonical service is known;
-            // the other three map straight to their service.
+            // the other main categories map straight to their service.
             subcategory: "",
             serviceRequired: cat.category ? enquiryServiceForCategory(cat.category) : "",
           },
@@ -659,7 +681,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         if (!form.whatsappSame && !isPhoneValid(form.whatsapp))
           return "Enter a valid 10-digit WhatsApp number.";
         if (!form.shareConsent)
-          return "Please accept sharing your details with up to 3 verified vendors to continue.";
+          return "Please accept sharing your details with up to 3 eligible vendors to continue.";
         return null;
       default:
         return null;
@@ -966,7 +988,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     }
 
     if (!form.shareConsent) {
-      setError("Please accept sharing your details with up to 3 verified vendors to continue.");
+      setError("Please accept sharing your details with up to 3 eligible vendors to continue.");
       return;
     }
 
@@ -1056,11 +1078,11 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         const vendorName = modalOptions.targetVendorName || result.data.preferred_vendor?.vendor_name || "this vendor";
         setSuccessMessage(
           result.data.preferred_vendor?.assigned
-            ? `Your enquiry has been sent to ${vendorName}. If needed, QuickFurno may connect you with up to 2 more suitable verified vendors after some time.`
-            : `Your request for ${vendorName} has been received. QuickFurno will check this vendor's availability first. If they are unavailable, we will connect you with better matching verified vendors.`,
+            ? `Your enquiry has been sent to ${vendorName}. If needed, QuickFurno may connect you with up to 2 more suitable eligible vendors after some time.`
+            : `Your request for ${vendorName} has been received. QuickFurno will check this vendor's availability first. If they are unavailable, we may connect you with other eligible vendors under the matching rules.`,
         );
       } else {
-        setSuccessMessage("Your requirement has been submitted. QuickFurno will connect you with up to 3 relevant verified vendors.");
+        setSuccessMessage("Your requirement has been submitted. QuickFurno may connect you with up to 3 relevant eligible vendors.");
       }
       setSuccess(true);
     } catch (err) {
@@ -1128,12 +1150,27 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
    * wizard already used, so the payload, consent, preferred-vendor routing,
    * location metadata and tracking are unchanged.
    *
-   * Field order is fixed and mobile-first:
-   *   service -> city -> area -> name -> phone -> whatsapp -> budget ->
-   *   property type -> timeline -> message -> consent -> submit.
+   * Field order is fixed and mobile-first, grouped under three numbered
+   * section headings (visual grouping ONLY — no step gating, no Back/Next,
+   * per the QF-MOBILE-FORM contract) with contact details LAST so the form
+   * asks for a phone number only after the project is described:
+   *   [1 Your project]     service -> city -> area
+   *   [2 Project details]  budget -> property type -> timeline -> message
+   *   [3 Your contact]     name -> phone -> whatsapp -> consent -> submit.
    * Desktop pairs related fields into two columns purely with CSS, so the wide
    * layout never dictates the mobile structure.
    */
+  function sectionHead(n: number, title: string, hint: string) {
+    return (
+      <div className="qf-sf-sechead qf-sf-field--full">
+        <span className="qf-sf-sechead-n" aria-hidden="true">{n}</span>
+        <div>
+          <h4>{title}</h4>
+          <small>{hint}</small>
+        </div>
+      </div>
+    );
+  }
   function renderSingleForm() {
     const cityUi = fieldUi("city", { valid: Boolean(form.city), value: form.city, error: "Please select your city." });
     const hasCoordinates =
@@ -1166,6 +1203,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
 
     return (
       <div className="qf-sf">
+        {sectionHead(1, "Your project", "What you need done, and where")}
         {/* Service. The category source of truth is unchanged — these are the
             same mainCategories the tile grid used, rendered as a select. In the
             preferred-vendor flow the category is fixed by the vendor, so the
@@ -1274,7 +1312,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
             {locStatus === "locating" ? "Getting location…" : "Use my current location"}
           </button>
           {locStatus === "captured" ? (
-            <p className="qf-sf-note qf-sf-note--ok">Location captured — we&apos;ll use this to match relevant verified vendors.</p>
+            <p className="qf-sf-note qf-sf-note--ok">Location captured — we&apos;ll use this as one matching signal for eligible vendors.</p>
           ) : null}
           {locStatus === "denied" ? (
             <p className="qf-sf-note">No problem — your city and area above are enough.</p>
@@ -1284,67 +1322,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
           ) : null}
         </div>
 
-        <label className={`qf-sf-field${nameUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-name">
-          <span className="qf-sf-label">Your name</span>
-          <div className="qf-rf-input-wrapper">
-            <input
-              id="qf-sf-name"
-              ref={nameInputRef}
-              value={form.name}
-              onChange={(e) => {
-                set("name", e.target.value);
-                markTouched("name");
-              }}
-              onBlur={() => markTouched("name")}
-              placeholder="e.g. Rahul Sharma"
-              autoComplete="name"
-            />
-            <ValidationIcon state={nameUi.iconState} />
-          </div>
-          {nameUi.showError ? <span className="qf-rf-field-err">{nameUi.error}</span> : null}
-        </label>
-
-        <label className={`qf-sf-field${phoneUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-phone">
-          <span className="qf-sf-label">Phone number</span>
-          <div className="qf-rf-input-wrapper">
-            <input
-              id="qf-sf-phone"
-              value={form.phone}
-              onChange={(e) => onPhoneChange(e.target.value)}
-              onBlur={() => markTouched("phone")}
-              placeholder="10-digit mobile number"
-              inputMode="numeric"
-              autoComplete="tel"
-              maxLength={10}
-            />
-            <ValidationIcon state={phoneUi.iconState} />
-          </div>
-          {phoneUi.showError ? <span className="qf-rf-field-err">{phoneUi.error}</span> : null}
-        </label>
-
-        <label className="qf-sf-check qf-sf-field--full">
-          <input type="checkbox" checked={form.whatsappSame} onChange={(e) => onWhatsappSameChange(e.target.checked)} />
-          <span>WhatsApp number same as phone</span>
-        </label>
-
-        {!form.whatsappSame ? (
-          <label className={`qf-sf-field${whatsappUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-wa">
-            <span className="qf-sf-label">WhatsApp number</span>
-            <div className="qf-rf-input-wrapper">
-              <input
-                id="qf-sf-wa"
-                value={form.whatsapp}
-                onChange={(e) => onWhatsappChange(e.target.value)}
-                onBlur={() => markTouched("whatsapp")}
-                placeholder="10-digit WhatsApp number"
-                inputMode="numeric"
-                maxLength={10}
-              />
-              <ValidationIcon state={whatsappUi.iconState} />
-            </div>
-            {whatsappUi.showError ? <span className="qf-rf-field-err">{whatsappUi.error}</span> : null}
-          </label>
-        ) : null}
+        {sectionHead(2, "Project details", "Budget and timing — rough estimates are fine")}
 
         {/* Budget — ONE band select that writes the canonical
             budgetMin / budgetMax / budgetNotSure fields, so budgetSummary() and
@@ -1419,6 +1397,70 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
           />
         </label>
 
+        {sectionHead(3, "Your contact", "Where the matched vendors' quotes should reach you")}
+
+        <label className={`qf-sf-field${nameUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-name">
+          <span className="qf-sf-label">Your name</span>
+          <div className="qf-rf-input-wrapper">
+            <input
+              id="qf-sf-name"
+              ref={nameInputRef}
+              value={form.name}
+              onChange={(e) => {
+                set("name", e.target.value);
+                markTouched("name");
+              }}
+              onBlur={() => markTouched("name")}
+              placeholder="e.g. Rahul Sharma"
+              autoComplete="name"
+            />
+            <ValidationIcon state={nameUi.iconState} />
+          </div>
+          {nameUi.showError ? <span className="qf-rf-field-err">{nameUi.error}</span> : null}
+        </label>
+
+        <label className={`qf-sf-field${phoneUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-phone">
+          <span className="qf-sf-label">Phone number</span>
+          <div className="qf-rf-input-wrapper">
+            <input
+              id="qf-sf-phone"
+              value={form.phone}
+              onChange={(e) => onPhoneChange(e.target.value)}
+              onBlur={() => markTouched("phone")}
+              placeholder="10-digit mobile number"
+              inputMode="numeric"
+              autoComplete="tel"
+              maxLength={10}
+            />
+            <ValidationIcon state={phoneUi.iconState} />
+          </div>
+          {phoneUi.showError ? <span className="qf-rf-field-err">{phoneUi.error}</span> : null}
+        </label>
+
+        <label className="qf-sf-check qf-sf-field--full">
+          <input type="checkbox" checked={form.whatsappSame} onChange={(e) => onWhatsappSameChange(e.target.checked)} />
+          <span>WhatsApp number same as phone</span>
+        </label>
+
+        {!form.whatsappSame ? (
+          <label className={`qf-sf-field${whatsappUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-wa">
+            <span className="qf-sf-label">WhatsApp number</span>
+            <div className="qf-rf-input-wrapper">
+              <input
+                id="qf-sf-wa"
+                value={form.whatsapp}
+                onChange={(e) => onWhatsappChange(e.target.value)}
+                onBlur={() => markTouched("whatsapp")}
+                placeholder="10-digit WhatsApp number"
+                inputMode="numeric"
+                maxLength={10}
+              />
+              <ValidationIcon state={whatsappUi.iconState} />
+            </div>
+            {whatsappUi.showError ? <span className="qf-rf-field-err">{whatsappUi.error}</span> : null}
+          </label>
+        ) : null}
+
         {/* Consent — the SAME legal text and the same share_consent semantics,
             in a compact row instead of a large card. Never pre-checked. */}
         <label className={`qf-sf-consent${consentError ? " has-error" : ""}`}>
@@ -1431,7 +1473,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
             }}
           />
           <span>
-            I agree that QuickFurno may share my enquiry and contact details with up to 3 verified vendors initially. If vendors are unavailable, non-responsive, or unable to serve my requirement, QuickFurno may manually connect me with additional verified vendors to fulfil my request.{" "}
+            I agree that QuickFurno may share my enquiry and contact details with up to 3 eligible vendors initially. If vendors are unavailable, non-responsive, or unable to serve my requirement, QuickFurno may manually connect me with additional eligible vendors under the marketplace matching rules.{" "}
             <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
             {" · "}
             <a href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>
@@ -1439,7 +1481,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         </label>
         {consentError ? (
           <span className="qf-rf-field-err qf-rf-field-err--block">
-            Please accept sharing your details with up to 3 verified vendors to continue.
+            Please accept sharing your details with up to 3 eligible vendors to continue.
           </span>
         ) : null}
       </div>
@@ -1469,7 +1511,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
           >
             <header className="qf-rf-top">
               <div className="qf-rf-top-row">
-                <span className="qf-rf-flow-name">Get Matched With Verified Teams</span>
+                <span className="qf-rf-flow-name">Get Matched With Eligible Pros</span>
                 <button type="button" className="qf-rf-close" aria-label="Close" onClick={requestClose}>
                   ×
                 </button>
@@ -1484,7 +1526,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                   <h3 id="qf-rf-title">Tell us about your project</h3>
                   <p>
                     Share your requirement once. QuickFurno will match you with up to 3 relevant
-                    verified vendors.
+                    eligible vendors.
                   </p>
                 </div>
               ) : null}
@@ -1503,7 +1545,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                     ✓
                   </span>
                   <h3 id="qf-rf-title">Requirement submitted</h3>
-                  <p>{successMessage || "Your requirement has been submitted. QuickFurno will connect you with up to 3 relevant verified vendors."}</p>
+                  <p>{successMessage || "Your requirement has been submitted. QuickFurno may connect you with up to 3 relevant eligible vendors."}</p>
                 </div>
               ) : (
                 <>
@@ -1563,7 +1605,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                 >
                   {submitting ? "Submitting…" : "Get Free Team Matches"}
                 </button>
-                <p className="qf-sf-trust">Free for homeowners · Up to 3 verified vendors · Your details stay private</p>
+                <p className="qf-sf-trust">Free to enquire · Up to 3 eligible vendors · Contact sharing follows your consent</p>
               </footer>
             )}
 

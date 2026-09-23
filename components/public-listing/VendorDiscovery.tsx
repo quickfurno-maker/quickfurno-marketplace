@@ -157,7 +157,7 @@ export function VendorDiscovery({
           <h2>
             {filtersActive
               ? "No vendors match these filters"
-              : "No verified vendors are available in this category right now."}
+              : "No approved vendors are available in this category right now."}
           </h2>
           <p>
             {filtersActive
@@ -172,7 +172,7 @@ export function VendorDiscovery({
             ) : null}
             <EnquiryModalTrigger
               className="qf-pub-btn qf-pub-btn--primary"
-              modalTitle={`Get matched with verified ${categoryName}`}
+              modalTitle={`Get matched with eligible ${categoryName}`}
               serviceCategory={enquiryService}
               source={`Category empty state: ${categoryName}`}
             >

@@ -8,10 +8,10 @@
 //
 // Category matching: real vendor rows store trades in `service_categories`
 // (e.g. "Full Home Interior", "Modular Kitchen", "Carpentry", "Wardrobe",
-// "False Ceiling") — NOT the public category-page names. Those are vendor
-// SERVICES, not public categories: we only use them to map a vendor onto the
-// existing public category pages (see PUBLIC_CATEGORY_SERVICE_ALIASES). We never
-// add them as new public categories.
+// "Tiling") — NOT the public category-page names. Those are vendor SERVICES,
+// not public categories: we only use them to map a vendor onto the existing
+// public category pages (see PUBLIC_CATEGORY_SERVICE_ALIASES). False Ceiling was
+// promoted from a service to its own public category in the Pune launch update.
 //
 // Hard rules honoured here:
 //   • adminClient() is used server-side only — the service role never reaches the
@@ -53,6 +53,7 @@ const IMAGE_TONE_BY_CATEGORY: Record<QuickFurnoCategory, string> = {
   Sofa: "sofa-studio",
   Painter: "paint-finish",
   "Civil Work": "civil-reno",
+  "False Ceiling": "warm-suite",
 };
 
 /**
@@ -78,7 +79,6 @@ const PUBLIC_CATEGORY_SERVICE_ALIASES: Record<QuickFurnoCategory, string[]> = {
     "Interior Designer",
     "Modular Kitchen",
     "Wardrobe",
-    "False Ceiling",
   ],
   "Premium Interiors": [
     "Full Home Interior",
@@ -109,13 +109,18 @@ const PUBLIC_CATEGORY_SERVICE_ALIASES: Record<QuickFurnoCategory, string[]> = {
   ],
   "Civil Work": [
     "Civil Work",
-    "False Ceiling",
     "Civil",
     "Renovation",
     "Home Renovation",
     "Tiling",
-    "POP",
     "Waterproofing",
+  ],
+  "False Ceiling": [
+    "False Ceiling",
+    "POP",
+    "POP Ceiling",
+    "Gypsum Ceiling",
+    "Ceiling",
   ],
   Painter: ["Painter", "Painting", "Paint", "Texture", "Waterproofing"],
   Sofa: ["Sofa", "Sofa Maker", "Sofa Makers", "Custom Sofa & Upholstery", "Upholstery", "Recliner"],
@@ -130,6 +135,9 @@ const CATEGORY_RESOLUTION_PRIORITY: QuickFurnoCategory[] = [
   "Modular Factory",
   "Interior Designers",
   "Premium Interiors",
+  // Last on purpose: an interior or civil vendor who also ticks False Ceiling
+  // keeps their main category; only ceiling-only vendors resolve here.
+  "False Ceiling",
 ];
 
 /**
@@ -297,7 +305,7 @@ function mapToPublicVendor(
   const experience = asText(row.experience) ?? asText(row.years_experience) ?? "Verified Team";
   // Real, canonical public service labels the vendor actually provides. Legacy
   // service tags ("Modular Kitchen", "Carpentry", …) are folded to their public
-  // category; ambiguous services (Wardrobe, False Ceiling) are dropped so the
+  // category; ambiguous services (e.g. Wardrobe) are dropped so the
   // profile never invents services the vendor did not choose.
   const serviceCategories = canonicalServiceLabels(row);
   const subCategory = serviceCategories[0] ?? category;
@@ -352,6 +360,9 @@ const LEGACY_SERVICE_TO_CANONICAL: Record<string, QuickFurnoCategory> = {
   renovation: "Civil Work",
   "custom sofa & upholstery": "Sofa",
   upholstery: "Sofa",
+  pop: "False Ceiling",
+  "pop ceiling": "False Ceiling",
+  "gypsum ceiling": "False Ceiling",
 };
 
 const CANONICAL_CATEGORY_BY_KEY = new Map<string, QuickFurnoCategory>(

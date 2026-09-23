@@ -277,8 +277,8 @@ export function VendorsPage({ data, error }: { data: VendorsDirectoryData | null
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total Vendors" value={formatNumber(totals.all)} helper="All vendor records (live count)" icon="vendors" />
-        <StatCard label="Approved" value={formatNumber(totals.approved)} helper="Verified vendors (live count)" icon="vendors" tone="emerald" />
-        <StatCard label="Pending Approval" value={formatNumber(totals.pending)} helper="Awaiting verification (live count)" icon="vendors" tone="indigo" />
+        <StatCard label="Approved" value={formatNumber(totals.approved)} helper="Approved vendors (live count)" icon="vendors" tone="emerald" />
+        <StatCard label="Pending Approval" value={formatNumber(totals.pending)} helper="Awaiting review (live count)" icon="vendors" tone="indigo" />
         <StatCard label="Low Credits" value={formatNumber(totals.lowBalance)} helper="Renewal risk (live count)" icon="notifications" tone="amber" />
       </section>
 

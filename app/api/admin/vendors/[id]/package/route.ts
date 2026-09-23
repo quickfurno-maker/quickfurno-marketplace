@@ -16,7 +16,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getAdminSession();
   if (!session.isSuperadmin) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 403 });
@@ -46,7 +46,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   // NOTE (Phase 4): `record.creditsToAdd` is intentionally ignored here — this route
   // updates package metadata only and must not become a second credit-grant path.
-  const result = await updateVendorPackage(params.id, {
+  const result = await updateVendorPackage((await params).id, {
     packageName: typeof record.packageName === "string" ? record.packageName : null,
     packageStatus: packageStatus as PackageStatus,
     packageExpiresAt: typeof record.packageExpiresAt === "string" ? record.packageExpiresAt : null,

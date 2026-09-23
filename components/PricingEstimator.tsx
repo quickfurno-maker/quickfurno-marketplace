@@ -22,6 +22,9 @@ export function PricingEstimator() {
     if (category === "Sofa") {
       return "Sofa work depends on fabric, frame, foam quality and seating size. Submit a requirement for custom pricing.";
     }
+    if (category === "False Ceiling") {
+      return "False ceiling work depends on ceiling area, design and lighting. Submit a requirement for a quote after a site visit.";
+    }
 
     const sqft = Number(area);
     if (!Number.isFinite(sqft) || sqft <= 0) {

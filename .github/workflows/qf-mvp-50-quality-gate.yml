@@ -64,6 +64,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Production dependency security audit
+        run: npm audit --omit=dev --audit-level=high
+
       # QF-MVP-40 provider/template authority is what the 50.x orchestration consumes, so the
       # exact-head gate proves it too. All offline: no secrets, no Meta, no Supabase.
       - name: QF-MVP-40.4 template catalogue

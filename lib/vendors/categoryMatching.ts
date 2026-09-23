@@ -14,6 +14,13 @@ export interface CategoryMatchResult {
   reason: string;
 }
 
+// Labels that mean false-ceiling work. Shared by the synonym groups and the
+// parent groups below (and mirrored in SQL by the False Ceiling migration).
+const FALSE_CEILING_LABELS = [
+  "false ceiling", "pop", "pop ceiling", "pop false ceiling", "gypsum ceiling",
+  "gypsum false ceiling", "ceiling", "ceiling work", "cove lighting",
+];
+
 // Canonical service groups. Public category labels and enquiry service labels
 // both fold into these groups so organic leads can match paid/trial vendors
 // even when the two sides store different but equivalent labels.
@@ -21,7 +28,6 @@ export const CANONICAL_CATEGORY_GROUPS: Record<string, string[]> = {
   "Interior Designers": [
     "interior designers", "full home interior", "home interior",
     "interior design", "interior designer", "interior", "interiors",
-    "false ceiling",
   ],
   Carpenters: [
     "carpenters", "carpentry", "carpenter", "custom furniture",
@@ -43,8 +49,11 @@ export const CANONICAL_CATEGORY_GROUPS: Record<string, string[]> = {
   Painter: ["painter", "painting", "paint", "texture painting", "wall painting"],
   "Civil Work": [
     "civil work", "civil", "home renovation", "renovation", "tiling",
-    "tile work", "masonry", "pop", "plumbing civil", "waterproofing",
+    "tile work", "masonry", "plumbing civil", "waterproofing",
   ],
+  // Own category since the Pune launch update: ceiling enquiries go to ceiling
+  // vendors. "POP" means POP (plaster of Paris) ceiling work here.
+  "False Ceiling": FALSE_CEILING_LABELS,
 };
 
 // normalized label -> canonical group names. Some services (for example
@@ -241,10 +250,10 @@ export function isInteriorFallbackCompatible(lead: LeadLike, vendor: VendorLike)
 // Phase 26A-2D: Parent category groups.
 // One client is capped at 3 vendors PER PARENT CATEGORY GROUP (not globally and
 // not per subcategory). All interior subcategories share one Interior cap;
-// Sofa / Painting / Civil Work are separate groups. Unknown categories become
+// Sofa / Painting / Civil Work / False Ceiling are separate groups. Unknown categories become
 // their own group so they never collide with a mapped one. PURE + client-safe.
 // ---------------------------------------------------------------------------
-export const KNOWN_PARENT_CATEGORY_GROUPS = ["Interior", "Sofa", "Painting", "Civil Work"] as const;
+export const KNOWN_PARENT_CATEGORY_GROUPS = ["Interior", "Sofa", "Painting", "Civil Work", "False Ceiling"] as const;
 export type KnownParentCategoryGroup = (typeof KNOWN_PARENT_CATEGORY_GROUPS)[number];
 
 // Seed labels per group (normalised on load, so plural/case variants fold in).
@@ -253,7 +262,7 @@ const PARENT_GROUP_DEFINITIONS: Record<KnownParentCategoryGroup, string[]> = {
     "full home interior", "home interior", "interiors", "interior", "interior designers",
     "interior designer", "premium interiors", "premium interior", "carpenters", "carpenter",
     "carpentry", "modular factory", "modular kitchen", "modular furniture", "wardrobe",
-    "wood work", "woodwork", "furniture work", "false ceiling", "turnkey interior",
+    "wood work", "woodwork", "furniture work", "turnkey interior",
     "complete interior", "kitchen carpenter",
   ],
   Sofa: [
@@ -265,6 +274,7 @@ const PARENT_GROUP_DEFINITIONS: Record<KnownParentCategoryGroup, string[]> = {
     "civil work", "renovation", "home renovation", "masonry", "tile work",
     "plumbing civil", "plumbing",
   ],
+  "False Ceiling": FALSE_CEILING_LABELS,
 };
 
 const LABEL_TO_PARENT_GROUP: Map<string, KnownParentCategoryGroup> = (() => {
@@ -320,6 +330,8 @@ export const CATEGORY_MATCHING_SMOKE_CASES = [
   ["Premium Interior Design", "Premium Interiors"],
   ["Custom Sofa & Upholstery", "Sofa"],
   ["Full Home Interior", "Interior Designers"],
+  ["False Ceiling", "False Ceiling"],
+  ["POP", "False Ceiling"],
 ] as const;
 
 export function verifyCategoryMatchingSmokeCases(): CategoryMatchResult[] {

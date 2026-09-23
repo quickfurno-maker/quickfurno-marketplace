@@ -2,7 +2,6 @@
 
 import { ClientSelectedVendorEnquiry } from "@/components/vendors/ClientSelectedVendorEnquiry";
 import { FreeVendorInterestButton } from "@/components/FreeVendorInterestButton";
-import { CONTACT_TEL } from "@/lib/config";
 import type { VendorPublicProfileView } from "./profileModel";
 
 /**
@@ -24,8 +23,8 @@ import type { VendorPublicProfileView } from "./profileModel";
  * removed rather than the correct one being replaced.
  *
  * Free / unpaid vendors keep the gated FreeVendorInterestButton and never get a
- * selected-vendor enquiry. No surface renders a vendor's own phone, WhatsApp or
- * email; the only tel: link is QuickFurno's own switchboard.
+ * selected-vendor enquiry. No surface renders a phone number: not a vendor's own
+ * phone, WhatsApp or email, and not QuickFurno's own number.
  */
 export function VendorPrimaryAction({
   vendor,
@@ -108,15 +107,10 @@ export function VendorProfileActionCard({
         className="qf-pub-btn qf-pub-btn--primary qf-pub-btn--block"
       />
 
-      {/* QuickFurno's own switchboard — never the vendor's number. */}
-      <a className="qf-vprofile-actioncard-tel" href={CONTACT_TEL}>
-        Call QuickFurno
-      </a>
-
       <ul className="qf-vprofile-actioncard-points">
         <li>Free for homeowners</li>
         <li>Your contact details are shared only through the enquiry process</li>
-        <li>QuickFurno may match up to 3 relevant verified vendors</li>
+        <li>QuickFurno may match up to 3 relevant eligible vendors</li>
       </ul>
     </div>
   );

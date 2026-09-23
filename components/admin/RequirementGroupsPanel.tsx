@@ -61,6 +61,7 @@ const FILTERS = [
   "Sofa",
   "Painting",
   "Civil Work",
+  "False Ceiling",
   "Preferred vendor waiting",
   "Waiting for client selection",
   "Auto-fill due",
@@ -141,6 +142,7 @@ export function RequirementGroupsPanel({
         case "Sofa":
         case "Painting":
         case "Civil Work":
+        case "False Ceiling":
           return group === filter;
         case "Preferred vendor waiting":
           return row.preferred_vendor_status === "waiting_for_recharge";

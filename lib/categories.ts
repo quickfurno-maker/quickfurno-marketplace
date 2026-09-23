@@ -23,7 +23,7 @@ export type MainCategory = {
   subcategories: CategorySubItem[];
 };
 
-// Approved structure: Interior (4 subs) · Sofa · Painter · Civil Work.
+// Approved structure: Interior (4 subs) · Sofa · Painter · Civil Work · False Ceiling.
 export const mainCategories: MainCategory[] = [
   {
     id: "interior",
@@ -59,6 +59,14 @@ export const mainCategories: MainCategory[] = [
     tagline: "Renovation, masonry, and repair work.",
     icon: "civil",
     category: "Civil Work",
+    subcategories: [],
+  },
+  {
+    id: "false-ceiling",
+    label: "False Ceiling",
+    tagline: "POP and gypsum ceilings, cove lighting, and ceiling repair.",
+    icon: "ceiling",
+    category: "False Ceiling",
     subcategories: [],
   },
 ];

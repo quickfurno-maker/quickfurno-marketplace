@@ -34,8 +34,8 @@ export const AOS_AGENT_REGISTRY: readonly AgentRegistryEntry[] = Object.freeze([
   { num: 3, slug: "lead-lens", name: "QF-AOS-LeadLens", status: "active", mode: "rule_based", group: "foundation", purpose: "Observes canonical Core lead-quality scoring and qualification." },
   { num: 4, slug: "trust-shield", name: "QF-AOS-TrustShield", status: "active", mode: "rule_based", group: "foundation", purpose: "Observes canonical duplicate and lead-quality hard-gate evidence." },
   { num: 5, slug: "match-forge", name: "QF-AOS-MatchForge", status: "active", mode: "rule_based", group: "foundation", purpose: "Observes canonical Core matching outcomes and vendor recommendations." },
-  { num: 6, slug: "lead-flow", name: "QF-AOS-LeadFlow", status: "active", mode: "rule_based", group: "foundation", purpose: "Observes the Core-owned lead lifecycle through verified vendor delivery; does not manage quotation, site visit, negotiation or project execution." },
-  { num: 7, slug: "ops-brief", name: "QF-AOS-OpsBrief", status: "active", mode: "rule_based", group: "foundation", purpose: "Produces read-only lead-generation operations summaries through verified vendor delivery, excluding downstream vendor-client commercial execution." },
+  { num: 6, slug: "lead-flow", name: "QF-AOS-LeadFlow", status: "active", mode: "rule_based", group: "foundation", purpose: "Observes the Core-owned lead lifecycle through assigned vendor delivery; does not manage quotation, site visit, negotiation or project execution." },
+  { num: 7, slug: "ops-brief", name: "QF-AOS-OpsBrief", status: "active", mode: "rule_based", group: "foundation", purpose: "Produces read-only lead-generation operations summaries through assigned vendor delivery, excluding downstream vendor-client commercial execution." },
 ]);
 
 export function getAgentRegistryEntry(slug: string): AgentRegistryEntry | undefined {

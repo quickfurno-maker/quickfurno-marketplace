@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LogoMark } from "@/components/Logo";
+import { CONTACT, whatsappLink } from "@/lib/config";
 
 export function Wordmark({ className = "text-xl" }: { className?: string }) {
   return (
@@ -59,9 +60,9 @@ export function SiteFooter() {
           <div>
             <p className="eyebrow">Contact</p>
             <ul className="mt-3 space-y-1 font-sans text-sm text-muted">
-              <li>Kharadi Annex, Pune 411014</li>
-              <li>+91 77200 00553</li>
-              <li>quickfurno@gmail.com</li>
+              <li>{CONTACT.address}</li>
+              <li><a href={whatsappLink()} target="_blank" rel="noopener noreferrer">WhatsApp support</a></li>
+              <li><a href={"mailto:" + CONTACT.email}>{CONTACT.email}</a></li>
             </ul>
           </div>
         </div>

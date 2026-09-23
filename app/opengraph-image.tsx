@@ -3,11 +3,11 @@ import { ImageResponse } from "next/og";
 export const runtime = "edge";
 
 // Generates the social share image and wires og:image / twitter:image automatically.
-export const alt = "QuickFurno — verified home-service vendors in Pune";
+export const alt = "QuickFurno — approved home-service vendors in Pune";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-const pills = ["Verified Vendors", "Transparent Rates", "Pune"];
+const pills = ["Approved Vendors", "Transparent Rates", "Pune"];
 
 export default function OpengraphImage() {
   return new ImageResponse(

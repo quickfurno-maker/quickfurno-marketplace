@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Poppins, Playfair_Display } from "next/font/google";
+import localFont from "next/font/local";
 import { EnquiryModalProvider } from "@/components/ClientEnquiryModal";
 import { ScrollProgress } from "@/components/ScrollProgress";
 import { ScrollReveal } from "@/components/ScrollReveal";
@@ -24,6 +25,9 @@ import "./public-utility-v2.css";
 import "./vendor-auth-v2.css";
 // Final locked homepage visual system; selectors are qfh-* scoped and do not restyle vendor/public utility pages.
 import "./home-final.css";
+// Pune launch homepage (approved Desktop 1440 / Mobile 390 mockup). qfp-* scoped
+// only; loaded last so it wins over home-final.css on the homepage.
+import "./home-pune-launch.css";
 
 // Type system: Poppins (geometric sans) for the logo, headlines, body and UI;
 // Playfair Display italic only for the gold accent words.
@@ -33,6 +37,18 @@ const poppins = Poppins({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
   variable: "--font-manrope",
+  display: "swap",
+});
+
+// Plus Jakarta Sans — body/UI face of the Pune launch homepage (headings and
+// the logo stay Poppins). Self-hosted variable font (OFL-1.1, see
+// app/fonts/PLUS-JAKARTA-SANS-LICENSE.txt) so the build never depends on a
+// Google Fonts fetch.
+const jakarta = localFont({
+  src: "./fonts/plus-jakarta-sans-latin-wght-normal.woff2",
+  weight: "200 800",
+  style: "normal",
+  variable: "--font-jakarta",
   display: "swap",
 });
 
@@ -47,7 +63,7 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: "QuickFurno | Verified Home-Service Marketplace",
   description:
-    "QuickFurno helps clients in Pune compare verified interior designers, carpenters, modular factories, painters, sofa and civil-work vendors.",
+    "QuickFurno helps clients in Pune compare verified interior designers, carpenters, modular factories, painters, sofa, civil-work and false ceiling vendors.",
   metadataBase: new URL("https://quickfurno.in"),
   openGraph: {
     title: "QuickFurno | Verified Home-Service Marketplace",
@@ -71,7 +87,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${poppins.variable} ${playfair.variable}`}>
+    <html lang="en" className={`${poppins.variable} ${playfair.variable} ${jakarta.variable}`}>
       <body>
         <ScrollProgress />
         <ScrollReveal />

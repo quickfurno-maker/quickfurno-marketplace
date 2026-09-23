@@ -8,7 +8,7 @@ import { getVendorPublicVisibility } from "@/lib/vendors/vendorVisibility";
 import { loadMarketplaceRuntimeSettings } from "@/lib/lead-assignment/runtimeSettings";
 
 export const FREE_VENDOR_INTEREST_CLIENT_MESSAGE =
-  "Request received. QuickFurno has registered your interest. Our team will help you connect with a suitable verified vendor shortly.";
+  "Request received. QuickFurno has registered your interest. Our team will help you connect with a suitable eligible vendor shortly.";
 
 export interface CaptureFreeVendorInterestInput {
   vendorId: string;

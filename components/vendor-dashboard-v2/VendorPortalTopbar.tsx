@@ -53,7 +53,7 @@ export function VendorPortalTopbar({
             <span className="qf-vendor-v2-account-text">
               <span className="qf-vendor-v2-account-name">{businessName}</span>
               <span className="qf-vendor-v2-account-meta">
-                {verified ? "Verified vendor" : "Under review"}
+                {verified ? "Approved vendor" : "Under review"}
               </span>
             </span>
           </Link>

@@ -13,6 +13,8 @@
   --qfp-orange: var(--qfd-orange);
   --qfp-orange-dark: #d63f12;
   --qfp-amber: #ffb13d;
+  /* Headline accent sampled off the board: softer than --qfp-amber. */
+  --qfp-gold: #f6c057;
   --qfp-coral: #ff8a5c;
   --qfp-green: #1f9d5b;
   --qfp-muted: #655f54;
@@ -168,11 +170,14 @@
    ========================================================================== */
 .qfp-hero {
   position: relative;
-  min-height: 647px;
   background: #16130f;
   overflow: hidden;
+  /* Column, not a centred row: the feature band is a child of the hero and has
+     to sit under the copy rather than beside it. The photo still covers the
+     whole section; the band paints over its foot, and the rounded top corners
+     let the photo show through at the edges, which is the lap the board draws. */
   display: flex;
-  align-items: center;
+  flex-direction: column;
 }
 .qfp-hero-media { position: absolute; inset: 0; }
 .qfp-hero-media img { object-fit: cover; object-position: right center; }
@@ -181,31 +186,114 @@
   inset: 0;
   background: linear-gradient(90deg, rgba(18, 15, 12, 0.92) 0%, rgba(18, 15, 12, 0.78) 38%, rgba(18, 15, 12, 0.25) 62%, rgba(18, 15, 12, 0) 100%);
 }
-.qfp-hero-inner { position: relative; padding: 72px 0; }
-.qfp-hero-copy { width: min(680px, 100%); display: flex; flex-direction: column; gap: 26px; }
-.qfp-hero h1 {
-  max-width: 620px;
-  font-size: 56px;
-  line-height: 1.12;
-  color: #f7f1e6;
+.qfp-hero-inner {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  min-height: 600px;
+  padding: 84px 0 52px;
 }
-.qfp-hero h1 span { color: var(--qfp-amber); }
-.qfp-hero-badges { display: flex; flex-wrap: wrap; gap: 12px; }
-.qfp-hero-badge {
+.qfp-hero-copy { width: min(772px, 100%); display: flex; flex-direction: column; gap: 22px; }
+.qfp-hero-kicker {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  padding: 10px 16px;
-  font-size: 14px;
+  gap: 14px;
+  font-size: 12.5px;
   font-weight: 700;
-  color: #f2ece0;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #cdc9c0;
 }
-.qfp-hero-badge b { color: var(--qfp-amber); font-weight: 700; }
-.qfp-hero-badge .qfp-badge-short { display: none; }
-.qfp-hero-note { font-size: 12px; color: #948b7c; margin-top: -14px; }
+.qfp-hero-kicker i { display: block; flex-shrink: 0; width: 44px; height: 2px; border-radius: 2px; background: var(--qfp-orange); }
+.qfp-hero h1 {
+  max-width: 660px;
+  font-size: 56px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: #fefefe;
+}
+.qfp-hero h1 span { color: var(--qfp-gold); }
+.qfp-hero-lede { max-width: 580px; font-size: 17px; line-height: 1.6; color: #d6d0c6; }
+.qfp-hero-points {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.qfp-hero-points li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 17px;
+  max-width: 152px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #f2ece2;
+}
+.qfp-hero-points li:first-child { padding-left: 0; }
+.qfp-hero-points li + li { border-left: 1px solid rgba(255, 255, 255, 0.18); }
+.qfp-hero-points i {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 35px;
+  height: 35px;
+  border-radius: 999px;
+  border: 1px solid rgba(246, 192, 87, 0.5);
+  color: var(--qfp-gold);
+}
+.qfp-hero-popular { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.qfp-hero-popular-label { font-size: 13px; color: #b9b1a3; }
+.qfp-hero-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 13px;
+  font-weight: 600;
+  color: #f2ece2;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.qfp-hero-chip:hover { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.34); }
+
+/* Feature band, lapping over the foot of the photo. */
+.qfp-hero-features {
+  position: relative;
+  z-index: 2;
+  background: #fefdfc;
+  border-radius: 28px 28px 0 0;
+  box-shadow: 0 -18px 40px -26px rgba(20, 24, 29, 0.45);
+}
+.qfp-hero-features-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 26px 0 28px;
+}
+.qfp-hero-feature { display: flex; align-items: flex-start; gap: 14px; padding: 0 26px; }
+.qfp-hero-feature + .qfp-hero-feature { border-left: 1px solid #efe8dc; }
+.qfp-hero-feature:first-child { padding-left: 0; }
+.qfp-hero-feature:last-child { padding-right: 0; }
+.qfp-hero-feature > i {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  background: #fdeee2;
+  color: var(--qfd-orange-text);
+}
+.qfp-hero-feature > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.qfp-hero-feature strong { font-size: 14.5px; font-weight: 800; color: var(--qfp-ink); }
+.qfp-hero-feature span { font-size: 13px; line-height: 1.45; color: var(--qfp-muted); }
+.qfp-hero-note { font-size: 12px; color: #948b7c; }
 
 .qfp-quote {
   display: flex;
@@ -225,7 +313,7 @@
   color: #746d61;
 }
 .qfp-quote-field--service { flex: 1 1 auto; min-width: 0; border-right: 1px solid #ece7dd; }
-.qfp-quote-field--area { flex: 0 0 186px; }
+.qfp-quote-field--area { flex: 0 0 238px; }
 .qfp-quote-field select,
 .qfp-quote-field input {
   width: 100%;
@@ -974,11 +1062,28 @@
   .qfp-hero-copy { width: 100%; max-width: 480px; gap: 14px; }
   .qfp-hero h1 { font-size: 30px; line-height: 1.15; color: #fff; }
   .qfp-hero h1 br { display: none; }
-  .qfp-hero-badges { gap: 8px; }
-  .qfp-hero-badge { gap: 6px; padding: 7px 11px; font-size: 12px; background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.18); }
-  .qfp-hero-badge svg { width: 13px; height: 13px; }
-  .qfp-hero-badge .qfp-badge-full { display: none; }
-  .qfp-hero-badge .qfp-badge-short { display: inline; }
+  .qfp-hero-kicker { gap: 10px; font-size: 10.5px; letter-spacing: 0.18em; }
+  .qfp-hero-kicker i { width: 26px; }
+  .qfp-hero-lede { font-size: 14px; line-height: 1.5; }
+  /* Four points across a phone would be 90px each. Two rows of two, and the
+     vertical rules come off because they no longer separate anything. */
+  .qfp-hero-points { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 8px; }
+  .qfp-hero-points li { max-width: none; padding: 0; font-size: 11.5px; gap: 8px; }
+  .qfp-hero-points li + li { border-left: 0; }
+  .qfp-hero-points i { width: 30px; height: 30px; }
+  .qfp-hero-points i svg { width: 15px; height: 15px; }
+  .qfp-hero-popular { gap: 6px; }
+  .qfp-hero-popular-label { font-size: 11.5px; }
+  .qfp-hero-chip { padding: 5px 11px; font-size: 11.5px; }
+  .qfp-hero-features { border-radius: 20px 20px 0 0; }
+  .qfp-hero-features-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 0; padding: 18px 0 20px; }
+  .qfp-hero-feature { padding: 0 12px; gap: 10px; }
+  .qfp-hero-feature:first-child, .qfp-hero-feature:nth-child(3) { padding-left: 0; }
+  .qfp-hero-feature:nth-child(3) { border-left: 0; }
+  .qfp-hero-feature > i { width: 36px; height: 36px; }
+  .qfp-hero-feature > i svg { width: 18px; height: 18px; }
+  .qfp-hero-feature strong { font-size: 12.5px; }
+  .qfp-hero-feature span { font-size: 11px; line-height: 1.35; }
   .qfp-hero-note { order: 10; margin-top: 0; text-align: center; font-size: 11px; color: rgba(255, 255, 255, 0.7); }
   .qfp-quote { padding: 0; background: transparent; box-shadow: none; border-radius: 12px; }
   .qfp-quote-field { display: none; }

@@ -155,7 +155,8 @@ type GlyphName =
   | "plan" | "cube" | "check" | "kitchen" | "wardrobe" | "cabinet"
   | "sofa" | "recliner" | "wrench" | "hand" | "home" | "villa"
   | "sparkle" | "ceiling" | "bulb" | "led" | "roller" | "brush"
-  | "texture" | "building" | "brick" | "beam" | "crown" | "shield" | "factory";
+  | "texture" | "building" | "brick" | "beam" | "crown" | "shield" | "factory"
+  | "rupee" | "users";
 
 const GLYPHS: Record<GlyphName, ReactNode> = {
   plan: <><rect x="3" y="3" width="18" height="18" rx="1.5" /><path d="M3 10h11M14 3v18" /></>,
@@ -183,6 +184,8 @@ const GLYPHS: Record<GlyphName, ReactNode> = {
   crown: <><path d="M3 17 5 7l4.5 4L12 4l2.5 7L19 7l2 10z" /><path d="M3.6 20.5h16.8" /></>,
   shield: <><path d="M12 3l7.5 3v6c0 4.2-3 7.6-7.5 9-4.5-1.4-7.5-4.8-7.5-9V6z" /><path d="M8.8 12.2l2.2 2.2 4.2-4.4" /></>,
   factory: <><path d="M3 21V10l6 3.5V10l6 3.5V6h6v15z" /><path d="M7 17h2M13 17h2M18 17h2" /></>,
+  rupee: <><path d="M7 5h10M7 9.2h10" /><path d="M14 5c0 2.6-2.1 4.2-4.9 4.2H7l8.2 9.8" /></>,
+  users: <><circle cx="9.2" cy="8.2" r="3.2" /><path d="M3 19.6a6.3 6.3 0 0 1 12.4 0" /><path d="M16.4 5.4a3.2 3.2 0 0 1 0 5.7M17.8 14.4a6.3 6.3 0 0 1 3.4 5.2" /></>,
 };
 
 function Glyph({ name, size = 18 }: { name: GlyphName; size?: number }) {
@@ -423,6 +426,42 @@ function Header() {
   );
 }
 
+// ---- Hero ------------------------------------------------------------------
+// Board: kicker rule, two-tone headline, a four-point trust row, the search
+// bar, popular chips, and a feature band that laps over the foot of the photo.
+
+const HERO_POINTS: { icon: GlyphName; label: string }[] = [
+  { icon: "shield", label: "Verified Professionals" },
+  { icon: "rupee", label: "Free to Enquire" },
+  { icon: "users", label: "Up to 3 Matches" },
+  { icon: "check", label: "No Obligation" },
+];
+
+// Consumer wording for six registry categories: LABEL is what a homeowner
+// searches for, the href still resolves through categorySlug, and anything not
+// in the registry is filtered out below - so a chip can never point at a
+// category the marketplace does not actually have.
+const POPULAR = (
+  [
+    { category: "Modular Factory", label: "Modular Kitchen" },
+    { category: "Interior Designers", label: "Interior Designer" },
+    { category: "Carpenters", label: "Carpenter" },
+    { category: "Painter", label: "Painter" },
+    { category: "Civil Work", label: "Civil Work" },
+    { category: "Sofa", label: "Sofa" },
+  ] as { category: QuickFurnoCategory; label: string }[]
+).filter((item) => categories.some((c) => c.name === item.category));
+
+const HERO_FEATURES: { icon: GlyphName; title: string; body: string }[] = [
+  { icon: "home", title: "All Home Services", body: "Interiors, kitchens, painting, carpentry, civil work & more." },
+  // Board said "Every professional is screened by our Pune team". The claim
+  // this site can actually stand behind is the one the Trust section makes:
+  // profiles are reviewed and approved before they are listed.
+  { icon: "shield", title: "Verified & Reviewed", body: "Every public profile is reviewed before it goes live." },
+  { icon: "rupee", title: "Transparent Quotes", body: "Compare quotes, profiles and previous work." },
+  { icon: "users", title: "Local Experts", body: "Professionals working across Pune & PCMC." },
+];
+
 function Hero() {
   const hero = heroImage("/assets/quickfurno/images/vendors/premium-living-room.svg");
   return (
@@ -444,36 +483,38 @@ function Hero() {
       <div className="qfp-hero-shade" aria-hidden="true" />
       <div className="qfp-shell qfp-hero-inner">
         <div className="qfp-hero-copy">
+          <span className="qfp-hero-kicker">
+            <i aria-hidden="true" />
+            Trusted home professionals in Pune
+          </span>
           <h1 id="qfp-hero-title">
-            One enquiry.<br />{" "}
-            {/* nbsp keeps "Pune pros." together: at 1440 the line broke after
-                "Pune" and left "pros." orphaned on a line of its own. */}
-            <span>Up to 3 verified Pune&nbsp;pros.</span>
+            Find the right
+            <br />
+            <span>home&nbsp;professional.</span>
+            <br />
+            <span>Faster.</span>
           </h1>
-          <div className="qfp-hero-badges" aria-label="Why QuickFurno">
-            <span className="qfp-hero-badge">
-              <ShieldIcon />
-              <span className="qfp-badge-full">Profiles reviewed</span>
-              <span className="qfp-badge-short">Reviewed</span>
-            </span>
-            <span className="qfp-hero-badge">
-              <PinIcon />
-              <span className="qfp-badge-full">Relevant Pune pros</span>
-              <span className="qfp-badge-short">Relevant</span>
-            </span>
-            <span className="qfp-hero-badge">
-              <BoltIcon />
-              Free to enquire
-            </span>
-          </div>
-          <small className="qfp-hero-note">Matches depend on category fit, eligibility and marketplace availability.</small>
+          <p className="qfp-hero-lede">
+            Tell us what you need. Get matched with up to 3 verified Pune professionals, compare
+            profiles and quotes, and choose with confidence.
+          </p>
+          <ul className="qfp-hero-points" aria-label="Why QuickFurno">
+            {HERO_POINTS.map((point) => (
+              <li key={point.label}>
+                <i aria-hidden="true">
+                  <Glyph name={point.icon} size={19} />
+                </i>
+                {point.label}
+              </li>
+            ))}
+          </ul>
           {/* data-quote-bar: the trigger reads this bar's <select> (service) and
               [data-quote-area] input at click time and opens the modal pre-filled. */}
           <div className="qfp-quote" aria-label="Start an enquiry" data-quote-bar>
             <label className="qfp-quote-field qfp-quote-field--service">
               <GridIcon />
               <select defaultValue="" aria-label="Select service">
-                <option value="">What do you need done?</option>
+                <option value="">What do you need?</option>
                 {categories.map((category) => (
                   <option key={category.name} value={category.name}>{category.name}</option>
                 ))}
@@ -481,12 +522,53 @@ function Hero() {
             </label>
             <label className="qfp-quote-field qfp-quote-field--area">
               <PinIcon size={18} stroke="#746D61" width={2} />
-              <input type="text" placeholder="Kharadi, Baner…" aria-label="Your locality" autoComplete="off" data-quote-area />
+              {/* A datalist rather than a <select>: the board draws a dropdown,
+                  but the marketplace accepts localities outside the listed set
+                  and the FAQ says so. Suggestions plus free text keeps both. */}
+              <input
+                type="text"
+                placeholder="Kharadi, Baner, Pune"
+                aria-label="Your locality"
+                autoComplete="off"
+                list="qfp-area-options"
+                data-quote-area
+              />
+              <datalist id="qfp-area-options">
+                {PUNE_AREAS.map((area) => (
+                  <option key={area} value={area} />
+                ))}
+              </datalist>
             </label>
             <EnquiryModalTrigger className="qfp-btn qfp-btn--primary qfp-quote-btn" source="Homepage hero quote bar">
               Get up to 3 matches <ArrowIcon size={16} stroke="#fff" />
             </EnquiryModalTrigger>
           </div>
+          <div className="qfp-hero-popular">
+            <span className="qfp-hero-popular-label">Popular:</span>
+            {POPULAR.map((item) => (
+              <Link key={item.label} className="qfp-hero-chip" href={`/category/${categorySlug(item.category)}`}>
+                {item.label}
+              </Link>
+            ))}
+          </div>
+          <small className="qfp-hero-note">
+            Matches depend on category fit, eligibility and marketplace availability.
+          </small>
+        </div>
+      </div>
+      <div className="qfp-hero-features">
+        <div className="qfp-shell qfp-hero-features-row">
+          {HERO_FEATURES.map((feature) => (
+            <div className="qfp-hero-feature" key={feature.title}>
+              <i aria-hidden="true">
+                <Glyph name={feature.icon} size={22} />
+              </i>
+              <div>
+                <strong>{feature.title}</strong>
+                <span>{feature.body}</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </section>

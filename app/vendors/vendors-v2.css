@@ -1191,6 +1191,7 @@
 }
 .qv-pro-fig img { width: 156px; height: auto; }
 .qv-pro-note { width: 92px; flex-shrink: 0; font-size: 16px; line-height: 1.18; }
+.qv-pro-fig { max-width: 100%; }
 .qv-pro-note-l { text-align: right; transform: rotate(3deg); }
 .qv-pro-note-r { text-align: left; transform: rotate(-4deg); }
 
@@ -1971,6 +1972,17 @@
 @media (min-width: 900px) { .qv-foot-chev { display: block; } }
 
 /* the 1280 board runs Cities second; mobile stacks it last */
+/* Between the breakpoint and the shell's full width the five footer columns
+   have less room than the 1280 board assumes, and .qv-sec is overflow:hidden,
+   so the last column was being clipped away rather than scrolled to. Tighten
+   the gap and the brand column across that band only — at 1184 and above the
+   board's own 34px gap and 330px brand are untouched. */
+@media (min-width: 900px) and (max-width: 1183.98px) {
+  .qv-foot-brand { width: 264px; }
+  .qv-foot-links { gap: 18px; }
+  .qv-foot-group a { font-size: 12.5px; }
+}
+
 @media (min-width: 900px) {
   .qv-foot-g-categories { order: 1; }
   .qv-foot-g-cities { order: 2; }

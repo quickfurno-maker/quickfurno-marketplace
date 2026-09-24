@@ -203,7 +203,7 @@ export function HeroV2() {
       <div className="qv-hero-shell">
         {/* the 1280 board floats these three above the headline; the 390 board
             drops them, so they are hidden rather than duplicated */}
-        <div className="qv-hero-cards" aria-hidden="true">
+        <div className="qv-hero-cards">
           {CARDS.map(([key, label]) => (
             <div className="qv-hero-card" key={label}>
               <span className="qv-hero-card-ico">
@@ -294,7 +294,7 @@ export function CategoriesV2() {
 
         <div className="qv-cats-grid">
           {CAT_CARDS.map((c) => (
-            <a className="qv-cat" href={`https://quickfurno.in/category/${c.slug}`} key={c.slug}>
+            <a className="qv-cat" href={`/category/${c.slug}`} key={c.slug}>
               <img src={`${IMG}/${c.file}.webp`} alt="" loading="lazy" decoding="async" />
               <span className="qv-cat-label">
                 <span className="qv-cat-l">{c.l1}</span>
@@ -309,7 +309,7 @@ export function CategoriesV2() {
           ))}
         </div>
 
-        <a className="qv-cats-all" href="https://quickfurno.in/services">
+        <a className="qv-cats-all" href="/services">
           {CAT_ALL}
           <Icon name="arrow" sw={2.1} />
         </a>
@@ -348,7 +348,7 @@ function Step({
         <p>{body}</p>
       </div>
       {checks ? (
-        <div className="qv-step-checks" aria-hidden="true">
+        <div className="qv-step-checks">
           {checks.map((c) => (
             <div className="qv-check" key={c}>
               <Icon name="check" sw={3} />
@@ -494,7 +494,7 @@ export function DashboardV2() {
               <Icon name="bolt_" sw={2} fill="currentColor" />
             </span>
             <p>{DASH_NOTE}</p>
-            <a className="qv-note-link" href="https://quickfurno.in/vendors">
+            <a className="qv-note-link" href="/vendors">
               {DASH_LINK}
               <Icon name="arrow" sw={2.1} />
             </a>
@@ -933,7 +933,7 @@ export function AreasV2() {
                   </div>
                 ))}
               </div>
-              <a className="qv-zone-all" href="https://quickfurno.in/vendors">
+              <a className="qv-zone-all" href="/vendors">
                 View all {count}
                 <Icon name="arrow" sw={2.2} />
               </a>
@@ -950,7 +950,7 @@ export function AreasV2() {
               <b>{AREAS_CHECK[0]}</b>
               <p>{AREAS_CHECK[1]}</p>
             </div>
-            <a className="qv-btn qv-btn-primary" href="https://quickfurno.in/vendors">
+            <a className="qv-btn qv-btn-primary" href="/vendors">
               {AREAS_CHECK[2]}
               <Icon name="arrow" sw={2.1} />
             </a>
@@ -984,7 +984,7 @@ export function FaqV2() {
             <span className="qv-hl">{FAQ_H2[1]}</span>
           </h2>
           <p className="qv-sec-sub">{FAQ_SUB}</p>
-          <a className="qv-faq-wa" href="https://quickfurno.in/vendors">
+          <a className="qv-faq-wa" href="/vendors">
             <span className="qv-faq-wa-ico">
               <Icon name="chat" sw={2.1} />
             </span>
@@ -1070,7 +1070,7 @@ export function ApplyV2() {
             <b>{SWITCH_T}</b>
             <p>{SWITCH_B}</p>
           </div>
-          <a className="qv-btn qv-btn-primary" href="https://quickfurno.in/">
+          <a className="qv-btn qv-btn-primary" href="/">
             <Icon name="people" sw={2} />
             {SWITCH_BTN}
             <Icon name="arrow" sw={2.1} />
@@ -1098,7 +1098,7 @@ function FootGroup({ title, links }: { title: string; links: readonly (readonly 
       <span className="qv-foot-group-t">{title.toUpperCase()}</span>
       <div className={title === "Categories" ? "qv-foot-cols2" : undefined}>
         {links.map(([t, h]) => (
-          <a href={`https://quickfurno.in${h}`} key={t}>
+          <a href={h} key={t}>
             {t}
             <Icon name="chev" className="qv-ico qv-foot-chev" sw={2.2} />
           </a>
@@ -1154,7 +1154,7 @@ export function FooterV2() {
             <p className="qv-foot-blurb">{FOOT_BLURB}</p>
             <div className="qv-foot-social">
               {SOCIALS.map(([name, icon]) => (
-                <a href="https://quickfurno.in/" aria-label={name} key={name}>
+                <a href="/" aria-label={name} key={name}>
                   <Icon name={icon} />
                 </a>
               ))}

@@ -30,10 +30,21 @@ build. Same rule as above: `.webp` wins over `.jpg`.
 | `how-step-1.webp`       | How it works, step 1                     | 900×1100, < 140KB  |
 | `how-step-3.webp`       | How it works, step 3                     | 900×1100, < 140KB  |
 | `faq-person.webp`       | FAQ section, right side                  | 900×1100, < 140KB  |
-| `pro-cutout.webp`       | For professionals band (cut-out, alpha)  | 900×1200 PNG/WebP  |
-| `vendor-trades.webp`    | /vendors trade tiles (one 8-up sheet)    | 1600×800, < 200KB  |
-| `vendor-match-phone.webp` | /vendors "How matching works"          | 900×1200, < 140KB  |
-| `vendor-support.webp`   | /vendors support section                 | 900×1200, < 140KB  |
+| `pro-cutout.webp`       | Tradesman, alpha cut-out (4 sections)    | ~600×1000 ✅ added |
+| `homeowner-cutout.webp` | Homeowner, alpha cut-out (3 sections)    | ~600×880 ✅ added  |
+| `vendor-coverage-map.webp` | /vendors Pune coverage map            | 1040×650, < 160KB  |
+
+Both cut-outs carry a real alpha channel and were split from a single
+two-person export. They are used at roughly 300–450px wide, so they are
+stored at source size rather than upscaled.
+
+### Substituted, not needed unless you want an upgrade
+
+| Was going to be   | Using instead                                        |
+| ----------------- | ---------------------------------------------------- |
+| 8 3D trade tiles  | the eight real photos in `categories/`               |
+| phone mockup      | the `.qfv-phone` mockup already built in CSS         |
+| dashboard capture | built as real HTML, so it carries no invented figures |
 
 Nothing in these may show invented vendor names, ratings, review counts or
 prices. A screenshot that fabricates marketplace data is the one thing the

@@ -340,7 +340,9 @@ const HOW_IT_WORKS: { icon: ReactNode; title: string; body: string; slot: string
   {
     icon: <CheckCircleIcon />,
     title: "Compare & choose",
-    body: "Review profiles, ratings, quotes and previous work. Then choose the professional you trust. No fee, no obligation.",
+    // No vendor carries a rating or a completed-project count yet (0 of 28),
+    // so the copy promises only what a homeowner actually sees today.
+    body: "Review profiles and quotes, then choose the professional you trust. No fee, no obligation.",
     slot: "how-step-3",
   },
 ];
@@ -678,6 +680,40 @@ function NotSureCard() {
 // Trust points shown as a row of verified-badge cards under the heading on
 // every screen size (swipeable on tablets and phones). All five are true
 // today — see lib/homepage-content.ts and the FAQ.
+// One badge per FAQ row, in HOME_FAQ order.
+const FAQ_ICONS = [
+  "faq-enquiry-chat",
+  "faq-matching-people",
+  "faq-public-profile-eye",
+  "faq-location-pin",
+  "faq-obligation-document",
+  "faq-work-tools",
+];
+
+const ICON = "/assets/quickfurno/images/icons";
+
+const SOCIAL_MARKS: Record<string, ReactNode> = {
+  facebook: <path d="M13.5 22v-8h2.7l.4-3.1h-3.1V8.9c0-.9.25-1.5 1.55-1.5h1.65V4.6A22 22 0 0 0 14.3 4.5c-2.4 0-4 1.45-4 4.1v2.3H7.6V14h2.7v8z" />,
+  instagram: <path d="M12 2.2c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9s.68.82.9 1.38c.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38s-.82.68-1.38.9c-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.8 3.8 0 0 1-1.38-.9 3.8 3.8 0 0 1-.9-1.38c-.16-.42-.36-1.06-.41-2.23C2.21 15.58 2.2 15.2 2.2 12s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38s.82-.68 1.38-.9c.42-.16 1.06-.36 2.23-.41C8.42 2.21 8.8 2.2 12 2.2m0 2.16c-3.15 0-3.5.01-4.74.07-1.14.05-1.76.24-2.17.4-.55.21-.94.47-1.35.88s-.67.8-.88 1.35c-.16.41-.35 1.03-.4 2.17-.06 1.24-.07 1.6-.07 4.74s.01 3.5.07 4.74c.05 1.14.24 1.76.4 2.17.21.55.47.94.88 1.35s.8.67 1.35.88c.41.16 1.03.35 2.17.4 1.24.06 1.6.07 4.74.07s3.5-.01 4.74-.07c1.14-.05 1.76-.24 2.17-.4.55-.21.94-.47 1.35-.88s.67-.8.88-1.35c.16-.41.35-1.03.4-2.17.06-1.24.07-1.6.07-4.74s-.01-3.5-.07-4.74c-.05-1.14-.24-1.76-.4-2.17a3.6 3.6 0 0 0-.88-1.35 3.6 3.6 0 0 0-1.35-.88c-.41-.16-1.03-.35-2.17-.4-1.24-.06-1.6-.07-4.74-.07m0 3.67a5.97 5.97 0 1 1 0 11.94 5.97 5.97 0 0 1 0-11.94m0 9.85a3.88 3.88 0 1 0 0-7.76 3.88 3.88 0 0 0 0 7.76m7.6-10.08a1.4 1.4 0 1 1-2.79 0 1.4 1.4 0 0 1 2.79 0" />,
+  youtube: <path d="M21.6 7.2a2.5 2.5 0 0 0-1.76-1.77C18.27 5 12 5 12 5s-6.27 0-7.84.43A2.5 2.5 0 0 0 2.4 7.2 26 26 0 0 0 2 12a26 26 0 0 0 .4 4.8 2.5 2.5 0 0 0 1.76 1.77C5.73 19 12 19 12 19s6.27 0 7.84-.43a2.5 2.5 0 0 0 1.76-1.77A26 26 0 0 0 22 12a26 26 0 0 0-.4-4.8M10 15.1V8.9l5.2 3.1z" />,
+  linkedin: <path d="M6.94 5.5a1.94 1.94 0 1 1-3.88 0 1.94 1.94 0 0 1 3.88 0M3.3 20h3.4V9.2H3.3zm6 0h3.36v-5.7c0-1.5.29-2.96 2.16-2.96 1.84 0 1.86 1.72 1.86 3.05V20h3.37v-6.3c0-2.93-.63-5.18-4.05-5.18-1.64 0-2.75.9-3.2 1.76h-.05V9.2H9.3z" />,
+};
+
+const SOCIALS = [
+  { name: "Facebook", icon: "facebook", href: "https://www.facebook.com/quickfurno" },
+  { name: "Instagram", icon: "instagram", href: "https://www.instagram.com/quickfurno" },
+  { name: "YouTube", icon: "youtube", href: "https://www.youtube.com/@quickfurno" },
+  { name: "LinkedIn", icon: "linkedin", href: "https://www.linkedin.com/company/quickfurno" },
+];
+
+// Wording kept to what the marketplace actually does - no promises about
+// homeowner vetting or lead volume, neither of which QuickFurno controls.
+const VENDOR_POINTS: { icon: string; title: string; body: string }[] = [
+  { icon: "vendor-quality-enquiries", title: "Real enquiries", body: "Enquiries arrive from Pune homeowners with their requirement attached." },
+  { icon: "vendor-verified-customers", title: "Reviewed listings", body: "Every public profile is reviewed and approved before it goes live." },
+  { icon: "vendor-grow-business", title: "Grow in Pune", body: "Appear in Pune's marketplace and receive matches when you are eligible." },
+];
+
 const TRUST_POINTS: { icon: GlyphName; title: string; body: string }[] = [
   // Board read "Every professional is identity & skill verified". Documents and
   // business details are reviewed; skill is not assessed, so this says what the
@@ -730,10 +766,14 @@ function BlueprintPlan() {
 // Three of the eight category photos, staggered, with a floating label on
 // each — the board's collage, built from photos already in the repo rather
 // than a new composite asset.
-const SERVICE_COLLAGE: { slug: string; label: string; icon: GlyphName }[] = [
-  { slug: "premium-interiors", label: "Interior Design", icon: "sofa" },
-  { slug: "carpenters", label: "Carpentry", icon: "wrench" },
-  { slug: "painter", label: "Painting", icon: "roller" },
+const SVC_IMG = "/assets/quickfurno/images/services";
+const SVC_ICON = "/assets/quickfurno/images/icons";
+
+// Photo and pill icon share a file name, so one entry drives both.
+const SERVICE_COLLAGE: { file: string; label: string }[] = [
+  { file: "interior-design", label: "Interior Design" },
+  { file: "carpentry", label: "Carpentry" },
+  { file: "painting", label: "Painting" },
 ];
 
 function ServicesHeading() {
@@ -765,18 +805,22 @@ function ServicesHeading() {
           <span className="qfp-svc-spark qfp-svc-spark--2" />
           <span className="qfp-svc-spark qfp-svc-spark--3" />
           <span className="qfp-svc-arc" />
-          {SERVICE_COLLAGE.map((item, index) => {
-            const image = categoryImage(item.slug, FALLBACK_CATEGORY_IMAGE(item.slug));
-            return (
-              <figure className={`qfp-svc-shot qfp-svc-shot--${index + 1}`} key={item.slug}>
-                <Image src={image.src} alt="" fill sizes="280px" />
-                <figcaption>
-                  <Glyph name={item.icon} size={15} />
-                  {item.label}
-                </figcaption>
-              </figure>
-            );
-          })}
+          {SERVICE_COLLAGE.map((item, index) => (
+            <figure className={`qfp-svc-shot qfp-svc-shot--${index + 1}`} key={item.file}>
+              {/* sizes is the width each shot is actually drawn at — on a phone
+                  the collage is half the screen, not all of it. */}
+              <Image
+                src={`${SVC_IMG}/${item.file}.webp`}
+                alt=""
+                fill
+                sizes="(max-width: 760px) 55vw, 290px"
+              />
+              <figcaption>
+                <Image src={`${SVC_ICON}/${item.file}.webp`} alt="" width={16} height={16} />
+                {item.label}
+              </figcaption>
+            </figure>
+          ))}
         </div>
       </div>
       <ol className="qfp-trust-row" aria-label="Why homeowners choose QuickFurno" data-reveal-group>
@@ -853,7 +897,7 @@ function HowItWorks() {
                     real/how-step-N.* exists — see that folder's README. */}
                 <div className="qfp-step-media">
                   {photo ? (
-                    <Image src={photo} alt="" fill sizes="(max-width: 980px) 45vw, 210px" />
+                    <Image src={photo} alt="" fill sizes="(max-width: 760px) 100vw, (max-width: 980px) 45vw, 210px" />
                   ) : (
                     <span className="qfp-slot-empty" aria-hidden="true" />
                   )}
@@ -1008,22 +1052,54 @@ function FAQ() {
   return (
     <section className="qfp-section qfp-faq" id="faq">
       <div className="qfp-shell">
-        <div className="qfp-head-center" data-reveal>
-          <span className="qfp-kicker">Good to know</span>
-          <h2>Questions Pune homeowners ask</h2>
+        <div className="qfp-faq-head" data-reveal>
+          <div>
+            <span className="qfp-kicker qfp-kicker--ruled">Good to know</span>
+            <h2>
+              Questions Pune
+              <br />
+              <span>homeowners ask</span>
+            </h2>
+            <p className="qfp-faq-lead">Quick answers to help you get started with confidence.</p>
+          </div>
         </div>
-        <div className="qfp-faq-list">
-          {HOME_FAQ.map((item) => (
-            <details className="qfp-faq-item" key={item.q}>
-              <summary>
-                <span>{item.q}</span>
-                <i aria-hidden="true">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                </i>
-              </summary>
-              <p>{item.a}</p>
-            </details>
-          ))}
+        <div className="qfp-faq-grid">
+          <div className="qfp-faq-list">
+            {HOME_FAQ.map((item, index) => (
+              <details className="qfp-faq-item" key={item.q}>
+                <summary>
+                  <i className="qfp-faq-badge" aria-hidden="true">
+                    <Image src={`${ICON}/${FAQ_ICONS[index] ?? FAQ_ICONS[0]}.webp`} alt="" width={26} height={26} />
+                  </i>
+                  <span>{item.q}</span>
+                  <b aria-hidden="true">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+                  </b>
+                </summary>
+                <p>{item.a}</p>
+              </details>
+            ))}
+          </div>
+          <aside className="qfp-faq-aside">
+            <div className="qfp-faq-photo">
+              <Image
+                src="/assets/quickfurno/images/real/faq-homeowner.webp"
+                alt=""
+                fill
+                sizes="(max-width: 980px) 100vw, 380px"
+              />
+            </div>
+            <div className="qfp-faq-support">
+              <i aria-hidden="true">
+                <Image src={`${ICON}/support-lightbulb.webp`} alt="" width={30} height={30} />
+              </i>
+              <h3>Still have questions?</h3>
+              <p>We are here to help — from choosing the right service to understanding how matching works.</p>
+              <a className="qfp-faq-support-btn" href={whatsappLink()} target="_blank" rel="noopener noreferrer">
+                Contact support <ArrowIcon size={14} stroke="#fff" />
+              </a>
+            </div>
+          </aside>
         </div>
       </div>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
@@ -1037,13 +1113,41 @@ function VendorCTA() {
       <div className="qfp-shell">
         <div className="qfp-vendor-card" data-reveal>
           <div className="qfp-vendor-copy">
-            <span className="qfp-kicker">For professionals</span>
-            <h2 id="qfp-vendor-title">Run a home-services business in Pune?</h2>
+            <span className="qfp-kicker qfp-kicker--ruled">For professionals</span>
+            <h2 id="qfp-vendor-title">
+              Grow your home services business <span>in Pune.</span>
+            </h2>
             <p>Apply for a reviewed public profile and Client Matching eligibility. Assignments depend on approval, account eligibility, matching credits and demand.</p>
+            <Link href="/vendors" className="qfp-vendor-btn">
+              Join as a vendor <ArrowIcon size={15} stroke="#fff" />
+            </Link>
           </div>
-          <Link href="/vendors" className="qfp-vendor-btn">
-            Join as a vendor <ArrowIcon size={15} stroke="#14181D" />
-          </Link>
+          <ul className="qfp-vendor-points">
+            {VENDOR_POINTS.map((point) => (
+              <li key={point.title}>
+                <i aria-hidden="true">
+                  <Image src={`${ICON}/${point.icon}.webp`} alt="" width={26} height={26} />
+                </i>
+                <div>
+                  <strong>{point.title}</strong>
+                  <span>{point.body}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="qfp-vendor-figure">
+            <Image
+              // -v2: the first crop still carried the board's handwritten
+              // line. Replacing the file in place was not enough - Next had
+              // already cached optimised variants under the old URL, so the
+              // new name is what actually evicts them.
+              src="/assets/quickfurno/images/real/vendor-cta-pro-v2.webp"
+              alt=""
+              fill
+              sizes="(max-width: 980px) 70vw, 330px"
+            />
+            <span className="qfp-vendor-note">Be part of Pune&rsquo;s trusted home services community.</span>
+          </div>
         </div>
       </div>
     </section>
@@ -1062,6 +1166,15 @@ function Footer() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9A876" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="M3 9.5 L12 3 L21 9.5 L21 21 L3 21 Z" /></svg>
               Made with care for a better Pune
             </span>
+            <ul className="qfp-footer-social">
+              {SOCIALS.map((social) => (
+                <li key={social.name}>
+                  <a href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.name}>
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{SOCIAL_MARKS[social.icon]}</svg>
+                  </a>
+                </li>
+              ))}
+            </ul>
           </div>
           <div className="qfp-footer-col qfp-footer-col--services">
             <h3>SERVICES</h3>
@@ -1076,13 +1189,27 @@ function Footer() {
             <Link href="/vendors">For professionals</Link>
             <Link href="/privacy">Privacy policy</Link>
             <Link href="/terms">Terms &amp; conditions</Link>
+            <Link href="#contact">Help &amp; support</Link>
           </div>
           <div className="qfp-footer-col qfp-footer-col--contact">
             <h3>CONTACT</h3>
-            <a href={whatsappLink()} target="_blank" rel="noopener noreferrer"><FooterChatIcon />WhatsApp us</a>
-            <a href={"mailto:" + CONTACT.email}><MailIcon />{CONTACT.email}</a>
-            <span><PinIcon size={15} stroke="#FF8A5C" width={2} />Kharadi, Pune, Maharashtra</span>
+            <a href={whatsappLink()} target="_blank" rel="noopener noreferrer">
+              <i aria-hidden="true"><FooterChatIcon /></i>
+              WhatsApp us
+            </a>
+            <a href={"mailto:" + CONTACT.email}>
+              <i aria-hidden="true"><MailIcon /></i>
+              {CONTACT.email}
+            </a>
+            <span>
+              <i aria-hidden="true"><PinIcon size={15} stroke="#FF8A5C" width={2} /></i>
+              Kharadi, Pune, Maharashtra
+            </span>
           </div>
+        </div>
+        <div className="qfp-footer-skyline" aria-hidden="true">
+          <span className="qfp-footer-sky" />
+          <em>A better Pune, together.</em>
         </div>
         <div className="qfp-footer-bottom">
           <span>© 2026 QuickFurno. All rights reserved.</span>

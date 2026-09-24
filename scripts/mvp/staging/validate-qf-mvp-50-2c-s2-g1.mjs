@@ -334,6 +334,14 @@ const POST_ANCHOR_PENDING = [
     remoteVersionStatus: "ABSENT_IN_STAGING_AND_PRODUCTION_HISTORY",
     remoteHistoryReadEvidence: "SUPABASE_MCP_LIST_MIGRATIONS_2026-09-18",
   },
+  // Jarvis OS operator command receipts are SOURCE-PENDING. The migration has not
+  // been applied to staging or production and grants no authority by existing on disk.
+  {
+    version: "20260924183000",
+    name: "jarvis_os_operator_command_receipts",
+    sha: "c8c66b3f8a55974f6ce92c8fe400bfacdc6ece4e06a431c02b3bc0cbe4b3ac3b",
+    phase: "JARVIS-OS-OPERATOR-COMMAND-BRIDGE",
+  },
 ].map((m) => ({
   ...m,
   filename: `${m.version}_${m.name}.sql`,
@@ -475,7 +483,7 @@ const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD
 // QF-MVP-40.14 RE-PIN: 108 -> 109, adding ONLY the SOURCE-PENDING Meta
 // transactional mapping seed + activation authority (20260912000000). No existing
 // migration was changed, renamed, deleted or reordered. Still exact equality.
-const MIGRATION_COUNT = 117;
+const MIGRATION_COUNT = 118;
 // The tree size AT THE MOMENT QF-MVP-80.05 reconciled history. It is a historical
 // fact about that reconciliation, not a live count, and it must never track
 // MIGRATION_COUNT: a later slice that legitimately ADDS a migration does not
@@ -689,9 +697,9 @@ function validateState(state) {
   const stagingAppliedPins = Array.isArray(manifest.stagingAppliedPostAnchorMigrations) ? manifest.stagingAppliedPostAnchorMigrations : null;
   const appliedTruth = [...(appliedPins ?? []), ...(reconciledPins ?? [])];
 
-  check("exactly thirty local migrations are newer than the anchor", postAnchorLocal.length === 30, `actual=${postAnchorLocal.length}`);
+  check("exactly thirty-one local migrations are newer than the anchor", postAnchorLocal.length === 31, `actual=${postAnchorLocal.length}`);
   check("the post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
-  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 30);
+  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 31);
   check("manifest declares exactly ten APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 10, `actual=${appliedPins?.length}`);
   check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
   check("manifest declares exactly five RECONCILED post-anchor migrations", reconciledPins !== null && reconciledPins.length === 5, `actual=${reconciledPins?.length}`);
@@ -704,7 +712,7 @@ function validateState(state) {
   // QF-MVP-40.14 RE-PIN: 4 -> 5. The Meta transactional mapping seed + activation
   // authority (20260912000000) is source-only and joins PENDING.
   check("the explicit PENDING post-anchor set holds exactly the nine pinned entries",
-    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 8,
+    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 9,
     `actual=${pendingPins?.length}`);
   check("the explicit STAGING-APPLIED post-anchor set holds exactly the six pinned entries",
     stagingAppliedPins !== null && stagingAppliedPins.length === POST_ANCHOR_STAGING_APPLIED.length &&

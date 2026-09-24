@@ -613,7 +613,7 @@
     "appliedEvidenceType": "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD",
     "remoteHistoryCountAfterApply": 20,
     "appliedExactlyOnce": true,
-    "postAnchorMigrationCount": 31,
+    "postAnchorMigrationCount": 32,
     "supersedesNewestLocalMigrationRule": "QF-MVP-50.2-FINAL-CLOSURE-R2"
   },
   "appliedPostAnchorMigrations": [
@@ -1284,6 +1284,22 @@
       "appliedToProduction": false,
       "remoteVersionStatus": "ABSENT_IN_STAGING_AND_PRODUCTION_HISTORY",
       "remoteHistoryReadEvidence": "SUPABASE_MCP_LIST_MIGRATIONS_2026-09-18",
+      "remoteHistoryCountObservedAtApply": false,
+      "requiresSeparateStagingDeploymentGate": true
+    },
+    {
+      "version": "20260924183000",
+      "name": "jarvis_os_operator_command_receipts",
+      "path": "supabase/migrations/20260924183000_jarvis_os_operator_command_receipts.sql",
+      "sha256": "c8c66b3f8a55974f6ce92c8fe400bfacdc6ece4e06a431c02b3bc0cbe4b3ac3b",
+      "phase": "JARVIS-OS-OPERATOR-COMMAND-BRIDGE",
+      "operationalStatus": "PENDING",
+      "purpose": "Creates a bounded service-role-only replay and idempotency receipt ledger for signed Jarvis OS operator commands. It stores command correlation and final outcome metadata only, grants no business authority, performs no provider action, and remains unapplied until its own staging and production migration gates.",
+      "appliedExactlyOnce": false,
+      "appliedByThisPhase": false,
+      "appliedToStaging": false,
+      "appliedToProduction": false,
+      "remoteVersionStatus": "NOT_PROVEN_OFFLINE",
       "remoteHistoryCountObservedAtApply": false,
       "requiresSeparateStagingDeploymentGate": true
     }

@@ -238,7 +238,7 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // publication membership (104). This phase still adds no migration of ITS OWN to this
 // slice; the pin is the live tree size, so it moves to the truthful current count.
 // Still exact equality, never `>=`.
-check("migration count is re-pinned at the current 118", migrations.length === 118);
+check("migration count is re-pinned at the current 119", migrations.length === 119);
 
 console.log(`\nC6 integrated Admin V2: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

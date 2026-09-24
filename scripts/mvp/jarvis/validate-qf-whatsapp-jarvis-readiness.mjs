@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import crypto from "node:crypto";
 import assert from "node:assert/strict";
 import { decideCallbackIdentityRegistry } from "../../../lib/communication/providers/metaCallbackIdentityRegistry.ts";
@@ -10,6 +12,7 @@ import {
   sealConversationValue,
   openConversationValue,
 } from "../../../lib/communication/conversationSeal.ts";
+import { resolveJarvisSigningPrivateKey } from "../../../lib/jarvis/signingPrivateKeySource.ts";
 import {
   QFJ_WHATSAPP_REPLY_PATH,
   QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN,
@@ -167,10 +170,13 @@ await test("authority material is derived from live QuickFurno state rather than
   assert.match(conversationService, /communication_jarvis_turn_outbox/);
   assert.match(conversationService, /inbound\.provider_message_id !== conversation\.last_inbound_provider_message_id/);
 });
-await test("hosted-processing and subject status fail closed outside proven eligible text subjects", () => {
+await test("processing class and subject status fail closed outside proven eligible subjects", () => {
   assert.equal(classifyQfWhatsAppDataClass("text"), "HOSTED_ALLOWED");
   assert.equal(classifyQfWhatsAppDataClass("button_reply"), "HOSTED_ALLOWED");
-  for (const type of ["image", "document", "audio", "location", "contact", "order", "unsupported", null]) {
+  for (const type of ["image", "document", "audio", "video", "sticker"]) {
+    assert.equal(classifyQfWhatsAppDataClass(type), "LOCAL_ONLY");
+  }
+  for (const type of ["location", "contact", "order", "system", "unsupported", null]) {
     assert.equal(classifyQfWhatsAppDataClass(type), "HUMAN_ONLY");
   }
   assert.equal(deriveQfJarvisSubjectStatus({}), "in-progress");
@@ -213,11 +219,28 @@ await test("Jarvis callback replay identity is claimed before queueing and final
 });
 await test("QuickFurno to Jarvis gateway carries conversation facts but no provider secrets", () => {
   assert.match(gatewayService, /QF_JARVIS_BASE_URL/);
-  assert.match(gatewayService, /QF_JARVIS_SIGNING_PRIVATE_KEY_PEM/);
+  assert.match(gatewayService, /resolveJarvisSigningPrivateKey/);
+  assert.match(read(".env.example"), /QF_JARVIS_SIGNING_PRIVATE_KEY_FILE=/);
   assert.match(gatewayService, /normalizedText/);
   assert.doesNotMatch(gatewayService, /WHATSAPP_ACCESS_TOKEN/);
   assert.doesNotMatch(gatewayService, /WHATSAPP_APP_SECRET/);
   assert.doesNotMatch(gatewayService, /WHATSAPP_PHONE_NUMBER_ID/);
+});
+await test("Jarvis signing key source accepts exactly one bounded source and fails closed", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qf-jarvis-signing-"));
+  const file = path.join(dir, "signing.pem");
+  fs.writeFileSync(file, "FILE_PRIVATE_KEY\n", { mode: 0o600 });
+  try {
+    assert.equal(resolveJarvisSigningPrivateKey({ QF_JARVIS_SIGNING_PRIVATE_KEY_FILE: file }), "FILE_PRIVATE_KEY");
+    assert.equal(resolveJarvisSigningPrivateKey({ QF_JARVIS_SIGNING_PRIVATE_KEY_PEM: "INLINE\\nPRIVATE" }), "INLINE\nPRIVATE");
+    assert.equal(resolveJarvisSigningPrivateKey({ QF_JARVIS_SIGNING_PRIVATE_KEY_FILE: "relative.pem" }), null);
+    assert.equal(resolveJarvisSigningPrivateKey({
+      QF_JARVIS_SIGNING_PRIVATE_KEY_FILE: file,
+      QF_JARVIS_SIGNING_PRIVATE_KEY_PEM: "INLINE",
+    }), null);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 await test("multi-account callback gate admits either exact configured identity", () => {
   const p1 = { object:"whatsapp_business_account", entry:[{ id:"111", changes:[{ field:"messages", value:{ metadata:{ phone_number_id:"222" }}}]}]};

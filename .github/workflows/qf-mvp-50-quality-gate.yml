@@ -265,6 +265,9 @@ jobs:
       - name: WhatsApp / Jarvis conversational readiness
         run: npm run test:mvp:whatsapp-jarvis
 
+      - name: WhatsApp / Jarvis signed media bridge
+        run: npm run test:mvp:whatsapp-media-bridge
+
       - name: WhatsApp essential feature certification
         run: npm run test:mvp:whatsapp-essential
 

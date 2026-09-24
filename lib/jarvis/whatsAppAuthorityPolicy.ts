@@ -7,18 +7,20 @@ export type QfJarvisSubjectStatus =
   | "in-progress";
 
 const HOSTED_TEXT_TYPES = new Set(["text", "button_reply", "list_reply"]);
+const LOCAL_MEDIA_TYPES = new Set(["image", "document", "audio", "video", "sticker"]);
 
 /**
- * QuickFurno-owned hosted-processing policy for conversational WhatsApp.
+ * QuickFurno-owned processing policy for conversational WhatsApp.
  *
- * Only minimized text/selection turns are eligible for the hosted Jarvis model.
- * Attachments, audio, location, contact cards, orders and unsupported/system
- * payloads remain HUMAN_ONLY. There is no permissive default.
+ * Minimized text/selection turns may use an approved hosted model. Media is LOCAL_ONLY:
+ * the signed bridge may deliver exact, turn-bound bytes to Jarvis, but a hosted provider
+ * cannot receive them unless a later reviewed policy explicitly changes this class.
+ * Location, contacts, orders and unsupported/system payloads remain HUMAN_ONLY.
  */
 export function classifyQfWhatsAppDataClass(messageType: unknown): QfJarvisDataClass {
-  return typeof messageType === "string" && HOSTED_TEXT_TYPES.has(messageType)
-    ? "HOSTED_ALLOWED"
-    : "HUMAN_ONLY";
+  if (typeof messageType !== "string") return "HUMAN_ONLY";
+  if (HOSTED_TEXT_TYPES.has(messageType)) return "HOSTED_ALLOWED";
+  return LOCAL_MEDIA_TYPES.has(messageType) ? "LOCAL_ONLY" : "HUMAN_ONLY";
 }
 
 /**

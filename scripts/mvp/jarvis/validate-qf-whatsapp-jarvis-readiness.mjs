@@ -167,10 +167,13 @@ await test("authority material is derived from live QuickFurno state rather than
   assert.match(conversationService, /communication_jarvis_turn_outbox/);
   assert.match(conversationService, /inbound\.provider_message_id !== conversation\.last_inbound_provider_message_id/);
 });
-await test("hosted-processing and subject status fail closed outside proven eligible text subjects", () => {
+await test("processing class and subject status fail closed outside proven eligible subjects", () => {
   assert.equal(classifyQfWhatsAppDataClass("text"), "HOSTED_ALLOWED");
   assert.equal(classifyQfWhatsAppDataClass("button_reply"), "HOSTED_ALLOWED");
-  for (const type of ["image", "document", "audio", "location", "contact", "order", "unsupported", null]) {
+  for (const type of ["image", "document", "audio", "video", "sticker"]) {
+    assert.equal(classifyQfWhatsAppDataClass(type), "LOCAL_ONLY");
+  }
+  for (const type of ["location", "contact", "order", "system", "unsupported", null]) {
     assert.equal(classifyQfWhatsAppDataClass(type), "HUMAN_ONLY");
   }
   assert.equal(deriveQfJarvisSubjectStatus({}), "in-progress");

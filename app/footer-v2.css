@@ -212,3 +212,35 @@
   .qv-foot-g-forvendors { order: 4; }
   .qv-foot-g-support { order: 5; }
 }
+
+/* real brand marks are filled paths, not the stroked line set */
+.qv-foot-social a svg { width: 16px; height: 16px; display: block; }
+
+/* the way to reach a human, carried over from the homepage footer */
+.qv-foot-contact { margin-top: 14px; list-style: none; padding: 0; }
+.qv-foot-contact li + li { margin-top: 8px; }
+.qv-foot-contact a,
+.qv-foot-contact span {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: #CFC6B8;
+}
+.qv-foot-contact .qv-ico { width: 15px; height: 15px; color: var(--qv-amber); }
+.qv-foot-contact a:hover { color: #FFFFFF; }
+
+@media (min-width: 900px) {
+  .qv-foot-social a svg { width: 17px; height: 17px; }
+  .qv-foot-contact { margin-top: 16px; }
+  .qv-foot-contact a,
+  .qv-foot-contact span { font-size: 13px; }
+}
+
+/* The footer sits on every page, and the site's global `h1, h2, h3 { color }`
+   rules load alongside this file. Its headings state their own colour at a
+   specificity that cannot lose, rather than depending on import order. */
+.qv-foot .qv-foot-cta-h,
+.qv-foot .qv-foot-group-t { color: #FFFFFF; }
+.qv-foot .qv-foot-cta-h { font-family: inherit; letter-spacing: -0.02em; }

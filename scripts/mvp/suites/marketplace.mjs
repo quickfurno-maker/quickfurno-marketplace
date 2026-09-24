@@ -1713,7 +1713,11 @@ export const suite = {
             file + ' must not invent counts');
         }
         // The approved bounded promises are still present on the active homepage.
-        const hero = readFileSync('components/home/PuneLaunchHomepage.tsx', 'utf8').toLowerCase();
+        // The homepage now renders the shared footer rather than one of its own,
+        // and that is where the bounded promises are stated, so the composition
+        // is what has to carry them.
+        const hero = (readFileSync('components/home/PuneLaunchHomepage.tsx', 'utf8')
+          + readFileSync('components/Footer.tsx', 'utf8')).toLowerCase();
         assertTrue(hero.includes('up to 3 active'), 'keeps the bounded up-to-3 claim');
         assertTrue(hero.includes('free to enquire'), 'keeps the no-homeowner-enquiry-fee claim');
       },

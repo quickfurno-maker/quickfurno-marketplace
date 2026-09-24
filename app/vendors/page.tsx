@@ -7,6 +7,7 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { whatsappLink } from "@/lib/config";
 import { categories, categorySlug } from "@/lib/quickfurno-data";
+import { optionalRealImage } from "@/lib/homepage-images";
 import "./vendors-pro.css";
 
 // ============================================================================
@@ -218,6 +219,37 @@ const ZONES = [
   },
 ];
 
+// Five areas per card, the rest behind a <details> disclosure.
+const ZONE_PREVIEW = 5;
+// Derived, never typed by hand: the cards print the real count and the
+// footer line stays right when a locality is added to ZONES.
+const TOTAL_AREAS = ZONES.reduce((n, zone) => n + zone.areas.length, 0);
+const ZONE_BLURB: Record<string, string> = {
+  "East Pune": "IT hubs, residential & growing areas",
+  "West Pune": "Premium & residential hubs",
+  "Central Pune": "Core city & established areas",
+  "South Pune": "Residential & upcoming areas",
+  "Pimpri-Chinchwad": "Well connected residential areas",
+};
+const AREA_FEATURES: { icon: IconName; title: string; body: string }[] = [
+  { icon: "shield", title: "Verified professionals", body: "Every public profile is reviewed before it goes live." },
+  { icon: "list", title: "Transparent matching", body: "Category fit first, then location and approved signals." },
+  { icon: "pin", title: "Pune & PCMC", body: `${TOTAL_AREAS} localities recorded across ${ZONES.length} zones.` },
+];
+// Empty frame until real/vendor-coverage-map.(webp|png) is added.
+const coverageMap = optionalRealImage("vendor-coverage-map");
+
+function ZoneMark() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 21V9.5L12 4l8 5.5V21" />
+      <path d="M3 21h18" />
+      <path d="M9 21v-5h6v5" />
+      <path d="M8.5 11.5h2M13.5 11.5h2" />
+    </svg>
+  );
+}
+
 // Roadmap shown to a visiting professional, matching the homepage's journey
 // section. Nothing here is selectable: vendor registration validates against
 // normalizeLaunchCity() on the server, so an application outside Pune still
@@ -282,10 +314,12 @@ type IconName =
   | "check"
   | "user"
   | "headset"
-  | "ticket";
+  | "ticket"
+  | "chevron-right";
 
 function Icon({ name, size = 22, color = "#F04A1A", width = 1.9 }: { name: IconName; size?: number; color?: string; width?: number }) {
   const paths: Record<IconName, ReactNode> = {
+    "chevron-right": <path d="m9.5 5.5 6.5 6.5-6.5 6.5" />,
     home: (
       <>
         <path d="M4 11.5 12 5l8 6.5" />
@@ -1039,33 +1073,103 @@ export default function VendorsPage() {
           <div className="qfv-shell">
             <div className="qfv-areas-head">
               <div className="qfv-head">
-                <span className="qfv-kicker">Where we match</span>
-                <h2 className="qfv-h2">Serving the Pune marketplace.</h2>
+                <span className="qfv-kicker qfv-kicker--ruled">Where we match</span>
+                <h2 className="qfv-h2">
+                  Serving the <span>Pune</span> marketplace.
+                </h2>
+                <p className="qfv-lede">
+                  We match you with verified professionals across Pune. Set your base and covered areas when you
+                  apply — geography can influence ranking, it does not create a guaranteed radius or assignment.
+                </p>
               </div>
-              <p className="qfv-lede" style={{ maxWidth: 400 }}>
-                Set your base and covered areas when you apply. Geography can influence ranking when authoritative
-                data is available; it does not create a guaranteed radius or assignment.
-              </p>
+              {/* Reserved for the coverage map. Renders as an empty frame until
+                  real/vendor-coverage-map.(webp|png) exists — see that folder's
+                  README. No stand-in art, so an unfilled slot reads as unfilled. */}
+              <div className="qfv-areas-map">
+                {coverageMap ? (
+                  <Image src={coverageMap} alt="" fill sizes="(max-width: 980px) 100vw, 520px" />
+                ) : (
+                  <span className="qfv-slot-empty" aria-hidden="true" />
+                )}
+                <span className="qfv-areas-map-pill">
+                  <Icon name="pin" size={15} width={2} />
+                  Covers {TOTAL_AREAS} localities across Pune &amp; PCMC
+                </span>
+              </div>
             </div>
+
             <div className="qfv-zones">
               {ZONES.map((zone) => (
                 <div className="qfv-zone" key={zone.name}>
                   <header>
-                    <h3>{zone.name}</h3>
-                    <small>{zone.areas.length} localities</small>
+                    <span className="qfv-zone-ic" aria-hidden="true">
+                      <ZoneMark />
+                    </span>
+                    <div>
+                      <h3>{zone.name}</h3>
+                      <small>{ZONE_BLURB[zone.name] ?? "Pune coverage"}</small>
+                    </div>
+                    {/* The exact number, not "12+". There are twelve. */}
+                    <em>{zone.areas.length} areas</em>
                   </header>
                   <ul>
-                    {zone.areas.map((area) => (
-                      <li key={area}>{area}</li>
+                    {zone.areas.slice(0, ZONE_PREVIEW).map((area) => (
+                      <li key={area}>
+                        {area}
+                        <Icon name="chevron-right" size={14} width={2} color="#B9B1A3" />
+                      </li>
                     ))}
                   </ul>
+                  {zone.areas.length > ZONE_PREVIEW ? (
+                    /* <details> rather than a "View all areas" link: there is no
+                       per-zone route to send anyone to, and a link that goes
+                       nowhere is worse than a disclosure that works offline. */
+                    <details className="qfv-zone-more">
+                      <summary>
+                        View all {zone.areas.length} areas
+                        <Icon name="chevron-right" size={13} width={2.4} color="#C93A0E" />
+                      </summary>
+                      <ul>
+                        {zone.areas.slice(ZONE_PREVIEW).map((area) => (
+                          <li key={area}>
+                            {area}
+                            <Icon name="chevron-right" size={14} width={2} color="#B9B1A3" />
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  ) : null}
                 </div>
               ))}
             </div>
-            <p className="qfv-areas-note">
-              <Icon name="pin" size={16} width={2} />
-              Pune coverage is recorded on vendor profiles and used by the governed matching system.
-            </p>
+
+            <div className="qfv-areas-foot">
+              <div className="qfv-areas-check">
+                <span className="qfv-areas-check-ic" aria-hidden="true">
+                  <Icon name="pin" size={22} width={2} color="#C93A0E" />
+                </span>
+                <div>
+                  <h3>Not sure if we cover your area?</h3>
+                  <p>Tell us where the work is — we record coverage on every vendor profile.</p>
+                </div>
+                <EnquiryModalTrigger
+                  className="qfv-btn qfv-btn--primary"
+                  modalTitle="Tell us what your home needs"
+                  source="Vendors page — coverage check"
+                >
+                  Check your area <Arrow />
+                </EnquiryModalTrigger>
+              </div>
+              <div className="qfv-areas-feats">
+                {AREA_FEATURES.map((feature) => (
+                  <div key={feature.title}>
+                    <Icon name={feature.icon} size={22} width={2} color="#C93A0E" />
+                    <strong>{feature.title}</strong>
+                    <span>{feature.body}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 

@@ -843,22 +843,160 @@
   border-top: 1px solid var(--qfv-line);
   padding: 64px 0;
 }
-.qfv-areas-head { display: flex; flex-wrap: wrap; gap: 20px 40px; align-items: flex-end; justify-content: space-between; }
-.qfv-zones { display: grid; gap: 16px; margin-top: 32px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+/* Kicker with a rule either side, as on the board. */
+.qfv-kicker--ruled { display: inline-flex; align-items: center; gap: 12px; }
+.qfv-kicker--ruled::before,
+.qfv-kicker--ruled::after { content: ""; width: 26px; height: 1.5px; background: var(--qfv-orange); border-radius: 2px; }
+.qfv-h2 span { color: var(--qfd-orange-text); }
+.qfv-areas-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.86fr);
+  gap: 36px;
+  align-items: center;
+}
+.qfv-areas-map {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #fbf5ec;
+  border: 1px solid var(--qfv-card-line);
+}
+.qfv-areas-map img { object-fit: cover; }
+/* Reserved, visibly unfilled. A stand-in graphic here would read as a
+   decision rather than a gap, and nobody would remember to replace it. */
+.qfv-slot-empty {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(135deg, rgba(201, 58, 14, 0.05) 0 10px, transparent 10px 20px);
+}
+.qfv-areas-map-pill {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 28px);
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--qfv-card-line);
+  box-shadow: 0 10px 24px -14px rgba(20, 24, 29, 0.5);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--qfv-ink);
+}
+
+/* Five equal cards rather than the board's 4 + 1 wide: a fifth card spanning
+   two columns leaves two dead cells beside it, and the zones carry equal
+   weight anyway. */
+.qfv-zones { display: grid; gap: 16px; margin-top: 34px; grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .qfv-zone {
+  display: flex;
+  flex-direction: column;
   background: #fff;
   border: 1px solid var(--qfv-card-line);
   border-radius: 16px;
-  padding: 18px 18px 20px;
+  padding: 16px 16px 18px;
   box-shadow: 0 20px 40px -38px rgba(20, 24, 29, 0.45);
 }
-.qfv-zone header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid #f2ece2; }
-.qfv-zone h3 { font-size: 16px; letter-spacing: -0.01em; }
-.qfv-zone small { font-size: 11.5px; color: var(--qfv-muted-2); font-weight: 700; }
-.qfv-zone ul { margin-top: 12px; display: flex; flex-direction: column; gap: 7px; }
-.qfv-zone li { display: flex; align-items: center; gap: 9px; font-size: 14px; color: #3f3b34; }
-.qfv-zone li::before { content: ""; width: 5px; height: 5px; border-radius: 999px; background: var(--qfv-orange); flex-shrink: 0; }
-.qfv-areas-note { display: inline-flex; align-items: center; gap: 9px; margin-top: 22px; font-size: 13.5px; color: var(--qfv-muted); }
+.qfv-zone header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f2ece2;
+}
+.qfv-zone-ic {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #fdeee2;
+  color: var(--qfd-orange-text);
+}
+.qfv-zone h3 { font-size: 15px; letter-spacing: -0.01em; line-height: 1.2; }
+.qfv-zone small { display: block; margin-top: 3px; font-size: 11px; line-height: 1.3; color: var(--qfv-muted-2); font-weight: 600; }
+.qfv-zone header em {
+  grid-column: 1 / -1;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--qfd-orange-text);
+}
+.qfv-zone ul { margin-top: 12px; display: flex; flex-direction: column; }
+.qfv-zone li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 0;
+  font-size: 13.5px;
+  color: #3f3b34;
+  border-bottom: 1px solid #f6f1e8;
+}
+.qfv-zone li:last-child { border-bottom: 0; }
+.qfv-zone-more { margin-top: 6px; }
+.qfv-zone-more summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+  padding-top: 8px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--qfd-orange-text);
+}
+.qfv-zone-more summary::-webkit-details-marker { display: none; }
+.qfv-zone-more[open] summary svg { transform: rotate(90deg); }
+.qfv-zone-more summary svg { transition: transform 0.18s ease; }
+
+.qfv-areas-foot {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+.qfv-areas-check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 22px 24px;
+  border-radius: 18px;
+  background: linear-gradient(120deg, #fff6ec 0%, #fdeadb 100%);
+  border: 1px solid #f3dcc8;
+}
+.qfv-areas-check-ic {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 10px 22px -14px rgba(20, 24, 29, 0.5);
+}
+.qfv-areas-check h3 { font-size: 18px; letter-spacing: -0.015em; }
+.qfv-areas-check p { margin-top: 4px; font-size: 13.5px; line-height: 1.45; color: var(--qfv-muted); }
+.qfv-areas-feats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  padding: 18px 8px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid var(--qfv-card-line);
+}
+.qfv-areas-feats > div { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 14px; text-align: center; }
+.qfv-areas-feats > div + div { border-left: 1px solid #f2ece2; }
+.qfv-areas-feats strong { font-size: 13.5px; font-weight: 800; color: var(--qfv-ink); line-height: 1.25; }
+.qfv-areas-feats span { font-size: 11.5px; line-height: 1.35; color: var(--qfv-muted); }
 
 /* ================= CITIES ================= */
 .qfv-cities {
@@ -1058,6 +1196,11 @@
 }
 
 @media (max-width: 979px) {
+  .qfv-areas-head { grid-template-columns: minmax(0, 1fr); }
+  .qfv-zones { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .qfv-areas-foot { grid-template-columns: minmax(0, 1fr); }
+  .qfv-areas-check { grid-template-columns: auto minmax(0, 1fr); }
+  .qfv-areas-check .qfv-btn { grid-column: 2; justify-self: start; }
   .qfv-hero-tag { position: static; align-self: flex-start; margin-bottom: 4px; }
   /* The photo gives up 70px so the hero's own Apply button clears the 74px
      sticky bar. Copy still starts 68px before the photo ends, so the veil
@@ -1073,6 +1216,11 @@
 }
 
 @media (max-width: 620px) {
+  .qfv-zones { grid-template-columns: minmax(0, 1fr); }
+  .qfv-areas-feats { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .qfv-areas-feats > div + div { border-left: 0; border-top: 1px solid #f2ece2; padding-top: 14px; }
+  .qfv-areas-check { grid-template-columns: minmax(0, 1fr); text-align: left; }
+  .qfv-areas-check .qfv-btn { grid-column: 1; }
   .qfv-compare-row { grid-template-columns: 1fr; }
   .qfv-compare-row > * { padding: 12px 16px; font-size: 14.5px; }
   .qfv-compare-row--head { display: none; }

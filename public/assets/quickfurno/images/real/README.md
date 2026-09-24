@@ -19,5 +19,25 @@ Use `.webp` or `.jpg`. Landscape, well-lit, photos only when QuickFurno has docu
 | `categories/civil-work.jpg`            | Civil Work service card           | 400×300, < 60KB   |
 | `categories/false-ceiling.jpg`         | False Ceiling service card        | 400×300, < 60KB   |
 
+## Slots from the 2026 boards
+
+These have **no illustrated fallback**. Until the file exists the section
+renders a reserved empty frame; drop the file in and it appears on the next
+build. Same rule as above: `.webp` wins over `.jpg`.
+
+| File                    | Where it appears                         | Ideal size         |
+| ----------------------- | ---------------------------------------- | ------------------ |
+| `how-step-1.webp`       | How it works, step 1                     | 900×1100, < 140KB  |
+| `how-step-3.webp`       | How it works, step 3                     | 900×1100, < 140KB  |
+| `faq-person.webp`       | FAQ section, right side                  | 900×1100, < 140KB  |
+| `pro-cutout.webp`       | For professionals band (cut-out, alpha)  | 900×1200 PNG/WebP  |
+| `vendor-trades.webp`    | /vendors trade tiles (one 8-up sheet)    | 1600×800, < 200KB  |
+| `vendor-match-phone.webp` | /vendors "How matching works"          | 900×1200, < 140KB  |
+| `vendor-support.webp`   | /vendors support section                 | 900×1200, < 140KB  |
+
+Nothing in these may show invented vendor names, ratings, review counts or
+prices. A screenshot that fabricates marketplace data is the one thing the
+homepage rules forbid outright.
+
 Partial is fine: add only `hero.jpg` and the hero becomes a photo while the
 cards keep their illustrations. Delete a file to go back to the illustration.

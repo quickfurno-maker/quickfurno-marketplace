@@ -59,3 +59,16 @@ export function heroImage(fallbackSrc: string): HomepageImage {
 export function categoryImage(slug: string, fallbackSrc: string): HomepageImage {
   return resolveHomepageImage(`categories/${slug}`, fallbackSrc);
 }
+
+/**
+ * A slot with NO illustrated fallback: returns the real photo's URL, or null
+ * when the file has not been added yet.
+ *
+ * The sections built from the new boards use this so an unfilled slot renders
+ * as a reserved empty frame rather than a broken image or a stand-in that
+ * looks deliberate. Drop the file into real/ under the documented name and it
+ * appears on the next build — no code change.
+ */
+export function optionalRealImage(slotName: string): string | null {
+  return findRealImage(slotName);
+}

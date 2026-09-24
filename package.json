@@ -174,7 +174,8 @@
     "test:automation-native": "node scripts/mvp/automation/validate-qf-native-automation.mjs",
     "test:aarohi:crm": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/aarohi/validate-qf-aarohi-crm.mjs",
     "test:mvp:whatsapp-essential": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-essential-features.mjs",
-    "test:mvp:whatsapp-human-desk": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-human-desk.mjs"
+    "test:mvp:whatsapp-human-desk": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-human-desk.mjs",
+    "test:mvp:jarvis-operator-bridge": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-jarvis-operator-bridge.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

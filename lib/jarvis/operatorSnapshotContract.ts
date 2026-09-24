@@ -20,7 +20,7 @@ export const qfjOperatorSnapshotRequestSchema = z.object({
 }).strict();
 
 const approvalSchema = z.object({
-  id: identifier,
+  id: z.string().uuid(),
   requestedAction: label,
   risk: z.enum(["informational","low-risk-reversible","client-or-vendor-facing","money-related","high-risk"]),
   requestedAuthority: label,

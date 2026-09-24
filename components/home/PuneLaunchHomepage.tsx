@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { categories, categorySlug, type QuickFurnoCategory } from "@/lib/quickfurno-data";
 import { HOME_FAQ, PUNE_AREAS, TESTIMONIALS } from "@/lib/homepage-content";
-import { categoryImage, heroImage, resolveHomepageImage } from "@/lib/homepage-images";
+import { categoryImage, heroImage, optionalRealImage, resolveHomepageImage } from "@/lib/homepage-images";
 import { getPublicVendorCountsByCategory } from "@/services/publicVendorService";
 import { CONTACT, whatsappLink } from "@/lib/config";
 
@@ -324,21 +324,24 @@ const OTHER_SERVICES = categories
 
 const FALLBACK_CATEGORY_IMAGE = (slug: string) => `/assets/quickfurno/images/categories/${slug}.svg`;
 
-const HOW_IT_WORKS = [
+const HOW_IT_WORKS: { icon: ReactNode; title: string; body: string; slot: string }[] = [
   {
     icon: <ChatIcon />,
     title: "Tell us what you need",
-    body: "Pick the service, your locality and the project details you want to share. Your phone number is requested at the contact step.",
+    body: "Choose the service, share your location and a few details. Your phone number is requested at the contact step.",
+    slot: "how-step-1",
   },
   {
     icon: <ShieldCheckIcon size={26} stroke="#fff" width={2} />,
     title: "We find eligible pros",
-    body: "QuickFurno can assign up to 3 active pros at a time after category and marketplace eligibility checks; approved ranking signals determine order.",
+    body: "QuickFurno matches you with up to 3 verified professionals based on your service, location and eligibility checks.",
+    slot: "how-step-2",
   },
   {
     icon: <CheckCircleIcon />,
     title: "Compare & choose",
-    body: "Review profiles and quotes side by side, then deal directly with the one you trust. No fee, no obligation.",
+    body: "Review profiles, ratings, quotes and previous work. Then choose the professional you trust. No fee, no obligation.",
+    slot: "how-step-3",
   },
 ];
 
@@ -790,25 +793,35 @@ function HowItWorks() {
       <span className="qfp-how-glow-b" aria-hidden="true" />
       <div className="qfp-shell">
         <div className="qfp-head-center" data-reveal>
-          <span className="qfp-kicker">How it works</span>
-          <h2>Three steps. Zero running around.</h2>
+          <span className="qfp-kicker qfp-kicker--ruled">How it works</span>
+          <h2>
+            Three steps. <span>Zero running around.</span>
+          </h2>
+          <p className="qfp-how-lede">From your requirement to a trusted professional — all in one place.</p>
         </div>
         <ol className="qfp-steps" data-reveal-group>
-          {HOW_IT_WORKS.map((step, index) => (
-            <li className="qfp-step" key={step.title}>
-              <div className="qfp-step-top">
-                <span className="qfp-step-icon">{step.icon}</span>
+          {HOW_IT_WORKS.map((step, index) => {
+            const photo = optionalRealImage(step.slot);
+            return (
+              <li className="qfp-step" key={step.title}>
                 <span className="qfp-step-num" aria-hidden="true">0{index + 1}</span>
-              </div>
-              <div className="qfp-step-text">
-                <h3>{step.title}</h3>
-                <p>{step.body}</p>
-              </div>
-              {index < HOW_IT_WORKS.length - 1 ? (
-                <span className="qfp-step-next" aria-hidden="true"><ArrowIcon size={13} stroke="#C93A0E" width={2.6} /></span>
-              ) : null}
-            </li>
-          ))}
+                <div className="qfp-step-text">
+                  <span className="qfp-step-icon">{step.icon}</span>
+                  <h3>{step.title}</h3>
+                  <p>{step.body}</p>
+                </div>
+                {/* Reserved half of the card. Empty and visibly so until
+                    real/how-step-N.* exists — see that folder's README. */}
+                <div className="qfp-step-media">
+                  {photo ? (
+                    <Image src={photo} alt="" fill sizes="(max-width: 980px) 45vw, 210px" />
+                  ) : (
+                    <span className="qfp-slot-empty" aria-hidden="true" />
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ol>
       </div>
     </section>

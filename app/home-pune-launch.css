@@ -664,51 +664,89 @@
 .qfp-how-glow-b { left: -90px; bottom: -110px; width: 500px; height: 340px; background: radial-gradient(closest-side, rgba(240, 74, 26, 0.09), rgba(240, 74, 26, 0) 72%); }
 .qfp-how .qfp-shell { position: relative; }
 .qfp-how h2 { font-size: 40px; }
+.qfp-kicker--ruled { display: inline-flex; align-items: center; gap: 12px; }
+.qfp-kicker--ruled::before,
+.qfp-kicker--ruled::after { content: ""; width: 30px; height: 1.5px; border-radius: 2px; background: currentColor; opacity: 0.5; }
+.qfp-how h2 span { color: var(--qfd-orange-text); }
+.qfp-how-lede { max-width: 620px; font-size: 16.5px; line-height: 1.6; color: var(--qfp-muted); }
+
 .qfp-steps {
-  margin-top: 52px;
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 30px;
+  margin-top: 46px;
 }
 .qfp-step {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  padding: 34px 30px 30px;
-  background: linear-gradient(180deg, #fff 0%, #fffdf8 100%);
-  border: 1px solid #eee6d7;
-  border-radius: 22px;
-  box-shadow: 0 1px 2px rgba(20, 24, 29, 0.04), 0 26px 52px -20px rgba(20, 24, 29, 0.22);
-}
-.qfp-step-top { display: flex; align-items: center; justify-content: space-between; }
-.qfp-step-icon {
-  width: 58px;
-  height: 58px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #a82f0a 0%, #c93a0e 100%);
   display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  box-shadow: 0 12px 22px -8px rgba(240, 74, 26, 0.55);
+  grid-template-columns: minmax(0, 1fr) 40%;
+  align-items: stretch;
+  min-height: 252px;
+  border-radius: 24px;
+  background: linear-gradient(160deg, #fffdfa 0%, #fdf6ec 100%);
+  border: 1px solid #f2e7d6;
+  box-shadow: 0 26px 52px -30px rgba(20, 24, 29, 0.42);
 }
-.qfp-step-num { font-family: var(--qfp-head); font-weight: 700; font-size: 36px; letter-spacing: -0.03em; line-height: 1; color: #ece3d2; }
-.qfp-step-text { display: flex; flex-direction: column; gap: 10px; }
-.qfp-step h3 { font-family: var(--qfp-body); font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
-.qfp-step p { font-size: 15px; line-height: 1.65; color: #78736a; }
-.qfp-step-next {
+/* Orange disc lapping the card's top-left corner. It sits outside the card's
+   own bounds, so the card cannot clip it — .qfp-steps keeps the overflow. */
+.qfp-step-num {
   position: absolute;
-  top: 50px;
-  right: -15px;
+  top: 14px;
+  left: 14px;
   z-index: 3;
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  background: #fff;
-  border: 1px solid #eee6d7;
-  box-shadow: 0 6px 14px rgba(20, 24, 29, 0.12);
   display: grid;
   place-items: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 999px;
+  background: var(--qfp-orange);
+  color: #fff;
+  font-family: var(--qfp-head);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+  box-shadow: 0 14px 26px -12px rgba(240, 74, 26, 0.7);
+}
+.qfp-step-text { display: flex; flex-direction: column; gap: 9px; padding: 76px 16px 24px 22px; }
+/* Board draws a pale chip with an orange glyph. The three step icons are
+   drawn with a white stroke baked in, so the chip stays solid orange -
+   recolouring the glyphs would mean editing three icon components for a
+   52px detail. */
+.qfp-step-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: var(--qfp-orange);
+  box-shadow: 0 12px 22px -10px rgba(240, 74, 26, 0.6);
+}
+.qfp-step-icon svg { width: 25px; height: 25px; }
+.qfp-step h3 { font-family: var(--qfp-body); font-size: 19px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; }
+.qfp-step p { font-size: 13.5px; line-height: 1.55; color: #78736a; }
+.qfp-step-media { position: relative; overflow: hidden; border-radius: 0 24px 24px 0; }
+.qfp-step-media img { object-fit: cover; }
+.qfp-slot-empty {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(135deg, rgba(201, 58, 14, 0.06) 0 10px, transparent 10px 20px);
+}
+/* Dashed run between the cards, drawn in the grid gap by a pseudo-element so
+   it needs no markup of its own. The card clips its own overflow for the
+   photo, so this hangs off .qfp-step rather than sitting inside it. */
+.qfp-step + .qfp-step::before {
+  content: "";
+  position: absolute;
+  top: 38px;
+  left: -30px;
+  width: 30px;
+  height: 2px;
+  background-image: linear-gradient(90deg, var(--qfp-orange) 0 6px, transparent 6px 12px);
+  background-size: 12px 2px;
+  background-repeat: repeat-x;
+  opacity: 0.75;
 }
 
 /* ==========================================================================
@@ -1013,6 +1051,9 @@
    RESPONSIVE — tablet
    ========================================================================== */
 @media (max-width: 1100px) {
+  .qfp-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+  .qfp-step + .qfp-step::before { display: none; }
+  .qfp-step { grid-template-columns: minmax(0, 1fr) 38%; min-height: 226px; }
   .qfp-nav { gap: 22px; }
   .qfp-service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; }
   /* The photo pane sizes itself now (aspect-ratio + inset:0), so the old
@@ -1030,6 +1071,19 @@
    RESPONSIVE — mobile (matches the Mobile 390 board)
    ========================================================================== */
 @media (max-width: 760px) {
+  .qfp-how-lede { font-size: 14px; }
+  .qfp-kicker--ruled::before, .qfp-kicker--ruled::after { width: 18px; }
+  .qfp-steps { grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 24px; }
+  /* The reserved photo half is dead weight on a phone: it would be ~150px
+     of hatching per card. Text only here; the photo returns at 761px. */
+  .qfp-step { grid-template-columns: minmax(0, 1fr); min-height: 0; border-radius: 18px; }
+  .qfp-step-media { display: none; }
+  .qfp-step-text { padding: 18px 18px 20px 76px; gap: 6px; }
+  .qfp-step-num { top: 18px; left: 16px; width: 44px; height: 44px; font-size: 15px; }
+  .qfp-step-icon { position: absolute; top: 70px; left: 18px; width: 40px; height: 40px; }
+  .qfp-step-icon svg { width: 19px; height: 19px; }
+  .qfp-step h3 { font-size: 16px; }
+  .qfp-step p { font-size: 13px; line-height: 1.5; }
   /* The fixed bottom nav needs clearance. The dark footer carries it (so the
      space below the footer stays footer-coloured) and the legacy global
      body padding is dropped on this page only. */

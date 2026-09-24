@@ -128,25 +128,86 @@ function MailIcon() {
 // Service card copy. Keyed by the canonical category name so a typo here is a
 // type error, and iteration always happens over the registry (never this map).
 // --------------------------------------------------------------------------
+type Sub = { label: string; icon: GlyphName };
 type ServiceMeta = {
   desc: string;
   short: string;
   cta: string;
   alt: string;
-  mark: ReactNode;
+  /** Qualitative pill, top-left of the photo. Never a count — see below. */
+  badge: string;
+  badgeIcon: GlyphName;
+  /** The three sub-categories shown in the bar under the photo. */
+  subs: [Sub, Sub, Sub];
   /** Optional per-photo crop focus (CSS object-position), e.g. "center 30%". */
   pos?: string;
 };
 
-const markProps = { width: 40, height: 40, viewBox: "0 0 48 48", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
+// ---------------------------------------------------------------------------
+// One line-icon set, shared by the card badges and the sub-category bars.
+// Glyphs repeat ACROSS cards on purpose (a repair and a renovation are the
+// same spanner) but never twice WITHIN one card, which is what would read as
+// a mistake. Every glyph is drawn on the same 24px box at the same weight so
+// the bars line up optically.
+// ---------------------------------------------------------------------------
+type GlyphName =
+  | "plan" | "cube" | "check" | "kitchen" | "wardrobe" | "cabinet"
+  | "sofa" | "recliner" | "wrench" | "hand" | "home" | "villa"
+  | "sparkle" | "ceiling" | "bulb" | "led" | "roller" | "brush"
+  | "texture" | "building" | "brick" | "beam" | "crown" | "shield" | "factory";
+
+const GLYPHS: Record<GlyphName, ReactNode> = {
+  plan: <><rect x="3" y="3" width="18" height="18" rx="1.5" /><path d="M3 10h11M14 3v18" /></>,
+  cube: <><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" /><path d="M4 7.5 12 12l8-4.5M12 12v9" /></>,
+  check: <><circle cx="12" cy="12" r="9" /><path d="M8.4 12.2l2.4 2.4 4.7-5" /></>,
+  kitchen: <><rect x="3" y="4" width="18" height="5" rx="1" /><rect x="3" y="11" width="18" height="10" rx="1" /><path d="M12 11v10M8 15h1.5M14.5 15H16" /></>,
+  wardrobe: <><rect x="5" y="3" width="14" height="18" rx="1.5" /><path d="M12 3v18M9.5 11v2M14.5 11v2" /></>,
+  cabinet: <><rect x="4" y="4" width="16" height="16" rx="1.5" /><path d="M4 9.5h16M4 15h16M10.5 6.8h3M10.5 12.2h3M10.5 17.6h3" /></>,
+  sofa: <><path d="M5 12V9.5A2.5 2.5 0 0 1 7.5 7h9A2.5 2.5 0 0 1 19 9.5V12" /><path d="M3.5 12.5A1.5 1.5 0 0 1 5 11h14a1.5 1.5 0 0 1 1.5 1.5V18h-17z" /><path d="M6 18v2M18 18v2" /></>,
+  recliner: <><rect x="6" y="7" width="12" height="9" rx="2" /><path d="M6 10H4.5a1.5 1.5 0 0 0 0 3H6M18 10h1.5a1.5 1.5 0 0 1 0 3H18M8 16v3M16 16v3" /></>,
+  wrench: <><path d="M15.4 3.6a5 5 0 0 0-6.1 6.1l-5.7 5.7a2 2 0 0 0 2.8 2.8l5.7-5.7a5 5 0 0 0 6.1-6.1l-2.8 2.8-2.5-.6-.6-2.5z" /></>,
+  hand: <><path d="M9 11V5.6a1.5 1.5 0 0 1 3 0V11" /><path d="M12 10.6V4.9a1.5 1.5 0 0 1 3 0V11" /><path d="M15 11V7.6a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7 6 6 0 0 1-5.2-3L4 14.6a1.6 1.6 0 0 1 2.6-1.8L9 15" /></>,
+  home: <><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" /><path d="M9.5 21v-6h5v6" /></>,
+  villa: <><path d="M2 11 7 6.5 12 11M12 11l5-4.5 5 4.5" /><path d="M4 11v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9" /><path d="M10 21v-5h4v5" /></>,
+  sparkle: <><path d="M12 3.5l1.9 5.4 5.4 1.9-5.4 1.9-1.9 5.4-1.9-5.4L4.7 10.8l5.4-1.9z" /><path d="M18.6 16.4l.6 1.8 1.8.6-1.8.6-.6 1.8-.6-1.8-1.8-.6 1.8-.6z" /></>,
+  ceiling: <><path d="M3 5h18" /><path d="M6 5v3.5h12V5" /><path d="M12 8.5V13" /><path d="M9 13h6l-1.5 4.5h-3z" /></>,
+  bulb: <><path d="M9 17.4a5.5 5.5 0 1 1 6 0V19a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1z" /><path d="M10 22h4" /></>,
+  led: <><rect x="2.5" y="9" width="19" height="6" rx="3" /><path d="M7 12h.01M12 12h.01M17 12h.01" /></>,
+  roller: <><rect x="3.5" y="4" width="13" height="5" rx="1.5" /><path d="M16.5 6.5h3A1.5 1.5 0 0 1 21 8v3a1.5 1.5 0 0 1-1.5 1.5H12A1.5 1.5 0 0 0 10.5 14v1.5" /><rect x="8.5" y="15.5" width="4" height="6" rx="1.2" /></>,
+  brush: <><rect x="8" y="2.5" width="8" height="6" rx="1.2" /><path d="M12 8.5v4" /><path d="M9.5 12.5h5V20a2.5 2.5 0 0 1-5 0z" /></>,
+  texture: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M6 10c2-2 4-2 6 0s4 2 6 0M6 15c2-2 4-2 6 0s4 2 6 0" /></>,
+  building: <><rect x="4" y="3" width="16" height="18" rx="1.5" /><path d="M8 7h2M14 7h2M8 11h2M14 11h2M8 15h2M14 15h2" /></>,
+  brick: <><rect x="3" y="5" width="18" height="14" rx="1" /><path d="M3 12h18M9 5v7M15 12v7" /></>,
+  beam: <><path d="M3 6h18M3 18h18" /><path d="M7 6v12M17 6v12" /><path d="M7 6l10 12" /></>,
+  crown: <><path d="M3 17 5 7l4.5 4L12 4l2.5 7L19 7l2 10z" /><path d="M3.6 20.5h16.8" /></>,
+  shield: <><path d="M12 3l7.5 3v6c0 4.2-3 7.6-7.5 9-4.5-1.4-7.5-4.8-7.5-9V6z" /><path d="M8.8 12.2l2.2 2.2 4.2-4.4" /></>,
+  factory: <><path d="M3 21V10l6 3.5V10l6 3.5V6h6v15z" /><path d="M7 17h2M13 17h2M18 17h2" /></>,
+};
+
+function Glyph({ name, size = 18 }: { name: GlyphName; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {GLYPHS[name]}
+    </svg>
+  );
+}
 
 const SERVICE_META: Record<QuickFurnoCategory, ServiceMeta> = {
   "Interior Designers": {
     desc: "Complete home interiors — design to handover.",
-    short: "Complete home interiors — design to handover.",
+    short: "Complete home interiors",
     cta: "Explore Designers",
     alt: "Two interior designers in their studio with material samples, colour swatches and floor plans",
-    mark: null,
+    // The board read "25+ Experts". There are four live designers, so that
+    // badge would have put a fabricated number on the busiest page of the
+    // site, against the no-invented-stats rule the rest of this file follows.
+    badge: "Verified Profiles",
+    badgeIcon: "shield",
+    subs: [
+      { label: "Space Planning", icon: "plan" },
+      { label: "3D Designs", icon: "cube" },
+      { label: "Turnkey Execution", icon: "check" },
+    ],
   },
   "Modular Factory": {
     desc: "Factory-finish kitchens & wardrobes.",
@@ -154,54 +215,78 @@ const SERVICE_META: Record<QuickFurnoCategory, ServiceMeta> = {
     cta: "Explore Modular",
     alt: "Technician inspecting a sage-green cabinet shutter in a modular furniture factory",
     pos: "center 30%",
-    mark: (
-      <svg {...markProps}><rect x="10" y="12" width="28" height="24" rx="2" /><line x1="24" y1="12" x2="24" y2="36" /><line x1="19" y1="18" x2="19" y2="20" /><line x1="29" y1="18" x2="29" y2="20" /></svg>
-    ),
+    badge: "Factory Finish",
+    badgeIcon: "factory",
+    subs: [
+      { label: "Modular Kitchens", icon: "kitchen" },
+      { label: "Wardrobes", icon: "wardrobe" },
+      { label: "Custom Cabinets", icon: "cabinet" },
+    ],
   },
   Carpenters: {
     desc: "Custom furniture & woodwork.",
     short: "Furniture & woodwork",
     cta: "Find Carpenters",
     alt: "Carpenter sanding a custom cabinet",
-    mark: (
-      <svg {...markProps}><path d="M17 13 V25 M31 13 V25" /><path d="M15 25 H33 V28 H15 Z" /><path d="M18 28 V37 M30 28 V37" /></svg>
-    ),
+    badge: "Skilled Professionals",
+    badgeIcon: "wrench",
+    subs: [
+      { label: "Furniture", icon: "sofa" },
+      { label: "Repairs", icon: "wrench" },
+      { label: "Custom Work", icon: "hand" },
+    ],
   },
   "Premium Interiors": {
     desc: "Premium design & execution.",
     short: "Design & execution",
     cta: "Explore Premium",
     alt: "Luxurious premium living room",
-    mark: (
-      <svg {...markProps}><path d="M24 10 l4.2 8.6 9.3 1.1 -6.8 6.4 1.7 9.2 -8.4 -4.5 -8.4 4.5 1.7 -9.2 -6.8 -6.4 9.3 -1.1 z" /></svg>
-    ),
+    badge: "Luxury Spaces",
+    badgeIcon: "crown",
+    subs: [
+      { label: "Residential", icon: "home" },
+      { label: "Villas", icon: "villa" },
+      { label: "Premium Finish", icon: "sparkle" },
+    ],
   },
   Sofa: {
-    desc: "Custom sofas & upholstery.",
+    desc: "New sofa sales & upholstery.",
     short: "Sofas & upholstery",
     cta: "Explore Sofas",
     alt: "Sofa maker welcoming you to a showroom of fabric and leather sofas",
-    mark: (
-      <svg {...markProps}><path d="M13 27 v-4 a3 3 0 0 1 3 -3 h16 a3 3 0 0 1 3 3 v4" /><path d="M10 27 a3 3 0 0 1 3 -3 h22 a3 3 0 0 1 3 3 v7 h-28 z" /><path d="M14 34 v3 M34 34 v3" /></svg>
-    ),
+    badge: "Wide Collection",
+    badgeIcon: "sofa",
+    subs: [
+      { label: "New Sofas", icon: "sofa" },
+      { label: "Custom Upholstery", icon: "hand" },
+      { label: "Recliners", icon: "recliner" },
+    ],
   },
   Painter: {
     desc: "Interior & exterior painting.",
     short: "Interior & exterior",
     cta: "Book a Painter",
     alt: "Painter rolling beige paint onto a wall",
-    mark: (
-      <svg {...markProps}><rect x="11" y="12" width="20" height="9" rx="2" /><path d="M31 16 h6 v7 l-13 3 v6" /><rect x="21" y="33" width="6" height="8" rx="1.5" /></svg>
-    ),
+    badge: "Trusted Pros",
+    badgeIcon: "brush",
+    subs: [
+      { label: "Interior Painting", icon: "roller" },
+      { label: "Exterior Painting", icon: "building" },
+      { label: "Texture Finish", icon: "texture" },
+    ],
   },
   "Civil Work": {
-    desc: "Renovation, masonry & repairs.",
+    desc: "Renovations, masonry & repairs.",
     short: "Renovation & repairs",
     cta: "Get Started",
     alt: "Mason beside fresh brickwork",
-    mark: (
-      <svg {...markProps}><rect x="10" y="14" width="28" height="20" rx="1" /><line x1="10" y1="24" x2="38" y2="24" /><line x1="24" y1="14" x2="24" y2="24" /><line x1="17" y1="24" x2="17" y2="34" /><line x1="31" y1="24" x2="31" y2="34" /></svg>
-    ),
+    badge: "All Types",
+    badgeIcon: "building",
+    subs: [
+      { label: "Renovation", icon: "wrench" },
+      { label: "Masonry", icon: "brick" },
+      { label: "Structural Work", icon: "beam" },
+    ],
   },
   "False Ceiling": {
     desc: "POP & gypsum ceilings, cove lighting.",
@@ -209,9 +294,13 @@ const SERVICE_META: Record<QuickFurnoCategory, ServiceMeta> = {
     cta: "Explore Ceilings",
     alt: "Installer finishing a layered POP false ceiling with warm cove lighting",
     pos: "center 30%",
-    mark: (
-      <svg {...markProps}><path d="M8 13 H40" /><path d="M13 13 V19 H35 V13" /><path d="M17 23 H31" /><path d="M24 19 V27" /><path d="M20 27 H28 L26 32 H22 Z" /></svg>
-    ),
+    badge: "Modern Designs",
+    badgeIcon: "bulb",
+    subs: [
+      { label: "POP Ceiling", icon: "ceiling" },
+      { label: "Cove Lighting", icon: "bulb" },
+      { label: "LED Integration", icon: "led" },
+    ],
   },
 };
 
@@ -403,63 +492,54 @@ function Hero() {
   );
 }
 
+// One card shape for all eight categories. The board drops the 2x2 featured
+// tile, so Interior Designers is now the same card as the rest - it simply
+// leads the grid. Photo runs the full pane, copy sits on it over a scrim, and
+// the sub-category bar below is the part that does real work: it answers
+// "what is actually in here?" before anyone has to click.
 function ServiceCard({ name }: { name: QuickFurnoCategory }) {
   const meta = SERVICE_META[name];
   const slug = categorySlug(name);
   const image = categoryImage(slug, FALLBACK_CATEGORY_IMAGE(slug));
   return (
     <Link href={`/category/${slug}`} className="qfp-card">
-      <div className="qfp-card-media">
-        <Image
-          src={image.src}
-          alt={meta.alt}
-          fill
-          sizes="(max-width: 760px) 50vw, (max-width: 1100px) 50vw, 282px"
-          style={meta.pos ? { objectPosition: meta.pos } : undefined}
-        />
-      </div>
-      <div className="qfp-card-body">
-        <span className="qfp-card-accent" aria-hidden="true" />
-        <h3>{name}</h3>
-        <p className="qfp-card-desc-long">{meta.desc}</p>
-        <p className="qfp-card-desc-short">{meta.short}</p>
-        <span className="qfp-card-cta"><i><ArrowIcon stroke="#C93A0E" /></i>{meta.cta}</span>
-        {meta.mark ? <span className="qfp-card-mark" aria-hidden="true">{meta.mark}</span> : null}
-      </div>
-    </Link>
-  );
-}
-
-function FeaturedServiceCard() {
-  const name = FEATURED.name;
-  const meta = SERVICE_META[name];
-  const slug = categorySlug(name);
-  const image = categoryImage(slug, FALLBACK_CATEGORY_IMAGE(slug));
-  return (
-    <Link href={`/category/${slug}`} className="qfp-card qfp-card--featured">
-      <div className="qfp-card-media">
-        <Image src={image.src} alt={meta.alt} fill priority sizes="(max-width: 760px) 100vw, (max-width: 1100px) 100vw, 588px" />
-      </div>
-      <div className="qfp-card-body">
-        <span className="qfp-card-accent" aria-hidden="true" />
-        <h3>{name}</h3>
-        <p className="qfp-card-desc-long">{meta.desc}</p>
-        <span className="qfp-card-cta"><i><ArrowIcon stroke="#fff" /></i>{meta.cta}</span>
-        <div className="qfp-card-perks" aria-label="What interior designers cover">
-          <span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C93A0E" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="1.5" /><line x1="3" y1="10" x2="14" y2="10" /><line x1="14" y1="3" x2="14" y2="21" /></svg>
-            Space Planning
+      <span className="qfp-card-face">
+        <span className="qfp-card-media">
+          <Image
+            src={image.src}
+            alt={meta.alt}
+            fill
+            sizes="(max-width: 760px) 50vw, (max-width: 1100px) 50vw, 300px"
+            style={meta.pos ? { objectPosition: meta.pos } : undefined}
+          />
+        </span>
+        <span className="qfp-card-scrim" aria-hidden="true" />
+        <span className="qfp-card-badge">
+          <Glyph name={meta.badgeIcon} size={15} />
+          {meta.badge}
+        </span>
+        <span className="qfp-card-copy">
+          <span className="qfp-card-title">{name}</span>
+          <span className="qfp-card-desc qfp-card-desc-long">{meta.desc}</span>
+          <span className="qfp-card-desc qfp-card-desc-short">{meta.short}</span>
+          <span className="qfp-card-btn">
+            {meta.cta}
+            <ArrowIcon size={16} stroke="#fff" />
           </span>
-          <span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C93A0E" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 l8 4.5 v9 L12 21 4 16.5 v-9 z" /><path d="M4 7.5 L12 12 l8 -4.5 M12 12 V21" /></svg>
-            3D Designs
+        </span>
+      </span>
+      {/* Informational, deliberately not links: sub-category routes do not
+          exist yet, and three anchors all pointing at the same category page
+          would be noise for a screen reader and for search. They become links
+          the day those pages do. */}
+      <span className="qfp-card-subs">
+        {meta.subs.map((sub) => (
+          <span className="qfp-card-sub" key={sub.label}>
+            <Glyph name={sub.icon} size={19} />
+            <span>{sub.label}</span>
           </span>
-          <span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C93A0E" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8.5 12.2 l2.4 2.4 4.6 -5" /></svg>
-            End-to-End Execution
-          </span>
-        </div>
-      </div>
+        ))}
+      </span>
     </Link>
   );
 }
@@ -577,13 +657,16 @@ function Services() {
       <span id="categories" aria-hidden="true" />
       <div className="qfp-shell">
         <ServicesHeading />
+        {/* Eight equal cards, 4x2. FEATURED now means "leads the grid", not
+            "is twice the size" - the board treats every category the same. */}
         <div className="qfp-service-grid" data-reveal-group>
-          <FeaturedServiceCard />
-          {OTHER_SERVICES.map((category) => (
+          {[FEATURED, ...OTHER_SERVICES].map((category) => (
             <ServiceCard key={category.name} name={category.name} />
           ))}
-          <NotSureCard />
         </div>
+        {/* Eight categories fill 4x2 exactly, so the "not sure" CTA no longer
+            has a spare cell. It reads stronger as a full-width band anyway. */}
+        <NotSureCard />
       </div>
     </section>
   );

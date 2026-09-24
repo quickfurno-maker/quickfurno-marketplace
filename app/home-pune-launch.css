@@ -298,102 +298,133 @@
 .qfp-service-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-rows: 300px;
   gap: 24px;
 }
+
+/* ---- Category card ------------------------------------------------------
+   Board spec: full-bleed photo, copy over a dark gradient, a white value
+   pill top-left, and a sub-category bar on #FAF7F2 underneath. All eight
+   cards are identical now - the old 2x2 featured tile is gone.
+
+   The badge is deliberately qualitative. A live vendor count would read
+   0 on five of the eight categories today, so the count is not wired in;
+   when supply justifies it, it belongs beside the badge in this same pill
+   row and needs no layout change. */
 .qfp-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  border-radius: 18px;
+  border-radius: 16px;
   overflow: hidden;
-  background: var(--qfp-card-bg);
+  background: #fff;
   border: 1px solid var(--qfp-card-line);
   box-shadow: 0 16px 38px -18px rgba(20, 24, 29, 0.2);
   transition: transform 0.22s ease, box-shadow 0.22s ease;
 }
-.qfp-card:hover { transform: translateY(-3px); box-shadow: 0 26px 48px -20px rgba(20, 24, 29, 0.3); }
-.qfp-card-media { position: relative; height: 176px; flex-shrink: 0; overflow: hidden; }
-.qfp-card-media img { object-fit: cover; object-position: center 42%; transition: transform 0.6s ease; }
-.qfp-card:hover .qfp-card-media img { transform: scale(1.04); }
-.qfp-card-body {
+.qfp-card:hover { transform: translateY(-4px); box-shadow: 0 28px 52px -20px rgba(20, 24, 29, 0.32); }
+
+/* The photo pane: media, scrim, badge and copy all stack in here. */
+.qfp-card-face {
   position: relative;
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 16px 18px 17px;
+  display: block;
+  aspect-ratio: 5 / 7;
+  min-height: 330px;
   overflow: hidden;
 }
-.qfp-card-accent { display: block; flex-shrink: 0; width: 26px; height: 3px; border-radius: 2px; background: var(--qfp-orange); }
-.qfp-card h3 { font-size: 18px; letter-spacing: -0.01em; line-height: 1.2; }
-.qfp-card p { font-size: 13px; line-height: 1.4; color: var(--qfp-muted); }
-.qfp-card-cta {
-  margin-top: auto;
+.qfp-card-media { position: absolute; inset: 0; display: block; }
+.qfp-card-media img { object-fit: cover; object-position: center 40%; transition: transform 0.6s ease; }
+.qfp-card:hover .qfp-card-media img { transform: scale(1.05); }
+.qfp-card-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(15, 15, 15, 0) 26%,
+    rgba(15, 15, 15, 0.5) 48%,
+    rgba(15, 15, 15, 0.85) 68%,
+    rgba(15, 15, 15, 0.93) 100%
+  );
+}
+.qfp-card-badge {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 2;
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--qfd-orange-text);
-}
-.qfp-card-cta i {
-  width: 30px;
-  height: 30px;
+  gap: 7px;
+  max-width: calc(100% - 28px);
+  padding: 7px 13px 7px 11px;
   border-radius: 999px;
-  background: #fbeee7;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  transition: background 0.18s ease;
+  background: #fff;
+  color: var(--qfp-ink);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  box-shadow: 0 6px 16px -8px rgba(20, 24, 29, 0.55);
 }
-.qfp-card:hover .qfp-card-cta i { background: #f7dfd2; }
-.qfp-card-mark { position: absolute; right: 14px; bottom: 12px; pointer-events: none; color: #e4dac8; }
-.qfp-card-desc-short { display: none; }
-
-/* Featured (Interior Designers) — photo top, 2x2 */
-.qfp-card--featured {
-  grid-column: span 2;
-  grid-row: span 2;
-  border-radius: 22px;
-  box-shadow: 0 26px 56px -22px rgba(20, 24, 29, 0.26);
-}
-.qfp-card--featured .qfp-card-media { height: 336px; }
-.qfp-card--featured .qfp-card-media img { object-position: center 22%; }
-.qfp-card--featured .qfp-card-body {
-  justify-content: center;
-  gap: 0;
-  padding: 24px 32px 26px;
-  background: linear-gradient(180deg, #fbf6ed 0%, #f0e6d2 100%);
-}
-.qfp-card--featured .qfp-card-accent { width: 30px; margin-bottom: 14px; }
-.qfp-card--featured h3 { font-size: 30px; letter-spacing: -0.02em; line-height: 1.08; }
-.qfp-card--featured p { font-size: 15px; line-height: 1.55; margin-top: 8px; }
-.qfp-card--featured .qfp-card-cta { margin-top: 16px; gap: 12px; font-size: 14px; }
-.qfp-card--featured .qfp-card-cta i { width: 40px; height: 40px; background: var(--qfp-orange); box-shadow: 0 10px 20px -6px rgba(240, 74, 26, 0.55); }
-.qfp-card--featured .qfp-card-cta i svg { stroke: #fff; }
-.qfp-card-tag {
+.qfp-card-badge svg { flex-shrink: 0; color: var(--qfp-orange); }
+.qfp-card-copy {
   position: absolute;
-  top: 20px;
-  left: 20px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px;
+}
+.qfp-card-title {
+  font-family: var(--qfp-head);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: #fff;
+}
+.qfp-card-desc { font-size: 13.5px; line-height: 1.45; color: rgba(255, 255, 255, 0.82); }
+.qfp-card-desc-short { display: none; }
+.qfp-card-btn {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  height: 42px;
+  border-radius: 999px;
   background: var(--qfp-orange);
   color: #fff;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  padding: 6px 12px;
-  border-radius: 999px;
+  font-size: 14.5px;
+  font-weight: 700;
+  transition: background 0.18s ease;
 }
-.qfp-card-perks {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid #ebe3d3;
+.qfp-card:hover .qfp-card-btn { background: var(--qfp-orange-dark); }
+
+/* Sub-category bar. Informational, so no hover affordance. */
+.qfp-card-subs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  background: #faf7f2;
+  border-top: 1px solid #f1eadd;
+  padding: 11px 4px 12px;
+}
+.qfp-card-sub {
   display: flex;
-  flex-wrap: wrap;
-  gap: 26px;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 0 2px;
+  text-align: center;
 }
-.qfp-card-perks span { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: #55503f; line-height: 1.25; }
-.qfp-card-perks svg { flex-shrink: 0; }
+.qfp-card-sub svg { color: #8a8378; }
+/* Two lines are always reserved, whether the label needs them or not:
+   "Repairs" fits on one and "Turnkey Execution" does not, and without this
+   the bars sit at different heights across a row and the grid looks ragged. */
+.qfp-card-sub > span { font-size: 10.5px; line-height: 1.25; font-weight: 600; color: #6b7280; min-height: 26px; }
 
 /* Not-sure card — dark olive, plant photo. One grid cell since the 8th
    category (False Ceiling): it closes the last row as a tall CTA tile. */
@@ -467,6 +498,35 @@
   mask-composite: intersect;
 }
 .qfp-notsure-media img { object-fit: cover; object-position: center; }
+
+/* ---- CTA band -----------------------------------------------------------
+   Eight categories fill the 4x2 grid exactly, so this CTA no longer has a
+   spare cell to sit in. Out of the grid it reads better as a full-width
+   band anyway: copy left, photo feathered in from the right. The phone
+   rules further down still apply and keep it compact there. */
+.qfp-notsure {
+  grid-column: auto;
+  flex-direction: row;
+  align-items: stretch;
+  margin-top: 24px;
+  min-height: 188px;
+}
+.qfp-notsure-glow { left: -60px; top: -90px; width: 460px; height: 300px; }
+.qfp-notsure-copy { justify-content: center; gap: 10px; padding: 30px 40px; max-width: 640px; }
+.qfp-notsure-title { font-size: 30px; }
+.qfp-notsure-desc { font-size: 15px; max-width: 480px; }
+/* Was margin-top:auto to pin it to the bottom of a tall tile; in a centred
+   band that would drag it away from the copy it belongs to. */
+.qfp-notsure-btn { margin-top: 4px; }
+.qfp-notsure-media {
+  top: 0;
+  height: 100%;
+  width: 44%;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 62%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 62%);
+  -webkit-mask-composite: source-over;
+  mask-composite: add;
+}
 
 /* ==========================================================================
    HOW IT WORKS
@@ -835,9 +895,9 @@
 @media (max-width: 1100px) {
   .qfp-nav { gap: 22px; }
   .qfp-service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; }
-  .qfp-card--featured { grid-row: auto; }
-  .qfp-card--featured .qfp-card-media { height: 300px; }
-  .qfp-card-media { height: 190px; }
+  /* The photo pane sizes itself now (aspect-ratio + inset:0), so the old
+     fixed media heights are gone - a height here would beat inset:0 and
+     leave the bottom of the pane empty. */
   .qfp-steps { gap: 22px; }
   .qfp-step-next { display: none; }
   .qfp-city-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 18px; }
@@ -910,31 +970,22 @@
   .qfp-trust-card span { font-size: 11.5px; line-height: 1.35; }
   .qfp-service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; gap: 14px; }
   .qfp-card { border-radius: 16px; box-shadow: 0 10px 24px -12px rgba(20, 24, 29, 0.18); }
-  .qfp-card-media { height: 150px; }
-  .qfp-card-body { gap: 6px; padding: 12px 13px 13px; }
-  .qfp-card-accent { width: 22px; }
-  .qfp-card h3 { font-size: 15px; }
-  .qfp-card p { font-size: 11.5px; line-height: 1.35; }
+  .qfp-card-face { min-height: 0; aspect-ratio: 4 / 5; }
+  .qfp-card-badge { top: 10px; left: 10px; gap: 5px; padding: 5px 9px 5px 8px; font-size: 10px; }
+  .qfp-card-badge svg { width: 13px; height: 13px; }
+  .qfp-card-copy { padding: 12px; gap: 4px; }
+  .qfp-card-title { font-size: 15.5px; }
+  .qfp-card-desc { font-size: 11.5px; line-height: 1.35; }
   .qfp-card-desc-long { display: none; }
   .qfp-card-desc-short { display: block; }
-  .qfp-card-cta { gap: 7px; font-size: 11px; padding-top: 4px; }
-  .qfp-card-cta i { width: 24px; height: 24px; }
-  .qfp-card-cta i svg { width: 11px; height: 11px; }
-  .qfp-card-mark { display: none; }
-  .qfp-card--featured { grid-column: 1 / -1; border-radius: 18px; box-shadow: 0 16px 34px -16px rgba(20, 24, 29, 0.2); }
-  .qfp-card--featured .qfp-card-media { height: 208px; }
-  .qfp-card--featured .qfp-card-media img { object-position: center; }
-  .qfp-card--featured .qfp-card-body { justify-content: flex-start; gap: 8px; padding: 17px 18px 18px; background: none; }
-  .qfp-card--featured .qfp-card-accent { width: 26px; margin-bottom: 0; }
-  .qfp-card--featured h3 { font-size: 21px; letter-spacing: -0.01em; }
-  .qfp-card--featured p { font-size: 13px; line-height: 1.45; margin-top: 0; }
-  .qfp-card--featured .qfp-card-desc-long { display: block; }
-  .qfp-card--featured .qfp-card-desc-short { display: none; }
-  .qfp-card--featured .qfp-card-cta { margin-top: 4px; gap: 9px; font-size: 13px; }
-  .qfp-card--featured .qfp-card-cta i { width: 32px; height: 32px; }
-  .qfp-card--featured .qfp-card-cta i svg { width: 15px; height: 15px; }
-  .qfp-card-tag { top: 14px; left: 14px; font-size: 10px; padding: 6px 10px; }
-  .qfp-card-perks { display: none; }
+  .qfp-card-btn { height: 34px; margin-top: 6px; gap: 6px; font-size: 12px; }
+  /* Two cards across a 390px screen leaves ~55px per sub-category, so the
+     labels drop a step and are allowed to wrap onto a second line rather
+     than being hidden - the bar is the part that explains the category. */
+  .qfp-card-subs { padding: 8px 2px 9px; }
+  .qfp-card-sub { gap: 3px; }
+  .qfp-card-sub svg { width: 16px; height: 16px; }
+  .qfp-card-sub > span { font-size: 9px; line-height: 1.2; min-height: 22px; }
   .qfp-notsure { grid-column: auto; align-items: flex-start; gap: 14px; padding: 16px 14px 14px; border-radius: 16px; background: linear-gradient(150deg, #14181d 0%, #1b2027 100%); }
   .qfp-notsure-glow { left: auto; right: -40px; top: -40px; width: 180px; height: 150px; background: radial-gradient(closest-side, rgba(255, 177, 61, 0.2), rgba(255, 177, 61, 0) 72%); }
   .qfp-notsure-copy { flex: 1 1 auto; padding: 0; gap: 6px; }

@@ -359,10 +359,10 @@
 /* ---- Services heading: copy left, photo collage right ------------------ */
 .qfp-svc-head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.92fr);
-  gap: 44px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr);
+  gap: 40px;
   align-items: center;
-  min-height: 380px;
+  min-height: 340px;
   margin-bottom: 40px;
 }
 .qfp-svc-copy { display: flex; flex-direction: column; gap: 16px; max-width: 520px; }
@@ -373,9 +373,37 @@
 /* The three shots overlap on a fixed canvas, so each one is placed rather
    than flowed. Height is fixed for the same reason — absolutely positioned
    children give the parent nothing to size itself from. */
-.qfp-svc-collage { position: relative; height: 380px; }
-.qfp-svc-plan { position: absolute; right: -30px; top: 0; opacity: 0.4; pointer-events: none; }
-.qfp-svc-plan svg { width: 420px; height: 240px; }
+.qfp-svc-collage { position: relative; height: 304px; }
+.qfp-svc-plan { position: absolute; right: -40px; top: -28px; opacity: 0.32; pointer-events: none; }
+.qfp-svc-plan svg { width: 400px; height: 226px; }
+/* Four-point sparkle: two crossed ellipses via a conic-free trick - a
+   rotated square with concave sides reads as the board's star. */
+.qfp-svc-spark {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: var(--qfp-orange);
+  opacity: 0.55;
+  clip-path: polygon(50% 0, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0 50%, 42% 42%);
+}
+.qfp-svc-spark--1 { left: -18px; top: 60px; width: 14px; height: 14px; }
+.qfp-svc-spark--2 { left: 128px; top: -16px; }
+.qfp-svc-spark--3 { left: 330px; bottom: -14px; width: 15px; height: 15px; }
+/* The arc sweeping off the right edge. A ring with three quarters hidden. */
+.qfp-svc-arc {
+  position: absolute;
+  right: -54px;
+  top: 46px;
+  width: 150px;
+  height: 150px;
+  border: 2px solid var(--qfp-orange);
+  border-radius: 999px;
+  border-left-color: transparent;
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  opacity: 0.5;
+  transform: rotate(-24deg);
+}
 .qfp-svc-shot {
   position: absolute;
   margin: 0;
@@ -384,9 +412,9 @@
   box-shadow: 0 30px 60px -28px rgba(20, 24, 29, 0.5);
 }
 .qfp-svc-shot img { object-fit: cover; border-radius: 18px; }
-.qfp-svc-shot--1 { left: 0; top: 34px; width: 250px; height: 290px; z-index: 1; }
-.qfp-svc-shot--2 { left: 205px; top: 4px; width: 210px; height: 268px; z-index: 2; }
-.qfp-svc-shot--3 { left: 360px; top: 96px; width: 200px; height: 236px; z-index: 3; }
+.qfp-svc-shot--1 { left: 8px; top: 22px; width: 278px; height: 240px; z-index: 1; }
+.qfp-svc-shot--2 { left: 212px; top: 0; width: 212px; height: 232px; z-index: 2; }
+.qfp-svc-shot--3 { left: 372px; top: 66px; width: 242px; height: 192px; z-index: 3; }
 .qfp-svc-shot figcaption {
   position: absolute;
   z-index: 4;
@@ -403,9 +431,9 @@
   color: var(--qfp-ink);
 }
 .qfp-svc-shot figcaption svg { color: var(--qfd-orange-text); }
-.qfp-svc-shot--1 figcaption { left: -26px; bottom: 58px; }
-.qfp-svc-shot--2 figcaption { left: 42px; top: -18px; }
-.qfp-svc-shot--3 figcaption { right: -30px; bottom: 44px; }
+.qfp-svc-shot--1 figcaption { left: -40px; top: 104px; }
+.qfp-svc-shot--2 figcaption { left: 16px; top: -16px; }
+.qfp-svc-shot--3 figcaption { right: -24px; bottom: 34px; }
 
 /* ---- Benefit row ------------------------------------------------------- */
 .qfp-trust-row {
@@ -418,10 +446,10 @@
 .qfp-trust-card > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .qfp-trust-card {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-start;
-  gap: 10px;
-  padding: 20px 18px 22px;
+  gap: 13px;
+  padding: 18px 16px 20px;
   background: #fffdfa;
   border: 1px solid #f1e8da;
   border-radius: 18px;
@@ -429,14 +457,15 @@
 .qfp-trust-card > i {
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 46px;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
   border-radius: 999px;
   background: #fdeee2;
   color: var(--qfd-orange-text);
 }
-.qfp-trust-card strong { font-size: 15px; font-weight: 800; line-height: 1.25; }
-.qfp-trust-card span { font-size: 13px; line-height: 1.45; color: var(--qfp-muted); }
+.qfp-trust-card strong { font-size: 14.5px; font-weight: 800; line-height: 1.25; }
+.qfp-trust-card span { font-size: 12.5px; line-height: 1.45; color: var(--qfp-muted); }
 
 .qfp-service-grid {
   display: grid;

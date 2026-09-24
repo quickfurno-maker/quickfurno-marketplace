@@ -759,6 +759,12 @@ function ServicesHeading() {
           <span className="qfp-svc-plan">
             <BlueprintPlan />
           </span>
+          {/* Board decoration: four-point sparkles and the arc sweeping off the
+              right edge. Drawn in CSS rather than imported so they scale. */}
+          <span className="qfp-svc-spark qfp-svc-spark--1" />
+          <span className="qfp-svc-spark qfp-svc-spark--2" />
+          <span className="qfp-svc-spark qfp-svc-spark--3" />
+          <span className="qfp-svc-arc" />
           {SERVICE_COLLAGE.map((item, index) => {
             const image = categoryImage(item.slug, FALLBACK_CATEGORY_IMAGE(item.slug));
             return (

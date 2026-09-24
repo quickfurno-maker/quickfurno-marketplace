@@ -678,12 +678,15 @@ function NotSureCard() {
 // Trust points shown as a row of verified-badge cards under the heading on
 // every screen size (swipeable on tablets and phones). All five are true
 // today — see lib/homepage-content.ts and the FAQ.
-const TRUST_POINTS: { title: string; body: string }[] = [
-  { title: "Profiles reviewed", body: "Active public listings must pass marketplace controls" },
-  { title: "Bounded matching", body: "Up to 3 active pros can be assigned at a time" },
-  { title: "Free to enquire", body: "No homeowner fee to submit an enquiry" },
-  { title: "Pune launch", body: "The marketplace launch is focused on Pune" },
-  { title: "Governed contact sharing", body: "Client details follow assignment and consent controls" },
+const TRUST_POINTS: { icon: GlyphName; title: string; body: string }[] = [
+  // Board read "Every professional is identity & skill verified". Documents and
+  // business details are reviewed; skill is not assessed, so this says what the
+  // marketplace actually does.
+  { icon: "shield", title: "Verified profiles", body: "Every public profile is reviewed and approved before it is listed." },
+  { icon: "users", title: "Up to 3 matches", body: "Get matched with up to 3 relevant pros for your requirement." },
+  { icon: "rupee", title: "Free to enquire", body: "No homeowner fee to submit an enquiry or compare quotes." },
+  { icon: "home", title: "Pune focused", body: "A marketplace built for Pune, with local professionals." },
+  { icon: "check", title: "Transparent process", body: "Compare profiles, reviews and quotes, then choose." },
 ];
 
 function BlueprintPlan() {
@@ -724,28 +727,58 @@ function BlueprintPlan() {
   );
 }
 
+// Three of the eight category photos, staggered, with a floating label on
+// each — the board's collage, built from photos already in the repo rather
+// than a new composite asset.
+const SERVICE_COLLAGE: { slug: string; label: string; icon: GlyphName }[] = [
+  { slug: "premium-interiors", label: "Interior Design", icon: "sofa" },
+  { slug: "carpenters", label: "Carpentry", icon: "wrench" },
+  { slug: "painter", label: "Painting", icon: "roller" },
+];
+
 function ServicesHeading() {
   return (
     <>
-      <div className="qfp-bp" data-reveal>
-        <div className="qfp-bp-copy">
-          <span className="qfp-bp-kicker">
-            <i className="t" aria-hidden="true" /><i className="l" aria-hidden="true" />
-            Our services
-            <i className="l" aria-hidden="true" /><i className="t" aria-hidden="true" />
-          </span>
-          <h2>Home services.<br />One marketplace.</h2>
-          <p>From interiors to painting, browse the Pune launch categories in one marketplace.</p>
+      <div className="qfp-svc-head" data-reveal>
+        <div className="qfp-svc-copy">
+          <span className="qfp-kicker qfp-kicker--ruled">Our services</span>
+          <h2>
+            Home services.
+            <br />
+            <span>One marketplace.</span>
+          </h2>
+          {/* Board read "carpentry to cleaning". Cleaning is not one of the
+              eight categories, and the homepage must not advertise a service
+              the marketplace cannot route. */}
+          <p>
+            From interiors to painting, carpentry to modular work — explore every home service
+            QuickFurno covers in Pune and get matched with verified professionals, all in one place.
+          </p>
         </div>
-        <div className="qfp-bp-plan" aria-hidden="true">
-          <BlueprintPlan />
-          <span className="qfp-bp-home">YOUR HOME</span>
+        <div className="qfp-svc-collage" aria-hidden="true">
+          <span className="qfp-svc-plan">
+            <BlueprintPlan />
+          </span>
+          {SERVICE_COLLAGE.map((item, index) => {
+            const image = categoryImage(item.slug, FALLBACK_CATEGORY_IMAGE(item.slug));
+            return (
+              <figure className={`qfp-svc-shot qfp-svc-shot--${index + 1}`} key={item.slug}>
+                <Image src={image.src} alt="" fill sizes="280px" />
+                <figcaption>
+                  <Glyph name={item.icon} size={15} />
+                  {item.label}
+                </figcaption>
+              </figure>
+            );
+          })}
         </div>
       </div>
       <ol className="qfp-trust-row" aria-label="Why homeowners choose QuickFurno" data-reveal-group>
         {TRUST_POINTS.map((point) => (
           <li className="qfp-trust-card" key={point.title}>
-            <VerifiedRosette size={26} />
+            <i aria-hidden="true">
+              <Glyph name={point.icon} size={22} />
+            </i>
             <div>
               <strong>{point.title}</strong>
               <span>{point.body}</span>

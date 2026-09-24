@@ -356,32 +356,87 @@
   pointer-events: none;
 }
 .qfp-services .qfp-shell { position: relative; }
-.qfp-bp { display: flex; align-items: center; justify-content: space-between; gap: 40px; min-height: 350px; margin-top: -24px; margin-bottom: 8px; }
-.qfp-bp-copy { position: relative; z-index: 1; max-width: 480px; display: flex; flex-direction: column; }
-.qfp-bp-kicker { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase; color: var(--qfd-orange-text); }
-.qfp-bp-kicker i { display: block; flex-shrink: 0; background: var(--qfp-orange); }
-.qfp-bp-kicker i.t { width: 1.5px; height: 12px; }
-.qfp-bp-kicker i.l { width: 28px; height: 1.5px; }
-.qfp-bp-copy h2 { margin-top: 16px; font-size: 54px; line-height: 60px; letter-spacing: -0.035em; }
-.qfp-bp-copy p { margin-top: 16px; font-size: 16px; line-height: 26px; color: var(--qfp-muted); }
-.qfp-bp-plan { position: relative; width: 640px; height: 350px; flex-shrink: 0; }
-.qfp-bp-svg { position: absolute; left: 0; top: 0; width: 640px; height: 350px; display: block; }
-.qfp-bp-home { position: absolute; left: 250px; top: 292px; padding: 0 8px; background: var(--qfp-ivory); font-size: 11px; font-weight: 800; letter-spacing: 0.18em; color: #655f54; }
-.qfp-trust-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin: 0 0 44px; }
+/* ---- Services heading: copy left, photo collage right ------------------ */
+.qfp-svc-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.92fr);
+  gap: 44px;
+  align-items: center;
+  min-height: 380px;
+  margin-bottom: 40px;
+}
+.qfp-svc-copy { display: flex; flex-direction: column; gap: 16px; max-width: 520px; }
+.qfp-svc-copy h2 { font-size: 54px; line-height: 1.06; letter-spacing: -0.035em; }
+.qfp-svc-copy h2 span { color: var(--qfd-orange-text); }
+.qfp-svc-copy p { font-size: 16px; line-height: 1.6; color: var(--qfp-muted); }
+
+/* The three shots overlap on a fixed canvas, so each one is placed rather
+   than flowed. Height is fixed for the same reason — absolutely positioned
+   children give the parent nothing to size itself from. */
+.qfp-svc-collage { position: relative; height: 380px; }
+.qfp-svc-plan { position: absolute; right: -30px; top: 0; opacity: 0.4; pointer-events: none; }
+.qfp-svc-plan svg { width: 420px; height: 240px; }
+.qfp-svc-shot {
+  position: absolute;
+  margin: 0;
+  border-radius: 18px;
+  overflow: visible;
+  box-shadow: 0 30px 60px -28px rgba(20, 24, 29, 0.5);
+}
+.qfp-svc-shot img { object-fit: cover; border-radius: 18px; }
+.qfp-svc-shot--1 { left: 0; top: 34px; width: 250px; height: 290px; z-index: 1; }
+.qfp-svc-shot--2 { left: 205px; top: 4px; width: 210px; height: 268px; z-index: 2; }
+.qfp-svc-shot--3 { left: 360px; top: 96px; width: 200px; height: 236px; z-index: 3; }
+.qfp-svc-shot figcaption {
+  position: absolute;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 12px 26px -12px rgba(20, 24, 29, 0.55);
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--qfp-ink);
+}
+.qfp-svc-shot figcaption svg { color: var(--qfd-orange-text); }
+.qfp-svc-shot--1 figcaption { left: -26px; bottom: 58px; }
+.qfp-svc-shot--2 figcaption { left: 42px; top: -18px; }
+.qfp-svc-shot--3 figcaption { right: -30px; bottom: 44px; }
+
+/* ---- Benefit row ------------------------------------------------------- */
+.qfp-trust-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0 0 44px;
+}
+/* strong + span are inline by default and ran together on one line. */
+.qfp-trust-card > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .qfp-trust-card {
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
-  gap: 12px;
-  padding: 16px 16px 17px;
-  background: #fff;
-  border: 1px solid #ebe3d4;
-  border-radius: 16px;
-  box-shadow: 0 12px 26px -20px rgba(20, 24, 29, 0.35);
+  gap: 10px;
+  padding: 20px 18px 22px;
+  background: #fffdfa;
+  border: 1px solid #f1e8da;
+  border-radius: 18px;
 }
-.qfp-trust-card svg { flex-shrink: 0; margin-top: 1px; }
-.qfp-trust-card div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.qfp-trust-card strong { font-size: 14.5px; line-height: 1.3; font-weight: 800; color: var(--qfp-ink); }
-.qfp-trust-card span { font-size: 12.5px; line-height: 1.4; color: var(--qfp-muted); }
+.qfp-trust-card > i {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  background: #fdeee2;
+  color: var(--qfd-orange-text);
+}
+.qfp-trust-card strong { font-size: 15px; font-weight: 800; line-height: 1.25; }
+.qfp-trust-card span { font-size: 13px; line-height: 1.45; color: var(--qfp-muted); }
 
 .qfp-service-grid {
   display: grid;
@@ -1051,6 +1106,12 @@
    RESPONSIVE — tablet
    ========================================================================== */
 @media (max-width: 1100px) {
+  .qfp-svc-head { grid-template-columns: minmax(0, 1fr); gap: 28px; min-height: 0; }
+  .qfp-svc-copy h2 { font-size: 42px; }
+  .qfp-svc-collage { height: 330px; }
+  .qfp-svc-shot--1 { width: 210px; height: 250px; }
+  .qfp-svc-shot--2 { left: 175px; width: 185px; height: 232px; }
+  .qfp-svc-shot--3 { left: 305px; width: 175px; height: 205px; }
   .qfp-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
   .qfp-step + .qfp-step::before { display: none; }
   .qfp-step { grid-template-columns: minmax(0, 1fr) 38%; min-height: 226px; }
@@ -1071,6 +1132,22 @@
    RESPONSIVE — mobile (matches the Mobile 390 board)
    ========================================================================== */
 @media (max-width: 760px) {
+  .qfp-svc-copy h2 { font-size: 28px; }
+  .qfp-svc-copy p { font-size: 14px; }
+  /* The overlap needs ~560px of width to read. Below that the third shot
+     would sit off-canvas, so the collage becomes two shots on a shorter
+     canvas and the labels come in from the edges. */
+  .qfp-svc-collage { height: 230px; }
+  .qfp-svc-plan { display: none; }
+  .qfp-svc-shot--1 { left: 0; top: 10px; width: 160px; height: 195px; }
+  .qfp-svc-shot--2 { left: 140px; top: 32px; width: 150px; height: 178px; }
+  .qfp-svc-shot--3 { display: none; }
+  .qfp-svc-shot figcaption { padding: 6px 10px; font-size: 10.5px; }
+  .qfp-svc-shot--1 figcaption { left: -8px; bottom: 34px; }
+  .qfp-svc-shot--2 figcaption { left: auto; right: -10px; top: auto; bottom: 26px; }
+  .qfp-trust-card { padding: 14px 14px 16px; }
+  .qfp-trust-card > i { width: 38px; height: 38px; }
+  .qfp-trust-card > i svg { width: 18px; height: 18px; }
   .qfp-how-lede { font-size: 14px; }
   .qfp-kicker--ruled::before, .qfp-kicker--ruled::after { width: 18px; }
   .qfp-steps { grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 24px; }

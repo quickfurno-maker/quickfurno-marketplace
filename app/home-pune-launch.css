@@ -330,8 +330,8 @@
 .qfp-card-face {
   position: relative;
   display: block;
-  aspect-ratio: 1 / 1;
-  min-height: 236px;
+  aspect-ratio: 5 / 7;
+  min-height: 330px;
   overflow: hidden;
 }
 .qfp-card-media { position: absolute; inset: 0; display: block; }
@@ -368,13 +368,13 @@
 .qfp-card-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   max-width: 100%;
-  padding: 6px 11px 6px 9px;
+  padding: 7px 13px 7px 11px;
   border-radius: 999px;
   background: #fff;
   color: var(--qfp-ink);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
@@ -407,30 +407,30 @@
   z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 16px;
+  gap: 6px;
+  padding: 20px;
 }
 .qfp-card-title {
   font-family: var(--qfp-head);
-  font-size: 19px;
+  font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.15;
   color: #fff;
 }
-.qfp-card-desc { font-size: 12.5px; line-height: 1.4; color: rgba(255, 255, 255, 0.82); }
+.qfp-card-desc { font-size: 13.5px; line-height: 1.45; color: rgba(255, 255, 255, 0.82); }
 .qfp-card-desc-short { display: none; }
 .qfp-card-btn {
-  margin-top: 7px;
+  margin-top: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  height: 37px;
+  gap: 9px;
+  height: 42px;
   border-radius: 999px;
   background: var(--qfp-orange);
   color: #fff;
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 700;
   transition: background 0.18s ease;
 }
@@ -442,13 +442,13 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   background: #faf7f2;
   border-top: 1px solid #f1eadd;
-  padding: 9px 4px 10px;
+  padding: 11px 4px 12px;
 }
 .qfp-card-sub {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   padding: 0 2px;
   text-align: center;
 }
@@ -456,7 +456,7 @@
 /* Two lines are always reserved, whether the label needs them or not:
    "Repairs" fits on one and "Turnkey Execution" does not, and without this
    the bars sit at different heights across a row and the grid looks ragged. */
-.qfp-card-sub > span { font-size: 10px; line-height: 1.22; font-weight: 600; color: #6b7280; min-height: 24px; }
+.qfp-card-sub > span { font-size: 10.5px; line-height: 1.25; font-weight: 600; color: #6b7280; min-height: 26px; }
 
 /* Not-sure card — dark olive, plant photo. One grid cell since the 8th
    category (False Ceiling): it closes the last row as a tall CTA tile. */

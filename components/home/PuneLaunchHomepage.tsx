@@ -534,7 +534,7 @@ function ServiceCard({ name, count }: { name: QuickFurnoCategory; count: number 
         <span className="qfp-card-scrim" aria-hidden="true" />
         <span className="qfp-card-top">
           <span className="qfp-card-badge">
-            <Glyph name={meta.badgeIcon} size={14} />
+            <Glyph name={meta.badgeIcon} size={15} />
             {meta.badge}
           </span>
           {label ? <span className="qfp-card-count">{label}</span> : null}
@@ -556,7 +556,7 @@ function ServiceCard({ name, count }: { name: QuickFurnoCategory; count: number 
       <span className="qfp-card-subs">
         {meta.subs.map((sub) => (
           <span className="qfp-card-sub" key={sub.label}>
-            <Glyph name={sub.icon} size={17} />
+            <Glyph name={sub.icon} size={19} />
             <span>{sub.label}</span>
           </span>
         ))}

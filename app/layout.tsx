@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Poppins, Playfair_Display } from "next/font/google";
+import { Caveat, Poppins, Playfair_Display } from "next/font/google";
 import localFont from "next/font/local";
 import { EnquiryModalProvider } from "@/components/ClientEnquiryModal";
 import { ScrollProgress } from "@/components/ScrollProgress";
@@ -68,6 +68,16 @@ const playfair = Playfair_Display({
   display: "swap",
 });
 
+// Caveat — the handwritten accent lines on the rebuilt homepage sections
+// ("Still have a question?", "Be part of Pune's trusted home services
+// community.", "A better Pune, together."). Nothing else uses it.
+const caveat = Caveat({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-caveat",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "QuickFurno | Verified Home-Service Marketplace",
   description:
@@ -95,7 +105,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${poppins.variable} ${playfair.variable} ${jakarta.variable}`}>
+    <html lang="en" className={`${poppins.variable} ${playfair.variable} ${jakarta.variable} ${caveat.variable}`}>
       <body>
         <ScrollProgress />
         <ScrollReveal />

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
@@ -70,14 +69,13 @@ export function Header() {
           <span />
           <span />
         </button>
-        <Link href="/" className="qf-brand" aria-label="QuickFurno home" onClick={() => setOpen(false)}>
-          <Image
-            src="/assets/quickfurno/logos/quickfurno-logo.svg"
-            alt="QuickFurno"
-            width={260}
-            height={70}
-            priority
-          />
+        {/* The same wordmark the homepage renders, reusing its own .qfp-logo
+            class rather than a copy, so the two can never drift apart. This
+            was an <Image> of quickfurno-logo.svg — an older mark with
+            different lettering and an icon — which meant a visitor moving from
+            the homepage to /vendors or a category page saw the brand change. */}
+        <Link href="/" className="qf-brand qfp-logo" aria-label="QuickFurno home" onClick={() => setOpen(false)}>
+          Quick<em>Furno</em>
         </Link>
 
         <nav className="qf-nav" aria-label="Primary navigation">

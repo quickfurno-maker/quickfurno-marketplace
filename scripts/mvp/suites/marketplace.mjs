@@ -890,7 +890,19 @@ export const suite = {
           'vendor conversion derives the trade list from canonical categories');
         assertTrue(src.includes('Client Matching'), 'Client Matching is the primary conversion proposition');
         assertFalse(/>\s*Leads?\s*</i.test(src), 'retired lead label is absent from vendor conversion UI');
-        assertFalse(/Mumbai/i.test(src), 'Mumbai cannot return to the Pune launch conversion page');
+        // Mumbai may be NAMED on the roadmap, never OFFERED. This banned the
+        // string outright, which also removed the approved "Made in Pune.
+        // Coming to your city next." journey section from this page — six
+        // tiles, five of them marked "Coming soon", none selectable. The rule
+        // that matters is that a professional cannot APPLY from a non-launch
+        // city, and vendorService still validates that on the server.
+        assertFalse(/<option[^>]*>\s*Mumbai/i.test(src), 'Mumbai is never a selectable option here');
+        assertFalse(/value\s*=\s*["']Mumbai["']/i.test(src), 'Mumbai is never a submitted value here');
+        assertFalse(/city\s*[:=]\s*["']Mumbai["']/i.test(src), 'no city field is set to Mumbai here');
+        if (/Mumbai/i.test(src)) {
+          assertTrue(/Coming soon/.test(src), 'a named non-launch city is marked Coming soon');
+          assertEqual((src.match(/live:\s*true/g) || []).length, 1, 'exactly one city is marked live');
+        }
         assertFalse(/Wardrobes?\s*&?\s*Storage/i.test(src), 'non-canonical wardrobe/storage category cannot return');
       },
     },

@@ -218,8 +218,17 @@ const ZONES = [
   },
 ];
 
+// Roadmap shown to a visiting professional, matching the homepage's journey
+// section. Nothing here is selectable: vendor registration validates against
+// normalizeLaunchCity() on the server, so an application outside Pune still
+// fails closed. See the note on CITIES in components/home/PuneLaunchHomepage.tsx.
 const CITIES = [
   { name: "Pune", image: "/assets/quickfurno/images/launch/cities/pune.jpg", live: true },
+  { name: "Delhi NCR", image: "/assets/quickfurno/images/launch/cities/delhi-ncr.jpg" },
+  { name: "Mumbai", image: "/assets/quickfurno/images/launch/cities/mumbai.jpg" },
+  { name: "Hyderabad", image: "/assets/quickfurno/images/launch/cities/hyderabad.jpg" },
+  { name: "Kolkata", image: "/assets/quickfurno/images/launch/cities/kolkata.jpg" },
+  { name: "Bengaluru", image: "/assets/quickfurno/images/launch/cities/bengaluru.jpg" },
 ];
 
 const FAQ = [
@@ -1071,9 +1080,9 @@ export default function VendorsPage() {
               <span className="qfv-kicker" style={{ color: "#FF8A5C" }}>
                 Our journey
               </span>
-              <h2 className="qfv-h2">Made in Pune. Focused on Pune.</h2>
+              <h2 className="qfv-h2">Made in Pune. Coming to your city next.</h2>
               <p>
-                QuickFurno is launching as a Pune-only marketplace so supply, matching and support can stay focused.
+                We are building QuickFurno where we live — then bringing verified home professionals to more of India.
               </p>
             </div>
             <div className="qfv-city-grid">
@@ -1083,10 +1092,14 @@ export default function VendorsPage() {
                     <Image src={city.image} alt={city.name} width={104} height={104} sizes="104px" />
                   </span>
                   <b>{city.name}</b>
-                  <span className="qfv-city-live">
-                    <i className="qfv-dot" style={{ width: 7, height: 7 }} />
-                    Live now
-                  </span>
+                  {city.live ? (
+                    <span className="qfv-city-live">
+                      <i className="qfv-dot" style={{ width: 7, height: 7 }} />
+                      Live now
+                    </span>
+                  ) : (
+                    <span className="qfv-city-soon">Coming soon</span>
+                  )}
                 </div>
               ))}
             </div>

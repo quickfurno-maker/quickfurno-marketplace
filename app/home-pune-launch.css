@@ -94,6 +94,11 @@
 }
 .qfp-logo em { font-style: normal; color: var(--qfd-orange-text); }
 .qfp-logo--light { color: #f7f1e6; }
+/* --qfd-orange-text is tuned for dark type on a PALE panel. On the footer's
+   near-black it measured 2.61:1 against a 3:1 requirement, so "Furno" was the
+   one unreadable word in the wordmark. The coral is the orange this codebase
+   already uses on dark surfaces, and it clears the bar comfortably. */
+.qfp-logo--light em { color: var(--qfp-coral); }
 
 /* ==========================================================================
    HEADER

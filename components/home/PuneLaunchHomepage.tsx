@@ -258,8 +258,22 @@ const VERIFY_POINTS = [
   { title: "Support channels", body: "Vendors can use WhatsApp and the dashboard support workspace when they need help." },
 ];
 
+// The approved mockup's journey section: Pune live, the rest on the roadmap.
+//
+// This was reduced to Pune alone during the Pune-only launch hardening, which
+// also added a CI rule banning the string "Mumbai" from every active surface.
+// The launch IS Pune-only and stays that way — nothing here is selectable, and
+// no lead or vendor can be created outside Pune. These names are a roadmap
+// shown to a visitor, which is a different thing from a city the product will
+// transact in, and the guard now draws that line instead of banning the word
+// outright. See scripts/mvp/launch/validate-pune-only-launch.mjs.
 const CITIES = [
   { name: "Pune", file: "pune", live: true },
+  { name: "Delhi NCR", file: "delhi-ncr", live: false },
+  { name: "Mumbai", file: "mumbai", live: false },
+  { name: "Hyderabad", file: "hyderabad", live: false },
+  { name: "Kolkata", file: "kolkata", live: false },
+  { name: "Bengaluru", file: "bengaluru", live: false },
 ];
 
 // Areas: the mockup shows 11 pills + "+ N more" on desktop, 7 + "+ N more" on
@@ -612,8 +626,8 @@ function MadeInPune() {
       <div className="qfp-shell">
         <div className="qfp-head-center" data-reveal>
           <span className="qfp-kicker qfp-kicker--coral">Our journey</span>
-          <h2 id="qfp-cities-title">Made in Pune. Focused on Pune.</h2>
-          <p className="qfp-cities-lead">QuickFurno is launching as a Pune-only marketplace so supply, matching and support can stay focused.</p>
+          <h2 id="qfp-cities-title">Made in Pune. Coming to your city next.</h2>
+          <p className="qfp-cities-lead">We are building QuickFurno where we live — then bringing verified home professionals to more of India.</p>
         </div>
         <ul className="qfp-city-grid" data-reveal-group>
           {CITIES.map((city) => (
@@ -622,11 +636,16 @@ function MadeInPune() {
                 <Image src={`${LAUNCH_IMG}/cities/${city.file}.jpg`} alt="" fill sizes="104px" />
               </span>
               <strong>{city.name}</strong>
-              <span className="qfp-city-status qfp-city-status--live"><i aria-hidden="true" />Live now</span>
+              {city.live ? (
+                <span className="qfp-city-status qfp-city-status--live"><i aria-hidden="true" />Live now</span>
+              ) : (
+                <span className="qfp-city-status">Coming soon</span>
+              )}
             </li>
           ))}
         </ul>
-        {/* Decorative skyline retained as artwork; the launch itself remains Pune-only. */}
+        {/* Decorative skyline: the India skyline belongs with a roadmap that
+            reaches beyond Pune, which is what this section shows again. */}
         <div className="qfp-cities-skyline" aria-hidden="true">
           <Image src={`${LAUNCH_IMG}/india-skyline.png`} alt="" width={2200} height={415} sizes="(max-width: 760px) 100vw, 1100px" />
         </div>

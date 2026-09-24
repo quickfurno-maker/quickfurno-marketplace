@@ -204,6 +204,55 @@ export async function getPublicVendorsForCategory(
 }
 
 /**
+ * Live public vendor count per category, for the homepage cards.
+ *
+ * Shares matchesPublicCategory and getVendorPublicVisibility with
+ * getPublicVendorsForCategory above ON PURPOSE, against a single fetch rather
+ * than one per category. If the two ever drifted apart, a card would advertise
+ * a number the category page does not actually list — worse than no number at
+ * all, and exactly the kind of thing nobody notices until a customer does.
+ *
+ * Returns null when the table is unreachable so callers can hide the count
+ * instead of rendering a confident zero.
+ */
+export async function getPublicVendorCountsByCategory(
+  categories: readonly QuickFurnoCategory[],
+  settings?: MarketplaceRuntimeSettings,
+): Promise<Map<QuickFurnoCategory, number> | null> {
+  try {
+    const runtimeSettings = settings ?? (await loadMarketplaceRuntimeSettings());
+
+    const { data, error } = await adminClient()
+      .from("vendors")
+      .select("*")
+      .ilike("city", LAUNCH_CITY)
+      .limit(500);
+
+    if (error || !Array.isArray(data)) {
+      console.warn("[public vendor counts] vendors table unavailable", { message: error?.message });
+      return null;
+    }
+
+    const visible = (data as VendorRow[]).filter(
+      (row) => getVendorPublicVisibility(row, runtimeSettings).isPubliclyVisible,
+    );
+
+    const counts = new Map<QuickFurnoCategory, number>();
+    for (const category of categories) {
+      counts.set(category, visible.filter((row) => matchesPublicCategory(row, category)).length);
+    }
+
+    console.info("[public vendor counts]", Object.fromEntries(counts));
+    return counts;
+  } catch (error) {
+    console.warn("[public vendor counts] unexpected error", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+    return null;
+  }
+}
+
+/**
  * Public vendor profile for `/vendors/[id]`. Resolved from Supabase ONLY.
  * Returns `null` whenever the vendor must not be shown, so the caller 404s:
  *   - Supabase row found + publicly visible → mapped safe Vendor.

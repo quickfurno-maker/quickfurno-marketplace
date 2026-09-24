@@ -5,6 +5,7 @@ import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { categories, categorySlug, type QuickFurnoCategory } from "@/lib/quickfurno-data";
 import { HOME_FAQ, PUNE_AREAS, TESTIMONIALS } from "@/lib/homepage-content";
 import { categoryImage, heroImage, resolveHomepageImage } from "@/lib/homepage-images";
+import { getPublicVendorCountsByCategory } from "@/services/publicVendorService";
 import { CONTACT, whatsappLink } from "@/lib/config";
 
 // ============================================================================
@@ -497,10 +498,27 @@ function Hero() {
 // leads the grid. Photo runs the full pane, copy sits on it over a scrim, and
 // the sub-category bar below is the part that does real work: it answers
 // "what is actually in here?" before anyone has to click.
-function ServiceCard({ name }: { name: QuickFurnoCategory }) {
+// Five of the eight categories have no publicly visible vendor yet. A card
+// reading "0 pros" advertises an empty marketplace on the busiest page of the
+// site, so zero renders as the state instead of the number. Set this to false
+// to print a literal "0 pros".
+const SOFTEN_ZERO_COUNT = true;
+
+/** null = count unavailable (hide the pill entirely). */
+function countLabel(count: number | null): string | null {
+  if (count === null) return null;
+  // Short on purpose: "Accepting enquiries" was wide enough to wrap under the
+  // longer badges and not the shorter ones, so the top row came out uneven
+  // across a grid row.
+  if (count === 0) return SOFTEN_ZERO_COUNT ? "Enquiries open" : "0 pros";
+  return `${count} ${count === 1 ? "pro" : "pros"}`;
+}
+
+function ServiceCard({ name, count }: { name: QuickFurnoCategory; count: number | null }) {
   const meta = SERVICE_META[name];
   const slug = categorySlug(name);
   const image = categoryImage(slug, FALLBACK_CATEGORY_IMAGE(slug));
+  const label = countLabel(count);
   return (
     <Link href={`/category/${slug}`} className="qfp-card">
       <span className="qfp-card-face">
@@ -514,9 +532,12 @@ function ServiceCard({ name }: { name: QuickFurnoCategory }) {
           />
         </span>
         <span className="qfp-card-scrim" aria-hidden="true" />
-        <span className="qfp-card-badge">
-          <Glyph name={meta.badgeIcon} size={15} />
-          {meta.badge}
+        <span className="qfp-card-top">
+          <span className="qfp-card-badge">
+            <Glyph name={meta.badgeIcon} size={14} />
+            {meta.badge}
+          </span>
+          {label ? <span className="qfp-card-count">{label}</span> : null}
         </span>
         <span className="qfp-card-copy">
           <span className="qfp-card-title">{name}</span>
@@ -535,7 +556,7 @@ function ServiceCard({ name }: { name: QuickFurnoCategory }) {
       <span className="qfp-card-subs">
         {meta.subs.map((sub) => (
           <span className="qfp-card-sub" key={sub.label}>
-            <Glyph name={sub.icon} size={19} />
+            <Glyph name={sub.icon} size={17} />
             <span>{sub.label}</span>
           </span>
         ))}
@@ -651,7 +672,11 @@ function ServicesHeading() {
   );
 }
 
-function Services() {
+async function Services() {
+  const ordered = [FEATURED, ...OTHER_SERVICES];
+  // One fetch for all eight. Null means the table was unreachable, in which
+  // case every card hides its count rather than claiming zero.
+  const counts = await getPublicVendorCountsByCategory(ordered.map((c) => c.name));
   return (
     <section className="qfp-section qfp-services" id="services">
       <span id="categories" aria-hidden="true" />
@@ -660,8 +685,12 @@ function Services() {
         {/* Eight equal cards, 4x2. FEATURED now means "leads the grid", not
             "is twice the size" - the board treats every category the same. */}
         <div className="qfp-service-grid" data-reveal-group>
-          {[FEATURED, ...OTHER_SERVICES].map((category) => (
-            <ServiceCard key={category.name} name={category.name} />
+          {ordered.map((category) => (
+            <ServiceCard
+              key={category.name}
+              name={category.name}
+              count={counts ? counts.get(category.name) ?? 0 : null}
+            />
           ))}
         </div>
         {/* Eight categories fill 4x2 exactly, so the "not sure" CTA no longer

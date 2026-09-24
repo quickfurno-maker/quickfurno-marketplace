@@ -9,6 +9,7 @@ Use `.webp` or `.jpg`. Landscape, well-lit, photos only when QuickFurno has docu
 | File                                   | Where it appears                  | Ideal size        |
 | -------------------------------------- | --------------------------------- | ----------------- |
 | `hero.jpg`                             | Big hero image, top of homepage   | 1200×760, < 250KB |
+| `trust.jpg`                            | Trust & safety panel ("PUNE LAUNCH") | 1200×900, < 180KB |
 | `categories/interior-designers.jpg`    | Interior Designers service card   | 400×300, < 60KB   |
 | `categories/carpenters.jpg`            | Carpenters service card           | 400×300, < 60KB   |
 | `categories/modular-factory.jpg`       | Modular Factory service card      | 400×300, < 60KB   |

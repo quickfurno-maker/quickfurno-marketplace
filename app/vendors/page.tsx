@@ -434,14 +434,12 @@ export default function VendorsPage() {
                 Now onboarding pros across Pune
               </span>
               <h1>
-                One enquiry.
+                Get <span>verified</span>.
                 <br />
-                Up to <span>3 pros.</span>
-                <br />
-                No crowd.
+                Get matched nearby.
               </h1>
               <div className="qfv-slots">
-                <span className="qfv-slots-label">ACTIVE ASSIGNMENT CAP</span>
+                <span className="qfv-slots-label">AT ANY ONE TIME</span>
                 <div className="qfv-slots-row">
                   <span className="qfv-slot">
                     <Icon name="check" size={13} color="#5EBE8B" width={3} />
@@ -455,19 +453,9 @@ export default function VendorsPage() {
                 </div>
               </div>
               <p className="qfv-hero-body">
-                Eligible enquiries can be assigned to up to 3 active pros at a time. Category fit comes first;
-                geography and other approved ranking signals help order the eligible pool.
+                Eligible enquiries go to at most 3 active pros at a time — your trade first, then distance and a few
+                other approved signals.
               </p>
-              <div>
-                <span className="qfv-trade-label">WHAT’S YOUR TRADE?</span>
-                <div className="qfv-trades">
-                  {TRADES.map((trade) => (
-                    <Link key={trade} className="qfv-trade" href={tradeHref(trade)}>
-                      {trade}
-                    </Link>
-                  ))}
-                </div>
-              </div>
               <div className="qfv-hero-cta">
                 <Link className="qfv-btn qfv-btn--primary" href={SIGNUP_HREF}>
                   Apply free <Arrow />
@@ -476,10 +464,18 @@ export default function VendorsPage() {
                   Vendor login
                 </Link>
                 <span className="qfv-note qfv-note--light">
-                  Free to apply, 6 short steps
-                  <br />
-                  Matching requires approval, eligibility and available credits
+                  Free to apply, 6 short steps · Matching requires approval, eligibility and available credits
                 </span>
+              </div>
+              <div className="qfv-trade-pick">
+                <span className="qfv-trade-label">WHAT’S YOUR TRADE?</span>
+                <div className="qfv-trades">
+                  {TRADES.map((trade) => (
+                    <Link key={trade} className="qfv-trade" href={tradeHref(trade)}>
+                      {trade}
+                    </Link>
+                  ))}
+                </div>
               </div>
               <EnquiryModalTrigger
                 className="qfv-hero-switch"

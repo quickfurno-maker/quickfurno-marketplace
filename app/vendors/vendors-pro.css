@@ -622,8 +622,18 @@
   right: 0;
   bottom: 0;
   height: 170px;
-  -webkit-mask-image: url("/assets/quickfurno/images/vendors/skyline-mask.png");
-  mask-image: url("/assets/quickfurno/images/vendors/skyline-mask.png");
+  /* A CSS mask uses ONLY the alpha channel, so every RGB byte in the source
+     was decoded and thrown away. This was a 161 KB PNG - the single heaviest
+     asset on the page, and on a phone it was 90% of all image bytes against a
+     hero that costs 18 KB. A CSS url() never passes through next/image, so
+     nothing was optimizing it.
+
+     WebP at the same 1600x302 carries a bit-identical alpha channel for 91 KB.
+     The phone override below cuts it further: this band is 170px tall and at
+     most ~430px wide there, so 1600px was about four times what the device
+     can resolve. */
+  -webkit-mask-image: url("/assets/quickfurno/images/vendors/skyline-mask.webp");
+  mask-image: url("/assets/quickfurno/images/vendors/skyline-mask.webp");
   -webkit-mask-size: cover;
   mask-size: cover;
   -webkit-mask-position: 62% bottom;
@@ -1049,11 +1059,14 @@
 
 @media (max-width: 979px) {
   .qfv-hero-tag { position: static; align-self: flex-start; margin-bottom: 4px; }
-  .qfv-hero-inner { padding-top: 260px; }
-  .qfv-hero-photo-wrap { height: 340px; }
+  /* The photo gives up 70px so the hero's own Apply button clears the 74px
+     sticky bar. Copy still starts 68px before the photo ends, so the veil
+     hand-off is unchanged. */
+  .qfv-hero-inner { padding-top: 202px; }
+  .qfv-hero-photo-wrap { height: 270px; }
   .qfv-hero-photo { object-position: 66% center; }
   .qfv-hero-veil {
-    background: linear-gradient(180deg, rgba(22, 19, 15, 0.14) 0px, rgba(22, 19, 15, 0.02) 140px, rgba(22, 19, 15, 0.58) 262px, #16130f 340px);
+    background: linear-gradient(180deg, rgba(22, 19, 15, 0.14) 0px, rgba(22, 19, 15, 0.02) 110px, rgba(22, 19, 15, 0.58) 207px, #16130f 270px);
   }
   .qfv-support-visual { flex-direction: column; align-items: center; gap: 18px; }
   .qfv-support-person { display: none; }
@@ -1070,5 +1083,57 @@
   .qfv-dash-vendor { margin-top: 12px; }
   .qfv-dash-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .qfv-final-card { padding: 28px 22px; }
-  .qfv-phone { width: 260px; }
+  /* Was 260px, which silently undid the 390px set on .qfv-phone above and
+     kept the mockup looking like a toy on the device it is meant to mimic. */
+  .qfv-phone { width: min(330px, 100%); }
+}
+
+/* ---- Hero density on phones -------------------------------------------
+   The hero stacked 7 blocks and pushed "Apply free" - the only conversion
+   control on a vendor acquisition page - below the fold. The trade picker
+   was the worst offender at 211px, so it now scrolls sideways on one line
+   and sits after the CTA rather than in front of it. */
+@media (max-width: 760px) {
+  .qfv-hero-copy { gap: 14px; }
+  .qfv-trades {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+    /* Bleed to the screen edge so a half-cut chip signals "there is more". */
+    margin-right: calc(var(--qfv-gutter, 20px) * -1);
+    padding-right: var(--qfv-gutter, 20px);
+  }
+  .qfv-trades::-webkit-scrollbar { display: none; }
+  .qfv-trade { flex: 0 0 auto; }
+}
+
+/* ---- Short phones (iPhone SE and friends) ------------------------------
+   Keyed to viewport HEIGHT, because height is the actual constraint - a 375px
+   wide screen is fine, a 667px tall one is not. Measured: "Apply free" landed
+   120px below the fold here even after the changes above. */
+@media (max-width: 979px) and (max-height: 740px) {
+  .qfv-hero-photo-wrap { height: 220px; }
+  .qfv-hero-inner { padding-top: 156px; }
+  .qfv-hero-veil {
+    background: linear-gradient(180deg, rgba(22, 19, 15, 0.14) 0px, rgba(22, 19, 15, 0.02) 90px, rgba(22, 19, 15, 0.58) 169px, #16130f 220px);
+  }
+  /* The only block that can go without losing information: the sentence
+     directly beneath it already says "at most 3 active pros at a time" in
+     words, and the How-matching-works section says it again. */
+  .qfv-slots { display: none; }
+  .qfv-hero-copy { gap: 12px; }
+}
+
+/* Phones get a mask sized for the screen they have: 35 KB instead of 161 KB,
+   a 126 KB saving on every mobile visit to this page. The silhouette is
+   decorative and painted at 24% opacity, where the resampling difference
+   measures under 3/255 of actual paint. */
+@media (max-width: 760px) {
+  .qfv-skyline,
+  .qfv-skyline--back {
+    -webkit-mask-image: url("/assets/quickfurno/images/vendors/skyline-mask-sm.webp");
+    mask-image: url("/assets/quickfurno/images/vendors/skyline-mask-sm.webp");
+  }
 }

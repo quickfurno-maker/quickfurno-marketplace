@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { categories, categorySlug, type QuickFurnoCategory } from "@/lib/quickfurno-data";
 import { HOME_FAQ, PUNE_AREAS, TESTIMONIALS } from "@/lib/homepage-content";
-import { categoryImage, heroImage } from "@/lib/homepage-images";
+import { categoryImage, heroImage, resolveHomepageImage } from "@/lib/homepage-images";
 import { CONTACT, whatsappLink } from "@/lib/config";
 
 // ============================================================================
@@ -355,8 +355,10 @@ function Hero() {
       <div className="qfp-shell qfp-hero-inner">
         <div className="qfp-hero-copy">
           <h1 id="qfp-hero-title">
-            Pune home professionals.<br />{" "}
-            <span>One enquiry away.</span>
+            One enquiry.<br />{" "}
+            {/* nbsp keeps "Pune pros." together: at 1440 the line broke after
+                "Pune" and left "pros." orphaned on a line of its own. */}
+            <span>Up to 3 verified Pune&nbsp;pros.</span>
           </h1>
           <div className="qfp-hero-badges" aria-label="Why QuickFurno">
             <span className="qfp-hero-badge">
@@ -665,6 +667,10 @@ function initials(name: string) {
 
 function TrustAndSafety() {
   const testimonial = TESTIMONIALS[0];
+  // Was a hard-coded path to the illustrated placeholder, so unlike every
+  // other image on this page it could not be swapped by dropping a file into
+  // real/. It now uses the same slot mechanism: real/trust.(webp|jpg|…).
+  const trust = resolveHomepageImage("trust", "/assets/quickfurno/images/vendors/premium-living-room.svg");
   return (
     <section className="qfp-section qfp-trust" id="why-quickfurno">
       <div className="qfp-shell qfp-trust-grid">
@@ -688,7 +694,7 @@ function TrustAndSafety() {
         </div>
         <div className="qfp-trust-visual" data-reveal>
           <div className="qfp-trust-photo">
-            <Image src="/assets/quickfurno/images/vendors/premium-living-room.svg" alt="" fill sizes="(max-width: 760px) 100vw, 564px" />
+            <Image src={trust.src} alt="" fill sizes="(max-width: 760px) 100vw, 564px" />
             <span className="qfp-trust-pill-label">PUNE LAUNCH</span>
           </div>
           {testimonial ? (

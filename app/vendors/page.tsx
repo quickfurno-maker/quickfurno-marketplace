@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
+import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { Icon } from "@/components/qf-icon";
+import { categories, categorySlug } from "@/lib/quickfurno-data";
 import "./vendors-pro.css";
 import "./vendors-v2.css";
 import {
@@ -9,7 +13,6 @@ import {
   CategoriesV2,
   DashboardV2,
   FaqV2,
-  FooterV2,
   HeroV2,
   MatchingV2,
   PromiseV2,
@@ -18,6 +21,16 @@ import {
   WhyV2,
 } from "./vendors-v2";
 import { FAQ_ITEMS } from "./vendors-content";
+
+// The portal tabs this page sends professionals to. Both CTAs exist: the old
+// page had signup only, and a returning vendor had nowhere to go.
+const SIGNUP_HREF = "/vendor?mode=signup";
+const LOGIN_HREF = "/vendor?mode=login";
+
+// Trades come from the canonical registry, never a local copy, so a category
+// added there is offered here too.
+const TRADES = categories.map((category) => category.name);
+const TRADE_SLUGS = TRADES.map((trade) => categorySlug(trade));
 
 // ============================================================================
 // QuickFurno — For professionals (/vendors)
@@ -70,6 +83,19 @@ export default function VendorsPage() {
       "@type": "Question",
       name: q,
       acceptedAnswer: { "@type": "Answer", text: a },
+    })),
+  };
+
+  // The trades a professional can apply under, from the canonical registry.
+  const tradesJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "QuickFurno categories in Pune",
+    itemListElement: TRADES.map((trade, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: trade,
+      url: `https://quickfurno.in/category/${TRADE_SLUGS[i]}`,
     })),
   };
 
@@ -130,9 +156,21 @@ export default function VendorsPage() {
 
         <FaqV2 />
         <ApplyV2 />
+
+        {/* Phones only. The page is long and the apply CTA would otherwise sit
+            far below the fold for the whole scroll. */}
+        <div className="qfv-sticky">
+          <Link className="qfv-btn qfv-btn--primary" href={SIGNUP_HREF}>
+            Apply free <Icon name="arrow" sw={2.1} />
+          </Link>
+          <Link className="qfv-btn qfv-btn--ghost" href={LOGIN_HREF}>
+            Log in
+          </Link>
+        </div>
       </main>
-      <FooterV2 />
+      <Footer />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(tradesJsonLd) }} />
     </>
   );
 }

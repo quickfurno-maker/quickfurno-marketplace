@@ -8,11 +8,11 @@
 // =============================================================================
 
 import { Fragment, type CSSProperties, type ReactNode } from "react";
-import { GLYPHS } from "./vendors-glyphs";
+import { Icon } from "@/components/qf-icon";
+import { categories, categorySlug } from "@/lib/quickfurno-data";
 import {
   BADGE,
   CAT_ALL,
-  CAT_CARDS,
   CAT_EYE,
   CAT_SUB,
   DASH_EYE,
@@ -81,12 +81,6 @@ import {
   FAQ_PILLS,
   FAQ_SCRIPT,
   FAQ_SUB,
-  FOOT_BLURB,
-  FOOT_COLS,
-  FOOT_CTAS,
-  FOOT_LEGAL,
-  FOOT_SCRIPT,
-  FOOT_TRUST,
   SWITCH_B,
   SWITCH_BTN,
   SWITCH_T,
@@ -104,35 +98,27 @@ import {
 
 const IMG = "/assets/quickfurno/images/vendors/v2";
 
-// ------------------------------------------------------------------ atoms ---
+// The eight live categories, straight from the canonical registry — add one
+// there and it appears here. Only the artwork filename is local, because the
+// boards ship one illustration per category.
+const CAT_ART: Record<string, string> = {
+  "interior-designers": "cat-interior-designers",
+  carpenters: "cat-carpenters-ply-machine",
+  "modular-factory": "cat-modular-factory",
+  "premium-interiors": "cat-premium-interiors",
+  sofa: "cat-sofa",
+  painter: "cat-painter",
+  "civil-work": "cat-civil-work",
+  "false-ceiling": "cat-false-ceiling",
+};
 
-export function Icon({
-  name,
-  className = "qv-ico",
-  sw = 1.9,
-  fill = "none",
-}: {
-  name: string;
-  className?: string;
-  sw?: number;
-  fill?: string;
-}) {
-  const d = GLYPHS[name];
-  if (!d) return null;
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill={fill}
-      stroke="currentColor"
-      strokeWidth={sw}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      dangerouslySetInnerHTML={{ __html: d }}
-    />
-  );
-}
+const CAT_CARDS = categories.map((category) => {
+  const slug = categorySlug(category.name);
+  const [l1, ...rest] = category.name.split(" ");
+  return { slug, l1, l2: rest.join(" "), file: CAT_ART[slug] ?? "cat-interior-designers" };
+});
+
+// ------------------------------------------------------------------ atoms ---
 
 export function Eyebrow({ children }: { children: ReactNode }) {
   return (
@@ -403,10 +389,14 @@ export function MatchingV2() {
         </div>
 
         <div className="qv-split-vis">
-          <div className="qv-visual">
+          <div
+            className="qv-visual"
+            role="img"
+            aria-label="Illustrative Client Matching product preview. Not live demand data."
+          >
             <img
               src={`${IMG}/match-composite.webp`}
-              alt="A QuickFurno project request on a phone beside a map of the matching area"
+              alt=""
               loading="lazy"
               decoding="async"
             />
@@ -1078,122 +1068,5 @@ export function ApplyV2() {
         </div>
       </div>
     </section>
-  );
-}
-
-// -------------------------------------------------------------- 12. footer ---
-
-const SOCIALS: readonly (readonly [string, string])[] = [
-  ["Instagram", "people"],
-  ["Facebook", "chat"],
-  ["YouTube", "arrow"],
-  ["LinkedIn", "doc"],
-  ["WhatsApp", "chat"],
-];
-
-function FootGroup({ title, links }: { title: string; links: readonly (readonly [string, string])[] }) {
-  const slug = title.toLowerCase().replace(/[^a-z]/g, "");
-  return (
-    <div className={`qv-foot-group qv-foot-g-${slug}`}>
-      <span className="qv-foot-group-t">{title.toUpperCase()}</span>
-      <div className={title === "Categories" ? "qv-foot-cols2" : undefined}>
-        {links.map(([t, h]) => (
-          <a href={h} key={t}>
-            {t}
-            <Icon name="chev" className="qv-ico qv-foot-chev" sw={2.2} />
-          </a>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-export function FooterV2() {
-  const groups = Object.fromEntries(FOOT_COLS.map(([t, l]) => [t, l]));
-  return (
-    <footer className="qv qv-sec qv-foot">
-      <div className="qv-shell">
-        <div className="qv-foot-ctas">
-          {FOOT_CTAS.map(([icon, eye, h1, h2, h3, body, btn, href, prim]) => (
-            <div className="qv-foot-cta" key={eye}>
-              <span
-                className="qv-foot-cta-ico"
-                style={{ backgroundColor: prim ? "#E0611E" : "rgba(224, 97, 30, 0.85)" }}
-              >
-                <Icon name={icon} sw={2} />
-              </span>
-              <div className="qv-foot-cta-body">
-                <span className="qv-foot-cta-eye">{eye}</span>
-                <h3>
-                  {h1}
-                  <span className="qv-hl">{h2}</span>
-                  {h3}
-                </h3>
-                <p>{body}</p>
-                <a
-                  className="qv-foot-cta-btn"
-                  href={href}
-                  style={{
-                    backgroundColor: prim ? "#E0611E" : "#FFFFFF",
-                    color: prim ? "#FFFFFF" : "#14110D",
-                  }}
-                >
-                  {btn}
-                  <Icon name="arrow" sw={2.1} />
-                </a>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="qv-foot-main">
-          <div className="qv-foot-brand">
-            <span className="qv-foot-brand-name">
-              Quick<span className="qv-hl">Furno</span>
-            </span>
-            <p className="qv-foot-blurb">{FOOT_BLURB}</p>
-            <div className="qv-foot-social">
-              {SOCIALS.map(([name, icon]) => (
-                <a href="/" aria-label={name} key={name}>
-                  <Icon name={icon} />
-                </a>
-              ))}
-            </div>
-            <div className="qv-foot-trust">
-              {FOOT_TRUST.map(([icon, a, b]) => (
-                <div className="qv-foot-trust-col" key={a}>
-                  <Icon name={icon} sw={2} />
-                  <span>
-                    {a}
-                    <br />
-                    {b}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="qv-foot-links">
-            <FootGroup title="Categories" links={groups["Categories"]} />
-            <div className="qv-foot-rest">
-              <FootGroup title="Company" links={groups["Company"]} />
-              <FootGroup title="For Vendors" links={groups["For Vendors"]} />
-              <FootGroup title="Support" links={groups["Support"]} />
-              <FootGroup title="Cities" links={groups["Cities"]} />
-            </div>
-          </div>
-        </div>
-
-        <div className="qv-foot-sky">
-          <span className="qv-script">{FOOT_SCRIPT}</span>
-          <img src={`${IMG}/foot-skyline.webp`} alt="The Pune skyline" loading="lazy" decoding="async" />
-        </div>
-
-        <div className="qv-foot-legal">
-          <span>{FOOT_LEGAL[0]}</span>
-          <span>{FOOT_LEGAL[1]}</span>
-        </div>
-      </div>
-    </footer>
   );
 }

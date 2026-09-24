@@ -36,6 +36,10 @@ import "./qf-tokens.css";
 // Shared primitives built on those tokens: buttons, chips, fields, cards,
 // pills, gradient sections. qfd-* scoped; nothing here styles a bare element.
 import "./qf-primitives.css";
+// The public token layer for the canvas-built surfaces, and the site footer
+// that now uses it. Loaded here because <Footer /> renders on every page.
+import "./qv-tokens.css";
+import "./footer-v2.css";
 
 // Type system: Poppins (geometric sans) for the logo, headlines, body and UI;
 // Playfair Display italic only for the gold accent words.

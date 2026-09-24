@@ -22,6 +22,17 @@ import { assert, assertEqual, assertTrue, assertFalse } from '../lib/harness.mjs
 import { categoryArtwork, categoriesWithArtwork } from '../../../components/public-listing/categoryArtwork.ts';
 import { existsSync, readFileSync } from 'node:fs';
 
+// The /vendors page was split across three files when it was rebuilt from the
+// approved boards: page.tsx (shell, metadata, structured data), vendors-v2.tsx
+// (the section markup) and vendors-content.ts (the approved copy). These
+// assertions are about the guarantees the PAGE makes, not about which file
+// holds a given string, so they read the set.
+const VENDOR_PAGE_FILES = ['app/vendors/page.tsx', 'app/vendors/vendors-v2.tsx',
+                           'app/vendors/vendors-content.ts'];
+function readVendorPage() {
+  return VENDOR_PAGE_FILES.map((f) => readFileSync(f, 'utf8')).join('\n');
+}
+
 import {
   formatServiceLabels,
   BUDGET_MIN_PLACEHOLDER,
@@ -824,12 +835,12 @@ export const suite = {
     {
       name: 'vendor acquisition CTAs route to the real portal tabs',
       run: () => {
-        const src = readFileSync('app/vendors/page.tsx', 'utf8');
-        assertTrue(src.includes('const SIGNUP_HREF = "/vendor?mode=signup"'), 'signup target');
-        assertTrue(src.includes('const LOGIN_HREF = "/vendor?mode=login"'), 'login target');
+        const src = readVendorPage();
+        assertTrue(src.includes('"/vendor?mode=signup"'), 'signup target');
+        assertTrue(src.includes('"/vendor?mode=login"'), 'login target');
         // Both a signup AND a login CTA must exist (the old page had no login CTA).
-        assertTrue((src.match(/SIGNUP_HREF/g) || []).length >= 2, 'signup CTA used');
-        assertTrue((src.match(/LOGIN_HREF/g) || []).length >= 2, 'login CTA used');
+        assertTrue((src.match(/vendor\?mode=signup/g) || []).length >= 2, 'signup CTA used');
+        assertTrue((src.match(/vendor\?mode=login/g) || []).length >= 2, 'login CTA used');
         // No second auth surface on this page.
         assertFalse(/VendorRegisterForm|LoginForm|<form/.test(src), 'no duplicate auth form');
         // The portal itself still honours both modes.
@@ -843,7 +854,7 @@ export const suite = {
       run: () => {
         // Assert on shipped JSX only — the file's header comment deliberately
         // records what was removed.
-        const src = readFileSync('app/vendors/page.tsx', 'utf8')
+        const src = readVendorPage()
           .replace(/\/\*[\s\S]*?\*\//g, '')
           .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
           .replace(/\/\/.*$/gm, '');
@@ -881,7 +892,7 @@ export const suite = {
     {
       name: 'vendor conversion page is Client Matching-first and canonical-category driven',
       run: () => {
-        const src = readFileSync('app/vendors/page.tsx', 'utf8')
+        const src = readVendorPage()
           .replace(/\/\*[\s\S]*?\*\//g, '')
           .replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
         assertTrue(src.includes('categories, categorySlug'),
@@ -909,12 +920,12 @@ export const suite = {
     {
       name: 'vendor page preview is labelled illustrative and the journey states eligibility',
       run: () => {
-        const src = readFileSync('app/vendors/page.tsx', 'utf8');
+        const src = readVendorPage();
         // Product/example previews must announce themselves as illustrative, never live demand.
         assertTrue(src.includes('ILLUSTRATIVE EXAMPLE'), 'visible illustrative product label');
         assertTrue(src.includes('Illustrative Client Matching product preview. Not live demand data.'),
           'accessible name says illustrative and not live demand');
-        assertTrue(src.includes('EXAMPLE QUALITY CHECK'), 'example quality card is labelled');
+        assertTrue(/example quality check/i.test(src), 'example quality card is labelled');
         // The journey must not imply matching starts immediately after signup.
         assertTrue(/Approval does not by itself activate Client Matching/i.test(src),
           'states approval is not sufficient for matching');
@@ -1653,12 +1664,12 @@ export const suite = {
         // MEASURED DEFECT: the shared footer used h3, so on pages whose main
         // content has no visible h2 (/enquiry) the outline jumped h1 -> h3.
         const footer = readFileSync('components/Footer.tsx', 'utf8');
-        assertTrue(footer.includes('<h2 className="qf-foot-acc-head">'), 'footer groups are h2');
-        assertFalse(/<h3 className="qf-foot-acc-head"/.test(footer), 'no h3 regression');
+        assertTrue(footer.includes('<h2 className="qv-foot-group-t">'), 'footer groups are h2');
+        assertFalse(/<h3[^>]*qv-foot-group-t/.test(footer), 'no h3 regression');
         // The level change must stay purely semantic: styling lives on the
         // inner button, so no stylesheet may start targeting the heading tag.
-        const css = readFileSync('app/qf-public-v2.css', 'utf8');
-        assertFalse(/\.qf-foot-acc-head\s+h3|\.qf-foot\s+h3\b/.test(css), 'no tag-based footer heading style');
+        const css = readFileSync('app/footer-v2.css', 'utf8');
+        assertFalse(/\.qv-foot-group-t\s+h3|\.qv-foot\s+h[23]\b/.test(css), 'no tag-based footer heading style');
       },
     },
     {

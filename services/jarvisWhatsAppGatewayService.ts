@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { adminClient } from "../lib/supabase";
 import { deriveJarvisNormalizedText } from "../lib/communication/providers/metaWhatsAppInbound";
 import { signalConversationalWhatsAppPresence } from "./conversationalWhatsAppService";
+import { resolveJarvisSigningPrivateKey } from "../lib/jarvis/signingPrivateKeySource";
 import {
   QFJ_WHATSAPP_TURN_KEY_ID_HEADER,
   QFJ_WHATSAPP_TURN_PATH,
@@ -19,7 +20,7 @@ function gatewayConfig(env: NodeJS.ProcessEnv = process.env) {
   if (env.QF_JARVIS_WHATSAPP_ENABLED?.trim().toLowerCase() !== "true") return null;
   const baseUrl = env.QF_JARVIS_BASE_URL?.trim();
   const keyId = env.QF_JARVIS_SIGNING_KEY_ID?.trim();
-  const privateKeyPem = env.QF_JARVIS_SIGNING_PRIVATE_KEY_PEM?.replace(/\\n/g, "\n").trim();
+  const privateKeyPem = resolveJarvisSigningPrivateKey(env);
   if (!baseUrl || !keyId || !privateKeyPem) return null;
   try {
     const url = new URL(baseUrl);

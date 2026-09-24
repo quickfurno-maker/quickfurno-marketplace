@@ -798,7 +798,7 @@ export async function releaseHumanConversationToAi(input: {
   readonly expectedRevision: number;
   readonly operatorUserId: string;
 }): Promise<ConversationalResult<{ actor: AiConversationActor; revision: number }>> {
-  if (!HUMAN_OPERATION_ID.test(input.operatorUserId)) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,239}$/.test(input.operatorUserId)) {
     return { ok: false, reason: "conversation_not_sendable" };
   }
   const { data: conversation, error } = await adminClient()

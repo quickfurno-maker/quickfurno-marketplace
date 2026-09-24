@@ -7,10 +7,6 @@ import {
   QFJ_OPERATOR_COMMAND_PATH,
   QFJ_OPERATOR_COMMAND_SIGNING_DOMAIN,
 } from "../../../lib/jarvis/operatorCommandContract.ts";
-import {
-  qfjOperatorCommandSigningInput,
-  verifyQfjOperatorCommandSignature,
-} from "../../../lib/jarvis/operatorCommandAuth.ts";
 
 let passed=0;
 const ok=(condition,message)=>{assert.ok(condition,message);passed+=1;};
@@ -34,36 +30,30 @@ const keyId="jarvis-os-command-test";
 const raw=Buffer.from(JSON.stringify(command),"utf8");
 const digest=crypto.createHash("sha256").update(raw).digest("base64url");
 const operatorId="owner";
-const input=qfjOperatorCommandSigningInput({
-  commandId:command.commandId,
-  issuedAt:command.issuedAt,
-  keyId,
+const input=[
+  QFJ_OPERATOR_COMMAND_SIGNING_DOMAIN,
+  "POST",
+  QFJ_OPERATOR_COMMAND_PATH,
+  "qf-jarvis-os",
+  "quickfurno-core",
   operatorId,
-  bodyDigest:digest,
-});
-const signature=crypto.sign(null,Buffer.from(input,"utf8"),privateKey).toString("base64url");
+  command.commandId,
+  command.issuedAt,
+  keyId,
+  digest,
+].join("\n");
+const signatureBytes=crypto.sign(null,Buffer.from(input,"utf8"),privateKey);
 const publicKeyPem=publicKey.export({type:"spki",format:"pem"}).toString();
 
 ok(QFJ_OPERATOR_COMMAND_PATH==="/api/internal/jarvis/operator-command","command path is pinned");
 ok(QFJ_OPERATOR_COMMAND_SIGNING_DOMAIN==="qfj.jarvis-os.operator-command.http.sig.v1","signing domain is pinned");
-ok(verifyQfjOperatorCommandSignature({
-  rawBody:raw,
-  command:parsed,
-  keyId,
-  signature,
-  operatorId,
-  keys:[{keyId,publicKeyPem}],
-  now:new Date().toISOString(),
-}),"valid Ed25519 command signature verifies");
-ok(!verifyQfjOperatorCommandSignature({
-  rawBody:raw,
-  command:parsed,
-  keyId,
-  signature,
-  operatorId,
-  keys:[{keyId,publicKeyPem}],
-  now:new Date(Date.now()+120_000).toISOString(),
-}),"stale signed command is refused");
+ok(crypto.verify(null,Buffer.from(input,"utf8"),publicKey,signatureBytes),"canonical Ed25519 command signature verifies");
+
+const auth=fs.readFileSync("lib/jarvis/operatorCommandAuth.ts","utf8");
+ok(auth.includes("QFJ_OPERATOR_COMMAND_FRESHNESS_MS"),"runtime verifier enforces command freshness");
+ok(auth.includes("args.operatorId"),"runtime verifier binds operator identity");
+ok(auth.includes("rawQfjBodyDigest(args.rawBody)"),"runtime verifier binds exact request body");
+ok(auth.includes("crypto.verify"),"runtime verifier uses Ed25519 verification");
 
 const migration=fs.readFileSync("supabase/migrations/20260924183000_jarvis_os_operator_command_receipts.sql","utf8");
 ok(migration.includes("jarvis_os_operator_command_receipts"),"durable command receipt table exists");

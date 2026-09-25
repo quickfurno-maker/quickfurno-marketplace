@@ -218,12 +218,18 @@
 
 /* the way to reach a human, carried over from the homepage footer */
 .qv-foot-contact { margin-top: 14px; list-style: none; padding: 0; }
-.qv-foot-contact li + li { margin-top: 8px; }
+.qv-foot-contact li + li { margin-top: 4px; }
+/* These two are real links — the WhatsApp number and the support address —
+   and they were 17px tall, under the 24px minimum a touch target needs. The
+   padding buys the height without moving the text, so the spacing between the
+   rows above absorbs it. */
 .qv-foot-contact a,
 .qv-foot-contact span {
   display: inline-flex;
   align-items: center;
   gap: 9px;
+  min-height: 28px;
+  padding: 4px 0;
   font-size: 12.5px;
   line-height: 1.35;
   color: #CFC6B8;

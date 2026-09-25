@@ -409,10 +409,13 @@ function Hero() {
             <i aria-hidden="true" />
             Trusted home professionals in Pune
           </span>
+          {/* The {" "} are load-bearing: JSX drops the whitespace before a
+              <br/> on its own line, and the phone rules hide those breaks, so
+              without them the headline reads "righthome professional." */}
           <h1 id="qfp-hero-title">
-            Find the right
+            Find the right{" "}
             <br />
-            <span>home&nbsp;professional.</span>
+            <span>home&nbsp;professional.</span>{" "}
             <br />
             <span>Faster.</span>
           </h1>
@@ -737,24 +740,28 @@ async function Services() {
 // nothing. Copy is the approved wording — up to 3 pros, no fee, no obligation
 // — and no vendor carries a rating or a completed-project count, so neither is
 // claimed here.
+// `slot` names a PAIR of files: real/<slot>-d.webp for the 1280 side pane and
+// real/<slot>-m.webp for the phone banner. The two frames are nothing alike
+// — one is twice as tall as it is wide, the other nearly twice as wide as it
+// is tall — so each photo is cut to its frame rather than cropped by chance.
 const HOW_IT_WORKS: { icon: ReactNode; title: string; body: string; slot: string }[] = [
   {
     icon: <ChatIcon />,
     title: "Tell us what you need",
     body: "Choose the service, share your location and a few details. Your phone number is requested at the contact step.",
-    slot: "how-step-1-v2",
+    slot: "how-step-1",
   },
   {
     icon: <G name="shield" size={26} stroke="#fff" width={2} />,
     title: "We find eligible pros",
     body: "QuickFurno matches you with up to 3 active professionals based on your service, location and eligibility checks.",
-    slot: "how-step-2-v2",
+    slot: "how-step-2",
   },
   {
     icon: <G name="check2" size={26} stroke="#fff" width={2} />,
     title: "Compare & choose",
     body: "Review profiles and quotes, then choose the professional you trust. No fee, no obligation.",
-    slot: "how-step-3-v2",
+    slot: "how-step-3",
   },
 ];
 
@@ -773,7 +780,9 @@ function HowItWorks() {
         </div>
         <ol className="qfp-steps" data-reveal-group>
           {HOW_IT_WORKS.map((step, index) => {
-            const photo = optionalRealImage(step.slot);
+            // -d is the tall pane the 1280 board draws; -m is the phone banner.
+            const photoPane = optionalRealImage(`${step.slot}-d`);
+            const photoBanner = optionalRealImage(`${step.slot}-m`);
             return (
               <li className="qfp-step" key={step.title}>
                 <span className="qfp-step-num" aria-hidden="true">0{index + 1}</span>
@@ -783,8 +792,14 @@ function HowItWorks() {
                   <p>{step.body}</p>
                 </div>
                 <div className="qfp-step-media">
-                  {photo ? (
-                    <Image src={photo} alt="" fill sizes="(max-width: 760px) 100vw, (max-width: 980px) 45vw, 210px" />
+                  {photoPane && photoBanner ? (
+                    /* Each file is already the size and shape it renders at, so
+                       there is nothing for the optimiser to do and only the one
+                       that matches the screen is fetched. */
+                    <picture>
+                      <source media="(min-width: 761px)" srcSet={photoPane} />
+                      <img src={photoBanner} alt="" loading="lazy" decoding="async" />
+                    </picture>
                   ) : (
                     <span className="qfp-slot-empty" aria-hidden="true" />
                   )}
@@ -951,7 +966,11 @@ function FAQ() {
     <section className="qfp-section qfp2-faq" id="faq">
       {photo ? (
         <div className="qfp2-faq-photo" aria-hidden="true">
-          <Image src={photo} alt="" width={800} height={869} sizes="(max-width: 899px) 0px, 380px" />
+          {/* The frame is 362x470 and the photo is filled to cover, so it is the
+    HEIGHT that decides how much file is needed: 470 tall at this
+    photo's shape is 440 wide, not the frame's 362. Asking for 380 got
+    a file that had to be stretched 1.13x. */}
+          <Image src={photo} alt="" width={800} height={869} sizes="(max-width: 899px) 0px, 440px" />
           <span className="qfp2-faq-fade-x" />
           <span className="qfp2-faq-fade-y" />
         </div>

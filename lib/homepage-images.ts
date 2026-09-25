@@ -55,9 +55,17 @@ export function heroImage(fallbackSrc: string): HomepageImage {
   return resolveHomepageImage("hero", fallbackSrc);
 }
 
-/** Service-card slot: real/categories/<slug>.(webp|jpg|jpeg|png). */
+/**
+ * Service-card slot: real/categories/<slug>-v2.(webp|jpg|jpeg|png).
+ *
+ * The -v2 suffix is a cache bust, not decoration. These photos were re-cut to
+ * a 1.09 frame so the square phone card and the 1.19 desktop card each lose
+ * under 10% instead of up to 36%. Overwriting the old filenames was not
+ * enough: Next keys its optimised variants by URL, so the old crops kept
+ * being served. A new name is what evicts them.
+ */
 export function categoryImage(slug: string, fallbackSrc: string): HomepageImage {
-  return resolveHomepageImage(`categories/${slug}`, fallbackSrc);
+  return resolveHomepageImage(`categories/${slug}-v2`, fallbackSrc);
 }
 
 /**

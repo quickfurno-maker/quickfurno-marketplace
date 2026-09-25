@@ -2,12 +2,23 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
 
-// Generates the social share image and wires og:image / twitter:image automatically.
-export const alt = "QuickFurno — approved home-service vendors in Pune";
+// The card people see when a quickfurno.in link is shared — on WhatsApp above
+// all, which is where most of these links travel. It is the first impression
+// of the brand, so it uses the current mark, not the green-and-gold one the
+// site stopped using.
+//
+// The old version read "with ratings and transparent rates". No vendor carries
+// a rating yet, so that was advertising something the marketplace does not
+// have, on the one image QuickFurno cannot take back once a link is sent. The
+// line now says what the product actually does.
+export const alt = "QuickFurno — approved home-service professionals in Pune";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-const pills = ["Approved Vendors", "Transparent Rates", "Pune"];
+const ORANGE = "#E0611E";
+const INK = "#14100C";
+
+const pills = ["Approved profiles", "Up to 3 matches", "Free to enquire"];
 
 export default function OpengraphImage() {
   return new ImageResponse(
@@ -20,60 +31,38 @@ export default function OpengraphImage() {
           flexDirection: "column",
           justifyContent: "center",
           padding: "0 92px",
-          background: "linear-gradient(135deg, #B8874A 0%, #1F1A14 70%)",
+          background: INK,
+          backgroundImage:
+            "radial-gradient(60% 60% at 8% 0%, rgba(224, 97, 30, 0.34) 0%, rgba(20, 16, 12, 0) 70%)",
           color: "#F7F1E8",
           fontFamily: "sans-serif",
         }}
       >
-        {/* brand lockup */}
-        <div style={{ display: "flex", alignItems: "center", gap: 30 }}>
-          <div
-            style={{
-              position: "relative",
-              width: 116,
-              height: 116,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 30,
-              background: "linear-gradient(135deg, #12694f, #063a2c)",
-              boxShadow: "0 20px 50px rgba(0,0,0,0.4)",
-            }}
-          >
-            <div style={{ width: 70, height: 70, borderRadius: "50%", border: "9px solid #C9A066" }} />
-            <div
-              style={{
-                position: "absolute",
-                right: 22,
-                bottom: 22,
-                width: 34,
-                height: 9,
-                borderRadius: 5,
-                background: "#C9A066",
-                transform: "rotate(45deg)",
-              }}
-            />
+        {/* The wordmark, drawn rather than fetched: this runs on the edge and
+            must not depend on a file request to render. */}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <div style={{ display: "flex", fontSize: 76, fontWeight: 800, letterSpacing: -2.5 }}>
+            <span style={{ color: "#FFFFFF" }}>Quick</span>
+            <span style={{ color: ORANGE }}>Furno</span>
           </div>
-          <div style={{ display: "flex", fontSize: 70, fontWeight: 800, letterSpacing: -2 }}>
-            <span style={{ color: "#ffffff" }}>Quick</span>
-            <span style={{ color: "#C9A066" }}>Furno</span>
-          </div>
+          <div style={{ display: "flex", marginTop: 8, fontSize: 26, fontWeight: 600, color: ORANGE }}>®</div>
         </div>
 
         <div
           style={{
             display: "flex",
-            marginTop: 40,
-            maxWidth: 940,
+            marginTop: 36,
+            maxWidth: 960,
             fontSize: 44,
             lineHeight: 1.25,
-            color: "#d7e7e0",
+            color: "#E8E0D4",
           }}
         >
-          Compare verified interior designers, carpenters &amp; modular experts — with ratings and transparent rates.
+          Tell us what your home needs. QuickFurno connects you with approved interior designers,
+          carpenters and modular specialists in Pune.
         </div>
 
-        <div style={{ display: "flex", gap: 18, marginTop: 46 }}>
+        <div style={{ display: "flex", gap: 18, marginTop: 44 }}>
           {pills.map((pill) => (
             <div
               key={pill}
@@ -82,11 +71,11 @@ export default function OpengraphImage() {
                 alignItems: "center",
                 padding: "14px 26px",
                 borderRadius: 999,
-                fontSize: 28,
+                fontSize: 27,
                 fontWeight: 700,
                 color: "#F7F1E8",
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(230,198,90,0.45)",
+                background: "rgba(255, 255, 255, 0.07)",
+                border: "1px solid rgba(224, 97, 30, 0.45)",
               }}
             >
               {pill}

@@ -746,12 +746,12 @@
   overflow: hidden;
   padding: 96px 0 104px;
   background:
-    radial-gradient(62% 90% at 4% 18%, rgba(157, 62, 10, 0.26), transparent 60%),
-    radial-gradient(58% 92% at 96% 74%, rgba(181, 70, 8, 0.22), transparent 62%),
-    linear-gradient(145deg, #0a0908 0%, #100d0b 48%, #080706 100%);
-  border-top: 1px solid rgba(255, 133, 38, 0.16);
-  border-bottom: 1px solid rgba(255, 133, 38, 0.16);
-  color: #fff;
+    radial-gradient(62% 90% at 4% 18%, rgba(201, 58, 14, 0.24), transparent 60%),
+    radial-gradient(58% 92% at 96% 74%, rgba(255, 177, 61, 0.14), transparent 62%),
+    var(--qfd-grad-dark);
+  border-top: 1px solid rgba(201, 58, 14, 0.24);
+  border-bottom: 1px solid rgba(201, 58, 14, 0.2);
+  color: var(--qfd-on-dark);
 }
 .qfp-how::before,
 .qfp-how::after {
@@ -771,13 +771,20 @@
 .qfp-how-glow-b { left: -140px; bottom: -180px; width: 560px; height: 420px; background: radial-gradient(closest-side, rgba(201, 58, 14, 0.22), rgba(201, 58, 14, 0) 72%); }
 .qfp-how .qfp-shell { position: relative; z-index: 1; }
 .qfp-how .qfp-head-center { gap: 13px; }
-.qfp-how .qfp-kicker { color: #ff8a32; }
-.qfp-how h2 { max-width: 900px; font-size: clamp(40px, 4.2vw, 58px); line-height: 1.03; letter-spacing: -0.045em; color: #fff; }
+.qfp-how .qfp-kicker { color: var(--qfd-amber); }
+.qfp-how h2 {
+  max-width: 900px;
+  font-family: var(--qfd-font-head);
+  font-size: clamp(40px, 4.2vw, 58px);
+  line-height: 1.03;
+  letter-spacing: var(--qfd-track-head);
+  color: var(--qfd-on-dark);
+}
 .qfp-kicker--ruled { display: inline-flex; align-items: center; gap: 14px; }
 .qfp-kicker--ruled::before,
 .qfp-kicker--ruled::after { content: ""; width: 48px; height: 1.5px; border-radius: 2px; background: currentColor; opacity: 0.72; }
-.qfp-how h2 span { color: #ff6418; }
-.qfp-how-lede { max-width: 690px; font-size: 17px; line-height: 1.6; color: rgba(255,255,255,0.62); }
+.qfp-how h2 span { color: var(--qfd-amber); }
+.qfp-how-lede { max-width: 720px; font-size: 17px; line-height: 1.6; color: var(--qfd-on-dark-muted); }
 
 .qfp-steps { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 30px; margin-top: 52px; }
 .qfp-step {
@@ -786,37 +793,39 @@
   grid-template-columns: minmax(0, 46%) minmax(0, 54%);
   align-items: stretch;
   min-height: 430px;
-  overflow: hidden;
-  border-radius: 28px;
-  background: linear-gradient(155deg, rgba(255, 126, 28, 0.08), rgba(255, 255, 255, 0.025) 38%), rgba(13, 12, 11, 0.9);
-  border: 1px solid rgba(255, 122, 25, 0.72);
-  box-shadow: 0 32px 70px -36px rgba(255, 91, 12, 0.52), inset 0 1px rgba(255,255,255,0.04);
+  overflow: visible;
+  border-radius: var(--qfd-r-2xl);
+  background: linear-gradient(155deg, rgba(201, 58, 14, 0.1), rgba(255, 255, 255, 0.025) 38%), rgba(18, 22, 27, 0.92);
+  border: 1px solid rgba(201, 58, 14, 0.62);
+  box-shadow: 0 32px 70px -36px rgba(201, 58, 14, 0.58), inset 0 1px rgba(255,255,255,0.04);
 }
 .qfp-step::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: inset 0 0 50px rgba(255, 98, 12, 0.025); }
 .qfp-step-num {
   position: absolute; top: 22px; left: 22px; z-index: 5;
-  display: grid; place-items: center; width: 62px; height: 62px; border-radius: 999px;
-  border: 2px solid #ff741d; background: rgba(61, 23, 5, 0.84); color: #fff;
-  font-family: var(--qfp-head); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; line-height: 1;
-  box-shadow: 0 0 0 7px rgba(255, 98, 12, 0.055), 0 0 26px rgba(255, 98, 12, 0.34);
+  display: grid; place-items: center; width: 62px; height: 62px; border-radius: var(--qfd-r-pill);
+  border: 2px solid var(--qfd-orange); background: rgba(61, 23, 5, 0.84); color: var(--qfd-on-dark);
+  font-family: var(--qfd-font-head); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; line-height: 1;
+  box-shadow: 0 0 0 7px rgba(201, 58, 14, 0.08), 0 0 26px rgba(201, 58, 14, 0.38);
 }
 .qfp-step-text {
   position: relative; z-index: 4; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end;
   gap: 12px; padding: 104px 18px 34px 28px;
+  overflow: hidden;
+  border-radius: var(--qfd-r-2xl) 0 0 var(--qfd-r-2xl);
   background: linear-gradient(90deg, rgba(8,7,6,0.96) 0%, rgba(10,9,8,0.89) 76%, rgba(10,9,8,0.18) 100%);
 }
 .qfp-step-icon {
-  display: grid; place-items: center; width: 54px; height: 54px; border-radius: 999px;
-  border: 1px solid rgba(255, 125, 29, 0.8); background: rgba(255, 105, 18, 0.08); color: #fff;
-  box-shadow: 0 0 22px rgba(255, 97, 12, 0.13);
+  display: grid; place-items: center; width: 54px; height: 54px; border-radius: var(--qfd-r-pill);
+  border: 1px solid rgba(201, 58, 14, 0.78); background: rgba(201, 58, 14, 0.12); color: var(--qfd-on-dark);
+  box-shadow: 0 0 22px rgba(201, 58, 14, 0.16);
 }
 .qfp-step-icon svg { width: 25px; height: 25px; }
-.qfp-step h3 { max-width: 210px; font-family: var(--qfp-head); font-size: 25px; font-weight: 800; letter-spacing: -0.035em; line-height: 1.04; color: #fff; }
-.qfp-step p { max-width: 225px; font-size: 13.5px; line-height: 1.65; color: rgba(255,255,255,0.69); }
-.qfp-step-media { position: relative; min-width: 0; overflow: hidden; background: #17110d; }
+.qfp-step h3 { max-width: 210px; font-family: var(--qfd-font-head); font-size: 25px; font-weight: 800; letter-spacing: var(--qfd-track-head); line-height: 1.04; color: var(--qfd-on-dark); }
+.qfp-step p { max-width: 225px; font-size: 13.5px; line-height: 1.65; color: var(--qfd-on-dark-muted); }
+.qfp-step-media { position: relative; min-width: 0; overflow: hidden; border-radius: 0 var(--qfd-r-2xl) var(--qfd-r-2xl) 0; background: #17110d; }
 .qfp-step-media::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(90deg, rgba(8,7,6,0.72) 0%, rgba(8,7,6,0.02) 45%); }
 .qfp-step-media picture { position: absolute; inset: 0; display: block; }
-.qfp-step-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.qfp-step-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .qfp-step--1 .qfp-step-media {
   background:
     radial-gradient(circle at 55% 48%, rgba(255, 132, 42, 0.30), transparent 42%),
@@ -824,11 +833,11 @@
 }
 .qfp-step--1 .qfp-step-media img {
   object-fit: contain;
-  object-position: center bottom;
-  width: 112%;
-  height: 112%;
-  max-width: none;
-  transform: translate(-2%, 6%) rotate(4deg);
+  object-position: center;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  transform: none;
   filter: drop-shadow(0 22px 30px rgba(0,0,0,.45));
 }
 .qfp-step--3 .qfp-step-media {
@@ -839,16 +848,29 @@
 .qfp-step--3 .qfp-step-media img {
   object-fit: contain;
   object-position: center;
-  width: 104%;
-  height: 104%;
-  max-width: none;
-  transform: translate(1%, 0);
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  transform: none;
   filter: drop-shadow(0 20px 28px rgba(0,0,0,.35));
 }
 .qfp-slot-empty { position: absolute; inset: 0; background: repeating-linear-gradient(135deg, rgba(255, 112, 24, 0.06) 0 10px, transparent 10px 20px); }
 .qfp-step + .qfp-step::before {
-  content: ""; position: absolute; top: 72px; left: -31px; width: 31px; height: 2px; z-index: 6;
-  background-image: linear-gradient(90deg, #ff741d 0 6px, transparent 6px 12px); background-size: 12px 2px; background-repeat: repeat-x; opacity: 0.86;
+  content: "\2192";
+  position: absolute;
+  top: 58px;
+  left: -33px;
+  z-index: 7;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--qfd-r-pill);
+  background: var(--qfd-orange);
+  color: var(--qfd-on-dark);
+  font: 800 20px/1 var(--qfd-font-head);
+  box-shadow: 0 0 0 6px rgba(201, 58, 14, 0.1), var(--qfd-shadow-orange);
+  opacity: 1;
 }
 
 /* Step 02 ? Priya Sharma in Baner matched to three nearby interior Teams. */
@@ -869,9 +891,9 @@
 .qfp-how-client { left: 46%; top: 49%; transform: translate(-50%, -50%); padding: 7px 10px 7px 7px; border-radius: 14px; }
 .qfp-how-client > i { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 34px; border-radius: 999px; background: #ff6517; color: #fff; font-style: normal; font-size: 11px; font-weight: 800; box-shadow: 0 0 0 5px rgba(255,101,23,.16); }
 .qfp-how-client span,
-.qfp-how-team span { display: grid; min-width: 0; }
+.qfp-how-team span { display: grid; min-width: 0; overflow: hidden; }
 .qfp-how-client strong,
-.qfp-how-team strong { color: #fff; font-size: 10.5px; font-weight: 800; line-height: 1.2; white-space: nowrap; }
+.qfp-how-team strong { overflow: hidden; color: #fff; font-size: 10.5px; font-weight: 800; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; }
 .qfp-how-client small,
 .qfp-how-team small { margin-top: 2px; color: rgba(255,255,255,.58); font-size: 8.5px; line-height: 1.2; white-space: nowrap; }
 .qfp-how-team { min-width: 118px; max-width: 132px; padding: 7px 9px; border-radius: 12px; }
@@ -892,6 +914,43 @@
   box-shadow: 0 14px 28px rgba(0,0,0,.26); backdrop-filter: blur(8px);
 }
 .qfp-how-match-pill strong { color: #8ef0af; font-size: 17px; }
+
+.qfp-how-assurance {
+  width: fit-content;
+  max-width: 100%;
+  margin: 44px auto 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--qfd-r-pill);
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+}
+.qfp-how-assurance li {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 18px;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.qfp-how-assurance li:last-child { border-right: 0; }
+.qfp-how-assurance svg { flex: 0 0 auto; color: var(--qfd-amber); }
+
+@media (min-width: 1100px) {
+  .qfp-step--2 { margin-top: 18px; }
+  .qfp-step--3 { margin-top: 36px; }
+  .qfp-how-assurance { margin-top: 32px; }
+}
 
 /* ==========================================================================
    MADE IN PUNE
@@ -1366,6 +1425,7 @@
   .qfp-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
   .qfp-step + .qfp-step::before { display: none; }
   .qfp-step { grid-template-columns: minmax(0, 1fr) 38%; min-height: 226px; }
+  .qfp-step--3 { grid-column: 1 / -1; width: calc((100% - 22px) / 2); justify-self: center; }
   .qfp-nav { gap: 22px; }
   .qfp-service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; }
   /* The photo pane sizes itself now (aspect-ratio + inset:0), so the old
@@ -1414,6 +1474,7 @@
   .qfp-how-lede { font-size: 14px; }
   .qfp-kicker--ruled::before, .qfp-kicker--ruled::after { width: 18px; }
   .qfp-steps { grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 24px; }
+  .qfp-step--3 { grid-column: auto; width: auto; justify-self: stretch; }
   /* The step photos exist now, so the card stacks instead of dropping them:
      photo on top, text under it at full width. Hiding them would mean a
      phone visitor never sees the only art this section has. */
@@ -1586,6 +1647,7 @@
     gap: 8px;
     min-width: 0;
     padding: 84px 8px 22px 17px;
+    border-radius: 22px 0 0 22px;
     background: linear-gradient(90deg, rgba(8,7,6,.98), rgba(9,8,7,.91) 82%, rgba(9,8,7,.12));
   }
   .qfp-step--3 .qfp-step-text { padding-top: 76px; }
@@ -1601,40 +1663,34 @@
     aspect-ratio: auto;
     height: 100%;
     min-height: 0;
-    border-radius: 0;
+    border-radius: 0 22px 22px 0;
   }
   .qfp-step-media picture { inset: 0; }
-  .qfp-step--1 .qfp-step-media img {
-    object-fit: contain;
-    object-position: center bottom;
-    width: 124%;
-    height: 124%;
-    transform: translate(-4%, 10%) rotate(4deg);
-  }
+  .qfp-step--1 .qfp-step-media img,
   .qfp-step--3 .qfp-step-media img {
     object-fit: contain;
     object-position: center;
-    width: 108%;
-    height: 108%;
-    transform: translate(2%, 0);
+    width: 100%;
+    height: 100%;
+    transform: none;
   }
   .qfp-step + .qfp-step::before {
-    content: "?";
-    top: -31px;
+    content: "\2193";
+    top: -29px;
     left: 50%;
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
     transform: translateX(-50%);
     display: grid;
     place-items: center;
-    border: 1.5px solid #ff741d;
-    border-radius: 999px;
-    background: #351506;
+    border: 0;
+    border-radius: var(--qfd-r-pill);
+    background: var(--qfd-orange);
     background-image: none;
-    color: #fff;
-    font: 800 21px/1 var(--qfp-head);
+    color: var(--qfd-on-dark);
+    font: 800 19px/1 var(--qfd-font-head);
     opacity: 1;
-    box-shadow: 0 0 0 5px rgba(255,98,12,.08), 0 0 18px rgba(255,98,12,.28);
+    box-shadow: 0 0 0 5px rgba(201,58,14,.09), var(--qfd-shadow-orange);
   }
 
   .qfp-how-map-base { transform: scale(1.16); }
@@ -1671,6 +1727,25 @@
   }
   .qfp-how-match-pill svg { width: 13px; height: 13px; }
   .qfp-how-match-pill strong { font-size: 14px; }
+
+  .qfp-how-assurance {
+    width: 100%;
+    margin-top: 24px;
+    display: grid;
+    grid-template-columns: 1fr;
+    padding: 5px 12px;
+    border-radius: 18px;
+  }
+  .qfp-how-assurance li {
+    justify-content: flex-start;
+    min-height: 38px;
+    padding: 0 4px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    font-size: 11.5px;
+    white-space: normal;
+  }
+  .qfp-how-assurance li:last-child { border-bottom: 0; }
 
   /* cities */
   .qfp-cities-skyline { margin: 32px -20px 0; max-width: none; }
@@ -1832,8 +1907,8 @@
   .qfp-step { grid-template-columns: minmax(0, 46%) minmax(0, 54%); }
   .qfp-step--2 { grid-template-columns: minmax(0, 44%) minmax(0, 56%); }
   .qfp-step-text { padding-left: 14px; padding-right: 6px; }
-  .qfp-step h3 { font-size: 18px; }
-  .qfp-step p { font-size: 10.75px; }
+  .qfp-step h3 { font-size: 19px; }
+  .qfp-step p { font-size: 11.25px; line-height: 1.5; }
   .qfp-how-team { min-width: 68px; max-width: 76px; padding: 4px 5px; }
   .qfp-how-team > i { width: 20px; height: 20px; flex-basis: 20px; }
   .qfp-how-team strong { font-size: 6.8px; }

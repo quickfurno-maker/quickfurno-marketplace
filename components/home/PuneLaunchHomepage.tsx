@@ -737,18 +737,17 @@ async function Services() {
 
 // Restored: the rebuild in c6cfb34 dropped this section while the header and
 // the footer kept linking to #how-it-works, so that nav item pointed at
-// nothing. Copy is the approved wording — up to 3 pros, no fee, no obligation
-// — and no vendor carries a rating or a completed-project count, so neither is
-// claimed here.
-// `slot` names a PAIR of files: real/<slot>-d.webp for the 1280 side pane and
-// real/<slot>-m.webp for the phone banner. The two frames are nothing alike
-// — one is twice as tall as it is wide, the other nearly twice as wide as it
-// is tall — so each photo is cut to its frame rather than cropped by chance.
+// nothing. Copy stays within the marketplace rules — up to 3 eligible Teams,
+// no homeowner fee and no obligation to hire — without inventing performance
+// claims that the vendor data does not support.
+// `slot` names the tall real/<slot>-d.webp composition. The final section
+// keeps a tall visual pane beside the copy on desktop and phone, so one
+// purpose-cut asset can be preserved without swapping to a mismatched banner.
 const HOW_IT_WORKS: { icon: ReactNode; title: string; body: string; slot?: string; visual: "photo" | "map" }[] = [
   {
     icon: <ChatIcon />,
     title: "Tell us what you need",
-    body: "Choose the service, share your location and a few details. Your phone number is requested at the contact step.",
+    body: "Choose a service, share your Pune location and a few details. We ask for your phone number only at the contact step.",
     slot: "how-step-1",
     visual: "photo",
   },
@@ -761,16 +760,16 @@ const HOW_IT_WORKS: { icon: ReactNode; title: string; body: string; slot?: strin
   {
     icon: <G name="check2" size={26} stroke="#fff" width={2} />,
     title: "Compare & choose",
-    body: "Review profiles and quotes, then choose the professional you trust. No fee, no obligation.",
+    body: "Review profiles and quotes, then choose the Team you trust. No homeowner fee, no obligation to hire.",
     slot: "how-step-3",
     visual: "photo",
   },
 ];
 
 const HOW_TEAM_MATCHES = [
-  { name: "UrbanNest Interiors", position: "qfp-how-team--one", meta: "1.2 km ? 4.8?" },
-  { name: "Studio A Interiors", position: "qfp-how-team--two", meta: "1.8 km ? 4.6?" },
-  { name: "Craftline Interior Co.", position: "qfp-how-team--three", meta: "2.1 km ? 4.7?" },
+  { name: "UrbanNest Interiors", position: "qfp-how-team--one", meta: "1.2 km \u00b7 4.8\u2605" },
+  { name: "Studio A Interiors", position: "qfp-how-team--two", meta: "1.8 km \u00b7 4.6\u2605" },
+  { name: "Craftline Interior Co.", position: "qfp-how-team--three", meta: "2.1 km \u00b7 4.7\u2605" },
 ] as const;
 
 function HowMatchMap() {
@@ -806,13 +805,12 @@ function HowItWorks() {
       <div className="qfp-shell">
         <div className="qfp-head-center" data-reveal>
           <span className="qfp-kicker qfp-kicker--ruled">How it works</span>
-          <h2>Three steps. <span>Zero running around.</span></h2>
-          <p className="qfp-how-lede">From your requirement to a trusted professional ? all in one place.</p>
+          <h2>One request. <span>Three simple steps.</span></h2>
+          <p className="qfp-how-lede">Tell us what your home needs. QuickFurno can match you with up to 3 eligible Teams, then you compare and choose.</p>
         </div>
         <ol className="qfp-steps" data-reveal-group>
           {HOW_IT_WORKS.map((step, index) => {
             const photoPane = step.slot ? optionalRealImage(`${step.slot}-d`) : null;
-            const photoBanner = step.slot ? optionalRealImage(`${step.slot}-m`) : null;
             return (
               <li className={`qfp-step qfp-step--${index + 1}`} key={step.title}>
                 <span className="qfp-step-num" aria-hidden="true">0{index + 1}</span>
@@ -824,11 +822,13 @@ function HowItWorks() {
                 <div className={`qfp-step-media${step.visual === "map" ? " qfp-step-media--map" : ""}`}>
                   {step.visual === "map" ? (
                     <HowMatchMap />
-                  ) : photoPane && photoBanner ? (
-                    <picture>
-                      <source media="(min-width: 761px)" srcSet={photoPane} />
-                      <img src={photoBanner} alt="" loading="lazy" decoding="async" />
-                    </picture>
+                  ) : photoPane ? (
+                    <Image
+                      src={photoPane}
+                      alt=""
+                      fill
+                      sizes="(max-width: 760px) 55vw, (max-width: 1100px) 38vw, 210px"
+                    />
                   ) : (
                     <span className="qfp-slot-empty" aria-hidden="true" />
                   )}
@@ -837,6 +837,11 @@ function HowItWorks() {
             );
           })}
         </ol>
+        <ul className="qfp-how-assurance" aria-label="QuickFurno process benefits">
+          <li><G name="chat" size={16} stroke="currentColor" width={2} /><span>Free enquiry</span></li>
+          <li><G name="people" size={16} stroke="currentColor" width={2} /><span>Up to 3 eligible matches</span></li>
+          <li><G name="check2" size={16} stroke="currentColor" width={2} /><span>You choose who to hire</span></li>
+        </ul>
       </div>
     </section>
   );

@@ -747,20 +747,20 @@ const HOW_IT_WORKS: { icon: ReactNode; title: string; body: string; slot?: strin
   {
     icon: <ChatIcon />,
     title: "Tell us what you need",
-    body: "Choose a service, share your Pune location and a few details. We ask for your phone number only at the contact step.",
+    body: "Choose a service, share your Pune location and a few details.",
     slot: "how-step-1",
     visual: "photo",
   },
   {
     icon: <G name="people" size={26} stroke="#fff" width={2} />,
     title: "We find eligible Teams",
-    body: "QuickFurno matches you with up to 3 active Teams based on your service, location and eligibility checks.",
+    body: "We match you with up to 3 active Teams based on service, location and eligibility.",
     visual: "map",
   },
   {
     icon: <G name="check2" size={26} stroke="#fff" width={2} />,
     title: "Compare & choose",
-    body: "Review profiles and quotes, then choose the Team you trust. No homeowner fee, no obligation to hire.",
+    body: "Compare profiles and quotes, then choose the Team you trust. No homeowner fee or obligation.",
     slot: "how-step-3",
     visual: "photo",
   },

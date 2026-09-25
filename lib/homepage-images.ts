@@ -55,7 +55,28 @@ export function heroImage(fallbackSrc: string): HomepageImage {
   return resolveHomepageImage("hero", fallbackSrc);
 }
 
-/** Service-card slot: real/categories/<slug>.(webp|jpg|jpeg|png). */
+/**
+ * Service-card slot: real/categories/<slug>-v2.(webp|jpg|jpeg|png).
+ *
+ * The -v2 suffix is a cache bust, not decoration. These photos were re-cut to
+ * a 1.09 frame so the square phone card and the 1.19 desktop card each lose
+ * under 10% instead of up to 36%. Overwriting the old filenames was not
+ * enough: Next keys its optimised variants by URL, so the old crops kept
+ * being served. A new name is what evicts them.
+ */
 export function categoryImage(slug: string, fallbackSrc: string): HomepageImage {
-  return resolveHomepageImage(`categories/${slug}`, fallbackSrc);
+  return resolveHomepageImage(`categories/${slug}-v2`, fallbackSrc);
+}
+
+/**
+ * A slot with NO illustrated fallback: returns the real photo's URL, or null
+ * when the file has not been added yet.
+ *
+ * The sections built from the new boards use this so an unfilled slot renders
+ * as a reserved empty frame rather than a broken image or a stand-in that
+ * looks deliberate. Drop the file into real/ under the documented name and it
+ * appears on the next build — no code change.
+ */
+export function optionalRealImage(slotName: string): string | null {
+  return findRealImage(slotName);
 }

@@ -13,6 +13,8 @@
   --qfp-orange: var(--qfd-orange);
   --qfp-orange-dark: #d63f12;
   --qfp-amber: #ffb13d;
+  /* Headline accent sampled off the board: softer than --qfp-amber. */
+  --qfp-gold: #f6c057;
   --qfp-coral: #ff8a5c;
   --qfp-green: #1f9d5b;
   --qfp-muted: #655f54;
@@ -94,6 +96,11 @@
 }
 .qfp-logo em { font-style: normal; color: var(--qfd-orange-text); }
 .qfp-logo--light { color: #f7f1e6; }
+/* --qfd-orange-text is tuned for dark type on a PALE panel. On the footer's
+   near-black it measured 2.61:1 against a 3:1 requirement, so "Furno" was the
+   one unreadable word in the wordmark. The coral is the orange this codebase
+   already uses on dark surfaces, and it clears the bar comfortably. */
+.qfp-logo--light em { color: var(--qfp-coral); }
 
 /* ==========================================================================
    HEADER
@@ -163,11 +170,14 @@
    ========================================================================== */
 .qfp-hero {
   position: relative;
-  min-height: 647px;
   background: #16130f;
   overflow: hidden;
+  /* Column, not a centred row: the feature band is a child of the hero and has
+     to sit under the copy rather than beside it. The photo still covers the
+     whole section; the band paints over its foot, and the rounded top corners
+     let the photo show through at the edges, which is the lap the board draws. */
   display: flex;
-  align-items: center;
+  flex-direction: column;
 }
 .qfp-hero-media { position: absolute; inset: 0; }
 .qfp-hero-media img { object-fit: cover; object-position: right center; }
@@ -176,31 +186,114 @@
   inset: 0;
   background: linear-gradient(90deg, rgba(18, 15, 12, 0.92) 0%, rgba(18, 15, 12, 0.78) 38%, rgba(18, 15, 12, 0.25) 62%, rgba(18, 15, 12, 0) 100%);
 }
-.qfp-hero-inner { position: relative; padding: 72px 0; }
-.qfp-hero-copy { width: min(680px, 100%); display: flex; flex-direction: column; gap: 26px; }
-.qfp-hero h1 {
-  max-width: 620px;
-  font-size: 56px;
-  line-height: 1.12;
-  color: #f7f1e6;
+.qfp-hero-inner {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  min-height: 600px;
+  padding: 84px 0 52px;
 }
-.qfp-hero h1 span { color: var(--qfp-amber); }
-.qfp-hero-badges { display: flex; flex-wrap: wrap; gap: 12px; }
-.qfp-hero-badge {
+.qfp-hero-copy { width: min(772px, 100%); display: flex; flex-direction: column; gap: 22px; }
+.qfp-hero-kicker {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  padding: 10px 16px;
-  font-size: 14px;
+  gap: 14px;
+  font-size: 12.5px;
   font-weight: 700;
-  color: #f2ece0;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #cdc9c0;
 }
-.qfp-hero-badge b { color: var(--qfp-amber); font-weight: 700; }
-.qfp-hero-badge .qfp-badge-short { display: none; }
-.qfp-hero-note { font-size: 12px; color: #948b7c; margin-top: -14px; }
+.qfp-hero-kicker i { display: block; flex-shrink: 0; width: 44px; height: 2px; border-radius: 2px; background: var(--qfp-orange); }
+.qfp-hero h1 {
+  max-width: 660px;
+  font-size: 56px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: #fefefe;
+}
+.qfp-hero h1 span { color: var(--qfp-gold); }
+.qfp-hero-lede { max-width: 580px; font-size: 17px; line-height: 1.6; color: #d6d0c6; }
+.qfp-hero-points {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.qfp-hero-points li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 17px;
+  max-width: 152px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #f2ece2;
+}
+.qfp-hero-points li:first-child { padding-left: 0; }
+.qfp-hero-points li + li { border-left: 1px solid rgba(255, 255, 255, 0.18); }
+.qfp-hero-points i {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 35px;
+  height: 35px;
+  border-radius: 999px;
+  border: 1px solid rgba(246, 192, 87, 0.5);
+  color: var(--qfp-gold);
+}
+.qfp-hero-popular { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.qfp-hero-popular-label { font-size: 13px; color: #b9b1a3; }
+.qfp-hero-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 13px;
+  font-weight: 600;
+  color: #f2ece2;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.qfp-hero-chip:hover { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.34); }
+
+/* Feature band, lapping over the foot of the photo. */
+.qfp-hero-features {
+  position: relative;
+  z-index: 2;
+  background: #fefdfc;
+  border-radius: 28px 28px 0 0;
+  box-shadow: 0 -18px 40px -26px rgba(20, 24, 29, 0.45);
+}
+.qfp-hero-features-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 26px 0 28px;
+}
+.qfp-hero-feature { display: flex; align-items: flex-start; gap: 14px; padding: 0 26px; }
+.qfp-hero-feature + .qfp-hero-feature { border-left: 1px solid #efe8dc; }
+.qfp-hero-feature:first-child { padding-left: 0; }
+.qfp-hero-feature:last-child { padding-right: 0; }
+.qfp-hero-feature > i {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  background: #fdeee2;
+  color: var(--qfd-orange-text);
+}
+.qfp-hero-feature > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.qfp-hero-feature strong { font-size: 14.5px; font-weight: 800; color: var(--qfp-ink); }
+.qfp-hero-feature span { font-size: 13px; line-height: 1.45; color: var(--qfp-muted); }
+.qfp-hero-note { font-size: 12px; color: #948b7c; }
 
 .qfp-quote {
   display: flex;
@@ -220,7 +313,7 @@
   color: #746d61;
 }
 .qfp-quote-field--service { flex: 1 1 auto; min-width: 0; border-right: 1px solid #ece7dd; }
-.qfp-quote-field--area { flex: 0 0 186px; }
+.qfp-quote-field--area { flex: 0 0 238px; }
 .qfp-quote-field select,
 .qfp-quote-field input {
   width: 100%;
@@ -263,132 +356,285 @@
   pointer-events: none;
 }
 .qfp-services .qfp-shell { position: relative; }
-.qfp-bp { display: flex; align-items: center; justify-content: space-between; gap: 40px; min-height: 350px; margin-top: -24px; margin-bottom: 8px; }
-.qfp-bp-copy { position: relative; z-index: 1; max-width: 480px; display: flex; flex-direction: column; }
-.qfp-bp-kicker { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase; color: var(--qfd-orange-text); }
-.qfp-bp-kicker i { display: block; flex-shrink: 0; background: var(--qfp-orange); }
-.qfp-bp-kicker i.t { width: 1.5px; height: 12px; }
-.qfp-bp-kicker i.l { width: 28px; height: 1.5px; }
-.qfp-bp-copy h2 { margin-top: 16px; font-size: 54px; line-height: 60px; letter-spacing: -0.035em; }
-.qfp-bp-copy p { margin-top: 16px; font-size: 16px; line-height: 26px; color: var(--qfp-muted); }
-.qfp-bp-plan { position: relative; width: 640px; height: 350px; flex-shrink: 0; }
-.qfp-bp-svg { position: absolute; left: 0; top: 0; width: 640px; height: 350px; display: block; }
-.qfp-bp-home { position: absolute; left: 250px; top: 292px; padding: 0 8px; background: var(--qfp-ivory); font-size: 11px; font-weight: 800; letter-spacing: 0.18em; color: #655f54; }
-.qfp-trust-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin: 0 0 44px; }
+/* ---- Services heading: copy left, photo collage right ------------------ */
+.qfp-svc-head {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr);
+  gap: 40px;
+  align-items: center;
+  min-height: 340px;
+  margin-bottom: 40px;
+}
+.qfp-svc-copy { display: flex; flex-direction: column; gap: 16px; max-width: 520px; }
+.qfp-svc-copy h2 { font-size: 54px; line-height: 1.06; letter-spacing: -0.035em; }
+.qfp-svc-copy h2 span { color: var(--qfd-orange-text); }
+.qfp-svc-copy p { font-size: 16px; line-height: 1.6; color: var(--qfp-muted); }
+
+/* The three shots overlap on a fixed canvas, so each one is placed rather
+   than flowed. Height is fixed for the same reason — absolutely positioned
+   children give the parent nothing to size itself from. */
+/* Ratio + percentage children, not a fixed height and pixel offsets: one
+   composition then scales to every width instead of three hand-tuned forks.
+   614x304 is the board's canvas. */
+.qfp-svc-collage { position: relative; aspect-ratio: 614 / 304; }
+.qfp-svc-plan { position: absolute; right: -40px; top: -28px; opacity: 0.32; pointer-events: none; }
+.qfp-svc-plan svg { width: 400px; height: 226px; }
+/* Four-point sparkle: two crossed ellipses via a conic-free trick - a
+   rotated square with concave sides reads as the board's star. */
+.qfp-svc-spark {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: var(--qfp-orange);
+  opacity: 0.55;
+  clip-path: polygon(50% 0, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0 50%, 42% 42%);
+}
+.qfp-svc-spark--1 { left: -2.9%; top: 19.7%; width: 14px; height: 14px; }
+.qfp-svc-spark--2 { left: 20.8%; top: -5.3%; }
+.qfp-svc-spark--3 { left: 53.7%; bottom: -4.6%; width: 15px; height: 15px; }
+/* The arc sweeping off the right edge. A ring with three quarters hidden. */
+.qfp-svc-arc {
+  position: absolute;
+  right: -54px;
+  top: 46px;
+  width: 150px;
+  height: 150px;
+  border: 2px solid var(--qfp-orange);
+  border-radius: 999px;
+  border-left-color: transparent;
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  opacity: 0.5;
+  transform: rotate(-24deg);
+}
+.qfp-svc-shot {
+  position: absolute;
+  margin: 0;
+  border-radius: 18px;
+  overflow: visible;
+  box-shadow: 0 30px 60px -28px rgba(20, 24, 29, 0.5);
+}
+.qfp-svc-shot img { object-fit: cover; border-radius: 18px; }
+/* Portrait source into a landscape box: a centre crop lands on blank wall,
+   so bias up to where the roller and the painter actually are. */
+.qfp-svc-shot--3 img { object-position: center 32%; }
+.qfp-svc-shot--1 { left: 1.3%; top: 7.2%; width: 45.3%; height: 79%; z-index: 1; }
+.qfp-svc-shot--2 { left: 34.5%; top: 0; width: 34.5%; height: 76.3%; z-index: 2; }
+.qfp-svc-shot--3 { left: 60.6%; top: 21.7%; width: 39.4%; height: 63.2%; z-index: 3; }
+.qfp-svc-shot figcaption {
+  position: absolute;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 12px 26px -12px rgba(20, 24, 29, 0.55);
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--qfp-ink);
+}
+.qfp-svc-shot figcaption img { flex-shrink: 0; width: 16px; height: 16px; }
+.qfp-svc-shot--1 figcaption { left: -40px; top: 104px; }
+.qfp-svc-shot--2 figcaption { left: 16px; top: -16px; }
+.qfp-svc-shot--3 figcaption { right: -24px; bottom: 34px; }
+
+/* ---- Benefit row ------------------------------------------------------- */
+.qfp-trust-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0 0 44px;
+}
+/* strong + span are inline by default and ran together on one line. */
+.qfp-trust-card > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .qfp-trust-card {
   display: flex;
+  flex-direction: row;
   align-items: flex-start;
-  gap: 12px;
-  padding: 16px 16px 17px;
-  background: #fff;
-  border: 1px solid #ebe3d4;
-  border-radius: 16px;
-  box-shadow: 0 12px 26px -20px rgba(20, 24, 29, 0.35);
+  gap: 13px;
+  padding: 18px 16px 20px;
+  background: #fffdfa;
+  border: 1px solid #f1e8da;
+  border-radius: 18px;
 }
-.qfp-trust-card svg { flex-shrink: 0; margin-top: 1px; }
-.qfp-trust-card div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.qfp-trust-card strong { font-size: 14.5px; line-height: 1.3; font-weight: 800; color: var(--qfp-ink); }
-.qfp-trust-card span { font-size: 12.5px; line-height: 1.4; color: var(--qfp-muted); }
+.qfp-trust-card > i {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: #fdeee2;
+  color: var(--qfd-orange-text);
+}
+.qfp-trust-card strong { font-size: 14.5px; font-weight: 800; line-height: 1.25; }
+.qfp-trust-card span { font-size: 12.5px; line-height: 1.45; color: var(--qfp-muted); }
 
 .qfp-service-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-rows: 300px;
   gap: 24px;
 }
+
+/* ---- Category card ------------------------------------------------------
+   Board spec: full-bleed photo, copy over a dark gradient, a white value
+   pill top-left, and a sub-category bar on #FAF7F2 underneath. All eight
+   cards are identical now - the old 2x2 featured tile is gone.
+
+   The badge is deliberately qualitative. A live vendor count would read
+   0 on five of the eight categories today, so the count is not wired in;
+   when supply justifies it, it belongs beside the badge in this same pill
+   row and needs no layout change. */
 .qfp-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  border-radius: 18px;
+  border-radius: 16px;
   overflow: hidden;
-  background: var(--qfp-card-bg);
+  background: #fff;
   border: 1px solid var(--qfp-card-line);
   box-shadow: 0 16px 38px -18px rgba(20, 24, 29, 0.2);
   transition: transform 0.22s ease, box-shadow 0.22s ease;
 }
-.qfp-card:hover { transform: translateY(-3px); box-shadow: 0 26px 48px -20px rgba(20, 24, 29, 0.3); }
-.qfp-card-media { position: relative; height: 176px; flex-shrink: 0; overflow: hidden; }
-.qfp-card-media img { object-fit: cover; object-position: center 42%; transition: transform 0.6s ease; }
-.qfp-card:hover .qfp-card-media img { transform: scale(1.04); }
-.qfp-card-body {
+.qfp-card:hover { transform: translateY(-4px); box-shadow: 0 28px 52px -20px rgba(20, 24, 29, 0.32); }
+
+/* The photo pane: media, scrim, badge and copy all stack in here. */
+/* Square, not 5:7. The taller pane pushed the card to ~490px and only three
+   rows of it were doing any work; at 1:1 the whole grid loses roughly a third
+   of its height and still leaves half the photo visible above the copy. */
+.qfp-card-face {
   position: relative;
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 16px 18px 17px;
+  display: block;
+  aspect-ratio: 5 / 7;
+  min-height: 330px;
   overflow: hidden;
 }
-.qfp-card-accent { display: block; flex-shrink: 0; width: 26px; height: 3px; border-radius: 2px; background: var(--qfp-orange); }
-.qfp-card h3 { font-size: 18px; letter-spacing: -0.01em; line-height: 1.2; }
-.qfp-card p { font-size: 13px; line-height: 1.4; color: var(--qfp-muted); }
-.qfp-card-cta {
-  margin-top: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--qfd-orange-text);
-}
-.qfp-card-cta i {
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  background: #fbeee7;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  transition: background 0.18s ease;
-}
-.qfp-card:hover .qfp-card-cta i { background: #f7dfd2; }
-.qfp-card-mark { position: absolute; right: 14px; bottom: 12px; pointer-events: none; color: #e4dac8; }
-.qfp-card-desc-short { display: none; }
-
-/* Featured (Interior Designers) — photo top, 2x2 */
-.qfp-card--featured {
-  grid-column: span 2;
-  grid-row: span 2;
-  border-radius: 22px;
-  box-shadow: 0 26px 56px -22px rgba(20, 24, 29, 0.26);
-}
-.qfp-card--featured .qfp-card-media { height: 336px; }
-.qfp-card--featured .qfp-card-media img { object-position: center 22%; }
-.qfp-card--featured .qfp-card-body {
-  justify-content: center;
-  gap: 0;
-  padding: 24px 32px 26px;
-  background: linear-gradient(180deg, #fbf6ed 0%, #f0e6d2 100%);
-}
-.qfp-card--featured .qfp-card-accent { width: 30px; margin-bottom: 14px; }
-.qfp-card--featured h3 { font-size: 30px; letter-spacing: -0.02em; line-height: 1.08; }
-.qfp-card--featured p { font-size: 15px; line-height: 1.55; margin-top: 8px; }
-.qfp-card--featured .qfp-card-cta { margin-top: 16px; gap: 12px; font-size: 14px; }
-.qfp-card--featured .qfp-card-cta i { width: 40px; height: 40px; background: var(--qfp-orange); box-shadow: 0 10px 20px -6px rgba(240, 74, 26, 0.55); }
-.qfp-card--featured .qfp-card-cta i svg { stroke: #fff; }
-.qfp-card-tag {
+.qfp-card-media { position: absolute; inset: 0; display: block; }
+.qfp-card-media img { object-fit: cover; object-position: center 40%; transition: transform 0.6s ease; }
+.qfp-card:hover .qfp-card-media img { transform: scale(1.05); }
+.qfp-card-scrim {
   position: absolute;
-  top: 20px;
-  left: 20px;
-  background: var(--qfp-orange);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  padding: 6px 12px;
-  border-radius: 999px;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(15, 15, 15, 0) 26%,
+    rgba(15, 15, 15, 0.5) 48%,
+    rgba(15, 15, 15, 0.85) 68%,
+    rgba(15, 15, 15, 0.93) 100%
+  );
 }
-.qfp-card-perks {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid #ebe3d3;
+/* Tagline pill and live count share the top row. It wraps rather than
+   squeezing: "Skilled Professionals" next to "Accepting enquiries" will not
+   fit a 286px card on one line, and a second stacked pill reads far better
+   than two ellipsised ones. */
+.qfp-card-top {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 2;
   display: flex;
   flex-wrap: wrap;
-  gap: 26px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
 }
-.qfp-card-perks span { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: #55503f; line-height: 1.25; }
-.qfp-card-perks svg { flex-shrink: 0; }
+.qfp-card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 7px 13px 7px 11px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--qfp-ink);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  box-shadow: 0 6px 16px -8px rgba(20, 24, 29, 0.55);
+}
+.qfp-card-badge svg { flex-shrink: 0; color: var(--qfp-orange); }
+/* Live count, read from the same predicates the category page lists by. */
+.qfp-card-count {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(15, 15, 15, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.qfp-card-copy {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px;
+}
+.qfp-card-title {
+  font-family: var(--qfp-head);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: #fff;
+}
+.qfp-card-desc { font-size: 13.5px; line-height: 1.45; color: rgba(255, 255, 255, 0.82); }
+.qfp-card-desc-short { display: none; }
+.qfp-card-btn {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  height: 42px;
+  border-radius: 999px;
+  background: var(--qfp-orange);
+  color: #fff;
+  font-size: 14.5px;
+  font-weight: 700;
+  transition: background 0.18s ease;
+}
+.qfp-card:hover .qfp-card-btn { background: var(--qfp-orange-dark); }
+
+/* Sub-category bar. Informational, so no hover affordance. */
+.qfp-card-subs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  background: #faf7f2;
+  border-top: 1px solid #f1eadd;
+  padding: 11px 4px 12px;
+}
+.qfp-card-sub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 0 2px;
+  text-align: center;
+}
+.qfp-card-sub svg { color: #8a8378; }
+/* Two lines are always reserved, whether the label needs them or not:
+   "Repairs" fits on one and "Turnkey Execution" does not, and without this
+   the bars sit at different heights across a row and the grid looks ragged. */
+.qfp-card-sub > span { font-size: 10.5px; line-height: 1.25; font-weight: 600; color: #6b7280; min-height: 26px; }
 
 /* Not-sure card — dark olive, plant photo. One grid cell since the 8th
    category (False Ceiling): it closes the last row as a tall CTA tile. */
@@ -463,6 +709,35 @@
 }
 .qfp-notsure-media img { object-fit: cover; object-position: center; }
 
+/* ---- CTA band -----------------------------------------------------------
+   Eight categories fill the 4x2 grid exactly, so this CTA no longer has a
+   spare cell to sit in. Out of the grid it reads better as a full-width
+   band anyway: copy left, photo feathered in from the right. The phone
+   rules further down still apply and keep it compact there. */
+.qfp-notsure {
+  grid-column: auto;
+  flex-direction: row;
+  align-items: stretch;
+  margin-top: 24px;
+  min-height: 188px;
+}
+.qfp-notsure-glow { left: -60px; top: -90px; width: 460px; height: 300px; }
+.qfp-notsure-copy { justify-content: center; gap: 10px; padding: 30px 40px; max-width: 640px; }
+.qfp-notsure-title { font-size: 30px; }
+.qfp-notsure-desc { font-size: 15px; max-width: 480px; }
+/* Was margin-top:auto to pin it to the bottom of a tall tile; in a centred
+   band that would drag it away from the copy it belongs to. */
+.qfp-notsure-btn { margin-top: 4px; }
+.qfp-notsure-media {
+  top: 0;
+  height: 100%;
+  width: 44%;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 62%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 62%);
+  -webkit-mask-composite: source-over;
+  mask-composite: add;
+}
+
 /* ==========================================================================
    HOW IT WORKS
    ========================================================================== */
@@ -479,51 +754,94 @@
 .qfp-how-glow-b { left: -90px; bottom: -110px; width: 500px; height: 340px; background: radial-gradient(closest-side, rgba(240, 74, 26, 0.09), rgba(240, 74, 26, 0) 72%); }
 .qfp-how .qfp-shell { position: relative; }
 .qfp-how h2 { font-size: 40px; }
+.qfp-kicker--ruled { display: inline-flex; align-items: center; gap: 12px; }
+.qfp-kicker--ruled::before,
+.qfp-kicker--ruled::after { content: ""; width: 30px; height: 1.5px; border-radius: 2px; background: currentColor; opacity: 0.5; }
+.qfp-how h2 span { color: var(--qfd-orange-text); }
+.qfp-how-lede { max-width: 620px; font-size: 16.5px; line-height: 1.6; color: var(--qfp-muted); }
+
 .qfp-steps {
-  margin-top: 52px;
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 30px;
+  margin-top: 46px;
 }
 .qfp-step {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  padding: 34px 30px 30px;
-  background: linear-gradient(180deg, #fff 0%, #fffdf8 100%);
-  border: 1px solid #eee6d7;
-  border-radius: 22px;
-  box-shadow: 0 1px 2px rgba(20, 24, 29, 0.04), 0 26px 52px -20px rgba(20, 24, 29, 0.22);
-}
-.qfp-step-top { display: flex; align-items: center; justify-content: space-between; }
-.qfp-step-icon {
-  width: 58px;
-  height: 58px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #a82f0a 0%, #c93a0e 100%);
   display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  box-shadow: 0 12px 22px -8px rgba(240, 74, 26, 0.55);
+  grid-template-columns: minmax(0, 1fr) 40%;
+  align-items: stretch;
+  min-height: 252px;
+  border-radius: 24px;
+  background: linear-gradient(160deg, #fffdfa 0%, #fdf6ec 100%);
+  border: 1px solid #f2e7d6;
+  box-shadow: 0 26px 52px -30px rgba(20, 24, 29, 0.42);
 }
-.qfp-step-num { font-family: var(--qfp-head); font-weight: 700; font-size: 36px; letter-spacing: -0.03em; line-height: 1; color: #ece3d2; }
-.qfp-step-text { display: flex; flex-direction: column; gap: 10px; }
-.qfp-step h3 { font-family: var(--qfp-body); font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
-.qfp-step p { font-size: 15px; line-height: 1.65; color: #78736a; }
-.qfp-step-next {
+/* Orange disc lapping the card's top-left corner. It sits outside the card's
+   own bounds, so the card cannot clip it — .qfp-steps keeps the overflow. */
+.qfp-step-num {
   position: absolute;
-  top: 50px;
-  right: -15px;
+  top: 14px;
+  left: 14px;
   z-index: 3;
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  background: #fff;
-  border: 1px solid #eee6d7;
-  box-shadow: 0 6px 14px rgba(20, 24, 29, 0.12);
   display: grid;
   place-items: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 999px;
+  background: var(--qfp-orange);
+  color: #fff;
+  font-family: var(--qfp-head);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+  box-shadow: 0 14px 26px -12px rgba(240, 74, 26, 0.7);
+}
+.qfp-step-text { display: flex; flex-direction: column; gap: 9px; padding: 76px 16px 24px 22px; }
+/* Board draws a pale chip with an orange glyph. The three step icons are
+   drawn with a white stroke baked in, so the chip stays solid orange -
+   recolouring the glyphs would mean editing three icon components for a
+   52px detail. */
+.qfp-step-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: var(--qfp-orange);
+  box-shadow: 0 12px 22px -10px rgba(240, 74, 26, 0.6);
+}
+.qfp-step-icon svg { width: 25px; height: 25px; }
+.qfp-step h3 { font-family: var(--qfp-body); font-size: 19px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; }
+.qfp-step p { font-size: 13.5px; line-height: 1.55; color: #78736a; }
+.qfp-step-media { position: relative; overflow: hidden; border-radius: 0 24px 24px 0; }
+/* Two crops of each photo, each cut to the frame it lands in: a tall one for
+   the 1280 side pane, a banner for the phone. One file cannot serve both —
+   these photos are near-square, so the pane was throwing away half the
+   picture and the phone banner about two thirds of it. */
+.qfp-step-media picture { position: absolute; inset: 0; display: block; }
+.qfp-step-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.qfp-slot-empty {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(135deg, rgba(201, 58, 14, 0.06) 0 10px, transparent 10px 20px);
+}
+/* Dashed run between the cards, drawn in the grid gap by a pseudo-element so
+   it needs no markup of its own. The card clips its own overflow for the
+   photo, so this hangs off .qfp-step rather than sitting inside it. */
+.qfp-step + .qfp-step::before {
+  content: "";
+  position: absolute;
+  top: 38px;
+  left: -30px;
+  width: 30px;
+  height: 2px;
+  background-image: linear-gradient(90deg, var(--qfp-orange) 0 6px, transparent 6px 12px);
+  background-size: 12px 2px;
+  background-repeat: repeat-x;
+  opacity: 0.75;
 }
 
 /* ==========================================================================
@@ -688,10 +1006,24 @@
 /* ==========================================================================
    FAQ
    ========================================================================== */
-.qfp-faq { padding: 80px 0 24px; }
-.qfp-faq .qfp-shell { max-width: 820px; }
-.qfp-faq h2 { font-size: 36px; }
-.qfp-faq-list { margin-top: 36px; display: grid; gap: 10px; }
+.qfp-faq {
+  padding: 84px 0 28px;
+  background:
+    radial-gradient(760px 420px at 88% 8%, rgba(246, 192, 87, 0.16), transparent 65%),
+    radial-gradient(620px 380px at 4% 92%, rgba(214, 90, 32, 0.07), transparent 70%),
+    linear-gradient(180deg, #fdfbf8 0%, #f7f2ea 100%);
+}
+.qfp-faq-head { margin-bottom: 30px; }
+.qfp-faq-head h2 { font-size: 46px; line-height: 1.06; letter-spacing: -0.03em; }
+.qfp-faq-head h2 span { color: var(--qfd-orange-text); }
+.qfp-faq-lead { margin-top: 12px; font-size: 16px; line-height: 1.6; color: var(--qfp-muted); }
+.qfp-faq-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  gap: 34px;
+  align-items: start;
+}
+.qfp-faq-list { display: grid; gap: 10px; }
 .qfp-faq-item {
   border: 1px solid #e6dfd0;
   border-radius: 14px;
@@ -703,60 +1035,149 @@
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px 22px;
+  gap: 14px;
+  padding: 13px 18px 13px 13px;
   font-size: 16px;
   font-weight: 700;
   color: var(--qfp-ink);
 }
 .qfp-faq-item summary::-webkit-details-marker { display: none; }
-.qfp-faq-item summary i {
+.qfp-faq-item summary > span { flex: 1; min-width: 0; }
+/* The badge art already carries its own pale tile, so the container only
+   rounds it - a second background underneath would double up. */
+.qfp-faq-badge {
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  background: #fbeee7;
   display: grid;
   place-items: center;
-  color: var(--qfd-orange-text);
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.qfp-faq-badge img { width: 100%; height: 100%; object-fit: contain; }
+.qfp-faq-item summary b {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #f6efe4;
+  color: var(--qfp-ink);
   transition: transform 0.2s ease;
 }
-.qfp-faq-item[open] summary i { transform: rotate(45deg); }
-.qfp-faq-item p { padding: 0 22px 20px; font-size: 15px; line-height: 1.65; color: var(--qfp-muted); }
+.qfp-faq-item[open] summary b { transform: rotate(180deg); }
+.qfp-faq-item p { padding: 0 20px 18px 67px; font-size: 15px; line-height: 1.65; color: var(--qfp-muted); }
+
+.qfp-faq-aside { display: flex; flex-direction: column; }
+.qfp-faq-photo {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 5 / 4;
+  border-radius: 20px;
+  overflow: hidden;
+}
+.qfp-faq-photo img { object-fit: cover; object-position: center 22%; }
+/* Fades the photo's own cream backdrop into the section instead of ending
+   on a hard edge, the way the board does. */
+.qfp-faq-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 52%, rgba(250, 246, 239, 0.9) 100%);
+}
+.qfp-faq-support {
+  position: relative;
+  z-index: 1;
+  margin-top: -34px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 24px;
+  border: 1px solid #efe4d3;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #fdf8f1 100%);
+  box-shadow: 0 26px 54px -30px rgba(20, 24, 29, 0.4);
+}
+.qfp-faq-support > i { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; overflow: hidden; }
+.qfp-faq-support > i img { width: 100%; height: 100%; object-fit: contain; }
+.qfp-faq-support h3 { font-size: 23px; line-height: 1.15; letter-spacing: -0.02em; }
+.qfp-faq-support p { font-size: 14.5px; line-height: 1.6; color: var(--qfp-muted); }
+.qfp-faq-support-btn {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #d4601f 0%, #b94a12 100%);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  transition: filter 0.18s ease;
+}
+.qfp-faq-support-btn:hover { filter: brightness(1.08); }
 
 /* ==========================================================================
    VENDOR CTA
    ========================================================================== */
 .qfp-vendor { padding: 72px 0; }
 .qfp-vendor-card {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.95fr) minmax(0, 0.9fr);
   align-items: center;
-  justify-content: space-between;
-  gap: 48px;
-  padding: 44px 52px;
-  background: #fbf9f4;
-  border: 1px solid var(--qfp-line);
-  border-radius: 20px;
+  gap: 40px;
+  padding: 44px 48px;
+  background:
+    radial-gradient(520px 320px at 92% 12%, rgba(246, 192, 87, 0.22), transparent 68%),
+    linear-gradient(135deg, #fdf3e6 0%, #fbeada 55%, #f9e4cd 100%);
+  border: 1px solid #f0e0cb;
+  border-radius: 24px;
 }
-.qfp-vendor-copy { display: flex; flex-direction: column; gap: 10px; max-width: 620px; }
-.qfp-vendor-copy h2 { font-size: 30px; }
+.qfp-vendor-copy { display: flex; flex-direction: column; gap: 12px; }
+.qfp-vendor-copy h2 { font-size: 40px; line-height: 1.08; letter-spacing: -0.03em; }
+.qfp-vendor-copy h2 span { color: var(--qfd-orange-text); }
 .qfp-vendor-copy p { font-size: 15px; line-height: 1.6; color: var(--qfp-muted); }
+
+.qfp-vendor-points { display: flex; flex-direction: column; gap: 18px; margin: 0; padding: 0; list-style: none; }
+.qfp-vendor-points li { display: flex; align-items: flex-start; gap: 13px; }
+.qfp-vendor-points li > i { flex-shrink: 0; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 999px; overflow: hidden; background: #fff; }
+.qfp-vendor-points li > i img { width: 78%; height: 78%; object-fit: contain; }
+.qfp-vendor-points li > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.qfp-vendor-points strong { font-size: 15px; font-weight: 800; }
+.qfp-vendor-points span { font-size: 13.5px; line-height: 1.5; color: var(--qfp-muted); }
+
+.qfp-vendor-figure { position: relative; width: 100%; aspect-ratio: 8 / 15; }
+.qfp-vendor-figure img { object-fit: cover; object-position: center top; border-radius: 18px; }
+.qfp-vendor-note {
+  position: absolute;
+  right: -10px;
+  top: 6px;
+  max-width: 150px;
+  font-family: var(--qfp-body);
+  font-size: 13.5px;
+  font-style: italic;
+  line-height: 1.45;
+  color: #8a6a44;
+  text-align: right;
+}
 .qfp-vendor-btn {
-  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 6px;
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  border: 2px solid var(--qfp-ink);
-  color: var(--qfp-ink);
+  background: linear-gradient(180deg, #d4601f 0%, #b04510 100%);
+  color: #fff;
   font-size: 16px;
   font-weight: 800;
   padding: 16px 30px;
   border-radius: 12px;
-  transition: background 0.18s ease, color 0.18s ease;
+  box-shadow: 0 18px 34px -20px rgba(176, 69, 16, 0.9);
+  transition: filter 0.18s ease;
 }
-.qfp-vendor-btn:hover { background: var(--qfp-ink); color: #fff; }
-.qfp-vendor-btn:hover svg { stroke: #fff; }
+.qfp-vendor-btn:hover { filter: brightness(1.08); }
 
 /* ==========================================================================
    FOOTER
@@ -770,12 +1191,69 @@
 .qfp-footer-brand { display: flex; flex-direction: column; gap: 18px; }
 .qfp-footer-brand p { font-size: 15px; line-height: 1.65; color: var(--qfp-muted-2); max-width: 300px; }
 .qfp-footer-made { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: #c9a876; }
+.qfp-footer-social { display: flex; gap: 10px; margin: 2px 0 0; padding: 0; list-style: none; }
+.qfp-footer-social a {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: #272b31;
+  color: #e8ecf1;
+  transition: background 0.16s ease, transform 0.16s ease;
+}
+.qfp-footer-social a:hover { background: var(--qfp-orange); color: #fff; transform: translateY(-2px); }
+.qfp-footer-social svg { width: 16px; height: 16px; }
+
+.qfp-footer-skyline { position: relative; margin-top: 46px; }
+/* Alpha mask, not an <img>: the line art then takes this colour rather than
+   shipping a baked-in background that would band against the footer. */
+.qfp-footer-sky {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1600 / 365;
+  background: linear-gradient(180deg, #6b727b 0%, #2c323a 100%);
+  -webkit-mask-image: url("/assets/quickfurno/images/pune-skyline-footer.webp");
+  mask-image: url("/assets/quickfurno/images/pune-skyline-footer.webp");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+.qfp-footer-skyline em {
+  position: absolute;
+  right: 4px;
+  bottom: 30px;
+  font-size: 15px;
+  font-style: italic;
+  color: #d8dde4;
+}
+.qfp-footer-skyline em::after {
+  content: "";
+  display: block;
+  width: 62px;
+  height: 2px;
+  margin: 5px 0 0 auto;
+  border-radius: 2px;
+  background: var(--qfp-orange);
+}
 .qfp-footer-col { display: flex; flex-direction: column; gap: 12px; }
 .qfp-footer-col h3 { font-family: var(--qfp-body); font-size: 13px; font-weight: 800; letter-spacing: 0.16em; color: #9aa3b0; }
 .qfp-footer-col a { font-size: 14px; color: #c3c9d2; transition: color 0.15s ease; }
 .qfp-footer-col a:hover { color: #fff; }
 .qfp-footer-col--contact { gap: 14px; }
 .qfp-footer-col--contact a, .qfp-footer-col--contact span { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.qfp-footer-col--contact > a > i, .qfp-footer-col--contact > span > i {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: #22262c;
+}
 .qfp-footer-col--contact a:first-of-type { font-weight: 700; color: #f2ede2; }
 .qfp-footer-bottom {
   margin-top: 56px;
@@ -828,15 +1306,35 @@
    RESPONSIVE — tablet
    ========================================================================== */
 @media (max-width: 1100px) {
+  .qfp-svc-head { grid-template-columns: minmax(0, 1fr); gap: 28px; min-height: 0; }
+  .qfp-svc-copy h2 { font-size: 42px; }
+  /* Single column hands the collage the whole container - cap it so the
+     photos do not blow up to half the viewport. */
+  /* Explicit width, not max-width: justify-self on a grid item turns off
+     stretch, and every child here is absolutely positioned, so a
+     content-sized collage would measure zero. */
+  .qfp-svc-collage { width: min(620px, 100%); justify-self: center; }
+  .qfp-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+  .qfp-step + .qfp-step::before { display: none; }
+  .qfp-step { grid-template-columns: minmax(0, 1fr) 38%; min-height: 226px; }
   .qfp-nav { gap: 22px; }
   .qfp-service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; }
-  .qfp-card--featured { grid-row: auto; }
-  .qfp-card--featured .qfp-card-media { height: 300px; }
-  .qfp-card-media { height: 190px; }
+  /* The photo pane sizes itself now (aspect-ratio + inset:0), so the old
+     fixed media heights are gone - a height here would beat inset:0 and
+     leave the bottom of the pane empty. */
   .qfp-steps { gap: 22px; }
   .qfp-step-next { display: none; }
   .qfp-city-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 18px; }
   .qfp-trust-grid { gap: 40px; }
+  .qfp-faq-head h2 { font-size: 38px; }
+  .qfp-faq-grid { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+  /* The aside is no longer a column beside the list, so the photo becomes a
+     banner over the support card rather than a tall portrait. */
+  .qfp-faq-photo { aspect-ratio: 16 / 6; }
+  .qfp-faq-photo img { object-position: center 18%; }
+  .qfp-vendor-card { grid-template-columns: minmax(0, 1fr) minmax(0, 0.82fr); gap: 30px 36px; }
+  .qfp-vendor-copy { grid-column: 1 / -1; }
+  .qfp-vendor-copy h2 { font-size: 34px; }
   .qfp-footer-grid { grid-template-columns: 1.4fr 1fr 1fr; }
   .qfp-footer-col--contact { grid-column: 1 / -1; }
 }
@@ -845,6 +1343,44 @@
    RESPONSIVE — mobile (matches the Mobile 390 board)
    ========================================================================== */
 @media (max-width: 760px) {
+  .qfp-svc-copy h2 { font-size: 28px; }
+  .qfp-svc-copy p { font-size: 14px; }
+  .qfp-svc-plan { display: none; }
+  /* All three photos stay on the phone. They are the section's only art, and
+     a square canvas buys each one real size instead of a letterbox sliver. */
+  .qfp-svc-collage { aspect-ratio: 1 / 1; width: min(330px, 100%); justify-self: center; }
+  .qfp-svc-shot--1 { left: 0; top: 6%; width: 58%; height: 42%; }
+  .qfp-svc-shot--2 { left: 54%; top: 0; width: 46%; height: 52%; }
+  .qfp-svc-shot--3 { left: 13%; top: 55%; width: 56%; height: 43%; }
+  .qfp-svc-shot, .qfp-svc-shot img { border-radius: 14px; }
+  .qfp-svc-arc { right: -26px; top: 28%; width: 94px; height: 94px; border-width: 1.5px; }
+  .qfp-svc-shot figcaption { padding: 5px 9px; font-size: 10px; gap: 5px; }
+  .qfp-svc-shot figcaption img { width: 13px; height: 13px; }
+  .qfp-svc-shot--1 figcaption { left: -6px; top: auto; bottom: -13px; }
+  .qfp-svc-shot--2 figcaption { left: auto; right: -6px; top: -11px; }
+  .qfp-svc-shot--3 figcaption { right: -10px; bottom: auto; top: 38%; }
+  .qfp-trust-card { padding: 14px 14px 16px; }
+  .qfp-trust-card > i { width: 38px; height: 38px; }
+  .qfp-trust-card > i svg { width: 18px; height: 18px; }
+  .qfp-how-lede { font-size: 14px; }
+  .qfp-kicker--ruled::before, .qfp-kicker--ruled::after { width: 18px; }
+  .qfp-steps { grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 24px; }
+  /* The step photos exist now, so the card stacks instead of dropping them:
+     photo on top, text under it at full width. Hiding them would mean a
+     phone visitor never sees the only art this section has. */
+  .qfp-step { grid-template-columns: minmax(0, 1fr); min-height: 0; border-radius: 18px; }
+  /* The phone crop is drawn at exactly this ratio, so the frame matches the
+     file and none of the picture is thrown away. */
+  .qfp-step-media { display: block; order: -1; aspect-ratio: 348 / 196; height: auto; border-radius: 18px 18px 0 0; }
+  .qfp-step-media img { object-position: center; }
+  .qfp-step-text { padding: 16px 18px 20px; gap: 6px; }
+  /* The number laps the photo's top-left corner, as on the board. */
+  .qfp-step-num { top: 12px; left: 12px; width: 40px; height: 40px; font-size: 14px; }
+  /* Inline, not a left gutter - the text needs the full card width here. */
+  .qfp-step-icon { position: static; width: 40px; height: 40px; }
+  .qfp-step-icon svg { width: 19px; height: 19px; }
+  .qfp-step h3 { font-size: 16px; }
+  .qfp-step p { font-size: 13px; line-height: 1.5; }
   /* The fixed bottom nav needs clearance. The dark footer carries it (so the
      space below the footer stays footer-coloured) and the legacy global
      body padding is dropped on this page only. */
@@ -865,7 +1401,10 @@
      height, so the whole family fits instead of a face close-up.
      --qfp-hero-img-h: band height. 111.7vw = aspect of half the photo
      (0.5 x 1024 / 572); capped so tablets don't get a giant band. */
-  .qfp-hero { --qfp-hero-img-h: min(111.7vw, 520px); min-height: 0; height: auto; display: block; }
+  /* A square band. The three people span 61% of the photo's width, and a
+     square window aligned right takes all of them in; the old 0.9 band was
+     just narrow enough to cut the painter off the right edge. */
+  .qfp-hero { --qfp-hero-img-h: min(100vw, 460px); min-height: 0; height: auto; display: block; }
   .qfp-hero-media { top: 0; bottom: auto; height: var(--qfp-hero-img-h); }
   .qfp-hero-media img { object-position: right center; }
   .qfp-hero-shade { background: linear-gradient(180deg, rgba(18, 15, 12, 0.18) 0, rgba(18, 15, 12, 0) 80px, rgba(18, 15, 12, 0) calc(var(--qfp-hero-img-h) - 210px), rgba(18, 15, 12, 0.88) calc(var(--qfp-hero-img-h) - 70px), #16130f var(--qfp-hero-img-h)); }
@@ -877,11 +1416,29 @@
   .qfp-hero-copy { width: 100%; max-width: 480px; gap: 14px; }
   .qfp-hero h1 { font-size: 30px; line-height: 1.15; color: #fff; }
   .qfp-hero h1 br { display: none; }
-  .qfp-hero-badges { gap: 8px; }
-  .qfp-hero-badge { gap: 6px; padding: 7px 11px; font-size: 12px; background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.18); }
-  .qfp-hero-badge svg { width: 13px; height: 13px; }
-  .qfp-hero-badge .qfp-badge-full { display: none; }
-  .qfp-hero-badge .qfp-badge-short { display: inline; }
+  .qfp-hero-kicker { gap: 10px; font-size: 10.5px; letter-spacing: 0.18em; }
+  .qfp-hero-kicker i { width: 26px; }
+  .qfp-hero-lede { font-size: 14px; line-height: 1.5; }
+  /* Four points across a phone would be 90px each. Two rows of two, and the
+     vertical rules come off because they no longer separate anything. */
+  .qfp-hero-points { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 8px; }
+  .qfp-hero-points li { max-width: none; padding: 0; font-size: 11.5px; gap: 8px; }
+  .qfp-hero-points li + li { border-left: 0; }
+  .qfp-hero-points i { width: 30px; height: 30px; }
+  .qfp-hero-points i svg { width: 15px; height: 15px; }
+  .qfp-hero-popular { gap: 6px; }
+  .qfp-hero-popular-label { font-size: 11.5px; }
+  /* 44px is the smallest target a thumb hits reliably; these were 29px. */
+  .qfp-hero-chip { min-height: 44px; padding: 5px 14px; font-size: 11.5px; }
+  .qfp-hero-features { border-radius: 20px 20px 0 0; }
+  .qfp-hero-features-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 0; padding: 18px 0 20px; }
+  .qfp-hero-feature { padding: 0 12px; gap: 10px; }
+  .qfp-hero-feature:first-child, .qfp-hero-feature:nth-child(3) { padding-left: 0; }
+  .qfp-hero-feature:nth-child(3) { border-left: 0; }
+  .qfp-hero-feature > i { width: 36px; height: 36px; }
+  .qfp-hero-feature > i svg { width: 18px; height: 18px; }
+  .qfp-hero-feature strong { font-size: 12.5px; }
+  .qfp-hero-feature span { font-size: 11px; line-height: 1.35; }
   .qfp-hero-note { order: 10; margin-top: 0; text-align: center; font-size: 11px; color: rgba(255, 255, 255, 0.7); }
   .qfp-quote { padding: 0; background: transparent; box-shadow: none; border-radius: 12px; }
   .qfp-quote-field { display: none; }
@@ -905,31 +1462,24 @@
   .qfp-trust-card span { font-size: 11.5px; line-height: 1.35; }
   .qfp-service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; gap: 14px; }
   .qfp-card { border-radius: 16px; box-shadow: 0 10px 24px -12px rgba(20, 24, 29, 0.18); }
-  .qfp-card-media { height: 150px; }
-  .qfp-card-body { gap: 6px; padding: 12px 13px 13px; }
-  .qfp-card-accent { width: 22px; }
-  .qfp-card h3 { font-size: 15px; }
-  .qfp-card p { font-size: 11.5px; line-height: 1.35; }
+  .qfp-card-face { min-height: 0; aspect-ratio: 4 / 5; }
+  .qfp-card-top { top: 9px; left: 9px; right: 9px; gap: 5px; }
+  .qfp-card-badge { gap: 5px; padding: 5px 8px 5px 7px; font-size: 10px; }
+  .qfp-card-badge svg { width: 13px; height: 13px; }
+  .qfp-card-count { padding: 5px 8px; font-size: 9.5px; }
+  .qfp-card-copy { padding: 12px; gap: 4px; }
+  .qfp-card-title { font-size: 15.5px; }
+  .qfp-card-desc { font-size: 11.5px; line-height: 1.35; }
   .qfp-card-desc-long { display: none; }
   .qfp-card-desc-short { display: block; }
-  .qfp-card-cta { gap: 7px; font-size: 11px; padding-top: 4px; }
-  .qfp-card-cta i { width: 24px; height: 24px; }
-  .qfp-card-cta i svg { width: 11px; height: 11px; }
-  .qfp-card-mark { display: none; }
-  .qfp-card--featured { grid-column: 1 / -1; border-radius: 18px; box-shadow: 0 16px 34px -16px rgba(20, 24, 29, 0.2); }
-  .qfp-card--featured .qfp-card-media { height: 208px; }
-  .qfp-card--featured .qfp-card-media img { object-position: center; }
-  .qfp-card--featured .qfp-card-body { justify-content: flex-start; gap: 8px; padding: 17px 18px 18px; background: none; }
-  .qfp-card--featured .qfp-card-accent { width: 26px; margin-bottom: 0; }
-  .qfp-card--featured h3 { font-size: 21px; letter-spacing: -0.01em; }
-  .qfp-card--featured p { font-size: 13px; line-height: 1.45; margin-top: 0; }
-  .qfp-card--featured .qfp-card-desc-long { display: block; }
-  .qfp-card--featured .qfp-card-desc-short { display: none; }
-  .qfp-card--featured .qfp-card-cta { margin-top: 4px; gap: 9px; font-size: 13px; }
-  .qfp-card--featured .qfp-card-cta i { width: 32px; height: 32px; }
-  .qfp-card--featured .qfp-card-cta i svg { width: 15px; height: 15px; }
-  .qfp-card-tag { top: 14px; left: 14px; font-size: 10px; padding: 6px 10px; }
-  .qfp-card-perks { display: none; }
+  .qfp-card-btn { height: 34px; margin-top: 6px; gap: 6px; font-size: 12px; }
+  /* Two cards across a 390px screen leaves ~55px per sub-category, so the
+     labels drop a step and are allowed to wrap onto a second line rather
+     than being hidden - the bar is the part that explains the category. */
+  .qfp-card-subs { padding: 8px 2px 9px; }
+  .qfp-card-sub { gap: 3px; }
+  .qfp-card-sub svg { width: 16px; height: 16px; }
+  .qfp-card-sub > span { font-size: 9px; line-height: 1.2; min-height: 22px; }
   .qfp-notsure { grid-column: auto; align-items: flex-start; gap: 14px; padding: 16px 14px 14px; border-radius: 16px; background: linear-gradient(150deg, #14181d 0%, #1b2027 100%); }
   .qfp-notsure-glow { left: auto; right: -40px; top: -40px; width: 180px; height: 150px; background: radial-gradient(closest-side, rgba(255, 177, 61, 0.2), rgba(255, 177, 61, 0) 72%); }
   .qfp-notsure-copy { flex: 1 1 auto; padding: 0; gap: 6px; }
@@ -957,15 +1507,15 @@
   .qfp-how-glow-b { display: none; }
   .qfp-how h2 { font-size: 26px; }
   .qfp-steps { margin-top: 22px; grid-template-columns: 1fr; gap: 14px; }
-  .qfp-step { flex-direction: row; align-items: center; gap: 15px; padding: 18px; border-radius: 18px; box-shadow: 0 1px 2px rgba(20, 24, 29, 0.04), 0 18px 34px -16px rgba(20, 24, 29, 0.2); }
-  .qfp-step-top { display: contents; }
-  .qfp-step-icon { width: 50px; height: 50px; border-radius: 14px; box-shadow: 0 10px 18px -8px rgba(240, 74, 26, 0.55); }
-  .qfp-step-icon svg { width: 24px; height: 24px; }
-  .qfp-step-text { display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0; }
+  /* .qfp-step is a grid: flex-direction, order and flex-grow on it did
+     nothing, and the padding was insetting the photo off the card edge. */
+  .qfp-step { border-radius: 18px; box-shadow: 0 1px 2px rgba(20, 24, 29, 0.04), 0 18px 34px -16px rgba(20, 24, 29, 0.2); }
+  .qfp-step-icon { width: 44px; height: 44px; border-radius: 13px; box-shadow: 0 10px 18px -8px rgba(240, 74, 26, 0.55); }
+  .qfp-step-icon svg { width: 21px; height: 21px; }
+  .qfp-step-text { gap: 4px; padding: 14px 16px 18px; min-width: 0; }
   .qfp-step h3 { font-size: 16px; }
   .qfp-step p { font-size: 13.5px; line-height: 1.55; }
-  .qfp-step-num { order: 3; font-size: 24px; align-self: flex-start; flex-shrink: 0; }
-  .qfp-step-next { display: none; }
+  .qfp-step-num { width: 36px; height: 36px; font-size: 13px; }
 
   /* cities */
   .qfp-cities-skyline { margin: 32px -20px 0; max-width: none; }
@@ -1017,30 +1567,57 @@
 
   /* faq */
   .qfp-faq { padding: 44px 0 8px; }
-  .qfp-faq h2 { font-size: 26px; }
-  .qfp-faq-list { margin-top: 20px; gap: 8px; }
-  .qfp-faq-item summary { padding: 14px 16px; font-size: 14.5px; }
-  .qfp-faq-item p { padding: 0 16px 16px; font-size: 14px; }
+  .qfp-faq-head { margin-bottom: 20px; }
+  .qfp-faq-head h2 { font-size: 27px; }
+  .qfp-faq-lead { margin-top: 9px; font-size: 14px; }
+  .qfp-faq-grid { gap: 20px; }
+  .qfp-faq-list { gap: 8px; }
+  .qfp-faq-item summary { gap: 11px; padding: 10px 14px 10px 10px; font-size: 14.5px; }
+  .qfp-faq-badge { width: 34px; height: 34px; border-radius: 10px; }
+  .qfp-faq-item summary b { width: 22px; height: 22px; }
+  .qfp-faq-item p { padding: 0 14px 15px 55px; font-size: 14px; }
+  .qfp-faq-photo { aspect-ratio: 16 / 7; border-radius: 16px; }
+  .qfp-faq-support { margin-top: -26px; gap: 8px; padding: 18px; border-radius: 16px; }
+  .qfp-faq-support > i { width: 40px; height: 40px; border-radius: 12px; }
+  .qfp-faq-support h3 { font-size: 20px; }
+  .qfp-faq-support p { font-size: 14px; }
+  .qfp-faq-support-btn { padding: 13px 18px; font-size: 14.5px; }
 
   /* vendor */
   .qfp-vendor { padding: 36px 0; }
-  .qfp-vendor-card { flex-direction: column; align-items: stretch; gap: 12px; padding: 24px; border-radius: 16px; }
-  .qfp-vendor-copy { gap: 12px; }
-  .qfp-vendor-copy h2 { font-size: 22px; }
+  /* The card is a grid now - flex-direction here would quietly do nothing. */
+  .qfp-vendor-card { grid-template-columns: minmax(0, 1fr); gap: 22px; padding: 24px 20px; border-radius: 18px; }
+  .qfp-vendor-copy { gap: 11px; }
+  .qfp-vendor-copy h2 { font-size: 25px; }
   .qfp-vendor-copy p { font-size: 14px; }
-  .qfp-vendor-btn { justify-content: center; padding: 13px; font-size: 15px; border-radius: 10px; margin-top: 4px; }
+  .qfp-vendor-btn { justify-content: center; align-self: stretch; padding: 14px; font-size: 15px; border-radius: 11px; margin-top: 4px; }
+  .qfp-vendor-points { gap: 14px; }
+  .qfp-vendor-points li > i { width: 40px; height: 40px; }
+  .qfp-vendor-points strong { font-size: 14.5px; }
+  .qfp-vendor-points span { font-size: 13px; }
+  /* The extra top margin is the note's room: it is absolute (so it cannot
+     push the aspect-ratio box around) and two lines tall, and the row gap
+     alone left it overlapping the benefit above. */
+  .qfp-vendor-figure { aspect-ratio: 3 / 4; max-width: 230px; justify-self: center; margin-top: 30px; }
+  .qfp-vendor-note { top: -46px; right: auto; left: 0; width: 100%; max-width: none; text-align: center; }
 
   /* footer */
   .qfp-footer { padding-top: 40px; padding-bottom: calc(66px + env(safe-area-inset-bottom)); }
-  .qfp-footer-grid { grid-template-columns: 1fr; gap: 26px; }
+  /* Two columns rather than hiding them: these links are the only footer
+     navigation a phone visitor gets, and they fit fine side by side. */
+  .qfp-footer-grid { grid-template-columns: 1fr 1fr; gap: 24px 18px; }
+  .qfp-footer-brand { grid-column: 1 / -1; gap: 14px; }
   .qfp-footer-brand p { font-size: 14px; line-height: 1.6; }
-  .qfp-footer-made { display: none; }
-  .qfp-footer-col--services, .qfp-footer-col--company { display: none; }
-  .qfp-footer-col--contact { gap: 12px; }
-  .qfp-footer-col--contact h3 { display: none; }
+  .qfp-footer-made { display: flex; font-size: 13px; }
+  .qfp-footer-col--services, .qfp-footer-col--company { display: flex; gap: 10px; }
+  .qfp-footer-col h3 { font-size: 12px; }
+  .qfp-footer-col a { font-size: 13.5px; }
+  .qfp-footer-col--contact { grid-column: 1 / -1; gap: 12px; }
   .qfp-footer-col--contact a, .qfp-footer-col--contact span { font-size: 14px; }
   .qfp-footer-col--contact a:first-of-type { font-size: 15px; }
-  .qfp-footer-col--contact span { display: none; }
+  .qfp-footer-col--contact > a > i, .qfp-footer-col--contact > span > i { width: 26px; height: 26px; border-radius: 8px; }
+  .qfp-footer-skyline { margin-top: 30px; }
+  .qfp-footer-skyline em { position: static; display: block; margin-bottom: 8px; text-align: right; font-size: 13px; }
   .qfp-footer-bottom { margin-top: 26px; padding: 18px 0 22px; flex-direction: column; align-items: flex-start; gap: 6px; font-size: 12px; }
   .qfp-footer-tagline { display: none; }
   .qfp-footer-legal { display: flex; }
@@ -1123,4 +1700,456 @@
   display: inline-flex;
   align-items: center;
   min-height: 24px;
+}
+
+/* ==========================================================================
+   QuickFurno — canvas port (qfp2-*)
+   Self-contained block for the six sections rebuilt from the approved boards:
+   How it works, Why QuickFurno, Pune localities, FAQ, For professionals and
+   the footer. Mobile-first; the desktop layout starts at 900px.
+   Nothing here depends on the older qfp-* rules beyond .qfp-shell.
+   ========================================================================== */
+:root {
+  --qf2-ink: #221E19;
+  --qf2-body: #78736A;
+  --qf2-mid: #4C4740;
+  --qf2-orange: #C9430E;
+  --qf2-bright: #E8551F;
+  --qf2-peach: #FDEEE3;
+  --qf2-line: #F2E7D6;
+  --qf2-panel: #FBEFE2;
+  --qfp-script: var(--font-caveat), "Caveat", "Segoe Script", cursive;
+}
+
+/* ---------- shared head ---------- */
+.qfp2-head { display: flex; flex-direction: column; align-items: center; gap: 9px; text-align: center; }
+.qfp2-head--left { align-items: flex-start; text-align: left; }
+.qfp2-kicker {
+  display: inline-flex; align-items: center; gap: 12px;
+  color: var(--qf2-orange); font-size: 11px; font-weight: 800;
+  letter-spacing: 0.17em; text-transform: uppercase;
+}
+.qfp2-kicker::before, .qfp2-kicker::after {
+  content: ""; width: 22px; height: 2px; border-radius: 2px; background: currentColor;
+}
+.qfp2-head--left .qfp2-kicker::after, .qfp2-kicker--start::after { display: none; }
+.qfp2-head h2 {
+  margin: 0; font-family: var(--qfp-head);
+  font-size: 25px; line-height: 1.1; font-weight: 700; letter-spacing: -0.03em; color: var(--qf2-ink);
+}
+.qfp2-head h2 span { color: var(--qf2-orange); }
+.qfp2-head p { margin: 0; max-width: 34ch; font-size: 13.5px; line-height: 1.5; color: var(--qf2-body); }
+.qfp2-head--left p { max-width: 42ch; }
+
+/* ==========================  WHY QUICKFURNO  ============================ */
+.qfp2-why { padding: 46px 0 48px; background: linear-gradient(180deg, #FDFBF8 0%, #FAF4EB 54%, #FDFBF8 100%); }
+.qfp2-why-grid { display: grid; gap: 22px; }
+.qfp2-why-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.qfp2-why-copy h2 {
+  margin: 0; font-family: var(--qfp-head);
+  font-size: 26px; line-height: 1.06; font-weight: 700; letter-spacing: -0.03em; color: var(--qf2-ink);
+}
+.qfp2-why-copy h2 span { color: var(--qf2-orange); }
+.qfp2-why-lede { margin: 0; max-width: 46ch; font-size: 13.5px; line-height: 1.55; color: var(--qf2-body); }
+.qfp2-why-points {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px;
+  width: 100%; margin: 12px 0 0; padding: 0; list-style: none;
+}
+.qfp2-why-points li { display: flex; align-items: flex-start; gap: 11px; }
+.qfp2-why-points i {
+  flex-shrink: 0; display: grid; place-items: center; width: 38px; height: 38px;
+  border-radius: 12px; background: var(--qf2-peach);
+}
+.qfp2-why-points > li > span { display: flex; flex-direction: column; gap: 4px; }
+.qfp2-why-points strong { font-size: 13.5px; font-weight: 700; color: var(--qf2-ink); }
+.qfp2-why-points em { font-style: normal; font-size: 12.5px; line-height: 1.45; color: var(--qf2-body); }
+.qfp2-why-stats {
+  display: flex; align-items: flex-start; width: 100%;
+  margin: 20px 0 0; padding: 18px 0 0; border-top: 1px solid #ECE2D3; list-style: none;
+}
+.qfp2-why-stats li {
+  flex: 1 1 0; box-sizing: border-box; display: flex; flex-direction: column;
+  align-items: center; gap: 5px; padding: 0 10px; text-align: center;
+}
+.qfp2-why-stats li + li { border-left: 1px solid #ECE2D3; }
+.qfp2-why-stats strong {
+  font-family: var(--qfp-head); font-size: 20px; font-weight: 800;
+  letter-spacing: -0.03em; line-height: 1.05; color: var(--qf2-orange);
+}
+.qfp2-why-stats em { font-style: normal; font-size: 10.5px; line-height: 1.35; color: var(--qf2-body); }
+.qfp2-why-photo { position: relative; border-radius: 16px; overflow: hidden; box-shadow: 0 34px 64px -40px rgba(20, 24, 29, 0.55); }
+.qfp2-why-photo > img { display: block; width: 100%; height: auto; }
+.qfp2-why-pill {
+  position: absolute; left: 1.4%; top: 3%; width: 34%; box-sizing: border-box;
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
+  border-radius: 999px; background: #fff; box-shadow: 0 10px 24px -14px rgba(20, 24, 29, 0.5);
+  font-size: 8.5px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--qf2-ink); white-space: nowrap;
+}
+.qfp2-why-pill svg { flex-shrink: 0; }
+.qfp2-why-checklist {
+  position: absolute; right: 0.8%; top: 9.5%; width: 35%; box-sizing: border-box;
+  margin: 0; padding: 2px 9px 3px; border-radius: 11px; background: #FFFDFA;
+  box-shadow: 0 18px 38px -22px rgba(20, 24, 29, 0.55); list-style: none;
+}
+.qfp2-why-checklist li { display: flex; align-items: center; gap: 7px; padding: 4px 0; border-bottom: 1px solid #F1E9DC; }
+.qfp2-why-checklist li:last-child { border-bottom: 0; }
+.qfp2-why-checklist i { flex-shrink: 0; display: grid; place-items: center; width: 14px; height: 14px; border-radius: 999px; background: #E7F6EC; }
+.qfp2-why-checklist span { font-size: 8.5px; line-height: 1.25; color: #3F3A33; }
+.qfp2-why-note {
+  position: absolute; left: 0; bottom: 0; width: 46%; box-sizing: border-box;
+  display: flex; align-items: center; gap: 8px; padding: 9px 10px;
+  border-radius: 0 13px 0 0; background: #FFFDFA;
+  box-shadow: 0 -10px 30px -18px rgba(20, 24, 29, 0.5);
+  font-size: 9px; line-height: 1.4; color: #3F3A33;
+}
+.qfp2-why-note i { flex-shrink: 0; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 999px; background: #E7F6EC; }
+
+/* ==========================  PUNE LOCALITIES  =========================== */
+.qfp2-areas { position: relative; overflow: hidden; padding: 44px 0 0; background: linear-gradient(180deg, #FDFBF8 0%, #F8F2E9 40%, #FBF7F0 74%, #FDFCFA 100%); }
+.qfp2-areas-map { position: absolute; top: -14px; right: -40px; width: 190px; height: auto; opacity: 0.5; pointer-events: none; }
+.qfp2-areas .qfp2-head { margin-bottom: 20px; }
+.qfp2-areas .qfp-shell { position: relative; }
+.qfp2-area-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin: 0; padding: 0; list-style: none; }
+.qfp2-area-cards > li:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.qfp2-area-card {
+  display: flex; align-items: center; gap: 7px; height: 100%; box-sizing: border-box;
+  padding: 4px 5px 4px 4px; border-radius: 999px; background: #fff;
+  border: 1px solid var(--qf2-line); box-shadow: 0 10px 22px -14px rgba(20, 24, 29, 0.34);
+}
+.qfp2-area-card img { flex-shrink: 0; width: 30px; height: 30px; border-radius: 999px; object-fit: cover; }
+.qfp2-area-name { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-size: 11.5px; font-weight: 600; color: var(--qf2-ink); }
+.qfp2-area-card b { flex-shrink: 0; display: grid; place-items: center; width: 19px; height: 19px; margin-left: auto; border-radius: 999px; background: var(--qf2-peach); }
+.qfp2-areas-more {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: fit-content; margin: 18px auto 0; padding: 9px 15px; border-radius: 999px;
+  background: #FDF0E5; border: 1px solid #F7E2CE; font-size: 11.5px; font-weight: 600; color: #6B5F52;
+}
+.qfp2-areas-skyline { margin-top: 22px; }
+.qfp2-areas-skyline img { display: block; width: 100%; height: auto; }
+
+/* ==============================  FAQ  =================================== */
+.qfp2-faq { position: relative; overflow: hidden; padding: 46px 0 48px; background: linear-gradient(180deg, #FDFBF8 0%, #FAF4EB 52%, #FDFBF8 100%); }
+.qfp2-faq-photo { display: none; }
+.qfp2-faq-band { display: flex; flex-direction: column; gap: 18px; margin-bottom: 20px; }
+.qfp2-faq-help { display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center; }
+.qfp2-faq-script {
+  position: relative; display: inline-flex; align-items: flex-start; gap: 6px;
+  font-family: var(--qfp-script); font-size: 23px; font-weight: 600; line-height: 1.1;
+  color: var(--qf2-mid);
+}
+.qfp2-faq-script svg { margin-top: 4px; opacity: 0.75; }
+.qfp2-faq-sub { font-size: 12.5px; color: var(--qf2-body); }
+.qfp2-faq-pill {
+  display: inline-flex; align-items: center; gap: 9px; padding: 11px 17px;
+  border-radius: 999px; background: #FBE7D6; font-size: 13px; font-weight: 600; color: #8F3008;
+  text-decoration: none;
+}
+.qfp2-faq-grid { display: grid; gap: 20px; }
+.qfp2-faq-list { display: flex; flex-direction: column; gap: 8px; }
+.qfp2-faq-item {
+  border-radius: 13px; background: #fff; border: 1px solid #F4EADC;
+  box-shadow: 0 12px 24px -20px rgba(20, 24, 29, 0.45);
+}
+.qfp2-faq-item summary { display: flex; align-items: center; gap: 11px; padding: 8px 11px 8px 8px; cursor: pointer; list-style: none; }
+.qfp2-faq-item summary::-webkit-details-marker { display: none; }
+.qfp2-faq-item summary i { flex-shrink: 0; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; background: var(--qf2-peach); }
+.qfp2-faq-item summary > span { flex-grow: 1; font-size: 13px; font-weight: 600; color: var(--qf2-ink); }
+.qfp2-faq-item summary b { flex-shrink: 0; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; background: #F6F1E9; color: #8B8378; transition: transform 0.18s ease; }
+.qfp2-faq-item[open] summary b { transform: rotate(180deg); }
+.qfp2-faq-item > p { margin: 0; padding: 0 14px 14px 55px; font-size: 12.5px; line-height: 1.6; color: var(--qf2-body); }
+.qfp2-faq-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 11px;
+  padding: 16px; border-radius: 18px; background: #FFFDFA; border: 1px solid var(--qf2-line);
+  box-shadow: 0 26px 52px -34px rgba(20, 24, 29, 0.5);
+}
+.qfp2-faq-card-banner { display: block; width: 100%; height: 276px; border-radius: 12px; overflow: hidden; }
+.qfp2-faq-card-banner img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; }
+.qfp2-faq-bulb { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 15px; background: #FBEBDA; }
+.qfp2-faq-card h3 { margin: 0; font-family: var(--qfp-head); font-size: 21px; line-height: 1.12; font-weight: 700; letter-spacing: -0.02em; color: var(--qf2-ink); }
+.qfp2-faq-card > p { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--qf2-body); }
+.qfp2-faq-btn {
+  box-sizing: border-box; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 13px 18px; border-radius: 11px; background: linear-gradient(180deg, #E8551F 0%, #B23A08 100%);
+  color: #fff; font-size: 13.5px; font-weight: 700; text-decoration: none;
+}
+
+/* ======================  FOR PROFESSIONALS  ============================= */
+.qfp2-vendor { padding: 12px 0 28px; background: #FDFBF8; }
+.qfp2-vendor-card { position: relative; overflow: hidden; border-radius: 20px; background: linear-gradient(150deg, #FDF4E8 0%, #FBEEDF 52%, #F9E9D6 100%); }
+.qfp2-vendor-inner { position: relative; padding: 26px 20px 24px; }
+.qfp2-vendor-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 13px; }
+.qfp2-vendor-copy h2 { margin: 0; font-family: var(--qfp-head); font-size: 25px; line-height: 1.07; font-weight: 700; letter-spacing: -0.03em; color: var(--qf2-ink); }
+.qfp2-vendor-copy h2 span { color: var(--qf2-orange); }
+.qfp2-vendor-copy > p { margin: 0; max-width: 42ch; font-size: 13px; line-height: 1.55; color: var(--qf2-body); }
+.qfp2-vendor-btn {
+  display: inline-flex; align-items: center; gap: 11px; padding: 14px 20px; border-radius: 12px;
+  background: linear-gradient(180deg, #C9430E 0%, #9C3208 100%); color: #fff;
+  font-size: 14px; font-weight: 700; text-decoration: none;
+  box-shadow: 0 16px 30px -18px rgba(156, 50, 8, 0.9);
+}
+.qfp2-vendor-points { display: flex; flex-direction: column; gap: 16px; margin: 22px 0 0; padding: 0; list-style: none; }
+.qfp2-vendor-points li { display: flex; align-items: flex-start; gap: 11px; }
+.qfp2-vendor-points i { flex-shrink: 0; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 999px; background: #fff; box-shadow: 0 10px 20px -14px rgba(20, 24, 29, 0.5); }
+.qfp2-vendor-points > li > span { display: flex; flex-direction: column; gap: 3px; }
+.qfp2-vendor-points strong { font-size: 13.5px; font-weight: 700; color: var(--qf2-ink); }
+.qfp2-vendor-points em { font-style: normal; font-size: 12px; line-height: 1.45; color: var(--qf2-body); }
+.qfp2-vendor-figure { position: relative; height: 342px; overflow: hidden; }
+.qfp2-vendor-blob {
+  position: absolute; left: 36%; top: 22px; transform: translateX(-50%);
+  width: 252px; height: 300px; opacity: 0.75; background: #F3DCBF;
+  border-radius: 48% 52% 44% 56% / 54% 46% 58% 42%;
+}
+.qfp2-vendor-figure img {
+  position: absolute; left: 36%; bottom: 0; transform: translateX(-50%);
+  width: 208px; height: 342px; object-fit: cover; object-position: 50% 40%;
+}
+.qfp2-vendor-note {
+  position: absolute; right: 4px; top: 30px; width: 102px;
+  font-family: var(--qfp-script); font-size: 16.5px; line-height: 1.24; font-weight: 600; color: #6B4A2A;
+}
+
+/* ==============================  FOOTER  ================================ */
+.qfp2-footer { position: relative; overflow: hidden; padding: 40px 0 22px; background: #1A1917; }
+.qfp2-footer-sky { position: absolute; right: -26px; bottom: 0; width: 320px; height: auto; opacity: 0.16; pointer-events: none; }
+.qfp2-footer .qfp-shell { position: relative; }
+.qfp2-rule { position: relative; height: 1px; margin: 18px 0; background: #2B2A27; }
+.qfp2-footer-brand { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.qfp2-footer-brand > p { margin: 0; font-size: 12.5px; line-height: 1.6; color: #A8A29A; }
+.qfp2-footer-made { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #E8A33D; }
+.qfp2-footer-links { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+.qfp2-footer h3 { margin: 0 0 12px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: #8A837A; }
+.qfp2-footer-links ul, .qfp2-footer-contact ul { display: flex; flex-direction: column; gap: 9px; margin: 0; padding: 0; list-style: none; }
+.qfp2-footer-links a { font-size: 12.5px; line-height: 1.25; color: #CFC9C1; text-decoration: none; }
+.qfp2-footer-links a:hover { color: #fff; }
+.qfp2-footer-wa {
+  box-sizing: border-box; width: 100%; display: inline-flex; align-items: center; gap: 12px;
+  padding: 11px 12px; border-radius: 12px; background: #232220; border: 1px solid #33312E; text-decoration: none;
+}
+.qfp2-footer-wa i { flex-shrink: 0; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 999px; background: #25D366; }
+.qfp2-footer-wa > span { flex-grow: 1; white-space: nowrap; font-size: 13px; font-weight: 700; color: #fff; }
+.qfp2-footer-contact ul { margin-top: 13px; }
+.qfp2-footer-contact li { display: flex; align-items: center; gap: 11px; }
+.qfp2-footer-contact li i { flex-shrink: 0; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: #262523; }
+.qfp2-footer-contact li a, .qfp2-footer-contact li span { font-size: 12.5px; line-height: 1.35; color: #CFC9C1; text-decoration: none; }
+.qfp2-footer-social-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.qfp2-footer-social { display: inline-flex; gap: 9px; margin: 0; padding: 0; list-style: none; }
+.qfp2-footer-social a { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 999px; background: #262523; color: #E4DFD8; }
+.qfp2-footer-social svg { width: 15px; height: 15px; }
+.qfp2-footer-script {
+  width: 122px; font-family: var(--qfp-script); font-size: 16.5px; line-height: 1.2;
+  font-weight: 600; color: #C9C3BA; text-align: center;
+}
+.qfp2-footer-script i { display: block; width: 54px; height: 2px; margin: 4px auto 0; border-radius: 2px; background: #E8A33D; opacity: 0.9; }
+.qfp2-footer-bottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font-size: 11.5px; color: #7E786F; }
+.qfp2-footer-bottom nav { display: inline-flex; gap: 10px; }
+.qfp2-footer-bottom a { color: #7E786F; text-decoration: none; }
+.qfp2-footer-bottom a:hover { color: #CFC9C1; }
+
+/* ======================================================================== */
+/*  DESKTOP                                                                 */
+/* ======================================================================== */
+@media (min-width: 900px) {
+  .qfp2-head { gap: 11px; }
+  .qfp2-head h2 { font-size: 42px; line-height: 1.08; }
+  .qfp2-head p { max-width: 560px; font-size: 16px; }
+  .qfp2-kicker { font-size: 12.5px; }
+
+  /* ---- why quickfurno ---- */
+  .qfp2-why { padding: 74px 0 78px; }
+  .qfp2-why-grid { grid-template-columns: minmax(0, 1fr) 560px; gap: 46px; align-items: center; }
+  .qfp2-why-copy { gap: 15px; }
+  .qfp2-why-copy h2 { font-size: 44px; }
+  .qfp2-why-lede { font-size: 16px; }
+  .qfp2-why-points { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px 28px; margin-top: 18px; }
+  .qfp2-why-points i { width: 44px; height: 44px; border-radius: 14px; }
+  .qfp2-why-points strong { font-size: 15.5px; }
+  .qfp2-why-points em { font-size: 13.5px; }
+  .qfp2-why-stats { margin-top: 32px; padding-top: 26px; }
+  .qfp2-why-stats li { flex-direction: row; align-items: center; gap: 12px; text-align: left; padding: 0 18px; }
+  .qfp2-why-stats li:first-child { padding-left: 0; }
+  .qfp2-why-stats li > span { display: flex; flex-direction: column; gap: 2px; }
+  .qfp2-why-stats strong { font-size: 30px; }
+  .qfp2-why-stats em { font-size: 12.5px; }
+  .qfp2-why-photo { border-radius: 22px; }
+  .qfp2-why-pill { padding: 9px 16px; font-size: 11.5px; gap: 9px; }
+  .qfp2-why-checklist { padding: 4px 15px 6px; border-radius: 15px; }
+  .qfp2-why-checklist li { padding: 7px 0; gap: 9px; }
+  .qfp2-why-checklist i { width: 19px; height: 19px; }
+  .qfp2-why-checklist span { font-size: 12.5px; }
+  .qfp2-why-note { padding: 15px 17px; border-radius: 0 18px 0 0; font-size: 12.5px; gap: 11px; }
+  .qfp2-why-note i { width: 28px; height: 28px; }
+
+  /* ---- localities ---- */
+  .qfp2-areas { padding: 72px 0 0; }
+  .qfp2-areas-map { top: -26px; right: 34px; width: 290px; opacity: 0.85; }
+  .qfp2-areas .qfp2-head { margin-bottom: 30px; }
+  .qfp2-area-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px; }
+  .qfp2-area-cards > li:last-child:nth-child(odd) { grid-column: auto; }
+  .qfp2-area-card { padding: 4px 5px 4px 4px; }
+  .qfp2-area-card img { width: 38px; height: 38px; }
+  .qfp2-area-name { gap: 5px; font-size: 13.5px; }
+  .qfp2-area-card b { width: 23px; height: 23px; margin-left: 0; }
+  .qfp2-areas-more { margin-top: 24px; padding: 10px 20px; font-size: 14px; }
+  .qfp2-areas-skyline { margin-top: 30px; }
+
+  /* ---- faq ---- */
+  .qfp2-faq { padding: 66px 0 72px; }
+  .qfp2-faq-photo { display: block; position: absolute; top: 0; right: 0; width: 362px; height: 470px; overflow: hidden; }
+  .qfp2-faq-photo img { width: 100%; height: 100%; object-fit: cover; object-position: 100% 0; }
+  .qfp2-faq-fade-x { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(253,251,248,0.92) 0%, rgba(253,251,248,0.28) 26%, rgba(253,251,248,0) 58%); }
+  .qfp2-faq-fade-y { position: absolute; left: 0; right: 0; bottom: 0; height: 130px; background: linear-gradient(180deg, rgba(251,246,238,0) 0%, rgba(251,246,238,0.75) 58%, #FBF6EE 100%); }
+  .qfp2-faq .qfp-shell { position: relative; }
+  .qfp2-faq-band { flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 36px; padding-right: 286px; margin-bottom: 24px; }
+  .qfp2-faq-script { font-size: 27px; }
+  .qfp2-faq-sub { font-size: 13.5px; }
+  .qfp2-faq-pill { padding: 12px 20px; font-size: 14.5px; }
+  .qfp2-faq-grid { grid-template-columns: minmax(0, 1fr) 352px; gap: 48px; align-items: start; }
+  .qfp2-faq-list { gap: 9px; }
+  .qfp2-faq-item summary { gap: 14px; padding: 9px 13px 9px 9px; }
+  .qfp2-faq-item summary i { width: 42px; height: 42px; border-radius: 14px; }
+  .qfp2-faq-item summary > span { font-size: 15.5px; }
+  .qfp2-faq-item summary b { width: 27px; height: 27px; }
+  .qfp2-faq-item > p { padding: 0 16px 16px 66px; font-size: 13.5px; }
+  .qfp2-faq-card { margin-top: 104px; padding: 24px; border-radius: 20px; gap: 13px; }
+  .qfp2-faq-card-banner { display: none; }
+  .qfp2-faq-bulb { width: 54px; height: 54px; border-radius: 18px; }
+  .qfp2-faq-card h3 { font-size: 25px; }
+  .qfp2-faq-card > p { font-size: 13.5px; }
+  .qfp2-faq-btn { padding: 14px 20px; border-radius: 12px; font-size: 14.5px; }
+
+  /* ---- for professionals ---- */
+  .qfp2-vendor { padding: 16px 0 34px; }
+  .qfp2-vendor-card { border-radius: 26px; background: linear-gradient(115deg, #FDF4E8 0%, #FBEEDF 46%, #F9E9D6 100%); }
+  .qfp2-vendor-inner {
+    box-sizing: border-box; min-height: 486px; display: grid;
+    grid-template-columns: minmax(0, 1fr) 246px; gap: 34px; align-items: center;
+    padding: 42px 380px 44px 44px;
+  }
+  .qfp2-vendor-copy { gap: 16px; }
+  .qfp2-vendor-copy h2 { font-size: 38px; }
+  .qfp2-vendor-copy > p { max-width: 470px; font-size: 15.5px; }
+  .qfp2-vendor-btn { padding: 16px 26px; border-radius: 13px; font-size: 15.5px; }
+  .qfp2-vendor-points { margin: 0; gap: 22px; }
+  .qfp2-vendor-points i { width: 48px; height: 48px; }
+  .qfp2-vendor-points strong { font-size: 15px; }
+  .qfp2-vendor-points em { font-size: 13px; }
+  .qfp2-vendor-figure { position: absolute; right: 0; top: 0; bottom: 0; width: 368px; height: auto; display: flex; align-items: center; justify-content: flex-start; }
+  .qfp2-vendor-blob { left: auto; right: 58px; top: 48px; transform: none; width: 332px; height: 372px; }
+  .qfp2-vendor-figure img { position: relative; left: auto; bottom: auto; transform: none; width: 296px; height: 100%; max-height: 486px; object-position: 50% 40%; }
+  .qfp2-vendor-note { right: 14px; top: 44px; width: 112px; font-size: 19px; }
+
+  /* ---- footer ---- */
+  .qfp2-footer { padding: 66px 0 26px; }
+  .qfp2-footer-sky { right: 158px; bottom: 48px; width: 545px; opacity: 0.5; }
+  .qfp2-footer .qfp-shell { display: grid; grid-template-columns: minmax(0, 1.22fr) minmax(0, 0.82fr) minmax(0, 0.88fr) minmax(0, 1.05fr); gap: 34px 40px; align-items: start; }
+  .qfp2-rule { display: none; }
+  .qfp2-footer-brand { grid-column: 1; gap: 15px; }
+  .qfp2-footer-brand > p { max-width: 32ch; font-size: 14.5px; }
+  .qfp2-footer-made { font-size: 13.5px; }
+  .qfp2-footer-links { display: contents; }
+  .qfp2-footer-links > div:first-child { grid-column: 2; }
+  .qfp2-footer-links > div:last-child { grid-column: 3; }
+  .qfp2-footer h3 { margin-bottom: 18px; font-size: 11.5px; }
+  .qfp2-footer-links ul { gap: 13px; }
+  .qfp2-footer-links a { font-size: 14.5px; }
+  .qfp2-footer-contact { grid-column: 4; }
+  .qfp2-footer-wa { padding: 12px 16px; border-radius: 13px; }
+  .qfp2-footer-wa i { width: 34px; height: 34px; }
+  .qfp2-footer-wa > span { font-size: 15px; }
+  .qfp2-footer-contact ul { margin-top: 16px; gap: 13px; }
+  .qfp2-footer-contact li i { width: 32px; height: 32px; }
+  .qfp2-footer-contact li a, .qfp2-footer-contact li span { font-size: 14.5px; }
+  .qfp2-footer-social-row { grid-column: 1; grid-row: 2; justify-content: flex-start; margin-top: 4px; }
+  .qfp2-footer-social a { width: 38px; height: 38px; }
+  .qfp2-footer-social svg { width: 16px; height: 16px; }
+  .qfp2-footer-script { position: absolute; right: 24px; bottom: 96px; width: 134px; font-size: 19px; }
+  .qfp2-footer-bottom { grid-column: 1 / -1; margin-top: 28px; padding-top: 20px; border-top: 1px solid #2B2A27; font-size: 13px; }
+}
+
+/* ---- canvas port: hero, services and Made in Pune -----------------------
+   These three sections keep their original qfp-* markup; the canvas differs
+   from them only by subtraction (the hero's white feature strip, the services
+   blueprint collage + trust row + "not sure" band, and the India skyline under
+   the city row are all gone) plus the sizing below. ---------------------- */
+.qfp2-services { padding: 46px 0 48px; }
+.qfp2-svc-head { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 22px; }
+.qfp2-svc-head h2 {
+  margin: 0; font-family: var(--qfp-head);
+  font-size: 30px; line-height: 1.06; font-weight: 700; letter-spacing: -0.03em; color: var(--qf2-ink);
+}
+.qfp2-svc-head h2 span { color: var(--qf2-orange); }
+.qfp2-cities h2 span { color: #FFB13D; }
+
+@media (min-width: 900px) {
+  .qfp2-services { padding: 82px 0 78px; }
+  .qfp2-svc-head { gap: 16px; margin-bottom: 44px; }
+  .qfp2-svc-head h2 { font-size: 54px; }
+  .qfp2-cities { padding: 80px 0 84px; }
+}
+
+/* Service cards: the canvas photo pane is a short landscape band (236px at a
+   ~288px card), not the 5:7 portrait the earlier board used. */
+.qfp2-services .qfp-service-grid { gap: 14px; }
+.qfp2-services .qfp-card-face { aspect-ratio: 1 / 1; min-height: 0; }
+.qfp2-services .qfp-card { border-radius: 18px; }
+
+@media (min-width: 900px) {
+  .qfp2-services .qfp-service-grid { gap: 22px; }
+  .qfp2-services .qfp-card-face { aspect-ratio: auto; height: 236px; min-height: 0; }
+  .qfp2-services .qfp-card { border-radius: 20px; }
+}
+
+/* ---- hero photo scale on wide screens ----------------------------------
+   The photo is 1536x960 (1.6:1). With `cover` in a short full-bleed band the
+   browser scales by WIDTH, so the wider the viewport the more of the frame is
+   cropped — at 1920 the band showed about a third of the picture and cut the
+   heads off. Two limits fix it: the band grows with the viewport up to 900px,
+   and the photo itself stops widening at 2400px so an ultra-wide monitor does
+   not magnify it further. Anchored right, the spare width on the left sits
+   under the copy, where the shade is almost solid anyway. -------------- */
+@media (min-width: 900px) {
+  .qfp2-hero { min-height: clamp(660px, 46vw, 900px); }
+  .qfp2-hero .qfp-hero-media { left: auto; right: 0; width: min(100%, 2400px); }
+  .qfp2-hero .qfp-hero-media img { object-position: 72% 30%; }
+}
+
+/* ---- desktop rhythm pass -------------------------------------------------
+   Audit at 1440 found three things making the page read as unorganised:
+   section headings ran 54 / 44 / 40 / 42 / 42 / 38px with no scale; vertical
+   padding ran 82/78, 74/78, 80/84, 72/0, 66/72, 16/34; and the localities
+   section lost its bottom padding when the skyline came out. One type size,
+   one rhythm. The two centred sections (Made in Pune, Localities) stay
+   centred — that break is deliberate and now reads as such because nothing
+   else varies around it. ------------------------------------------------- */
+@media (min-width: 900px) {
+  .qfp2-svc-head h2,
+  .qfp2-why-copy h2,
+  .qfp2-head h2,
+  .qfp2-cities h2,
+  .qfp2-vendor-copy h2 {
+    font-size: 44px;
+    line-height: 1.07;
+    letter-spacing: -0.03em;
+  }
+
+  .qfp2-services,
+  .qfp2-why,
+  .qfp2-cities,
+  .qfp2-areas,
+  .qfp2-faq { padding-top: 76px; padding-bottom: 80px; }
+
+  .qfp2-vendor { padding: 4px 0 80px; }
+
+  /* headline blocks get the same space under them everywhere */
+  .qfp2-svc-head { margin-bottom: 36px; }
+  .qfp2-areas .qfp2-head { margin-bottom: 32px; }
+  .qfp2-faq-band { margin-bottom: 32px; }
+}
+
+/* The vendor headline is the one step down from the 44px section scale: it
+   sits inside a card whose copy column is capped at ~496px by the photo, and
+   "home services business" wraps to a fourth line at 44. */
+@media (min-width: 900px) {
+  .qfp2-vendor-copy h2 { font-size: 40px; }
 }

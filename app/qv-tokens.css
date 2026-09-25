@@ -1,0 +1,95 @@
+/* ==========================================================================
+   QuickFurno public token layer.
+
+   Shared by the /vendors page and the site footer, so it is loaded once from
+   the root layout rather than by either of them. Anything scoped to a single
+   page belongs in that page's own stylesheet, not here.
+   ========================================================================== */
+
+/* ==========================================================================
+   QuickFurno /vendors — ported from the approved canvas boards.
+
+   One responsive implementation, not two. Mobile-first values come from the
+   390 board; the `min-width: 900px` block carries the 1280 board's values
+   inside an 1184px shell. Images that differ between the boards are swapped
+   with <picture>, so only one file is ever downloaded.
+   ========================================================================== */
+
+.qv {
+  --qv-ink: #0E0C08;
+  --qv-amber: #FCB253;
+  --qv-orange: #E0611E;
+  --qv-dark: #14110D;
+  --qv-body: #6E675C;
+  --qv-line: #F2E7D6;
+  --qv-red: #D93A2B;
+  --qv-green: #1F9254;
+  --qv-muted: #CFC6B8;
+  --qv-faint: #A79E90;
+  --qv-shell: 1184px;
+  --qv-pad: 20px;
+
+  color: var(--qv-dark);
+  font-family: Poppins, ui-sans-serif, system-ui, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.qv *,
+.qv *::before,
+.qv *::after { box-sizing: border-box; }
+
+/* :where() keeps these resets at zero specificity, so a component class
+   such as .qv-btn-ghost still wins over them */
+:where(.qv) :where(h1, h2, h3, p) { margin: 0; }
+:where(.qv) :where(a) { color: inherit; text-decoration: none; }
+:where(.qv) :where(img) { display: block; max-width: none; }
+:where(.qv) :where(summary) { list-style: none; cursor: pointer; }
+.qv summary::-webkit-details-marker { display: none; }
+
+/* every section is full-bleed; the shell centres the content ----------------- */
+.qv-sec { position: relative; overflow: hidden; }
+.qv-shell { position: relative; padding-left: var(--qv-pad); padding-right: var(--qv-pad); }
+
+@media (min-width: 900px) {
+  .qv-shell {
+    width: var(--qv-shell);
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+/* shared bits ---------------------------------------------------------------- */
+.qv-ico { display: block; flex-shrink: 0; width: 20px; height: 20px; }
+
+.qv-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  color: var(--qv-orange);
+}
+.qv-eyebrow i {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background-color: var(--qv-orange);
+}
+@media (min-width: 900px) { .qv-eyebrow { font-size: 11px; } }
+
+.qv-script {
+  font-family: Caveat, ui-serif, cursive;
+  line-height: 1.16;
+  color: #1E2A38;
+}
+
+/* the orange half of a two-tone heading, used on every surface */
+.qv-hl { color: var(--qv-orange); }

@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
+import { Wordmark } from "@/components/Wordmark";
 
 // Single source of truth for the unified public-site navigation.
 // Anchor links (e.g. /#categories) resolve to homepage sections; on other
@@ -70,14 +70,12 @@ export function Header() {
           <span />
           <span />
         </button>
+        {/* The approved QuickFurno mark, from <Wordmark /> so the header and
+            the footer can never drift apart. This used to be a CSS text
+            wordmark (.qfp-logo) because the logo file the site had was an
+            older mark with different lettering; that file is now replaced. */}
         <Link href="/" className="qf-brand" aria-label="QuickFurno home" onClick={() => setOpen(false)}>
-          <Image
-            src="/assets/quickfurno/logos/quickfurno-logo.svg"
-            alt="QuickFurno"
-            width={260}
-            height={70}
-            priority
-          />
+          <Wordmark height={26} priority />
         </Link>
 
         <nav className="qf-nav" aria-label="Primary navigation">

@@ -3,9 +3,11 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { categories, categorySlug, type QuickFurnoCategory } from "@/lib/quickfurno-data";
-import { HOME_FAQ, PUNE_AREAS, TESTIMONIALS } from "@/lib/homepage-content";
-import { categoryImage, heroImage } from "@/lib/homepage-images";
-import { CONTACT, whatsappLink } from "@/lib/config";
+import { HOME_FAQ, PUNE_AREAS } from "@/lib/homepage-content";
+import { categoryImage, heroImage, optionalRealImage } from "@/lib/homepage-images";
+import { getPublicVendorCountsByCategory } from "@/services/publicVendorService";
+import { Footer } from "@/components/Footer";
+import { whatsappLink } from "@/lib/config";
 
 // ============================================================================
 // QuickFurno — Pune launch homepage
@@ -64,14 +66,6 @@ function GridIcon({ size = 18, stroke = "#746D61" }: IconProps) {
     </svg>
   );
 }
-function ShieldCheckIcon({ size = 18, stroke = "#C93A0E", width = 2 }: IconProps) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 3l7 3v5c0 4.6-3.1 7.7-7 9-3.9-1.3-7-4.4-7-9V6l7-3z" />
-      <path d="M9 12l2.2 2.2L15.5 10" />
-    </svg>
-  );
-}
 function HomeIcon({ size = 18, stroke = "#C93A0E" }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -87,66 +81,94 @@ function ChatIcon({ size = 26 }: IconProps) {
     </svg>
   );
 }
-function CheckCircleIcon({ size = 26 }: IconProps) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21.5 11.2V12a9.5 9.5 0 1 1-5.6-8.7" /><polyline points="21.5 4.5 12 14 9 11" />
-    </svg>
-  );
-}
 /** 24-point green rosette with a white tick — the "verified" mark from the mockup. */
-function VerifiedRosette({ size = 26 }: IconProps) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <polygon
-        points="12.00,0.80 14.56,2.44 17.60,2.30 19.00,5.00 21.70,6.40 21.56,9.44 23.20,12.00 21.56,14.56 21.70,17.60 19.00,19.00 17.60,21.70 14.56,21.56 12.00,23.20 9.44,21.56 6.40,21.70 5.00,19.00 2.30,17.60 2.44,14.56 0.80,12.00 2.44,9.44 2.30,6.40 5.00,5.00 6.40,2.30 9.44,2.44"
-        fill="#1F9D5B"
-      />
-      <polyline points="7.2,12.4 10.4,15.6 17,9" fill="none" stroke="#FFFFFF" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-function FooterChatIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FF8A5C" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M20 11.5a8 8 0 0 1-11.7 7.1L4 19.8l1.2-4.1A8 8 0 1 1 20 11.5Z" />
-      <path d="M8.5 10.5h7" />
-      <path d="M8.5 13.5h4.5" />
-    </svg>
-  );
-}
-
-function MailIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FF8A5C" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
-      <rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7 L12 13 L2 7" />
-    </svg>
-  );
-}
-
 // --------------------------------------------------------------------------
 // Service card copy. Keyed by the canonical category name so a typo here is a
 // type error, and iteration always happens over the registry (never this map).
 // --------------------------------------------------------------------------
+type Sub = { label: string; icon: GlyphName };
 type ServiceMeta = {
   desc: string;
   short: string;
   cta: string;
   alt: string;
-  mark: ReactNode;
+  /** Qualitative pill, top-left of the photo. Never a count — see below. */
+  badge: string;
+  badgeIcon: GlyphName;
+  /** The three sub-categories shown in the bar under the photo. */
+  subs: [Sub, Sub, Sub];
   /** Optional per-photo crop focus (CSS object-position), e.g. "center 30%". */
   pos?: string;
 };
 
-const markProps = { width: 40, height: 40, viewBox: "0 0 48 48", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
+// ---------------------------------------------------------------------------
+// One line-icon set, shared by the card badges and the sub-category bars.
+// Glyphs repeat ACROSS cards on purpose (a repair and a renovation are the
+// same spanner) but never twice WITHIN one card, which is what would read as
+// a mistake. Every glyph is drawn on the same 24px box at the same weight so
+// the bars line up optically.
+// ---------------------------------------------------------------------------
+type GlyphName =
+  | "plan" | "cube" | "check" | "kitchen" | "wardrobe" | "cabinet"
+  | "sofa" | "recliner" | "wrench" | "hand" | "home" | "villa"
+  | "sparkle" | "ceiling" | "bulb" | "led" | "roller" | "brush"
+  | "texture" | "building" | "brick" | "beam" | "crown" | "shield" | "factory"
+  | "rupee" | "users";
+
+const GLYPHS: Record<GlyphName, ReactNode> = {
+  plan: <><rect x="3" y="3" width="18" height="18" rx="1.5" /><path d="M3 10h11M14 3v18" /></>,
+  cube: <><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" /><path d="M4 7.5 12 12l8-4.5M12 12v9" /></>,
+  check: <><circle cx="12" cy="12" r="9" /><path d="M8.4 12.2l2.4 2.4 4.7-5" /></>,
+  kitchen: <><rect x="3" y="4" width="18" height="5" rx="1" /><rect x="3" y="11" width="18" height="10" rx="1" /><path d="M12 11v10M8 15h1.5M14.5 15H16" /></>,
+  wardrobe: <><rect x="5" y="3" width="14" height="18" rx="1.5" /><path d="M12 3v18M9.5 11v2M14.5 11v2" /></>,
+  cabinet: <><rect x="4" y="4" width="16" height="16" rx="1.5" /><path d="M4 9.5h16M4 15h16M10.5 6.8h3M10.5 12.2h3M10.5 17.6h3" /></>,
+  sofa: <><path d="M5 12V9.5A2.5 2.5 0 0 1 7.5 7h9A2.5 2.5 0 0 1 19 9.5V12" /><path d="M3.5 12.5A1.5 1.5 0 0 1 5 11h14a1.5 1.5 0 0 1 1.5 1.5V18h-17z" /><path d="M6 18v2M18 18v2" /></>,
+  recliner: <><rect x="6" y="7" width="12" height="9" rx="2" /><path d="M6 10H4.5a1.5 1.5 0 0 0 0 3H6M18 10h1.5a1.5 1.5 0 0 1 0 3H18M8 16v3M16 16v3" /></>,
+  wrench: <><path d="M15.4 3.6a5 5 0 0 0-6.1 6.1l-5.7 5.7a2 2 0 0 0 2.8 2.8l5.7-5.7a5 5 0 0 0 6.1-6.1l-2.8 2.8-2.5-.6-.6-2.5z" /></>,
+  hand: <><path d="M9 11V5.6a1.5 1.5 0 0 1 3 0V11" /><path d="M12 10.6V4.9a1.5 1.5 0 0 1 3 0V11" /><path d="M15 11V7.6a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7 6 6 0 0 1-5.2-3L4 14.6a1.6 1.6 0 0 1 2.6-1.8L9 15" /></>,
+  home: <><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" /><path d="M9.5 21v-6h5v6" /></>,
+  villa: <><path d="M2 11 7 6.5 12 11M12 11l5-4.5 5 4.5" /><path d="M4 11v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9" /><path d="M10 21v-5h4v5" /></>,
+  sparkle: <><path d="M12 3.5l1.9 5.4 5.4 1.9-5.4 1.9-1.9 5.4-1.9-5.4L4.7 10.8l5.4-1.9z" /><path d="M18.6 16.4l.6 1.8 1.8.6-1.8.6-.6 1.8-.6-1.8-1.8-.6 1.8-.6z" /></>,
+  ceiling: <><path d="M3 5h18" /><path d="M6 5v3.5h12V5" /><path d="M12 8.5V13" /><path d="M9 13h6l-1.5 4.5h-3z" /></>,
+  bulb: <><path d="M9 17.4a5.5 5.5 0 1 1 6 0V19a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1z" /><path d="M10 22h4" /></>,
+  led: <><rect x="2.5" y="9" width="19" height="6" rx="3" /><path d="M7 12h.01M12 12h.01M17 12h.01" /></>,
+  roller: <><rect x="3.5" y="4" width="13" height="5" rx="1.5" /><path d="M16.5 6.5h3A1.5 1.5 0 0 1 21 8v3a1.5 1.5 0 0 1-1.5 1.5H12A1.5 1.5 0 0 0 10.5 14v1.5" /><rect x="8.5" y="15.5" width="4" height="6" rx="1.2" /></>,
+  brush: <><rect x="8" y="2.5" width="8" height="6" rx="1.2" /><path d="M12 8.5v4" /><path d="M9.5 12.5h5V20a2.5 2.5 0 0 1-5 0z" /></>,
+  texture: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M6 10c2-2 4-2 6 0s4 2 6 0M6 15c2-2 4-2 6 0s4 2 6 0" /></>,
+  building: <><rect x="4" y="3" width="16" height="18" rx="1.5" /><path d="M8 7h2M14 7h2M8 11h2M14 11h2M8 15h2M14 15h2" /></>,
+  brick: <><rect x="3" y="5" width="18" height="14" rx="1" /><path d="M3 12h18M9 5v7M15 12v7" /></>,
+  beam: <><path d="M3 6h18M3 18h18" /><path d="M7 6v12M17 6v12" /><path d="M7 6l10 12" /></>,
+  crown: <><path d="M3 17 5 7l4.5 4L12 4l2.5 7L19 7l2 10z" /><path d="M3.6 20.5h16.8" /></>,
+  shield: <><path d="M12 3l7.5 3v6c0 4.2-3 7.6-7.5 9-4.5-1.4-7.5-4.8-7.5-9V6z" /><path d="M8.8 12.2l2.2 2.2 4.2-4.4" /></>,
+  factory: <><path d="M3 21V10l6 3.5V10l6 3.5V6h6v15z" /><path d="M7 17h2M13 17h2M18 17h2" /></>,
+  rupee: <><path d="M7 5h10M7 9.2h10" /><path d="M14 5c0 2.6-2.1 4.2-4.9 4.2H7l8.2 9.8" /></>,
+  users: <><circle cx="9.2" cy="8.2" r="3.2" /><path d="M3 19.6a6.3 6.3 0 0 1 12.4 0" /><path d="M16.4 5.4a3.2 3.2 0 0 1 0 5.7M17.8 14.4a6.3 6.3 0 0 1 3.4 5.2" /></>,
+};
+
+function Glyph({ name, size = 18 }: { name: GlyphName; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {GLYPHS[name]}
+    </svg>
+  );
+}
 
 const SERVICE_META: Record<QuickFurnoCategory, ServiceMeta> = {
   "Interior Designers": {
     desc: "Complete home interiors — design to handover.",
-    short: "Complete home interiors — design to handover.",
+    short: "Complete home interiors",
     cta: "Explore Designers",
     alt: "Two interior designers in their studio with material samples, colour swatches and floor plans",
-    mark: null,
+    // The board read "25+ Experts". There are four live designers, so that
+    // badge would have put a fabricated number on the busiest page of the
+    // site, against the no-invented-stats rule the rest of this file follows.
+    badge: "Verified Profiles",
+    badgeIcon: "shield",
+    subs: [
+      { label: "Space Planning", icon: "plan" },
+      { label: "3D Designs", icon: "cube" },
+      { label: "Turnkey Execution", icon: "check" },
+    ],
   },
   "Modular Factory": {
     desc: "Factory-finish kitchens & wardrobes.",
@@ -154,54 +176,78 @@ const SERVICE_META: Record<QuickFurnoCategory, ServiceMeta> = {
     cta: "Explore Modular",
     alt: "Technician inspecting a sage-green cabinet shutter in a modular furniture factory",
     pos: "center 30%",
-    mark: (
-      <svg {...markProps}><rect x="10" y="12" width="28" height="24" rx="2" /><line x1="24" y1="12" x2="24" y2="36" /><line x1="19" y1="18" x2="19" y2="20" /><line x1="29" y1="18" x2="29" y2="20" /></svg>
-    ),
+    badge: "Factory Finish",
+    badgeIcon: "factory",
+    subs: [
+      { label: "Modular Kitchens", icon: "kitchen" },
+      { label: "Wardrobes", icon: "wardrobe" },
+      { label: "Custom Cabinets", icon: "cabinet" },
+    ],
   },
   Carpenters: {
     desc: "Custom furniture & woodwork.",
     short: "Furniture & woodwork",
     cta: "Find Carpenters",
     alt: "Carpenter sanding a custom cabinet",
-    mark: (
-      <svg {...markProps}><path d="M17 13 V25 M31 13 V25" /><path d="M15 25 H33 V28 H15 Z" /><path d="M18 28 V37 M30 28 V37" /></svg>
-    ),
+    badge: "Skilled Professionals",
+    badgeIcon: "wrench",
+    subs: [
+      { label: "Furniture", icon: "sofa" },
+      { label: "Repairs", icon: "wrench" },
+      { label: "Custom Work", icon: "hand" },
+    ],
   },
   "Premium Interiors": {
     desc: "Premium design & execution.",
     short: "Design & execution",
     cta: "Explore Premium",
     alt: "Luxurious premium living room",
-    mark: (
-      <svg {...markProps}><path d="M24 10 l4.2 8.6 9.3 1.1 -6.8 6.4 1.7 9.2 -8.4 -4.5 -8.4 4.5 1.7 -9.2 -6.8 -6.4 9.3 -1.1 z" /></svg>
-    ),
+    badge: "Luxury Spaces",
+    badgeIcon: "crown",
+    subs: [
+      { label: "Residential", icon: "home" },
+      { label: "Villas", icon: "villa" },
+      { label: "Premium Finish", icon: "sparkle" },
+    ],
   },
   Sofa: {
-    desc: "Custom sofas & upholstery.",
+    desc: "New sofa sales & upholstery.",
     short: "Sofas & upholstery",
     cta: "Explore Sofas",
     alt: "Sofa maker welcoming you to a showroom of fabric and leather sofas",
-    mark: (
-      <svg {...markProps}><path d="M13 27 v-4 a3 3 0 0 1 3 -3 h16 a3 3 0 0 1 3 3 v4" /><path d="M10 27 a3 3 0 0 1 3 -3 h22 a3 3 0 0 1 3 3 v7 h-28 z" /><path d="M14 34 v3 M34 34 v3" /></svg>
-    ),
+    badge: "Wide Collection",
+    badgeIcon: "sofa",
+    subs: [
+      { label: "New Sofas", icon: "sofa" },
+      { label: "Custom Upholstery", icon: "hand" },
+      { label: "Recliners", icon: "recliner" },
+    ],
   },
   Painter: {
     desc: "Interior & exterior painting.",
     short: "Interior & exterior",
     cta: "Book a Painter",
     alt: "Painter rolling beige paint onto a wall",
-    mark: (
-      <svg {...markProps}><rect x="11" y="12" width="20" height="9" rx="2" /><path d="M31 16 h6 v7 l-13 3 v6" /><rect x="21" y="33" width="6" height="8" rx="1.5" /></svg>
-    ),
+    badge: "Trusted Pros",
+    badgeIcon: "brush",
+    subs: [
+      { label: "Interior Painting", icon: "roller" },
+      { label: "Exterior Painting", icon: "building" },
+      { label: "Texture Finish", icon: "texture" },
+    ],
   },
   "Civil Work": {
-    desc: "Renovation, masonry & repairs.",
+    desc: "Renovations, masonry & repairs.",
     short: "Renovation & repairs",
     cta: "Get Started",
     alt: "Mason beside fresh brickwork",
-    mark: (
-      <svg {...markProps}><rect x="10" y="14" width="28" height="20" rx="1" /><line x1="10" y1="24" x2="38" y2="24" /><line x1="24" y1="14" x2="24" y2="24" /><line x1="17" y1="24" x2="17" y2="34" /><line x1="31" y1="24" x2="31" y2="34" /></svg>
-    ),
+    badge: "All Types",
+    badgeIcon: "building",
+    subs: [
+      { label: "Renovation", icon: "wrench" },
+      { label: "Masonry", icon: "brick" },
+      { label: "Structural Work", icon: "beam" },
+    ],
   },
   "False Ceiling": {
     desc: "POP & gypsum ceilings, cove lighting.",
@@ -209,9 +255,13 @@ const SERVICE_META: Record<QuickFurnoCategory, ServiceMeta> = {
     cta: "Explore Ceilings",
     alt: "Installer finishing a layered POP false ceiling with warm cove lighting",
     pos: "center 30%",
-    mark: (
-      <svg {...markProps}><path d="M8 13 H40" /><path d="M13 13 V19 H35 V13" /><path d="M17 23 H31" /><path d="M24 19 V27" /><path d="M20 27 H28 L26 32 H22 Z" /></svg>
-    ),
+    badge: "Modern Designs",
+    badgeIcon: "bulb",
+    subs: [
+      { label: "POP Ceiling", icon: "ceiling" },
+      { label: "Cove Lighting", icon: "bulb" },
+      { label: "LED Integration", icon: "led" },
+    ],
   },
 };
 
@@ -231,35 +281,25 @@ const OTHER_SERVICES = categories
 
 const FALLBACK_CATEGORY_IMAGE = (slug: string) => `/assets/quickfurno/images/categories/${slug}.svg`;
 
-const HOW_IT_WORKS = [
-  {
-    icon: <ChatIcon />,
-    title: "Tell us what you need",
-    body: "Pick the service, your locality and the project details you want to share. Your phone number is requested at the contact step.",
-  },
-  {
-    icon: <ShieldCheckIcon size={26} stroke="#fff" width={2} />,
-    title: "We find eligible pros",
-    body: "QuickFurno can assign up to 3 active pros at a time after category and marketplace eligibility checks; approved ranking signals determine order.",
-  },
-  {
-    icon: <CheckCircleIcon />,
-    title: "Compare & choose",
-    body: "Review profiles and quotes side by side, then deal directly with the one you trust. No fee, no obligation.",
-  },
-];
-
 // Verification steps — same four checks as lib/homepage-content VERIFY_STEPS,
 // with the tighter one-line copy from the approved mockup.
-const VERIFY_POINTS = [
-  { title: "Business profile review", body: "Business details are reviewed before an approved profile is listed." },
-  { title: "Service information review", body: "Services, coverage and submitted profile information are reviewed before listing." },
-  { title: "Approved before listing", body: "Pending, rejected, suspended or hidden profiles are not shown as active public vendors." },
-  { title: "Support channels", body: "Vendors can use WhatsApp and the dashboard support workspace when they need help." },
-];
 
+// The approved mockup's journey section: Pune live, the rest on the roadmap.
+//
+// This was reduced to Pune alone during the Pune-only launch hardening, which
+// also added a CI rule banning the string "Mumbai" from every active surface.
+// The launch IS Pune-only and stays that way — nothing here is selectable, and
+// no lead or vendor can be created outside Pune. These names are a roadmap
+// shown to a visitor, which is a different thing from a city the product will
+// transact in, and the guard now draws that line instead of banning the word
+// outright. See scripts/mvp/launch/validate-pune-only-launch.mjs.
 const CITIES = [
   { name: "Pune", file: "pune", live: true },
+  { name: "Delhi NCR", file: "delhi-ncr", live: false },
+  { name: "Mumbai", file: "mumbai", live: false },
+  { name: "Hyderabad", file: "hyderabad", live: false },
+  { name: "Kolkata", file: "kolkata", live: false },
+  { name: "Bengaluru", file: "bengaluru", live: false },
 ];
 
 // Areas: the mockup shows 11 pills + "+ N more" on desktop, 7 + "+ N more" on
@@ -269,7 +309,6 @@ const AREAS_VISIBLE_MOBILE = 7;
 
 const NAV_LINKS = [
   { href: "#services", label: "Services" },
-  { href: "#how-it-works", label: "How it works" },
   { href: "#why-quickfurno", label: "Why QuickFurno" },
   { href: "/vendors", label: "For professionals" },
 ];
@@ -319,10 +358,36 @@ function Header() {
   );
 }
 
+// ---- Hero ------------------------------------------------------------------
+// Board: kicker rule, two-tone headline, a four-point trust row, the search
+// bar, popular chips, and a feature band that laps over the foot of the photo.
+
+const HERO_POINTS: { icon: GlyphName; label: string }[] = [
+  { icon: "shield", label: "Verified Professionals" },
+  { icon: "rupee", label: "Free to Enquire" },
+  { icon: "users", label: "Up to 3 Matches" },
+  { icon: "check", label: "No Obligation" },
+];
+
+// Consumer wording for six registry categories: LABEL is what a homeowner
+// searches for, the href still resolves through categorySlug, and anything not
+// in the registry is filtered out below - so a chip can never point at a
+// category the marketplace does not actually have.
+const POPULAR = (
+  [
+    { category: "Modular Factory", label: "Modular Kitchen" },
+    { category: "Interior Designers", label: "Interior Designer" },
+    { category: "Carpenters", label: "Carpenter" },
+    { category: "Painter", label: "Painter" },
+    { category: "Civil Work", label: "Civil Work" },
+    { category: "Sofa", label: "Sofa" },
+  ] as { category: QuickFurnoCategory; label: string }[]
+).filter((item) => categories.some((c) => c.name === item.category));
+
 function Hero() {
   const hero = heroImage("/assets/quickfurno/images/vendors/premium-living-room.svg");
   return (
-    <section className="qfp-hero" aria-labelledby="qfp-hero-title">
+    <section className="qfp-hero qfp2-hero" aria-labelledby="qfp-hero-title">
       <div className="qfp-hero-media" aria-hidden="true">
         {/* sizes = the width the photo is actually DRAWN at. On phones the
             band shows half the picture, so the photo renders ~2x the screen
@@ -340,34 +405,41 @@ function Hero() {
       <div className="qfp-hero-shade" aria-hidden="true" />
       <div className="qfp-shell qfp-hero-inner">
         <div className="qfp-hero-copy">
+          <span className="qfp-hero-kicker">
+            <i aria-hidden="true" />
+            Trusted home professionals in Pune
+          </span>
+          {/* The {" "} are load-bearing: JSX drops the whitespace before a
+              <br/> on its own line, and the phone rules hide those breaks, so
+              without them the headline reads "righthome professional." */}
           <h1 id="qfp-hero-title">
-            Pune home professionals.<br />{" "}
-            <span>One enquiry away.</span>
+            Find the right{" "}
+            <br />
+            <span>home&nbsp;professional.</span>{" "}
+            <br />
+            <span>Faster.</span>
           </h1>
-          <div className="qfp-hero-badges" aria-label="Why QuickFurno">
-            <span className="qfp-hero-badge">
-              <ShieldIcon />
-              <span className="qfp-badge-full">Profiles reviewed</span>
-              <span className="qfp-badge-short">Reviewed</span>
-            </span>
-            <span className="qfp-hero-badge">
-              <PinIcon />
-              <span className="qfp-badge-full">Relevant Pune pros</span>
-              <span className="qfp-badge-short">Relevant</span>
-            </span>
-            <span className="qfp-hero-badge">
-              <BoltIcon />
-              Free to enquire
-            </span>
-          </div>
-          <small className="qfp-hero-note">Matches depend on category fit, eligibility and marketplace availability.</small>
+          <p className="qfp-hero-lede">
+            Tell us what you need. Get matched with up to 3 verified Pune professionals, compare
+            profiles and quotes, and choose with confidence.
+          </p>
+          <ul className="qfp-hero-points" aria-label="Why QuickFurno">
+            {HERO_POINTS.map((point) => (
+              <li key={point.label}>
+                <i aria-hidden="true">
+                  <Glyph name={point.icon} size={19} />
+                </i>
+                {point.label}
+              </li>
+            ))}
+          </ul>
           {/* data-quote-bar: the trigger reads this bar's <select> (service) and
               [data-quote-area] input at click time and opens the modal pre-filled. */}
           <div className="qfp-quote" aria-label="Start an enquiry" data-quote-bar>
             <label className="qfp-quote-field qfp-quote-field--service">
               <GridIcon />
               <select defaultValue="" aria-label="Select service">
-                <option value="">What do you need done?</option>
+                <option value="">What do you need?</option>
                 {categories.map((category) => (
                   <option key={category.name} value={category.name}>{category.name}</option>
                 ))}
@@ -375,79 +447,246 @@ function Hero() {
             </label>
             <label className="qfp-quote-field qfp-quote-field--area">
               <PinIcon size={18} stroke="#746D61" width={2} />
-              <input type="text" placeholder="Kharadi, Baner…" aria-label="Your locality" autoComplete="off" data-quote-area />
+              {/* A datalist rather than a <select>: the board draws a dropdown,
+                  but the marketplace accepts localities outside the listed set
+                  and the FAQ says so. Suggestions plus free text keeps both. */}
+              <input
+                type="text"
+                placeholder="Kharadi, Baner, Pune"
+                aria-label="Your locality"
+                autoComplete="off"
+                list="qfp-area-options"
+                data-quote-area
+              />
+              <datalist id="qfp-area-options">
+                {PUNE_AREAS.map((area) => (
+                  <option key={area} value={area} />
+                ))}
+              </datalist>
             </label>
             <EnquiryModalTrigger className="qfp-btn qfp-btn--primary qfp-quote-btn" source="Homepage hero quote bar">
               Get up to 3 matches <ArrowIcon size={16} stroke="#fff" />
             </EnquiryModalTrigger>
           </div>
+          <div className="qfp-hero-popular">
+            <span className="qfp-hero-popular-label">Popular:</span>
+            {POPULAR.map((item) => (
+              <Link key={item.label} className="qfp-hero-chip" href={`/category/${categorySlug(item.category)}`}>
+                {item.label}
+              </Link>
+            ))}
+          </div>
+          <small className="qfp-hero-note">
+            Matches depend on category fit, eligibility and marketplace availability.
+          </small>
         </div>
       </div>
     </section>
   );
 }
 
-function ServiceCard({ name }: { name: QuickFurnoCategory }) {
+// One card shape for all eight categories. The board drops the 2x2 featured
+// tile, so Interior Designers is now the same card as the rest - it simply
+// leads the grid. Photo runs the full pane, copy sits on it over a scrim, and
+// the sub-category bar below is the part that does real work: it answers
+// "what is actually in here?" before anyone has to click.
+// Five of the eight categories have no publicly visible vendor yet. A card
+// reading "0 pros" advertises an empty marketplace on the busiest page of the
+// site, so zero renders as the state instead of the number. Set this to false
+// to print a literal "0 pros".
+const SOFTEN_ZERO_COUNT = true;
+
+/** null = count unavailable (hide the pill entirely). */
+function countLabel(count: number | null): string | null {
+  if (count === null) return null;
+  // Short on purpose: "Accepting enquiries" was wide enough to wrap under the
+  // longer badges and not the shorter ones, so the top row came out uneven
+  // across a grid row.
+  if (count === 0) return SOFTEN_ZERO_COUNT ? "Enquiries open" : "0 pros";
+  return `${count} ${count === 1 ? "pro" : "pros"}`;
+}
+
+function ServiceCard({ name, count }: { name: QuickFurnoCategory; count: number | null }) {
   const meta = SERVICE_META[name];
   const slug = categorySlug(name);
   const image = categoryImage(slug, FALLBACK_CATEGORY_IMAGE(slug));
+  const label = countLabel(count);
   return (
     <Link href={`/category/${slug}`} className="qfp-card">
-      <div className="qfp-card-media">
-        <Image
-          src={image.src}
-          alt={meta.alt}
-          fill
-          sizes="(max-width: 760px) 50vw, (max-width: 1100px) 50vw, 282px"
-          style={meta.pos ? { objectPosition: meta.pos } : undefined}
-        />
-      </div>
-      <div className="qfp-card-body">
-        <span className="qfp-card-accent" aria-hidden="true" />
-        <h3>{name}</h3>
-        <p className="qfp-card-desc-long">{meta.desc}</p>
-        <p className="qfp-card-desc-short">{meta.short}</p>
-        <span className="qfp-card-cta"><i><ArrowIcon stroke="#C93A0E" /></i>{meta.cta}</span>
-        {meta.mark ? <span className="qfp-card-mark" aria-hidden="true">{meta.mark}</span> : null}
-      </div>
+      <span className="qfp-card-face">
+        <span className="qfp-card-media">
+          <Image
+            src={image.src}
+            alt={meta.alt}
+            fill
+            sizes="(max-width: 760px) 50vw, (max-width: 1100px) 50vw, 300px"
+            style={meta.pos ? { objectPosition: meta.pos } : undefined}
+          />
+        </span>
+        <span className="qfp-card-scrim" aria-hidden="true" />
+        <span className="qfp-card-top">
+          <span className="qfp-card-badge">
+            <Glyph name={meta.badgeIcon} size={15} />
+            {meta.badge}
+          </span>
+          {label ? <span className="qfp-card-count">{label}</span> : null}
+        </span>
+        <span className="qfp-card-copy">
+          <span className="qfp-card-title">{name}</span>
+          <span className="qfp-card-desc qfp-card-desc-long">{meta.desc}</span>
+          <span className="qfp-card-desc qfp-card-desc-short">{meta.short}</span>
+          <span className="qfp-card-btn">
+            {meta.cta}
+            <ArrowIcon size={16} stroke="#fff" />
+          </span>
+        </span>
+      </span>
+      {/* Informational, deliberately not links: sub-category routes do not
+          exist yet, and three anchors all pointing at the same category page
+          would be noise for a screen reader and for search. They become links
+          the day those pages do. */}
+      <span className="qfp-card-subs">
+        {meta.subs.map((sub) => (
+          <span className="qfp-card-sub" key={sub.label}>
+            <Glyph name={sub.icon} size={19} />
+            <span>{sub.label}</span>
+          </span>
+        ))}
+      </span>
     </Link>
   );
 }
 
-function FeaturedServiceCard() {
-  const name = FEATURED.name;
-  const meta = SERVICE_META[name];
-  const slug = categorySlug(name);
-  const image = categoryImage(slug, FALLBACK_CATEGORY_IMAGE(slug));
+const FAQ_ICONS = [
+  "faq-enquiry-chat",
+  "faq-matching-people",
+  "faq-public-profile-eye",
+  "faq-location-pin",
+  "faq-obligation-document",
+  "faq-work-tools",
+];
+
+const ICON = "/assets/quickfurno/images/icons";
+
+// Wording kept to what the marketplace actually does - no promises about
+// homeowner vetting or lead volume, neither of which QuickFurno controls.
+const VENDOR_POINTS: { icon: string; title: string; body: string }[] = [
+  { icon: "vendor-quality-enquiries", title: "Real enquiries", body: "Enquiries arrive from Pune homeowners with their requirement attached." },
+  { icon: "vendor-verified-customers", title: "Reviewed listings", body: "Every public profile is reviewed and approved before it goes live." },
+  { icon: "vendor-grow-business", title: "Grow in Pune", body: "Appear in Pune's marketplace and receive matches when you are eligible." },
+];
+
+// ============================================================================
+// Canvas port (v2 sections)
+//
+// How it works, Why QuickFurno, Pune localities, FAQ, For professionals and
+// the footer are built from the approved canvas boards. Styling is the
+// self-contained qfp2-* block at the end of app/home-pune-launch.css so the
+// rebuild never fights the older qfp-* rules.
+//
+// HONESTY: every count and claim below is checked against the database and the
+// codebase. 28 vendors exist, 0 carry a rating, 0 carry a completed-project
+// count, no background check runs anywhere, and PUNE_AREAS holds 20 entries —
+// so the boards' "5,000+ pros", "50,000+ projects", "4.8/5", "past work &
+// reviews" and "39 more localities" are all absent here.
+// ============================================================================
+const REAL = "/assets/quickfurno/images/real";
+
+type GlyphKey = "chat" | "people" | "doc" | "eye" | "pin" | "wrench" | "bulb" | "bars" | "shield" | "trend" | "rupee" | "grid" | "home2" | "mail2" | "check2";
+
+const G2: Record<GlyphKey, ReactNode> = {
+  chat: <><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.4A8 8 0 1 1 21 12z" /><circle cx="8.5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="15.5" cy="12" r="1" /></>,
+  people: <><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5" /><circle cx="17" cy="8.5" r="2.4" /><path d="M16 14.6c3 .3 5 2 5 5.4" /></>,
+  doc: <><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4" /><path d="M9 12h6" /><path d="M9 16h5" /></>,
+  eye: <><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z" /><circle cx="12" cy="12" r="2.6" /></>,
+  pin: <><path d="M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11z" /><circle cx="12" cy="10" r="2.4" /></>,
+  wrench: <path d="M9.9 9.9a4.7 4.7 0 0 1 6.2-6.2l-3 3 1 3.2 3.2 1 3-3a4.7 4.7 0 0 1-6.2 6.2L6.7 20.9a2.4 2.4 0 0 1-3.4-3.4z" />,
+  bulb: <><path d="M9.2 17.5a6 6 0 1 1 5.6 0" /><path d="M9.5 18h5" /><path d="M10.5 21h3" /></>,
+  bars: <><path d="M5 20V13" /><path d="M12 20V7" /><path d="M19 20v-9" /></>,
+  shield: <><path d="M12 3 4.6 6v6.1c0 4.2 3 7.7 7.4 8.9 4.4-1.2 7.4-4.7 7.4-8.9V6z" /><path d="m9 12 2 2 4-4" /></>,
+  trend: <><path d="M3 17 9.5 10.5l3.5 3.5L21 6" /><path d="M15 6h6v6" /></>,
+  rupee: <><path d="M6 4h12" /><path d="M6 9h12" /><path d="M16 4c0 3.3-2.5 5-6 5h-4l9 11" /></>,
+  grid: <><circle cx="6" cy="6" r="1.6" /><circle cx="12" cy="6" r="1.6" /><circle cx="18" cy="6" r="1.6" /><circle cx="6" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="18" cy="12" r="1.6" /><circle cx="6" cy="18" r="1.6" /><circle cx="12" cy="18" r="1.6" /><circle cx="18" cy="18" r="1.6" /></>,
+  home2: <><path d="M4 10.5 12 4l8 6.5V20H4z" /><path d="M10 20v-5h4v5" /></>,
+  mail2: <><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="m3.6 6.5 8.4 6 8.4-6" /></>,
+  check2: <><circle cx="12" cy="12" r="9" /><path d="m8.5 12 2.4 2.4 4.6-4.8" /></>,
+};
+
+function G({ name, size = 20, stroke = "#C9430E", width = 1.9, fill = "none" }: { name: GlyphKey; size?: number; stroke?: string; width?: number; fill?: string }) {
   return (
-    <Link href={`/category/${slug}`} className="qfp-card qfp-card--featured">
-      <div className="qfp-card-media">
-        <Image src={image.src} alt={meta.alt} fill priority sizes="(max-width: 760px) 100vw, (max-width: 1100px) 100vw, 588px" />
-      </div>
-      <div className="qfp-card-body">
-        <span className="qfp-card-accent" aria-hidden="true" />
-        <h3>{name}</h3>
-        <p className="qfp-card-desc-long">{meta.desc}</p>
-        <span className="qfp-card-cta"><i><ArrowIcon stroke="#fff" /></i>{meta.cta}</span>
-        <div className="qfp-card-perks" aria-label="What interior designers cover">
-          <span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C93A0E" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="1.5" /><line x1="3" y1="10" x2="14" y2="10" /><line x1="14" y1="3" x2="14" y2="21" /></svg>
-            Space Planning
-          </span>
-          <span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C93A0E" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 l8 4.5 v9 L12 21 4 16.5 v-9 z" /><path d="M4 7.5 L12 12 l8 -4.5 M12 12 V21" /></svg>
-            3D Designs
-          </span>
-          <span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C93A0E" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8.5 12.2 l2.4 2.4 4.6 -5" /></svg>
-            End-to-End Execution
-          </span>
-        </div>
-      </div>
-    </Link>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={name === "grid" ? stroke : fill} stroke={name === "grid" ? "none" : stroke} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {G2[name]}
+    </svg>
   );
 }
 
+function Tick({ size = 13 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#3FA96A" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m5 13 4 4L19 7" />
+    </svg>
+  );
+}
+
+// "Why QuickFurno" — the board's four benefit cards. Board wording claimed
+// background checks, verified pricing, verified customer reviews and ratings;
+// none of those exist, so each line says what the marketplace actually does.
+const WHY_POINTS: { glyph: GlyphKey; title: string; body: string }[] = [
+  { glyph: "shield", title: "Reviewed profiles", body: "Every public profile is reviewed and approved before it is listed." },
+  { glyph: "doc", title: "Clear information", body: "Services, coverage and contact details are checked before a profile goes live." },
+  { glyph: "people", title: "Compare with confidence", body: "Get up to 3 matches, compare profiles and quotes, then choose what suits you best." },
+  { glyph: "rupee", title: "No obligation to hire", body: "Explore, compare and connect for free. You stay in control at every step." },
+];
+
+// The board's stat strip read 5,000+ pros / 50,000+ projects / 4.8 rating.
+// All three are invented, so the strip carries product facts instead.
+const WHY_STATS: { glyph: GlyphKey; value: string; label: string }[] = [
+  { glyph: "grid", value: String(categories.length), label: "Service categories live in Pune" },
+  { glyph: "people", value: "Up to 3", label: "Matches per enquiry" },
+  { glyph: "rupee", value: "₹0", label: "Homeowner fee, always" },
+];
+
+const WHY_CHECKS = ["Business details check", "Service details check", "Coverage & categories", "Approved before listing"];
+
+// Locality photo chips. Only the first ARES_WITH_PHOTOS have artwork; the rest
+// of PUNE_AREAS is summarised in the badge below the grid.
+const AREA_PHOTOS: Record<string, string> = {
+  Kharadi: "loc-kharadi",
+  "Viman Nagar": "loc-viman-nagar",
+  "Koregaon Park": "loc-koregaon-park",
+  Baner: "loc-baner",
+  Wakad: "loc-wakad",
+  Hinjewadi: "loc-hinjewadi",
+  Magarpatta: "loc-magarpatta",
+  Kothrud: "loc-kothrud",
+  Aundh: "loc-aundh",
+  Hadapsar: "loc-hadapsar",
+  "Pimpri-Chinchwad": "loc-pimpri-chinchwad",
+};
+
+// Three of the eight category photos, staggered, with a floating label on
+// each — the board's collage, built from photos already in the repo rather
+// than a new composite asset.
+
+// Photo and pill icon share a file name, so one entry drives both.
+
+function ServicesHeading() {
+  return (
+    <div className="qfp2-svc-head" data-reveal>
+      <span className="qfp2-kicker">Our services</span>
+      <h2>
+        Home services.
+        <br />
+        <span>One marketplace.</span>
+      </h2>
+    </div>
+  );
+}
+
+// Restored with the How it works section: the rebuild in c6cfb34 dropped this
+// alternate homeowner entry point, taking the homepage from five conversion
+// routes to four. It is for the visitor who does not know which category their
+// job belongs to, which is a real share of enquiries.
 function NotSureCard() {
   return (
     <EnquiryModalTrigger className="qfp-notsure" source="Homepage not-sure card" modalTitle="Tell us about your home">
@@ -455,7 +694,7 @@ function NotSureCard() {
       <span className="qfp-notsure-copy">
         <span className="qfp-notsure-kicker">LET&apos;S BUILD TOGETHER</span>
         <span className="qfp-notsure-title">Not sure where to start?</span>
-        <span className="qfp-notsure-desc">Tell us about your home - we&apos;ll route your request to the right service.</span>
+        <span className="qfp-notsure-desc">Tell us about your home — we&apos;ll route your request to the right service.</span>
         <span className="qfp-notsure-desc qfp-notsure-desc--short">We&apos;ll route your request.</span>
         <span className="qfp-notsure-btn">Get Matched <ArrowIcon stroke="#fff" /></span>
       </span>
@@ -467,111 +706,64 @@ function NotSureCard() {
   );
 }
 
-// --------------------------------------------------------------------------
-// Services heading — "blueprint" concept (chosen on the design canvas).
-// A light architect's grid + a line-drawn floor plan labelled "Your home",
-// with the three trust points pinned to it like design notes. On tablets and
-// phones the plan becomes a faint corner sketch and the notes a simple list.
-// --------------------------------------------------------------------------
-// Trust points shown as a row of verified-badge cards under the heading on
-// every screen size (swipeable on tablets and phones). All five are true
-// today — see lib/homepage-content.ts and the FAQ.
-const TRUST_POINTS: { title: string; body: string }[] = [
-  { title: "Profiles reviewed", body: "Active public listings must pass marketplace controls" },
-  { title: "Bounded matching", body: "Up to 3 active pros can be assigned at a time" },
-  { title: "Free to enquire", body: "No homeowner fee to submit an enquiry" },
-  { title: "Pune launch", body: "The marketplace launch is focused on Pune" },
-  { title: "Governed contact sharing", body: "Client details follow assignment and consent controls" },
-];
-
-function BlueprintPlan() {
-  const line = "#CDBB9B";
+async function Services() {
+  const ordered = [FEATURED, ...OTHER_SERVICES];
+  // One fetch for all eight. Null means the table was unreachable, in which
+  // case every card hides its count rather than claiming zero.
+  const counts = await getPublicVendorCountsByCategory(ordered.map((c) => c.name));
   return (
-    <svg className="qfp-bp-svg" viewBox="0 0 640 350" fill="none" aria-hidden="true" focusable="false">
-      <rect x="60" y="50" width="500" height="230" fill="rgba(255,255,255,0.55)" stroke={line} strokeWidth="2" />
-      <line x1="300" y1="50" x2="300" y2="150" stroke={line} strokeWidth="2" />
-      <line x1="60" y1="170" x2="200" y2="170" stroke={line} strokeWidth="2" />
-      <line x1="250" y1="170" x2="300" y2="170" stroke={line} strokeWidth="2" />
-      <line x1="200" y1="170" x2="200" y2="120" stroke={line} strokeWidth="1.5" />
-      <path d="M200 120 A50 50 0 0 1 250 170" stroke={line} strokeWidth="1.2" strokeDasharray="4 4" />
-      <line x1="380" y1="46" x2="480" y2="46" stroke={line} strokeWidth="1.5" />
-      <line x1="380" y1="54" x2="480" y2="54" stroke={line} strokeWidth="1.5" />
-      <rect x="370" y="200" width="150" height="44" rx="8" stroke={line} strokeWidth="1.5" />
-      <line x1="420" y1="206" x2="420" y2="238" stroke={line} strokeWidth="1.2" />
-      <line x1="470" y1="206" x2="470" y2="238" stroke={line} strokeWidth="1.2" />
-      <rect x="410" y="150" width="70" height="30" rx="6" stroke={line} strokeWidth="1.2" />
-      <rect x="90" y="72" width="110" height="76" rx="6" stroke={line} strokeWidth="1.5" />
-      <line x1="90" y1="92" x2="200" y2="92" stroke={line} strokeWidth="1.2" />
-      <path d="M60 250 L160 250 L160 280" stroke={line} strokeWidth="1.5" />
-      <line x1="60" y1="300" x2="560" y2="300" stroke={line} strokeWidth="1.2" />
-      <line x1="60" y1="294" x2="60" y2="306" stroke={line} strokeWidth="1.2" />
-      <line x1="560" y1="294" x2="560" y2="306" stroke={line} strokeWidth="1.2" />
-      <g className="qfp-bp-leaders">
-        {[
-          [145, 110],
-          [430, 50],
-          [445, 222],
-        ].map(([x1, y1]) => (
-          <g key={`${x1}-${y1}`}>
-            <circle cx={x1} cy={y1} r="10" fill="rgba(240,74,26,0.15)" />
-            <circle cx={x1} cy={y1} r="5" fill="#C93A0E" />
-          </g>
-        ))}
-      </g>
-    </svg>
-  );
-}
-
-function ServicesHeading() {
-  return (
-    <>
-      <div className="qfp-bp" data-reveal>
-        <div className="qfp-bp-copy">
-          <span className="qfp-bp-kicker">
-            <i className="t" aria-hidden="true" /><i className="l" aria-hidden="true" />
-            Our services
-            <i className="l" aria-hidden="true" /><i className="t" aria-hidden="true" />
-          </span>
-          <h2>Home services.<br />One marketplace.</h2>
-          <p>From interiors to painting, browse the Pune launch categories in one marketplace.</p>
-        </div>
-        <div className="qfp-bp-plan" aria-hidden="true">
-          <BlueprintPlan />
-          <span className="qfp-bp-home">YOUR HOME</span>
-        </div>
-      </div>
-      <ol className="qfp-trust-row" aria-label="Why homeowners choose QuickFurno" data-reveal-group>
-        {TRUST_POINTS.map((point) => (
-          <li className="qfp-trust-card" key={point.title}>
-            <VerifiedRosette size={26} />
-            <div>
-              <strong>{point.title}</strong>
-              <span>{point.body}</span>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </>
-  );
-}
-
-function Services() {
-  return (
-    <section className="qfp-section qfp-services" id="services">
+    <section className="qfp-section qfp-services qfp2-services" id="services">
       <span id="categories" aria-hidden="true" />
       <div className="qfp-shell">
         <ServicesHeading />
+        {/* Eight equal cards, 4x2. FEATURED now means "leads the grid", not
+            "is twice the size" - the board treats every category the same. */}
         <div className="qfp-service-grid" data-reveal-group>
-          <FeaturedServiceCard />
-          {OTHER_SERVICES.map((category) => (
-            <ServiceCard key={category.name} name={category.name} />
+          {ordered.map((category) => (
+            <ServiceCard
+              key={category.name}
+              name={category.name}
+              count={counts ? counts.get(category.name) ?? 0 : null}
+            />
           ))}
-          <NotSureCard />
         </div>
+        {/* Eight categories fill 4x2 exactly, so this reads as a full-width
+            band under the grid rather than a spare cell. */}
+        <NotSureCard />
       </div>
     </section>
   );
 }
+
+// Restored: the rebuild in c6cfb34 dropped this section while the header and
+// the footer kept linking to #how-it-works, so that nav item pointed at
+// nothing. Copy is the approved wording — up to 3 pros, no fee, no obligation
+// — and no vendor carries a rating or a completed-project count, so neither is
+// claimed here.
+// `slot` names a PAIR of files: real/<slot>-d.webp for the 1280 side pane and
+// real/<slot>-m.webp for the phone banner. The two frames are nothing alike
+// — one is twice as tall as it is wide, the other nearly twice as wide as it
+// is tall — so each photo is cut to its frame rather than cropped by chance.
+const HOW_IT_WORKS: { icon: ReactNode; title: string; body: string; slot: string }[] = [
+  {
+    icon: <ChatIcon />,
+    title: "Tell us what you need",
+    body: "Choose the service, share your location and a few details. Your phone number is requested at the contact step.",
+    slot: "how-step-1",
+  },
+  {
+    icon: <G name="shield" size={26} stroke="#fff" width={2} />,
+    title: "We find eligible pros",
+    body: "QuickFurno matches you with up to 3 active professionals based on your service, location and eligibility checks.",
+    slot: "how-step-2",
+  },
+  {
+    icon: <G name="check2" size={26} stroke="#fff" width={2} />,
+    title: "Compare & choose",
+    body: "Review profiles and quotes, then choose the professional you trust. No fee, no obligation.",
+    slot: "how-step-3",
+  },
+];
 
 function HowItWorks() {
   return (
@@ -580,25 +772,41 @@ function HowItWorks() {
       <span className="qfp-how-glow-b" aria-hidden="true" />
       <div className="qfp-shell">
         <div className="qfp-head-center" data-reveal>
-          <span className="qfp-kicker">How it works</span>
-          <h2>Three steps. Zero running around.</h2>
+          <span className="qfp-kicker qfp-kicker--ruled">How it works</span>
+          <h2>
+            Three steps. <span>Zero running around.</span>
+          </h2>
+          <p className="qfp-how-lede">From your requirement to a trusted professional — all in one place.</p>
         </div>
         <ol className="qfp-steps" data-reveal-group>
-          {HOW_IT_WORKS.map((step, index) => (
-            <li className="qfp-step" key={step.title}>
-              <div className="qfp-step-top">
-                <span className="qfp-step-icon">{step.icon}</span>
+          {HOW_IT_WORKS.map((step, index) => {
+            // -d is the tall pane the 1280 board draws; -m is the phone banner.
+            const photoPane = optionalRealImage(`${step.slot}-d`);
+            const photoBanner = optionalRealImage(`${step.slot}-m`);
+            return (
+              <li className="qfp-step" key={step.title}>
                 <span className="qfp-step-num" aria-hidden="true">0{index + 1}</span>
-              </div>
-              <div className="qfp-step-text">
-                <h3>{step.title}</h3>
-                <p>{step.body}</p>
-              </div>
-              {index < HOW_IT_WORKS.length - 1 ? (
-                <span className="qfp-step-next" aria-hidden="true"><ArrowIcon size={13} stroke="#C93A0E" width={2.6} /></span>
-              ) : null}
-            </li>
-          ))}
+                <div className="qfp-step-text">
+                  <span className="qfp-step-icon">{step.icon}</span>
+                  <h3>{step.title}</h3>
+                  <p>{step.body}</p>
+                </div>
+                <div className="qfp-step-media">
+                  {photoPane && photoBanner ? (
+                    /* Each file is already the size and shape it renders at, so
+                       there is nothing for the optimiser to do and only the one
+                       that matches the screen is fetched. */
+                    <picture>
+                      <source media="(min-width: 761px)" srcSet={photoPane} />
+                      <img src={photoBanner} alt="" loading="lazy" decoding="async" />
+                    </picture>
+                  ) : (
+                    <span className="qfp-slot-empty" aria-hidden="true" />
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ol>
       </div>
     </section>
@@ -607,13 +815,13 @@ function HowItWorks() {
 
 function MadeInPune() {
   return (
-    <section className="qfp-section qfp-cities" aria-labelledby="qfp-cities-title">
+    <section className="qfp-section qfp-cities qfp2-cities" aria-labelledby="qfp-cities-title">
       <span className="qfp-cities-glow" aria-hidden="true" />
       <div className="qfp-shell">
         <div className="qfp-head-center" data-reveal>
           <span className="qfp-kicker qfp-kicker--coral">Our journey</span>
-          <h2 id="qfp-cities-title">Made in Pune. Focused on Pune.</h2>
-          <p className="qfp-cities-lead">QuickFurno is launching as a Pune-only marketplace so supply, matching and support can stay focused.</p>
+          <h2 id="qfp-cities-title">Made in Pune. <span>Coming to your city next.</span></h2>
+          <p className="qfp-cities-lead">We are building QuickFurno where we live — then bringing verified home professionals to more of India.</p>
         </div>
         <ul className="qfp-city-grid" data-reveal-group>
           {CITIES.map((city) => (
@@ -622,71 +830,77 @@ function MadeInPune() {
                 <Image src={`${LAUNCH_IMG}/cities/${city.file}.jpg`} alt="" fill sizes="104px" />
               </span>
               <strong>{city.name}</strong>
-              <span className="qfp-city-status qfp-city-status--live"><i aria-hidden="true" />Live now</span>
+              {city.live ? (
+                <span className="qfp-city-status qfp-city-status--live"><i aria-hidden="true" />Live now</span>
+              ) : (
+                <span className="qfp-city-status">Coming soon</span>
+              )}
             </li>
           ))}
         </ul>
-        {/* Decorative skyline retained as artwork; the launch itself remains Pune-only. */}
-        <div className="qfp-cities-skyline" aria-hidden="true">
-          <Image src={`${LAUNCH_IMG}/india-skyline.png`} alt="" width={2200} height={415} sizes="(max-width: 760px) 100vw, 1100px" />
-        </div>
       </div>
     </section>
   );
 }
 
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
 function TrustAndSafety() {
-  const testimonial = TESTIMONIALS[0];
+  const hero = optionalRealImage("why-hero-v2");
   return (
-    <section className="qfp-section qfp-trust" id="why-quickfurno">
-      <div className="qfp-shell qfp-trust-grid">
-        <div className="qfp-trust-copy" data-reveal>
-          <span className="qfp-kicker">Trust &amp; safety</span>
-          <h2>Listed only after we say yes.</h2>
-          <p className="qfp-trust-lead">
-            Public profiles must pass QuickFurno&apos;s listing controls before they appear. Approval and active status are rechecked by the marketplace.
+    <section className="qfp-section qfp2-why" id="why-quickfurno">
+      <div className="qfp-shell qfp2-why-grid">
+        <div className="qfp2-why-copy" data-reveal>
+          <span className="qfp2-kicker">Why QuickFurno</span>
+          <h2>
+            Reviewed before listed.<br />
+            <span>Yours to choose.</span>
+          </h2>
+          <p className="qfp2-why-lede">
+            Every professional on QuickFurno is reviewed and approved before listing. You compare profiles and quotes and choose the right expert — with no homeowner fee and no obligation to hire.
           </p>
-          <ul className="qfp-verify-list">
-            {VERIFY_POINTS.map((point) => (
-              <li className="qfp-verify-item" key={point.title}>
-                <VerifiedRosette />
-                <div>
+          <ul className="qfp2-why-points">
+            {WHY_POINTS.map((point) => (
+              <li key={point.title}>
+                <i><G name={point.glyph} size={20} /></i>
+                <span>
                   <strong>{point.title}</strong>
-                  <span>{point.body}</span>
-                </div>
+                  <em>{point.body}</em>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <ul className="qfp2-why-stats">
+            {WHY_STATS.map((stat) => (
+              <li key={stat.label}>
+                <i><G name={stat.glyph} size={22} stroke="#E8551F" width={2} /></i>
+                <span>
+                  <strong>{stat.value}</strong>
+                  <em>{stat.label}</em>
+                </span>
               </li>
             ))}
           </ul>
         </div>
-        <div className="qfp-trust-visual" data-reveal>
-          <div className="qfp-trust-photo">
-            <Image src="/assets/quickfurno/images/vendors/premium-living-room.svg" alt="" fill sizes="(max-width: 760px) 100vw, 564px" />
-            <span className="qfp-trust-pill-label">PUNE LAUNCH</span>
-          </div>
-          {testimonial ? (
-            <figure className="qfp-quote-card">
-              <svg width="30" height="24" viewBox="0 0 30 24" fill="#C93A0E" opacity="0.25" aria-hidden="true">
-                <path d="M0 24 L6 0 L14 0 L9 24 Z M16 24 L22 0 L30 0 L25 24 Z" />
-              </svg>
-              <blockquote>{testimonial.quote}</blockquote>
-              <figcaption className="qfp-quote-who">
-                <span className="qfp-quote-avatar" aria-hidden="true">{initials(testimonial.name)}</span>
-                <div>
-                  <strong>{testimonial.name}</strong>
-                  <span>{testimonial.detail}</span>
-                </div>
-              </figcaption>
-            </figure>
-          ) : null}
+        <div className="qfp2-why-visual" data-reveal>
+          {hero ? (
+            <div className="qfp2-why-photo">
+              <Image src={hero} alt="Two QuickFurno professionals reviewing plans" width={895} height={676} sizes="(max-width: 899px) 100vw, 560px" />
+              <span className="qfp2-why-pill">
+                <G name="shield" size={16} width={2} />
+                Reviewed &amp; approved
+              </span>
+              <ul className="qfp2-why-checklist">
+                {WHY_CHECKS.map((c) => (
+                  <li key={c}><i><Tick size={11} /></i><span>{c}</span></li>
+                ))}
+              </ul>
+              <span className="qfp2-why-note">
+                <i><Tick size={13} /></i>
+                Every public profile is reviewed and approved before it goes live.
+              </span>
+            </div>
+          ) : (
+            <span className="qfp-slot-empty" aria-hidden="true" />
+          )}
         </div>
       </div>
     </section>
@@ -694,31 +908,43 @@ function TrustAndSafety() {
 }
 
 function Areas() {
-  const desktopHidden = Math.max(0, PUNE_AREAS.length - AREAS_VISIBLE_DESKTOP);
-  const mobileHidden = Math.max(0, PUNE_AREAS.length - AREAS_VISIBLE_MOBILE);
+  const withPhotos = PUNE_AREAS.filter((a) => AREA_PHOTOS[a]);
+  const remaining = PUNE_AREAS.length - withPhotos.length;
   return (
-    <section className="qfp-section qfp-areas" aria-labelledby="qfp-areas-title">
+    <section className="qfp-section qfp2-areas" aria-labelledby="qfp-areas-title">
+      <Image className="qfp2-areas-map" src={`${REAL}/areas/pune-map.webp`} alt="" aria-hidden="true" width={601} height={508} />
       <div className="qfp-shell">
-        <h2 id="qfp-areas-title">
-          <span className="qfp-areas-title-full">Serving {PUNE_AREAS.length}+ localities across Pune &amp; PCMC</span>
-          <span className="qfp-areas-title-short">{PUNE_AREAS.length}+ localities across Pune &amp; PCMC</span>
-        </h2>
-        <input type="checkbox" id="qfp-areas-toggle" className="qfp-areas-toggle" aria-label="Show all localities" />
-        <div className="qfp-area-pills" role="list">
-          {PUNE_AREAS.map((area, index) => {
-            const classes = ["qfp-area-pill"];
-            if (index >= AREAS_VISIBLE_DESKTOP) classes.push("qfp-area-pill--d-extra");
-            if (index >= AREAS_VISIBLE_MOBILE) classes.push("qfp-area-pill--m-extra");
-            return <span className={classes.join(" ")} role="listitem" key={area}>{area}</span>;
-          })}
-          {desktopHidden > 0 ? (
-            <label htmlFor="qfp-areas-toggle" className="qfp-area-pill qfp-area-more qfp-area-more--desktop">+ {desktopHidden} more</label>
-          ) : null}
-          {mobileHidden > 0 ? (
-            <label htmlFor="qfp-areas-toggle" className="qfp-area-pill qfp-area-more qfp-area-more--mobile">+ {mobileHidden} more</label>
-          ) : null}
+        <div className="qfp2-head" data-reveal>
+          <span className="qfp2-kicker">Where we work</span>
+          <h2 id="qfp-areas-title">
+            Pune localities <span>we cover.</span>
+          </h2>
+          <p>
+            Pick your locality when you send an enquiry. You can select these and many more areas across Pune — a listed locality is not a guarantee of matching supply.
+          </p>
         </div>
-        <p className="qfp-areas-note">Your locality not listed? You can still submit an enquiry; assignment depends on marketplace eligibility and available supply.</p>
+        <ul className="qfp2-area-cards" role="list">
+          {withPhotos.map((area) => (
+            <li key={area}>
+              <span className="qfp2-area-card">
+                <Image src={`${REAL}/areas/${AREA_PHOTOS[area]}.webp`} alt="" width={112} height={112} />
+                <span className="qfp2-area-name">
+                  <G name="pin" size={13} stroke="#E8551F" width={2.1} />
+                  {area}
+                </span>
+                <b aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E8551F" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round"><path d="m9 5 7 7-7 7" /></svg>
+                </b>
+              </span>
+            </li>
+          ))}
+        </ul>
+        {remaining > 0 ? (
+          <p className="qfp2-areas-more">
+            <G name="grid" size={18} stroke="#E8551F" />
+            …and {remaining} more across Pune.
+          </p>
+        ) : null}
       </div>
     </section>
   );
@@ -734,25 +960,74 @@ function FAQ() {
       acceptedAnswer: { "@type": "Answer", text: item.a },
     })),
   };
+  const photo = optionalRealImage("faq-homeowner-v2");
+  const glyphs: GlyphKey[] = ["chat", "people", "eye", "pin", "doc", "wrench"];
   return (
-    <section className="qfp-section qfp-faq" id="faq">
-      <div className="qfp-shell">
-        <div className="qfp-head-center" data-reveal>
-          <span className="qfp-kicker">Good to know</span>
-          <h2>Questions Pune homeowners ask</h2>
+    <section className="qfp-section qfp2-faq" id="faq">
+      {photo ? (
+        <div className="qfp2-faq-photo" aria-hidden="true">
+          {/* The frame is 362x470 and the photo is filled to cover, so it is the
+    HEIGHT that decides how much file is needed: 470 tall at this
+    photo's shape is 440 wide, not the frame's 362. Asking for 380 got
+    a file that had to be stretched 1.13x. */}
+          <Image src={photo} alt="" width={800} height={869} sizes="(max-width: 899px) 0px, 440px" />
+          <span className="qfp2-faq-fade-x" />
+          <span className="qfp2-faq-fade-y" />
         </div>
-        <div className="qfp-faq-list">
-          {HOME_FAQ.map((item) => (
-            <details className="qfp-faq-item" key={item.q}>
-              <summary>
-                <span>{item.q}</span>
-                <i aria-hidden="true">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                </i>
-              </summary>
-              <p>{item.a}</p>
-            </details>
-          ))}
+      ) : null}
+      <div className="qfp-shell">
+        <div className="qfp2-faq-band">
+          <div className="qfp2-head qfp2-head--left" data-reveal>
+            <span className="qfp2-kicker">Good to know</span>
+            <h2>
+              Questions Pune<br />
+              <span>homeowners ask</span>
+            </h2>
+            <p>Quick answers to help you get started with confidence.</p>
+          </div>
+          <div className="qfp2-faq-help" data-reveal>
+            <span className="qfp2-faq-script">
+              Still have a question?
+              <svg width="66" height="36" viewBox="0 0 72 40" fill="none" stroke="#5B534A" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 6C24 -1 56 2 66 26" /><path d="M60 20.5 66.5 28 69.5 18" /></svg>
+            </span>
+            <span className="qfp2-faq-sub">We&rsquo;re here to help.</span>
+            <a className="qfp2-faq-pill" href={whatsappLink()} target="_blank" rel="noopener noreferrer">
+              <G name="chat" size={15} />
+              Contact support
+              <ArrowIcon size={14} stroke="#C9430E" />
+            </a>
+          </div>
+        </div>
+        <div className="qfp2-faq-grid">
+          <div className="qfp2-faq-list">
+            {HOME_FAQ.map((item, index) => (
+              <details className="qfp2-faq-item" key={item.q}>
+                <summary>
+                  <i aria-hidden="true"><G name={glyphs[index] ?? "chat"} size={19} /></i>
+                  <span>{item.q}</span>
+                  <b aria-hidden="true">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+                  </b>
+                </summary>
+                <p>{item.a}</p>
+              </details>
+            ))}
+          </div>
+          <aside className="qfp2-faq-card" data-reveal>
+            {photo ? (
+              <span className="qfp2-faq-card-banner">
+                <Image src={photo} alt="" width={800} height={869} sizes="(max-width: 899px) 90vw, 0px" />
+              </span>
+            ) : null}
+            <i className="qfp2-faq-bulb" aria-hidden="true"><G name="bulb" size={24} /></i>
+            <h3>Still have<br />questions?</h3>
+            <p>Our support team is here to help you with anything — from choosing the right service to understanding the process.</p>
+            <a className="qfp2-faq-btn" href={whatsappLink()} target="_blank" rel="noopener noreferrer">
+              <G name="chat" size={15} stroke="#fff" />
+              Contact support
+              <ArrowIcon size={14} stroke="#fff" />
+            </a>
+          </aside>
         </div>
       </div>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
@@ -761,67 +1036,47 @@ function FAQ() {
 }
 
 function VendorCTA() {
+  const pro = optionalRealImage("vendor-pro-v2");
+  const glyphs: GlyphKey[] = ["bars", "shield", "trend"];
   return (
-    <section className="qfp-section qfp-vendor" aria-labelledby="qfp-vendor-title">
+    <section className="qfp-section qfp2-vendor" aria-labelledby="qfp-vendor-title">
       <div className="qfp-shell">
-        <div className="qfp-vendor-card" data-reveal>
-          <div className="qfp-vendor-copy">
-            <span className="qfp-kicker">For professionals</span>
-            <h2 id="qfp-vendor-title">Run a home-services business in Pune?</h2>
-            <p>Apply for a reviewed public profile and Client Matching eligibility. Assignments depend on approval, account eligibility, matching credits and demand.</p>
+        <div className="qfp2-vendor-card" data-reveal>
+          <div className="qfp2-vendor-inner">
+            <div className="qfp2-vendor-copy">
+              <span className="qfp2-kicker qfp2-kicker--start">For professionals</span>
+              <h2 id="qfp-vendor-title">
+                Grow your<br />
+                home services business<br />
+                <span>in Pune.</span>
+              </h2>
+              <p>Create a profile, get it reviewed and listed, and receive enquiries from Pune homeowners with their requirement attached.</p>
+              <Link href="/vendors" className="qfp2-vendor-btn">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="9.5" cy="8" r="3.4" /><path d="M3 20c0-3.5 2.9-5.6 6.5-5.6s6.5 2.1 6.5 5.6" /><path d="M19 7v6" /><path d="M22 10h-6" /></svg>
+                Join as a vendor
+                <ArrowIcon size={15} stroke="#fff" />
+              </Link>
+            </div>
+            <ul className="qfp2-vendor-points">
+              {VENDOR_POINTS.map((point, i) => (
+                <li key={point.title}>
+                  <i aria-hidden="true"><G name={glyphs[i] ?? "bars"} size={20} width={2.1} /></i>
+                  <span>
+                    <strong>{point.title}</strong>
+                    <em>{point.body}</em>
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
-          <Link href="/vendors" className="qfp-vendor-btn">
-            Join as a vendor <ArrowIcon size={15} stroke="#14181D" />
-          </Link>
+          <div className="qfp2-vendor-figure">
+            <span className="qfp2-vendor-blob" aria-hidden="true" />
+            {pro ? <Image src={pro} alt="" width={620} height={1020} sizes="(max-width: 899px) 60vw, 300px" /> : null}
+            <span className="qfp2-vendor-note">Be part of Pune&rsquo;s trusted home services community.</span>
+          </div>
         </div>
       </div>
     </section>
-  );
-}
-
-function Footer() {
-  return (
-    <footer className="qfp-footer" id="contact">
-      <div className="qfp-shell">
-        <div className="qfp-footer-grid">
-          <div className="qfp-footer-brand">
-            <Logo light />
-            <p>A Pune-focused marketplace for homeowners and home-service professionals.</p>
-            <span className="qfp-footer-made">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9A876" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="M3 9.5 L12 3 L21 9.5 L21 21 L3 21 Z" /></svg>
-              Made with care for a better Pune
-            </span>
-          </div>
-          <div className="qfp-footer-col qfp-footer-col--services">
-            <h3>SERVICES</h3>
-            {categories.map((category) => (
-              <Link key={category.name} href={`/category/${categorySlug(category.name)}`}>{category.name}</Link>
-            ))}
-          </div>
-          <div className="qfp-footer-col qfp-footer-col--company">
-            <h3>COMPANY</h3>
-            <Link href="#how-it-works">How it works</Link>
-            <Link href="#why-quickfurno">Why QuickFurno</Link>
-            <Link href="/vendors">For professionals</Link>
-            <Link href="/privacy">Privacy policy</Link>
-            <Link href="/terms">Terms &amp; conditions</Link>
-          </div>
-          <div className="qfp-footer-col qfp-footer-col--contact">
-            <h3>CONTACT</h3>
-            <a href={whatsappLink()} target="_blank" rel="noopener noreferrer"><FooterChatIcon />WhatsApp us</a>
-            <a href={"mailto:" + CONTACT.email}><MailIcon />{CONTACT.email}</a>
-            <span><PinIcon size={15} stroke="#FF8A5C" width={2} />Kharadi, Pune, Maharashtra</span>
-          </div>
-        </div>
-        <div className="qfp-footer-bottom">
-          <span>© 2026 QuickFurno. All rights reserved.</span>
-          <span className="qfp-footer-tagline">Reviewed profiles | Up to 3 active matches | Free to enquire</span>
-          <nav className="qfp-footer-legal" aria-label="Legal links">
-            <Link href="/privacy">Privacy</Link> · <Link href="/terms">Terms</Link> · <Link href="/vendors">Vendor policy</Link>
-          </nav>
-        </div>
-      </div>
-    </footer>
   );
 }
 
@@ -860,12 +1115,15 @@ export function PuneLaunchHomepage() {
         <Hero />
         <Services />
         <HowItWorks />
-        <MadeInPune />
         <TrustAndSafety />
+        <MadeInPune />
         <Areas />
         <FAQ />
         <VendorCTA />
       </main>
+      {/* The nav points at /#contact; the shared footer owns the contact block
+          but cannot carry the id itself, or every page would ship a duplicate. */}
+      <span id="contact" aria-hidden="true" />
       <Footer />
       <BottomNav />
     </div>

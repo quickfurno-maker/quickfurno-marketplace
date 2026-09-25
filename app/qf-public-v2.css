@@ -1230,8 +1230,14 @@
   .qf-site-header .qf-location-pill { min-height:36px; padding:0 .65rem; font-size:.72rem; }
 }
 
-.qf-foot.qf-foot { background:#064e3e; border-top:0; color:#fff; }
-.qf-foot .qf-foot-logo-q { color:#fff; }
+/* The shared footer was bottle green (#064e3e) while the homepage footer is
+   the warm near-black ink of the design system, so /vendors, the category
+   pages and every legal page ended in a different brand from the homepage.
+   Same ink now, same product. The coral wordmark is unchanged: it is already
+   the orange this codebase uses on dark, and it is what the homepage footer
+   uses too. */
+.qf-foot.qf-foot { background:var(--qfp-ink, #14181d); border-top:0; color:#fff; }
+.qf-foot .qf-foot-logo-q { color:#f7f1e6; }
 .qf-foot .qf-foot-logo-f { color:#ff8a6d; }
 .qf-foot .qf-foot-tagline { color:rgba(255,255,255,.72); }
 .qf-foot .qf-foot-acc { border-bottom-color:rgba(255,255,255,.11); }

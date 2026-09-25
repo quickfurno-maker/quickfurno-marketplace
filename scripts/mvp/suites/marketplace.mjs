@@ -22,6 +22,17 @@ import { assert, assertEqual, assertTrue, assertFalse } from '../lib/harness.mjs
 import { categoryArtwork, categoriesWithArtwork } from '../../../components/public-listing/categoryArtwork.ts';
 import { existsSync, readFileSync } from 'node:fs';
 
+// The /vendors page was split across three files when it was rebuilt from the
+// approved boards: page.tsx (shell, metadata, structured data), vendors-v2.tsx
+// (the section markup) and vendors-content.ts (the approved copy). These
+// assertions are about the guarantees the PAGE makes, not about which file
+// holds a given string, so they read the set.
+const VENDOR_PAGE_FILES = ['app/vendors/page.tsx', 'app/vendors/vendors-v2.tsx',
+                           'app/vendors/vendors-content.ts'];
+function readVendorPage() {
+  return VENDOR_PAGE_FILES.map((f) => readFileSync(f, 'utf8')).join('\n');
+}
+
 import {
   formatServiceLabels,
   BUDGET_MIN_PLACEHOLDER,
@@ -824,12 +835,12 @@ export const suite = {
     {
       name: 'vendor acquisition CTAs route to the real portal tabs',
       run: () => {
-        const src = readFileSync('app/vendors/page.tsx', 'utf8');
-        assertTrue(src.includes('const SIGNUP_HREF = "/vendor?mode=signup"'), 'signup target');
-        assertTrue(src.includes('const LOGIN_HREF = "/vendor?mode=login"'), 'login target');
+        const src = readVendorPage();
+        assertTrue(src.includes('"/vendor?mode=signup"'), 'signup target');
+        assertTrue(src.includes('"/vendor?mode=login"'), 'login target');
         // Both a signup AND a login CTA must exist (the old page had no login CTA).
-        assertTrue((src.match(/SIGNUP_HREF/g) || []).length >= 2, 'signup CTA used');
-        assertTrue((src.match(/LOGIN_HREF/g) || []).length >= 2, 'login CTA used');
+        assertTrue((src.match(/vendor\?mode=signup/g) || []).length >= 2, 'signup CTA used');
+        assertTrue((src.match(/vendor\?mode=login/g) || []).length >= 2, 'login CTA used');
         // No second auth surface on this page.
         assertFalse(/VendorRegisterForm|LoginForm|<form/.test(src), 'no duplicate auth form');
         // The portal itself still honours both modes.
@@ -843,7 +854,7 @@ export const suite = {
       run: () => {
         // Assert on shipped JSX only — the file's header comment deliberately
         // records what was removed.
-        const src = readFileSync('app/vendors/page.tsx', 'utf8')
+        const src = readVendorPage()
           .replace(/\/\*[\s\S]*?\*\//g, '')
           .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
           .replace(/\/\/.*$/gm, '');
@@ -881,7 +892,7 @@ export const suite = {
     {
       name: 'vendor conversion page is Client Matching-first and canonical-category driven',
       run: () => {
-        const src = readFileSync('app/vendors/page.tsx', 'utf8')
+        const src = readVendorPage()
           .replace(/\/\*[\s\S]*?\*\//g, '')
           .replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
         assertTrue(src.includes('categories, categorySlug'),
@@ -890,19 +901,36 @@ export const suite = {
           'vendor conversion derives the trade list from canonical categories');
         assertTrue(src.includes('Client Matching'), 'Client Matching is the primary conversion proposition');
         assertFalse(/>\s*Leads?\s*</i.test(src), 'retired lead label is absent from vendor conversion UI');
-        assertFalse(/Mumbai/i.test(src), 'Mumbai cannot return to the Pune launch conversion page');
+        // Mumbai may be NAMED on the roadmap, never OFFERED. This banned the
+        // string outright, which also removed the approved "Made in Pune.
+        // Coming to your city next." journey section from this page — six
+        // tiles, five of them marked "Coming soon", none selectable. The rule
+        // that matters is that a professional cannot APPLY from a non-launch
+        // city, and vendorService still validates that on the server.
+        assertFalse(/<option[^>]*>\s*Mumbai/i.test(src), 'Mumbai is never a selectable option here');
+        assertFalse(/value\s*=\s*["']Mumbai["']/i.test(src), 'Mumbai is never a submitted value here');
+        assertFalse(/city\s*[:=]\s*["']Mumbai["']/i.test(src), 'no city field is set to Mumbai here');
+        if (/Mumbai/i.test(src)) {
+          assertTrue(/Coming soon/.test(src), 'a named non-launch city is marked Coming soon');
+          assertEqual((src.match(/live:\s*true/g) || []).length, 1, 'exactly one city is marked live');
+        }
         assertFalse(/Wardrobes?\s*&?\s*Storage/i.test(src), 'non-canonical wardrobe/storage category cannot return');
       },
     },
     {
       name: 'vendor page preview is labelled illustrative and the journey states eligibility',
       run: () => {
-        const src = readFileSync('app/vendors/page.tsx', 'utf8');
+        const src = readVendorPage();
         // Product/example previews must announce themselves as illustrative, never live demand.
         assertTrue(src.includes('ILLUSTRATIVE EXAMPLE'), 'visible illustrative product label');
         assertTrue(src.includes('Illustrative Client Matching product preview. Not live demand data.'),
           'accessible name says illustrative and not live demand');
-        assertTrue(src.includes('EXAMPLE QUALITY CHECK'), 'example quality card is labelled');
+        // Was 'Example quality check', the title of an overlay card on the old
+        // composite preview. The approved board replaced that whole composite with
+        // the map and its named example vendors, so the card is gone by design. The
+        // rule it enforced is unchanged — anything invented on a preview must say so
+        // — and is now carried by the badge over the map.
+        assertTrue(/example vendors/i.test(src), 'invented vendors on the preview are labelled');
         // The journey must not imply matching starts immediately after signup.
         assertTrue(/Approval does not by itself activate Client Matching/i.test(src),
           'states approval is not sufficient for matching');
@@ -1641,12 +1669,12 @@ export const suite = {
         // MEASURED DEFECT: the shared footer used h3, so on pages whose main
         // content has no visible h2 (/enquiry) the outline jumped h1 -> h3.
         const footer = readFileSync('components/Footer.tsx', 'utf8');
-        assertTrue(footer.includes('<h2 className="qf-foot-acc-head">'), 'footer groups are h2');
-        assertFalse(/<h3 className="qf-foot-acc-head"/.test(footer), 'no h3 regression');
+        assertTrue(footer.includes('<h2 className="qv-foot-group-t">'), 'footer groups are h2');
+        assertFalse(/<h3[^>]*qv-foot-group-t/.test(footer), 'no h3 regression');
         // The level change must stay purely semantic: styling lives on the
         // inner button, so no stylesheet may start targeting the heading tag.
-        const css = readFileSync('app/qf-public-v2.css', 'utf8');
-        assertFalse(/\.qf-foot-acc-head\s+h3|\.qf-foot\s+h3\b/.test(css), 'no tag-based footer heading style');
+        const css = readFileSync('app/footer-v2.css', 'utf8');
+        assertFalse(/\.qv-foot-group-t\s+h3|\.qv-foot\s+h[23]\b/.test(css), 'no tag-based footer heading style');
       },
     },
     {
@@ -1690,7 +1718,11 @@ export const suite = {
             file + ' must not invent counts');
         }
         // The approved bounded promises are still present on the active homepage.
-        const hero = readFileSync('components/home/PuneLaunchHomepage.tsx', 'utf8').toLowerCase();
+        // The homepage now renders the shared footer rather than one of its own,
+        // and that is where the bounded promises are stated, so the composition
+        // is what has to carry them.
+        const hero = (readFileSync('components/home/PuneLaunchHomepage.tsx', 'utf8')
+          + readFileSync('components/Footer.tsx', 'utf8')).toLowerCase();
         assertTrue(hero.includes('up to 3 active'), 'keeps the bounded up-to-3 claim');
         assertTrue(hero.includes('free to enquire'), 'keeps the no-homeowner-enquiry-fee claim');
       },

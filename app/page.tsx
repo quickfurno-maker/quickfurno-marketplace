@@ -16,8 +16,11 @@ export const metadata: Metadata = {
   },
 };
 
-// The launch homepage is fully static (no per-request data); keep a periodic
-// revalidation so any future server-side content refreshes without a deploy.
+// The service cards now read live public vendor counts from Supabase, so this
+// page is no longer purely static. 300s means a newly approved vendor shows up
+// on the homepage within five minutes without a deploy. Drop it to 0 (or use
+// force-dynamic) only if the count ever has to be exact to the second — that
+// costs the static render on every visit.
 export const revalidate = 300;
 
 export default function HomePage() {

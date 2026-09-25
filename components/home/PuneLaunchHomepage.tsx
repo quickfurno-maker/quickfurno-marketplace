@@ -731,20 +731,20 @@ const HOW_IT_WORKS: { icon: ReactNode; title: string; body: string; slot?: strin
   {
     icon: <ChatIcon />,
     title: "Tell us what you need",
-    body: "Choose a service, share your Pune location and add a few project details.",
+    body: "Share your service, Pune location and a few project details.",
     slot: "how-step-1",
     visual: "photo",
   },
   {
     icon: <G name="people" size={26} stroke="#fff" width={2} />,
     title: "Get matched with eligible Teams",
-    body: "We shortlist up to 3 active Teams based on service, location and eligibility.",
+    body: "We shortlist up to 3 active Teams by service, location and eligibility.",
     visual: "map",
   },
   {
     icon: <G name="check2" size={26} stroke="#fff" width={2} />,
     title: "Compare & choose",
-    body: "Compare reviewed profiles and quotes, then choose the Team that fits your project.",
+    body: "Compare reviewed profiles and quotes. You choose who to hire.",
     slot: "how-step-3",
     visual: "profiles",
   },
@@ -799,7 +799,7 @@ function HowProfileCompare() {
             <i aria-hidden="true">{profile.initials}</i>
             <span>
               <strong>{profile.name}</strong>
-              <small><G name="check2" size={12} stroke="currentColor" width={2.2} /> Reviewed profile</small>
+              <small><G name="check2" size={12} stroke="currentColor" width={2.2} /> Reviewed</small>
             </span>
             <ArrowIcon size={16} stroke="currentColor" />
           </span>
@@ -818,7 +818,7 @@ function HowItWorks() {
         <div className="qfp-head-center qfp-flow-head" data-reveal>
           <span className="qfp-kicker qfp-kicker--ruled">How it works</span>
           <h2>One request. <span>Three simple steps.</span></h2>
-          <p className="qfp-how-lede">Tell us what your home needs. We can match you with up to 3 eligible Teams, then you compare and choose — all in one place.</p>
+          <p className="qfp-how-lede">Tell us what your home needs. Get up to 3 eligible Teams to compare — then choose the right fit.</p>
         </div>
 
         <ol className="qfp-flow-list" data-reveal-group>

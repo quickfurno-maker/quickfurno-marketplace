@@ -2665,74 +2665,6 @@
 
 /* ==========================================================================
    FINAL HOW-IT-WORKS CONVERSION JOURNEY — 2026-09-25
-   Uses unique qfp-flow-* classes so the premium journey does not inherit the
-   legacy card-grid geometry above.
-   ========================================================================== */
-.qfp-flow { padding: 88px 0 94px; }
-.qfp-flow .qfp-shell { position: relative; z-index: 1; }
-.qfp-flow-head { gap: 14px; }
-.qfp-flow-head h2 { max-width: 920px; }
-.qfp-flow-head .qfp-how-lede { max-width: 760px; }
-
-.qfp-flow-list {
-  position: relative;
-  display: grid;
-  gap: 18px;
-  max-width: 1080px;
-  margin: 48px auto 0;
-  padding: 0;
-  list-style: none;
-}
-.qfp-flow-list::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 8%;
-  bottom: 8%;
-  width: 1px;
-  transform: translateX(-50%);
-  background: linear-gradient(180deg, transparent, rgba(255,136,41,.78) 12%, rgba(255,136,41,.78) 88%, transparent);
-  box-shadow: 0 0 18px rgba(255,115,24,.55);
-}
-
-.qfp-flow-step {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 38%) minmax(0, 62%);
-  min-height: 350px;
-  border: 1px solid rgba(255,122,25,.78);
-  border-radius: 28px;
-  background: linear-gradient(135deg, rgba(12,12,13,.98), rgba(20,17,14,.94));
-  box-shadow: 0 28px 70px -42px rgba(255,98,12,.82);
-  overflow: hidden;
-}
-.qfp-flow-copy {
-  position: relative;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 12px;
-  padding: 34px 34px 32px 38px;
-  background: linear-gradient(90deg, rgba(8,8,9,.98) 0%, rgba(10,10,11,.95) 78%, rgba(10,10,11,.58) 100%);
-}
-.qfp-flow-num {
-  display: grid;
-  place-items: center;
-  width: 66px;
-  height: 66px;
-  border: 2px solid var(--qfd-orange);
-  border-radius: 999px;
-  color: #fff;
-  background: rgba(78,29,7,.82);
-  font: 800 21px/1 var(--qfd-font-head);
-  box-shadow: 0 0 0 8px rgba(201,58,14,.09), 0 0 28px rgba(255,105,18,.32);
-}
-
-/* ==========================================================================
-   FINAL HOW-IT-WORKS CONVERSION JOURNEY — 2026-09-25
    Unique qfp-flow-* classes keep this journey isolated from legacy card CSS.
    ========================================================================== */
 .qfp-flow { padding: 88px 0 94px; }
@@ -2756,10 +2688,10 @@
   left: 50%;
   top: 8%;
   bottom: 8%;
-  width: 1px;
+  width: 2px;
   transform: translateX(-50%);
-  background: linear-gradient(180deg, transparent, rgba(255,136,41,.78) 12%, rgba(255,136,41,.78) 88%, transparent);
-  box-shadow: 0 0 18px rgba(255,115,24,.55);
+  background: linear-gradient(180deg, transparent, rgba(255,151,57,.88) 12%, rgba(255,151,57,.88) 88%, transparent);
+  box-shadow: 0 0 14px rgba(255,115,24,.42);
 }
 
 .qfp-flow-step {
@@ -2768,10 +2700,10 @@
   display: grid;
   grid-template-columns: minmax(0, 38%) minmax(0, 62%);
   min-height: 350px;
-  border: 1px solid rgba(255,122,25,.78);
+  border: 1px solid rgba(255,122,25,.48);
   border-radius: 28px;
   background: linear-gradient(135deg, rgba(12,12,13,.98), rgba(20,17,14,.94));
-  box-shadow: 0 28px 70px -42px rgba(255,98,12,.82);
+  box-shadow: 0 26px 62px -44px rgba(255,98,12,.58);
   overflow: hidden;
 }
 .qfp-flow-copy {
@@ -3008,12 +2940,12 @@
     border-radius: 18px;
   }
   .qfp-flow-step--2 {
-    min-height: 232px;
-    grid-template-columns: minmax(0, 43%) minmax(0, 57%);
+    min-height: 226px;
+    grid-template-columns: minmax(0, 49%) minmax(0, 51%);
   }
   .qfp-flow-step--3 {
-    min-height: 220px;
-    grid-template-columns: minmax(0, 43%) minmax(0, 57%);
+    min-height: 216px;
+    grid-template-columns: minmax(0, 46%) minmax(0, 54%);
   }
 
   .qfp-flow-copy {
@@ -3035,15 +2967,19 @@
   }
   .qfp-flow-icon svg { width: 15px; height: 15px; }
   .qfp-flow-copy h3 {
-    max-width: 135px;
+    max-width: 150px;
     margin-top: 2px;
     font-size: 16px;
     line-height: 1.02;
   }
+  .qfp-flow-step--2 .qfp-flow-copy h3 {
+    max-width: 158px;
+    font-size: 15.5px;
+  }
   .qfp-flow-copy p {
-    max-width: 138px;
+    max-width: 150px;
     font-size: 10.5px;
-    line-height: 1.38;
+    line-height: 1.36;
   }
   .qfp-flow-photo-wide { display: none; }
   .qfp-flow-photo-tall {
@@ -3053,21 +2989,21 @@
   }
 
   .qfp-flow-profile-list {
-    width: calc(100% - 18px);
-    gap: 7px;
+    width: calc(100% - 16px);
+    gap: 8px;
   }
   .qfp-flow-profile-row {
-    grid-template-columns: 28px minmax(0, 1fr) 12px;
-    gap: 7px;
-    min-height: 48px;
-    padding: 5px 7px 5px 5px;
-    border-radius: 10px;
+    grid-template-columns: 30px minmax(0, 1fr) 12px;
+    gap: 8px;
+    min-height: 50px;
+    padding: 6px 8px 6px 6px;
+    border-radius: 11px;
   }
   .qfp-flow-profile-row > i {
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
     border-radius: 8px;
-    font-size: 8px;
+    font-size: 8.5px;
   }
   .qfp-flow-profile-row > span { gap: 2px; }
   .qfp-flow-profile-row strong { font-size: 10.5px; }
@@ -3081,12 +3017,12 @@
   }
 
   .qfp-flow-trust li {
-    min-height: 50px;
+    min-height: 52px;
     flex-direction: column;
     gap: 4px;
-    padding: 6px 4px;
-    font-size: 8.7px;
-    line-height: 1.15;
+    padding: 7px 4px;
+    font-size: 9.3px;
+    line-height: 1.16;
   }
   .qfp-flow-trust svg { width: 15px; height: 15px; }
 
@@ -3099,7 +3035,11 @@
     font-size: 13.5px;
   }
   .qfp-flow-cta svg { width: 16px; height: 16px; }
-  .qfp-flow-convert p { font-size: 9.5px; }
+  .qfp-flow-convert p {
+    color: rgba(255,198,104,.9);
+    font-size: 10.5px;
+    font-weight: 600;
+  }
 
   .qfp-flow .qfp-how-match-pill {
     left: auto;

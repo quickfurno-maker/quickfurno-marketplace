@@ -739,110 +739,126 @@
 }
 
 /* ==========================================================================
-   HOW IT WORKS
+   HOW IT WORKS ? dark QuickFurno journey
    ========================================================================== */
 .qfp-how {
   position: relative;
   overflow: hidden;
-  padding: 90px 0;
-  background: linear-gradient(160deg, #fffcf6 0%, #f7f1e6 54%, #efe6d6 100%);
-  border-top: 1px solid #ede6d8;
-  border-bottom: 1px solid #e7dfce;
+  padding: 96px 0 104px;
+  background:
+    radial-gradient(62% 90% at 4% 18%, rgba(157, 62, 10, 0.26), transparent 60%),
+    radial-gradient(58% 92% at 96% 74%, rgba(181, 70, 8, 0.22), transparent 62%),
+    linear-gradient(145deg, #0a0908 0%, #100d0b 48%, #080706 100%);
+  border-top: 1px solid rgba(255, 133, 38, 0.16);
+  border-bottom: 1px solid rgba(255, 133, 38, 0.16);
+  color: #fff;
 }
-.qfp-how-glow-a, .qfp-how-glow-b { position: absolute; pointer-events: none; }
-.qfp-how-glow-a { right: -60px; top: -90px; width: 540px; height: 360px; background: radial-gradient(closest-side, rgba(255, 177, 61, 0.2), rgba(255, 177, 61, 0) 72%); }
-.qfp-how-glow-b { left: -90px; bottom: -110px; width: 500px; height: 340px; background: radial-gradient(closest-side, rgba(240, 74, 26, 0.09), rgba(240, 74, 26, 0) 72%); }
-.qfp-how .qfp-shell { position: relative; }
-.qfp-how h2 { font-size: 40px; }
-.qfp-kicker--ruled { display: inline-flex; align-items: center; gap: 12px; }
+.qfp-how::before,
+.qfp-how::after {
+  content: "";
+  position: absolute;
+  width: 560px;
+  height: 560px;
+  border: 1px solid rgba(255, 111, 18, 0.3);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.qfp-how::before { left: -360px; top: -260px; }
+.qfp-how::after { right: -350px; bottom: -360px; }
+.qfp-how-glow-a,
+.qfp-how-glow-b { position: absolute; pointer-events: none; filter: blur(2px); }
+.qfp-how-glow-a { right: -120px; top: -160px; width: 620px; height: 420px; background: radial-gradient(closest-side, rgba(255, 112, 24, 0.22), rgba(255, 112, 24, 0) 72%); }
+.qfp-how-glow-b { left: -140px; bottom: -180px; width: 560px; height: 420px; background: radial-gradient(closest-side, rgba(201, 58, 14, 0.22), rgba(201, 58, 14, 0) 72%); }
+.qfp-how .qfp-shell { position: relative; z-index: 1; }
+.qfp-how .qfp-head-center { gap: 13px; }
+.qfp-how .qfp-kicker { color: #ff8a32; }
+.qfp-how h2 { max-width: 900px; font-size: clamp(40px, 4.2vw, 58px); line-height: 1.03; letter-spacing: -0.045em; color: #fff; }
+.qfp-kicker--ruled { display: inline-flex; align-items: center; gap: 14px; }
 .qfp-kicker--ruled::before,
-.qfp-kicker--ruled::after { content: ""; width: 30px; height: 1.5px; border-radius: 2px; background: currentColor; opacity: 0.5; }
-.qfp-how h2 span { color: var(--qfd-orange-text); }
-.qfp-how-lede { max-width: 620px; font-size: 16.5px; line-height: 1.6; color: var(--qfp-muted); }
+.qfp-kicker--ruled::after { content: ""; width: 48px; height: 1.5px; border-radius: 2px; background: currentColor; opacity: 0.72; }
+.qfp-how h2 span { color: #ff6418; }
+.qfp-how-lede { max-width: 690px; font-size: 17px; line-height: 1.6; color: rgba(255,255,255,0.62); }
 
-.qfp-steps {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 30px;
-  margin-top: 46px;
-}
+.qfp-steps { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 30px; margin-top: 52px; }
 .qfp-step {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 40%;
+  grid-template-columns: minmax(0, 46%) minmax(0, 54%);
   align-items: stretch;
-  min-height: 252px;
-  border-radius: 24px;
-  background: linear-gradient(160deg, #fffdfa 0%, #fdf6ec 100%);
-  border: 1px solid #f2e7d6;
-  box-shadow: 0 26px 52px -30px rgba(20, 24, 29, 0.42);
+  min-height: 430px;
+  overflow: hidden;
+  border-radius: 28px;
+  background: linear-gradient(155deg, rgba(255, 126, 28, 0.08), rgba(255, 255, 255, 0.025) 38%), rgba(13, 12, 11, 0.9);
+  border: 1px solid rgba(255, 122, 25, 0.72);
+  box-shadow: 0 32px 70px -36px rgba(255, 91, 12, 0.52), inset 0 1px rgba(255,255,255,0.04);
 }
-/* Orange disc lapping the card's top-left corner. It sits outside the card's
-   own bounds, so the card cannot clip it — .qfp-steps keeps the overflow. */
+.qfp-step::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: inset 0 0 50px rgba(255, 98, 12, 0.025); }
 .qfp-step-num {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  width: 50px;
-  height: 50px;
-  border-radius: 999px;
-  background: var(--qfp-orange);
-  color: #fff;
-  font-family: var(--qfp-head);
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: 0;
-  line-height: 1;
-  box-shadow: 0 14px 26px -12px rgba(240, 74, 26, 0.7);
+  position: absolute; top: 22px; left: 22px; z-index: 5;
+  display: grid; place-items: center; width: 62px; height: 62px; border-radius: 999px;
+  border: 2px solid #ff741d; background: rgba(61, 23, 5, 0.84); color: #fff;
+  font-family: var(--qfp-head); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; line-height: 1;
+  box-shadow: 0 0 0 7px rgba(255, 98, 12, 0.055), 0 0 26px rgba(255, 98, 12, 0.34);
 }
-.qfp-step-text { display: flex; flex-direction: column; gap: 9px; padding: 76px 16px 24px 22px; }
-/* Board draws a pale chip with an orange glyph. The three step icons are
-   drawn with a white stroke baked in, so the chip stays solid orange -
-   recolouring the glyphs would mean editing three icon components for a
-   52px detail. */
+.qfp-step-text {
+  position: relative; z-index: 4; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end;
+  gap: 12px; padding: 104px 18px 34px 28px;
+  background: linear-gradient(90deg, rgba(8,7,6,0.96) 0%, rgba(10,9,8,0.89) 76%, rgba(10,9,8,0.18) 100%);
+}
 .qfp-step-icon {
-  display: grid;
-  place-items: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 999px;
-  background: var(--qfp-orange);
-  box-shadow: 0 12px 22px -10px rgba(240, 74, 26, 0.6);
+  display: grid; place-items: center; width: 54px; height: 54px; border-radius: 999px;
+  border: 1px solid rgba(255, 125, 29, 0.8); background: rgba(255, 105, 18, 0.08); color: #fff;
+  box-shadow: 0 0 22px rgba(255, 97, 12, 0.13);
 }
 .qfp-step-icon svg { width: 25px; height: 25px; }
-.qfp-step h3 { font-family: var(--qfp-body); font-size: 19px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; }
-.qfp-step p { font-size: 13.5px; line-height: 1.55; color: #78736a; }
-.qfp-step-media { position: relative; overflow: hidden; border-radius: 0 24px 24px 0; }
-/* Two crops of each photo, each cut to the frame it lands in: a tall one for
-   the 1280 side pane, a banner for the phone. One file cannot serve both —
-   these photos are near-square, so the pane was throwing away half the
-   picture and the phone banner about two thirds of it. */
+.qfp-step h3 { max-width: 210px; font-family: var(--qfp-head); font-size: 25px; font-weight: 800; letter-spacing: -0.035em; line-height: 1.04; color: #fff; }
+.qfp-step p { max-width: 225px; font-size: 13.5px; line-height: 1.65; color: rgba(255,255,255,0.69); }
+.qfp-step-media { position: relative; min-width: 0; overflow: hidden; background: #17110d; }
+.qfp-step-media::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(90deg, rgba(8,7,6,0.72) 0%, rgba(8,7,6,0.02) 45%); }
 .qfp-step-media picture { position: absolute; inset: 0; display: block; }
 .qfp-step-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.qfp-slot-empty {
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(135deg, rgba(201, 58, 14, 0.06) 0 10px, transparent 10px 20px);
-}
-/* Dashed run between the cards, drawn in the grid gap by a pseudo-element so
-   it needs no markup of its own. The card clips its own overflow for the
-   photo, so this hangs off .qfp-step rather than sitting inside it. */
+.qfp-step--1 .qfp-step-media img { object-position: 53% center; }
+.qfp-step--3 .qfp-step-media img { object-position: center center; }
+.qfp-slot-empty { position: absolute; inset: 0; background: repeating-linear-gradient(135deg, rgba(255, 112, 24, 0.06) 0 10px, transparent 10px 20px); }
 .qfp-step + .qfp-step::before {
-  content: "";
-  position: absolute;
-  top: 38px;
-  left: -30px;
-  width: 30px;
-  height: 2px;
-  background-image: linear-gradient(90deg, var(--qfp-orange) 0 6px, transparent 6px 12px);
-  background-size: 12px 2px;
-  background-repeat: repeat-x;
-  opacity: 0.75;
+  content: ""; position: absolute; top: 72px; left: -31px; width: 31px; height: 2px; z-index: 6;
+  background-image: linear-gradient(90deg, #ff741d 0 6px, transparent 6px 12px); background-size: 12px 2px; background-repeat: repeat-x; opacity: 0.86;
 }
+
+/* Step 02 ? Priya Sharma in Baner matched to three nearby interior Teams. */
+.qfp-step-media--map::after { display: none; }
+.qfp-how-map { position: absolute; inset: 0; overflow: hidden; background: #101416; }
+.qfp-how-map-base { position: absolute; inset: 0; width: 100% !important; height: 100% !important; object-fit: cover; filter: saturate(0.6) brightness(0.55) contrast(1.22); transform: scale(1.08); }
+.qfp-how-map-shade { position: absolute; inset: 0; background: radial-gradient(circle at 48% 52%, rgba(255, 103, 19, 0.22), transparent 22%), linear-gradient(90deg, rgba(6,7,8,0.42), rgba(4,5,6,0.02)); }
+.qfp-how-map-label { position: absolute; left: 42%; top: 49%; transform: translate(-50%, -50%); font-family: var(--qfp-head); font-size: 14px; font-weight: 800; letter-spacing: 0.15em; color: rgba(255,255,255,0.22); }
+.qfp-how-client,
+.qfp-how-team { position: absolute; z-index: 4; display: flex; align-items: center; gap: 8px; border: 1px solid rgba(255, 129, 30, 0.64); background: rgba(11, 12, 13, 0.92); box-shadow: 0 12px 28px rgba(0,0,0,0.34); backdrop-filter: blur(8px); }
+.qfp-how-client { left: 46%; top: 49%; transform: translate(-50%, -50%); padding: 7px 10px 7px 7px; border-radius: 14px; }
+.qfp-how-client > i { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 34px; border-radius: 999px; background: #ff6517; color: #fff; font-style: normal; font-size: 11px; font-weight: 800; box-shadow: 0 0 0 5px rgba(255,101,23,.16); }
+.qfp-how-client span,
+.qfp-how-team span { display: grid; min-width: 0; }
+.qfp-how-client strong,
+.qfp-how-team strong { color: #fff; font-size: 10.5px; font-weight: 800; line-height: 1.2; white-space: nowrap; }
+.qfp-how-client small,
+.qfp-how-team small { margin-top: 2px; color: rgba(255,255,255,.58); font-size: 8.5px; line-height: 1.2; white-space: nowrap; }
+.qfp-how-team { min-width: 118px; max-width: 132px; padding: 7px 9px; border-radius: 12px; }
+.qfp-how-team > i { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px; border-radius: 9px; background: rgba(255, 177, 61, 0.1); border: 1px solid rgba(255,177,61,.24); }
+.qfp-how-team--one { left: 9%; top: 13%; }
+.qfp-how-team--two { right: 4%; top: 24%; }
+.qfp-how-team--three { right: 7%; bottom: 16%; }
+.qfp-how-map-lines { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.qfp-how-map-lines i { position: absolute; left: 47%; top: 51%; width: 1px; height: 112px; transform-origin: top center; border-left: 2px dashed rgba(255, 122, 25, 0.84); }
+.qfp-how-map-lines i:nth-child(1) { transform: rotate(220deg); height: 120px; }
+.qfp-how-map-lines i:nth-child(2) { transform: rotate(292deg); height: 106px; }
+.qfp-how-map-lines i:nth-child(3) { transform: rotate(145deg); height: 105px; }
+.qfp-how-match-pill {
+  position: absolute; z-index: 5; left: 10px; right: 10px; bottom: 12px; min-height: 40px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid rgba(63, 196, 102, 0.45); border-radius: 999px;
+  background: rgba(4, 91, 37, 0.86); color: #d9ffe5; font-size: 10px; font-weight: 700;
+  box-shadow: 0 14px 28px rgba(0,0,0,.26); backdrop-filter: blur(8px);
+}
+.qfp-how-match-pill strong { color: #8ef0af; font-size: 17px; }
 
 /* ==========================================================================
    MADE IN PUNE
@@ -1502,20 +1518,42 @@
   .qfp-notsure-media { display: none; }
 
   /* how it works */
-  .qfp-how { padding: 44px 0; }
-  .qfp-how-glow-a { right: -40px; top: -60px; width: 280px; height: 210px; }
-  .qfp-how-glow-b { display: none; }
-  .qfp-how h2 { font-size: 26px; }
-  .qfp-steps { margin-top: 22px; grid-template-columns: 1fr; gap: 14px; }
-  /* .qfp-step is a grid: flex-direction, order and flex-grow on it did
-     nothing, and the padding was insetting the photo off the card edge. */
-  .qfp-step { border-radius: 18px; box-shadow: 0 1px 2px rgba(20, 24, 29, 0.04), 0 18px 34px -16px rgba(20, 24, 29, 0.2); }
-  .qfp-step-icon { width: 44px; height: 44px; border-radius: 13px; box-shadow: 0 10px 18px -8px rgba(240, 74, 26, 0.55); }
-  .qfp-step-icon svg { width: 21px; height: 21px; }
-  .qfp-step-text { gap: 4px; padding: 14px 16px 18px; min-width: 0; }
-  .qfp-step h3 { font-size: 16px; }
-  .qfp-step p { font-size: 13.5px; line-height: 1.55; }
-  .qfp-step-num { width: 36px; height: 36px; font-size: 13px; }
+  .qfp-how { padding: 52px 0 58px; }
+  .qfp-how::before { left: -430px; top: -330px; }
+  .qfp-how::after { right: -430px; bottom: -410px; }
+  .qfp-how-glow-a { right: -80px; top: -70px; width: 320px; height: 240px; }
+  .qfp-how-glow-b { left: -100px; bottom: -80px; width: 300px; height: 220px; display: block; }
+  .qfp-how .qfp-head-center { gap: 10px; }
+  .qfp-how .qfp-kicker { font-size: 10px; letter-spacing: .23em; }
+  .qfp-kicker--ruled::before,
+  .qfp-kicker--ruled::after { width: 34px; }
+  .qfp-how h2 { max-width: 330px; font-size: 38px; line-height: 1.02; }
+  .qfp-how-lede { max-width: 330px; font-size: 15px; line-height: 1.55; }
+  .qfp-steps { margin-top: 30px; grid-template-columns: 1fr; gap: 18px; }
+  .qfp-step { grid-template-columns: minmax(0, 44%) minmax(0, 56%); min-height: 390px; border-radius: 22px; box-shadow: 0 26px 52px -34px rgba(255, 91, 12, 0.65); }
+  .qfp-step-num { top: 16px; left: 16px; width: 54px; height: 54px; font-size: 18px; }
+  .qfp-step-text { justify-content: flex-end; gap: 10px; padding: 92px 8px 26px 18px; background: linear-gradient(90deg, rgba(8,7,6,.98), rgba(9,8,7,.90) 82%, rgba(9,8,7,.08)); }
+  .qfp-step-icon { width: 48px; height: 48px; }
+  .qfp-step-icon svg { width: 22px; height: 22px; }
+  .qfp-step h3 { max-width: 145px; font-size: 22px; line-height: 1.04; }
+  .qfp-step p { max-width: 150px; font-size: 12.5px; line-height: 1.55; }
+  .qfp-step + .qfp-step::before { top: -19px; left: 50%; width: 2px; height: 19px; background-image: linear-gradient(180deg, #ff741d 0 6px, transparent 6px 12px); background-size: 2px 12px; background-repeat: repeat-y; }
+  .qfp-step--1 .qfp-step-media img { object-position: 58% center; }
+  .qfp-step--3 .qfp-step-media img { object-position: 55% center; }
+  .qfp-how-team { min-width: 100px; max-width: 108px; padding: 6px 7px; gap: 6px; }
+  .qfp-how-team > i { width: 26px; height: 26px; flex-basis: 26px; }
+  .qfp-how-team strong { font-size: 9px; }
+  .qfp-how-team small { font-size: 7.5px; }
+  .qfp-how-team--one { left: 6%; top: 14%; }
+  .qfp-how-team--two { right: 3%; top: 27%; }
+  .qfp-how-team--three { right: 4%; bottom: 18%; }
+  .qfp-how-client { left: 44%; top: 50%; padding: 6px 8px 6px 6px; }
+  .qfp-how-client > i { width: 30px; height: 30px; flex-basis: 30px; font-size: 10px; }
+  .qfp-how-client strong { font-size: 9.5px; }
+  .qfp-how-client small { font-size: 7.5px; }
+  .qfp-how-map-lines i { left: 45%; top: 51%; }
+  .qfp-how-match-pill { left: 7px; right: 7px; bottom: 9px; min-height: 36px; font-size: 8.5px; gap: 4px; }
+  .qfp-how-match-pill strong { font-size: 15px; }
 
   /* cities */
   .qfp-cities-skyline { margin: 32px -20px 0; max-width: none; }

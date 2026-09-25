@@ -744,26 +744,59 @@ async function Services() {
 // real/<slot>-m.webp for the phone banner. The two frames are nothing alike
 // — one is twice as tall as it is wide, the other nearly twice as wide as it
 // is tall — so each photo is cut to its frame rather than cropped by chance.
-const HOW_IT_WORKS: { icon: ReactNode; title: string; body: string; slot: string }[] = [
+const HOW_IT_WORKS: { icon: ReactNode; title: string; body: string; slot?: string; visual: "photo" | "map" }[] = [
   {
     icon: <ChatIcon />,
     title: "Tell us what you need",
     body: "Choose the service, share your location and a few details. Your phone number is requested at the contact step.",
     slot: "how-step-1",
+    visual: "photo",
   },
   {
-    icon: <G name="shield" size={26} stroke="#fff" width={2} />,
-    title: "We find eligible pros",
-    body: "QuickFurno matches you with up to 3 active professionals based on your service, location and eligibility checks.",
-    slot: "how-step-2",
+    icon: <G name="people" size={26} stroke="#fff" width={2} />,
+    title: "We find eligible Teams",
+    body: "QuickFurno matches you with up to 3 active Teams based on your service, location and eligibility checks.",
+    visual: "map",
   },
   {
     icon: <G name="check2" size={26} stroke="#fff" width={2} />,
     title: "Compare & choose",
     body: "Review profiles and quotes, then choose the professional you trust. No fee, no obligation.",
     slot: "how-step-3",
+    visual: "photo",
   },
 ];
+
+const HOW_TEAM_MATCHES = [
+  { name: "Interior Team 01", position: "qfp-how-team--one" },
+  { name: "Interior Team 02", position: "qfp-how-team--two" },
+  { name: "Interior Team 03", position: "qfp-how-team--three" },
+] as const;
+
+function HowMatchMap() {
+  return (
+    <div className="qfp-how-map" aria-label="Illustration of Priya Sharma in Baner matched with three nearby interior Teams">
+      <Image className="qfp-how-map-base" src={`${REAL}/areas/pune-map.webp`} alt="" aria-hidden="true" width={601} height={508} />
+      <span className="qfp-how-map-shade" aria-hidden="true" />
+      <span className="qfp-how-map-label" aria-hidden="true">BANER</span>
+      <span className="qfp-how-client">
+        <i aria-hidden="true">PS</i>
+        <span><strong>Priya Sharma</strong><small>Baner, Pune</small></span>
+      </span>
+      {HOW_TEAM_MATCHES.map((team) => (
+        <span className={`qfp-how-team ${team.position}`} key={team.name}>
+          <i aria-hidden="true"><G name="home2" size={15} stroke="#FFB13D" width={2} /></i>
+          <span><strong>{team.name}</strong><small>Nearby match</small></span>
+        </span>
+      ))}
+      <span className="qfp-how-map-lines" aria-hidden="true"><i /><i /><i /></span>
+      <span className="qfp-how-match-pill">
+        <G name="people" size={17} stroke="#8EF0AF" width={2} />
+        <strong>3</strong> matched interior Teams
+      </span>
+    </div>
+  );
+}
 
 function HowItWorks() {
   return (
@@ -773,29 +806,25 @@ function HowItWorks() {
       <div className="qfp-shell">
         <div className="qfp-head-center" data-reveal>
           <span className="qfp-kicker qfp-kicker--ruled">How it works</span>
-          <h2>
-            Three steps. <span>Zero running around.</span>
-          </h2>
-          <p className="qfp-how-lede">From your requirement to a trusted professional — all in one place.</p>
+          <h2>Three steps. <span>Zero running around.</span></h2>
+          <p className="qfp-how-lede">From your requirement to a trusted professional ? all in one place.</p>
         </div>
         <ol className="qfp-steps" data-reveal-group>
           {HOW_IT_WORKS.map((step, index) => {
-            // -d is the tall pane the 1280 board draws; -m is the phone banner.
-            const photoPane = optionalRealImage(`${step.slot}-d`);
-            const photoBanner = optionalRealImage(`${step.slot}-m`);
+            const photoPane = step.slot ? optionalRealImage(`${step.slot}-d`) : null;
+            const photoBanner = step.slot ? optionalRealImage(`${step.slot}-m`) : null;
             return (
-              <li className="qfp-step" key={step.title}>
+              <li className={`qfp-step qfp-step--${index + 1}`} key={step.title}>
                 <span className="qfp-step-num" aria-hidden="true">0{index + 1}</span>
                 <div className="qfp-step-text">
                   <span className="qfp-step-icon">{step.icon}</span>
                   <h3>{step.title}</h3>
                   <p>{step.body}</p>
                 </div>
-                <div className="qfp-step-media">
-                  {photoPane && photoBanner ? (
-                    /* Each file is already the size and shape it renders at, so
-                       there is nothing for the optimiser to do and only the one
-                       that matches the screen is fetched. */
+                <div className={`qfp-step-media${step.visual === "map" ? " qfp-step-media--map" : ""}`}>
+                  {step.visual === "map" ? (
+                    <HowMatchMap />
+                  ) : photoPane && photoBanner ? (
                     <picture>
                       <source media="(min-width: 761px)" srcSet={photoPane} />
                       <img src={photoBanner} alt="" loading="lazy" decoding="async" />

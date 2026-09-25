@@ -485,25 +485,14 @@ function Hero() {
   );
 }
 
-// One card shape for all eight categories. The board drops the 2x2 featured
-// tile, so Interior Designers is now the same card as the rest - it simply
-// leads the grid. Photo runs the full pane, copy sits on it over a scrim, and
-// the sub-category bar below is the part that does real work: it answers
-// "what is actually in here?" before anyone has to click.
-// Five of the eight categories have no publicly visible vendor yet. A card
-// reading "0 pros" advertises an empty marketplace on the busiest page of the
-// site, so zero renders as the state instead of the number. Set this to false
-// to print a literal "0 pros".
-const SOFTEN_ZERO_COUNT = true;
-
-/** null = count unavailable (hide the pill entirely). */
+// One card shape for all eight categories. Interior Designers leads the grid
+// but is not visually oversized. Desktop keeps the richer card treatment;
+// phone layouts intentionally simplify each tile to photo + title + action.
+// Live count pills use literal Teams and disappear when the live count is zero.
+/** null = count unavailable; zero = no live Team pill. */
 function countLabel(count: number | null): string | null {
-  if (count === null) return null;
-  // Short on purpose: "Accepting enquiries" was wide enough to wrap under the
-  // longer badges and not the shorter ones, so the top row came out uneven
-  // across a grid row.
-  if (count === 0) return SOFTEN_ZERO_COUNT ? "Enquiries open" : "0 pros";
-  return `${count} ${count === 1 ? "pro" : "pros"}`;
+  if (count === null || count <= 0) return null;
+  return `${count} ${count === 1 ? "Team" : "Teams"}`;
 }
 
 function ServiceCard({ name, count }: { name: QuickFurnoCategory; count: number | null }) {

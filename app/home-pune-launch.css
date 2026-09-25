@@ -2424,22 +2424,96 @@
   .qfp2-services { padding: 30px 0 32px; }
   .qfp2-svc-head { gap: 7px; margin-bottom: 14px; }
   .qfp2-svc-head h2 { font-size: 23px; line-height: 1.06; }
-  .qfp2-services .qfp-service-grid { gap: 8px; }
-  .qfp2-services .qfp-card { border-radius: 12px; }
-  .qfp2-services .qfp-card-face { aspect-ratio: 3 / 2; }
-  .qfp-card-copy { padding: 8px; gap: 2px; }
-  .qfp-card-title { font-size: 13px; }
-  .qfp-card-desc { font-size: 10px; line-height: 1.25; }
-  .qfp-card-btn { height: 28px; margin-top: 3px; font-size: 10.5px; }
-  .qfp-card-count { padding: 4px 7px; font-size: 8.5px; }
-  .qfp-card-badge { padding: 4px 7px 4px 6px; font-size: 9px; }
-  .qfp-card-subs { display: none; }
-  .qfp-notsure { min-height: 96px; margin-top: 10px; padding: 11px 10px; border-radius: 12px; }
-  .qfp-notsure-copy { padding: 0; gap: 4px; }
-  .qfp-notsure-kicker { font-size: 8.5px; }
-  .qfp-notsure-title { font-size: 14.5px; }
-  .qfp-notsure-desc--short { font-size: 11px; }
-  .qfp-notsure-arrow { width: 36px; height: 36px; }
+  .qfp2-services .qfp-service-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .qfp2-services .qfp-card {
+    border-radius: 14px;
+    border-color: #e7ddcf;
+    background: #fffdf9;
+    box-shadow: 0 10px 24px -18px rgba(20, 24, 29, 0.42);
+  }
+  .qfp2-services .qfp-card-face {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) 40px;
+    aspect-ratio: auto;
+    height: 132px;
+    min-height: 0;
+    background: #fffdf9;
+  }
+  .qfp2-services .qfp-card-media {
+    position: relative;
+    inset: auto;
+    grid-row: 1;
+    min-height: 0;
+  }
+  .qfp2-services .qfp-card-media img { object-position: center 42%; }
+  .qfp2-services .qfp-card-scrim { display: none; }
+  .qfp2-services .qfp-card-top {
+    top: 7px;
+    left: 7px;
+    right: auto;
+    display: block;
+  }
+  .qfp2-services .qfp-card-badge { display: none; }
+  .qfp2-services .qfp-card-count {
+    padding: 4px 7px;
+    border: 0;
+    background: rgba(20, 24, 29, 0.74);
+    font-size: 8.5px;
+    box-shadow: 0 5px 14px -8px rgba(0, 0, 0, 0.8);
+  }
+  .qfp2-services .qfp-card-copy {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    grid-row: 2;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 7px 8px 7px 10px;
+    background: #fffdf9;
+  }
+  .qfp2-services .qfp-card-title {
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--qf2-ink);
+    font-size: 12.5px;
+    line-height: 1.12;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .qfp2-services .qfp-card-desc { display: none; }
+  .qfp2-services .qfp-card-btn {
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+    margin: 0;
+    padding: 0;
+    gap: 0;
+    border-radius: 999px;
+    font-size: 0;
+  }
+  .qfp2-services .qfp-card-btn svg { width: 13px; height: 13px; }
+  .qfp2-services .qfp-card-subs { display: none; }
+
+  .qfp2-services .qfp-notsure {
+    width: 100%;
+    min-height: 88px;
+    margin-top: 12px;
+    padding: 13px 14px;
+    align-items: center;
+    border-radius: 14px;
+  }
+  .qfp2-services .qfp-notsure-copy { padding: 0; gap: 4px; }
+  .qfp2-services .qfp-notsure-kicker { font-size: 8.5px; }
+  .qfp2-services .qfp-notsure-title { font-size: 15px; }
+  .qfp2-services .qfp-notsure-desc--short { font-size: 10.5px; }
+  .qfp2-services .qfp-notsure-arrow { width: 34px; height: 34px; }
   .qfp-how { padding: 32px 0 36px; }
   .qfp-how .qfp-shell { width: min(350px, calc(100% - 40px)); }
   .qfp-how h2 { max-width: 292px; font-size: 24px; line-height: 1.02; }

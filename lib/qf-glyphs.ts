@@ -1,5 +1,7 @@
 // Icon paths lifted verbatim from the approved canvas boards.
 export const GLYPHS: Record<string, string> = {
+  "target": "<circle cx=\"12\" cy=\"12\" r=\"8.2\"/><circle cx=\"12\" cy=\"12\" r=\"3.6\"/><path d=\"M12 1.9v2.6\"/><path d=\"M12 19.5v2.6\"/><path d=\"M1.9 12h2.6\"/><path d=\"M19.5 12h2.6\"/>",
+  "clock": "<circle cx=\"12\" cy=\"12\" r=\"8.6\"/><path d=\"M12 6.8V12l3.4 2\"/>",
   "arrow": "<path d=\"M4.2 12h14.4\"/><path d=\"M13 6.2l5.8 5.8-5.8 5.8\"/>",
   "badge_": "<circle cx=\"12\" cy=\"9.4\" r=\"5.8\"/><path d=\"M9.6 10l1.7 1.7 3.2-3.3\"/><path d=\"M8.3 14.6L7 21.2l5-2.4 5 2.4-1.3-6.6\"/>",
   "bars": "<path d=\"M4.2 20h15.6\"/><path d=\"M7.2 20v-5.4\"/><path d=\"M12 20V9.2\"/><path d=\"M16.8 20v-8\"/><path d=\"M5.6 7.4l4.6-3 3.4 2.2 4.8-3.2\"/>",

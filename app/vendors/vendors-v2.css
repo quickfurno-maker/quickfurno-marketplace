@@ -292,24 +292,53 @@
 }
 .qv-cats-sub { margin-top: 11px; font-size: 14.5px; line-height: 1.55; color: var(--qv-body); }
 
+/* All eight categories on one phone screen: 4 across, 2 rows, no sideways
+   scroll. Two rows of two used to run 652px tall and pushed the rest of the
+   page down; this is 534px. */
 .qv-cats-grid {
-  margin-top: 22px;
+  margin-top: 20px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 11px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
 }
+/* The card is a size container so the 1280 card below can size its parts as
+   shares of the card's own width. Note a container's OWN box can't use cqw —
+   those units would resolve against an outer container — so padding, gap and
+   radius here are plain values, and only descendants use cqw.
+   The card carries no side padding: that keeps the circle's 70% honest, and
+   the name gets its own inset instead. */
 .qv-cat {
+  container-type: inline-size;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 11px;
-  padding: 11px 12px;
-  background-color: #FFFFFF;
-  border: 1px solid var(--qv-line);
-  border-radius: 15px;
-  box-shadow: 0 16px 30px -26px rgba(20, 17, 13, 0.55);
+  gap: 6px;
+  padding: 8px 0 9px;
+  background-color: #FCFAF8;
+  border: 0;
+  border-radius: 14px;
+  box-shadow: 0 14px 24px -20px rgba(20, 17, 13, 0.45);
 }
-.qv-cat img { width: 46px; height: 42px; object-fit: contain; flex-shrink: 0; }
-.qv-cat-label { font-size: 12.5px; line-height: 1.25; font-weight: 700; color: var(--qv-dark); }
+.qv-cat picture { display: block; width: 70%; }
+.qv-cat img {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  object-fit: cover;
+  display: block;
+}
+.qv-cat-label {
+  display: block;
+  min-height: 24px;
+  padding: 0 4px;
+  font-size: 9.9px;
+  line-height: 1.22;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--qv-dark);
+  text-align: center;
+}
+.qv-cat-go { display: none; }
 
 /* the 390 board makes this a full-width button, the 1280 board a plain link */
 .qv-cats-all {
@@ -341,25 +370,52 @@
   .qv-cats-sub { margin-top: 12px; font-size: 16px; }
   .qv-br-m { display: none; }
 
-  .qv-cats-grid { margin-top: 34px; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 16px; }
+  .qv-cats-grid {
+    margin-top: 34px;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 34px;
+    align-items: stretch;
+  }
+  /* The 1280 card: full-bleed illustration, the name centred in the space
+     below it, and a round arrow at the foot. Same cqw trick as the phone
+     card, so the eight stay in proportion as the shell narrows. */
   .qv-cat {
-    flex-direction: column;
-    gap: 11px;
-    padding: 16px 10px 18px;
-    border-radius: 18px;
-    box-shadow: 0 20px 36px -30px rgba(20, 17, 13, 0.55);
+    gap: 0;
+    padding: 0;
+    /* 10.45% of the 118px card, as a plain value: a container cannot use cqw
+       on its own box (it would measure an outer container, not itself). */
+    border-radius: 12.4px;
+    box-shadow: 0 18px 32px -26px rgba(20, 17, 13, 0.42);
+    overflow: hidden;
     text-align: center;
   }
-  .qv-cat img { width: 100%; max-width: 104px; height: 88px; }
+  .qv-cat picture { width: 100%; }
+  .qv-cat img { aspect-ratio: 201 / 204; border-radius: 0; }
   .qv-cat-label {
-    min-height: 34px;
+    flex-grow: 1;
+    min-height: 47.26cqw;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
-    line-height: 1.3;
+    padding: 0 9cqw;
+    font-size: 12.94cqw;
+    min-width: 0;
+    line-height: 1.2;
+    letter-spacing: -0.005em;
   }
+  .qv-cat-go {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 36.82cqw;
+    height: 36.82cqw;
+    margin-bottom: 28.86cqw;
+    border-radius: 999px;
+    background-color: #FDEFE3;
+  }
+  .qv-cat-go .qv-ico { width: 13.44cqw; height: 13.44cqw; color: var(--qv-orange); }
 
   .qv-cats-all {
     margin-top: 0;
@@ -376,19 +432,37 @@
   }
 }
 
-.qv-cat-l { display: inline; }
-@media (min-width: 900px) { .qv-cat-l { display: block; } }
+/* Both boards break a two-word name onto its own line. */
+.qv-cat-l { display: block; }
 
 /* ===================================== 3. HOW MATCHING WORKS + 4. DASHBOARD ==
    Both sections are a copy column, a stepped list, a note strip and a piece of
    artwork. The 390 board stacks them; the 1280 board floats the artwork beside
    the list. One grid, two area maps.
    ========================================================================== */
+/* The matching band is the first of the four dark sections. Its tokens are
+   shared by the other three through .qv-dk, so the darks stay identical. */
+.qv-dk {
+  --dk-title: #FFFFFF;
+  --dk-body: rgba(240, 236, 230, 0.62);
+  --dk-soft: rgba(240, 236, 230, 0.80);
+  --dk-card: rgba(255, 255, 255, 0.035);
+  --dk-inset: rgba(255, 255, 255, 0.028);
+  --dk-line: rgba(255, 255, 255, 0.075);
+  --dk-check: #61BB48;
+  --dk-tintbg: rgba(224, 97, 30, 0.16);
+  --dk-tintln: rgba(224, 97, 30, 0.30);
+  background-color: #0B0B0C;
+}
+.qv-dk .qv-sec-h2, .qv-dk .qv-eyebrow { color: var(--dk-title); }
+.qv-dk .qv-sec-sub { color: var(--dk-body); }
+
 .qv-match {
-  padding: 36px 0 40px;
-  background-image: radial-gradient(112% 86% at 96% -8%, rgba(252, 178, 83, 0.20), rgba(0, 0, 0, 0) 56%),
-    radial-gradient(84% 72% at 2% 6%, rgba(224, 97, 30, 0.06), rgba(0, 0, 0, 0) 52%),
-    linear-gradient(180deg, #FFFCF8 0%, #FBF6EF 44%, #F7F0E6 100%);
+  /* side padding belongs to .qv-shell; adding it here too would inset the
+     band's contents twice */
+  padding: 36px 0 38px;
+  background-image: radial-gradient(58% 40% at 2% 10%, rgba(224, 97, 30, 0.10), rgba(0, 0, 0, 0) 60%),
+    radial-gradient(52% 38% at 6% 94%, rgba(224, 97, 30, 0.07), rgba(0, 0, 0, 0) 58%);
 }
 .qv-dash {
   padding: 38px 0 40px;
@@ -413,6 +487,555 @@
 
 /* the dashboard board puts its note above the artwork */
 .qv-dash .qv-split { grid-template-areas: "copy" "steps" "note" "vis"; }
+
+/* ---- 3. how matching works: the dark board -------------------------------
+   One DOM, two orders. The 390 board reads copy -> map -> steps -> phone ->
+   note; the 1280 board puts the steps beside the map and adds the three
+   benefits under the rule. Grid areas do the reordering. */
+.qv-msplit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "copy" "vis" "steps" "phone" "note";
+}
+.qv-msplit-copy { grid-area: copy; }
+.qv-msplit-vis { grid-area: vis; margin-top: 18px; }
+.qv-msplit-steps { grid-area: steps; margin-top: 18px; }
+.qv-msplit-phone { grid-area: phone; margin-top: 18px; }
+.qv-msplit-note { grid-area: note; margin-top: 18px; }
+.qv-msplit-ben { display: none; }
+.qv-msplit-phone img { width: 100%; height: auto; aspect-ratio: 308 / 320; display: block; border-radius: 16px; }
+
+/* the map, and the example vendors drawn over it */
+.qv-mmap { position: relative; }
+/* Each artwork declares its ratio so the browser reserves the space before
+   the file arrives. Without it these lazy images start at zero height and
+   the page jumps as you scroll. The 1280 cuts have their own ratios. */
+.qv-mmap img { width: 100%; height: auto; aspect-ratio: 304 / 380; display: block; border-radius: 16px; }
+.qv-mpin {
+  position: absolute;
+  left: var(--mx);
+  top: var(--my);
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+  min-width: 96px;
+  padding: 5px 7px;
+  border-radius: 10px;
+  background-color: rgba(10, 10, 12, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  text-align: center;
+}
+.qv-mpin b { display: block; font-size: 8.5px; line-height: 1.2; font-weight: 700; color: #FFFFFF; }
+.qv-mpin i {
+  display: block;
+  margin-top: 2px;
+  font-size: 8px;
+  line-height: 1.2;
+  font-style: normal;
+  color: var(--dk-body);
+}
+.qv-mmap-tag {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background-color: rgba(10, 10, 12, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dk-body);
+}
+
+/* a step: tap-to-open on a phone */
+.qv-mstep {
+  box-sizing: border-box;
+  background-color: var(--dk-card);
+  border: 1px solid var(--dk-line);
+  border-radius: 15px;
+}
+.qv-mstep + .qv-mstep { margin-top: 10px; }
+.qv-mstep > summary {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  list-style: none;
+  cursor: pointer;
+}
+.qv-mstep > summary::-webkit-details-marker { display: none; }
+.qv-mstep-n {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background-color: var(--qv-orange);
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.qv-mstep-ico {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background-color: var(--dk-tintbg);
+  border: 1px solid var(--dk-tintln);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--qv-orange);
+}
+.qv-mstep-ico .qv-ico { width: 17px; height: 17px; }
+.qv-mstep-head { flex-grow: 1; min-width: 0; }
+.qv-mstep-eye { display: none; }
+.qv-mstep-head h3 {
+  margin: 0;
+  font-size: 13.8px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--dk-title);
+}
+.qv-mstep-chev { flex-shrink: 0; color: rgba(240, 236, 230, 0.45); display: flex; }
+.qv-mstep-chev .qv-ico { width: 15px; height: 15px; transition: transform 0.18s ease; }
+.qv-mstep[open] .qv-mstep-chev .qv-ico { transform: rotate(180deg); }
+.qv-mstep-panel { padding: 0 13px 13px; }
+.qv-mstep-panel p { margin: 0 0 9px; font-size: 12.5px; line-height: 1.5; color: var(--dk-body); }
+.qv-mstep-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 11px 12px;
+  background-color: var(--dk-inset);
+  border: 1px solid var(--dk-line);
+  border-radius: 12px;
+}
+.qv-mstep-checks > div { display: flex; align-items: center; gap: 8px; }
+.qv-mstep-checks .qv-ico { width: 12.5px; height: 12.5px; color: var(--dk-check); flex-shrink: 0; }
+.qv-mstep-checks span { font-size: 12px; line-height: 1.35; color: var(--dk-soft); }
+
+/* the "no fixed volume is promised" note */
+.qv-mnote {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 16px 20px;
+  background-color: var(--dk-card);
+  border: 1px solid var(--dk-line);
+  border-radius: 16px;
+}
+.qv-mnote-ico {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background-color: var(--qv-orange);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.qv-mnote-ico .qv-ico { width: 18px; height: 18px; }
+.qv-mnote p { margin: 0; flex-grow: 1; font-size: 13.5px; line-height: 1.5; color: var(--dk-body); }
+
+/* the three benefits under the rule (1280 board only) */
+.qv-mben { display: flex; align-items: flex-start; gap: 13px; }
+.qv-mben-ico {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background-color: var(--dk-tintbg);
+  border: 1px solid var(--dk-tintln);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--qv-orange);
+}
+.qv-mben-ico .qv-ico { width: 20px; height: 20px; }
+.qv-mben-t { display: block; font-size: 15px; line-height: 1.25; font-weight: 700; color: var(--dk-title); }
+.qv-mben-d { display: block; margin-top: 5px; font-size: 12.5px; line-height: 1.45; color: var(--dk-body); }
+
+/* ---- 5/6/8. the three remaining dark boards ------------------------------
+   Same ground and tokens as the matching band. Mobile first; the 1280 layout
+   is in the min-width:900px block further down. */
+
+/* the gradient call to action the "why" and "promise" bands close on */
+.qv-dcta {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  background-color: var(--dk-card);
+  border: 1px solid var(--dk-line);
+  border-radius: 18px;
+}
+.qv-dcta-ico {
+  grid-column: 1;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background-color: rgba(224, 97, 30, 0.18);
+  border: 1px solid rgba(224, 97, 30, 0.40);
+  box-shadow: 0 0 24px -6px rgba(224, 97, 30, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--qv-orange);
+}
+.qv-dcta-ico .qv-ico { width: 19px; height: 19px; }
+.qv-dcta-t {
+  grid-column: 2;
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--dk-title);
+}
+.qv-dcta-b {
+  grid-column: 1 / -1;
+  margin: 5px 0 0;
+  font-size: 12.3px;
+  line-height: 1.45;
+  color: var(--dk-body);
+}
+.qv-dcta-act { grid-column: 1 / -1; display: block; }
+.qv-dcta-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 13px;
+  padding: 15px 20px;
+  border-radius: 13px;
+  background-image: linear-gradient(135deg, #F47A20 0%, #E4550C 100%);
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 800;
+  box-shadow: 0 16px 30px -16px rgba(224, 97, 30, 0.75);
+}
+.qv-dcta-btn .qv-ico { width: 16px; height: 16px; }
+.qv-dcta-note {
+  display: block;
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--dk-body);
+  text-align: center;
+}
+
+/* ---- 5. why QuickFurno is different --------------------------------------- */
+.qv-why { padding: 34px 0 36px; }
+.qv-wsplit-copy .qv-sec-h2 { font-size: 29px; line-height: 1.1; }
+.qv-wsplit-copy .qv-sec-sub { font-size: 13.6px; }
+.qv-why, .qv-get, .qv-pro {
+  background-image: radial-gradient(58% 40% at 2% 10%, rgba(224, 97, 30, 0.10), rgba(0, 0, 0, 0) 60%),
+    radial-gradient(52% 38% at 6% 94%, rgba(224, 97, 30, 0.07), rgba(0, 0, 0, 0) 58%);
+}
+.qv-wsplit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "copy" "fig" "panels" "cta";
+}
+.qv-wsplit-copy { grid-area: copy; }
+.qv-wsplit-fig { grid-area: fig; margin-top: 18px; }
+.qv-wsplit-panels { grid-area: panels; }
+.qv-wsplit-cta { grid-area: cta; margin-top: 14px; }
+.qv-wsplit-fig img { width: 100%; height: auto; aspect-ratio: 382 / 278; display: block; border-radius: 16px; }
+
+.qv-wben { margin-top: 20px; display: flex; align-items: flex-start; gap: 10px; }
+.qv-wben-i {
+  flex-grow: 1;
+  flex-basis: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+}
+.qv-wben-ico {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background-color: var(--dk-tintbg);
+  border: 1px solid rgba(224, 97, 30, 0.34);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--qv-orange);
+}
+.qv-wben-ico .qv-ico { width: 18px; height: 18px; }
+.qv-wben-tx b { display: block; font-size: 13.5px; line-height: 1.2; font-weight: 700; color: var(--dk-title); }
+.qv-wben-tx i {
+  display: block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  font-style: normal;
+  color: var(--dk-body);
+}
+
+.qv-wpan {
+  box-sizing: border-box;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 16px;
+}
+.qv-wpan--bad { background-color: rgba(120, 28, 20, 0.14); border: 1px solid rgba(224, 64, 46, 0.30); }
+.qv-wpan--good { background-color: rgba(16, 86, 48, 0.16); border: 1px solid rgba(37, 169, 92, 0.30); }
+.qv-wpan > summary {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 14px;
+  list-style: none;
+  cursor: pointer;
+}
+.qv-wpan > summary::-webkit-details-marker { display: none; }
+.qv-wpan--bad > summary { background-color: rgba(176, 42, 28, 0.30); }
+.qv-wpan--good > summary { background-color: rgba(20, 118, 62, 0.32); }
+.qv-wpan-ico {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #FFFFFF;
+}
+.qv-wpan--bad .qv-wpan-ico { background-color: #E0402E; }
+.qv-wpan--good .qv-wpan-ico { background-color: #25A95C; }
+.qv-wpan-ico .qv-ico { width: 15px; height: 15px; }
+.qv-wpan-head { flex-grow: 1; min-width: 0; }
+.qv-wpan-head b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--dk-title);
+}
+.qv-wpan-head i { display: block; margin-top: 3px; font-size: 11.5px; font-style: normal; }
+.qv-wpan--bad .qv-wpan-head i { color: rgba(255, 190, 180, 0.85); }
+.qv-wpan--good .qv-wpan-head i { color: rgba(170, 235, 196, 0.85); }
+.qv-wpan-chev { flex-shrink: 0; display: flex; transform: rotate(90deg); color: rgba(240, 236, 230, 0.45); }
+.qv-wpan-chev .qv-ico { width: 16px; height: 16px; transition: transform 0.18s ease; }
+.qv-wpan[open] .qv-wpan-chev .qv-ico { transform: rotate(180deg); }
+.qv-wpan-rows { padding: 0 4px 6px; }
+.qv-wpan-row { display: flex; align-items: center; gap: 11px; padding: 11px 13px; }
+.qv-wpan-row + .qv-wpan-row { border-top: 1px solid rgba(255, 255, 255, 0.07); }
+.qv-wpan-ric {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.qv-wpan--bad .qv-wpan-ric { border: 1px solid rgba(224, 64, 46, 0.30); color: #E0402E; }
+.qv-wpan--good .qv-wpan-ric { border: 1px solid rgba(37, 169, 92, 0.30); color: #25A95C; }
+.qv-wpan-ric .qv-ico { width: 15px; height: 15px; }
+.qv-wpan-rtx { flex-grow: 1; min-width: 0; }
+.qv-wpan-rtx b { display: block; font-size: 13.2px; line-height: 1.25; font-weight: 700; color: var(--dk-title); }
+.qv-wpan-rtx i {
+  display: block;
+  margin-top: 4px;
+  font-size: 11.8px;
+  line-height: 1.45;
+  font-style: normal;
+  color: var(--dk-body);
+}
+.qv-wpan-rch { flex-shrink: 0; display: flex; color: rgba(240, 236, 230, 0.32); }
+.qv-wpan-rch .qv-ico { width: 13px; height: 13px; }
+
+/* ---- 6. what you get ------------------------------------------------------ */
+.qv-get { padding: 34px 0 36px; }
+.qv-gsplit-copy .qv-sec-h2 { font-size: 29px; line-height: 1.1; }
+.qv-gsplit-copy .qv-sec-sub { font-size: 13.8px; }
+.qv-gsplit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "copy" "fig" "rows" "trust";
+}
+.qv-gsplit-copy { grid-area: copy; }
+.qv-gsplit-fig { grid-area: fig; margin-top: 10px; }
+.qv-gsplit-rows { grid-area: rows; margin-top: 14px; }
+.qv-gsplit-trust { grid-area: trust; margin-top: 16px; }
+/* the 390 board runs this artwork edge to edge */
+.qv-gsplit-fig img {
+  width: calc(100% + (var(--qv-pad) * 2));
+  margin-left: calc(var(--qv-pad) * -1);
+  height: auto;
+  aspect-ratio: 941 / 762;
+  display: block;
+}
+.qv-gscript { display: none; }
+
+.qv-grow {
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  padding: 13px 14px;
+  background-color: var(--dk-card);
+  border: 1px solid var(--dk-line);
+  border-radius: 15px;
+}
+.qv-grow + .qv-grow { margin-top: 10px; }
+.qv-grow-ico {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background-image: linear-gradient(145deg, rgba(224, 97, 30, 0.34), rgba(224, 97, 30, 0.12));
+  border: 1px solid rgba(224, 97, 30, 0.34);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--qv-orange);
+}
+.qv-grow-ico .qv-ico { width: 19px; height: 19px; }
+.qv-grow-tx { flex-grow: 1; min-width: 0; }
+.qv-grow-tx b { display: block; font-size: 15px; line-height: 1.25; font-weight: 700; color: var(--dk-title); }
+.qv-grow-tx i {
+  display: block;
+  margin-top: 5px;
+  font-size: 12.3px;
+  line-height: 1.5;
+  font-style: normal;
+  color: var(--dk-body);
+}
+.qv-grow-chev { flex-shrink: 0; align-self: center; display: flex; color: rgba(240, 236, 230, 0.38); }
+.qv-grow-chev .qv-ico { width: 15px; height: 15px; }
+
+.qv-gtrust {
+  box-sizing: border-box;
+  padding: 14px;
+  background-color: var(--dk-card);
+  border: 1px solid var(--dk-line);
+  border-radius: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 11px;
+}
+.qv-gtrust-i {
+  flex-grow: 1;
+  flex-basis: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+}
+.qv-gtrust-i + .qv-gtrust-i { padding-left: 10px; border-left: 1px solid var(--dk-line); }
+.qv-gtrust-ico {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background-color: var(--qv-orange);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.qv-gtrust-ico .qv-ico { width: 16px; height: 16px; }
+.qv-gtrust-tx b { display: block; font-size: 12.5px; line-height: 1.2; font-weight: 700; color: var(--dk-title); }
+.qv-gtrust-tx i {
+  display: block;
+  margin-top: 3px;
+  font-size: 10.8px;
+  line-height: 1.35;
+  font-style: normal;
+  color: var(--dk-body);
+}
+.qv-gtrust .qv-dcta-btn { flex-basis: 100%; margin-top: 14px; }
+
+/* ---- 8. our promise ------------------------------------------------------- */
+.qv-pro { padding: 34px 0 36px; }
+.qv-psplit-copy .qv-sec-h2 { font-size: 29px; line-height: 1.1; }
+.qv-psplit-copy .qv-sec-sub { font-size: 13.8px; }
+.qv-psplit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "copy" "fig" "cols" "cta";
+}
+.qv-psplit-copy { grid-area: copy; }
+.qv-psplit-fig { grid-area: fig; margin-top: 16px; }
+.qv-psplit-cols { grid-area: cols; }
+.qv-psplit-cta { grid-area: cta; margin-top: 16px; }
+.qv-psplit-fig img { width: 100%; height: auto; aspect-ratio: 540 / 298; display: block; border-radius: 16px; }
+
+.qv-pcol {
+  box-sizing: border-box;
+  margin-top: 12px;
+  padding: 13px 14px 10px;
+  background-color: var(--dk-card);
+  border: 1px solid var(--dk-line);
+  border-radius: 17px;
+}
+.qv-pcol-h { display: flex; align-items: center; gap: 11px; padding-bottom: 13px; }
+.qv-pcol-ico {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.qv-pcol-ico .qv-ico { width: 19px; height: 19px; }
+.qv-pcol--pro .qv-pcol-ico,
+.qv-pcol--pro .qv-pcol-ric {
+  background-color: rgba(224, 97, 30, 0.18);
+  border: 1px solid rgba(224, 97, 30, 0.38);
+  color: var(--qv-orange);
+}
+/* the board's navy reads as a hole on near-black, so the homeowner column
+   takes a light blue on this ground */
+.qv-pcol--home .qv-pcol-ico,
+.qv-pcol--home .qv-pcol-ric {
+  background-color: rgba(58, 111, 184, 0.22);
+  border: 1px solid rgba(58, 111, 184, 0.45);
+  color: #A9D4F2;
+}
+.qv-pcol-tx b { display: block; font-size: 16px; line-height: 1.2; font-weight: 700; color: var(--dk-title); }
+.qv-pcol-tx i { display: block; margin-top: 2px; font-size: 11.8px; font-style: normal; color: var(--dk-body); }
+.qv-pcol-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; }
+.qv-pcol-row + .qv-pcol-row { border-top: 1px solid var(--dk-line); }
+.qv-pcol-ric {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.qv-pcol-ric .qv-ico { width: 15px; height: 15px; }
+.qv-pcol-rtx { flex-grow: 1; min-width: 0; }
+.qv-pcol-rtx b { display: block; font-size: 13px; line-height: 1.3; font-weight: 700; color: var(--dk-title); }
+.qv-pcol-rtx i {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.8px;
+  line-height: 1.45;
+  font-style: normal;
+  color: var(--dk-body);
+}
 
 .qv-sec-h2 {
   margin-top: 11px;
@@ -615,7 +1238,269 @@
 }
 
 @media (min-width: 900px) {
-  .qv-match { padding: 64px 0 68px; }
+  .qv-match { padding: 62px 0 56px; }
+  .qv-why { padding: 58px 0 54px; }
+  .qv-get { padding: 58px 0 54px; }
+  .qv-pro { padding: 60px 0; }
+
+  /* the three dark boards share one call-to-action shape at 1280: icon and
+     headline, a rule, the body, then the button on the right */
+  .qv-dcta {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 18px;
+    padding: 16px 20px;
+    border-radius: 20px;
+  }
+  .qv-dcta-ico { width: 48px; height: 48px; }
+  .qv-dcta-ico .qv-ico { width: 22px; height: 22px; }
+  .qv-dcta-t { grid-column: 2; grid-row: 1; font-size: 17px; }
+  .qv-dcta-b { grid-column: 2; grid-row: 2; margin-top: 5px; font-size: 13px; }
+  .qv-dcta-act { grid-column: 3; grid-row: 1 / span 2; }
+  .qv-dcta-btn { width: auto; margin-top: 0; padding: 16px 30px; font-size: 15.5px; }
+
+  /* The promise board's call to action puts its sentence in its own column,
+     behind a rule, rather than under the headline. */
+  .qv-dcta--pro { grid-template-columns: auto auto minmax(0, 1fr) auto; gap: 26px; padding: 18px 22px; }
+  .qv-dcta--pro .qv-dcta-ico { width: 52px; height: 52px; margin-right: -11px; }
+  .qv-dcta--pro .qv-dcta-ico .qv-ico { width: 24px; height: 24px; }
+  .qv-dcta--pro .qv-dcta-t { grid-column: 2; grid-row: 1; font-size: 19px; }
+  .qv-dcta--pro .qv-dcta-b {
+    grid-column: 3;
+    grid-row: 1;
+    margin: 0;
+    padding-left: 26px;
+    border-left: 1px solid var(--dk-line);
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  .qv-dcta--pro .qv-dcta-act { grid-column: 4; grid-row: 1; }
+  .qv-dcta--pro .qv-dcta-btn { padding: 15px 28px; }
+  .qv-dcta-btn .qv-ico { width: 17px; height: 17px; }
+
+  /* ---- 5. why QuickFurno is different ---- */
+  .qv-wsplit {
+    grid-template-columns: 500px minmax(0, 1fr);
+    grid-template-areas: "copy fig" "panels panels" "cta cta";
+    align-items: start;
+    column-gap: 22px;
+  }
+  .qv-wsplit-copy { padding-top: 6px; }
+  .qv-wsplit-copy .qv-sec-h2 { font-size: 42px; line-height: 1.07; }
+  .qv-wsplit-copy .qv-sec-sub { margin-top: 13px; font-size: 15px; }
+  .qv-wsplit-fig { margin-top: -22px; }
+  .qv-wsplit-fig img {
+    aspect-ratio: 608 / 374;
+    border-radius: 18px;
+    mask-image: linear-gradient(to right, rgba(0, 0, 0, 0) 0%, #000000 7%, #000000 100%);
+    -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0) 0%, #000000 7%, #000000 100%);
+  }
+  .qv-wsplit-panels { margin-top: 24px; display: flex; align-items: flex-start; gap: 20px; }
+  .qv-wsplit-cta { margin-top: 18px; }
+
+  .qv-wben { margin-top: 24px; gap: 16px; }
+  .qv-wben-i { flex-direction: row; align-items: center; text-align: left; gap: 10px; }
+  .qv-wben-ico { width: 34px; height: 34px; }
+  .qv-wben-ico .qv-ico { width: 17px; height: 17px; }
+  .qv-wben-tx i { font-size: 11.8px; }
+
+  .qv-wpan { flex-grow: 1; flex-basis: 0; min-width: 0; margin-top: 0; border-radius: 18px; }
+  .qv-wpan::details-content { display: contents; content-visibility: visible; }
+  .qv-wpan > summary { padding: 15px 18px; cursor: default; }
+  .qv-wpan-ico { width: 36px; height: 36px; }
+  .qv-wpan-ico .qv-ico { width: 17px; height: 17px; }
+  .qv-wpan-head b { font-size: 14px; }
+  .qv-wpan-head i { font-size: 12.5px; }
+  .qv-wpan-chev { display: none; }
+  .qv-wpan-rows { padding: 0 6px 8px; }
+  .qv-wpan-row { gap: 13px; padding: 13px 16px; }
+  .qv-wpan-ric { width: 38px; height: 38px; border-radius: 11px; }
+  .qv-wpan-ric .qv-ico { width: 17px; height: 17px; }
+  .qv-wpan-rtx b { font-size: 14.5px; }
+  .qv-wpan-rtx i { font-size: 12.8px; }
+  .qv-wpan-rch .qv-ico { width: 15px; height: 15px; }
+
+  /* ---- 6. what you get ---- */
+  .qv-gsplit {
+    grid-template-columns: 452px minmax(0, 1fr);
+    grid-template-areas: "copy fig" "rows fig" "trust trust";
+    align-items: start;
+    column-gap: 24px;
+  }
+  .qv-gsplit-copy .qv-sec-h2 { font-size: 42px; line-height: 1.07; }
+  .qv-gsplit-copy .qv-sec-sub { margin-top: 13px; font-size: 15.5px; }
+  .qv-gsplit-fig { grid-row: 1 / span 2; margin-top: -30px; }
+  .qv-gsplit-fig img {
+    width: 100%;
+    margin-left: 0;
+    aspect-ratio: 936 / 890;
+    mask-image: linear-gradient(to right, rgba(0, 0, 0, 0) 0%, #000000 6%, #000000 100%);
+    -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0) 0%, #000000 6%, #000000 100%);
+  }
+  .qv-gsplit-rows { margin-top: 22px; }
+  .qv-gsplit-trust { margin-top: 22px; }
+  .qv-gscript { display: block; margin-top: 18px; }
+  .qv-gscript .qv-script {
+    display: block;
+    max-width: 400px;
+    font-size: 25px;
+    line-height: 1.2;
+    color: #F6C98A;
+  }
+  .qv-gscript i {
+    display: block;
+    width: 190px;
+    height: 7px;
+    margin-top: 5px;
+    border-radius: 7px;
+    background-image: linear-gradient(90deg, rgba(224, 97, 30, 0) 0%, #E0611E 38%, rgba(224, 97, 30, 0) 100%);
+  }
+
+  .qv-grow { gap: 15px; padding: 16px 17px; border-radius: 17px; }
+  .qv-grow + .qv-grow { margin-top: 12px; }
+  .qv-grow-ico { width: 46px; height: 46px; border-radius: 14px; }
+  .qv-grow-ico .qv-ico { width: 21px; height: 21px; }
+  .qv-grow-tx b { font-size: 17px; }
+  .qv-grow-tx i { font-size: 13.5px; }
+  .qv-grow-chev { display: none; }
+
+  .qv-gtrust {
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 24px;
+    padding: 16px 20px;
+    border-radius: 20px;
+  }
+  .qv-gtrust-i { flex-direction: row; align-items: center; text-align: left; gap: 12px; }
+  .qv-gtrust-i + .qv-gtrust-i { padding-left: 22px; }
+  .qv-gtrust-ico { width: 42px; height: 42px; border-radius: 12px; }
+  .qv-gtrust-ico .qv-ico { width: 19px; height: 19px; }
+  .qv-gtrust-tx b { font-size: 14.5px; }
+  .qv-gtrust-tx i { font-size: 12px; }
+  .qv-gtrust .qv-dcta-btn { flex: 0 0 auto; margin-top: 0; }
+
+  /* ---- 8. our promise ---- */
+  .qv-psplit {
+    grid-template-columns: minmax(0, 1fr) 535px;
+    grid-template-areas: "copy fig" "cols cols" "cta cta";
+    align-items: start;
+    column-gap: 30px;
+  }
+  .qv-psplit-copy { padding-top: 14px; }
+  .qv-psplit-copy .qv-sec-h2 { font-size: 44px; line-height: 1.06; }
+  .qv-psplit-copy .qv-sec-sub { margin-top: 14px; max-width: 430px; font-size: 16px; }
+  .qv-psplit-fig { margin-top: 6px; }
+  .qv-psplit-fig img {
+    aspect-ratio: 576 / 292;
+    border-radius: 18px;
+    box-shadow: 0 26px 50px -30px rgba(0, 0, 0, 0.85);
+    mask-image: linear-gradient(to right, rgba(0, 0, 0, 0) 0%, #000000 9%, #000000 100%);
+    -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0) 0%, #000000 9%, #000000 100%);
+  }
+  .qv-psplit-cols { margin-top: 22px; display: flex; align-items: stretch; gap: 20px; }
+  .qv-psplit-cta { margin-top: 18px; }
+
+  .qv-pcol {
+    flex-grow: 1;
+    flex-basis: 0;
+    min-width: 0;
+    margin-top: 0;
+    padding: 18px 20px 6px;
+    border-radius: 20px;
+  }
+  .qv-pcol-h { gap: 14px; padding-bottom: 16px; }
+  .qv-pcol-ico { width: 50px; height: 50px; border-radius: 15px; }
+  .qv-pcol-ico .qv-ico { width: 23px; height: 23px; }
+  .qv-pcol-tx b { font-size: 20px; }
+  .qv-pcol-tx i { font-size: 13px; }
+  .qv-pcol-row { gap: 14px; padding: 15px 0; }
+  .qv-pcol-ric { width: 40px; height: 40px; border-radius: 12px; }
+  .qv-pcol-ric .qv-ico { width: 19px; height: 19px; }
+  .qv-pcol-rtx b { font-size: 15.5px; }
+  .qv-pcol-rtx i { font-size: 13px; }
+
+  /* ---- 3. how matching works, 1280 board ---------------------------------
+     Steps beside the map, the note across the full width, then the three
+     benefits under a rule. Every step is open here: the panel is forced
+     visible both ways, for engines that hide it with ::details-content and
+     for the older ones that hide the child itself. */
+  .qv-msplit {
+    grid-template-columns: minmax(0, 1fr) 446px;
+    grid-template-areas: "copy vis" "steps vis" "note note" "ben ben";
+    align-items: start;
+    column-gap: 28px;
+  }
+  .qv-msplit-copy .qv-sec-sub { max-width: 470px; font-size: 15.5px; }
+  .qv-msplit-vis { margin-top: -62px; }
+  .qv-msplit-steps { margin-top: 26px; }
+  .qv-msplit-note { margin-top: 22px; }
+  .qv-msplit-phone { display: none; }
+  .qv-msplit-ben {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 26px;
+    margin-top: 26px;
+    padding-top: 26px;
+    border-top: 1px solid var(--dk-line);
+  }
+
+  /* the wide map bleeds off both edges rather than ending on a hard corner */
+  .qv-mmap img {
+    aspect-ratio: 446 / 1046;
+    border-radius: 0;
+    mask-image: linear-gradient(to right, rgba(0, 0, 0, 0) 0%, #000000 7%, #000000 95%, rgba(0, 0, 0, 0) 100%);
+    -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0) 0%, #000000 7%, #000000 95%, rgba(0, 0, 0, 0) 100%);
+  }
+  .qv-mpin {
+    left: var(--dx);
+    top: var(--dy);
+    min-width: 0;
+    padding: 5px 9px;
+    white-space: nowrap;
+  }
+  .qv-mpin b { font-size: 11px; }
+  .qv-mpin i { font-size: 10px; }
+  .qv-mmap-tag { left: 14px; bottom: 14px; font-size: 8.5px; }
+
+  .qv-mstep {
+    display: grid;
+    grid-template-columns: 34px 44px minmax(0, 1fr) 186px;
+    grid-template-rows: auto auto;
+    column-gap: 16px;
+    align-items: center;
+    padding: 18px 20px;
+    border-radius: 18px;
+  }
+  .qv-mstep + .qv-mstep { margin-top: 14px; }
+  .qv-mstep > summary { display: contents; }
+  /* Chrome wraps a <details>' content in ::details-content, which would
+     otherwise be the grid item and carry the body text and the checklist
+     into one cell. Dissolving it, and the panel inside it, puts both back
+     on the card's own grid. */
+  .qv-mstep::details-content { display: contents; content-visibility: visible; }
+  .qv-mstep-panel { display: contents; }
+  .qv-mstep-n { grid-column: 1; grid-row: 1 / span 2; width: 34px; height: 34px; font-size: 13.5px; }
+  .qv-mstep-ico { grid-column: 2; grid-row: 1 / span 2; width: 44px; height: 44px; border-radius: 14px; }
+  .qv-mstep-ico .qv-ico { width: 21px; height: 21px; }
+  .qv-mstep-head { grid-column: 3; grid-row: 1; }
+  .qv-mstep-eye {
+    display: block;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    color: var(--qv-orange);
+  }
+  .qv-mstep-head h3 { margin-top: 5px; font-size: 18px; line-height: 1.24; letter-spacing: -0.02em; }
+  .qv-mstep-chev { display: none; }
+  .qv-mstep-panel p { grid-column: 3; grid-row: 2; margin: 6px 0 0; font-size: 13.5px; }
+  .qv-mstep-checks {
+    grid-column: 4;
+    grid-row: 1 / span 2;
+    gap: 9px;
+    padding: 14px 16px;
+    border-radius: 14px;
+  }
+  .qv-mstep-checks .qv-ico { width: 14px; height: 14px; }
+  .qv-mstep-checks span { font-size: 13.5px; }
   .qv-dash { padding: 66px 0 70px; }
 
   .qv-split {
@@ -693,12 +1578,7 @@
 .qv-dash .qv-step-body h3 { margin-top: 0; }
 
 /* ============================ 5. WHY QUICKFURNO IS DIFFERENT =============== */
-.qv-why {
-  padding: 38px 0 40px;
-  background-image: radial-gradient(96% 78% at 98% -6%, rgba(252, 178, 83, 0.20), rgba(0, 0, 0, 0) 54%),
-    radial-gradient(86% 72% at 0% 8%, rgba(224, 97, 30, 0.06), rgba(0, 0, 0, 0) 50%),
-    linear-gradient(180deg, #FFFDFA 0%, #FCF8F1 46%, #F7F0E6 100%);
-}
+/* the light ground this band used to carry now lives on the dark rule above */
 .qv-why-top { display: grid; grid-template-columns: minmax(0, 1fr); }
 
 /* the figure and the four cards are siblings, so the 1280 board can flank the
@@ -834,8 +1714,6 @@
 @media (min-width: 900px) {
   .qv-why { padding: 66px 0 70px; }
   .qv-why-top { grid-template-columns: minmax(0, 1fr) 656px; column-gap: 40px; align-items: center; }
-  .qv-why .qv-sec-h2 { font-size: 38px; line-height: 1.1; }
-  .qv-why .qv-sec-sub { margin-top: 14px; max-width: none; font-size: 16px; line-height: 1.58; }
 
   .qv-why-cluster {
     margin-top: 0;
@@ -866,14 +1744,7 @@
 }
 
 /* ============================================ 6. WHAT YOU GET ============== */
-.qv-get {
-  padding: 38px 0 42px;
-  background-color: #141A22;
-  background-image: radial-gradient(86% 70% at 88% -6%, rgba(252, 178, 83, 0.16), rgba(0, 0, 0, 0) 58%),
-    linear-gradient(180deg, #141A22 0%, #121820 54%, #0F141B 100%);
-}
-.qv-get .qv-sec-h2 { color: #FFFFFF; font-size: 30px; line-height: 1.12; }
-.qv-get .qv-sec-sub { margin-top: 12px; color: #A9B1BC; }
+/* superseded: this band now uses the shared dark ground */
 .qv-get-fig {
   margin-top: 22px;
   display: flex;
@@ -934,8 +1805,6 @@
 @media (min-width: 900px) {
   .qv-get { padding: 68px 0 72px; }
   .qv-get .qv-split { grid-template-columns: 452px minmax(0, 1fr); grid-template-areas: "copy vis" "steps vis" "note vis"; align-items: center; column-gap: 48px; }
-  .qv-get .qv-sec-h2 { margin-top: 12px; font-size: 42px; line-height: 1.08; letter-spacing: -0.032em; }
-  .qv-get .qv-sec-sub { display: none; }
   .qv-get-fig { margin-top: 0; align-items: stretch; }
   .qv-get-fig span { font-size: 24px; text-align: right; margin-bottom: 8px; }
   .qv-get-fig img {
@@ -1100,11 +1969,7 @@
 }
 
 /* ============================================= 8. OUR PROMISE ============== */
-.qv-pro {
-  padding: 38px 0 40px;
-  background-image: radial-gradient(98% 82% at 94% -8%, rgba(252, 178, 83, 0.17), rgba(0, 0, 0, 0) 54%),
-    linear-gradient(180deg, #FFFDFA 0%, #FDF8F2 48%, #F8F1E7 100%);
-}
+/* superseded: this band now uses the shared dark ground */
 .qv-pro .qv-split { grid-template-areas: "copy" "vis" "steps" "note"; }
 
 
@@ -1222,8 +2087,6 @@
     align-items: center;
     column-gap: 36px;
   }
-  .qv-pro .qv-sec-h2 { font-size: 42px; line-height: 1.1; letter-spacing: -0.032em; }
-  .qv-pro .qv-sec-sub { margin-top: 14px; max-width: 470px; font-size: 16px; line-height: 1.58; }
 
   .qv-pro-fig { margin-top: 0; gap: 4px; }
   .qv-pro-fig img { width: 268px; }
@@ -1317,11 +2180,46 @@
   width: 100%;
   background-color: #FFFFFF;
   border: 1px solid #F2ECE3;
-  border-radius: 18px;
-  padding: 14px;
+  border-radius: 16px;
   box-shadow: 0 22px 40px -32px rgba(20, 17, 13, 0.5);
 }
-.qv-zone-h { display: flex; align-items: flex-start; gap: 10px; }
+.qv-zone > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 13px;
+  list-style: none;
+  cursor: pointer;
+}
+.qv-zone > summary::-webkit-details-marker { display: none; }
+.qv-zone-t { flex-grow: 1; min-width: 0; }
+.qv-zone-t b { display: block; font-size: 14.5px; line-height: 1.2; font-weight: 700; color: var(--qv-dark); }
+/* the open zone gets the warmer tile, the rest a paler one */
+.qv-zone-ico { background-color: #FBF4EB; }
+.qv-zone[open] .qv-zone-ico { background-color: #FDEFE3; }
+/* the phone's one-line summary: "12 areas · IT hubs, residential & growing" */
+.qv-zone-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.3;
+  font-style: normal;
+  color: #7C7468;
+}
+.qv-zone-sub b { display: inline; font-size: inherit; font-weight: 800; color: var(--qv-orange); }
+.qv-zone-blurb { display: none; }
+.qv-zone-count { display: none; }
+.qv-zone-tog {
+  flex-shrink: 0;
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 400;
+  color: #C6BEB2;
+}
+.qv-zone-tog::before { content: "+"; }
+.qv-zone[open] .qv-zone-tog { color: var(--qv-orange); }
+.qv-zone[open] .qv-zone-tog::before { content: "\2212"; }
+.qv-zone-panel { padding: 0 13px 11px; }
 .qv-zone-ico {
   width: 34px;
   height: 34px;
@@ -1334,10 +2232,10 @@
   color: var(--qv-orange);
 }
 .qv-zone-ico .qv-ico { width: 17px; height: 17px; }
-.qv-zone-h b { display: block; font-size: 15px; line-height: 1.2; font-weight: 700; color: var(--qv-dark); }
-.qv-zone-h i { display: block; margin-top: 3px; font-size: 12px; line-height: 1.35; font-style: normal; color: #7C7468; }
+.qv-zone-blurb { margin-top: 3px; font-size: 12px; line-height: 1.35; font-style: normal; color: #7C7468; }
+/* the pin-and-count pill belongs to the 1280 board; the phone folds the
+   count into the summary line instead (see .qv-zone-sub) */
 .qv-zone-count {
-  display: inline-flex;
   align-items: center;
   gap: 6px;
   margin-top: 11px;
@@ -1346,7 +2244,7 @@
   color: var(--qv-orange);
 }
 .qv-zone-count .qv-ico { width: 12px; height: 12px; }
-.qv-zone-list { margin-top: 10px; }
+.qv-zone-list { margin-top: 0; }
 .qv-zone-row {
   display: flex;
   align-items: center;
@@ -1444,12 +2342,27 @@
   .qv-pill span { font-size: 13.5px; text-align: left; }
 
   .qv-areas-zones { margin-top: 44px; flex-direction: row; align-items: flex-start; gap: 16px; }
-  .qv-zone { flex-grow: 1; flex-basis: 0; min-width: 0; width: auto; padding: 16px 15px; }
-  .qv-zone-ico { width: 38px; height: 38px; }
+  .qv-zone { flex-grow: 1; flex-basis: 0; min-width: 0; width: auto; border-radius: 18px; }
+  /* every zone is open here, so the panel is forced visible and the summary
+     stops behaving like a control */
+  .qv-zone::details-content { display: contents; content-visibility: visible; }
+  .qv-zone > summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    padding: 16px 15px 0;
+    cursor: default;
+  }
+  .qv-zone-ico { width: 38px; height: 38px; background-color: #FDEFE3; }
   .qv-zone-ico .qv-ico { width: 19px; height: 19px; }
-  .qv-zone-h b { font-size: 16px; }
-  .qv-zone-h i { font-size: 12.5px; }
-  .qv-zone-count { font-size: 12px; }
+  .qv-zone-t { flex: 1 1 auto; }
+  .qv-zone-t b { font-size: 16px; }
+  .qv-zone-sub { display: none; }
+  .qv-zone-blurb { display: block; }
+  .qv-zone-blurb { font-size: 12.5px; }
+  .qv-zone-tog { display: none; }
+  .qv-zone-panel { padding: 0 15px 16px; }
+  .qv-zone-count { display: inline-flex; flex-basis: 100%; margin-top: 11px; font-size: 12px; }
   .qv-zone-count .qv-ico { width: 13px; height: 13px; }
   .qv-zone-row { padding: 8px 0; }
   .qv-zone-row span { font-size: 13.5px; }
@@ -1549,17 +2462,36 @@
   .qv-faq-wa-ico { width: 34px; height: 34px; }
   .qv-faq-wa-ico .qv-ico { width: 18px; height: 18px; }
   .qv-faq-pills { margin-top: 26px; align-items: center; gap: 8px; }
-  .qv-faq-art { display: block; position: relative; width: 186px; }
-  .qv-faq-art img { width: 100%; height: auto; }
+  /* The photo is a tight crop with hard edges. A radial mask feathers it so
+     she rises out of the band instead of sitting in a visible rectangle, and
+     the script line clears the top of the frame rather than her face. */
+  .qv-faq-art { display: block; position: relative; width: 196px; align-self: flex-end; }
+  .qv-faq-art img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 151 / 370;
+    display: block;
+    /* Two masks intersected: the sides and the base feather out, the top stays
+       solid so her head keeps its edge. A single radial can't do both — at this
+       aspect it still leaves the right edge about two-thirds opaque. */
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, #000000 7%, #000000 68%, rgba(0, 0, 0, 0) 100%),
+      linear-gradient(to right, rgba(0, 0, 0, 0) 0%, #000000 22%, #000000 76%, rgba(0, 0, 0, 0) 100%);
+    mask-composite: intersect;
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, #000000 7%, #000000 68%, rgba(0, 0, 0, 0) 100%),
+      linear-gradient(to right, rgba(0, 0, 0, 0) 0%, #000000 22%, #000000 76%, rgba(0, 0, 0, 0) 100%);
+    -webkit-mask-composite: source-in;
+  }
   .qv-faq-art > .qv-script {
     position: absolute;
-    right: -4px;
-    top: -54px;
-    width: 118px;
-    font-size: 22px;
-    line-height: 1.14;
+    left: 50%;
+    top: -78px;
+    width: 172px;
+    margin-left: -86px;
+    font-size: 23px;
+    line-height: 1.16;
+    color: #1E2A38;
     text-align: center;
-    transform: rotate(-4deg);
+    transform: rotate(-3deg);
   }
   .qv-faq-panel { width: 528px; margin-top: 0; padding: 6px 8px; }
   .qv-faq-item { padding: 14px 16px; }

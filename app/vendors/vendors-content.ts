@@ -36,11 +36,22 @@ export const MATCH_H2 = ["From a homeowner’s", "need to ", "your phone"] as co
 export const MATCH_SUB = "Our matching process connects you with checked homeowner requests — based on service, locality, quality and eligibility." as const;
 export const STEPS = [["doc", "STEP 1", "Homeowner shares the requirement", "Service, locality, timeline and the project details they choose to provide are submitted on QuickFurno.", ["Service type", "Locality in Pune", "Project details", "Preferred timeline"]], ["shield", "STEP 2", "Quality and consent checks", "Incomplete or unclear requests can be held for clarification before assignment.", ["Valid, clear request", "Locality captured", "Project details", "Consent confirmed"]], ["people", "STEP 3", "Up to 3 eligible pros", "Category fit comes first; geography and the approved ranking rules then help order eligible vendors.", ["Category fit first", "Approved ranking", "Geography signal", "Up to 3 active pros"]], ["phone", "STEP 4", "Assigned in your dashboard", "If you receive an assignment, the permitted client details and requirement appear in Client Matching.", ["Dashboard alert", "Project details", "Contact after consent", "Start your work"]]] as const;
 export const MATCH_NOTE = "Matches depend on homeowner demand, account eligibility, available credits and the approved ranking order. No fixed volume is promised." as const;
-export const PINS = [{"pos": "left: 52.5%; top: 24.0%; width: 32.4%; min-height: 18.8%", "d": "1.2 km away"}, {"pos": "left: 40.9%; top: 49.8%; width: 31.6%; min-height: 19.7%", "d": "2.4 km away"}, {"pos": "left: 72.7%; top: 48.9%; width: 27.3%; min-height: 19.3%", "d": "3.1 km away"}] as const;
-export const PILL_POS = "left: 20.8%; top: 2.5%; width: 35.3%; min-height: 14.5%" as const;
-export const QUAL_POS = "left: 33.8%; top: 70.6%; width: 40.7%; min-height: 29.4%" as const;
-export const QUAL_TITLE = "Example quality check" as const;
-export const QUAL_ROWS = ["Service captured", "Locality captured", "Project details reviewed", "Consent path checked", "Before contact sharing"] as const;
+// Named example vendors drawn over the map. These are illustrations, not
+// listings — the "Example vendors" tag on the artwork says so — so no real
+// business is implied to be signed up. Each pin carries two positions: the
+// 1280 board's (dx, dy) and the 390 board's (mx, my), because the two boards
+// crop the map differently.
+export const MATCH_PINS = [
+  { n: "Abhijeet Interiors", d: "1.2 km away", dx: "46.5%", dy: "38.6%", mx: "17.8%", my: "73.7%" },
+  { n: "Woodcraft Pune", d: "2.4 km away", dx: "39.0%", dy: "50.8%", mx: "85.5%", my: "65.8%" },
+  { n: "Onestop Interiors", d: "3.1 km away", dx: "85.7%", dy: "52.1%", mx: "63.7%", my: "91.6%" },
+] as const;
+export const MATCH_PIN_NOTE = "Example vendors" as const;
+export const MATCH_BENEFITS = [
+  ["doc", "Real Homeowner Requests", "Phone-verified and location-specific"],
+  ["pin_", "Nearby Opportunities", "Based on your service area"],
+  ["shield", "Quality Checked", "Clear and complete requirements"],
+] as const;
 export const DASH_EYE = "ALWAYS-AVAILABLE DASHBOARD" as const;
 export const DASH_H2 = ["Your dashboard is available", "whenever you need it."] as const;
 export const DASH_SUB = "Track enquiries, assigned work, project status and support — all in one place, whenever you open it." as const;
@@ -56,12 +67,28 @@ export const WHY_CARDS = [["wrench", "Relevant to your service", "You get only e
 export const WHY_BAD_HEAD = ["WHAT WASTES A PRO’S TIME?", "Common issues on other platforms"] as const;
 export const WHY_GOOD_HEAD = ["HOW QUICKFURNO HANDLES IT", "A smarter, fairer and more relevant way"] as const;
 export const WHY_ROWS = [["doc", "Enquiries outside your service", "Requests that don’t match what you actually do.", "Category-first matching", "Your profile is considered for enquiries relevant to your approved services."], ["list", "Incomplete requirements", "Too little information to understand the job.", "Quality checks before matching", "Unclear or incomplete requests can be held for clarification."], ["pin_", "Jobs in the wrong area", "Opportunities too far from where you work.", "Geography-aware matching", "Location is considered alongside category and available routing data."], ["people", "Too many pros chasing one enquiry", "Everyone competing for the same customer.", "Up to 3 active pros at a time", "We limit active matching rather than sending the enquiry to an unlimited list."], ["phone", "Uncontrolled contact sharing", "Customer details distributed before proper checks.", "Governed contact sharing", "Contact details are shared through the approved assignment and consent process."], ["bars", "Unclear reasons for receiving work", "No visibility into how opportunities are allocated.", "Eligibility + ranking controls", "Approval, active status, matching credits and ranking signals determine assignment eligibility."]] as const;
+export const WHY_BENEFITS = [
+  ["target", "Right jobs", "Relevant to your service"],
+  ["pin_", "Right location", "In your area"],
+  ["clock", "Less hassle", "No more random enquiries"],
+] as const;
+export const WHY_CTA = [
+  "A fairer marketplace for everyone.",
+  "Less spam, more relevant opportunities and better outcomes for homeowners and pros.",
+  "Join QuickFurno",
+] as const;
 export const GET_EYE = "WHAT YOU GET" as const;
 export const GET_H2 = ["Everything you", "need to ", "win the job."] as const;
 export const GET_SUB = "Your approved services, areas and portfolio facts appear on your profile, so the enquiries that reach you are the relevant ones." as const;
 export const GET_SCRIPT = "Get only relevant enquiries, right in your dashboard." as const;
 export const GET_FEATS = [["badge_", "Approved public profile", "After approval, your published services, areas and portfolio facts can appear on your public profile."], ["doc", "Client matching dashboard", "Eligible assignments show the requirement facts that QuickFurno is permitted to share with you."], ["star_", "Assignment-verified reviews", "Only homeowners with a real QuickFurno assignment can submit a review for that vendor."], ["chat", "Vendor support workspace", "Raise a traceable support ticket from your dashboard or use the WhatsApp contact channel."]] as const;
 export const GET_PANEL = ["Your profile works for you", "Once approved, your services, service areas and portfolio facts can appear on your public profile and help you receive relevant opportunities."] as const;
+export const GET_TRUST = [
+  ["shield", "Verified homeowners", "Real projects and genuine enquiries"],
+  ["bolt_", "Relevant matches", "Based on your services and area"],
+  ["lock_", "Safe and transparent", "Clear rules for everyone"],
+] as const;
+export const GET_CTA = "Grow with QuickFurno" as const;
 export const SUP_EYE = "VENDOR SUPPORT" as const;
 export const SUP_H2 = ["Need help?", "Use your ", "support workspace."] as const;
 export const SUP_SUB = "Profile question or matching issue? Raise a tracked dashboard ticket or use the configured WhatsApp contact channel. No round-the-clock human response-time guarantee is claimed." as const;

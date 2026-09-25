@@ -26,32 +26,29 @@ import {
   MATCH_H2,
   MATCH_NOTE,
   MATCH_SUB,
-  PILL_POS,
-  PINS,
-  QUAL_POS,
-  QUAL_ROWS,
-  QUAL_TITLE,
+  GET_CTA,
+  GET_TRUST,
+  MATCH_BENEFITS,
+  MATCH_PIN_NOTE,
+  MATCH_PINS,
   STEPS,
   GET_EYE,
   GET_FEATS,
   GET_H2,
-  GET_PANEL,
   GET_SCRIPT,
   GET_SUB,
   WHY_BAD_HEAD,
-  WHY_CARDS,
+  WHY_BENEFITS,
+  WHY_CTA,
   WHY_EYE,
   WHY_GOOD_HEAD,
   WHY_H2,
   WHY_ROWS,
-  WHY_SCRIPT,
   WHY_SUB,
   PRO_COLS,
   PRO_CTA,
   PRO_EYE,
   PRO_H2,
-  PRO_NOTE_L,
-  PRO_NOTE_R,
   PRO_SUB,
   SUP_CTA,
   SUP_EYE,
@@ -99,23 +96,16 @@ import {
 const IMG = "/assets/quickfurno/images/vendors/v2";
 
 // The eight live categories, straight from the canonical registry — add one
-// there and it appears here. Only the artwork filename is local, because the
-// boards ship one illustration per category.
-const CAT_ART: Record<string, string> = {
-  "interior-designers": "cat-interior-designers",
-  carpenters: "cat-carpenters-ply-machine",
-  "modular-factory": "cat-modular-factory",
-  "premium-interiors": "cat-premium-interiors",
-  sofa: "cat-sofa",
-  painter: "cat-painter",
-  "civil-work": "cat-civil-work",
-  "false-ceiling": "cat-false-ceiling",
-};
-
+// there and it appears here. Artwork is named after the slug, so a new
+// category needs its two files and nothing else.
+//
+// Two cuts of the same illustration: the 1280 board fills the top of the card
+// with a squared-off panel, the 390 board uses a circular crop. <picture>
+// picks one, so a phone never downloads the desktop art and vice versa.
 const CAT_CARDS = categories.map((category) => {
   const slug = categorySlug(category.name);
   const [l1, ...rest] = category.name.split(" ");
-  return { slug, l1, l2: rest.join(" "), file: CAT_ART[slug] ?? "cat-interior-designers" };
+  return { slug, l1, l2: rest.join(" ") };
 });
 
 // ------------------------------------------------------------------ atoms ---
@@ -281,15 +271,18 @@ export function CategoriesV2() {
         <div className="qv-cats-grid">
           {CAT_CARDS.map((c) => (
             <a className="qv-cat" href={`/category/${c.slug}`} key={c.slug}>
-              <img src={`${IMG}/${c.file}.webp`} alt="" loading="lazy" decoding="async" />
+              <picture>
+                <source media="(min-width: 900px)" srcSet={`${IMG}/cat-icon-${c.slug}.webp`} />
+                <img src={`${IMG}/ring-${c.slug}.webp`} alt="" loading="lazy" decoding="async" />
+              </picture>
               <span className="qv-cat-label">
                 <span className="qv-cat-l">{c.l1}</span>
-                {c.l2 ? (
-                  <>
-                    {" "}
-                    <span className="qv-cat-l">{c.l2}</span>
-                  </>
-                ) : null}
+                {c.l2 ? <span className="qv-cat-l">{c.l2}</span> : null}
+              </span>
+              {/* 1280 board only; the 390 card has no arrow — there is no room
+                  for one and the whole card is already the tap target. */}
+              <span className="qv-cat-go" aria-hidden="true">
+                <Icon name="arrow" sw={2.3} />
               </span>
             </a>
           ))}
@@ -359,11 +352,41 @@ function parsePos(pos: string) {
 
 // -------------------------------------------------- 3. how matching works ---
 
+// The map artwork with the example vendors drawn over it. The names sit on
+// top of the labels baked into the image, so each chip has to stay at least
+// as wide as the label underneath it — that is what the min-width is for.
+function MatchMap() {
+  return (
+    <div className="qv-mmap">
+      <picture>
+        <source media="(min-width: 900px)" srcSet={`${IMG}/match-visual-d.webp`} />
+        <img
+          src={`${IMG}/match-visual-m.webp`}
+          alt="A homeowner request being matched to nearby example vendors"
+          loading="lazy"
+          decoding="async"
+        />
+      </picture>
+      {MATCH_PINS.map((p) => (
+        <span
+          className="qv-mpin"
+          key={p.n}
+          style={{ "--dx": p.dx, "--dy": p.dy, "--mx": p.mx, "--my": p.my } as CSSProperties}
+        >
+          <b>{p.n}</b>
+          <i>{p.d}</i>
+        </span>
+      ))}
+      <span className="qv-mmap-tag">{MATCH_PIN_NOTE}</span>
+    </div>
+  );
+}
+
 export function MatchingV2() {
   return (
-    <section className="qv-sec qv-match" id="how-matching-works">
-      <div className="qv-shell qv-split">
-        <div className="qv-split-copy">
+    <section className="qv-sec qv-dk qv-match" id="how-matching-works">
+      <div className="qv-shell qv-msplit">
+        <div className="qv-msplit-copy">
           <Eyebrow>{MATCH_EYE}</Eyebrow>
           <h2 className="qv-sec-h2">
             {MATCH_H2[0]}
@@ -374,73 +397,75 @@ export function MatchingV2() {
           <p className="qv-sec-sub">{MATCH_SUB}</p>
         </div>
 
-        <div className="qv-split-steps">
+        {/* Tap-to-open on a phone, where four expanded steps would add roughly
+            a screen and a half; always open from 900px up, where there is room
+            for them side by side with the map. */}
+        <div className="qv-msplit-steps">
           {STEPS.map(([icon, no, title, body, checks], i) => (
-            <Step
-              key={no}
-              icon={icon}
-              no={no}
-              title={title}
-              body={body}
-              checks={checks}
-              last={i === STEPS.length - 1}
-            />
+            <details className="qv-mstep" key={no}>
+              <summary>
+                <span className="qv-mstep-n">{String(i + 1).padStart(2, "0")}</span>
+                <span className="qv-mstep-ico">
+                  <Icon name={icon} sw={2} />
+                </span>
+                <span className="qv-mstep-head">
+                  <span className="qv-mstep-eye">{no}</span>
+                  <h3>{title}</h3>
+                </span>
+                <span className="qv-mstep-chev" aria-hidden="true">
+                  <Icon name="chev" sw={2.2} />
+                </span>
+              </summary>
+              <div className="qv-mstep-panel">
+                <p>{body}</p>
+                <div className="qv-mstep-checks">
+                  {checks.map((c) => (
+                    <div key={c}>
+                      <Icon name="check" sw={2.6} />
+                      <span>{c}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </details>
           ))}
         </div>
 
-        <div className="qv-split-vis">
-          <div
-            className="qv-visual"
-            role="img"
-            aria-label="Illustrative Client Matching product preview. Not live demand data."
-          >
-            <img
-              src={`${IMG}/match-composite.webp`}
-              alt=""
-              loading="lazy"
-              decoding="async"
-            />
-            <div className="qv-ov qv-ov-pill" style={parsePos(PILL_POS)}>
-              <Icon name="pin_" sw={2} />
-              <div className="qv-ov-body">
-                <span className="qv-ov-t">Example matching area</span>
-                <span className="qv-ov-d">Baner, Pune</span>
-              </div>
-            </div>
-            {PINS.map((p) => (
-              <div className="qv-ov" style={parsePos(p.pos)} key={p.pos}>
-                <span className="qv-ov-av">
-                  <Icon name="people" sw={2} />
-                </span>
-                <div className="qv-ov-body">
-                  <span className="qv-ov-t">Eligible pro</span>
-                  <span className="qv-ov-d">{p.d}</span>
-                  <span className="qv-ov-tag">EXAMPLE</span>
-                </div>
-              </div>
-            ))}
-            <div className="qv-ov-qual" style={parsePos(QUAL_POS)}>
-              <div className="qv-ov-qual-h">
-                <Icon name="doc" sw={2} />
-                <span>{QUAL_TITLE}</span>
-              </div>
-              {QUAL_ROWS.map((r) => (
-                <div className="qv-ov-qual-r" key={r}>
-                  <Icon name="check" sw={3} />
-                  <span>{r}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+        <div className="qv-msplit-vis">
+          <MatchMap />
         </div>
 
-        <div className="qv-split-note">
-          <div className="qv-note">
-            <span className="qv-note-ico">
+        {/* 390 board only — the 1280 board has the phone inside the map art. */}
+        <div className="qv-msplit-phone">
+          <img
+            src={`${IMG}/match-phone-m.webp`}
+            alt="The request as it appears on a vendor phone"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+
+        <div className="qv-msplit-note">
+          <div className="qv-mnote">
+            <span className="qv-mnote-ico">
               <Icon name="bolt_" sw={2} fill="currentColor" />
             </span>
             <p>{MATCH_NOTE}</p>
           </div>
+        </div>
+
+        <div className="qv-msplit-ben">
+          {MATCH_BENEFITS.map(([icon, title, body]) => (
+            <div className="qv-mben" key={title}>
+              <span className="qv-mben-ico">
+                <Icon name={icon} sw={2} />
+              </span>
+              <div>
+                <span className="qv-mben-t">{title}</span>
+                <span className="qv-mben-d">{body}</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </section>
@@ -521,97 +546,133 @@ export function DashboardV2() {
 
 // ----------------------------------------- 5. why QuickFurno is different ---
 
-function Panel({
-  head,
-  sub,
-  rows,
+// The problems / answers pair. Tap-to-open on a phone, where the two panels
+// run to twelve rows between them; both open from 900px up, side by side.
+function WhyPanel({
   tone,
+  head,
+  rows,
 }: {
-  head: string;
-  sub: string;
-  rows: readonly (readonly [string, string, string])[];
   tone: "bad" | "good";
+  head: readonly [string, string];
+  rows: readonly (readonly [string, string, string])[];
 }) {
   return (
-    <div className={`qv-panel qv-panel-${tone}`}>
-      <div className="qv-panel-h">
-        <span className="qv-panel-mark">
-          <Icon name={tone === "good" ? "check" : "x_"} sw={3} />
+    <details className={`qv-wpan qv-wpan--${tone}`}>
+      <summary>
+        <span className="qv-wpan-ico">
+          <Icon name={tone === "bad" ? "x_" : "check"} sw={2.6} />
         </span>
-        <div>
-          <b>{head}</b>
-          <i>{sub}</i>
-        </div>
-      </div>
-      {rows.map(([icon, t, b]) => (
-        <div className="qv-panel-row" key={t}>
-          <span className="qv-panel-row-ico">
-            <Icon name={icon} sw={2} />
-          </span>
-          <div className="qv-panel-row-body">
-            <b>{t}</b>
-            <i>{b}</i>
-          </div>
+        <span className="qv-wpan-head">
+          <b>{head[0]}</b>
+          <i>{head[1]}</i>
+        </span>
+        <span className="qv-wpan-chev" aria-hidden="true">
           <Icon name="chev" sw={2.2} />
-        </div>
-      ))}
+        </span>
+      </summary>
+      <div className="qv-wpan-rows">
+        {rows.map(([icon, t, b]) => (
+          <div className="qv-wpan-row" key={t}>
+            <span className="qv-wpan-ric">
+              <Icon name={icon} sw={2} />
+            </span>
+            <span className="qv-wpan-rtx">
+              <b>{t}</b>
+              <i>{b}</i>
+            </span>
+            <span className="qv-wpan-rch" aria-hidden="true">
+              <Icon name="chev" sw={2.2} />
+            </span>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+// The gradient call to action both the "why" and "what you get" bands close on.
+function DarkCta({
+  className,
+  icon,
+  title,
+  body,
+  label,
+  note,
+}: {
+  className: string;
+  icon: string;
+  title: ReactNode;
+  body?: string;
+  label: string;
+  note?: string;
+}) {
+  return (
+    <div className={`qv-dcta ${className}`}>
+      <span className="qv-dcta-ico">
+        <Icon name={icon} sw={2} />
+      </span>
+      <span className="qv-dcta-t">{title}</span>
+      {body ? <p className="qv-dcta-b">{body}</p> : null}
+      <span className="qv-dcta-act">
+        <a className="qv-dcta-btn" href={SIGNUP}>
+          {label}
+          <Icon name="arrow" sw={2.2} />
+        </a>
+        {note ? <span className="qv-dcta-note">{note}</span> : null}
+      </span>
     </div>
   );
 }
 
 export function WhyV2() {
   return (
-    <section className="qv-sec qv-why" id="why-quickfurno">
-      <div className="qv-shell">
-        <div className="qv-why-top">
-          <div>
-            <Eyebrow>{WHY_EYE}</Eyebrow>
-            <h2 className="qv-sec-h2">
-              {WHY_H2[0]}
-              <br />
-              <span className="qv-hl">{WHY_H2[1]}</span>
-              {WHY_H2[2]}
-            </h2>
-            <p className="qv-sec-sub">{WHY_SUB}</p>
-          </div>
-
-          <div className="qv-why-cluster">
-            <div className="qv-why-fig">
-              <span className="qv-script">{WHY_SCRIPT}</span>
-              <img
-                src={`${IMG}/why-person.webp`}
-                alt="A professional in a hard hat, arms folded"
-                loading="lazy"
-                decoding="async"
-              />
-            </div>
-            {WHY_CARDS.map(([icon, t, b], i) => (
-              <div className={`qv-why-card qv-why-c${i + 1}`} key={t}>
-                <span className="qv-why-card-ico">
+    <section className="qv-sec qv-dk qv-why" id="why-quickfurno">
+      <div className="qv-shell qv-wsplit">
+        <div className="qv-wsplit-copy">
+          <Eyebrow>{WHY_EYE}</Eyebrow>
+          <h2 className="qv-sec-h2">
+            {WHY_H2[0]}
+            <br />
+            <span className="qv-hl">{WHY_H2[1]}</span>
+            <br />
+            {WHY_H2[2].trim()}
+          </h2>
+          <p className="qv-sec-sub">{WHY_SUB}</p>
+          <div className="qv-wben">
+            {WHY_BENEFITS.map(([icon, t, b]) => (
+              <div className="qv-wben-i" key={t}>
+                <span className="qv-wben-ico">
                   <Icon name={icon} sw={2} />
                 </span>
-                <div>
+                <span className="qv-wben-tx">
                   <b>{t}</b>
                   <i>{b}</i>
-                </div>
+                </span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="qv-why-panels">
-          <Panel
-            head={WHY_BAD_HEAD[0]}
-            sub={WHY_BAD_HEAD[1]}
-            rows={WHY_ROWS.map((r) => [r[0], r[1], r[2]] as const)}
-            tone="bad"
-          />
-          <Panel
-            head={WHY_GOOD_HEAD[0]}
-            sub={WHY_GOOD_HEAD[1]}
-            rows={WHY_ROWS.map((r) => [r[0], r[3], r[4]] as const)}
-            tone="good"
-          />
+        <div className="qv-wsplit-fig">
+          <picture>
+            <source media="(min-width: 900px)" srcSet={`${IMG}/why-visual-d.webp`} />
+            <img
+              src={`${IMG}/why-visual-m.webp`}
+              alt="A professional on site"
+              loading="lazy"
+              decoding="async"
+            />
+          </picture>
+        </div>
+
+        <div className="qv-wsplit-panels">
+          <WhyPanel tone="bad" head={WHY_BAD_HEAD} rows={WHY_ROWS.map((r) => [r[0], r[1], r[2]] as const)} />
+          <WhyPanel tone="good" head={WHY_GOOD_HEAD} rows={WHY_ROWS.map((r) => [r[0], r[3], r[4]] as const)} />
+        </div>
+
+        <div className="qv-wsplit-cta">
+          <DarkCta className="qv-dcta--why" icon="shield" title={WHY_CTA[0]} body={WHY_CTA[1]} label={WHY_CTA[2]} />
         </div>
       </div>
     </section>
@@ -622,9 +683,9 @@ export function WhyV2() {
 
 export function WhatYouGetV2() {
   return (
-    <section className="qv-sec qv-get">
-      <div className="qv-shell qv-split">
-        <div className="qv-split-copy">
+    <section className="qv-sec qv-dk qv-get">
+      <div className="qv-shell qv-gsplit">
+        <div className="qv-gsplit-copy">
           <Eyebrow>{GET_EYE}</Eyebrow>
           <h2 className="qv-sec-h2">
             {GET_H2[0]}
@@ -633,41 +694,59 @@ export function WhatYouGetV2() {
             <span className="qv-hl">{GET_H2[2]}</span>
           </h2>
           <p className="qv-sec-sub">{GET_SUB}</p>
-        </div>
-
-        <div className="qv-split-vis">
-          <div className="qv-get-fig">
-            <span>{GET_SCRIPT}</span>
-            <picture>
-              <source media="(min-width: 900px)" srcSet={`${IMG}/get-dashboard.webp`} />
-              <img
-                src={`${IMG}/get-phone.webp`}
-                alt="The Client Matching dashboard"
-                loading="lazy"
-                decoding="async"
-              />
-            </picture>
+          {/* 1280 board only — the 390 board has no room for the script line */}
+          <div className="qv-gscript">
+            <span className="qv-script">{GET_SCRIPT}</span>
+            <i />
           </div>
         </div>
 
-        <div className="qv-split-steps qv-get-rows">
+        <div className="qv-gsplit-fig">
+          <picture>
+            <source media="(min-width: 900px)" srcSet={`${IMG}/get-visual-d.webp`} />
+            <img
+              src={`${IMG}/get-visual-m.webp`}
+              alt="The client matching dashboard on a vendor phone"
+              loading="lazy"
+              decoding="async"
+            />
+          </picture>
+        </div>
+
+        <div className="qv-gsplit-rows">
           {GET_FEATS.map(([icon, t, b]) => (
-            <div className="qv-get-row" key={t}>
-              <span className="qv-get-row-ico">
-                <Icon name={icon} />
+            <div className="qv-grow" key={t}>
+              <span className="qv-grow-ico">
+                <Icon name={icon} sw={2} />
               </span>
-              <div className="qv-get-row-body">
-                <h3>{t}</h3>
-                <p>{b}</p>
-              </div>
+              <span className="qv-grow-tx">
+                <b>{t}</b>
+                <i>{b}</i>
+              </span>
+              <span className="qv-grow-chev" aria-hidden="true">
+                <Icon name="chev" sw={2.2} />
+              </span>
             </div>
           ))}
         </div>
 
-        <div className="qv-split-note">
-          <div className="qv-get-panel">
-            <b>{GET_PANEL[0]}</b>
-            <p>{GET_PANEL[1]}</p>
+        <div className="qv-gsplit-trust">
+          <div className="qv-gtrust">
+            {GET_TRUST.map(([icon, t, b]) => (
+              <div className="qv-gtrust-i" key={t}>
+                <span className="qv-gtrust-ico">
+                  <Icon name={icon} sw={2} />
+                </span>
+                <span className="qv-gtrust-tx">
+                  <b>{t}</b>
+                  <i>{b}</i>
+                </span>
+              </div>
+            ))}
+            <a className="qv-dcta-btn" href={SIGNUP}>
+              {GET_CTA}
+              <Icon name="arrow" sw={2.2} />
+            </a>
           </div>
         </div>
       </div>
@@ -774,9 +853,9 @@ export function SupportV2() {
 
 export function PromiseV2() {
   return (
-    <section className="qv-sec qv-pro" id="our-promise">
-      <div className="qv-shell qv-split">
-        <div className="qv-split-copy">
+    <section className="qv-sec qv-dk qv-pro" id="our-promise">
+      <div className="qv-shell qv-psplit">
+        <div className="qv-psplit-copy">
           <Eyebrow>{PRO_EYE}</Eyebrow>
           <h2 className="qv-sec-h2">
             {PRO_H2[0]}
@@ -786,61 +865,62 @@ export function PromiseV2() {
           <p className="qv-sec-sub">{PRO_SUB}</p>
         </div>
 
-        <div className="qv-split-vis">
-          <div className="qv-pro-fig">
-            <span className="qv-script qv-pro-note qv-pro-note-l">{PRO_NOTE_L}</span>
+        <div className="qv-psplit-fig">
+          <picture>
+            <source media="(min-width: 900px)" srcSet={`${IMG}/pro-hero-d.webp`} />
             <img
-              src={`${IMG}/pro-pair.webp`}
-              alt="A professional and a homeowner standing back to back"
+              src={`${IMG}/pro-hero-m.webp`}
+              alt="A professional and a homeowner"
               loading="lazy"
               decoding="async"
             />
-            <span className="qv-script qv-pro-note qv-pro-note-r">{PRO_NOTE_R}</span>
-          </div>
+          </picture>
         </div>
 
-        <div className="qv-split-steps qv-pro-cols">
-          {PRO_COLS.map(([icon, title, sub, accent, tint, card, rows]) => (
-            <div className="qv-pro-col" key={title} style={{ backgroundColor: card }}>
-              <div className="qv-pro-col-h">
-                <span className="qv-pro-col-mark" style={{ backgroundColor: accent }}>
+        {/* Two governed promises. The blue column reads as the homeowner side;
+            on the dark ground its accent is lightened to #A9D4F2, because the
+            board's navy is invisible against near-black. */}
+        <div className="qv-psplit-cols">
+          {PRO_COLS.map(([icon, title, sub, accent, , , rows]) => (
+            <div className={`qv-pcol ${accent === "#E0611E" ? "qv-pcol--pro" : "qv-pcol--home"}`} key={title}>
+              <div className="qv-pcol-h">
+                <span className="qv-pcol-ico">
                   <Icon name={icon} sw={2} />
                 </span>
-                <div>
+                <span className="qv-pcol-tx">
                   <b>{title}</b>
                   <i>{sub}</i>
-                </div>
+                </span>
               </div>
               {rows.map(([rIcon, t, b]) => (
-                <div className="qv-pro-row" key={t}>
-                  <span className="qv-pro-row-ico" style={{ backgroundColor: tint, color: accent }}>
+                <div className="qv-pcol-row" key={t}>
+                  <span className="qv-pcol-ric">
                     <Icon name={rIcon} sw={2} />
                   </span>
-                  <div className="qv-pro-row-body">
+                  <span className="qv-pcol-rtx">
                     <b>{t}</b>
                     <i>{b}</i>
-                  </div>
+                  </span>
                 </div>
               ))}
             </div>
           ))}
         </div>
 
-        <div className="qv-split-note">
-          <div className="qv-pro-cta">
-            <span className="qv-pro-cta-ico">
-              <Icon name="shield" sw={2} />
-            </span>
-            <span className="qv-pro-cta-t">{PRO_CTA[0]}</span>
-            <p>{PRO_CTA[1]}</p>
-            <div className="qv-cta-stack">
-              <a className="qv-btn qv-btn-primary" href={SIGNUP}>
-                {PRO_CTA[2]}
-                <Icon name="arrow" sw={2.1} />
-              </a>
-              <small>{PRO_CTA[3]}</small>
-            </div>
-          </div>
+        <div className="qv-psplit-cta">
+          <DarkCta
+            className="qv-dcta--pro"
+            icon="shield"
+            title={
+              <>
+                {PRO_CTA[0].replace(" for everyone.", "")}
+                <span className="qv-hl"> for everyone.</span>
+              </>
+            }
+            body={PRO_CTA[1]}
+            label={PRO_CTA[2]}
+            note={PRO_CTA[3]}
+          />
         </div>
       </div>
     </section>
@@ -899,35 +979,45 @@ export function AreasV2() {
 
         <Pills items={AREAS_PILLS} className="qv-areas-pills" />
 
+        {/* Five zones. On a phone each one collapses to a ~60px row, which
+            takes the band from about 2,600px to 1,550px without dropping a
+            single locality; the first stays open so names are visible without
+            a tap. All five are open from 900px up, side by side. */}
         <div className="qv-areas-zones">
-          {AREAS_ZONES.map(([name, blurb, count, list]) => (
-            <div className="qv-zone" key={name}>
-              <div className="qv-zone-h">
+          {AREAS_ZONES.map(([name, blurb, count, list], i) => (
+            <details className="qv-zone" key={name} open={i === 0}>
+              <summary>
                 <span className="qv-zone-ico">
                   <Icon name="home_" sw={2} />
                 </span>
-                <div>
+                <span className="qv-zone-t">
                   <b>{name}</b>
-                  <i>{blurb}</i>
+                  <i className="qv-zone-blurb">{blurb}</i>
+                  <i className="qv-zone-sub">
+                    <b>{count}</b> · {blurb}
+                  </i>
+                </span>
+                <span className="qv-zone-count">
+                  <Icon name="pin_" sw={2.2} />
+                  {count}
+                </span>
+                <span className="qv-zone-tog" aria-hidden="true" />
+              </summary>
+              <div className="qv-zone-panel">
+                <div className="qv-zone-list">
+                  {list.map((a) => (
+                    <div className="qv-zone-row" key={a}>
+                      <span>{a}</span>
+                      <Icon name="chev" sw={2.2} />
+                    </div>
+                  ))}
                 </div>
+                <a className="qv-zone-all" href="/vendors">
+                  View all {count}
+                  <Icon name="arrow" sw={2.2} />
+                </a>
               </div>
-              <span className="qv-zone-count">
-                <Icon name="pin_" sw={2.2} />
-                {count}
-              </span>
-              <div className="qv-zone-list">
-                {list.map((a) => (
-                  <div className="qv-zone-row" key={a}>
-                    <span>{a}</span>
-                    <Icon name="chev" sw={2.2} />
-                  </div>
-                ))}
-              </div>
-              <a className="qv-zone-all" href="/vendors">
-                View all {count}
-                <Icon name="arrow" sw={2.2} />
-              </a>
-            </div>
+            </details>
           ))}
         </div>
 

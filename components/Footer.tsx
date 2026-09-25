@@ -12,6 +12,7 @@
 
 import Link from "next/link";
 import { Icon } from "@/components/qf-icon";
+import { Wordmark } from "@/components/Wordmark";
 import { CONTACT, whatsappLink } from "@/lib/config";
 import { categories, categorySlug, cities } from "@/lib/quickfurno-data";
 
@@ -176,8 +177,10 @@ export function Footer() {
 
         <div className="qv-foot-main">
           <div className="qv-foot-brand">
+            {/* The white-lettering cut of the same mark the header uses — the
+                footer panel is dark, so the dark artwork would disappear. */}
             <Link href="/" className="qv-foot-brand-name" aria-label="QuickFurno home">
-              Quick<span className="qv-hl">Furno</span>
+              <Wordmark height={28} light />
             </Link>
             <p className="qv-foot-blurb">
               QuickFurno helps homeowners discover approved, active interior, carpentry, modular,

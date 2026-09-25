@@ -1,0 +1,377 @@
+/* ==========================================================================
+   QuickFurno — "How it works" v3 (dark)
+   Replaces the .qfp-how / .qfp-step block on the homepage.
+
+   Breakpoints match the existing homepage: 1100px and 760px, desktop-first.
+   Card heights are auto — the grid equalises rows, so copy changes cannot
+   clip. Every visual is drawn in CSS; the only images are category photos.
+
+   Claims note: the vendor names are examples, not live listings, and the
+   section carries a visible disclaimer. Do not add star ratings or review
+   counts here — QuickFurno has no rating system.
+   ========================================================================== */
+
+.qfh{
+  --qfh-orange:#F04A1A;
+  --qfh-orange-lt:#FF8A4C;
+  --qfh-head:#FFFFFF;
+  --qfh-body:rgba(240,232,224,.74);
+  --qfh-line:rgba(240,122,42,.30);
+  --qfh-gap:28px;
+
+  position:relative; isolation:isolate; overflow:hidden;
+  padding:72px 0 64px;
+  background:radial-gradient(120% 130% at 50% -25%, #2A1D11 0%, #1A1410 38%, #100D0B 72%, #0B0A09 100%);
+  color:var(--qfh-head);
+  font-family:var(--font-jakarta,"Plus Jakarta Sans"),ui-sans-serif,system-ui,sans-serif;
+}
+
+/* sweeping light arcs */
+.qfh-arc{
+  position:absolute; pointer-events:none; border-radius:50%;
+  border:1.5px solid rgba(255,138,76,.55);
+  filter:blur(.3px); opacity:.85; z-index:0;
+}
+.qfh-arc::after{
+  content:""; position:absolute; inset:-14px; border-radius:50%;
+  border:1px solid rgba(255,160,90,.26);
+}
+.qfh-arc--l{ width:1120px; height:1120px; left:-720px; top:-700px; }
+.qfh-arc--r{ width:1240px; height:1240px; right:-800px; top:-780px; }
+.qfh-glow{
+  position:absolute; pointer-events:none; z-index:0; border-radius:50%;
+  background:radial-gradient(closest-side, rgba(240,74,26,.22), rgba(240,74,26,0) 72%);
+  width:620px; height:620px; left:50%; margin-left:-310px; top:-230px;
+}
+
+.qfh-shell{ position:relative; z-index:2; margin:0 auto; width:min(1160px, 100% - 40px); }
+
+/* ---------- header ---------- */
+.qfh-head-c{ text-align:center; }
+.qfh-kicker{
+  display:inline-flex; align-items:center; gap:12px; font-size:12px;
+  color:var(--qfh-orange-lt); text-transform:uppercase;
+  font-weight:700; letter-spacing:.20em; line-height:1;
+}
+.qfh-kicker::before,.qfh-kicker::after{
+  content:""; height:1px; width:34px;
+  background:linear-gradient(90deg,rgba(255,138,76,0),rgba(255,138,76,.85));
+}
+.qfh-kicker::after{ background:linear-gradient(90deg,rgba(255,138,76,.85),rgba(255,138,76,0)); }
+.qfh h2{
+  margin:18px 0 0; color:#fff; font-weight:800; letter-spacing:-.022em;
+  font-size:44px; line-height:1.09;
+  font-family:var(--font-manrope,"Poppins"),ui-sans-serif,system-ui,sans-serif;
+}
+.qfh h2 span{ color:var(--qfh-orange); }
+.qfh h2 br{ display:none; }
+.qfh-lede{
+  margin:14px auto 0; color:var(--qfh-body);
+  font-size:16.5px; line-height:1.5; max-width:640px;
+}
+
+/* ---------- steps ---------- */
+.qfh-steps{
+  list-style:none; margin:46px 0 0; padding:0; display:grid; position:relative;
+  grid-template-columns:repeat(3, minmax(0,1fr)); gap:var(--qfh-gap);
+}
+.qfh-step{
+  position:relative; display:flex; flex-direction:column; overflow:visible;
+  border-radius:22px;
+  background:linear-gradient(162deg,#251A12 0%,#191310 48%,#13100D 100%);
+  border:1px solid var(--qfh-line);
+  box-shadow:
+    inset 0 1px 0 rgba(255,180,130,.10),
+    0 0 0 1px rgba(240,122,42,.06),
+    0 34px 60px -34px rgba(0,0,0,.9);
+}
+
+/* visual pane */
+.qfh-visual{
+  position:relative; overflow:hidden; flex:none; height:214px;
+  border-top-left-radius:inherit; border-top-right-radius:inherit;
+  background:radial-gradient(120% 120% at 70% 0%, #2B1E13 0%, #17120E 60%, #100D0B 100%);
+  border-bottom:1px solid rgba(240,122,42,.18);
+}
+
+/* text block */
+.qfh-text{ display:flex; flex-direction:column; flex:1 1 auto; padding:20px 22px 24px; }
+.qfh-badges{ display:flex; align-items:center; flex:none; gap:12px; }
+.qfh-num{
+  display:grid; place-items:center; flex:none;
+  width:46px; height:46px; font-size:17px;
+  border-radius:999px; color:#fff; font-weight:800; line-height:1;
+  font-family:var(--font-manrope,"Poppins"),ui-sans-serif,system-ui,sans-serif;
+  background:rgba(14,12,11,.72);
+  border:2px solid var(--qfh-orange);
+  box-shadow:0 0 0 6px rgba(240,74,26,.10), 0 0 22px rgba(240,74,26,.45);
+}
+.qfh-icon{
+  display:grid; place-items:center; border-radius:999px; flex:none;
+  width:42px; height:42px;
+  border:1.5px solid rgba(240,122,42,.55);
+  background:rgba(240,74,26,.10);
+  box-shadow:0 0 18px -4px rgba(240,74,26,.55) inset;
+}
+.qfh-icon svg{ stroke:var(--qfh-orange-lt); width:20px; height:20px; }
+.qfh-text h3{
+  margin:14px 0 0; color:#fff; font-weight:800; letter-spacing:-.015em;
+  font-size:20px; line-height:1.2;
+  font-family:var(--font-manrope,"Poppins"),ui-sans-serif,system-ui,sans-serif;
+}
+.qfh-text p{ margin:9px 0 0; color:var(--qfh-body); font-size:13.5px; line-height:1.58; }
+
+/* connector: centred in the grid gap, so it follows any card height */
+.qfh-link{
+  position:absolute; z-index:6; display:grid; place-items:center;
+  width:34px; height:34px; border-radius:999px;
+  top:50%; left:calc(100% + var(--qfh-gap) / 2); transform:translate(-50%,-50%);
+  background:rgba(14,12,11,.92);
+  border:1.5px solid var(--qfh-orange);
+  box-shadow:0 0 18px rgba(240,74,26,.45);
+}
+.qfh-link svg{ stroke:var(--qfh-orange-lt); }
+.qfh-step:last-child .qfh-link{ display:none; }
+.qfh-link .qfh-link-d{ display:none; }
+
+/* disclaimer */
+.qfh-note{
+  margin:24px 0 0; text-align:center; color:rgba(240,232,224,.56);
+  font-size:12px; letter-spacing:.02em;
+}
+
+/* ---------- visual 1: app preview ---------- */
+.qfh-phone{
+  position:absolute; left:50%; transform:translateX(-50%);
+  width:212px; height:252px; top:14px;   /* bleeds off the bottom of the pane */
+  border-radius:26px 26px 0 0;
+  background:#141210; border:5px solid #241D18; border-bottom:0;
+  box-shadow:0 -2px 0 rgba(255,180,130,.10) inset, 0 26px 50px -18px rgba(0,0,0,.85);
+  overflow:hidden;
+}
+.qfh-scr{ background:#fff; height:100%; display:flex; flex-direction:column; }
+.qfh-scr-bar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:6px 10px 0; font-size:9.5px; color:#14110E; font-weight:700;
+}
+.qfh-wm{ font-weight:800; letter-spacing:-.02em; color:#1A1512; font-size:12px;
+  font-family:var(--font-manrope,"Poppins"),ui-sans-serif,system-ui,sans-serif; }
+.qfh-wm i{ font-style:normal; color:var(--qfh-orange); }
+.qfh-scr-h{
+  margin:0; color:#15110E; font-weight:800; letter-spacing:-.02em;
+  font-size:14.5px; line-height:1.15; padding:7px 10px 0;
+  font-family:var(--font-manrope,"Poppins"),ui-sans-serif,system-ui,sans-serif;
+}
+.qfh-scr-search{
+  display:flex; align-items:center; justify-content:space-between;
+  margin:7px 10px 0; padding:6px 8px; font-size:9px;
+  background:#F4F1EC; border:1px solid #E7E1D8; border-radius:10px; color:#6F685F;
+}
+.qfh-scr-search svg{ width:11px; height:11px; }
+.qfh-scr-grid{ display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:7px 10px 0; }
+.qfh-tile{ margin:0; border-radius:9px; overflow:hidden; background:#EFE9E0; position:relative; height:40px; }
+.qfh-tile img{ display:block; width:100%; height:100%; object-fit:cover; }
+.qfh-tile figcaption{
+  position:absolute; left:0; right:0; bottom:0; color:#fff; font-weight:700;
+  padding:12px 6px 5px; font-size:8px;
+  background:linear-gradient(180deg,rgba(12,10,9,0),rgba(12,10,9,.82));
+}
+
+/* ---------- visual 2: match map ---------- */
+.qfh-map{ position:absolute; inset:0; overflow:hidden; }
+.qfh-map-grid{
+  position:absolute; inset:-20%; opacity:.48;
+  background-image:
+    repeating-linear-gradient(64deg, rgba(212,180,150,.20) 0 1px, rgba(0,0,0,0) 1px 46px),
+    repeating-linear-gradient(-28deg, rgba(212,180,150,.16) 0 1px, rgba(0,0,0,0) 1px 62px),
+    repeating-linear-gradient(64deg, rgba(212,180,150,.30) 0 2px, rgba(0,0,0,0) 2px 190px);
+}
+.qfh-map-river{
+  position:absolute; width:150%; height:66px; left:-25%; top:62%;
+  background:linear-gradient(90deg,rgba(72,120,150,0),rgba(72,120,150,.34),rgba(72,120,150,0));
+  transform:rotate(-14deg); filter:blur(3px);
+}
+.qfh-rings{
+  position:absolute; border-radius:50%;
+  width:150px; height:150px; left:50%; top:54%; transform:translate(-50%,-50%);
+}
+.qfh-rings span{ position:absolute; inset:0; border-radius:50%; border:1px solid rgba(240,122,42,.30); }
+.qfh-rings span:nth-child(2){ inset:14%; border-color:rgba(240,122,42,.40); }
+.qfh-rings span:nth-child(3){ inset:30%; border-color:rgba(240,122,42,.55); }
+.qfh-rings::after{
+  content:""; position:absolute; inset:-30%; border-radius:50%;
+  background:radial-gradient(closest-side, rgba(240,74,26,.34), rgba(240,74,26,0) 70%);
+}
+.qfh-me{
+  position:absolute; z-index:4; display:flex; align-items:center; gap:7px;
+  left:50%; top:54%; transform:translate(-50%,-50%);
+}
+.qfh-me b{
+  display:grid; place-items:center; border-radius:999px 999px 999px 2px; flex:none;
+  width:24px; height:24px; transform:rotate(-45deg);
+  background:var(--qfh-orange); color:#fff;
+  box-shadow:0 0 0 4px rgba(240,74,26,.22), 0 6px 14px -4px rgba(0,0,0,.7);
+}
+.qfh-me b svg{ width:13px; height:13px; transform:rotate(45deg); }
+.qfh-me u{
+  text-decoration:none; background:#fff; color:#17120E; border-radius:8px;
+  display:block; white-space:nowrap; font-weight:700;
+  padding:5px 8px; font-size:9.5px; line-height:1.25;
+  box-shadow:0 8px 18px -8px rgba(0,0,0,.6);
+}
+.qfh-me u i{ display:block; font-style:normal; font-weight:500; color:#736A61; font-size:8.5px; }
+.qfh-vchip{
+  position:absolute; z-index:3; display:flex; align-items:center; gap:7px;
+  padding:5px 8px 5px 5px;
+  background:rgba(22,17,14,.94); border:1px solid rgba(240,122,42,.50);
+  border-radius:10px; white-space:nowrap;
+  box-shadow:0 10px 22px -10px rgba(0,0,0,.85);
+}
+.qfh-vchip img{ display:block; object-fit:cover; border-radius:6px; flex:none; width:26px; height:26px; }
+.qfh-vchip b{ display:block; color:#fff; font-weight:700; font-size:10px; line-height:1.25; }
+.qfh-vchip i{ display:block; font-style:normal; color:rgba(240,232,224,.62); font-size:8.5px; line-height:1.3; }
+.qfh-vchip--a{ left:9px;  top:11px; }
+.qfh-vchip--b{ right:9px; top:56px; }
+.qfh-vchip--c{ left:22px; bottom:13px; }
+.qfh-dot{
+  position:absolute; z-index:2; border-radius:999px 999px 999px 2px;
+  width:10px; height:10px;
+  background:var(--qfh-orange); transform:rotate(-45deg);
+  box-shadow:0 0 0 3px rgba(240,74,26,.22);
+}
+.qfh-dot--a{ left:66px;  top:62px; }
+.qfh-dot--b{ right:68px; top:106px; }
+.qfh-dot--c{ left:80px;  bottom:60px; }
+.qfh-map-tag{
+  position:absolute; z-index:5; display:inline-flex; align-items:center; gap:7px;
+  right:11px; bottom:11px; padding:5px 10px; font-size:9px;
+  border-radius:999px; font-weight:700; white-space:nowrap;
+  background:rgba(18,40,26,.92); color:#8FE3AC;
+  border:1px solid rgba(80,190,120,.45);
+}
+.qfh-map-tag svg{ stroke:#8FE3AC; flex:none; width:10px; height:10px; }
+
+/* ---------- visual 3: shortlist ---------- */
+.qfh-vlist{
+  position:absolute; inset:0; list-style:none; margin:0; padding:0 14px;
+  display:flex; flex-direction:column; justify-content:center; gap:8px;
+}
+.qfh-vlist::before{
+  content:""; position:absolute; inset:0;
+  background:radial-gradient(120% 100% at 80% 100%, rgba(240,150,60,.16), rgba(0,0,0,0) 70%);
+}
+.qfh-vrow{
+  position:relative; display:flex; align-items:center; gap:10px;
+  padding:8px 9px;
+  background:#FFFDFB; border-radius:12px;
+  box-shadow:0 12px 26px -14px rgba(0,0,0,.8);
+}
+.qfh-vrow img{ display:block; object-fit:cover; border-radius:9px; flex:none; width:34px; height:34px; }
+.qfh-vrow > div{ min-width:0; flex:1 1 auto; }
+.qfh-vrow b{ display:block; color:#17120E; font-weight:700; letter-spacing:-.01em; font-size:11.5px; line-height:1.3; }
+.qfh-vrow i{ display:block; font-style:normal; color:#6F675E; font-size:9.5px; line-height:1.35; margin-top:1px; }
+.qfh-chk{
+  display:inline-flex; align-items:center; gap:5px; border-radius:999px;
+  padding:2px 7px; font-size:8.5px; margin-top:3px;
+  background:#E8F6EC; color:#1D7A40; font-weight:700;
+}
+.qfh-chk svg{ stroke:#1D7A40; flex:none; width:9px; height:9px; }
+.qfh-vrow > svg{ stroke:#B8AEA3; flex:none; width:14px; height:14px; }
+
+/* ==========================================================================
+   <= 1100px — three across, tightened
+   ========================================================================== */
+@media (max-width:1100px){
+  .qfh{ --qfh-gap:20px; padding:64px 0 58px; }
+  .qfh h2{ font-size:38px; }
+  .qfh-lede{ font-size:15.5px; }
+  .qfh-steps{ margin-top:38px; }
+  .qfh-text{ padding:18px 18px 22px; }
+  .qfh-badges{ gap:10px; }
+  .qfh-num{ width:42px; height:42px; font-size:16px; }
+  .qfh-icon{ width:40px; height:40px; }
+  .qfh-icon svg{ width:19px; height:19px; }
+  .qfh-text h3{ font-size:18px; margin-top:12px; }
+
+  /* cards are ~310px here, so the map furniture comes down a size to stop
+     the chips crowding the centre pin */
+  .qfh-rings{ width:132px; height:132px; }
+  .qfh-vchip{ padding:4px 7px 4px 4px; }
+  .qfh-vchip img{ width:24px; height:24px; }
+  .qfh-vchip b{ font-size:9.5px; }
+  .qfh-vchip i{ font-size:8px; }
+  .qfh-vchip--b{ right:8px; top:52px; }
+  .qfh-vchip--c{ left:14px; bottom:12px; }
+  .qfh-dot--b{ right:62px; top:100px; }
+  .qfh-dot--c{ left:68px; bottom:58px; }
+  .qfh-map-tag{ padding:4px 9px; font-size:8.5px; }
+}
+
+/* ==========================================================================
+   <= 760px — single column, connectors become down arrows
+   ========================================================================== */
+@media (max-width:760px){
+  .qfh{ --qfh-gap:46px; padding:54px 0 52px; }
+  .qfh-shell{ width:min(350px, 100% - 40px); }
+  .qfh-kicker{ font-size:11px; }
+  .qfh h2{ font-size:30px; margin-top:16px; }
+  .qfh h2 br{ display:block; }
+  .qfh-lede{ font-size:14.5px; margin-top:12px; }
+  .qfh-steps{ margin-top:34px; grid-template-columns:1fr; }
+  .qfh-step{ border-radius:20px; }
+  .qfh-visual{ height:200px; }
+  .qfh-text{ padding:18px 18px 22px; }
+  .qfh-num{ width:40px; height:40px; font-size:15px; }
+  .qfh-icon{ width:38px; height:38px; }
+  .qfh-icon svg{ width:18px; height:18px; }
+  .qfh-text h3{ font-size:18px; margin-top:12px; }
+  .qfh-text p{ margin-top:8px; }
+  .qfh-note{ margin-top:22px; font-size:11px; }
+
+  .qfh-link{ top:calc(100% + var(--qfh-gap) / 2); left:50%; }
+  .qfh-link .qfh-link-r{ display:none; }
+  .qfh-link .qfh-link-d{ display:block; }
+
+  .qfh-arc--l{ width:520px; height:520px; left:-350px; top:-330px; }
+  .qfh-arc--r{ width:580px; height:580px; right:-400px; top:-360px; }
+  .qfh-glow{ width:360px; height:360px; margin-left:-180px; top:-140px; }
+
+  .qfh-phone{ width:198px; height:236px; top:13px; }
+  .qfh-scr-bar{ padding:5px 9px 0; font-size:9px; }
+  .qfh-wm{ font-size:11px; }
+  .qfh-scr-h{ font-size:13px; padding:6px 9px 0; }
+  .qfh-scr-search{ margin:6px 9px 0; padding:5px 8px; font-size:8.5px; }
+  .qfh-scr-grid{ gap:5px; padding:6px 9px 0; }
+  .qfh-tile{ height:40px; }
+  .qfh-tile figcaption{ padding:10px 5px 4px; font-size:7.5px; }
+
+  .qfh-rings{ width:132px; height:132px; }
+  .qfh-me b{ width:22px; height:22px; }
+  .qfh-me b svg{ width:12px; height:12px; }
+  .qfh-me u{ padding:4px 7px; font-size:9px; }
+  .qfh-me u i{ font-size:8px; }
+  .qfh-vchip{ padding:4px 7px 4px 4px; }
+  .qfh-vchip img{ width:24px; height:24px; }
+  .qfh-vchip b{ font-size:9.5px; }
+  .qfh-vchip i{ font-size:8px; }
+  .qfh-vchip--a{ left:8px;  top:10px; }
+  .qfh-vchip--b{ right:8px; top:52px; }
+  .qfh-vchip--c{ left:20px; bottom:12px; }
+  .qfh-dot{ width:9px; height:9px; }
+  .qfh-dot--a{ left:60px;  top:58px; }
+  .qfh-dot--b{ right:62px; top:100px; }
+  .qfh-dot--c{ left:74px;  bottom:58px; }
+  .qfh-map-tag{ right:9px; bottom:9px; padding:4px 9px; font-size:8.5px; }
+
+  .qfh-vlist{ padding:0 12px; gap:7px; }
+  .qfh-vrow{ padding:7px 8px; gap:8px; }
+  .qfh-vrow img{ width:32px; height:32px; }
+  .qfh-vrow b{ font-size:11px; }
+  .qfh-vrow i{ font-size:9px; }
+  .qfh-chk{ padding:2px 6px; font-size:8px; }
+}
+
+/* motion is decorative only; nothing here animates, but keep the hook */
+@media (prefers-reduced-motion:reduce){
+  .qfh-arc,.qfh-glow{ transition:none; }
+}

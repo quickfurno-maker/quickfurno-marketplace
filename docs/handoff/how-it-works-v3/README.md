@@ -58,6 +58,11 @@ Slugs used: `interior-designers`, `carpenters`, `painter`, `false-ceiling`,
 without an `<img>` — deliberate, per the honesty rule in
 `lib/homepage-images.ts`. Do not add a stock fallback.
 
+All three use `next/image`: `fill` + `sizes="96px"` for the phone tiles,
+fixed `26x26` and `34x34` for the map chips and the shortlist. That matters —
+the source category photos are 30-65KB each and are rendered here at 26-96px,
+so serving them raw would add roughly 300KB to the homepage for thumbnails.
+
 Everything else — the phone, the map, the pins, the rings, the arcs — is drawn
 in CSS. There is no background image in this section.
 

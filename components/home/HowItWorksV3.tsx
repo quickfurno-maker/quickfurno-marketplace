@@ -20,6 +20,7 @@
 // The example names and distances deliberately match the /vendors matching
 // board (app/vendors/vendors-content.ts → MATCH_PINS) so the two pages agree.
 // ============================================================================
+import Image from "next/image";
 import { optionalRealImage } from "@/lib/homepage-images";
 
 type Team = {
@@ -122,7 +123,7 @@ function AppPreview() {
             const src = cat(t.slug);
             return (
               <figure className="qfh-tile" key={t.slug}>
-                {src ? <img src={src} alt="" loading="lazy" decoding="async" /> : null}
+                {src ? <Image src={src} alt="" fill sizes="96px" /> : null}
                 <figcaption>{t.label}</figcaption>
               </figure>
             );
@@ -152,7 +153,7 @@ function MatchMap() {
         const src = cat(t.slug);
         return (
           <span className={`qfh-vchip qfh-vchip--${letters[i]}`} key={t.name}>
-            {src ? <img src={src} alt="" loading="lazy" decoding="async" /> : null}
+            {src ? <Image src={src} alt="" width={26} height={26} sizes="26px" /> : null}
             <span>
               <b>{t.name}</b>
               <i>
@@ -188,7 +189,7 @@ function Shortlist() {
         const src = cat(t.slug);
         return (
           <li className="qfh-vrow" key={t.name}>
-            {src ? <img src={src} alt="" loading="lazy" decoding="async" /> : null}
+            {src ? <Image src={src} alt="" width={34} height={34} sizes="34px" /> : null}
             <div>
               <b>{t.name}</b>
               <i>

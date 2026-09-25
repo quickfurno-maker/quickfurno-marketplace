@@ -767,9 +767,9 @@ const HOW_IT_WORKS: { icon: ReactNode; title: string; body: string; slot?: strin
 ];
 
 const HOW_TEAM_MATCHES = [
-  { name: "UrbanNest Interiors", position: "qfp-how-team--one", meta: "1.2 km \u00b7 4.8\u2605" },
-  { name: "Studio A Interiors", position: "qfp-how-team--two", meta: "1.8 km \u00b7 4.6\u2605" },
-  { name: "Craftline Interior Co.", position: "qfp-how-team--three", meta: "2.1 km \u00b7 4.7\u2605" },
+  { name: "UrbanNest", position: "qfp-how-team--one", meta: "1.2 km \u00b7 4.8\u2605" },
+  { name: "Studio A", position: "qfp-how-team--two", meta: "1.8 km \u00b7 4.6\u2605" },
+  { name: "Craftline", position: "qfp-how-team--three", meta: "2.1 km \u00b7 4.7\u2605" },
 ] as const;
 
 function HowMatchMap() {

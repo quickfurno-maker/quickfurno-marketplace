@@ -817,8 +817,34 @@
 .qfp-step-media::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(90deg, rgba(8,7,6,0.72) 0%, rgba(8,7,6,0.02) 45%); }
 .qfp-step-media picture { position: absolute; inset: 0; display: block; }
 .qfp-step-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.qfp-step--1 .qfp-step-media img { object-position: 53% center; }
-.qfp-step--3 .qfp-step-media img { object-position: center center; }
+.qfp-step--1 .qfp-step-media {
+  background:
+    radial-gradient(circle at 55% 48%, rgba(255, 132, 42, 0.30), transparent 42%),
+    linear-gradient(150deg, #3a1d0b 0%, #17100b 52%, #090807 100%);
+}
+.qfp-step--1 .qfp-step-media img {
+  object-fit: contain;
+  object-position: center bottom;
+  width: 112%;
+  height: 112%;
+  max-width: none;
+  transform: translate(-2%, 6%) rotate(4deg);
+  filter: drop-shadow(0 22px 30px rgba(0,0,0,.45));
+}
+.qfp-step--3 .qfp-step-media {
+  background:
+    radial-gradient(circle at 60% 42%, rgba(255, 176, 84, 0.27), transparent 44%),
+    linear-gradient(145deg, #3a2010 0%, #1b120c 54%, #0b0907 100%);
+}
+.qfp-step--3 .qfp-step-media img {
+  object-fit: contain;
+  object-position: center;
+  width: 104%;
+  height: 104%;
+  max-width: none;
+  transform: translate(1%, 0);
+  filter: drop-shadow(0 20px 28px rgba(0,0,0,.35));
+}
 .qfp-slot-empty { position: absolute; inset: 0; background: repeating-linear-gradient(135deg, rgba(255, 112, 24, 0.06) 0 10px, transparent 10px 20px); }
 .qfp-step + .qfp-step::before {
   content: ""; position: absolute; top: 72px; left: -31px; width: 31px; height: 2px; z-index: 6;
@@ -828,8 +854,15 @@
 /* Step 02 ? Priya Sharma in Baner matched to three nearby interior Teams. */
 .qfp-step-media--map::after { display: none; }
 .qfp-how-map { position: absolute; inset: 0; overflow: hidden; background: #101416; }
-.qfp-how-map-base { position: absolute; inset: 0; width: 100% !important; height: 100% !important; object-fit: cover; filter: saturate(0.6) brightness(0.55) contrast(1.22); transform: scale(1.08); }
-.qfp-how-map-shade { position: absolute; inset: 0; background: radial-gradient(circle at 48% 52%, rgba(255, 103, 19, 0.22), transparent 22%), linear-gradient(90deg, rgba(6,7,8,0.42), rgba(4,5,6,0.02)); }
+.qfp-how-map-base { position: absolute; inset: 0; width: 100% !important; height: 100% !important; object-fit: cover; filter: grayscale(.24) saturate(.72) brightness(.42) contrast(1.38); transform: scale(1.08); }
+.qfp-how-map-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 48% 53%, rgba(255, 103, 19, 0.34), transparent 24%),
+    linear-gradient(90deg, rgba(6,7,8,.34), rgba(4,5,6,.02)),
+    linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.2));
+}
 .qfp-how-map-label { position: absolute; left: 42%; top: 49%; transform: translate(-50%, -50%); font-family: var(--qfp-head); font-size: 14px; font-weight: 800; letter-spacing: 0.15em; color: rgba(255,255,255,0.22); }
 .qfp-how-client,
 .qfp-how-team { position: absolute; z-index: 4; display: flex; align-items: center; gap: 8px; border: 1px solid rgba(255, 129, 30, 0.64); background: rgba(11, 12, 13, 0.92); box-shadow: 0 12px 28px rgba(0,0,0,0.34); backdrop-filter: blur(8px); }
@@ -1571,25 +1604,46 @@
     border-radius: 0;
   }
   .qfp-step-media picture { inset: 0; }
-  .qfp-step--1 .qfp-step-media img { object-position: 54% center; }
-  .qfp-step--3 .qfp-step-media img { object-position: 53% center; }
+  .qfp-step--1 .qfp-step-media img {
+    object-fit: contain;
+    object-position: center bottom;
+    width: 124%;
+    height: 124%;
+    transform: translate(-4%, 10%) rotate(4deg);
+  }
+  .qfp-step--3 .qfp-step-media img {
+    object-fit: contain;
+    object-position: center;
+    width: 108%;
+    height: 108%;
+    transform: translate(2%, 0);
+  }
   .qfp-step + .qfp-step::before {
-    top: -21px;
+    content: "?";
+    top: -31px;
     left: 50%;
-    width: 2px;
-    height: 21px;
-    background-image: linear-gradient(180deg, #ff741d 0 6px, transparent 6px 12px);
-    background-size: 2px 12px;
-    background-repeat: repeat-y;
+    width: 36px;
+    height: 36px;
+    transform: translateX(-50%);
+    display: grid;
+    place-items: center;
+    border: 1.5px solid #ff741d;
+    border-radius: 999px;
+    background: #351506;
+    background-image: none;
+    color: #fff;
+    font: 800 21px/1 var(--qfp-head);
+    opacity: 1;
+    box-shadow: 0 0 0 5px rgba(255,98,12,.08), 0 0 18px rgba(255,98,12,.28);
   }
 
   .qfp-how-map-base { transform: scale(1.16); }
   .qfp-how-map-label { left: 48%; top: 52%; font-size: 10px; }
-  .qfp-how-team { min-width: 76px; max-width: 88px; padding: 5px 6px; gap: 5px; border-radius: 10px; }
+  .qfp-how-team { min-width: 84px; max-width: 102px; padding: 5px 6px; gap: 5px; border-radius: 10px; }
   .qfp-how-team > i { width: 23px; height: 23px; flex-basis: 23px; border-radius: 7px; }
   .qfp-how-team > i svg { width: 12px; height: 12px; }
-  .qfp-how-team strong { overflow: hidden; text-overflow: ellipsis; font-size: 7.5px; }
-  .qfp-how-team small { font-size: 6.5px; }
+  .qfp-how-team strong { overflow: hidden; text-overflow: ellipsis; font-size: 7.4px; }
+  .qfp-how-team small { font-size: 6.2px; color: rgba(255,255,255,.68); }
   .qfp-how-team--one { left: 5%; top: 17%; }
   .qfp-how-team--two { right: 4%; top: 36%; }
   .qfp-how-team--three { right: 7%; bottom: 14%; }

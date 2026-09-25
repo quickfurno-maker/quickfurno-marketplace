@@ -768,9 +768,9 @@ const HOW_IT_WORKS: { icon: ReactNode; title: string; body: string; slot?: strin
 ];
 
 const HOW_TEAM_MATCHES = [
-  { name: "Interior Team 01", position: "qfp-how-team--one" },
-  { name: "Interior Team 02", position: "qfp-how-team--two" },
-  { name: "Interior Team 03", position: "qfp-how-team--three" },
+  { name: "UrbanNest Interiors", position: "qfp-how-team--one", meta: "1.2 km ? 4.8?" },
+  { name: "Studio A Interiors", position: "qfp-how-team--two", meta: "1.8 km ? 4.6?" },
+  { name: "Craftline Interior Co.", position: "qfp-how-team--three", meta: "2.1 km ? 4.7?" },
 ] as const;
 
 function HowMatchMap() {
@@ -786,7 +786,7 @@ function HowMatchMap() {
       {HOW_TEAM_MATCHES.map((team) => (
         <span className={`qfp-how-team ${team.position}`} key={team.name}>
           <i aria-hidden="true"><G name="home2" size={15} stroke="#FFB13D" width={2} /></i>
-          <span><strong>{team.name}</strong><small>Nearby match</small></span>
+          <span><strong>{team.name}</strong><small>{team.meta}</small></span>
         </span>
       ))}
       <span className="qfp-how-map-lines" aria-hidden="true"><i /><i /><i /></span>

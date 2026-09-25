@@ -390,3 +390,87 @@
   .qf-enqpage-panel,
   .qf-legal-section { transition-duration: 0.01ms !important; }
 }
+/* ==========================================================================
+   QF-UI-20260925 ? qfd utility/enquiry page convergence
+   ========================================================================== */
+.qf-legal-page,
+.qf-enqpage {
+  --qf-brand-bg: var(--qfd-cream);
+  --qf-brand-surface: var(--qfd-card);
+  --qf-brand-inset: var(--qfd-ivory);
+  --qf-brand-line: var(--qfd-line-2);
+  --qf-brand-ink: var(--qfd-ink);
+  --qf-brand-ink-2: var(--qfd-muted);
+  --qf-brand-muted: var(--qfd-muted);
+  --qf-brand-faint: var(--qfd-faint);
+  --qf-brand-blue: var(--qfd-orange);
+  --qf-brand-blue-deep: var(--qfd-orange-hover);
+  --qf-brand-blue-tint: var(--qfd-tint-orange);
+  --qf-brand-success: var(--qfd-green);
+  --qf-radius-sm: var(--qfd-r-sm);
+  --qf-radius-md: var(--qfd-r-md);
+  --qf-radius-lg: var(--qfd-r-xl);
+  font-family: var(--qfd-font-body);
+  background:
+    radial-gradient(circle at 78% 4%, rgba(255,177,61,.12), transparent 24%),
+    var(--qfd-grad-page);
+}
+
+.qf-enqpage-shell { width: min(100% - 2rem, 860px); }
+.qf-enqpage-head {
+  margin: 0 auto clamp(1.25rem, 1rem + 1vw, 1.8rem);
+  max-width: 720px;
+  text-align: center;
+}
+.qf-enqpage-eyebrow,
+.qf-legal-eyebrow {
+  font-family: var(--qfd-font-mono);
+  color: var(--qfd-orange-text);
+  letter-spacing: var(--qfd-track-kicker);
+}
+.qf-enqpage-title,
+.qf-legal-title {
+  font-family: var(--qfd-font-head);
+  font-size: clamp(2rem, 1.4rem + 2.5vw, 3.15rem);
+  font-weight: 800;
+  letter-spacing: var(--qfd-track-head);
+}
+.qf-enqpage-lede {
+  margin-inline: auto;
+  font-size: var(--qfd-t-body);
+}
+
+.qf-enqpage-panel,
+.qf-legal-section,
+.qf-legal-note,
+.qf-enqpage-success {
+  border-color: var(--qfd-line);
+  border-radius: var(--qfd-r-xl);
+  background: var(--qfd-grad-card);
+  box-shadow: var(--qfd-shadow-card);
+}
+.qf-enqpage-panel { padding: clamp(1rem, .7rem + 1.4vw, 1.5rem); }
+.qf-legal-section { padding: clamp(1rem, .8rem + 1vw, 1.35rem); }
+.qf-legal-section h2,
+.qf-legal-note h2,
+.qf-enqpage-success h2 {
+  font-family: var(--qfd-font-head);
+  font-weight: 800;
+}
+.qf-legal-section a { color: var(--qfd-orange-text); }
+.qf-legal-section a:hover { color: var(--qfd-orange-hover); }
+.qf-legal-note {
+  border-color: color-mix(in srgb, var(--qfd-orange) 32%, var(--qfd-line));
+  background: var(--qfd-tint-orange);
+}
+.qf-legal-note h2 { color: var(--qfd-orange-text); }
+.qf-legal-note li::before { background: var(--qfd-orange); }
+
+.qf-enqpage-step[data-state="current"] .qf-enqpage-step-dot {
+  background: var(--qfd-orange);
+  border-color: var(--qfd-orange);
+}
+.qf-enqpage-step[data-state="done"] .qf-enqpage-step-dot {
+  background: var(--qfd-green);
+  border-color: var(--qfd-green);
+}

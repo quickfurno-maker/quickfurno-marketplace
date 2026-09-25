@@ -712,3 +712,179 @@
   align-items: center;
   min-height: 24px;
 }
+/* ==========================================================================
+   QF-UI-20260925 ? qfd public profile convergence
+   Presentation only. The existing profile DOM/data contract stays unchanged.
+   ========================================================================== */
+.qf-vprofile-page {
+  --qf-brand-bg: var(--qfd-cream);
+  --qf-brand-surface: var(--qfd-card);
+  --qf-brand-inset: var(--qfd-ivory);
+  --qf-brand-line: var(--qfd-line-2);
+  --qf-brand-ink: var(--qfd-ink);
+  --qf-brand-ink-2: var(--qfd-muted);
+  --qf-brand-muted: var(--qfd-muted);
+  --qf-brand-faint: var(--qfd-faint);
+  --qf-brand-blue: var(--qfd-orange);
+  --qf-brand-blue-deep: var(--qfd-orange-hover);
+  --qf-brand-blue-tint: var(--qfd-tint-orange);
+  --qf-brand-orange: var(--qfd-orange-text);
+  --qf-brand-success: var(--qfd-green);
+  --qf-radius-sm: var(--qfd-r-sm);
+  --qf-radius-md: var(--qfd-r-md);
+  --qf-radius-lg: var(--qfd-r-xl);
+  font-family: var(--qfd-font-body);
+  background: var(--qfd-grad-page);
+  padding-top: clamp(1rem, 0.65rem + 1.5vw, 1.75rem);
+}
+
+.qf-vprofile-breadcrumb a {
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: var(--qfd-r-pill);
+  color: var(--qfd-faint);
+}
+.qf-vprofile-breadcrumb a:hover {
+  color: var(--qfd-orange-text);
+  background: var(--qfd-tint-orange);
+}
+
+.qf-vprofile-hero {
+  border-color: var(--qfd-line);
+  border-radius: var(--qfd-r-2xl);
+  background: var(--qfd-grad-card);
+  box-shadow: var(--qfd-shadow-card);
+}
+.qf-vprofile-cover {
+  height: clamp(138px, 25vw, 220px);
+  background:
+    radial-gradient(circle at 78% 20%, rgba(255, 177, 61, 0.2), transparent 34%),
+    linear-gradient(135deg, #171c23 0%, #242a33 55%, #171c23 100%);
+}
+.qf-vprofile-cover-blank {
+  background:
+    radial-gradient(circle at 78% 20%, rgba(255, 177, 61, 0.2), transparent 34%),
+    linear-gradient(135deg, #171c23 0%, #242a33 55%, #171c23 100%);
+}
+.qf-vprofile-avatar {
+  margin-top: -34px;
+  border-width: 4px;
+  border-color: var(--qfd-card);
+  border-radius: var(--qfd-r-lg);
+  box-shadow: 0 18px 34px -24px rgba(20, 24, 29, 0.7);
+}
+.qf-vprofile-name {
+  font-family: var(--qfd-font-head);
+  font-size: clamp(1.45rem, 4.8vw, 2.15rem);
+  font-weight: 800;
+  letter-spacing: var(--qfd-track-head);
+}
+.qf-vprofile-verified {
+  color: var(--qfd-green-text);
+}
+.qf-vprofile-facts {
+  gap: 0.7rem;
+  padding-top: 1rem;
+  border-top-color: var(--qfd-line);
+}
+.qf-vprofile-facts > div {
+  min-width: 0;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--qfd-line);
+  border-radius: var(--qfd-r-md);
+  background: rgba(255,255,255,0.64);
+}
+.qf-vprofile-facts dt { color: var(--qfd-faint); }
+.qf-vprofile-facts dd { font-weight: 700; }
+
+.qf-vprofile-layout { gap: clamp(1rem, 0.7rem + 1.5vw, 1.5rem); }
+.qf-vprofile-main { gap: 1rem; }
+
+.qf-vprofile-nav {
+  gap: 0.4rem;
+  padding: 0.4rem;
+  border-color: var(--qfd-line);
+  border-radius: var(--qfd-r-pill);
+  background: rgba(255,255,255,0.78);
+  box-shadow: var(--qfd-shadow-card);
+  backdrop-filter: blur(10px);
+}
+.qf-vprofile-nav a {
+  min-height: var(--qfd-tap);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 0.95rem;
+  color: var(--qfd-muted);
+}
+.qf-vprofile-nav a:hover {
+  background: var(--qfd-tint-orange);
+  color: var(--qfd-orange-text);
+}
+
+.qf-vprofile-section,
+.qf-vreviews,
+.qf-vprofile-comparemore {
+  border-color: var(--qfd-line);
+  border-radius: var(--qfd-r-xl);
+  background: var(--qfd-grad-card);
+  box-shadow: var(--qfd-shadow-card);
+}
+.qf-vprofile-section {
+  padding: clamp(1rem, 0.8rem + 1vw, 1.4rem);
+}
+.qf-vprofile-section h2,
+.qf-vreviews-heading h2,
+.qf-vprofile-comparemore h2 {
+  font-family: var(--qfd-font-head);
+  font-size: clamp(1.08rem, 1rem + 0.4vw, 1.3rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+.qf-vprofile-services li,
+.qf-vprofile-areas li {
+  border-color: var(--qfd-line);
+  background: var(--qfd-ivory);
+}
+.qf-vprofile-shot {
+  border-color: var(--qfd-line);
+  border-radius: var(--qfd-r-lg);
+  background: var(--qfd-ivory);
+  box-shadow: var(--qfd-shadow-card);
+}
+.qf-vprofile-actioncard {
+  padding: clamp(1rem, 0.8rem + 1vw, 1.3rem);
+  border-color: var(--qfd-line);
+  border-top: 4px solid var(--qfd-orange);
+  border-radius: var(--qfd-r-xl);
+  background: var(--qfd-grad-card);
+  box-shadow: var(--qfd-shadow-raise);
+}
+.qf-vprofile-actioncard h2 {
+  font-family: var(--qfd-font-head);
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+.qf-vreviews-summary,
+.qf-vreview-card,
+.qf-vreviews-empty {
+  border-color: var(--qfd-line);
+  background: var(--qfd-ivory);
+}
+.qf-vreview-fields input,
+.qf-vreview-fields select,
+.qf-vreview-fields textarea {
+  border-color: var(--qfd-line-input);
+  border-radius: var(--qfd-r-md);
+  background: var(--qfd-card);
+}
+.qf-vreview-fields input:focus,
+.qf-vreview-fields select:focus,
+.qf-vreview-fields textarea:focus {
+  outline-color: var(--qfd-orange);
+}
+
+@media (min-width: 1024px) {
+  .qf-vprofile-aside { top: calc(var(--qf-public-header-h) + 1.25rem); }
+}

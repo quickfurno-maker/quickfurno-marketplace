@@ -144,14 +144,6 @@ export default function VendorsPage() {
               ))}
             </div>
           </div>
-          <Image
-            className="qfv-cities-art"
-            src="/assets/quickfurno/images/launch/india-skyline.png"
-            alt=""
-            width={1100}
-            height={208}
-            sizes="(max-width: 1100px) 100vw, 1100px"
-          />
         </section>
 
         <FaqV2 />

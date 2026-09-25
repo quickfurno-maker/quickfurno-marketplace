@@ -1003,7 +1003,9 @@
   position: relative;
   background: radial-gradient(130% 150% at 85% -10%, #2c2214 0%, #1a1e25 46%, #111419 100%);
   color: #f7f1e6;
-  padding: 64px 0 0;
+  /* The skyline illustration used to close this band and supply its bottom
+     spacing; with it gone the dark panel needs its own padding. */
+  padding: 64px 0;
   overflow: hidden;
 }
 .qfv-cities-head { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
@@ -1045,7 +1047,6 @@
   padding: 5px 11px;
   border-radius: 999px;
 }
-.qfv-cities-art { display: block; width: min(1100px, 100%); margin: 30px auto 0; }
 
 /* ================= FAQ ================= */
 .qfv-faq {

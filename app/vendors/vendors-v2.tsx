@@ -357,15 +357,18 @@ function parsePos(pos: string) {
 // as wide as the label underneath it — that is what the min-width is for.
 function MatchMap() {
   return (
-    <div className="qv-mmap">
+    /* role="img" plus the label make the whole illustration announce itself as
+       one thing, and as an example rather than live demand — the vendor names
+       drawn over it are invented. The inner <img> takes an empty alt so it is
+       not read out a second time. */
+    <div
+      className="qv-mmap"
+      role="img"
+      aria-label="Illustrative Client Matching product preview. Not live demand data."
+    >
       <picture>
         <source media="(min-width: 900px)" srcSet={`${IMG}/match-visual-d.webp`} />
-        <img
-          src={`${IMG}/match-visual-m.webp`}
-          alt="A homeowner request being matched to nearby example vendors"
-          loading="lazy"
-          decoding="async"
-        />
+        <img src={`${IMG}/match-visual-m.webp`} alt="" loading="lazy" decoding="async" />
       </picture>
       {MATCH_PINS.map((p) => (
         <span

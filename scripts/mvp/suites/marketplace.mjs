@@ -925,7 +925,12 @@ export const suite = {
         assertTrue(src.includes('ILLUSTRATIVE EXAMPLE'), 'visible illustrative product label');
         assertTrue(src.includes('Illustrative Client Matching product preview. Not live demand data.'),
           'accessible name says illustrative and not live demand');
-        assertTrue(/example quality check/i.test(src), 'example quality card is labelled');
+        // Was 'Example quality check', the title of an overlay card on the old
+        // composite preview. The approved board replaced that whole composite with
+        // the map and its named example vendors, so the card is gone by design. The
+        // rule it enforced is unchanged — anything invented on a preview must say so
+        // — and is now carried by the badge over the map.
+        assertTrue(/example vendors/i.test(src), 'invented vendors on the preview are labelled');
         // The journey must not imply matching starts immediately after signup.
         assertTrue(/Approval does not by itself activate Client Matching/i.test(src),
           'states approval is not sufficient for matching');

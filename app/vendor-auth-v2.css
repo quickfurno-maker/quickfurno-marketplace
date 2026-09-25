@@ -792,3 +792,152 @@
   .qf-vauth-brand-link img { width: 128px; }
   .qf-vauth-context { font-size: 0.62rem; padding-inline: 0.55rem; }
 }
+/* ==========================================================================
+   QF-UI-20260925 ? qfd vendor onboarding convergence
+   Dedicated vendor chrome stays dedicated; auth/onboarding behavior is unchanged.
+   ========================================================================== */
+.qf-vauth-header,
+.qf-vendor-public-page,
+.qf-vauth-footer,
+.qf-vauth-page {
+  --qf-brand-bg: var(--qfd-cream);
+  --qf-brand-surface: var(--qfd-card);
+  --qf-brand-inset: var(--qfd-ivory);
+  --qf-brand-line: var(--qfd-line-2);
+  --qf-brand-ink: var(--qfd-ink);
+  --qf-brand-ink-2: var(--qfd-muted);
+  --qf-brand-muted: var(--qfd-muted);
+  --qf-brand-faint: var(--qfd-faint);
+  --qf-brand-blue: var(--qfd-orange);
+  --qf-brand-blue-deep: var(--qfd-orange-hover);
+  --qf-brand-blue-tint: var(--qfd-tint-orange);
+  --qf-brand-orange: var(--qfd-orange-text);
+  --qf-brand-success: var(--qfd-green);
+  --qf-radius-sm: var(--qfd-r-sm);
+  --qf-radius-md: var(--qfd-r-md);
+  --qf-radius-lg: var(--qfd-r-xl);
+  font-family: var(--qfd-font-body);
+}
+
+.qf-vauth-header {
+  background: color-mix(in srgb, var(--qfd-card) 90%, transparent);
+  border-bottom-color: var(--qfd-line);
+  box-shadow: 0 12px 34px -30px rgba(20,24,29,.58);
+  backdrop-filter: blur(14px);
+}
+.qf-vauth-context {
+  border-color: color-mix(in srgb, var(--qfd-orange) 28%, var(--qfd-line));
+  background: var(--qfd-tint-orange);
+  color: var(--qfd-orange-text);
+}
+
+.qf-vendor-public-page,
+.qf-vauth-page {
+  background:
+    radial-gradient(circle at 82% 7%, rgba(255,177,61,.13), transparent 25%),
+    var(--qfd-grad-page);
+}
+
+.qf-vendor-public-page .qf-vendor-intro {
+  max-width: 700px;
+  padding: clamp(1.8rem, 1rem + 3vw, 3.4rem) 0 clamp(1.4rem, 1rem + 1vw, 2rem);
+}
+.qf-vendor-public-page .qf-vendor-intro-title {
+  font-family: var(--qfd-font-head);
+  font-size: clamp(2rem, 1.45rem + 2.2vw, 3rem);
+  font-weight: 800;
+  letter-spacing: var(--qfd-track-head);
+}
+.qf-vendor-public-page .qf-vendor-intro-sub {
+  max-width: 58ch;
+  font-size: var(--qfd-t-body);
+}
+
+.qf-vauth-tabs {
+  border-color: var(--qfd-line);
+  background: var(--qfd-card-warm);
+  box-shadow: var(--qfd-shadow-card);
+}
+.qf-vauth-tab { color: var(--qfd-muted); }
+.qf-vauth-tab[aria-selected="true"] {
+  background: var(--qfd-orange);
+  color: var(--qfd-on-dark);
+  box-shadow: var(--qfd-shadow-orange);
+}
+
+.qf-vauth-card,
+.qf-vrf.qf-vrf {
+  border-color: var(--qfd-line);
+  border-radius: var(--qfd-r-xl);
+  background: var(--qfd-grad-card);
+  box-shadow: var(--qfd-shadow-raise);
+}
+.qf-vauth-card { max-width: 480px; }
+.qf-vauth-card-title,
+.qf-vrf-subhead.qf-vrf-subhead {
+  font-family: var(--qfd-font-head);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+.qf-vauth-field input,
+.qf-vrf input,
+.qf-vrf select,
+.qf-vrf textarea {
+  border-color: var(--qfd-line-input);
+  border-radius: var(--qfd-r-md);
+  background: var(--qfd-card);
+}
+.qf-vauth-field input:focus-visible,
+.qf-vrf input:focus-visible,
+.qf-vrf select:focus-visible,
+.qf-vrf textarea:focus-visible {
+  border-color: var(--qfd-orange);
+  outline-color: var(--qfd-orange);
+}
+
+.qf-vauth-btn,
+.qf-vendor-public-page .qf-rf-btn--primary {
+  border-color: var(--qfd-orange);
+  background: var(--qfd-orange);
+  color: var(--qfd-on-dark);
+  box-shadow: var(--qfd-shadow-orange);
+}
+.qf-vauth-btn:hover:not(:disabled),
+.qf-vendor-public-page .qf-rf-btn--primary:hover:not(:disabled) {
+  border-color: var(--qfd-orange-hover);
+  background: var(--qfd-orange-hover);
+}
+
+.qf-vendor-public-page .qf-home-section {
+  border-radius: var(--qfd-r-2xl);
+  background: transparent;
+}
+.qf-vendor-public-page .qf-section-head h2 {
+  font-family: var(--qfd-font-head);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.qf-vendor-public-page .qf-step-node {
+  border: 1px solid var(--qfd-line);
+  border-radius: var(--qfd-r-xl);
+  background: var(--qfd-grad-card);
+  box-shadow: var(--qfd-shadow-card);
+}
+.qf-vendor-public-page .qf-step-node > span {
+  background: var(--qfd-orange);
+  color: var(--qfd-on-dark);
+}
+.qf-vendor-public-page .qf-step-node h3 {
+  font-family: var(--qfd-font-head);
+}
+
+.qf-vauth-footer {
+  border-top-color: var(--qfd-line);
+  background: var(--qfd-ivory);
+}
+.qf-vauth-back:hover,
+.qf-vauth-footer-links a:hover,
+.qf-vauth-alt a:hover {
+  color: var(--qfd-orange-text);
+}

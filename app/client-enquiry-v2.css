@@ -1334,3 +1334,162 @@
   background: #e03d1c;
   border-color: #e03d1c;
 }
+/* ==========================================================================
+   QF-UI-20260925 ? qfd enquiry convergence
+   Keeps the requirement-first form behavior intact; presentation only.
+   ========================================================================== */
+.qf-rf-backdrop,
+.qf-free-interest-backdrop {
+  --qf-brand-bg: var(--qfd-cream);
+  --qf-brand-surface: var(--qfd-card);
+  --qf-brand-inset: var(--qfd-ivory);
+  --qf-brand-line: var(--qfd-line-2);
+  --qf-brand-ink: var(--qfd-ink);
+  --qf-brand-ink-2: var(--qfd-muted);
+  --qf-brand-muted: var(--qfd-muted);
+  --qf-brand-faint: var(--qfd-faint);
+  --qf-brand-blue: var(--qfd-orange);
+  --qf-brand-blue-deep: var(--qfd-orange-hover);
+  --qf-brand-blue-tint: var(--qfd-tint-orange);
+  --qf-brand-success: var(--qfd-green);
+  --qf-radius-sm: var(--qfd-r-sm);
+  --qf-radius-md: var(--qfd-r-md);
+  --qf-radius-lg: var(--qfd-r-xl);
+  font-family: var(--qfd-font-body);
+}
+
+.qf-rf-backdrop.qf-rf-backdrop,
+.qf-free-interest-backdrop.qf-free-interest-backdrop {
+  background: rgba(18, 22, 27, 0.7);
+  backdrop-filter: blur(9px);
+}
+
+.qf-rf-modal.qf-rf-modal,
+.qf-free-interest-modal.qf-free-interest-modal {
+  border-radius: var(--qfd-r-2xl) var(--qfd-r-2xl) 0 0;
+  background: var(--qfd-grad-card);
+  box-shadow: var(--qfd-shadow-modal);
+}
+
+.qf-rf-top.qf-rf-top,
+.qf-free-interest-head.qf-free-interest-head {
+  background:
+    radial-gradient(circle at 92% 0%, rgba(255,177,61,.16), transparent 34%),
+    var(--qfd-card);
+  border-bottom-color: var(--qfd-line);
+}
+
+.qf-rf-flow-name.qf-rf-flow-name,
+.qf-rf-title.qf-rf-title,
+.qf-rf-question > h2,
+.qf-rf-question > h3,
+.qf-free-interest-title.qf-free-interest-title,
+.qf-free-interest-head h2 {
+  font-family: var(--qfd-font-head);
+  font-weight: 800;
+  letter-spacing: -0.028em;
+}
+
+.qf-rf-progress.qf-rf-progress { background: var(--qfd-line); }
+.qf-rf-progress-fill.qf-rf-progress-fill,
+.qf-rf-phase.is-active .qf-rf-phase-dot.qf-rf-phase-dot {
+  background: var(--qfd-orange);
+  border-color: var(--qfd-orange);
+}
+.qf-rf-phase.is-done .qf-rf-phase-dot.qf-rf-phase-dot {
+  background: var(--qfd-green);
+  border-color: var(--qfd-green);
+}
+
+.qf-rf-body.qf-rf-body,
+.qf-free-interest-body.qf-free-interest-body {
+  background: var(--qfd-grad-page);
+}
+
+.qf-rf-tile.qf-rf-tile,
+.qf-rf-chip.qf-rf-chip,
+.qf-rf-summary.qf-rf-summary,
+.qf-rf-preferred-summary.qf-rf-preferred-summary,
+.qf-rf-coverage-card,
+.qf-sf-consent {
+  border-color: var(--qfd-line);
+  background: var(--qfd-grad-card);
+}
+.qf-rf-tile.qf-rf-tile {
+  border-radius: var(--qfd-r-lg);
+  box-shadow: var(--qfd-shadow-card);
+}
+.qf-rf-tile:hover,
+.qf-rf-chip:hover {
+  border-color: var(--qfd-line-input);
+}
+.qf-rf-tile[aria-pressed="true"],
+.qf-rf-tile.is-selected,
+.qf-rf-chip[aria-pressed="true"],
+.qf-rf-chip.is-selected,
+.qf-rf-subcategory-card[aria-pressed="true"],
+.qf-rf-subcategory-card.is-selected {
+  border-color: var(--qfd-orange);
+  background: var(--qfd-tint-orange);
+  box-shadow: 0 0 0 2px rgba(201,58,14,.1);
+}
+
+.qf-rf-field input,
+.qf-rf-field select,
+.qf-rf-field textarea,
+.qf-rf-input-wrapper input,
+.qf-rf-money input,
+.qf-free-interest-body input,
+.qf-free-interest-body select,
+.qf-free-interest-body textarea {
+  border-color: var(--qfd-line-input);
+  border-radius: var(--qfd-r-md);
+  background: var(--qfd-card);
+}
+
+.qf-rf-field input:focus-visible,
+.qf-rf-field select:focus-visible,
+.qf-rf-field textarea:focus-visible,
+.qf-rf-input-wrapper input:focus-visible,
+.qf-rf-money input:focus-visible {
+  border-color: var(--qfd-orange);
+  outline-color: var(--qfd-orange);
+}
+
+.qf-rf-btn--primary.qf-rf-btn--primary,
+.qf-free-interest-actions button:last-child,
+.qf-sf-cta.qf-sf-cta {
+  border-color: var(--qfd-orange);
+  background: var(--qfd-orange);
+  color: var(--qfd-on-dark);
+  box-shadow: var(--qfd-shadow-orange);
+}
+.qf-rf-btn--primary:hover:not(:disabled),
+.qf-free-interest-actions button:last-child:hover,
+.qf-sf-cta.qf-sf-cta:hover:not(:disabled) {
+  border-color: var(--qfd-orange-hover);
+  background: var(--qfd-orange-hover);
+}
+
+.qf-rf-close.qf-rf-close,
+.qf-free-interest-close.qf-free-interest-close {
+  border-color: var(--qfd-line);
+  border-radius: var(--qfd-r-md);
+  background: rgba(255,255,255,.78);
+}
+.qf-rf-close:focus-visible,
+.qf-free-interest-close:focus-visible,
+.qf-rf-btn:focus-visible {
+  outline-color: var(--qfd-orange);
+}
+
+@media (min-width: 720px) {
+  .qf-rf-modal.qf-rf-modal,
+  .qf-free-interest-modal.qf-free-interest-modal {
+    border: 1px solid var(--qfd-line);
+    border-radius: var(--qfd-r-2xl);
+  }
+}
+@media (min-width: 992px) {
+  .qf-rf-modal.qf-rf-modal { max-width: 780px; }
+}

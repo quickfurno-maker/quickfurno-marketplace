@@ -100,7 +100,7 @@ export default function VendorsPage() {
   };
 
   return (
-    <>
+    <div className="qv-vendors-page">
       <Header />
       <main className="qfv-page qv">
         <HeroV2 />
@@ -163,6 +163,6 @@ export default function VendorsPage() {
       <Footer />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(tradesJsonLd) }} />
-    </>
+    </div>
   );
 }

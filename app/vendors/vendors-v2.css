@@ -2890,3 +2890,532 @@
     border: 1px solid rgba(224,97,30,.10);
   }
 }
+
+
+/* ==========================================================================
+   QF-UI-20260926 — vendor mobile compact-density pass
+   Keeps the approved visual language but removes the oversized/zoomed feel.
+   Desktop (900px+) is intentionally untouched.
+   ========================================================================== */
+@media (max-width: 899px) {
+  .qv-vendors-page .qv {
+    --qv-pad: 16px;
+  }
+
+  /* Shared type rhythm */
+  .qv-vendors-page .qv .qv-eyebrow,
+  .qv-vendors-page .qv .qfv-kicker {
+    font-size: 9.5px;
+    gap: 8px;
+  }
+
+  .qv-vendors-page .qv .qv-sec-h2 {
+    font-size: 26px !important;
+    line-height: 1.08 !important;
+    letter-spacing: -0.032em;
+  }
+
+  .qv-vendors-page .qv .qv-sec-sub {
+    margin-top: 9px;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+  }
+
+  /* Hero: keep image first, but bring the whole first screen into proportion */
+  .qv-vendors-page .qv-hero-bg {
+    width: calc(100% - 28px);
+    margin-top: 10px;
+    border-radius: 16px;
+  }
+
+  .qv-vendors-page .qv-hero-shell {
+    padding: 17px var(--qv-pad) 20px;
+  }
+
+  .qv-vendors-page .qv-badge {
+    gap: 7px;
+    padding: 6px 11px;
+    font-size: 9px;
+  }
+
+  .qv-vendors-page .qv-badge .qv-ico {
+    width: 14px;
+    height: 14px;
+  }
+
+  .qv-vendors-page .qv-hero h1 {
+    margin-top: 11px;
+    font-size: clamp(31px, 8.8vw, 35px);
+    line-height: 1.03;
+  }
+
+  .qv-vendors-page .qv-hero-lede {
+    margin-top: 10px;
+    max-width: 340px;
+    font-size: 13px;
+    line-height: 1.48;
+  }
+
+  .qv-vendors-page .qv-feats {
+    margin-top: 15px;
+    gap: 6px;
+  }
+
+  .qv-vendors-page .qv-feat {
+    gap: 6px;
+  }
+
+  .qv-vendors-page .qv-feat-ring {
+    width: 32px;
+    height: 32px;
+  }
+
+  .qv-vendors-page .qv-feat-ring .qv-ico {
+    width: 15px;
+    height: 15px;
+  }
+
+  .qv-vendors-page .qv-feat-label {
+    font-size: 10px;
+    line-height: 1.15;
+  }
+
+  .qv-vendors-page .qv-cta-row {
+    margin-top: 16px;
+    gap: 8px;
+  }
+
+  .qv-vendors-page .qv-hero .qv-btn {
+    min-height: 48px;
+    padding: 11px 12px;
+    font-size: 13.5px;
+    border-radius: 10px;
+  }
+
+  .qv-vendors-page .qv-hero-fine {
+    margin-top: 9px;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+
+  .qv-vendors-page .qv-hero-proof {
+    margin-top: 12px;
+  }
+
+  .qv-vendors-page .qv-proof {
+    gap: 11px;
+    padding: 12px 13px;
+    border-radius: 15px;
+  }
+
+  .qv-vendors-page .qv-proof-k {
+    font-size: 9px;
+  }
+
+  .qv-vendors-page .qv-proof-slots {
+    gap: 5px;
+    margin-top: 6px;
+  }
+
+  .qv-vendors-page .qv-slot {
+    padding: 4px 8px;
+    font-size: 9.5px;
+  }
+
+  .qv-vendors-page .qv-proof-p {
+    margin-top: 7px;
+    font-size: 11.5px;
+    line-height: 1.4;
+  }
+
+  /* Section spacing */
+  .qv-vendors-page .qv-cats,
+  .qv-vendors-page .qv-match,
+  .qv-vendors-page .qv-dash,
+  .qv-vendors-page .qv-why,
+  .qv-vendors-page .qv-get,
+  .qv-vendors-page .qv-sup,
+  .qv-vendors-page .qv-pro,
+  .qv-vendors-page .qv-areas,
+  .qv-vendors-page .qv-faq {
+    padding-top: 28px;
+    padding-bottom: 30px;
+  }
+
+  /* Categories */
+  .qv-vendors-page .qv-cats h2 {
+    font-size: 25px;
+    line-height: 1.08;
+  }
+
+  .qv-vendors-page .qv-cats-sub {
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .qv-vendors-page .qv-cats-grid {
+    margin-top: 18px;
+    gap: 8px;
+  }
+
+  .qv-vendors-page .qv-cat {
+    min-height: 88px;
+    padding-top: 8px;
+    padding-bottom: 7px;
+  }
+
+  .qv-vendors-page .qv-cat picture img {
+    width: 47px;
+    height: 47px;
+  }
+
+  .qv-vendors-page .qv-cat-label {
+    margin-top: 4px;
+  }
+
+  .qv-vendors-page .qv-cat-l {
+    font-size: 10px;
+    line-height: 1.1;
+  }
+
+  .qv-vendors-page .qv-cats-all {
+    min-height: 44px;
+    margin-top: 14px;
+    font-size: 13px;
+  }
+
+  /* Keep large artwork from consuming the whole phone width */
+  .qv-vendors-page .qv-msplit-vis,
+  .qv-vendors-page .qv-split-vis,
+  .qv-vendors-page .qv-wsplit-fig,
+  .qv-vendors-page .qv-gsplit-fig,
+  .qv-vendors-page .qv-pro-fig,
+  .qv-vendors-page .qv-areas-art {
+    width: min(100%, 320px);
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .qv-vendors-page .qv-msplit-vis,
+  .qv-vendors-page .qv-wsplit-fig,
+  .qv-vendors-page .qv-gsplit-fig,
+  .qv-vendors-page .qv-pro-fig {
+    margin-top: 16px;
+  }
+
+  .qv-vendors-page .qv-msplit-phone {
+    width: min(72%, 230px);
+    margin: 14px auto 0;
+  }
+
+  /* Matching */
+  .qv-vendors-page .qv-msplit-steps {
+    margin-top: 16px;
+  }
+
+  .qv-vendors-page .qv-mstep summary {
+    min-height: 58px;
+    padding-top: 9px;
+    padding-bottom: 9px;
+  }
+
+  .qv-vendors-page .qv-mstep-head h3 {
+    font-size: 13px;
+  }
+
+  .qv-vendors-page .qv-mstep-panel {
+    padding-bottom: 11px;
+  }
+
+  .qv-vendors-page .qv-msplit-note,
+  .qv-vendors-page .qv-msplit-ben {
+    margin-top: 13px;
+  }
+
+  /* Dashboard / support / promise step lists */
+  .qv-vendors-page .qv-split-steps {
+    margin-top: 17px;
+  }
+
+  .qv-vendors-page .qv-step {
+    min-height: 0;
+    padding-bottom: 17px;
+  }
+
+  .qv-vendors-page .qv-tile {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+  }
+
+  .qv-vendors-page .qv-step-body h3 {
+    font-size: 14px;
+    line-height: 1.25;
+  }
+
+  .qv-vendors-page .qv-step-body p {
+    margin-top: 4px;
+    font-size: 12.2px;
+    line-height: 1.46;
+  }
+
+  .qv-vendors-page .qv-split-note {
+    margin-top: 13px;
+  }
+
+  /* Why */
+  .qv-vendors-page .qv-wben {
+    margin-top: 16px;
+  }
+
+  .qv-vendors-page .qv-wben-ico {
+    width: 36px;
+    height: 36px;
+  }
+
+  .qv-vendors-page .qv-wben-tx b {
+    font-size: 11.5px;
+  }
+
+  .qv-vendors-page .qv-wben-tx i {
+    font-size: 10.5px;
+  }
+
+  .qv-vendors-page .qv-wsplit-panels {
+    margin-top: 15px;
+  }
+
+  .qv-vendors-page .qv-wpan summary {
+    min-height: 58px;
+    padding: 10px 12px;
+  }
+
+  .qv-vendors-page .qv-wsplit-cta {
+    margin-top: 11px;
+  }
+
+  /* What you get */
+  .qv-vendors-page .qv-gsplit-rows {
+    margin-top: 11px;
+  }
+
+  .qv-vendors-page .qv-grow {
+    min-height: 0;
+    padding: 11px 12px;
+  }
+
+  .qv-vendors-page .qv-grow-ico {
+    width: 40px;
+    height: 40px;
+  }
+
+  .qv-vendors-page .qv-grow-tx b {
+    font-size: 13.5px;
+  }
+
+  .qv-vendors-page .qv-grow-tx i {
+    font-size: 11.5px;
+    line-height: 1.4;
+  }
+
+  .qv-vendors-page .qv-gsplit-trust {
+    margin-top: 12px;
+  }
+
+  /* Support */
+  .qv-vendors-page .qv-sup-panel {
+    width: min(100%, 316px);
+    margin: 16px auto 0;
+    padding: 11px 10px 0;
+  }
+
+  /* Promise */
+  .qv-vendors-page .qv-pro .qv-split-steps {
+    margin-top: 14px;
+  }
+
+  /* Areas */
+  .qv-vendors-page .qv-areas-art {
+    margin-top: 30px;
+  }
+
+  .qv-vendors-page .qv-areas-badge {
+    max-width: calc(100vw - 38px);
+    padding: 7px 10px;
+    font-size: 10.5px;
+  }
+
+  .qv-vendors-page .qv-areas-pills {
+    margin-top: 24px;
+    gap: 4px;
+  }
+
+  .qv-vendors-page .qv-pill {
+    min-width: 0;
+    gap: 4px;
+  }
+
+  .qv-vendors-page .qv-pill-ico {
+    width: 30px;
+    height: 30px;
+  }
+
+  .qv-vendors-page .qv-pill-ico .qv-ico {
+    width: 14px;
+    height: 14px;
+  }
+
+  .qv-vendors-page .qv-pill span {
+    min-width: 0;
+    font-size: 9.5px;
+    line-height: 1.12;
+  }
+
+  .qv-vendors-page .qv-areas-zones {
+    margin-top: 28px;
+    gap: 9px;
+  }
+
+  .qv-vendors-page .qv-zone > summary {
+    padding: 10px 11px;
+  }
+
+  /* FAQ */
+  .qv-vendors-page .qv-faq-wa {
+    min-height: 48px;
+    margin-top: 14px;
+    padding: 9px 12px;
+    font-size: 13px;
+  }
+
+  .qv-vendors-page .qv-faq-pills {
+    margin-top: 14px;
+  }
+
+  .qv-vendors-page .qv-faq-panel {
+    margin-top: 15px;
+    border-radius: 16px;
+  }
+
+  .qv-vendors-page .qv-faq-item {
+    padding: 10px 11px;
+  }
+
+  .qv-vendors-page .qv-faq-q {
+    font-size: 12.5px;
+  }
+
+  .qv-vendors-page .qv-faq-item p {
+    font-size: 11.8px;
+    line-height: 1.48;
+  }
+
+  /* Final application block */
+  .qv-vendors-page .qv-apply {
+    padding-bottom: 24px;
+  }
+
+  .qv-vendors-page .qv-apply-block {
+    border-radius: 16px;
+    padding: 17px 15px;
+  }
+
+  .qv-vendors-page .qv-apply-inner {
+    gap: 12px;
+  }
+
+  .qv-vendors-page .qv-apply h2 {
+    font-size: 24px;
+  }
+
+  .qv-vendors-page .qv-apply p {
+    font-size: 12.5px;
+    line-height: 1.45;
+  }
+}
+
+/* Extra narrow phones: avoid the Areas feature-row clipping found at 320/360. */
+@media (max-width: 359px) {
+  .qv-vendors-page .qv-areas-pills {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .qv-vendors-page .qv-pill {
+    flex-direction: column;
+  }
+
+  .qv-vendors-page .qv-pill span {
+    font-size: 9px;
+  }
+}
+
+
+@media (max-width: 899px) {
+  /* Made in Pune */
+  .qv-vendors-page .qv .qfv-cities {
+    padding: 38px 0 40px;
+  }
+
+  .qv-vendors-page .qv .qfv-cities-head {
+    margin-bottom: 20px;
+  }
+
+  .qv-vendors-page .qv .qfv-cities-head .qfv-h2 {
+    margin-top: 8px;
+    font-size: 27px;
+    line-height: 1.06;
+  }
+
+  .qv-vendors-page .qv .qfv-cities-head > p {
+    margin-top: 9px;
+    font-size: 13px;
+    line-height: 1.48;
+  }
+
+  .qv-vendors-page .qv .qfv-city-grid {
+    gap: 8px;
+  }
+
+  .qv-vendors-page .qv .qfv-city {
+    gap: 6px;
+    padding: 9px;
+    border-radius: 14px;
+  }
+
+  .qv-vendors-page .qv .qfv-city-photo {
+    border-radius: 11px;
+    aspect-ratio: 16 / 9;
+  }
+
+  .qv-vendors-page .qv .qfv-city > b {
+    margin-top: 6px;
+    font-size: 13px;
+  }
+
+  .qv-vendors-page .qv .qfv-city-live,
+  .qv-vendors-page .qv .qfv-city-soon {
+    min-height: 22px;
+    margin-top: 3px;
+    padding: 3px 7px;
+    font-size: 9.5px;
+  }
+
+  /* Persistent conversion bar: preserve 44px+ targets but stop eating 74px. */
+  .qv-vendors-page .qfv-sticky {
+    gap: 8px;
+    padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+  }
+
+  .qv-vendors-page .qfv-sticky .qfv-btn {
+    min-height: 46px;
+    padding: 9px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+  }
+
+  .qv-vendors-page .qfv-sticky .qfv-btn--ghost {
+    min-width: 78px;
+  }
+}

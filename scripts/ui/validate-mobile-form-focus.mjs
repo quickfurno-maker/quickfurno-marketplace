@@ -38,6 +38,9 @@ const LEGACY_BRAND = "components/Brand.tsx";
 const FOOTER = "components/Footer.tsx";
 const HOME_ENQUIRY = "components/HomeEnquiryForm.tsx";
 const PUBLIC_HEADER = "components/Header.tsx";
+const VENDORS_PAGE = "app/vendors/page.tsx";
+const VENDORS_CSS = "app/vendors/vendors-v2.css";
+const FOOTER_CSS = "app/footer-v2.css";
 
 /** Strip block and line comments, then collapse whitespace runs. */
 function code(path) {
@@ -64,6 +67,9 @@ const LEGACY_BRAND_SRC = code(LEGACY_BRAND);
 const FOOTER_SRC = code(FOOTER);
 const HOME_ENQUIRY_SRC = code(HOME_ENQUIRY);
 const PUBLIC_HEADER_SRC = code(PUBLIC_HEADER);
+const VENDORS_PAGE_SRC = code(VENDORS_PAGE);
+const VENDORS_CSS_SRC = code(VENDORS_CSS);
+const FOOTER_CSS_SRC = code(FOOTER_CSS);
 
 const checks = [];
 const check = (name, fn) => checks.push({ name, fn });
@@ -425,6 +431,17 @@ check("25U [semantic] public content pages use the universal Header", () => {
       `${page} no longer imports the universal public Header`);
     assert(/<Header\s*\/>/.test(src), `${page} no longer renders the universal public Header`);
   }
+});
+
+check("25V [semantic] vendor mobile density stays scoped and compact", () => {
+  assert(/className="qv-vendors-page"/.test(VENDORS_PAGE_SRC),
+    "vendors page lost its scoping wrapper");
+  assert(/qv-vendors-page[\s\S]{0,600}qv-hero h1/.test(VENDORS_CSS_SRC),
+    "vendor mobile hero compaction is missing or no longer scoped");
+  assert(/qv-vendors-page[\s\S]{0,900}qfv-sticky/.test(VENDORS_CSS_SRC),
+    "vendor sticky conversion bar compaction is missing");
+  assert(/qv-vendors-page[\s\S]{0,500}qv-foot-ctas/.test(FOOTER_CSS_SRC),
+    "vendor-only footer compaction is missing");
 });
 
 check("25A [semantic] generic public quote CTAs do not bypass the main modal", () => {

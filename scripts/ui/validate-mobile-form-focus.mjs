@@ -36,6 +36,7 @@ const FINAL_HOME = "components/home/PuneLaunchHomepage.tsx";
 const FINAL_HOME_CSS = "app/home-pune-launch.css";
 const LEGACY_BRAND = "components/Brand.tsx";
 const FOOTER = "components/Footer.tsx";
+const HOME_ENQUIRY = "components/HomeEnquiryForm.tsx";
 
 /** Strip block and line comments, then collapse whitespace runs. */
 function code(path) {
@@ -60,6 +61,7 @@ const FINAL_HOME_CSS_SRC = code(FINAL_HOME_CSS);
 const FINAL_HOME_CSS_FLAT = flat(FINAL_HOME_CSS_SRC);
 const LEGACY_BRAND_SRC = code(LEGACY_BRAND);
 const FOOTER_SRC = code(FOOTER);
+const HOME_ENQUIRY_SRC = code(HOME_ENQUIRY);
 
 const checks = [];
 const check = (name, fn) => checks.push({ name, fn });
@@ -295,13 +297,16 @@ check("17 [semantic] Back / Next step navigation is gone", () => {
 check("18 [semantic] every required control is present in the one form", () => {
   const body = MODAL_SRC.slice(MODAL_SRC.indexOf("function renderSingleForm"));
   for (const id of ["qf-sf-service", "qf-sf-city", "qf-sf-name", "qf-sf-phone",
-                    "qf-sf-budget", "qf-sf-property", "qf-sf-timeline", "qf-sf-message"]) {
+                    "qf-sf-budget", "qf-sf-property", "qf-sf-timeline"]) {
     assert(body.includes(`id="${id}"`), `the single form is missing ${id}`);
   }
   assert(/GooglePlaceAutocomplete/.test(body), "the Area field lost its Google autocomplete");
   assert(/onManualChange=\{onAreaManualChange\}/.test(body), "the Area manual fallback is gone");
   assert(/type="checkbox"[\s\S]{0,200}form\.shareConsent/.test(body), "the consent checkbox is gone");
   assert(/form\.whatsappSame/.test(body), "the WhatsApp same-as-phone control is gone");
+  assert(!/qf-sf-message/.test(body), "the removed message/additional-details field returned");
+  assert(!/Project details \(optional\)|Tell us about your space/.test(HOME_ENQUIRY_SRC),
+    "the legacy enquiry form reintroduced the removed message/additional-details field");
 });
 
 check("18A [semantic] contact/location is first and OTP UI stays presentation-only", () => {

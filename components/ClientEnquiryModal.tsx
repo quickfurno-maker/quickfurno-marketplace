@@ -1509,18 +1509,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
               {timelineError ? <span className="qf-rf-field-err">Select your project timeline.</span> : null}
             </label>
 
-            <label className="qf-sf-field qf-sf-field--full" htmlFor="qf-sf-message">
-              <span className="qf-sf-label">Message / additional details <small>(optional)</small></span>
-              <textarea
-                id="qf-sf-message"
-                value={form.message}
-                onChange={(e) => set("message", e.target.value.slice(0, 500))}
-                placeholder="Anything else the teams should know?"
-                rows={3}
-                maxLength={500}
-              />
-              <span className="qf-sf-counter">{form.message.length}/500</span>
-            </label>
           </div>
         </section>
 

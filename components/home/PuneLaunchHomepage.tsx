@@ -767,8 +767,8 @@ function HowRequestPreview() {
           ))}
         </div>
         <div className="qfp-flow-project-field">
-          <G name="chat" size={15} stroke="currentColor" width={2} />
-          <span>Add a few project details...</span>
+          <G name="check2" size={15} stroke="currentColor" width={2} />
+          <span>Budget &amp; timeline</span>
         </div>
         <div className="qfp-flow-request-foot">
           <span><G name="home2" size={16} stroke="currentColor" width={2} /><i><small>Location</small><strong>Baner, Pune</strong></i></span>
@@ -790,13 +790,31 @@ function HowMatchMap() {
         <i className="qfp-flow-route qfp-flow-route--one" aria-hidden="true" />
         <i className="qfp-flow-route qfp-flow-route--two" aria-hidden="true" />
         <i className="qfp-flow-route qfp-flow-route--three" aria-hidden="true" />
+        <Image
+          className="qfp-flow-map-bg"
+          src="/assets/quickfurno/maps/pune-baner-osm.webp"
+          alt=""
+          fill
+          sizes="(max-width: 760px) 330px, 420px"
+          unoptimized
+        />
+        <span className="qfp-flow-map-tint" aria-hidden="true" />
+        <small className="qfp-flow-map-credit">© OpenStreetMap contributors</small>
         <span className="qfp-flow-client-card">
-          <i aria-hidden="true">PS</i>
+          <Image
+            className="qfp-flow-client-avatar"
+            src="/assets/quickfurno/images/real/priya-sharma-avatar.webp"
+            alt=""
+            width={56}
+            height={56}
+            sizes="32px"
+            unoptimized
+          />
           <span><strong>Priya Sharma</strong><small>Baner, Pune</small></span>
         </span>
         {HOW_TEAM_MATCHES.map((team) => (
           <span className={`qfp-flow-team-card ${team.position}`} key={team.name}>
-            <Image src={team.image} alt="" width={72} height={52} sizes="72px" />
+            <Image src={team.image} alt="" width={144} height={104} sizes="56px" unoptimized />
             <span><strong>{team.name}</strong><small>{team.meta}</small></span>
           </span>
         ))}
@@ -819,7 +837,7 @@ function HowProfileCompare() {
       <div className="qfp-flow-profile-list">
         {HOW_PROFILE_ROWS.map((profile, index) => (
           <span className="qfp-flow-profile-row" key={profile.name}>
-            <Image src={profile.image} alt="" width={76} height={58} sizes="76px" />
+            <Image src={profile.image} alt="" width={152} height={116} sizes="64px" unoptimized />
             <span>
               <strong>{profile.name}</strong>
               <small><G name="check2" size={12} stroke="currentColor" width={2.2} /> Reviewed profile</small>

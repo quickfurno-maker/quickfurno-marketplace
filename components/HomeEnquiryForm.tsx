@@ -96,8 +96,6 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
         <L label="Budget"><select className="field" value={f.budget} onChange={(e) => set("budget", e.target.value)}><option value="" className="bg-navy-deep">Select budget</option>{BUDGETS.map((b) => <option key={b} className="bg-navy-deep">{b}</option>)}</select></L>
         <L label="Timeline"><select className="field" value={f.timeline} onChange={(e) => set("timeline", e.target.value)}><option value="" className="bg-navy-deep">Select timeline</option>{TIMELINES.map((t) => <option key={t} className="bg-navy-deep">{t}</option>)}</select></L>
       </div>
-      <L label="Project details (optional)"><textarea className="field min-h-[84px]" value={f.message} onChange={(e) => set("message", e.target.value)} placeholder="Tell us about your space…" /></L>
-
       <label className="mt-5 flex items-start gap-3 font-sans text-xs leading-5 text-muted">
         <input
           type="checkbox"

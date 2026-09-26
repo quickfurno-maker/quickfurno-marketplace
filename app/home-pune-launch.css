@@ -3233,10 +3233,39 @@
 .qfp-flow-match-canvas {
   position: relative;
   overflow: hidden;
+  background: #182026;
+}
+.qfp-flow-map-bg {
+  position: absolute !important;
+  inset: 0;
+  z-index: 0;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+  object-position: 46% 52%;
+  filter: saturate(.78) brightness(.58) contrast(1.08);
+}
+.qfp-flow-map-tint {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   background:
-    linear-gradient(25deg,transparent 48%,rgba(255,255,255,.035) 49%,rgba(255,255,255,.035) 51%,transparent 52%),
-    linear-gradient(115deg,transparent 48%,rgba(255,255,255,.025) 49%,rgba(255,255,255,.025) 51%,transparent 52%);
-  background-size: 66px 66px,76px 76px;
+    radial-gradient(circle at 50% 50%, rgba(234,111,39,.13), transparent 33%),
+    linear-gradient(180deg, rgba(8,12,15,.12), rgba(8,12,15,.46));
+  pointer-events: none;
+}
+.qfp-flow-map-credit {
+  position: absolute;
+  z-index: 3;
+  left: 6px;
+  bottom: 5px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: rgba(7,10,12,.68);
+  color: rgba(255,255,255,.72);
+  font-size: 5.5px;
+  line-height: 1;
+  pointer-events: none;
 }
 
 .qfp-flow-client-card,
@@ -3270,6 +3299,15 @@
   font-style: normal;
   font-size: 8px;
   font-weight: 900;
+}
+.qfp-flow-client-avatar {
+  flex: 0 0 30px;
+  width: 30px !important;
+  height: 30px !important;
+  border: 1px solid rgba(255,255,255,.26);
+  border-radius: 999px;
+  object-fit: cover;
+  object-position: center 35%;
 }
 .qfp-flow-client-card > span,
 .qfp-flow-team-card > span {
@@ -3307,7 +3345,7 @@
 .qfp-flow-team-card.qfp-how-team--three { right:8%;bottom:9%; }
 .qfp-flow-route {
   position:absolute;
-  z-index:1;
+  z-index:2;
   left:50%;
   top:50%;
   height:1px;
@@ -3595,17 +3633,23 @@
     border-radius:8px;
   }
   .qfp-flow-client-card > i { flex-basis:22px;width:22px;height:22px;font-size:7px; }
+  .qfp-flow-client-avatar {
+    flex-basis:26px;
+    width:26px !important;
+    height:26px !important;
+  }
   .qfp-flow-team-card {
-    min-width:88px;
-    gap:4px;
+    min-width:102px;
+    gap:5px;
     padding:4px;
     border-radius:8px;
   }
   .qfp-flow-team-card > img {
-    flex-basis:28px;
-    width:28px;
-    height:24px;
-    border-radius:5px;
+    flex-basis:36px;
+    width:36px;
+    height:30px;
+    border-radius:6px;
+    image-rendering:auto;
   }
   .qfp-flow-client-card strong,
   .qfp-flow-team-card strong { font-size:6.3px; }
@@ -3625,13 +3669,18 @@
   .qfp-flow-compare-ui { padding-bottom:6px; }
   .qfp-flow-compare-ui .qfp-flow-profile-list { gap:5px;padding:7px; }
   .qfp-flow-profile-row {
-    grid-template-columns:42px minmax(0,1fr) auto;
+    grid-template-columns:48px minmax(0,1fr) auto;
     gap:5px;
     min-height:48px;
     padding:4px 5px 4px 4px;
     border-radius:8px;
   }
-  .qfp-flow-profile-row > img { width:42px;height:36px;border-radius:7px; }
+  .qfp-flow-profile-row > img {
+    width:48px;
+    height:40px;
+    border-radius:7px;
+    image-rendering:auto;
+  }
   .qfp-flow-profile-row strong { font-size:8px; }
   .qfp-flow-profile-row small { gap:2px;font-size:6px; }
   .qfp-flow-profile-row small svg { width:8px;height:8px; }

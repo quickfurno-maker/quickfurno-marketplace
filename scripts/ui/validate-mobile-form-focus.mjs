@@ -304,6 +304,18 @@ check("18 [semantic] every required control is present in the one form", () => {
   assert(/form\.whatsappSame/.test(body), "the WhatsApp same-as-phone control is gone");
 });
 
+check("18A [semantic] contact/location is first and OTP UI stays presentation-only", () => {
+  const body = MODAL_SRC.slice(MODAL_SRC.indexOf("function renderSingleForm"));
+  const contactAt = body.indexOf('"Contact & location"');
+  const projectAt = body.indexOf('"Project details"');
+  assert(contactAt >= 0 && projectAt > contactAt, "contact/location is no longer the first visual form section");
+  assert(/qf-sf-otp-send/.test(body) && /qf-sf-otp-verify/.test(body), "OTP UI controls are missing");
+  assert(/otpUiSeconds\s*>\s*0/.test(MODAL_SRC), "the 60-second resend countdown UI is missing");
+  assert(/3 attempts remaining/.test(body), "the OTP attempts display is missing");
+  assert(/OTP delivery will be connected in the backend phase/.test(MODAL_SRC),
+    "OTP UI is no longer explicitly isolated from backend verification");
+});
+
 check("19 [semantic] service and city are real selects bound to the shared sources", () => {
   const body = MODAL_SRC.slice(MODAL_SRC.indexOf("function renderSingleForm"));
   assert(/mainCategories\.map/.test(body), "the service select does not read mainCategories");
@@ -549,7 +561,7 @@ check("U44 the submit CTA is NOT inside the scrolling body", () => {
   const footerAt = MODAL_SRC.indexOf('className="qf-rf-footer qf-sf-footer"');
   const insideBody = MODAL_SRC.slice(bodyAt, footerAt);
   assert(!/qf-sf-cta/.test(insideBody), "the submit CTA was moved into the scroll body");
-  assert(!/Get Free Team Matches/.test(insideBody), "the submit CTA label appears inside the scroll body");
+  assert(!/Get up to 3 matches/.test(insideBody), "the submit CTA label appears inside the scroll body");
 });
 
 check("U45 qf-sf-cta lives inside qf-sf-footer", () => {
@@ -557,12 +569,12 @@ check("U45 qf-sf-cta lives inside qf-sf-footer", () => {
   const footerEnd = MODAL_SRC.indexOf("</footer>", footerAt);
   const footer = MODAL_SRC.slice(footerAt, footerEnd);
   assert(/qf-sf-cta/.test(footer), "qf-sf-cta is no longer inside the submit footer");
-  assert(/Get Free Team Matches/.test(footer), "the CTA label left the submit footer");
+  assert(/Get up to 3 matches/.test(footer), "the CTA label left the submit footer");
   assert(/qf-sf-trust/.test(footer), "the trust line left the submit footer");
 });
 
 check("U46 the CTA label appears exactly once in the modal", () => {
-  const hits = (MODAL_SRC.match(/Get Free Team Matches/g) || []).length;
+  const hits = (MODAL_SRC.match(/Get up to 3 matches/g) || []).length;
   assert(hits === 1, `expected exactly 1 CTA label, found ${hits}`);
 });
 

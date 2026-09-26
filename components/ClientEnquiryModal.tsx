@@ -413,6 +413,12 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const [locStatus, setLocStatus] = useState<"" | "locating" | "captured" | "denied" | "unsupported">("");
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  // Front-end OTP presentation only. Delivery + verification authority will be
+  // connected in the backend phase; these states must not affect lead submission.
+  const [otpUiSent, setOtpUiSent] = useState(false);
+  const [otpUiCode, setOtpUiCode] = useState(["", "", "", ""]);
+  const [otpUiSeconds, setOtpUiSeconds] = useState(0);
+  const [otpUiNotice, setOtpUiNotice] = useState("");
   // First step the client may navigate back to. 0 for the normal flow; for a
   // resolved preferred-vendor flow it is the first step the client still has to
   // fill, so category/subcategory (and prefilled city) stay locked/hidden.
@@ -440,6 +446,16 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     captureLeadAttribution();
   }, []);
+
+  // UI-only resend countdown. No network request is made here; OTP delivery and
+  // verification are intentionally deferred to the backend implementation.
+  useEffect(() => {
+    if (!open || otpUiSeconds <= 0) return;
+    const timer = window.setTimeout(() => {
+      setOtpUiSeconds((seconds) => Math.max(0, seconds - 1));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [open, otpUiSeconds]);
 
   const openModal = useCallback((options: EnquiryModalOptions = {}) => {
     // Preferred-vendor flow: the vendor's category/subcategory are the source of
@@ -485,6 +501,10 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setShowConfirm(false);
     setLocStatus("");
     setTouched({});
+    setOtpUiSent(false);
+    setOtpUiCode(["", "", "", ""]);
+    setOtpUiSeconds(0);
+    setOtpUiNotice("");
     setMinStep(preferredSelection ? startStep : 0);
     setStep(startStep);
     setModalOptions(options);
@@ -527,6 +547,10 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setSubmitting(false);
     setLocStatus("");
     setTouched({});
+    setOtpUiSent(false);
+    setOtpUiCode(["", "", "", ""]);
+    setOtpUiSeconds(0);
+    setOtpUiNotice("");
     setStep(0);
     setMinStep(0);
     setModalOptions({});
@@ -604,6 +628,32 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       // Ticking the box copies the cleaned phone number into WhatsApp.
       whatsapp: checked ? current.phone : current.whatsapp,
     }));
+  }
+
+  function startOtpUi() {
+    if (!isPhoneValid(form.phone)) {
+      markTouched("phone");
+      setOtpUiNotice("Enter a valid 10-digit mobile number first.");
+      return;
+    }
+    setOtpUiSent(true);
+    setOtpUiCode(["", "", "", ""]);
+    setOtpUiSeconds(60);
+    setOtpUiNotice("OTP delivery will be connected in the backend phase.");
+  }
+
+  function updateOtpUiDigit(index: number, raw: string) {
+    const digit = raw.replace(/\D/g, "").slice(-1);
+    setOtpUiCode((current) => current.map((value, i) => (i === index ? digit : value)));
+    setOtpUiNotice("");
+  }
+
+  function verifyOtpUi() {
+    if (otpUiCode.some((digit) => !digit)) {
+      setOtpUiNotice("Enter the 4-digit OTP.");
+      return;
+    }
+    setOtpUiNotice("OTP verification will activate when the backend is connected.");
   }
 
   function toggleNotSure() {
@@ -1150,27 +1200,26 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
    * wizard already used, so the payload, consent, preferred-vendor routing,
    * location metadata and tracking are unchanged.
    *
-   * Field order is fixed and mobile-first, grouped under three numbered
-   * section headings (visual grouping ONLY — no step gating, no Back/Next,
-   * per the QF-MOBILE-FORM contract) with contact details LAST so the form
-   * asks for a phone number only after the project is described:
-   *   [1 Your project]     service -> city -> area
-   *   [2 Project details]  budget -> property type -> timeline -> message
-   *   [3 Your contact]     name -> phone -> whatsapp -> consent -> submit.
-   * Desktop pairs related fields into two columns purely with CSS, so the wide
-   * layout never dictates the mobile structure.
+   * Field order is fixed and mobile-first. Contact + location comes first,
+   * followed by project details, then the unchanged consent and submit action:
+   *   [1 Contact & location] name -> phone -> WhatsApp -> OTP UI -> city -> area -> GPS
+   *   [2 Project details]   service -> budget -> property type -> timeline -> message
+   * OTP is presentation-only until the backend verification phase; it does not
+   * change the current lead payload or submission gate.
    */
-  function sectionHead(n: number, title: string, hint: string) {
+  function sectionHead(n: number, title: string, hint: string, required = false) {
     return (
       <div className="qf-sf-sechead qf-sf-field--full">
         <span className="qf-sf-sechead-n" aria-hidden="true">{n}</span>
-        <div>
+        <div className="qf-sf-sechead-copy">
           <h4>{title}</h4>
           <small>{hint}</small>
         </div>
+        {required ? <span className="qf-sf-required">Required</span> : null}
       </div>
     );
   }
+
   function renderSingleForm() {
     const cityUi = fieldUi("city", { valid: Boolean(form.city), value: form.city, error: "Please select your city." });
     const hasCoordinates =
@@ -1200,296 +1249,307 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     const subError = Boolean(touched.service) && isInterior && !form.subcategory;
     const budgetError = Boolean(touched.budgetMin) && currentBudgetBandId() === "";
     const timelineError = Boolean(touched.timeline) && !form.timeline;
+    const otpReady = otpUiSent && otpUiCode.every(Boolean);
 
     return (
       <div className="qf-sf">
-        {sectionHead(1, "Your project", "What you need done, and where")}
-        {/* Service. The category source of truth is unchanged — these are the
-            same mainCategories the tile grid used, rendered as a select. In the
-            preferred-vendor flow the category is fixed by the vendor, so the
-            picker is hidden exactly as the wizard hid those steps. */}
-        {minStep === 0 ? (
-          <label className={`qf-sf-field${serviceError ? " has-error" : ""}`} htmlFor="qf-sf-service">
-            <span className="qf-sf-label">Service needed</span>
-            <select
-              id="qf-sf-service"
-              value={form.categoryId}
-              onChange={(e) => {
-                const cat = mainCategories.find((c) => c.id === e.target.value);
-                if (cat) selectCategory(cat);
-                markTouched("service");
-              }}
-              onBlur={() => markTouched("service")}
-            >
-              <option value="">Select a service</option>
-              {mainCategories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.label}
-                </option>
-              ))}
-            </select>
-            {serviceError ? <span className="qf-rf-field-err">Select a service.</span> : null}
-          </label>
-        ) : null}
+        <section className="qf-sf-card qf-sf-card--contact">
+          {sectionHead(1, "Contact & location", "We'll use this to contact you and find pros in your area.", true)}
+          <div className="qf-sf-card-grid">
+            <label className={"qf-sf-field qf-sf-field--full" + (nameUi.showError ? " has-error" : "")} htmlFor="qf-sf-name">
+              <span className="qf-sf-label">Full name <b aria-hidden="true">*</b></span>
+              <div className="qf-rf-input-wrapper">
+                <input
+                  id="qf-sf-name"
+                  ref={nameInputRef}
+                  value={form.name}
+                  onChange={(e) => {
+                    set("name", e.target.value);
+                    markTouched("name");
+                  }}
+                  onBlur={() => markTouched("name")}
+                  placeholder="Enter your full name"
+                  autoComplete="name"
+                />
+                <ValidationIcon state={nameUi.iconState} />
+              </div>
+              {nameUi.showError ? <span className="qf-rf-field-err">{nameUi.error}</span> : null}
+            </label>
 
-        {/* Interior is the only category with a subcategory; this second select
-            appears only once Interior is chosen. */}
-        {minStep === 0 && isInterior ? (
-          <label className={`qf-sf-field${subError ? " has-error" : ""}`} htmlFor="qf-sf-sub">
-            <span className="qf-sf-label">Interior service</span>
-            <select
-              id="qf-sf-sub"
-              value={form.subcategory}
-              onChange={(e) => {
-                const sub = subcategoryOptions.find((o) => o.label === e.target.value);
-                if (sub) selectSubcategory(sub);
-                markTouched("service");
-              }}
-              onBlur={() => markTouched("service")}
-            >
-              <option value="">Select an interior service</option>
-              {subcategoryOptions.map((sub) => (
-                <option key={sub.label} value={sub.label}>
-                  {sub.label}
-                </option>
-              ))}
-            </select>
-            {subError ? <span className="qf-rf-field-err">Select an interior service.</span> : null}
-          </label>
-        ) : null}
+            <div className={"qf-sf-field qf-sf-field--full" + (phoneUi.showError ? " has-error" : "")}>
+              <span className="qf-sf-label">Mobile number <b aria-hidden="true">*</b></span>
+              <div className="qf-sf-phone-row">
+                <label className="qf-sf-phone-input" htmlFor="qf-sf-phone">
+                  <span className="qf-sf-country">+91</span>
+                  <input
+                    id="qf-sf-phone"
+                    value={form.phone}
+                    onChange={(e) => {
+                      onPhoneChange(e.target.value);
+                      setOtpUiSent(false);
+                      setOtpUiCode(["", "", "", ""]);
+                      setOtpUiSeconds(0);
+                      setOtpUiNotice("");
+                    }}
+                    onBlur={() => markTouched("phone")}
+                    placeholder="Enter your mobile number"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    maxLength={10}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="qf-sf-otp-send"
+                  disabled={!isPhoneValid(form.phone) || (otpUiSent && otpUiSeconds > 0)}
+                  onClick={startOtpUi}
+                >
+                  {otpUiSent && otpUiSeconds > 0 ? "OTP sent" : otpUiSent ? "Resend OTP" : "Send OTP"}
+                </button>
+              </div>
+              {phoneUi.showError ? <span className="qf-rf-field-err">{phoneUi.error}</span> : null}
+            </div>
 
-        <label className={`qf-sf-field${cityUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-city">
-          <span className="qf-sf-label">City</span>
-          <select
-            id="qf-sf-city"
-            value={form.city}
-            onChange={(e) => {
-              set("city", e.target.value);
-              markTouched("city");
-            }}
-            onBlur={() => markTouched("city")}
-            disabled={citiesLoading && activeCities.length === 0}
-          >
-            <option value="">{citiesLoading && !citiesLoaded ? "Loading cities…" : "Select your city"}</option>
-            {form.city && !activeCities.includes(form.city) ? (
-              <option value={form.city}>{form.city}</option>
+            <label className="qf-sf-whatsapp qf-sf-field--full">
+              <span className="qf-sf-wa-mark" aria-hidden="true">✓</span>
+              <input type="checkbox" checked={form.whatsappSame} onChange={(e) => onWhatsappSameChange(e.target.checked)} />
+              <span>
+                <strong>This number is on WhatsApp</strong>
+                <small>We&apos;ll also share updates on WhatsApp</small>
+              </span>
+            </label>
+
+            {!form.whatsappSame ? (
+              <label className={"qf-sf-field qf-sf-field--full" + (whatsappUi.showError ? " has-error" : "")} htmlFor="qf-sf-wa">
+                <span className="qf-sf-label">WhatsApp number <b aria-hidden="true">*</b></span>
+                <div className="qf-rf-input-wrapper">
+                  <input
+                    id="qf-sf-wa"
+                    value={form.whatsapp}
+                    onChange={(e) => onWhatsappChange(e.target.value)}
+                    onBlur={() => markTouched("whatsapp")}
+                    placeholder="10-digit WhatsApp number"
+                    inputMode="numeric"
+                    maxLength={10}
+                  />
+                  <ValidationIcon state={whatsappUi.iconState} />
+                </div>
+                {whatsappUi.showError ? <span className="qf-rf-field-err">{whatsappUi.error}</span> : null}
+              </label>
             ) : null}
-            {activeCities.map((city) => (
-              <option key={city} value={city}>
-                {city}
-              </option>
-            ))}
-          </select>
-          {citiesLoaded && activeCities.length === 0 ? (
-            <span className="qf-rf-field-err">{NO_ACTIVE_CITIES_MESSAGE}</span>
-          ) : cityUi.showError ? (
-            <span className="qf-rf-field-err">{cityUi.error}</span>
-          ) : null}
-        </label>
 
-        {/* Area keeps the Google enhancement AND the manual fallback verbatim. */}
-        <label className={`qf-sf-field qf-sf-area${areaUi.showError ? " has-error" : ""}`}>
-          <span className="qf-sf-label">Area / locality</span>
-          <div className="qf-rf-input-wrapper">
-            <GooglePlaceAutocomplete
-              value={form.area}
-              city={form.city}
-              mode="locality"
-              onManualChange={onAreaManualChange}
-              onPlaceSelected={onAreaPlaceSelected}
-              onBlur={() => markTouched("area")}
-              placeholder="e.g. Kharadi, Baner, Andheri"
-              autoComplete="off"
-            />
-            <ValidationIcon state={areaUi.iconState} />
+            <div className="qf-sf-otp qf-sf-field--full" aria-label="4 digit OTP verification">
+              <span className="qf-sf-label">Verify your number <b aria-hidden="true">*</b></span>
+              <div className="qf-sf-otp-row">
+                <div className="qf-sf-otp-digits">
+                  {otpUiCode.map((digit, index) => (
+                    <input
+                      key={index}
+                      aria-label={"OTP digit " + (index + 1)}
+                      value={digit}
+                      onChange={(e) => updateOtpUiDigit(index, e.target.value)}
+                      inputMode="numeric"
+                      autoComplete={index === 0 ? "one-time-code" : "off"}
+                      maxLength={1}
+                      disabled={!otpUiSent}
+                    />
+                  ))}
+                </div>
+                <button type="button" className="qf-sf-otp-verify" disabled={!otpReady} onClick={verifyOtpUi}>
+                  Verify
+                </button>
+              </div>
+              <div className="qf-sf-otp-meta">
+                <span>ⓘ 3 attempts remaining</span>
+                <button type="button" disabled={!otpUiSent || otpUiSeconds > 0} onClick={startOtpUi}>
+                  {otpUiSent && otpUiSeconds > 0 ? "Resend OTP in " + otpUiSeconds + "s" : "Resend OTP"}
+                </button>
+              </div>
+              {otpUiNotice ? <p className="qf-sf-otp-note">{otpUiNotice}</p> : null}
+            </div>
+
+            <label className={"qf-sf-field qf-sf-field--full" + (cityUi.showError ? " has-error" : "")} htmlFor="qf-sf-city">
+              <span className="qf-sf-label">City <b aria-hidden="true">*</b></span>
+              <select
+                id="qf-sf-city"
+                value={form.city}
+                onChange={(e) => {
+                  set("city", e.target.value);
+                  markTouched("city");
+                }}
+                onBlur={() => markTouched("city")}
+                disabled={citiesLoading && activeCities.length === 0}
+              >
+                <option value="">{citiesLoading && !citiesLoaded ? "Loading cities…" : "Select your city"}</option>
+                {form.city && !activeCities.includes(form.city) ? <option value={form.city}>{form.city}</option> : null}
+                {activeCities.map((city) => <option key={city} value={city}>{city}</option>)}
+              </select>
+              {citiesLoaded && activeCities.length === 0 ? (
+                <span className="qf-rf-field-err">{NO_ACTIVE_CITIES_MESSAGE}</span>
+              ) : cityUi.showError ? (
+                <span className="qf-rf-field-err">{cityUi.error}</span>
+              ) : null}
+            </label>
+
+            <label className={"qf-sf-field qf-sf-area qf-sf-field--full" + (areaUi.showError ? " has-error" : "")}>
+              <span className="qf-sf-label">Area / locality <b aria-hidden="true">*</b></span>
+              <div className="qf-rf-input-wrapper">
+                <GooglePlaceAutocomplete
+                  value={form.area}
+                  city={form.city}
+                  mode="locality"
+                  onManualChange={onAreaManualChange}
+                  onPlaceSelected={onAreaPlaceSelected}
+                  onBlur={() => markTouched("area")}
+                  placeholder="Enter your area or locality"
+                  autoComplete="off"
+                />
+                <ValidationIcon state={areaUi.iconState} />
+              </div>
+              <small className="qf-sf-example">e.g. Kharadi, Baner, Andheri</small>
+              {areaUi.showError ? <span className="qf-rf-field-err">{areaUi.error}</span> : null}
+            </label>
+
+            <div className="qf-sf-locrow qf-sf-field--full">
+              <button type="button" className="qf-sf-loc" onClick={useMyLocation}>
+                <QFIcon name="pin" />
+                {locStatus === "locating" ? "Getting location…" : "Use my current location"}
+              </button>
+              {locStatus === "captured" ? (
+                <p className="qf-sf-note qf-sf-note--ok">Location captured — we&apos;ll use this as one matching signal for eligible vendors.</p>
+              ) : null}
+              {locStatus === "denied" ? <p className="qf-sf-note">No problem — your city and area above are enough.</p> : null}
+              {locStatus === "unsupported" ? <p className="qf-sf-note">Your browser does not support location — your city and area are enough.</p> : null}
+            </div>
           </div>
-          {areaUi.showError ? <span className="qf-rf-field-err">{areaUi.error}</span> : null}
-        </label>
+        </section>
 
-        <div className="qf-sf-locrow">
-          <button type="button" className="qf-sf-loc" onClick={useMyLocation}>
-            <QFIcon name="pin" />
-            {locStatus === "locating" ? "Getting location…" : "Use my current location"}
-          </button>
-          {locStatus === "captured" ? (
-            <p className="qf-sf-note qf-sf-note--ok">Location captured — we&apos;ll use this as one matching signal for eligible vendors.</p>
-          ) : null}
-          {locStatus === "denied" ? (
-            <p className="qf-sf-note">No problem — your city and area above are enough.</p>
-          ) : null}
-          {locStatus === "unsupported" ? (
-            <p className="qf-sf-note">Your browser does not support location — your city and area are enough.</p>
+        <section className="qf-sf-card qf-sf-card--project">
+          {sectionHead(2, "Project details", "Help us understand your requirement. Rough estimates are fine.")}
+          <div className="qf-sf-card-grid">
+            {minStep === 0 ? (
+              <label className={"qf-sf-field qf-sf-field--full" + (serviceError ? " has-error" : "")} htmlFor="qf-sf-service">
+                <span className="qf-sf-label">Service needed</span>
+                <select
+                  id="qf-sf-service"
+                  value={form.categoryId}
+                  onChange={(e) => {
+                    const cat = mainCategories.find((c) => c.id === e.target.value);
+                    if (cat) selectCategory(cat);
+                    markTouched("service");
+                  }}
+                  onBlur={() => markTouched("service")}
+                >
+                  <option value="">Select a service</option>
+                  {mainCategories.map((cat) => <option key={cat.id} value={cat.id}>{cat.label}</option>)}
+                </select>
+                {serviceError ? <span className="qf-rf-field-err">Select a service.</span> : null}
+              </label>
+            ) : null}
+
+            {minStep === 0 && isInterior ? (
+              <label className={"qf-sf-field qf-sf-field--full" + (subError ? " has-error" : "")} htmlFor="qf-sf-sub">
+                <span className="qf-sf-label">Interior service</span>
+                <select
+                  id="qf-sf-sub"
+                  value={form.subcategory}
+                  onChange={(e) => {
+                    const sub = subcategoryOptions.find((o) => o.label === e.target.value);
+                    if (sub) selectSubcategory(sub);
+                    markTouched("service");
+                  }}
+                  onBlur={() => markTouched("service")}
+                >
+                  <option value="">Select an interior service</option>
+                  {subcategoryOptions.map((sub) => <option key={sub.label} value={sub.label}>{sub.label}</option>)}
+                </select>
+                {subError ? <span className="qf-rf-field-err">Select an interior service.</span> : null}
+              </label>
+            ) : null}
+
+            <label className={"qf-sf-field" + (budgetError ? " has-error" : "")} htmlFor="qf-sf-budget">
+              <span className="qf-sf-label">Budget range</span>
+              <select
+                id="qf-sf-budget"
+                value={currentBudgetBandId()}
+                onChange={(e) => {
+                  selectBudgetBand(e.target.value);
+                  markTouched("budgetMin");
+                }}
+                onBlur={() => markTouched("budgetMin")}
+              >
+                <option value="">Select a budget range</option>
+                {BUDGET_BANDS.map((band) => <option key={band.id} value={band.id}>{band.label}</option>)}
+              </select>
+              {budgetError ? <span className="qf-rf-field-err">Select a budget range.</span> : null}
+            </label>
+
+            <label className="qf-sf-field" htmlFor="qf-sf-property">
+              <span className="qf-sf-label">Property type</span>
+              <select id="qf-sf-property" value={form.propertyType} onChange={(e) => set("propertyType", e.target.value)}>
+                <option value="">Select property type</option>
+                {PROPERTY_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+              </select>
+            </label>
+
+            <label className={"qf-sf-field qf-sf-field--full" + (timelineError ? " has-error" : "")} htmlFor="qf-sf-timeline">
+              <span className="qf-sf-label">When do you want to start?</span>
+              <select
+                id="qf-sf-timeline"
+                value={form.timeline}
+                onChange={(e) => {
+                  set("timeline", e.target.value);
+                  markTouched("timeline");
+                }}
+                onBlur={() => markTouched("timeline")}
+              >
+                <option value="">Select a timeline</option>
+                {RF_TIMELINES.map((tile) => <option key={tile.label} value={tile.label}>{tile.label}</option>)}
+              </select>
+              {timelineError ? <span className="qf-rf-field-err">Select your project timeline.</span> : null}
+            </label>
+
+            <label className="qf-sf-field qf-sf-field--full" htmlFor="qf-sf-message">
+              <span className="qf-sf-label">Message / additional details <small>(optional)</small></span>
+              <textarea
+                id="qf-sf-message"
+                value={form.message}
+                onChange={(e) => set("message", e.target.value.slice(0, 500))}
+                placeholder="Anything else the teams should know?"
+                rows={3}
+                maxLength={500}
+              />
+              <span className="qf-sf-counter">{form.message.length}/500</span>
+            </label>
+          </div>
+        </section>
+
+        <div className="qf-sf-consent-wrap">
+          <label className={"qf-sf-consent" + (consentError ? " has-error" : "")}>
+            <input
+              type="checkbox"
+              checked={form.shareConsent}
+              onChange={(e) => {
+                set("shareConsent", e.target.checked);
+                markTouched("consent");
+              }}
+            />
+            <span>
+              I agree that QuickFurno may share my enquiry and contact details with up to 3 eligible vendors initially. If vendors are unavailable, non-responsive, or unable to serve my requirement, QuickFurno may manually connect me with additional eligible vendors under the marketplace matching rules.{" "}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+              {" · "}
+              <a href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>
+            </span>
+          </label>
+          {consentError ? (
+            <span className="qf-rf-field-err qf-rf-field-err--block">
+              Please accept sharing your details with up to 3 eligible vendors to continue.
+            </span>
           ) : null}
         </div>
-
-        {sectionHead(2, "Project details", "Budget and timing — rough estimates are fine")}
-
-        {/* Budget — ONE band select that writes the canonical
-            budgetMin / budgetMax / budgetNotSure fields, so budgetSummary() and
-            the submitted `budget_range` string are unchanged. */}
-        <label className={`qf-sf-field${budgetError ? " has-error" : ""}`} htmlFor="qf-sf-budget">
-          <span className="qf-sf-label">Budget</span>
-          <select
-            id="qf-sf-budget"
-            value={currentBudgetBandId()}
-            onChange={(e) => {
-              selectBudgetBand(e.target.value);
-              markTouched("budgetMin");
-            }}
-            onBlur={() => markTouched("budgetMin")}
-          >
-            <option value="">Select a budget range</option>
-            {BUDGET_BANDS.map((band) => (
-              <option key={band.id} value={band.id}>
-                {band.label}
-              </option>
-            ))}
-          </select>
-          {budgetError ? <span className="qf-rf-field-err">Select a budget range.</span> : null}
-        </label>
-
-        <label className="qf-sf-field" htmlFor="qf-sf-property">
-          <span className="qf-sf-label">Property type</span>
-          <select
-            id="qf-sf-property"
-            value={form.propertyType}
-            onChange={(e) => set("propertyType", e.target.value)}
-          >
-            <option value="">Select property type</option>
-            {PROPERTY_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {/* Timeline remains a submitted payload field; it is a select now. */}
-        <label className={`qf-sf-field${timelineError ? " has-error" : ""}`} htmlFor="qf-sf-timeline">
-          <span className="qf-sf-label">When do you want to start?</span>
-          <select
-            id="qf-sf-timeline"
-            value={form.timeline}
-            onChange={(e) => {
-              set("timeline", e.target.value);
-              markTouched("timeline");
-            }}
-            onBlur={() => markTouched("timeline")}
-          >
-            <option value="">Select a timeline</option>
-            {RF_TIMELINES.map((tile) => (
-              <option key={tile.label} value={tile.label}>
-                {tile.label}
-              </option>
-            ))}
-          </select>
-          {timelineError ? <span className="qf-rf-field-err">Select your project timeline.</span> : null}
-        </label>
-
-        <label className="qf-sf-field qf-sf-field--full" htmlFor="qf-sf-message">
-          <span className="qf-sf-label">Message / details (optional)</span>
-          <textarea
-            id="qf-sf-message"
-            value={form.message}
-            onChange={(e) => set("message", e.target.value)}
-            placeholder="Anything else the teams should know?"
-            rows={3}
-          />
-        </label>
-
-        {sectionHead(3, "Your contact", "Where the matched vendors' quotes should reach you")}
-
-        <label className={`qf-sf-field${nameUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-name">
-          <span className="qf-sf-label">Your name</span>
-          <div className="qf-rf-input-wrapper">
-            <input
-              id="qf-sf-name"
-              ref={nameInputRef}
-              value={form.name}
-              onChange={(e) => {
-                set("name", e.target.value);
-                markTouched("name");
-              }}
-              onBlur={() => markTouched("name")}
-              placeholder="e.g. Rahul Sharma"
-              autoComplete="name"
-            />
-            <ValidationIcon state={nameUi.iconState} />
-          </div>
-          {nameUi.showError ? <span className="qf-rf-field-err">{nameUi.error}</span> : null}
-        </label>
-
-        <label className={`qf-sf-field${phoneUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-phone">
-          <span className="qf-sf-label">Phone number</span>
-          <div className="qf-rf-input-wrapper">
-            <input
-              id="qf-sf-phone"
-              value={form.phone}
-              onChange={(e) => onPhoneChange(e.target.value)}
-              onBlur={() => markTouched("phone")}
-              placeholder="10-digit mobile number"
-              inputMode="numeric"
-              autoComplete="tel"
-              maxLength={10}
-            />
-            <ValidationIcon state={phoneUi.iconState} />
-          </div>
-          {phoneUi.showError ? <span className="qf-rf-field-err">{phoneUi.error}</span> : null}
-        </label>
-
-        <label className="qf-sf-check qf-sf-field--full">
-          <input type="checkbox" checked={form.whatsappSame} onChange={(e) => onWhatsappSameChange(e.target.checked)} />
-          <span>WhatsApp number same as phone</span>
-        </label>
-
-        {!form.whatsappSame ? (
-          <label className={`qf-sf-field${whatsappUi.showError ? " has-error" : ""}`} htmlFor="qf-sf-wa">
-            <span className="qf-sf-label">WhatsApp number</span>
-            <div className="qf-rf-input-wrapper">
-              <input
-                id="qf-sf-wa"
-                value={form.whatsapp}
-                onChange={(e) => onWhatsappChange(e.target.value)}
-                onBlur={() => markTouched("whatsapp")}
-                placeholder="10-digit WhatsApp number"
-                inputMode="numeric"
-                maxLength={10}
-              />
-              <ValidationIcon state={whatsappUi.iconState} />
-            </div>
-            {whatsappUi.showError ? <span className="qf-rf-field-err">{whatsappUi.error}</span> : null}
-          </label>
-        ) : null}
-
-        {/* Consent — the SAME legal text and the same share_consent semantics,
-            in a compact row instead of a large card. Never pre-checked. */}
-        <label className={`qf-sf-consent${consentError ? " has-error" : ""}`}>
-          <input
-            type="checkbox"
-            checked={form.shareConsent}
-            onChange={(e) => {
-              set("shareConsent", e.target.checked);
-              markTouched("consent");
-            }}
-          />
-          <span>
-            I agree that QuickFurno may share my enquiry and contact details with up to 3 eligible vendors initially. If vendors are unavailable, non-responsive, or unable to serve my requirement, QuickFurno may manually connect me with additional eligible vendors under the marketplace matching rules.{" "}
-            <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
-            {" · "}
-            <a href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>
-          </span>
-        </label>
-        {consentError ? (
-          <span className="qf-rf-field-err qf-rf-field-err--block">
-            Please accept sharing your details with up to 3 eligible vendors to continue.
-          </span>
-        ) : null}
       </div>
     );
-  }
-
-
-  return (
+  }  return (
     <EnquiryModalContext.Provider value={contextValue}>
       {children}
       {open ? (
@@ -1525,8 +1585,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                 <div className="qf-sf-intro">
                   <h3 id="qf-rf-title">Tell us about your project</h3>
                   <p>
-                    Share your requirement once. QuickFurno will match you with up to 3 relevant
-                    eligible vendors.
+                    Share a few details and we&apos;ll match you with up to 3 relevant, verified pros.
                   </p>
                 </div>
               ) : null}
@@ -1603,9 +1662,9 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                   disabled={submitting}
                   onClick={handleSubmit}
                 >
-                  {submitting ? "Submitting…" : "Get Free Team Matches"}
+                  {submitting ? "Submitting…" : "Get up to 3 matches"}
                 </button>
-                <p className="qf-sf-trust">Free to enquire · Up to 3 eligible vendors · Contact sharing follows your consent</p>
+                <p className="qf-sf-trust">Verified &amp; trusted pros · Up to 3 relevant matches · Your details are secure</p>
               </footer>
             )}
 

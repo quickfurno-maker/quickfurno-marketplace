@@ -431,7 +431,8 @@ function ServiceCard({ name, count }: { name: QuickFurnoCategory; count: number 
             src={image.src}
             alt={meta.alt}
             fill
-            sizes="(max-width: 760px) 50vw, (max-width: 1100px) 50vw, 300px"
+            sizes="(max-width: 760px) calc(50vw - 25px), (max-width: 1100px) 50vw, 300px"
+            quality={90}
             style={meta.pos ? { objectPosition: meta.pos } : undefined}
           />
         </span>
@@ -604,15 +605,18 @@ function NotSureCard() {
     <EnquiryModalTrigger className="qfp-notsure" source="Homepage not-sure card" modalTitle="Tell us about your home">
       <span className="qfp-notsure-glow" aria-hidden="true" />
       <span className="qfp-notsure-copy">
-        <span className="qfp-notsure-kicker">LET&apos;S BUILD TOGETHER</span>
+        <span className="qfp-notsure-kicker">LET&apos;S BUILD TOGETHER <i aria-hidden="true" /></span>
         <span className="qfp-notsure-title">Not sure where to start?</span>
-        <span className="qfp-notsure-desc">Tell us about your home — we&apos;ll route your request to the right service.</span>
-        <span className="qfp-notsure-desc qfp-notsure-desc--short">We&apos;ll route your request.</span>
-        <span className="qfp-notsure-btn">Get Matched <ArrowIcon stroke="#fff" /></span>
+        <span className="qfp-notsure-desc">Tell us about your home — we&apos;ll route you to the right verified experts.</span>
+        <span className="qfp-notsure-btn">Get Matched <ArrowIcon stroke="currentColor" /></span>
       </span>
-      <span className="qfp-notsure-arrow" aria-hidden="true"><ArrowIcon size={17} stroke="#fff" /></span>
       <span className="qfp-notsure-media" aria-hidden="true">
-        <Image src={`${LAUNCH_IMG}/notsure-plant.jpg`} alt="" fill sizes="240px" />
+        <Image src={`${LAUNCH_IMG}/notsure-plant.jpg`} alt="" fill sizes="(max-width: 760px) 170px, 420px" quality={90} />
+      </span>
+      <span className="qfp-notsure-benefits" aria-hidden="true">
+        <span><G name="people" size={20} stroke="#FFB13D" /><b>Verified<br />Experts</b></span>
+        <span><BoltIcon size={20} stroke="#FFB13D" /><b>Quick<br />Response</b></span>
+        <span><G name="shield" size={20} stroke="#FFB13D" /><b>Safe &amp;<br />Reliable</b></span>
       </span>
     </EnquiryModalTrigger>
   );
@@ -638,10 +642,8 @@ async function Services() {
               count={counts ? counts.get(category.name) ?? 0 : null}
             />
           ))}
+          <NotSureCard />
         </div>
-        {/* Eight categories fill 4x2 exactly, so this reads as a full-width
-            band under the grid rather than a spare cell. */}
-        <NotSureCard />
       </div>
     </section>
   );

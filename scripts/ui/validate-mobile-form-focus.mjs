@@ -483,6 +483,25 @@ check("25X [semantic] vendor page CTAs have live destinations", () => {
     "vendor page contains a dead self-link CTA");
 });
 
+check("25Y [semantic] approved Services CTA stays inside the grid", () => {
+  const services = FINAL_HOME_SRC.slice(FINAL_HOME_SRC.indexOf("async function Services"));
+  const gridStart = services.indexOf('className="qfp-service-grid"');
+  const cardAt = services.indexOf("<NotSureCard />", gridStart);
+  const gridEnd = services.indexOf("</div>", cardAt);
+  assert(gridStart >= 0 && cardAt > gridStart && gridEnd > cardAt,
+    "Let's Build Together CTA is no longer inside the Services grid");
+  assert(/LET&apos;S BUILD TOGETHER/.test(FINAL_HOME_SRC) &&
+    /right verified experts/.test(FINAL_HOME_SRC) &&
+    /Verified<br \/>Experts/.test(FINAL_HOME_SRC) &&
+    /Quick<br \/>Response/.test(FINAL_HOME_SRC) &&
+    /Safe &amp;<br \/>Reliable/.test(FINAL_HOME_SRC),
+    "approved Services CTA copy or benefit strip changed");
+  assert(/qfp2-services \.qfp-card-media[\s\S]{0,120}aspect-ratio:\s*1\.5\s*\/\s*1/.test(FINAL_HOME_CSS_SRC),
+    "mobile service photography returned to the shallow over-cropped ratio");
+  assert(/quality=\{90\}/.test(FINAL_HOME_SRC),
+    "service imagery lost the approved high-quality image request");
+});
+
 check("25A [semantic] generic public quote CTAs do not bypass the main modal", () => {
   assert(!/href="\/enquiry"/.test(LEGACY_BRAND_SRC), "legacy public header/footer still navigates to the separate /enquiry funnel");
   const triggers = LEGACY_BRAND_SRC.match(/<EnquiryModalTrigger/g) || [];

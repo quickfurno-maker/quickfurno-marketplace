@@ -4045,3 +4045,254 @@
     font-size: 9.8px;
   }
 }
+
+
+/* ==========================================================================
+   QF-UI-20260926 — approved Services CTA + proportional service media
+   The "Let's build together" card now lives inside the service grid and uses
+   the approved dark olive / warm-gold treatment.
+   ========================================================================== */
+.qfp2-services .qfp-notsure {
+  grid-column: 1 / -1;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: 100%;
+  min-height: 220px;
+  margin-top: 0;
+  border: 1px solid rgba(255, 196, 89, 0.14);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 78% 38%, rgba(255, 177, 61, 0.12), transparent 34%),
+    linear-gradient(118deg, #101917 0%, #17211e 58%, #101612 100%);
+  box-shadow: 0 24px 52px -34px rgba(12, 19, 17, 0.82);
+}
+
+.qfp2-services .qfp-notsure-copy {
+  position: relative;
+  z-index: 3;
+  max-width: 62%;
+  padding: 30px 34px 76px;
+  gap: 9px;
+}
+
+.qfp2-services .qfp-notsure-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #f1b94e;
+  font-size: 10px;
+  letter-spacing: .17em;
+}
+
+.qfp2-services .qfp-notsure-kicker i {
+  width: 30px;
+  height: 1px;
+  background: #f1b94e;
+  opacity: .9;
+}
+
+.qfp2-services .qfp-notsure-title {
+  color: #f8f4ec;
+  font-size: 30px;
+  line-height: 1.08;
+}
+
+.qfp2-services .qfp-notsure-desc,
+.qfp2-services .qfp-notsure-desc--short {
+  display: block;
+  max-width: 470px;
+  color: #b9c0bb;
+  font-size: 14px;
+  line-height: 1.48;
+}
+
+.qfp2-services .qfp-notsure-btn {
+  min-height: 46px;
+  margin-top: 5px;
+  padding: 0 22px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f8cf72 0%, #e8a930 100%);
+  color: #151711;
+  box-shadow: 0 14px 28px -14px rgba(232, 169, 48, .7);
+}
+
+.qfp2-services .qfp-notsure-media {
+  z-index: 1;
+  top: 0;
+  right: 0;
+  bottom: auto;
+  width: 44%;
+  height: 100%;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,.35) 26%, #000 62%);
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,.35) 26%, #000 62%);
+  -webkit-mask-composite: source-over;
+  mask-composite: add;
+}
+
+.qfp2-services .qfp-notsure-media img {
+  object-fit: cover;
+  object-position: center;
+  filter: saturate(.9) brightness(.82);
+}
+
+.qfp2-services .qfp-notsure-glow {
+  z-index: 2;
+  left: -75px;
+  top: -120px;
+  width: 520px;
+  height: 350px;
+}
+
+.qfp2-services .qfp-notsure-benefits {
+  position: absolute;
+  z-index: 4;
+  left: 34px;
+  right: 34px;
+  bottom: 17px;
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  align-items: center;
+  gap: 0;
+  width: max-content;
+  max-width: calc(100% - 68px);
+}
+
+.qfp2-services .qfp-notsure-benefits > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 18px;
+  border-left: 1px solid rgba(255,255,255,.16);
+  color: #d6d9d4;
+}
+
+.qfp2-services .qfp-notsure-benefits > span:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.qfp2-services .qfp-notsure-benefits b {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.qfp2-services .qfp-notsure-arrow {
+  display: none;
+}
+
+/* Preserve more of the near-square source photography on phones instead of
+   forcing it into an overly shallow crop. */
+@media (max-width: 760px) {
+  .qfp2-services .qfp-card-face {
+    height: auto;
+    grid-template-rows: auto 40px;
+  }
+
+  .qfp2-services .qfp-card-media {
+    aspect-ratio: 1.5 / 1;
+  }
+
+  .qfp2-services .qfp-card-media img {
+    object-fit: cover;
+    transform: none;
+  }
+
+  .qfp2-services .qfp-card:hover .qfp-card-media img {
+    transform: none;
+  }
+
+  .qfp2-services .qfp-notsure {
+    min-height: 194px;
+    margin-top: 2px;
+    border-radius: 16px;
+  }
+
+  .qfp2-services .qfp-notsure-copy {
+    max-width: 73%;
+    padding: 15px 13px 58px;
+    gap: 5px;
+  }
+
+  .qfp2-services .qfp-notsure-kicker {
+    gap: 6px;
+    font-size: 8px;
+    letter-spacing: .13em;
+  }
+
+  .qfp2-services .qfp-notsure-kicker i {
+    width: 18px;
+  }
+
+  .qfp2-services .qfp-notsure-title {
+    font-size: 17px;
+    line-height: 1.1;
+  }
+
+  .qfp2-services .qfp-notsure-desc,
+  .qfp2-services .qfp-notsure-desc--short {
+    display: block;
+    max-width: 210px;
+    font-size: 10px;
+    line-height: 1.36;
+  }
+
+  .qfp2-services .qfp-notsure-btn {
+    min-height: 36px;
+    margin-top: 3px;
+    padding: 0 14px;
+    gap: 7px;
+    font-size: 11px;
+  }
+
+  .qfp2-services .qfp-notsure-btn svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .qfp2-services .qfp-notsure-media {
+    display: block;
+    width: 49%;
+    height: 100%;
+    opacity: .72;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 58%);
+    mask-image: linear-gradient(90deg, transparent 0%, #000 58%);
+  }
+
+  .qfp2-services .qfp-notsure-benefits {
+    left: 12px;
+    right: 12px;
+    bottom: 9px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: auto;
+    max-width: none;
+  }
+
+  .qfp2-services .qfp-notsure-benefits > span {
+    justify-content: center;
+    gap: 4px;
+    min-height: 32px;
+    padding: 0 5px;
+  }
+
+  .qfp2-services .qfp-notsure-benefits svg {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+  }
+
+  .qfp2-services .qfp-notsure-benefits b {
+    font-size: 7.5px;
+    line-height: 1.12;
+  }
+}
+
+@media (max-width: 760px) {
+  .qfp2-services .qfp-notsure-btn {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+  }
+}

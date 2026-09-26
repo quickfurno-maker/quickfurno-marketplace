@@ -9,7 +9,9 @@
 
 import Link from "next/link";
 import { Fragment, type CSSProperties, type ReactNode } from "react";
+import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { Icon } from "@/components/qf-icon";
+import { whatsappLink } from "@/lib/config";
 import { categories, categorySlug } from "@/lib/quickfurno-data";
 import {
   BADGE,
@@ -271,7 +273,7 @@ export function CategoriesV2() {
 
         <div className="qv-cats-grid">
           {CAT_CARDS.map((c) => (
-            <a className="qv-cat" href={`/category/${c.slug}`} key={c.slug}>
+            <Link className="qv-cat" href={`/category/${c.slug}`} key={c.slug}>
               <picture>
                 <source media="(min-width: 900px)" srcSet={`${IMG}/cat-icon-${c.slug}.webp`} />
                 <img src={`${IMG}/ring-${c.slug}.webp`} alt="" loading="lazy" decoding="async" />
@@ -285,14 +287,14 @@ export function CategoriesV2() {
               <span className="qv-cat-go" aria-hidden="true">
                 <Icon name="arrow" sw={2.3} />
               </span>
-            </a>
+            </Link>
           ))}
         </div>
 
-        <a className="qv-cats-all" href="/services">
+        <Link className="qv-cats-all" href="/#services">
           {CAT_ALL}
           <Icon name="arrow" sw={2.1} />
-        </a>
+        </Link>
       </div>
     </section>
   );
@@ -513,7 +515,7 @@ export function DashboardV2() {
               <Icon name="bolt_" sw={2} fill="currentColor" />
             </span>
             <p>{DASH_NOTE}</p>
-            <Link className="qv-note-link" href="/vendors">
+            <Link className="qv-note-link" href="#how-matching-works">
               {DASH_LINK}
               <Icon name="arrow" sw={2.1} />
             </Link>
@@ -1016,7 +1018,7 @@ export function AreasV2() {
                     </div>
                   ))}
                 </div>
-                <Link className="qv-zone-all" href="/vendors">
+                <Link className="qv-zone-all" href="/#areas">
                   View all {count}
                   <Icon name="arrow" sw={2.2} />
                 </Link>
@@ -1034,7 +1036,7 @@ export function AreasV2() {
               <b>{AREAS_CHECK[0]}</b>
               <p>{AREAS_CHECK[1]}</p>
             </div>
-            <Link className="qv-btn qv-btn-primary" href="/vendors">
+            <Link className="qv-btn qv-btn-primary" href="/#areas">
               {AREAS_CHECK[2]}
               <Icon name="arrow" sw={2.1} />
             </Link>
@@ -1068,12 +1070,17 @@ export function FaqV2() {
             <span className="qv-hl">{FAQ_H2[1]}</span>
           </h2>
           <p className="qv-sec-sub">{FAQ_SUB}</p>
-          <Link className="qv-faq-wa" href="/vendors">
+          <a
+            className="qv-faq-wa"
+            href={whatsappLink("Hi QuickFurno, I have a question about joining as a service professional.")}
+            target="_blank"
+            rel="noreferrer"
+          >
             <span className="qv-faq-wa-ico">
               <Icon name="chat" sw={2.1} />
             </span>
             {FAQ_BTN}
-          </Link>
+          </a>
           <Pills items={FAQ_PILLS} className="qv-faq-pills" />
         </div>
 
@@ -1154,11 +1161,15 @@ export function ApplyV2() {
             <b>{SWITCH_T}</b>
             <p>{SWITCH_B}</p>
           </div>
-          <Link className="qv-btn qv-btn-primary" href="/">
+          <EnquiryModalTrigger
+            className="qv-btn qv-btn-primary"
+            source="Vendor page homeowner switch"
+            modalTitle="Tell us what your home needs"
+          >
             <Icon name="people" sw={2} />
             {SWITCH_BTN}
             <Icon name="arrow" sw={2.1} />
-          </Link>
+          </EnquiryModalTrigger>
         </div>
       </div>
     </section>

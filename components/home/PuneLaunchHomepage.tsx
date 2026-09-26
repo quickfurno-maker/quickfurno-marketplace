@@ -907,7 +907,7 @@ function Areas() {
   const withPhotos = PUNE_AREAS.filter((a) => AREA_PHOTOS[a]);
   const remaining = PUNE_AREAS.length - withPhotos.length;
   return (
-    <section className="qfp-section qfp2-areas" aria-labelledby="qfp-areas-title">
+    <section className="qfp-section qfp2-areas" id="areas" aria-labelledby="qfp-areas-title">
       <Image className="qfp2-areas-map" src={`${REAL}/areas/pune-map.webp`} alt="" aria-hidden="true" width={601} height={508} />
       <div className="qfp-shell">
         <div className="qfp2-head" data-reveal>

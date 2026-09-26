@@ -39,6 +39,7 @@ const FOOTER = "components/Footer.tsx";
 const HOME_ENQUIRY = "components/HomeEnquiryForm.tsx";
 const PUBLIC_HEADER = "components/Header.tsx";
 const VENDORS_PAGE = "app/vendors/page.tsx";
+const VENDORS_V2 = "app/vendors/vendors-v2.tsx";
 const VENDORS_CSS = "app/vendors/vendors-v2.css";
 const FOOTER_CSS = "app/footer-v2.css";
 const SHARED_JOURNEY = "components/home/MadeInPune.tsx";
@@ -69,6 +70,7 @@ const FOOTER_SRC = code(FOOTER);
 const HOME_ENQUIRY_SRC = code(HOME_ENQUIRY);
 const PUBLIC_HEADER_SRC = code(PUBLIC_HEADER);
 const VENDORS_PAGE_SRC = code(VENDORS_PAGE);
+const VENDORS_V2_SRC = code(VENDORS_V2);
 const VENDORS_CSS_SRC = code(VENDORS_CSS);
 const FOOTER_CSS_SRC = code(FOOTER_CSS);
 const SHARED_JOURNEY_SRC = code(SHARED_JOURNEY);
@@ -457,6 +459,28 @@ check("25W [semantic] homepage and vendors share one journey implementation", ()
     "shared journey lost the homepage design-system scope");
   assert(!/qfv-cities/.test(VENDORS_PAGE_SRC),
     "vendors page reintroduced its old private journey markup");
+});
+
+check("25X [semantic] vendor page CTAs have live destinations", () => {
+  assert(/<Link className="qv-cat" href=\{`\/category\/\$\{c\.slug\}`\}/.test(VENDORS_V2_SRC),
+    "vendor category cards no longer use the canonical category routes");
+  assert(/className="qv-cats-all" href="\/#services"/.test(VENDORS_V2_SRC),
+    "View all categories no longer points to the homepage services section");
+  assert(!/href="\/services"/.test(VENDORS_V2_SRC),
+    "vendor page reintroduced the nonexistent /services route");
+  assert(/className="qv-note-link" href="#how-matching-works"/.test(VENDORS_V2_SRC),
+    "dashboard Learn more no longer points to the matching explanation");
+  assert(/className="qv-zone-all" href="\/#areas"/.test(VENDORS_V2_SRC) &&
+    /className="qv-btn qv-btn-primary" href="\/#areas"/.test(VENDORS_V2_SRC),
+    "vendor locality CTAs no longer point to the homepage areas section");
+  assert(/id="areas"/.test(FINAL_HOME_SRC),
+    "homepage areas section lost the anchor used by vendor CTAs");
+  assert(/href=\{whatsappLink\("Hi QuickFurno, I have a question about joining as a service professional\."\)\}/.test(VENDORS_V2_SRC),
+    "vendor Talk to our team CTA no longer uses the configured WhatsApp channel");
+  assert(/source="Vendor page homeowner switch"/.test(VENDORS_V2_SRC),
+    "vendor homeowner switch no longer opens the shared enquiry modal");
+  assert(!/href="\/vendors"/.test(VENDORS_V2_SRC),
+    "vendor page contains a dead self-link CTA");
 });
 
 check("25A [semantic] generic public quote CTAs do not bypass the main modal", () => {

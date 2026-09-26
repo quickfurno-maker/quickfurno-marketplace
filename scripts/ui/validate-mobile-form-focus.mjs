@@ -35,6 +35,7 @@ const CSS = "app/qf-public-v2.css";
 const FINAL_HOME = "components/home/PuneLaunchHomepage.tsx";
 const FINAL_HOME_CSS = "app/home-pune-launch.css";
 const LEGACY_BRAND = "components/Brand.tsx";
+const FOOTER = "components/Footer.tsx";
 
 /** Strip block and line comments, then collapse whitespace runs. */
 function code(path) {
@@ -58,6 +59,7 @@ const FINAL_HOME_FLAT = flat(FINAL_HOME_SRC);
 const FINAL_HOME_CSS_SRC = code(FINAL_HOME_CSS);
 const FINAL_HOME_CSS_FLAT = flat(FINAL_HOME_CSS_SRC);
 const LEGACY_BRAND_SRC = code(LEGACY_BRAND);
+const FOOTER_SRC = code(FOOTER);
 
 const checks = [];
 const check = (name, fn) => checks.push({ name, fn });
@@ -387,6 +389,13 @@ check("25A [semantic] generic public quote CTAs do not bypass the main modal", (
   assert(!/href="\/enquiry"/.test(LEGACY_BRAND_SRC), "legacy public header/footer still navigates to the separate /enquiry funnel");
   const triggers = LEGACY_BRAND_SRC.match(/<EnquiryModalTrigger/g) || [];
   assert(triggers.length >= 3, `expected legacy header/footer quote CTAs to use the shared modal, found ${triggers.length}`);
+});
+
+check("25B [semantic] footer homeowner CTA uses the same main enquiry modal", () => {
+  assert(/btn:\s*"Get up to 3 matches"/.test(FOOTER_SRC), "footer homeowner CTA copy drifted");
+  assert(/source="Footer homeowner CTA"/.test(FOOTER_SRC), "footer homeowner CTA no longer uses the shared modal authority");
+  assert(/<EnquiryModalTrigger[\s\S]{0,320}source="Footer homeowner CTA"[\s\S]{0,420}\{cta\.btn\}[\s\S]{0,120}<\/EnquiryModalTrigger>/.test(FOOTER_SRC),
+    "footer homeowner CTA is not rendered by EnquiryModalTrigger");
 });
 
 check("26 [semantic] the approved mobile bottom navigation remains mounted", () => {

@@ -41,9 +41,12 @@
   gap: 9px;
   margin-top: 12px;
   padding: 11px 18px;
+  border: 0;
   border-radius: 11px;
+  font: inherit;
   font-size: 13px;
   font-weight: 800;
+  cursor: pointer;
 }
 .qv-foot-cta-btn .qv-ico { width: 15px; height: 15px; }
 

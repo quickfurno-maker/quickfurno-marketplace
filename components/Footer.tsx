@@ -11,6 +11,7 @@
 // =============================================================================
 
 import Link from "next/link";
+import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { Icon } from "@/components/qf-icon";
 import { Wordmark } from "@/components/Wordmark";
 import { CONTACT, whatsappLink } from "@/lib/config";
@@ -26,8 +27,9 @@ const CTAS = [
     body:
       "Get approved pros for interiors, carpentry, modular, painting, sofa, civil work and false " +
       "ceiling in Pune.",
-    btn: "Start a Project",
+    btn: "Get up to 3 matches",
     href: "/",
+    enquiry: true,
     primary: false,
   },
   {
@@ -37,6 +39,7 @@ const CTAS = [
     body: "Get quality-checked enquiries, showcase your work and connect with homeowners in Pune.",
     btn: "Become a Vendor",
     href: "/vendor?mode=signup",
+    enquiry: false,
     primary: true,
   },
 ];
@@ -159,17 +162,32 @@ export function Footer() {
                   {cta.head[2]}
                 </h2>
                 <p>{cta.body}</p>
-                <Link
-                  className="qv-foot-cta-btn"
-                  href={cta.href}
-                  style={{
-                    backgroundColor: cta.primary ? "#E0611E" : "#FFFFFF",
-                    color: cta.primary ? "#FFFFFF" : "#14110D",
-                  }}
-                >
-                  {cta.btn}
-                  <Icon name="arrow" sw={2.1} />
-                </Link>
+                {cta.enquiry ? (
+                  <EnquiryModalTrigger
+                    className="qv-foot-cta-btn"
+                    source="Footer homeowner CTA"
+                    modalTitle="Tell us what your home needs"
+                    style={{
+                      backgroundColor: "#FFFFFF",
+                      color: "#14110D",
+                    }}
+                  >
+                    {cta.btn}
+                    <Icon name="arrow" sw={2.1} />
+                  </EnquiryModalTrigger>
+                ) : (
+                  <Link
+                    className="qv-foot-cta-btn"
+                    href={cta.href}
+                    style={{
+                      backgroundColor: "#E0611E",
+                      color: "#FFFFFF",
+                    }}
+                  >
+                    {cta.btn}
+                    <Icon name="arrow" sw={2.1} />
+                  </Link>
+                )}
               </div>
             </div>
           ))}

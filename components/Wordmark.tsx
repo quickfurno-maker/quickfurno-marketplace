@@ -35,6 +35,7 @@ export function Wordmark({
   return (
     <span
       style={{
+        position: "relative",
         display: "inline-flex",
         alignItems: "flex-start",
         flexShrink: 0,
@@ -53,10 +54,12 @@ export function Wordmark({
       <span
         aria-hidden="true"
         style={{
-          marginLeft: Math.round(height * 0.06),
-          fontSize: Math.max(9.5, Math.round(height * 0.4 * 10) / 10),
+          position: "absolute",
+          left: "calc(100% - 1px)",
+          top: -Math.max(1, Math.round(height * 0.04)),
+          fontSize: Math.max(6.5, Math.round(height * 0.28 * 10) / 10),
           lineHeight: 1,
-          fontWeight: 600,
+          fontWeight: 700,
           color: "#E0611E",
         }}
       >

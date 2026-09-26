@@ -40,12 +40,12 @@ export default function OpengraphImage() {
       >
         {/* The wordmark, drawn rather than fetched: this runs on the edge and
             must not depend on a file request to render. */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 0 }}>
           <div style={{ display: "flex", fontSize: 76, fontWeight: 800, letterSpacing: -2.5 }}>
             <span style={{ color: "#FFFFFF" }}>Quick</span>
             <span style={{ color: ORANGE }}>Furno</span>
           </div>
-          <div style={{ display: "flex", marginTop: 8, fontSize: 26, fontWeight: 600, color: ORANGE }}>®</div>
+          <div style={{ display: "flex", marginTop: 5, marginLeft: -2, fontSize: 20, fontWeight: 700, color: ORANGE }}>®</div>
         </div>
 
         <div

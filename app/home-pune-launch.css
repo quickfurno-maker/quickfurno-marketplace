@@ -2697,20 +2697,29 @@
   .qfp-how-assurance { margin-top: 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 4px 5px; border-radius: 14px; }
   .qfp-how-assurance li { min-height: 46px; padding: 3px 5px; justify-content: center; flex-direction: column; gap: 3px; border-bottom: 0; border-right: 1px solid rgba(255,255,255,.08); font-size: 8.7px; line-height: 1.15; text-align: center; }
   .qfp-how-assurance li:last-child { border-right: 0; }
-  .qfp2-why { padding: 30px 0 32px; }
-  .qfp2-why-grid { gap: 14px; }
-  .qfp2-why-copy { gap: 7px; }
-  .qfp2-why-copy h2 { font-size: 22px; line-height: 1.06; }
-  .qfp2-why-lede { font-size: 12.5px; line-height: 1.5; }
-  .qfp2-why-points { gap: 9px; margin-top: 6px; }
-  .qfp2-why-points i { width: 32px; height: 32px; border-radius: 9px; }
-  .qfp2-why-points strong { font-size: 13px; }
-  .qfp2-why-points em { font-size: 11.5px; line-height: 1.4; }
-  .qfp2-why-stats { margin-top: 10px; padding-top: 10px; }
-  .qfp2-why-stats strong { font-size: 18px; }
-  .qfp2-why-stats em { font-size: 9.5px; }
-  .qfp2-why-photo { height: 190px; border-radius: 12px; }
-  .qfp2-why-photo > img { width: 100%; height: 100%; object-fit: cover; object-position: center; }
+  /* Why QuickFurno keeps the premium mobile treatment defined above. */
+  .qfp2-why { padding: 52px 0 56px; }
+  .qfp2-why-grid { gap: 24px; }
+  .qfp2-why-copy { gap: 0; }
+  .qfp2-why-copy h2 {
+    font-size: clamp(29px, 8.2vw, 33px);
+    line-height: 1.01;
+  }
+  .qfp2-why-lede { font-size: 13.5px; line-height: 1.58; }
+  .qfp2-why-points { gap: 10px; margin-top: 22px; }
+  .qfp2-why-points i { width: 40px; height: 40px; border-radius: 13px; }
+  .qfp2-why-points strong { font-size: 13.5px; }
+  .qfp2-why-points em { font-size: 11.25px; line-height: 1.43; }
+  .qfp2-why-stats { margin-top: 12px; padding: 15px 4px; }
+  .qfp2-why-stats strong { font-size: 20px; }
+  .qfp2-why-stats em { font-size: 9.75px; }
+  .qfp2-why-photo { height: 258px; border-radius: 22px; }
+  .qfp2-why-photo > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 48%;
+  }
 
   .qfp2-cities { padding: 30px 0 32px; }
   .qfp-cities h2 { font-size: 22px; line-height: 1.06; }

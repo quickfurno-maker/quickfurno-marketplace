@@ -675,12 +675,6 @@ const HOW_IT_WORKS: { icon: ReactNode; title: string; body: string; visual: "req
 
 const HOW_SERVICE_OPTIONS = ["Interior design", "Carpentry", "Painting", "Civil work"] as const;
 
-const HOW_TEAM_MATCHES = [
-  { name: "UrbanNest", position: "qfp-how-team--one", meta: "Eligible match", image: "/assets/quickfurno/images/real/categories/interior-designers-v2.webp" },
-  { name: "Studio A", position: "qfp-how-team--two", meta: "Eligible match", image: "/assets/quickfurno/images/real/categories/premium-interiors-v2.webp" },
-  { name: "Craftline", position: "qfp-how-team--three", meta: "Eligible match", image: "/assets/quickfurno/images/real/categories/carpenters-v2.webp" },
-] as const;
-
 const HOW_PROFILE_ROWS = [
   { name: "UrbanNest", image: "/assets/quickfurno/images/real/categories/interior-designers-v2.webp" },
   { name: "Studio A", image: "/assets/quickfurno/images/real/categories/premium-interiors-v2.webp" },
@@ -719,48 +713,16 @@ function HowRequestPreview() {
 
 function HowMatchMap() {
   return (
-    <div className="qfp-flow-match-ui" aria-label="Illustration of a Baner homeowner matched with three eligible Teams">
-      <div className="qfp-flow-match-head">
-        <span><G name="people" size={16} stroke="currentColor" width={2} />Matches ready</span>
-        <strong>3 eligible Teams</strong>
-      </div>
-      <div className="qfp-flow-match-canvas">
-        <i className="qfp-flow-route qfp-flow-route--one" aria-hidden="true" />
-        <i className="qfp-flow-route qfp-flow-route--two" aria-hidden="true" />
-        <i className="qfp-flow-route qfp-flow-route--three" aria-hidden="true" />
-        <Image
-          className="qfp-flow-map-bg"
-          src="/assets/quickfurno/maps/pune-baner-osm.webp"
-          alt=""
-          fill
-          sizes="(max-width: 760px) 330px, 420px"
-          unoptimized
-        />
-        <span className="qfp-flow-map-tint" aria-hidden="true" />
-        <small className="qfp-flow-map-credit">© OpenStreetMap contributors</small>
-        <span className="qfp-flow-client-card">
-          <Image
-            className="qfp-flow-client-avatar"
-            src="/assets/quickfurno/images/real/priya-sharma-avatar.webp"
-            alt=""
-            width={56}
-            height={56}
-            sizes="32px"
-            unoptimized
-          />
-          <span><strong>Priya Sharma</strong><small>Baner, Pune</small></span>
-        </span>
-        {HOW_TEAM_MATCHES.map((team) => (
-          <span className={`qfp-flow-team-card ${team.position}`} key={team.name}>
-            <Image src={team.image} alt="" width={144} height={104} sizes="56px" unoptimized />
-            <span><strong>{team.name}</strong><small>{team.meta}</small></span>
-          </span>
-        ))}
-      </div>
-      <div className="qfp-flow-match-meta">
-        <G name="shield" size={15} stroke="currentColor" width={2} />
-        Matched by service, location &amp; eligibility
-      </div>
+    <div className="qfp-match-art" aria-label="Priya Sharma in Baner matched with three eligible Pune service teams">
+      <Image
+        className="qfp-match-art-img"
+        src="/assets/quickfurno/images/launch/pune-team-match-map.webp"
+        alt="Priya Sharma in Baner matched with three eligible Pune home service teams"
+        width={240}
+        height={300}
+        sizes="(max-width: 760px) 296px, 450px"
+        unoptimized
+      />
     </div>
   );
 }

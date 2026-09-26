@@ -502,6 +502,23 @@ check("25Y [semantic] approved Services CTA stays inside the grid", () => {
     "service imagery lost the approved high-quality image request");
 });
 
+check("25Z [semantic] Step 2 uses the approved eligible-team Pune map artwork", () => {
+  const matchStart = FINAL_HOME_SRC.indexOf("function HowMatchMap");
+  const matchEnd = FINAL_HOME_SRC.indexOf("function HowProfileCompare", matchStart);
+  const matchBlock = FINAL_HOME_SRC.slice(matchStart, matchEnd);
+  assert(/\/assets\/quickfurno\/images\/launch\/pune-team-match-map\.webp/.test(matchBlock),
+    "Step 2 no longer uses the approved Pune matching artwork");
+  assert(!/pune-baner-osm\.webp/.test(matchBlock),
+    "Step 2 reverted to the old reconstructed map background");
+  assert(/className="qfp-match-art"/.test(matchBlock) &&
+    /className="qfp-match-art-img"/.test(matchBlock),
+    "approved matching artwork wrapper/classes are missing");
+  assert(/\.qfp-match-art\s*\{[\s\S]{0,180}width:\s*min\(100%,\s*450px\)/.test(FINAL_HOME_CSS_SRC),
+    "desktop matching artwork sizing drifted");
+  assert(/@media \(max-width:\s*760px\)[\s\S]{0,180}\.qfp-match-art\s*\{[\s\S]{0,100}296px/.test(FINAL_HOME_CSS_SRC),
+    "mobile matching artwork sizing drifted");
+});
+
 check("25A [semantic] generic public quote CTAs do not bypass the main modal", () => {
   assert(!/href="\/enquiry"/.test(LEGACY_BRAND_SRC), "legacy public header/footer still navigates to the separate /enquiry funnel");
   const triggers = LEGACY_BRAND_SRC.match(/<EnquiryModalTrigger/g) || [];

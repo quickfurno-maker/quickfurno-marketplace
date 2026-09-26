@@ -4296,3 +4296,27 @@
     align-self: flex-start;
   }
 }
+
+/* Approved Step 2 matching artwork — replaces the reconstructed map UI. */
+.qfp-match-art {
+  width: min(100%, 450px);
+  margin-inline: auto;
+}
+
+.qfp-match-art-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 18px;
+  box-shadow: 0 22px 48px -32px rgba(0,0,0,.9);
+}
+
+@media (max-width: 760px) {
+  .qfp-match-art {
+    width: min(100%, 296px);
+  }
+
+  .qfp-match-art-img {
+    border-radius: 12px;
+  }
+}

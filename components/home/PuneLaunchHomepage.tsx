@@ -360,8 +360,8 @@ function Header() {
 }
 
 // ---- Hero ------------------------------------------------------------------
-// Board: kicker rule, two-tone headline, a four-point trust row, the search
-// bar, popular chips, and a feature band that laps over the foot of the photo.
+// Board: kicker rule, two-tone headline, a four-point trust row, and the
+// enquiry bar that laps over the foot of the photo.
 
 const HERO_POINTS: { icon: GlyphName; label: string }[] = [
   { icon: "shield", label: "Verified Professionals" },
@@ -369,21 +369,6 @@ const HERO_POINTS: { icon: GlyphName; label: string }[] = [
   { icon: "users", label: "Up to 3 Matches" },
   { icon: "check", label: "No Obligation" },
 ];
-
-// Consumer wording for six registry categories: LABEL is what a homeowner
-// searches for, the href still resolves through categorySlug, and anything not
-// in the registry is filtered out below - so a chip can never point at a
-// category the marketplace does not actually have.
-const POPULAR = (
-  [
-    { category: "Modular Factory", label: "Modular Kitchen" },
-    { category: "Interior Designers", label: "Interior Designer" },
-    { category: "Carpenters", label: "Carpenter" },
-    { category: "Painter", label: "Painter" },
-    { category: "Civil Work", label: "Civil Work" },
-    { category: "Sofa", label: "Sofa" },
-  ] as { category: QuickFurnoCategory; label: string }[]
-).filter((item) => categories.some((c) => c.name === item.category));
 
 function Hero() {
   const hero = heroImage("/assets/quickfurno/images/vendors/premium-living-room.svg");
@@ -469,17 +454,7 @@ function Hero() {
               Get up to 3 matches <ArrowIcon size={16} stroke="#fff" />
             </EnquiryModalTrigger>
           </div>
-          <div className="qfp-hero-popular">
-            <span className="qfp-hero-popular-label">Popular:</span>
-            {POPULAR.map((item) => (
-              <Link key={item.label} className="qfp-hero-chip" href={`/category/${categorySlug(item.category)}`}>
-                {item.label}
-              </Link>
-            ))}
-          </div>
-          <small className="qfp-hero-note">
-            Matches depend on category fit, eligibility and marketplace availability.
-          </small>
+
         </div>
       </div>
     </section>

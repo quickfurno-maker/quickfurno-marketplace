@@ -1,22 +1,23 @@
 "use client";
 
-import {
-  adminSetPackageActive,
-} from "@/app/actions";
+import { useState } from "react";
+import { adminSetPackageActive } from "@/app/actions";
 import {
   ActionMenu,
   DataTable,
+  PrimaryButton,
   StatCard,
   StatusBadge,
   ToggleSwitch,
 } from "../AdminPrimitives";
-import { type PackageRow } from "../adminTypes";
+import { type Category, type City, type PackageRow } from "../adminTypes";
 import {
   formatINR,
   formatNumber,
   shortId,
 } from "../adminUtils";
 import { Strong } from "./shared";
+import { PackageEditorModal } from "./PackageEditorModal";
 
 export const packageTemplates = [
   { name: "Starter Package", price: "INR 1,250", leads: "5 leads", validity: "30 days", features: ["Basic delivery", "City/category match", "Standard support"] },
@@ -27,7 +28,8 @@ export const packageTemplates = [
 
 /** C-PERF2: narrow section contract — packages config + one real revenue
  *  aggregate. No other marketplace data is fetched for this route. */
-export function PackagesPage({ packages, totalRevenue, notify, ask }: { packages: PackageRow[]; totalRevenue: number; notify: (message: string) => void; ask: any }) {
+export function PackagesPage({ packages, categories, cities, totalRevenue, notify, ask, runAction }: { packages: PackageRow[]; categories: Category[]; cities: City[]; totalRevenue: number; notify: (message: string) => void; ask: any; runAction: (title: string, action: () => Promise<{ ok: boolean; error?: string }>) => void }) {
+  const [editor, setEditor] = useState<PackageRow | null | undefined>(undefined);
   const activePackages = packages.filter((item) => item.is_active !== false).length;
   const avgLeadPrice = packages.length
     ? Math.round(packages.reduce((sum, item) => sum + Number(item.price_per_lead ?? 0), 0) / packages.length)
@@ -35,6 +37,14 @@ export function PackagesPage({ packages, totalRevenue, notify, ask }: { packages
 
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-950">Package control</h2>
+          <p className="mt-1 text-sm text-slate-500">Pricing, credits, validity, category/subcategory scope and city scope are controlled here.</p>
+        </div>
+        <PrimaryButton onClick={() => setEditor(null)}>Add package</PrimaryButton>
+      </div>
+
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Packages" value={formatNumber(packages.length || packageTemplates.length)} helper="Live rows or templates" icon="packages" />
         <StatCard label="Active" value={formatNumber(activePackages)} helper="Visible for sales" icon="subscriptions" tone="emerald" />
@@ -45,7 +55,7 @@ export function PackagesPage({ packages, totalRevenue, notify, ask }: { packages
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {packages.length ? (
           packages.map((item) => (
-            <PackageRowCard key={item.id} item={item} notify={notify} ask={ask} />
+            <PackageRowCard key={item.id} item={item} categories={categories} cities={cities} ask={ask} onEdit={() => setEditor(item)} />
           ))
         ) : (
           packageTemplates.map((item) => (
@@ -64,23 +74,36 @@ export function PackagesPage({ packages, totalRevenue, notify, ask }: { packages
           { header: "Leads", cell: (item) => formatNumber(item.lead_count) },
           { header: "Per Lead", cell: (item) => item.price_per_lead ? formatINR(item.price_per_lead) : "Not set" },
           { header: "Validity", cell: (item) => `${formatNumber(item.validity_days)} days` },
+          { header: "Category scope", cell: (item) => packageCategoryScope(item, categories) },
+          { header: "City scope", cell: (item) => packageCityScope(item, cities) },
           { header: "Status", cell: (item) => <StatusBadge value={item.is_active ? "Active" : "Inactive"} /> },
           {
             header: "Actions",
             cell: (item) => (
               <ActionMenu actions={[
-                { label: item.is_active ? "Disable" : "Enable", onClick: () => ask("Update package", "This will change package visibility.", () => adminSetPackageActive(item.id, !item.is_active)) },
+                { label: "Edit", onClick: () => setEditor(item) },
+                { label: item.is_active ? "Disable" : "Enable", onClick: () => ask("Update package", "This will change package visibility immediately for future package selection.", () => adminSetPackageActive(item.id, !item.is_active)) },
               ]} />
             ),
           },
         ]}
       />
+
+      {editor !== undefined ? (
+        <PackageEditorModal
+          item={editor}
+          categories={categories}
+          cities={cities}
+          runAction={runAction}
+          onClose={() => setEditor(undefined)}
+        />
+      ) : null}
     </div>
   );
 }
 
 
-export function PackageRowCard({ item, notify, ask }: { item: PackageRow; notify: (message: string) => void; ask: any }) {
+export function PackageRowCard({ item, categories, cities, ask, onEdit }: { item: PackageRow; categories: Category[]; cities: City[]; ask: any; onEdit: () => void }) {
   const features = packageFeatures(item);
 
   return (
@@ -93,6 +116,10 @@ export function PackageRowCard({ item, notify, ask }: { item: PackageRow; notify
         <StatusBadge value={item.is_active ? "Active" : "Inactive"} />
       </div>
       <p className="mt-5 text-3xl font-semibold tracking-tight text-slate-950">{formatINR(item.total_price || item.display_price)}</p>
+      <div className="mt-4 grid gap-1 text-xs text-slate-500">
+        <p><span className="font-semibold text-slate-700">Category:</span> {packageCategoryScope(item, categories)}</p>
+        <p><span className="font-semibold text-slate-700">City:</span> {packageCityScope(item, cities)}</p>
+      </div>
       <ul className="mt-5 space-y-2 text-sm text-slate-600">
         {features.map((feature) => (
           <li key={feature} className="flex items-start gap-2">
@@ -104,7 +131,8 @@ export function PackageRowCard({ item, notify, ask }: { item: PackageRow; notify
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
         <ToggleSwitch checked={Boolean(item.is_active)} label="Visible" />
         <ActionMenu actions={[
-          { label: item.is_active ? "Disable" : "Enable", onClick: () => ask("Update package", "This will change package visibility.", () => adminSetPackageActive(item.id, !item.is_active)) },
+          { label: "Edit", onClick: onEdit },
+          { label: item.is_active ? "Disable" : "Enable", onClick: () => ask("Update package", "This will change package visibility immediately for future package selection.", () => adminSetPackageActive(item.id, !item.is_active)) },
         ]} />
       </div>
     </article>
@@ -144,4 +172,25 @@ export function packageFeatures(item: PackageRow) {
     `${formatNumber(item.validity_days)} day validity`,
     item.price_per_lead ? `${formatINR(item.price_per_lead)} per lead` : "Pricing review prepared",
   ];
+}
+
+
+function packageCategoryScope(item: PackageRow, categories: Category[]): string {
+  const ids = item.category_ids ?? [];
+  if (ids.length === 0) return "All active categories";
+  const map = new Map(categories.map((row) => [row.id, row]));
+  return ids.map((id) => {
+    const row = map.get(id);
+    if (!row) return "Unknown category";
+    if (!row.parent_id) return row.name || "Unnamed category";
+    const parent = map.get(row.parent_id);
+    return [parent?.name, row.name].filter(Boolean).join(" / ") || "Unnamed category";
+  }).join(", ");
+}
+
+function packageCityScope(item: PackageRow, cities: City[]): string {
+  const ids = item.city_ids ?? [];
+  if (ids.length === 0) return "All active cities";
+  const map = new Map(cities.map((row) => [row.id, row]));
+  return ids.map((id) => map.get(id)?.name || "Unknown city").join(", ");
 }

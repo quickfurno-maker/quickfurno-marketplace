@@ -694,8 +694,21 @@ export const adminSuspendVendor   = async (id: string) => asAdmin((actor) => adm
 // the service independently re-derives superadmin authority from the session.
 export const adminActivateVendorLogin = async (vendorId: string) =>
   asAdmin(() => vendorLoginActivation.activateVendorLogin({ vendorId }));
-export const adminCreatePackage   = async (input: { name: string; lead_count: number; total_price: number; validity_days: number; is_active?: boolean }) =>
+export type AdminPackageActionInput = {
+  name: string;
+  lead_count: number;
+  total_price: number;
+  validity_days: number;
+  description?: string | null;
+  sort_order?: number;
+  is_active?: boolean;
+  category_ids?: string[];
+  city_ids?: string[];
+};
+export const adminCreatePackage = async (input: AdminPackageActionInput) =>
   asAdmin((actor) => admin.createPackage(input, actor));
+export const adminUpdatePackage = async (id: string, input: AdminPackageActionInput) =>
+  asAdmin((actor) => admin.updatePackage(id, input, actor));
 export const adminSetPackageActive = async (id: string, isActive: boolean) =>
   asAdmin((actor) => admin.setPackageActive(id, isActive, actor));
 export const adminCreateCategory = async (input: { name: string; is_active?: boolean }) =>

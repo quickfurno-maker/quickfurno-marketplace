@@ -86,7 +86,11 @@ export type PackageRow = {
   total_price?: number | null;
   display_price?: number | null;
   validity_days?: number | null;
+  description?: string | null;
+  sort_order?: number | null;
   is_active?: boolean | null;
+  category_ids?: string[];
+  city_ids?: string[];
 };
 
 export type Payment = {

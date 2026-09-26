@@ -102,7 +102,7 @@ function renderSection(
     // "leads" and "vendors" are served by dedicated server-paged directory
     // routes and never reach this switch — see app/admin/[section]/page.tsx.
     case "packages":
-      return <PackagesPage packages={payload?.packages ?? []} totalRevenue={Number(payload?.totalRevenue ?? 0)} notify={helpers.notify} ask={helpers.ask} />;
+      return <PackagesPage packages={payload?.packages ?? []} categories={payload?.categories ?? []} cities={payload?.cities ?? []} totalRevenue={Number(payload?.totalRevenue ?? 0)} notify={helpers.notify} ask={helpers.ask} runAction={helpers.runAction} />;
     case "categories":
       return <CategoriesPage categories={payload?.categories ?? []} notify={helpers.notify} />;
     case "cities":

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { LogoMark } from "@/components/Logo";
 import { CONTACT, whatsappLink } from "@/lib/config";
 
@@ -27,7 +28,7 @@ export function SiteHeader() {
           <Link href="/vendors/register" className="transition hover:text-ivory">For partners</Link>
           <Link href="/login" className="transition hover:text-ivory">Sign in</Link>
         </nav>
-        <Link href="/enquiry" className="btn-gold !px-5 !py-2.5 text-xs">Get free quotes</Link>
+        <EnquiryModalTrigger className="btn-gold !px-5 !py-2.5 text-xs" source="Legacy site header CTA">Get free quotes</EnquiryModalTrigger>
       </div>
     </header>
   );
@@ -44,14 +45,14 @@ export function SiteFooter() {
               Verified interior &amp; carpentry leads, matched to trusted local studios. Pune, Maharashtra.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <Link href="/enquiry" className="btn-gold !px-5 !py-2.5 text-xs">Get free quotes</Link>
+              <EnquiryModalTrigger className="btn-gold !px-5 !py-2.5 text-xs" source="Legacy site footer CTA">Get free quotes</EnquiryModalTrigger>
               <Link href="/vendors/register" className="btn-ghost !px-5 !py-2.5 text-xs">Register as partner</Link>
             </div>
           </div>
           <div>
             <p className="eyebrow">Explore</p>
             <ul className="mt-3 space-y-2 font-sans text-sm text-muted">
-              <li><Link href="/enquiry" className="transition hover:text-ivory">Get free quotes</Link></li>
+              <li><EnquiryModalTrigger className="transition hover:text-ivory" source="Legacy site footer link">Get free quotes</EnquiryModalTrigger></li>
               <li><Link href="/vendors/register" className="transition hover:text-ivory">Become a partner</Link></li>
               <li><Link href="/pricing" className="transition hover:text-ivory">Lead packs</Link></li>
               <li><Link href="/login" className="transition hover:text-ivory">Sign in</Link></li>

@@ -34,6 +34,7 @@ const PAGE = "app/page.tsx";
 const CSS = "app/qf-public-v2.css";
 const FINAL_HOME = "components/home/PuneLaunchHomepage.tsx";
 const FINAL_HOME_CSS = "app/home-pune-launch.css";
+const LEGACY_BRAND = "components/Brand.tsx";
 
 /** Strip block and line comments, then collapse whitespace runs. */
 function code(path) {
@@ -56,6 +57,7 @@ const FINAL_HOME_SRC = code(FINAL_HOME);
 const FINAL_HOME_FLAT = flat(FINAL_HOME_SRC);
 const FINAL_HOME_CSS_SRC = code(FINAL_HOME_CSS);
 const FINAL_HOME_CSS_FLAT = flat(FINAL_HOME_CSS_SRC);
+const LEGACY_BRAND_SRC = code(LEGACY_BRAND);
 
 const checks = [];
 const check = (name, fn) => checks.push({ name, fn });
@@ -366,9 +368,25 @@ check("24 [semantic] the approved hero quote entry point is present exactly once
 
 check("25 [semantic] homepage CTAs all use the shared enquiry modal authority", () => {
   assert(/EnquiryModalTrigger/.test(FINAL_HOME_SRC), "PuneLaunchHomepage no longer uses EnquiryModalTrigger");
-  for (const source of ["Homepage header", "Homepage hero quote bar", "Homepage bottom navigation"]) {
+  for (const source of [
+    "Homepage header",
+    "Homepage hero quote bar",
+    "Homepage not-sure card",
+    "Homepage how it works",
+    "Homepage bottom navigation",
+  ]) {
     assert(FINAL_HOME_SRC.includes(`source="${source}"`), `missing approved conversion entry point: ${source}`);
   }
+  assert(
+    /<EnquiryModalTrigger[\s\S]{0,240}source="Homepage how it works"[\s\S]{0,240}Start free enquiry[\s\S]{0,120}<\/EnquiryModalTrigger>/.test(FINAL_HOME_SRC),
+    "How it works 'Start free enquiry' no longer opens the shared enquiry modal",
+  );
+});
+
+check("25A [semantic] generic public quote CTAs do not bypass the main modal", () => {
+  assert(!/href="\/enquiry"/.test(LEGACY_BRAND_SRC), "legacy public header/footer still navigates to the separate /enquiry funnel");
+  const triggers = LEGACY_BRAND_SRC.match(/<EnquiryModalTrigger/g) || [];
+  assert(triggers.length >= 3, `expected legacy header/footer quote CTAs to use the shared modal, found ${triggers.length}`);
 });
 
 check("26 [semantic] the approved mobile bottom navigation remains mounted", () => {

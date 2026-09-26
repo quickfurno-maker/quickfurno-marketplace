@@ -949,10 +949,6 @@ function TrustAndSafety() {
           {hero ? (
             <div className="qfp2-why-photo">
               <Image src={hero} alt="Two QuickFurno professionals reviewing plans" width={895} height={676} sizes="(max-width: 899px) 100vw, 560px" />
-              <span className="qfp2-why-pill">
-                <G name="shield" size={16} width={2} />
-                Reviewed &amp; approved
-              </span>
               <ul className="qfp2-why-checklist">
                 {WHY_CHECKS.map((c) => (
                   <li key={c}><i><Tick size={11} /></i><span>{c}</span></li>

@@ -168,7 +168,7 @@ export function HeroV2() {
         <picture>
           <source media="(min-width: 900px)" srcSet={`${IMG}/hero2-desktop.webp`} />
           <img
-            src={`${IMG}/hero2-mobile.webp`}
+            src={`${IMG}/hero2-mobile-top.webp`}
             alt="A carpenter, an interior designer and a painter in front of the Pune skyline"
             fetchPriority="high"
             decoding="async"

@@ -280,8 +280,8 @@
   box-shadow: 0 0 0 4px rgba(74, 203, 118, 0.10);
 }
 @keyframes qfpHeroAreasMove {
-  from { transform: translateX(-50%); }
-  to { transform: translateX(0); }
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }
 @media (prefers-reduced-motion: reduce) {
   .qfp-hero-areas-track { animation: none; transform: translateX(0); }
@@ -2643,7 +2643,10 @@
   .qfp-menu-button { width: 40px; height: 40px; padding-top: 4px; padding-bottom: 4px; }
 
   .qfp-hero { --qfp-hero-img-h: min(72vw, 292px); }
-  .qfp-hero-inner { padding: calc(var(--qfp-hero-img-h) - 92px) 0 14px; }
+  .qfp-hero-inner {
+    min-height: 0;
+    padding: calc(var(--qfp-hero-img-h) - 92px) 0 8px;
+  }
   .qfp-hero-copy { gap: 8px; }
   .qfp-hero h1 { font-size: 24px; line-height: 1.08; }
   .qfp-hero-kicker { font-size: 9px; }

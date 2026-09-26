@@ -7,6 +7,7 @@
 // is one the product actually enforces.
 // =============================================================================
 
+import Link from "next/link";
 import { Fragment, type CSSProperties, type ReactNode } from "react";
 import { Icon } from "@/components/qf-icon";
 import { categories, categorySlug } from "@/lib/quickfurno-data";
@@ -512,10 +513,10 @@ export function DashboardV2() {
               <Icon name="bolt_" sw={2} fill="currentColor" />
             </span>
             <p>{DASH_NOTE}</p>
-            <a className="qv-note-link" href="/vendors">
+            <Link className="qv-note-link" href="/vendors">
               {DASH_LINK}
               <Icon name="arrow" sw={2.1} />
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -1015,10 +1016,10 @@ export function AreasV2() {
                     </div>
                   ))}
                 </div>
-                <a className="qv-zone-all" href="/vendors">
+                <Link className="qv-zone-all" href="/vendors">
                   View all {count}
                   <Icon name="arrow" sw={2.2} />
-                </a>
+                </Link>
               </div>
             </details>
           ))}
@@ -1033,10 +1034,10 @@ export function AreasV2() {
               <b>{AREAS_CHECK[0]}</b>
               <p>{AREAS_CHECK[1]}</p>
             </div>
-            <a className="qv-btn qv-btn-primary" href="/vendors">
+            <Link className="qv-btn qv-btn-primary" href="/vendors">
               {AREAS_CHECK[2]}
               <Icon name="arrow" sw={2.1} />
-            </a>
+            </Link>
           </div>
           <div className="qv-areas-trust">
             {AREAS_TRUST.map(([icon, t, b]) => (
@@ -1067,12 +1068,12 @@ export function FaqV2() {
             <span className="qv-hl">{FAQ_H2[1]}</span>
           </h2>
           <p className="qv-sec-sub">{FAQ_SUB}</p>
-          <a className="qv-faq-wa" href="/vendors">
+          <Link className="qv-faq-wa" href="/vendors">
             <span className="qv-faq-wa-ico">
               <Icon name="chat" sw={2.1} />
             </span>
             {FAQ_BTN}
-          </a>
+          </Link>
           <Pills items={FAQ_PILLS} className="qv-faq-pills" />
         </div>
 
@@ -1153,11 +1154,11 @@ export function ApplyV2() {
             <b>{SWITCH_T}</b>
             <p>{SWITCH_B}</p>
           </div>
-          <a className="qv-btn qv-btn-primary" href="/">
+          <Link className="qv-btn qv-btn-primary" href="/">
             <Icon name="people" sw={2} />
             {SWITCH_BTN}
             <Icon name="arrow" sw={2.1} />
-          </a>
+          </Link>
         </div>
       </div>
     </section>

@@ -59,6 +59,7 @@ export function TestimonialsCarousel({ testimonials }: { testimonials: readonly 
             key={testimonial.name}
             type="button"
             className={`qf-testimonial-dot${i === active ? " is-active" : ""}`}
+            role="tab"
             aria-label={`Go to testimonial ${i + 1}`}
             aria-selected={i === active}
             onClick={() => goTo(i)}

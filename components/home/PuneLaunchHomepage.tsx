@@ -7,6 +7,7 @@ import { HOME_FAQ, PUNE_AREAS } from "@/lib/homepage-content";
 import { categoryImage, heroImage, optionalRealImage } from "@/lib/homepage-images";
 import { getPublicVendorCountsByCategory } from "@/services/publicVendorService";
 import { Footer } from "@/components/Footer";
+import { Wordmark } from "@/components/Wordmark";
 import { whatsappLink } from "@/lib/config";
 
 // ============================================================================
@@ -313,10 +314,10 @@ const NAV_LINKS = [
   { href: "/vendors", label: "For professionals" },
 ];
 
-function Logo({ light = false }: { light?: boolean }) {
+function Logo() {
   return (
-    <Link href="/" className={`qfp-logo${light ? " qfp-logo--light" : ""}`} aria-label="QuickFurno home">
-      Quick<em>Furno</em>
+    <Link href="/" className="qfp-logo" aria-label="QuickFurno home">
+      <Wordmark height={27} priority />
     </Link>
   );
 }
@@ -724,31 +725,31 @@ async function Services() {
   );
 }
 
-// The conversion journey deliberately stays within product facts: a free
-// homeowner enquiry, up to 3 eligible matches, reviewed public profiles and
-// the homeowner choosing who to hire. The visuals are illustrative only.
-const HOW_IT_WORKS: { icon: ReactNode; title: string; body: string; slot?: string; visual: "photo" | "map" | "profiles" }[] = [
+// Native browser UI keeps the three-step story sharp at every resolution.
+// The conversion claims stay within product facts: free homeowner enquiry,
+// up to 3 eligible matches, reviewed profiles, and homeowner choice.
+const HOW_IT_WORKS: { icon: ReactNode; title: string; body: string; visual: "request" | "matches" | "profiles" }[] = [
   {
     icon: <ChatIcon />,
     title: "Tell us what you need",
     body: "Share your service, Pune location and a few project details.",
-    slot: "how-step-1",
-    visual: "photo",
+    visual: "request",
   },
   {
     icon: <G name="people" size={26} stroke="#fff" width={2} />,
     title: "Get matched with eligible Teams",
     body: "We shortlist up to 3 active Teams by service, location and eligibility.",
-    visual: "map",
+    visual: "matches",
   },
   {
     icon: <G name="check2" size={26} stroke="#fff" width={2} />,
     title: "Compare & choose",
     body: "Compare reviewed profiles and quotes. You choose who to hire.",
-    slot: "how-step-3",
     visual: "profiles",
   },
 ];
+
+const HOW_SERVICE_OPTIONS = ["Interior design", "Carpentry", "Painting", "Civil work"] as const;
 
 const HOW_TEAM_MATCHES = [
   { name: "UrbanNest", position: "qfp-how-team--one", meta: "Eligible match" },
@@ -762,48 +763,84 @@ const HOW_PROFILE_ROWS = [
   { name: "Craftline", initials: "CL" },
 ] as const;
 
+function HowRequestPreview() {
+  return (
+    <div className="qfp-flow-request-ui" aria-label="Illustration of a QuickFurno home-service enquiry">
+      <div className="qfp-flow-ui-top">
+        <span><i aria-hidden="true"><G name="chat" size={15} stroke="currentColor" width={2} /></i>QuickFurno request</span>
+        <small>Step 1 of 2</small>
+      </div>
+      <div className="qfp-flow-request-body">
+        <small>Service needed</small>
+        <strong>What does your home need?</strong>
+        <div className="qfp-flow-service-options">
+          {HOW_SERVICE_OPTIONS.map((service, index) => (
+            <span className={index === 0 ? "is-selected" : undefined} key={service}>
+              <i aria-hidden="true">{String(index + 1).padStart(2, "0")}</i>{service}
+            </span>
+          ))}
+        </div>
+        <div className="qfp-flow-request-foot">
+          <span><G name="home2" size={16} stroke="currentColor" width={2} /><i><small>Location</small><strong>Baner, Pune</strong></i></span>
+          <b>Continue <ArrowIcon size={15} stroke="currentColor" /></b>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HowMatchMap() {
   return (
-    <div className="qfp-how-map" aria-label="Illustration of a Baner homeowner matched with three eligible interior Teams">
-      <Image className="qfp-how-map-base" src={`${REAL}/areas/pune-map.webp`} alt="" aria-hidden="true" width={601} height={508} />
-      <span className="qfp-how-map-shade" aria-hidden="true" />
-      <span className="qfp-how-map-label" aria-hidden="true">BANER</span>
-      <span className="qfp-how-client">
-        <i aria-hidden="true">PS</i>
-        <span><strong>Priya Sharma</strong><small>Baner, Pune</small></span>
-      </span>
-      {HOW_TEAM_MATCHES.map((team) => (
-        <span className={`qfp-how-team ${team.position}`} key={team.name}>
-          <i aria-hidden="true"><G name="home2" size={15} stroke="#FFB13D" width={2} /></i>
-          <span><strong>{team.name}</strong><small>{team.meta}</small></span>
+    <div className="qfp-flow-match-ui" aria-label="Illustration of a Baner homeowner matched with three eligible Teams">
+      <div className="qfp-flow-match-head">
+        <span><G name="people" size={16} stroke="currentColor" width={2} />Matches ready</span>
+        <strong>3 eligible Teams</strong>
+      </div>
+      <div className="qfp-flow-match-canvas">
+        <i className="qfp-flow-route qfp-flow-route--one" aria-hidden="true" />
+        <i className="qfp-flow-route qfp-flow-route--two" aria-hidden="true" />
+        <i className="qfp-flow-route qfp-flow-route--three" aria-hidden="true" />
+        <span className="qfp-flow-client-card">
+          <i aria-hidden="true">PS</i>
+          <span><strong>Priya Sharma</strong><small>Baner, Pune</small></span>
         </span>
-      ))}
-      <span className="qfp-how-map-lines" aria-hidden="true"><i /><i /><i /></span>
-      <span className="qfp-how-match-pill">
-        <G name="people" size={17} stroke="#8EF0AF" width={2} />
-        <strong>3</strong> matched interior Teams
-      </span>
+        {HOW_TEAM_MATCHES.map((team) => (
+          <span className={`qfp-flow-team-card ${team.position}`} key={team.name}>
+            <i aria-hidden="true"><G name="home2" size={14} stroke="currentColor" width={2} /></i>
+            <span><strong>{team.name}</strong><small>{team.meta}</small></span>
+          </span>
+        ))}
+      </div>
+      <div className="qfp-flow-match-meta">
+        <G name="shield" size={15} stroke="currentColor" width={2} />
+        Matched by service, location &amp; eligibility
+      </div>
     </div>
   );
 }
 
 function HowProfileCompare() {
-  const background = optionalRealImage("how-step-3-d");
   return (
-    <div className="qfp-flow-profile-visual" aria-label="Illustration of three reviewed Team profiles ready to compare">
-      {background ? <Image src={background} alt="" fill sizes="(max-width: 760px) 55vw, 620px" /> : null}
-      <span className="qfp-flow-profile-shade" aria-hidden="true" />
+    <div className="qfp-flow-compare-ui" aria-label="Illustration of three reviewed Team profiles ready to compare">
+      <div className="qfp-flow-ui-top">
+        <span><i aria-hidden="true"><G name="check2" size={15} stroke="currentColor" width={2} /></i>Teams ready to compare</span>
+        <small>3 matches</small>
+      </div>
       <div className="qfp-flow-profile-list">
-        {HOW_PROFILE_ROWS.map((profile) => (
+        {HOW_PROFILE_ROWS.map((profile, index) => (
           <span className="qfp-flow-profile-row" key={profile.name}>
             <i aria-hidden="true">{profile.initials}</i>
             <span>
               <strong>{profile.name}</strong>
-              <small><G name="check2" size={12} stroke="currentColor" width={2.2} /> Reviewed</small>
+              <small><G name="check2" size={12} stroke="currentColor" width={2.2} /> Reviewed profile</small>
             </span>
-            <ArrowIcon size={16} stroke="currentColor" />
+            <b>{index === 0 ? "View" : "Compare"}</b>
           </span>
         ))}
+      </div>
+      <div className="qfp-flow-compare-foot">
+        <span>Compare profiles &amp; quotes</span>
+        <strong>You choose who to hire</strong>
       </div>
     </div>
   );
@@ -822,34 +859,23 @@ function HowItWorks() {
         </div>
 
         <ol className="qfp-flow-list" data-reveal-group>
-          {HOW_IT_WORKS.map((step, index) => {
-            const photoTall = step.slot ? optionalRealImage(`${step.slot}-d`) : null;
-            const photoWide = step.slot ? optionalRealImage(`${step.slot}-m`) : null;
-            return (
-              <li className={`qfp-flow-step qfp-flow-step--${index + 1}`} key={step.title}>
-                <div className="qfp-flow-copy">
+          {HOW_IT_WORKS.map((step, index) => (
+            <li className={`qfp-flow-step qfp-flow-step--${index + 1}`} key={step.title}>
+              <div className="qfp-flow-copy">
+                <div className="qfp-flow-step-meta">
                   <span className="qfp-flow-num" aria-hidden="true">0{index + 1}</span>
                   <span className="qfp-flow-icon">{step.icon}</span>
-                  <h3>{step.title}</h3>
-                  <p>{step.body}</p>
                 </div>
-                <div className={`qfp-flow-visual qfp-flow-visual--${step.visual}`}>
-                  {step.visual === "map" ? (
-                    <HowMatchMap />
-                  ) : step.visual === "profiles" ? (
-                    <HowProfileCompare />
-                  ) : photoTall || photoWide ? (
-                    <>
-                      {photoWide ? <Image className="qfp-flow-photo-wide" src={photoWide} alt="" fill sizes="620px" /> : null}
-                      {photoTall ? <Image className="qfp-flow-photo-tall" src={photoTall} alt="" fill sizes="(max-width: 760px) 55vw, 362px" /> : null}
-                    </>
-                  ) : (
-                    <span className="qfp-slot-empty" aria-hidden="true" />
-                  )}
-                </div>
-              </li>
-            );
-          })}
+                <h3>{step.title}</h3>
+                <p>{step.body}</p>
+              </div>
+              <div className={`qfp-flow-visual qfp-flow-visual--${step.visual}`}>
+                {step.visual === "request" ? <HowRequestPreview /> : null}
+                {step.visual === "matches" ? <HowMatchMap /> : null}
+                {step.visual === "profiles" ? <HowProfileCompare /> : null}
+              </div>
+            </li>
+          ))}
         </ol>
 
         <ul className="qfp-flow-trust" aria-label="QuickFurno process benefits">

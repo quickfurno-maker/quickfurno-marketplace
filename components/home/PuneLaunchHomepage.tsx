@@ -317,7 +317,7 @@ const NAV_LINKS = [
 function Logo() {
   return (
     <Link href="/" className="qfp-logo" aria-label="QuickFurno home">
-      <Wordmark height={27} priority />
+      <Wordmark height={24} priority />
     </Link>
   );
 }

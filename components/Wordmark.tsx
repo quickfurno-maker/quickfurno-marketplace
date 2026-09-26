@@ -55,9 +55,9 @@ export function Wordmark({
         aria-hidden="true"
         style={{
           position: "absolute",
-          left: "calc(100% - 5px)",
-          top: -Math.max(2, Math.round(height * 0.1)),
-          fontSize: Math.max(9.5, Math.round(height * 0.42 * 10) / 10),
+          left: "calc(100% - 4px)",
+          top: Math.max(0, Math.round(height * 0.02)),
+          fontSize: Math.max(10.5, Math.round(height * 0.46 * 10) / 10),
           lineHeight: 1,
           fontWeight: 700,
           color: "#E0611E",

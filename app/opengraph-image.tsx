@@ -45,7 +45,7 @@ export default function OpengraphImage() {
             <span style={{ color: "#FFFFFF" }}>Quick</span>
             <span style={{ color: ORANGE }}>Furno</span>
           </div>
-          <div style={{ display: "flex", marginTop: 2, marginLeft: -8, fontSize: 29, fontWeight: 700, color: ORANGE }}>®</div>
+          <div style={{ display: "flex", marginTop: 7, marginLeft: -7, fontSize: 31, fontWeight: 700, color: ORANGE }}>®</div>
         </div>
 
         <div

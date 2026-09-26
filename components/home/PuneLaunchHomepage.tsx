@@ -457,6 +457,17 @@ function Hero() {
 
         </div>
       </div>
+      <div className="qfp-hero-areas" aria-label="Pune service areas">
+        <div className="qfp-hero-areas-track">
+          {[...PUNE_AREAS, ...PUNE_AREAS].map((area, index) => (
+            <span className="qfp-hero-area-chip" key={`${area}-${index}`} aria-hidden={index >= PUNE_AREAS.length}>
+              <i className="qfp-hero-area-live" aria-hidden="true" />
+              <PinIcon size={13} stroke="currentColor" width={2} />
+              {area}
+            </span>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }

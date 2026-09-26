@@ -215,6 +215,77 @@
 }
 .qfp-hero h1 span { color: var(--qfp-gold); }
 .qfp-hero-lede { max-width: 580px; font-size: 17px; line-height: 1.6; color: #d6d0c6; }
+
+/* Live Pune locality ribbon. It reuses the canonical PUNE_AREAS list in JSX,
+   so the hero stays in sync with the locality selector instead of maintaining
+   a second marketing-only list. */
+.qfp-hero-areas {
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  overflow: hidden;
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(20, 18, 15, 0.92);
+  backdrop-filter: blur(12px);
+}
+.qfp-hero-areas::before,
+.qfp-hero-areas::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  width: 96px;
+  pointer-events: none;
+}
+.qfp-hero-areas::before {
+  left: 0;
+  background: linear-gradient(90deg, #171410 0%, rgba(23, 20, 16, 0) 100%);
+}
+.qfp-hero-areas::after {
+  right: 0;
+  background: linear-gradient(270deg, #171410 0%, rgba(23, 20, 16, 0) 100%);
+}
+.qfp-hero-areas-track {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  padding: 12px 10px 12px 0;
+  animation: qfpHeroAreasMove 38s linear infinite;
+  will-change: transform;
+}
+.qfp-hero-area-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.qfp-hero-area-chip svg { color: #f0a54a; }
+.qfp-hero-area-live {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #4acb76;
+  box-shadow: 0 0 0 4px rgba(74, 203, 118, 0.10);
+}
+@keyframes qfpHeroAreasMove {
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qfp-hero-areas-track { animation: none; transform: translateX(0); }
+}
 .qfp-hero-points {
   display: flex;
   flex-wrap: wrap;
@@ -2567,9 +2638,9 @@
    ========================================================================== */
 @media (max-width: 760px) {
   .qfp-shell { width: min(350px, calc(100% - 40px)); }
-  .qfp-header-inner { min-height: 52px; }
-  .qfp-logo { font-size: 19px; }
-  .qfp-menu-button { width: 36px; height: 36px; }
+  .qfp-header-inner { min-height: 48px; }
+  .qfp-logo { font-size: 18px; }
+  .qfp-menu-button { width: 40px; height: 40px; padding-top: 4px; padding-bottom: 4px; }
 
   .qfp-hero { --qfp-hero-img-h: min(72vw, 292px); }
   .qfp-hero-inner { padding: calc(var(--qfp-hero-img-h) - 92px) 0 14px; }
@@ -2582,6 +2653,10 @@
   .qfp-hero-points i { width: 26px; height: 26px; }
   .qfp-hero-points i svg { width: 14px; height: 14px; }
   .qfp-quote-btn { min-height: 44px; padding: 11px 15px; font-size: 13px; }
+  .qfp-hero-areas-track { gap: 8px; padding: 9px 8px 9px 0; animation-duration: 31s; }
+  .qfp-hero-area-chip { min-height: 28px; padding: 0 10px; gap: 6px; font-size: 10.5px; }
+  .qfp-hero-area-live { width: 5px; height: 5px; box-shadow: 0 0 0 3px rgba(74, 203, 118, 0.10); }
+  .qfp-hero-areas::before, .qfp-hero-areas::after { width: 38px; }
   .qfp-hero-popular { gap: 4px; }
   .qfp-hero-popular-label { font-size: 10px; }
   .qfp-hero-chip { min-height: 34px; padding: 3px 10px; font-size: 10px; }

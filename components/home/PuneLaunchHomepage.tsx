@@ -752,15 +752,15 @@ const HOW_IT_WORKS: { icon: ReactNode; title: string; body: string; visual: "req
 const HOW_SERVICE_OPTIONS = ["Interior design", "Carpentry", "Painting", "Civil work"] as const;
 
 const HOW_TEAM_MATCHES = [
-  { name: "UrbanNest", position: "qfp-how-team--one", meta: "Eligible match" },
-  { name: "Studio A", position: "qfp-how-team--two", meta: "Eligible match" },
-  { name: "Craftline", position: "qfp-how-team--three", meta: "Eligible match" },
+  { name: "UrbanNest", position: "qfp-how-team--one", meta: "Eligible match", image: "/assets/quickfurno/images/real/categories/interior-designers-v2.webp" },
+  { name: "Studio A", position: "qfp-how-team--two", meta: "Eligible match", image: "/assets/quickfurno/images/real/categories/premium-interiors-v2.webp" },
+  { name: "Craftline", position: "qfp-how-team--three", meta: "Eligible match", image: "/assets/quickfurno/images/real/categories/carpenters-v2.webp" },
 ] as const;
 
 const HOW_PROFILE_ROWS = [
-  { name: "UrbanNest", initials: "UN" },
-  { name: "Studio A", initials: "SA" },
-  { name: "Craftline", initials: "CL" },
+  { name: "UrbanNest", image: "/assets/quickfurno/images/real/categories/interior-designers-v2.webp" },
+  { name: "Studio A", image: "/assets/quickfurno/images/real/categories/premium-interiors-v2.webp" },
+  { name: "Craftline", image: "/assets/quickfurno/images/real/categories/carpenters-v2.webp" },
 ] as const;
 
 function HowRequestPreview() {
@@ -779,6 +779,10 @@ function HowRequestPreview() {
               <i aria-hidden="true">{String(index + 1).padStart(2, "0")}</i>{service}
             </span>
           ))}
+        </div>
+        <div className="qfp-flow-project-field">
+          <G name="chat" size={15} stroke="currentColor" width={2} />
+          <span>Add a few project details...</span>
         </div>
         <div className="qfp-flow-request-foot">
           <span><G name="home2" size={16} stroke="currentColor" width={2} /><i><small>Location</small><strong>Baner, Pune</strong></i></span>
@@ -806,7 +810,7 @@ function HowMatchMap() {
         </span>
         {HOW_TEAM_MATCHES.map((team) => (
           <span className={`qfp-flow-team-card ${team.position}`} key={team.name}>
-            <i aria-hidden="true"><G name="home2" size={14} stroke="currentColor" width={2} /></i>
+            <Image src={team.image} alt="" width={72} height={52} sizes="72px" />
             <span><strong>{team.name}</strong><small>{team.meta}</small></span>
           </span>
         ))}
@@ -829,7 +833,7 @@ function HowProfileCompare() {
       <div className="qfp-flow-profile-list">
         {HOW_PROFILE_ROWS.map((profile, index) => (
           <span className="qfp-flow-profile-row" key={profile.name}>
-            <i aria-hidden="true">{profile.initials}</i>
+            <Image src={profile.image} alt="" width={76} height={58} sizes="76px" />
             <span>
               <strong>{profile.name}</strong>
               <small><G name="check2" size={12} stroke="currentColor" width={2.2} /> Reviewed profile</small>
@@ -855,7 +859,7 @@ function HowItWorks() {
         <div className="qfp-head-center qfp-flow-head" data-reveal>
           <span className="qfp-kicker qfp-kicker--ruled">How it works</span>
           <h2>One request. <span>Three simple steps.</span></h2>
-          <p className="qfp-how-lede">Tell us what your home needs. Get up to 3 eligible Teams to compare — then choose the right fit.</p>
+          <p className="qfp-how-lede">Tell us what your home needs. We can match you with up to 3 eligible Teams, then you compare and choose — all in one place.</p>
         </div>
 
         <ol className="qfp-flow-list" data-reveal-group>

@@ -2048,6 +2048,155 @@
 }
 .qfp2-why-note i { flex-shrink: 0; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 999px; background: #E7F6EC; }
 
+@media (max-width: 899px) {
+  .qfp2-why {
+    position: relative;
+    overflow: hidden;
+    padding: 52px 0 56px;
+    background:
+      radial-gradient(circle at 105% -2%, rgba(232, 85, 31, 0.10) 0, rgba(232, 85, 31, 0) 32%),
+      linear-gradient(180deg, #FFFDF9 0%, #FBF6EE 55%, #FFFDF9 100%);
+  }
+  .qfp2-why::before {
+    content: "";
+    position: absolute;
+    right: -110px;
+    top: -118px;
+    width: 250px;
+    height: 250px;
+    border: 1px solid rgba(232, 85, 31, 0.08);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .qfp2-why-grid { position: relative; gap: 24px; }
+  .qfp2-why-copy { gap: 0; }
+  .qfp2-why .qfp2-kicker {
+    margin-bottom: 13px;
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+  }
+  .qfp2-why-copy h2 {
+    max-width: 100%;
+    font-size: clamp(29px, 8.2vw, 33px);
+    line-height: 1.01;
+    letter-spacing: -0.045em;
+  }
+  .qfp2-why-copy h2 span { display: inline-block; margin-top: 3px; }
+  .qfp2-why-lede {
+    max-width: 34ch;
+    margin-top: 15px;
+    font-size: 13.5px;
+    line-height: 1.58;
+    color: #686158;
+  }
+  .qfp2-why-points {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 22px;
+  }
+  .qfp2-why-points li {
+    min-width: 0;
+    min-height: 154px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    padding: 14px 13px 15px;
+    border: 1px solid #EFE2D2;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.86);
+    box-shadow: 0 16px 34px -28px rgba(31, 24, 17, 0.52);
+    backdrop-filter: blur(7px);
+  }
+  .qfp2-why-points i {
+    width: 40px;
+    height: 40px;
+    border: 1px solid #F7DECA;
+    border-radius: 13px;
+    background: linear-gradient(145deg, #FFF5EB 0%, #FBE5D1 100%);
+    color: var(--qf2-orange);
+  }
+  .qfp2-why-points > li > span { gap: 5px; }
+  .qfp2-why-points strong {
+    font-size: 13.5px;
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+  }
+  .qfp2-why-points em {
+    font-size: 11.25px;
+    line-height: 1.43;
+    color: #6D665E;
+  }
+  .qfp2-why-stats {
+    overflow: hidden;
+    margin: 12px 0 0;
+    padding: 15px 4px;
+    border: 1px solid #F0DDCA;
+    border-radius: 19px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(253,244,235,0.96) 100%);
+    box-shadow: 0 18px 38px -30px rgba(31, 24, 17, 0.54);
+  }
+  .qfp2-why-stats li {
+    gap: 4px;
+    padding: 0 7px;
+  }
+  .qfp2-why-stats li + li { border-left-color: #EAD7C4; }
+  .qfp2-why-stats li > i { height: 23px; display: grid; place-items: center; }
+  .qfp2-why-stats strong { font-size: 20px; line-height: 1; }
+  .qfp2-why-stats em {
+    max-width: 10ch;
+    font-size: 9.75px;
+    line-height: 1.25;
+    color: #625B53;
+  }
+  .qfp2-why-visual { margin-top: 0; }
+  .qfp2-why-photo {
+    border: 1px solid #EADFD1;
+    border-radius: 22px;
+    box-shadow: 0 28px 54px -34px rgba(25, 22, 18, 0.62);
+  }
+  .qfp2-why-photo > img {
+    aspect-ratio: 1.34 / 1;
+    object-fit: cover;
+    object-position: 50% 48%;
+  }
+  .qfp2-why-pill {
+    left: 4%;
+    top: 5%;
+    width: auto;
+    max-width: 60%;
+    padding: 7px 10px;
+    border: 1px solid rgba(236, 223, 207, 0.9);
+    font-size: 8.25px;
+    letter-spacing: 0.09em;
+    box-shadow: 0 12px 25px -17px rgba(20, 24, 29, 0.58);
+  }
+  .qfp2-why-checklist {
+    right: 3%;
+    top: 10%;
+    width: 38%;
+    padding: 4px 9px 5px;
+    border: 1px solid rgba(236, 223, 207, 0.9);
+    border-radius: 13px;
+    box-shadow: 0 20px 36px -22px rgba(20, 24, 29, 0.54);
+  }
+  .qfp2-why-checklist li { gap: 6px; padding: 4px 0; }
+  .qfp2-why-checklist i { width: 15px; height: 15px; }
+  .qfp2-why-checklist span { font-size: 8px; line-height: 1.22; }
+  .qfp2-why-note {
+    left: 3%;
+    bottom: 4%;
+    width: 58%;
+    padding: 9px 10px;
+    border: 1px solid rgba(236, 223, 207, 0.9);
+    border-radius: 13px;
+    box-shadow: 0 14px 28px -19px rgba(20, 24, 29, 0.58);
+    font-size: 9px;
+    line-height: 1.34;
+  }
+  .qfp2-why-note i { width: 22px; height: 22px; }
+}
+
 /* ==========================  PUNE LOCALITIES  =========================== */
 .qfp2-areas { position: relative; overflow: hidden; padding: 44px 0 0; background: linear-gradient(180deg, #FDFBF8 0%, #F8F2E9 40%, #FBF7F0 74%, #FDFCFA 100%); }
 .qfp2-areas-map { position: absolute; top: -14px; right: -40px; width: 190px; height: auto; opacity: 0.5; pointer-events: none; }

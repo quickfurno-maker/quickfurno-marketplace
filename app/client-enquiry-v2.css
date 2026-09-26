@@ -2027,3 +2027,102 @@
     font-size: 0.78rem;
   }
 }
+
+
+/* ==========================================================================
+   MOBILE FORM HEADER REFINEMENT — 2026-09-26
+   Compact topbar + proportionate gradient intro. Desktop intentionally unchanged.
+   ========================================================================== */
+@media (max-width: 719px) {
+  .qf-rf-top.qf-rf-top {
+    padding: 0.58rem 0.72rem 0.68rem;
+    background:
+      linear-gradient(180deg, #fffdf9 0%, #fffaf4 100%);
+  }
+
+  .qf-rf-top.qf-rf-top::after {
+    display: none;
+  }
+
+  .qf-rf-top-row {
+    min-height: 44px;
+    align-items: center;
+    gap: 0.55rem;
+  }
+
+  .qf-rf-flow-name.qf-rf-flow-name {
+    max-width: calc(100% - 54px);
+    gap: 0.35rem;
+    font-size: 0.76rem;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+  }
+
+  .qf-rf-flow-name.qf-rf-flow-name::before {
+    font-size: 0.82rem;
+  }
+
+  .qf-rf-close.qf-rf-close {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+  }
+
+  .qf-sf-intro {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    margin-top: 0.38rem;
+    padding: 0.68rem 0.78rem 0.72rem;
+    border: 1px solid rgba(224, 97, 30, 0.11);
+    border-radius: 18px;
+    background:
+      linear-gradient(128deg, #fff9f1 0%, #fff0dc 50%, #ffe2c2 100%);
+    box-shadow:
+      inset 0 1px rgba(255,255,255,.8),
+      0 12px 28px -24px rgba(201,58,14,.5);
+  }
+
+  .qf-sf-intro::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    right: -42px;
+    top: -58px;
+    width: 170px;
+    height: 170px;
+    border-radius: 44% 56% 62% 38%;
+    background:
+      radial-gradient(circle at 38% 40%, rgba(240,117,41,.28), transparent 42%),
+      linear-gradient(145deg, rgba(255,195,122,.42), rgba(255,255,255,.06));
+    transform: rotate(-8deg);
+  }
+
+  .qf-sf-intro::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    left: -28px;
+    bottom: -44px;
+    width: 112px;
+    height: 92px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,176,84,.18), transparent 68%);
+  }
+
+  .qf-sf-intro h3 {
+    max-width: 250px;
+    font-size: clamp(1.48rem, 6.9vw, 1.72rem);
+    line-height: 0.99;
+    letter-spacing: -0.047em;
+    color: #131a2b;
+  }
+
+  .qf-sf-intro p {
+    max-width: 286px;
+    margin-top: 0.32rem;
+    font-size: 0.74rem;
+    line-height: 1.38;
+    color: #67738a;
+  }
+}

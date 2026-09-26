@@ -1,19 +1,33 @@
 {
   "schemaVersion": 1,
   "generator": "scripts/mvp/inventory/run.mjs",
-  "note": "Regex-extracted OBJECT DECLARATIONS from committed migration SQL — repository evidence only. Applied-in-DB status is UNKNOWN_UNVERIFIED (see docs/QF-MVP-10-DATABASE-RECONCILIATION.md). Not a full SQL parser.",
+  "note": "Regex-extracted OBJECT DECLARATIONS from canonical migration SQL. Exact-version staging/production presence comes from currentPhase1Reconciliation; environment-specific baseline equivalence is governed separately. Not a full SQL parser.",
   "counts": {
-    "migrations": 110,
-    "uniqueTablesCreated": 122,
-    "uniqueFunctions": 131,
-    "uniqueTriggers": 49,
+    "migrations": 125,
+    "excludedWorktreeMigrations": 3,
+    "uniqueTablesCreated": 146,
+    "uniqueFunctions": 143,
+    "uniqueTriggers": 55,
     "uniqueEnums": 0,
     "uniqueExtensions": 2,
-    "uniquePolicies": 77,
-    "tablesWithRlsEnabled": 111
+    "uniquePolicies": 78,
+    "tablesWithRlsEnabled": 118
   },
   "aggregate": {
     "tablesCreated": [
+      "aarohi_campaign_members",
+      "aarohi_campaigns",
+      "aarohi_channel_identities",
+      "aarohi_conversations",
+      "aarohi_events",
+      "aarohi_handoffs",
+      "aarohi_identity_matches",
+      "aarohi_interactions",
+      "aarohi_opportunities",
+      "aarohi_prospect_sources",
+      "aarohi_prospects",
+      "aarohi_scores",
+      "aarohi_tasks",
       "admin_notifications",
       "ai_agent_runs",
       "ai_agents",
@@ -60,10 +74,15 @@
       "communication_consent_ack_intents",
       "communication_consent_command_receipts",
       "communication_consent_events",
+      "communication_conversation_events",
+      "communication_conversation_outbox",
+      "communication_conversations",
       "communication_delivery_events",
       "communication_frequency_policies",
       "communication_inbound_messages",
       "communication_intents",
+      "communication_jarvis_callback_receipts",
+      "communication_jarvis_turn_outbox",
       "communication_messages",
       "communication_preferences",
       "communication_provider_accounts",
@@ -86,6 +105,9 @@
       "domain_events",
       "free_vendor_profile_interests",
       "idempotency_records",
+      "jarvis_os_operator_command_receipts",
+      "jarvis_service_availability_pairs",
+      "jarvis_service_availability_taxonomy",
       "lead_assignment_approvals",
       "lead_assignment_events",
       "lead_assignment_queue",
@@ -94,7 +116,9 @@
       "lead_auto_assignment_logs",
       "lead_clarification_requests",
       "lead_clarification_responses",
+      "lead_connection_assurance",
       "lead_delivery_logs",
+      "lead_drafts",
       "lead_internal_notes",
       "lead_matching_runs",
       "lead_scores",
@@ -123,6 +147,7 @@
       "vendor_package_orders",
       "vendor_packages",
       "vendor_profile_change_requests",
+      "vendor_reviews",
       "vendor_segments",
       "vendor_support_messages",
       "vendor_support_threads",
@@ -146,6 +171,7 @@
       "assign_lead_to_vendors",
       "assign_package_to_vendor",
       "assign_vendor_to_requirement_group",
+      "bump_jarvis_service_availability_taxonomy",
       "check_duplicate_lead",
       "communication_consent_receipt_results_valid",
       "communication_consent_receipt_scope_result_valid",
@@ -157,6 +183,10 @@
       "increment_vendor_credits",
       "is_admin",
       "owns_vendor",
+      "qf_aarohi_complete_handoff_v1",
+      "qf_aarohi_confirm_identity_match_v1",
+      "qf_aarohi_set_human_takeover_v1",
+      "qf_aarohi_suppress_prospect_v1",
       "qf_acquire_domain_event",
       "qf_activate_meta_lead_assignment_v1",
       "qf_activate_meta_transactional_mapping_v1",
@@ -183,6 +213,7 @@
       "qf_canonical_text_field_v1",
       "qf_category_groups_for_label",
       "qf_category_labels_match",
+      "qf_city_is_active",
       "qf_claim_auth_delivery_attempt",
       "qf_claim_automation_job_for_family_v1",
       "qf_claim_automation_job_transport_for_family_v1",
@@ -200,6 +231,9 @@
       "qf_dead_letter_domain_event",
       "qf_decide_automation_action_request_v1",
       "qf_disable_meta_canary_v1",
+      "qf_enforce_active_city_on_assignment",
+      "qf_enforce_active_city_on_lead",
+      "qf_enforce_active_city_on_vendor",
       "qf_enforce_lead_assignment_active_cap",
       "qf_enforce_lead_lifetime_vendor_cap",
       "qf_enforce_segment_definition_pair",
@@ -221,6 +255,8 @@
       "qf_handoff_vendor_campaign_intents_v1",
       "qf_lead_vendor_category_matches",
       "qf_lead_vendor_parent_group_compatible",
+      "qf_mark_connection_client_response_v1",
+      "qf_mark_connection_riya_ready_v1",
       "qf_norm_text",
       "qf_normalize_category_label",
       "qf_parent_category_group",
@@ -251,6 +287,7 @@
       "qf_quiesce_meta_canary_v1",
       "qf_reconcile_automation_attempt_transport_v1",
       "qf_record_automation_execution_transport_v1",
+      "qf_record_vendor_client_response_v1",
       "qf_recover_automation_job_transport_v1",
       "qf_recover_automation_job_v1",
       "qf_recover_stale_dispatching_consent_ack_intents",
@@ -272,6 +309,9 @@
     ],
     "triggers": [
       "on_auth_user_created",
+      "trg_00_qf_lead_assignments_active_city_gate",
+      "trg_00_qf_leads_active_city_gate",
+      "trg_00_qf_vendors_active_city_gate",
       "trg_automation_action_request_insert_guard",
       "trg_automation_action_request_update_guard",
       "trg_automation_action_requests_no_delete",
@@ -294,6 +334,9 @@
       "trg_cfp_no_truncate",
       "trg_clre_immutable",
       "trg_clre_no_truncate",
+      "trg_jarvis_availability_cities",
+      "trg_jarvis_availability_pairs",
+      "trg_jarvis_availability_services",
       "trg_lead_assignment_events_immutable",
       "trg_lead_assignment_events_lifetime_cap",
       "trg_lead_assignment_events_no_truncate",
@@ -375,6 +418,7 @@
       "settings admin write ON app_settings",
       "settings public read ON app_settings",
       "status owner rw ON lead_status_updates",
+      "vendor media public read ON storage.objects",
       "vendor notes admin all ON vendor_internal_notes",
       "vendor_credit_logs admin all ON vendor_credit_logs",
       "vendor_dashboard_users admin read ON vendor_dashboard_users",
@@ -453,6 +497,7 @@
       "communication_frequency_policies",
       "communication_inbound_messages",
       "communication_intents",
+      "communication_jarvis_callback_receipts",
       "communication_messages",
       "communication_preferences",
       "communication_provider_canary_destinations",
@@ -472,11 +517,16 @@
       "crm_sources",
       "domain_events",
       "idempotency_records",
+      "jarvis_os_operator_command_receipts",
+      "jarvis_service_availability_pairs",
+      "jarvis_service_availability_taxonomy",
       "lead_assignment_approvals",
       "lead_assignment_events",
       "lead_assignments",
       "lead_attribution",
+      "lead_connection_assurance",
       "lead_delivery_logs",
+      "lead_drafts",
       "lead_internal_notes",
       "lead_matching_runs",
       "lead_scores",
@@ -504,6 +554,7 @@
       "vendor_package_orders",
       "vendor_packages",
       "vendor_profile_change_requests",
+      "vendor_reviews",
       "vendor_segments",
       "vendor_support_messages",
       "vendor_support_threads",
@@ -519,6 +570,11 @@
       "workflow_transition_history"
     ]
   },
+  "excludedWorktreeMigrations": [
+    "supabase/migrations/20260912010000_qf_vendor_package_razorpay_testmode.sql",
+    "supabase/migrations/20260912020000_qf_package_scope_governance.sql",
+    "supabase/migrations/20260912030000_qf_category_runtime_governance.sql"
+  ],
   "migrations": [
     {
       "file": "supabase/migrations/20260620000001_create_tables.sql",
@@ -571,9 +627,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -662,9 +718,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -672,7 +728,7 @@
       "name": "20260620000003_functions.sql",
       "order": 3,
       "timestampPrefix": "20260620000003",
-      "bytes": 16755,
+      "bytes": 17162,
       "objects": {
         "tablesCreated": [],
         "tablesAltered": [],
@@ -701,13 +757,13 @@
         "rlsEnabled": [],
         "policies": [],
         "grants": [
-          "execute ON get_public_eligible_vendors(text, text, text),\n  public.check_duplicate_lead(text, text, text),\n  public.get_setting_int(text, int) TO anon, authenticated, service_role"
+          "execute ON get_public_eligible_vendors(text, text, text),\r\n  public.check_duplicate_lead(text, text, text),\r\n  public.get_setting_int(text, int) TO anon, authenticated, service_role"
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -715,7 +771,7 @@
       "name": "20260620000004_seed_data.sql",
       "order": 4,
       "timestampPrefix": "20260620000004",
-      "bytes": 1784,
+      "bytes": 1826,
       "objects": {
         "tablesCreated": [],
         "tablesAltered": [],
@@ -732,9 +788,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -766,9 +822,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -877,9 +933,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -887,7 +943,7 @@
       "name": "20260622000007_vendor_location.sql",
       "order": 7,
       "timestampPrefix": "20260622000007",
-      "bytes": 1146,
+      "bytes": 1164,
       "objects": {
         "tablesCreated": [],
         "tablesAltered": [
@@ -915,9 +971,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -925,7 +981,7 @@
       "name": "20260624000008_lead_capture_consent.sql",
       "order": 8,
       "timestampPrefix": "20260624000008",
-      "bytes": 1021,
+      "bytes": 1038,
       "objects": {
         "tablesCreated": [],
         "tablesAltered": [
@@ -953,9 +1009,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -963,7 +1019,7 @@
       "name": "20260624000009_vendor_onboarding.sql",
       "order": 9,
       "timestampPrefix": "20260624000009",
-      "bytes": 1840,
+      "bytes": 1870,
       "objects": {
         "tablesCreated": [],
         "tablesAltered": [
@@ -998,9 +1054,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -1008,7 +1064,7 @@
       "name": "20260624000010_vendor_exact_columns.sql",
       "order": 10,
       "timestampPrefix": "20260624000010",
-      "bytes": 1859,
+      "bytes": 1889,
       "objects": {
         "tablesCreated": [],
         "tablesAltered": [
@@ -1042,9 +1098,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -1052,7 +1108,7 @@
       "name": "20260624000011_vendor_office_address.sql",
       "order": 11,
       "timestampPrefix": "20260624000011",
-      "bytes": 1233,
+      "bytes": 1253,
       "objects": {
         "tablesCreated": [],
         "tablesAltered": [
@@ -1080,9 +1136,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -1090,7 +1146,7 @@
       "name": "20260627000012_aos_management_foundation.sql",
       "order": 12,
       "timestampPrefix": "20260627000012",
-      "bytes": 23318,
+      "bytes": 23759,
       "objects": {
         "tablesCreated": [
           "aos_agent_logs",
@@ -1186,9 +1242,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -1196,7 +1252,7 @@
       "name": "20260627000013_crm_analytics_foundation.sql",
       "order": 13,
       "timestampPrefix": "20260627000013",
-      "bytes": 15160,
+      "bytes": 15486,
       "objects": {
         "tablesCreated": [
           "campaign_performance",
@@ -1274,9 +1330,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -1284,7 +1340,7 @@
       "name": "20260628000014_aos_control_center_foundation.sql",
       "order": 14,
       "timestampPrefix": "20260628000014",
-      "bytes": 30103,
+      "bytes": 30611,
       "objects": {
         "tablesCreated": [
           "aos_agent_logs",
@@ -1389,9 +1445,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -1399,7 +1455,7 @@
       "name": "20260628000015_crm_analytics_foundation_safe_placeholders.sql",
       "order": 15,
       "timestampPrefix": "20260628000015",
-      "bytes": 12705,
+      "bytes": 12987,
       "objects": {
         "tablesCreated": [
           "campaign_performance",
@@ -1476,9 +1532,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -1521,9 +1577,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -1574,9 +1630,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -1630,9 +1686,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -1668,9 +1724,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -1695,9 +1751,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -1734,9 +1790,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -1744,7 +1800,7 @@
       "name": "20260701000022_phase_25a_paid_only_auto_match_free_vendor_interest.sql",
       "order": 22,
       "timestampPrefix": "20260701000022",
-      "bytes": 5151,
+      "bytes": 5254,
       "objects": {
         "tablesCreated": [
           "free_vendor_profile_interests",
@@ -1777,9 +1833,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -1844,9 +1900,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -1907,9 +1963,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -1976,9 +2032,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2013,9 +2069,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2067,9 +2123,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2183,9 +2239,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2232,9 +2288,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2265,9 +2321,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2304,9 +2360,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2385,9 +2441,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2428,9 +2484,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2465,9 +2521,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2509,9 +2565,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2540,9 +2596,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2583,9 +2639,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2629,9 +2685,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2676,9 +2732,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2708,9 +2764,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2741,9 +2797,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2774,9 +2830,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2807,9 +2863,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2847,9 +2903,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2876,9 +2932,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2907,9 +2963,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2936,9 +2992,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -2967,9 +3023,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3078,9 +3134,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3118,9 +3174,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3168,9 +3224,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3205,9 +3261,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3261,9 +3317,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3316,9 +3372,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3377,9 +3433,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3432,9 +3488,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3468,9 +3524,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3546,9 +3602,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3602,9 +3658,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3654,9 +3710,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3717,9 +3773,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3758,9 +3814,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3830,9 +3886,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3873,9 +3929,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3932,9 +3988,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -3981,9 +4037,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4012,9 +4068,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4043,9 +4099,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4171,9 +4227,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4198,9 +4254,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4236,9 +4292,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4263,9 +4319,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4300,9 +4356,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4331,9 +4387,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4364,9 +4420,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4395,9 +4451,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4451,9 +4507,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4485,9 +4541,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4605,9 +4661,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4659,9 +4715,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4776,9 +4832,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4816,9 +4872,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4871,9 +4927,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -4907,9 +4963,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "ABSENT_AS_EXACT_VERSION",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5019,9 +5075,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5077,9 +5133,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5108,9 +5164,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5151,9 +5207,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5192,9 +5248,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5232,9 +5288,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5263,9 +5319,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5294,9 +5350,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5350,9 +5406,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5392,9 +5448,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5426,9 +5482,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5463,9 +5519,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5510,9 +5566,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5547,9 +5603,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5578,9 +5634,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5607,9 +5663,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5648,9 +5704,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5684,9 +5740,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5715,9 +5771,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5742,9 +5798,9 @@
         "grants": []
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5787,9 +5843,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5833,9 +5889,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5864,9 +5920,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5896,9 +5952,9 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
@@ -5927,17 +5983,86 @@
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260912021527_qf_launch_pune_only_city_activation.sql",
+      "name": "20260912021527_qf_launch_pune_only_city_activation.sql",
+      "order": 110,
+      "timestampPrefix": "20260912021527",
+      "bytes": 707,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": []
+      },
+      "appliedStatus": {
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260912024734_qf_active_city_authority_hardening.sql",
+      "name": "20260912024734_qf_active_city_authority_hardening.sql",
+      "order": 111,
+      "timestampPrefix": "20260912024734",
+      "bytes": 11022,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "get_public_eligible_vendors",
+          "qf_city_is_active",
+          "qf_enforce_active_city_on_assignment",
+          "qf_enforce_active_city_on_lead",
+          "qf_enforce_active_city_on_vendor",
+          "qf_vendor_assignment_eligible"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [
+          "trg_00_qf_lead_assignments_active_city_gate",
+          "trg_00_qf_leads_active_city_gate",
+          "trg_00_qf_vendors_active_city_gate"
+        ],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON get_public_eligible_vendors(text,text,text) TO public, anon, authenticated, service_role",
+          "execute ON qf_city_is_active(text) TO anon, authenticated, service_role",
+          "execute ON qf_vendor_assignment_eligible(uuid,uuid,integer) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     },
     {
       "file": "supabase/migrations/20260912040000_qf_aos_v2_intelligence.sql",
       "name": "20260912040000_qf_aos_v2_intelligence.sql",
-      "order": 110,
+      "order": 112,
       "timestampPrefix": "20260912040000",
-      "bytes": 11707,
+      "bytes": 11939,
       "objects": {
         "tablesCreated": [
           "aos_agent_logs",
@@ -5984,13 +6109,565 @@
           "select ON aos_agent_memory TO authenticated",
           "select ON aos_audit_logs TO authenticated",
           "select ON aos_recommendations TO authenticated",
-          "select ON aos_runs TO authenticated"
+          "select ON aos_runs TO authenticated",
+          "select, insert, update ON aos_agent_logs TO service_role",
+          "select, insert, update ON aos_agent_memory TO service_role",
+          "select, insert, update ON aos_audit_logs TO service_role",
+          "select, insert, update ON aos_recommendations TO service_role",
+          "select, insert, update ON aos_runs TO service_role"
         ]
       },
       "appliedStatus": {
-        "staging": "UNKNOWN_UNVERIFIED",
-        "production": "UNKNOWN_UNVERIFIED",
-        "note": "No DB access in this task; verify via QF-MVP-10.7 reconciliation."
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260912050000_qf_lead_generation_scope_lock.sql",
+      "name": "20260912050000_qf_lead_generation_scope_lock.sql",
+      "order": 113,
+      "timestampPrefix": "20260912050000",
+      "bytes": 22011,
+      "objects": {
+        "tablesCreated": [
+          "lead_connection_assurance"
+        ],
+        "tablesAltered": [
+          "automation_action_requests"
+        ],
+        "columnsAdded": [],
+        "constraints": [
+          "automation_action_requests_source_action_scope_check"
+        ],
+        "indexes": [
+          "idx_lead_connection_assurance_riya_due",
+          "idx_lead_connection_assurance_vendor"
+        ],
+        "functions": [
+          "qf_automation_vendor_business_state_v1",
+          "qf_mark_connection_client_response_v1",
+          "qf_mark_connection_riya_ready_v1",
+          "qf_produce_client_status_actions",
+          "qf_produce_vendor_assignment_actions",
+          "qf_record_vendor_client_response_v1"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [
+          "trg_qf_produce_vendor_assignment_actions"
+        ],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [
+          "lead_connection_assurance"
+        ],
+        "policies": [],
+        "grants": [
+          "execute ON qf_automation_vendor_business_state_v1(text, text, text, text) TO service_role",
+          "execute ON qf_mark_connection_client_response_v1(uuid, text) TO service_role",
+          "execute ON qf_mark_connection_riya_ready_v1(uuid) TO service_role",
+          "execute ON qf_record_vendor_client_response_v1(uuid, uuid, text) TO service_role",
+          "select, insert, update ON lead_connection_assurance TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260917000000_aarohi_acquisition_crm_foundation.sql",
+      "name": "20260917000000_aarohi_acquisition_crm_foundation.sql",
+      "order": 114,
+      "timestampPrefix": "20260917000000",
+      "bytes": 21742,
+      "objects": {
+        "tablesCreated": [
+          "aarohi_campaign_members",
+          "aarohi_campaigns",
+          "aarohi_channel_identities",
+          "aarohi_conversations",
+          "aarohi_events",
+          "aarohi_handoffs",
+          "aarohi_identity_matches",
+          "aarohi_interactions",
+          "aarohi_opportunities",
+          "aarohi_prospect_sources",
+          "aarohi_prospects",
+          "aarohi_scores",
+          "aarohi_tasks"
+        ],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [
+          "aarohi_conversations_prospect_idx",
+          "aarohi_events_idempotency_idx",
+          "aarohi_events_timeline_idx",
+          "aarohi_interactions_timeline_idx",
+          "aarohi_prospects_city_idx",
+          "aarohi_prospects_next_action_idx",
+          "aarohi_prospects_pipeline_idx",
+          "aarohi_scores_latest_idx",
+          "aarohi_sources_prospect_idx",
+          "aarohi_tasks_due_idx"
+        ],
+        "functions": [
+          "qf_aarohi_complete_handoff_v1",
+          "qf_aarohi_confirm_identity_match_v1",
+          "qf_aarohi_set_human_takeover_v1",
+          "qf_aarohi_suppress_prospect_v1"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [
+          "pgcrypto"
+        ],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_aarohi_complete_handoff_v1(uuid,uuid,uuid,text,text) TO service_role",
+          "execute ON qf_aarohi_confirm_identity_match_v1(uuid,uuid,uuid) TO service_role",
+          "execute ON qf_aarohi_set_human_takeover_v1(uuid,uuid,boolean,text) TO service_role",
+          "execute ON qf_aarohi_suppress_prospect_v1(uuid,uuid,text,text) TO service_role",
+          "select, insert ON aarohi_events TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260918093000_aarohi_anisha_vendor_crm_handoff.sql",
+      "name": "20260918093000_aarohi_anisha_vendor_crm_handoff.sql",
+      "order": 115,
+      "timestampPrefix": "20260918093000",
+      "bytes": 10458,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [
+          "vendor_crm_profiles"
+        ],
+        "columnsAdded": [
+          "aarohi_handoff_id",
+          "aarohi_prospect_id",
+          "acquisition_channel",
+          "acquisition_completed_at",
+          "acquisition_owner",
+          "acquisition_source"
+        ],
+        "constraints": [
+          "vcp_aarohi_handoff_fk",
+          "vcp_aarohi_prospect_fk",
+          "vcp_acquisition_channel_check",
+          "vcp_acquisition_owner_check",
+          "vcp_acquisition_source_check"
+        ],
+        "indexes": [
+          "vcp_aarohi_handoff_uidx",
+          "vcp_aarohi_prospect_uidx",
+          "vcp_acquisition_source_idx"
+        ],
+        "functions": [
+          "qf_aarohi_complete_handoff_v1"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_aarohi_complete_handoff_v1(uuid,uuid,uuid,text,text) TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260918120000_whatsapp_conversational_jarvis_foundation.sql",
+      "name": "20260918120000_whatsapp_conversational_jarvis_foundation.sql",
+      "order": 116,
+      "timestampPrefix": "20260918120000",
+      "bytes": 10323,
+      "objects": {
+        "tablesCreated": [
+          "communication_conversation_events",
+          "communication_conversation_outbox",
+          "communication_conversations",
+          "communication_jarvis_turn_outbox"
+        ],
+        "tablesAltered": [
+          "communication_inbound_messages",
+          "communication_messages",
+          "communication_provider_accounts"
+        ],
+        "columnsAdded": [
+          "account_alias",
+          "account_role",
+          "conversation_id",
+          "is_default_for_role",
+          "jarvis_access_mode"
+        ],
+        "constraints": [
+          "communication_conversation_human_state_chk",
+          "communication_conversation_jarvis_human_chk",
+          "communication_provider_account_alias_shape_chk",
+          "communication_provider_account_jarvis_role_chk"
+        ],
+        "indexes": [
+          "communication_conversation_active_destination_uidx",
+          "communication_conversation_actor_idx",
+          "communication_conversation_events_timeline_idx",
+          "communication_conversation_outbox_dispatch_idx",
+          "communication_conversation_outbox_provider_message_idx",
+          "communication_conversation_service_window_idx",
+          "communication_inbound_messages_conversation_idx",
+          "communication_jarvis_turn_outbox_dispatch_idx",
+          "communication_messages_conversation_idx",
+          "communication_provider_account_alias_uidx",
+          "communication_provider_default_conversational_uidx",
+          "communication_provider_default_transactional_uidx"
+        ],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "select,insert ON communication_conversation_events TO service_role",
+          "select,insert,update ON communication_conversation_outbox TO service_role",
+          "select,insert,update ON communication_conversations TO service_role",
+          "select,insert,update ON communication_jarvis_turn_outbox TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260918180500_jarvis_whatsapp_callback_replay_receipts.sql",
+      "name": "20260918180500_jarvis_whatsapp_callback_replay_receipts.sql",
+      "order": 117,
+      "timestampPrefix": "20260918180500",
+      "bytes": 1935,
+      "objects": {
+        "tablesCreated": [
+          "communication_jarvis_callback_receipts"
+        ],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [
+          "communication_jarvis_callback_receipt_finalize_chk"
+        ],
+        "indexes": [
+          "communication_jarvis_callback_receipts_created_idx"
+        ],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [
+          "communication_jarvis_callback_receipts"
+        ],
+        "policies": [],
+        "grants": [
+          "select,insert,update ON communication_jarvis_callback_receipts TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260919010000_vendor_review_system.sql",
+      "name": "20260919010000_vendor_review_system.sql",
+      "order": 118,
+      "timestampPrefix": "20260919010000",
+      "bytes": 2768,
+      "objects": {
+        "tablesCreated": [
+          "vendor_reviews"
+        ],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [
+          "vendor_reviews_one_per_vendor_lead",
+          "vendor_reviews_verified_source"
+        ],
+        "indexes": [
+          "idx_vendor_reviews_moderation",
+          "idx_vendor_reviews_public"
+        ],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [
+          "vendor_reviews"
+        ],
+        "policies": [],
+        "grants": [
+          "select, insert, update ON vendor_reviews TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260921054654_qf_audit_security_hardening.sql",
+      "name": "20260921054654_qf_audit_security_hardening.sql",
+      "order": 119,
+      "timestampPrefix": "20260921054654",
+      "bytes": 4054,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [],
+        "securityDefinerFunctions": true,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON is_admin() TO authenticated, service_role",
+          "execute ON owns_vendor(uuid) TO authenticated, service_role",
+          "execute ON qf_produce_campaign_recipient_action() TO service_role",
+          "execute ON qf_produce_vendor_low_credit_warning() TO service_role",
+          "execute ON qf_produce_vendor_onboarding_reminder() TO service_role",
+          "execute ON qf_produce_vendor_package_expiry_warnings() TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260921055639_qf_audit_rpc_surface_hardening.sql",
+      "name": "20260921055639_qf_audit_rpc_surface_hardening.sql",
+      "order": 120,
+      "timestampPrefix": "20260921055639",
+      "bytes": 1564,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": [
+          "execute ON qf_produce_vendor_assignment_actions() TO service_role",
+          "execute ON rls_auto_enable() TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260922120000_false_ceiling_category.sql",
+      "name": "20260922120000_false_ceiling_category.sql",
+      "order": 121,
+      "timestampPrefix": "20260922120000",
+      "bytes": 8899,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [
+          "qf_category_groups_for_label",
+          "qf_parent_category_group"
+        ],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [],
+        "grants": []
+      },
+      "appliedStatus": {
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260923170217_vendor_media_bucket.sql",
+      "name": "20260923170217_vendor_media_bucket.sql",
+      "order": 122,
+      "timestampPrefix": "20260923170217",
+      "bytes": 1365,
+      "objects": {
+        "tablesCreated": [],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [],
+        "policies": [
+          "vendor media public read ON storage.objects"
+        ],
+        "grants": []
+      },
+      "appliedStatus": {
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260924183000_jarvis_os_operator_command_receipts.sql",
+      "name": "20260924183000_jarvis_os_operator_command_receipts.sql",
+      "order": 123,
+      "timestampPrefix": "20260924183000",
+      "bytes": 1662,
+      "objects": {
+        "tablesCreated": [
+          "jarvis_os_operator_command_receipts"
+        ],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [
+          "jarvis_os_operator_command_receipts_final_shape"
+        ],
+        "indexes": [],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [
+          "jarvis_os_operator_command_receipts"
+        ],
+        "policies": [],
+        "grants": [
+          "select, insert, update ON jarvis_os_operator_command_receipts TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "ABSENT_AS_EXACT_VERSION",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260926035801_qf_jarvis_service_availability_deploy.sql",
+      "name": "20260926035801_qf_jarvis_service_availability_deploy.sql",
+      "order": 124,
+      "timestampPrefix": "20260926035801",
+      "bytes": 3330,
+      "objects": {
+        "tablesCreated": [
+          "jarvis_service_availability_pairs",
+          "jarvis_service_availability_taxonomy"
+        ],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [
+          "idx_jarvis_service_availability_pairs_active"
+        ],
+        "functions": [
+          "bump_jarvis_service_availability_taxonomy"
+        ],
+        "securityDefinerFunctions": true,
+        "triggers": [
+          "trg_jarvis_availability_cities",
+          "trg_jarvis_availability_pairs",
+          "trg_jarvis_availability_services"
+        ],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [
+          "jarvis_service_availability_pairs",
+          "jarvis_service_availability_taxonomy"
+        ],
+        "policies": [],
+        "grants": [
+          "select ON jarvis_service_availability_pairs TO service_role",
+          "select ON jarvis_service_availability_taxonomy TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
+      }
+    },
+    {
+      "file": "supabase/migrations/20260926035856_qf_lead_drafts_deploy.sql",
+      "name": "20260926035856_qf_lead_drafts_deploy.sql",
+      "order": 125,
+      "timestampPrefix": "20260926035856",
+      "bytes": 1987,
+      "objects": {
+        "tablesCreated": [
+          "lead_drafts"
+        ],
+        "tablesAltered": [],
+        "columnsAdded": [],
+        "constraints": [],
+        "indexes": [
+          "lead_drafts_created_at_idx",
+          "lead_drafts_stage_idx"
+        ],
+        "functions": [],
+        "securityDefinerFunctions": false,
+        "triggers": [],
+        "enums": [],
+        "extensions": [],
+        "rlsEnabled": [
+          "lead_drafts"
+        ],
+        "policies": [],
+        "grants": [
+          "select, insert, update ON lead_drafts TO service_role"
+        ]
+      },
+      "appliedStatus": {
+        "staging": "PRESENT_IN_REMOTE_HISTORY",
+        "production": "PRESENT_IN_REMOTE_HISTORY",
+        "note": "Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist."
       }
     }
   ]

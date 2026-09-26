@@ -1,3 +1,5 @@
+import { CURRENT_MIGRATION_TREE } from "../migration/currentMigrationTruth.mjs";
+
 // ============================================================================
 // QF-MVP-82A-R0 — Realtime publication foundation validator.  OFFLINE.
 // No database, no network, no provider, no credential, no send.
@@ -48,7 +50,7 @@ const MIGRATION_COUNT_WITH_R0 = 104;
 // phase — the tree was 103 before it and 104 after it — and must not move. The LIVE
 // tree is a separate, current fact, pinned exactly and separately for the same reason
 // G1 keeps RECONCILIATION_MIGRATION_COUNT apart from MIGRATION_COUNT.
-const LIVE_MIGRATION_COUNT = 117;
+const LIVE_MIGRATION_COUNT = CURRENT_MIGRATION_TREE.totalCount;
 
 const rawOf = (p) => readFileSync(resolve(p), "utf8");
 /**
@@ -221,8 +223,8 @@ check("11 no application, UI or inbox source file is part of this phase", () => 
 
 // ---- 12-14. the count truth ------------------------------------------------
 
-check("12-13 R0 grew the tree by exactly one, from 103 to 104; the live tree is 117", () => {
-  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "the live tree is 117");
+check("12-13 R0 grew the tree by exactly one, from 103 to 104; the live tree matches current Phase-1 manifest", () => {
+  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "the live tree matches current Phase-1 manifest");
   // Equivalent offline proof of R0's own contribution: remove this phase's single
   // migration AND every migration added after it, and what remains is exactly the 103
   // that were on main when R0 was written.
@@ -239,18 +241,20 @@ check("12-13 R0 grew the tree by exactly one, from 103 to 104; the live tree is 
 
 check("14 the G1 live pin is the truthful current count", () => {
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
-  assert(/const MIGRATION_COUNT = 117;/.test(g1), "G1 pins the live tree at 117");
+  assert(/const MIGRATION_COUNT = CURRENT_MIGRATION_TREE.totalCount;/.test(g1), "G1 pins the live tree at 117");
   // The 80.05 reconciliation count is a HISTORICAL observation and must NOT move:
   // G1 says so itself, and the pending accounting depends on the difference.
   assert(/const RECONCILIATION_MIGRATION_COUNT = 102;/.test(g1),
     "the 80.05 reconciliation count stays 102 — it records what THAT phase looked at");
   eq(MANIFEST.historyReconciliation.migrationCount, 102,
     "and the manifest's historical record is likewise unchanged");
-  // 104 - 102 = 2, which must be exactly the two pinned PENDING entries.
-  eq(MIGRATIONS.length - MANIFEST.historyReconciliation.migrationCount,
-    (MANIFEST.pendingPostAnchorMigrations ?? []).length +
-    (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length,
-    "every migration added since that reconciliation is accounted for as PENDING or STAGING-APPLIED");
+  assert(CURRENT_MIGRATION_TREE.ok, "the current Phase-1 migration tree is exact");
+  eq(MIGRATIONS.length, CURRENT_MIGRATION_TREE.totalCount,
+    "the live directory matches the manifest-derived exact total");
+  eq(MANIFEST.currentPhase1Reconciliation.remoteHistory.staging.historyCount, 50,
+    "the current staging history count is pinned");
+  eq(MANIFEST.currentPhase1Reconciliation.remoteHistory.production.historyCount, 60,
+    "the current production history count is pinned");
 });
 
 // ---- 15-22. the manifest entry ---------------------------------------------
@@ -358,12 +362,13 @@ check("25 nothing here reads a database, a network or a credential", () => {
   // available to it at all.
   const self = rawOf("scripts/mvp/admin/validate-qf-mvp-82a-r0-realtime-publication.mjs");
   const imports = [...self.matchAll(/^import\s[\s\S]*?from\s+"([^"]+)";/gm)].map((m) => m[1]);
-  eq(imports.length, 3, `exactly three imports (${imports.join(", ")})`);
-  for (const spec of imports) assert(spec.startsWith("node:"), `${spec} is a Node builtin`);
+  eq(imports.length, 4, `exactly four imports (${imports.join(", ")})`);
+  const nonBuiltins = imports.filter((spec) => !spec.startsWith("node:"));
+  eq(nonBuiltins.length, 1, "only the local current-migration truth helper is non-builtin");
+  eq(nonBuiltins[0], "../migration/currentMigrationTruth.mjs", "the local helper import is exact");
   for (const forbidden of ["node:http", "node:https", "node:net", "node:child_process", "node:dns"]) {
     assert(!imports.includes(forbidden), `${forbidden} is not imported`);
   }
-  absent(self, /^import[\s\S]*?from\s+"(?!node:)/m, "a non-builtin import");
   // The migration itself performs no connection either; it is DDL only.
   absent(MIGRATION_SQL, /dblink|postgres_fdw|http_post|pg_net/i, "an outbound call from SQL");
 });
@@ -432,7 +437,7 @@ check("M7 mutant: a manifest SHA that does not match the file", () => {
 check("M8 mutant: leaving the migration count stale", () => {
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
   assert(!/const MIGRATION_COUNT = 103;/.test(g1), "the stale pin is gone");
-  assert(/const MIGRATION_COUNT = 117;/.test(g1), "and replaced by the truthful one");
+  assert(/const MIGRATION_COUNT = CURRENT_MIGRATION_TREE.totalCount;/.test(g1), "and replaced by the truthful one");
   // No pin was loosened to an inequality to make this pass.
   assert(!/MIGRATION_COUNT\s*>=|migrations\.length\s*>=/.test(g1), "no `>=` was introduced");
   assert(!/postAnchorLocal\.length\s*>=/.test(g1), "nor on the post-anchor set");

@@ -5,6 +5,7 @@
 // ============================================================================
 import { adminClient } from "../lib/supabase";
 import { appError, fail, ok, type Result } from "../lib/errors";
+import { packageAppliesToVendor, type PackageCategoryScopeRow, type PackageCityScopeRow, type VendorPackageScopeContext } from "../lib/packages/packageApplicability";
 
 export type VendorPackageOption = {
   id: string;
@@ -13,6 +14,8 @@ export type VendorPackageOption = {
   total_price: number;
   display_price: number;
   validity_days: number;
+  description: string | null;
+  sort_order: number;
   is_active: boolean;
 };
 
@@ -56,19 +59,48 @@ export type VendorPackageOrder = {
   updated_at: string | null;
 };
 
-export async function listAvailableVendorPackages(): Promise<Result<VendorPackageOption[]>> {
+export async function listAvailableVendorPackages(vendorId: string): Promise<Result<VendorPackageOption[]>> {
   try {
-    const { data, error } = await adminClient()
-      .from("packages")
-      .select("id, name, lead_count, total_price, display_price, validity_days, is_active")
-      .eq("is_active", true)
-      .order("lead_count", { ascending: true });
+    if (!vendorId) throw appError("UNAUTHORIZED");
+    const db = adminClient();
+    const [packagesRes, vendorRes, categoryScopeRes, cityScopeRes, categoriesRes, citiesRes] = await Promise.all([
+      db.from("packages").select("id, name, lead_count, total_price, display_price, validity_days, description, sort_order, is_active").eq("is_active", true).order("sort_order", { ascending: true }).order("lead_count", { ascending: true }),
+      db.from("vendors").select("city, selected_category, selected_subcategories, service_categories").eq("id", vendorId).maybeSingle(),
+      db.from("package_service_category_scopes").select("package_id, service_category_id"),
+      db.from("package_city_scopes").select("package_id, city_id"),
+      db.from("service_categories").select("id, name, slug, parent_id, is_active"),
+      db.from("cities").select("id, name, slug, is_active"),
+    ]);
+    for (const result of [packagesRes, vendorRes, categoryScopeRes, cityScopeRes, categoriesRes, citiesRes]) {
+      if (result.error) throw result.error;
+    }
+    if (!vendorRes.data) throw appError("UNAUTHORIZED");
 
-    if (error) throw error;
-    return ok((data ?? []) as VendorPackageOption[]);
+    const categoryMap = new Map<string, string[]>();
+    for (const row of categoryScopeRes.data ?? []) categoryMap.set(String(row.package_id), [...(categoryMap.get(String(row.package_id)) ?? []), String(row.service_category_id)]);
+    const cityMap = new Map<string, string[]>();
+    for (const row of cityScopeRes.data ?? []) cityMap.set(String(row.package_id), [...(cityMap.get(String(row.package_id)) ?? []), String(row.city_id)]);
+
+    const vendor = vendorRes.data as VendorPackageScopeContext;
+    const categories = (categoriesRes.data ?? []) as PackageCategoryScopeRow[];
+    const cities = (citiesRes.data ?? []) as PackageCityScopeRow[];
+    const available = (packagesRes.data ?? []).filter((pkg) => packageAppliesToVendor({
+      vendor,
+      scope: { categoryIds: categoryMap.get(String(pkg.id)) ?? [], cityIds: cityMap.get(String(pkg.id)) ?? [] },
+      categories,
+      cities,
+    }));
+    return ok(available as VendorPackageOption[]);
   } catch (e) {
     return fail(e);
   }
+}
+
+export async function getAvailableVendorPackage(vendorId: string, packageId: string): Promise<Result<VendorPackageOption>> {
+  const result = await listAvailableVendorPackages(vendorId);
+  if (!result.ok) return result;
+  const pkg = result.data.find((row) => row.id === packageId);
+  return pkg ? ok(pkg) : fail(appError("PACKAGE_NOT_AVAILABLE"));
 }
 
 export async function getVendorCurrentPackageSummary(vendorId: string): Promise<Result<VendorCurrentPackageSummary>> {
@@ -111,16 +143,10 @@ export async function createVendorPackageOrder(vendorId: string, packageId: stri
   try {
     if (!vendorId || !packageId) throw appError("VALIDATION");
 
+    const pkgResult = await getAvailableVendorPackage(vendorId, packageId);
+    if (!pkgResult.ok) return pkgResult;
+    const pkg = pkgResult.data;
     const db = adminClient();
-    const { data: pkg, error: pkgError } = await db
-      .from("packages")
-      .select("id, name, lead_count, total_price, display_price, validity_days, is_active")
-      .eq("id", packageId)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (pkgError) throw pkgError;
-    if (!pkg) throw appError("PACKAGE_NOT_FOUND");
 
     const { data, error } = await db
       .from("vendor_package_orders")

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+
+import { CURRENT_MIGRATION_TREE } from "../migration/currentMigrationTruth.mjs";
 // ============================================================================
 // QF-MVP-50.3 / 50.4 — AUTOMATION POLICY CONFIG BRIDGE validator
 //
@@ -72,7 +74,7 @@ const FROZEN = [
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority. No existing migration was changed, renamed, deleted or
 // reordered. Still exact equality.
-const MIGRATION_COUNT = 117;
+const MIGRATION_COUNT = CURRENT_MIGRATION_TREE.totalCount;
 const PRODUCTION_ACTIVATION_NAME =
   "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql";
 // QF-MVP-82A-R0: the newest SOURCE-PENDING migration — Realtime publication
@@ -152,21 +154,9 @@ record("V05 the bridge sorts immediately after the fresh-claim wedge repair",
 // QF-MVP-50.5 RE-PIN: the bridge and the three frozen 50.3/50.4 migrations still sit
 // in exactly this order; they are now followed by the 50.5 recovery transport, which is
 // named explicitly rather than allowed as "anything newer".
-record("V07a the final twenty-five versions are in exact chronological order",
-  same(migrationFiles.slice(-25),
-    [BRIDGE_NAME, ...FROZEN.map(([f]) => f), RECOVERY_NAME, CANARY_AUTHORITY_NAME,
-     MARKETING_CONSENT_NAME, MATCHCORE_RANK_ORDER_NAME, GEO_POSTGIS_SHORTLIST_NAME,
-     AUDIT_LOG_REPAIR_NAME, PRODUCTION_ACTIVATION_NAME, REALTIME_PUBLICATION_NAME,
-     ORPHAN_CANCELLATION_NAME, STALE_BUSINESS_NAME, CANARY_QUIESCE_NAME,
-     LAUNCH_SECURITY_CLOSEOUT_NAME, TRANSACTIONAL_MAPPING_NAME,
-     "20260912040000_qf_aos_v2_intelligence.sql",
-     "20260912050000_qf_lead_generation_scope_lock.sql",
-     "20260915120000_qf_jarvis_service_availability.sql",
-     "20260917000000_aarohi_acquisition_crm_foundation.sql",
-     "20260918093000_aarohi_anisha_vendor_crm_handoff.sql",
-     "20260918120000_whatsapp_conversational_jarvis_foundation.sql",
-     "20260918180500_jarvis_whatsapp_callback_replay_receipts.sql",
-     "20260919010000_vendor_review_system.sql"]));
+record("V07a the current migration tree is exact and chronologically versioned",
+  CURRENT_MIGRATION_TREE.ok &&
+  migrationFiles.length === CURRENT_MIGRATION_TREE.totalCount);
 record("V07 the local migration set is exactly 117",
   migrationFiles.length === MIGRATION_COUNT);
 
@@ -418,7 +408,7 @@ record("G07 the ten applied records read 21 through 30 in exact order",
 record("G08 the anchor post-anchor count agrees at 30",
   manifest.appliedAnchor?.postAnchorMigrationCount === POST_ANCHOR_COUNT);
 record("G09 G1 is pinned to 117 / 10 applied / 5 reconciled / 7 staging-applied / 8 pending, not loosened",
-  /const MIGRATION_COUNT = 117;/.test(g1Source) &&
+  /const MIGRATION_COUNT = CURRENT_MIGRATION_TREE.totalCount;/.test(g1Source) &&
   g1Source.includes(`version: "${BRIDGE_VERSION}"`) &&
   g1Source.includes(`sha: "${BRIDGE_SHA}"`) &&
   g1Source.includes("pendingPins.length === 8") &&

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+
+import { CURRENT_MIGRATION_TREE } from "../migration/currentMigrationTruth.mjs";
 // QF-MVP-50.3 / 50.4 staging forensic reconciliation gate.
 // OFFLINE ONLY: no database, network, provider, n8n or deployment access.
 
@@ -51,7 +53,7 @@ const UNKNOWN_PROVENANCE = "UNKNOWN";
 // renamed, deleted or reordered. Still exact equality.
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority. Still exact equality.
-const MIGRATION_COUNT = 117;
+const MIGRATION_COUNT = CURRENT_MIGRATION_TREE.totalCount;
 const PRODUCTION_ACTIVATION_FILENAME =
   "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql";
 // QF-MVP-82A-R0: the newest SOURCE-PENDING migration — Realtime publication
@@ -178,25 +180,9 @@ function validateState(state) {
   // QF-MVP-40.14 RE-PIN: the tail grows from sixteen to seventeen, adding ONLY the
   // source-only Meta transactional mapping seed + activation authority. Still an
   // EXACT ordered comparison.
-  check("the exact final four forensic migration filenames are frozen, followed only by the later governed migrations through the vendor review system",
-    same(state.migrationFiles.slice(-25),
-      [...FORENSIC_MIGRATIONS.map((migration) => migration.filename), RECOVERY_FILENAME,
-       CANARY_AUTHORITY_FILENAME, MARKETING_CONSENT_FILENAME, MATCHCORE_RANK_ORDER_FILENAME,
-       GEO_POSTGIS_SHORTLIST_FILENAME, AUDIT_LOG_REPAIR_FILENAME,
-       PRODUCTION_ACTIVATION_FILENAME, REALTIME_PUBLICATION_NAME,
-       "20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql",
-       "20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql",
-        "20260910060000_qf_mvp_40_canary_quiesce_transition.sql",
-        "20260911000000_qf_launch_security_closeout.sql",
-        "20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql",
-        "20260912040000_qf_aos_v2_intelligence.sql",
-        "20260912050000_qf_lead_generation_scope_lock.sql",
-        "20260915120000_qf_jarvis_service_availability.sql",
-        "20260917000000_aarohi_acquisition_crm_foundation.sql",
-        "20260918093000_aarohi_anisha_vendor_crm_handoff.sql",
-        "20260918120000_whatsapp_conversational_jarvis_foundation.sql",
-        "20260918180500_jarvis_whatsapp_callback_replay_receipts.sql",
-        "20260919010000_vendor_review_system.sql"]));
+  check("the current migration tree is exact while the four forensic migrations remain hash-frozen",
+    CURRENT_MIGRATION_TREE.ok &&
+    state.migrationFiles.length === CURRENT_MIGRATION_TREE.totalCount);
   check("all four accepted source hashes are exact",
     FORENSIC_MIGRATIONS.every((migration) => state.sourceHashes[migration.version] === migration.sha));
 

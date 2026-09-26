@@ -30,7 +30,7 @@ export default async function VendorPackagePage({ searchParams }: VendorPackageP
   // The same three reads the pre-V2 page made, unchanged.
   const [summaryRes, packagesRes, ordersRes] = await Promise.all([
     getVendorCurrentPackageSummary(vendor.id),
-    listAvailableVendorPackages(),
+    listAvailableVendorPackages(vendor.id),
     listVendorPackageOrders(vendor.id),
   ]);
 

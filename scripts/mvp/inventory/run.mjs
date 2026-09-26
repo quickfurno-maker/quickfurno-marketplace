@@ -22,6 +22,7 @@ import {
   detectExternal, detectSupabase, detectRouteMethods, detectDirectives, extractExports, stableJson,
 } from './lib/util.mjs';
 import { extractSqlObjects } from './lib/sql.mjs';
+import { getCurrentMigrationTruth } from '../migration/currentMigrationTruth.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -142,20 +143,33 @@ function scanPackageAndConfig() {
 // --- Migrations -------------------------------------------------------------
 function scanMigrations() {
   const dir = path.join(REPO, 'supabase/migrations');
-  const files = walk(dir, ['.sql']).sort();
+  const { current } = getCurrentMigrationTruth();
+  const excludedNames = new Set(
+    (current.source?.worktreeInProgressExcludedMigrations ?? []).map((record) => record.filename),
+  );
+  const allFiles = walk(dir, ['.sql']).sort();
+  const excludedWorktreeMigrations = allFiles.filter((f) => excludedNames.has(path.basename(f)));
+  const files = allFiles.filter((f) => !excludedNames.has(path.basename(f)));
+  const stagingVersions = new Set((current.remoteHistory?.staging?.migrations ?? []).map((record) => record.version));
+  const productionVersions = new Set((current.remoteHistory?.production?.migrations ?? []).map((record) => record.version));
   const migrations = files.map((f, i) => {
     const r = rel(REPO, f);
     const base = path.basename(f);
     const tsMatch = base.match(/^(\d+)/);
+    const version = tsMatch ? tsMatch[1] : null;
     const sql = readText(f);
     return {
       file: r,
       name: base,
       order: i + 1,
-      timestampPrefix: tsMatch ? tsMatch[1] : null,
+      timestampPrefix: version,
       bytes: Buffer.byteLength(sql, 'utf8'),
       objects: extractSqlObjects(sql),
-      appliedStatus: { staging: 'UNKNOWN_UNVERIFIED', production: 'UNKNOWN_UNVERIFIED', note: 'No DB access in this task; verify via QF-MVP-10.7 reconciliation.' },
+      appliedStatus: {
+        staging: version && stagingVersions.has(version) ? 'PRESENT_IN_REMOTE_HISTORY' : 'ABSENT_AS_EXACT_VERSION',
+        production: version && productionVersions.has(version) ? 'PRESENT_IN_REMOTE_HISTORY' : 'ABSENT_AS_EXACT_VERSION',
+        note: 'Exact-version history evidence from currentPhase1Reconciliation. Absence does not imply semantic absence where environment-specific baselines exist.',
+      },
     };
   });
   // Aggregate unique objects across all migrations (repository declarations).
@@ -170,7 +184,7 @@ function scanMigrations() {
     agg.rlsEnabled.push(...m.objects.rlsEnabled);
   }
   for (const k of Object.keys(agg)) agg[k] = uniqSort(agg[k]);
-  return { migrations, aggregate: agg };
+  return { migrations, aggregate: agg, excludedWorktreeMigrations };
 }
 
 function main() {
@@ -209,9 +223,10 @@ function main() {
   const ledger = {
     schemaVersion: 1,
     generator: 'scripts/mvp/inventory/run.mjs',
-    note: 'Regex-extracted OBJECT DECLARATIONS from committed migration SQL — repository evidence only. Applied-in-DB status is UNKNOWN_UNVERIFIED (see docs/QF-MVP-10-DATABASE-RECONCILIATION.md). Not a full SQL parser.',
+    note: 'Regex-extracted OBJECT DECLARATIONS from canonical migration SQL. Exact-version staging/production presence comes from currentPhase1Reconciliation; environment-specific baseline equivalence is governed separately. Not a full SQL parser.',
     counts: {
       migrations: mig.migrations.length,
+      excludedWorktreeMigrations: mig.excludedWorktreeMigrations.length,
       uniqueTablesCreated: mig.aggregate.tablesCreated.length,
       uniqueFunctions: mig.aggregate.functions.length,
       uniqueTriggers: mig.aggregate.triggers.length,
@@ -221,6 +236,7 @@ function main() {
       tablesWithRlsEnabled: mig.aggregate.rlsEnabled.length,
     },
     aggregate: mig.aggregate,
+    excludedWorktreeMigrations: mig.excludedWorktreeMigrations.map((f) => rel(REPO, f)),
     migrations: mig.migrations,
   };
 

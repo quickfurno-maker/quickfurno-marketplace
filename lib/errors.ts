@@ -23,6 +23,7 @@ const MESSAGES: Record<string, string> = {
   PAYMENT_NOT_FOUND: "Payment not found.",
   PAYMENT_NOT_PAID: "Payment is not marked as paid yet.",
   PACKAGE_NOT_FOUND: "Package not found.",
+  PACKAGE_NOT_AVAILABLE: "This package is not available for your city or service category.",
   VALIDATION: "Some required fields are missing or invalid.",
   REPORT_WINDOW_CLOSED: "Bad-lead reports must be filed within the allowed window.",
   UNKNOWN: "Something went wrong. Please try again.",

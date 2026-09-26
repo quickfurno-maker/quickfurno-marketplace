@@ -157,13 +157,21 @@ export async function getAdminSubscriptionsPage(query: AdminSubscriptionsQuery):
 export async function getAdminPackagesPage(): Promise<Result<Row>> {
   try {
     const db = adminClient();
-    const [packages, paidAgg] = await Promise.all([
-      // Small config table: complete read is required (cards + management).
-      safeAggregateRows("packages.all", db.from("packages").select("*").order("lead_count", { ascending: true })),
+    const [packages, paidAgg, categoryScopes, cityScopes, categories, cities] = await Promise.all([
+      safeAggregateRows("packages.all", db.from("packages").select("*").order("sort_order", { ascending: true }).order("lead_count", { ascending: true })),
       safeAggregateRows("payments.paidAgg", db.from("payments").select("amount").eq("payment_status", "Paid")),
+      safeAggregateRows("packageCategoryScopes.all", db.from("package_service_category_scopes").select("package_id, service_category_id")),
+      safeAggregateRows("packageCityScopes.all", db.from("package_city_scopes").select("package_id, city_id")),
+      safeAggregateRows("packageCategories.all", db.from("service_categories").select("id, name, slug, parent_id, is_active, sort_order").order("sort_order", { ascending: true }).order("name", { ascending: true })),
+      safeAggregateRows("packageCities.all", db.from("cities").select("id, name, slug, state, is_active, launch_status, sort_order").order("sort_order", { ascending: true }).order("name", { ascending: true })),
     ]);
+    const categoryIds = new Map<string, string[]>();
+    for (const row of categoryScopes) categoryIds.set(String(row.package_id), [...(categoryIds.get(String(row.package_id)) ?? []), String(row.service_category_id)]);
+    const cityIds = new Map<string, string[]>();
+    for (const row of cityScopes) cityIds.set(String(row.package_id), [...(cityIds.get(String(row.package_id)) ?? []), String(row.city_id)]);
+    const scopedPackages = packages.map((row) => ({ ...row, category_ids: categoryIds.get(String(row.id)) ?? [], city_ids: cityIds.get(String(row.id)) ?? [] }));
     const totalRevenue = paidAgg.reduce((sum, r) => sum + Number(r.amount ?? 0), 0);
-    return ok({ packages, totalRevenue });
+    return ok({ packages: scopedPackages, totalRevenue, categories, cities });
   } catch (e) {
     return fail(e);
   }

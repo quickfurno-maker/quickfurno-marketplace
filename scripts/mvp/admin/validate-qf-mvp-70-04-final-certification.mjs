@@ -1,3 +1,5 @@
+import { CURRENT_MIGRATION_TREE } from "../migration/currentMigrationTruth.mjs";
+
 // ============================================================================
 // QF-MVP-70.04 — Phase 70 FINAL CERTIFICATION harness.
 //
@@ -660,7 +662,7 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority (20260903040000). This phase still adds no migration of its
 // own; the count is re-pinned by exact equality, never loosened.
-check("migration count is re-pinned at 117", migrations.length === 117);
+check("migration tree matches current Phase-1 manifest", CURRENT_MIGRATION_TREE.ok && migrations.length === CURRENT_MIGRATION_TREE.totalCount);
 check(
   "no Phase 70 migration exists",
   !migrations.some((f) => /qf_mvp_70|mvp_?70|operations_control|launch_control|launch_readiness|attention_queue/i.test(f)),

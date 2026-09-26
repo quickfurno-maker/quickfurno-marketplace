@@ -1,3 +1,5 @@
+import { CURRENT_MIGRATION_TREE } from "../migration/currentMigrationTruth.mjs";
+
 // ============================================================================
 // QF-MVP-70.03 — Launch control consolidation invariants harness.
 //
@@ -86,7 +88,7 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority (20260903040000). This phase still adds no migration of its
 // own; the count is re-pinned by exact equality, never loosened.
-check("migration count is re-pinned at 117", migrations.length === 117);
+check("migration tree matches current Phase-1 manifest", CURRENT_MIGRATION_TREE.ok && migrations.length === CURRENT_MIGRATION_TREE.totalCount);
 // Narrow to names THIS phase could plausibly introduce: "control" and
 // "readiness" already appear in three pre-existing migration filenames.
 check("no launch-control migration was added", !migrations.some((f) => /qf_mvp_70|mvp70|launch_control|launch_readiness/i.test(f)));

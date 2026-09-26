@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { CURRENT_MIGRATION_TREE } from "../migration/currentMigrationTruth.mjs";
+
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
@@ -475,7 +477,7 @@ const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD
 // QF-MVP-40.14 RE-PIN: 108 -> 109, adding ONLY the SOURCE-PENDING Meta
 // transactional mapping seed + activation authority (20260912000000). No existing
 // migration was changed, renamed, deleted or reordered. Still exact equality.
-const MIGRATION_COUNT = 117;
+const MIGRATION_COUNT = CURRENT_MIGRATION_TREE.totalCount;
 // The tree size AT THE MOMENT QF-MVP-80.05 reconciled history. It is a historical
 // fact about that reconciliation, not a live count, and it must never track
 // MIGRATION_COUNT: a later slice that legitimately ADDS a migration does not

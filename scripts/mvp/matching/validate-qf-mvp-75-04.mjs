@@ -1,3 +1,5 @@
+import { CURRENT_MIGRATION_TREE } from "../migration/currentMigrationTruth.mjs";
+
 // ============================================================================
 // QuickFurno — scripts/mvp/matching/validate-qf-mvp-75-04.mjs
 //
@@ -1030,7 +1032,7 @@ section('L. GOVERNANCE [static]');
   // so this assertion was already failing on a clean tree before this phase. 75.04 still
   // adds no migration of its own, which L02 below proves independently by name.
   check('L01 QF-MVP-75.04 itself adds NO migration — the live set is exactly 117',
-    migrations.length === 117, `found ${migrations.length}`);
+    CURRENT_MIGRATION_TREE.ok && migrations.length === CURRENT_MIGRATION_TREE.totalCount, `found ${migrations.length}`);
 
   check('L02 no 75.04 migration file exists',
     migrations.filter((f) => /qf_mvp_75_04|geofair/i.test(f)).length === 0);

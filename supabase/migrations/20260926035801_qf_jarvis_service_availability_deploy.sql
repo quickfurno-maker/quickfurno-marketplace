@@ -1,5 +1,3 @@
-begin;
-
 create table if not exists public.jarvis_service_availability_taxonomy (
   singleton boolean primary key default true check (singleton),
   taxonomy_version bigint not null default 1 check (taxonomy_version between 1 and 1000000),
@@ -67,5 +65,3 @@ comment on table public.jarvis_service_availability_pairs is
   'Core-owned explicit city-service availability pairs for the signed Jarvis read boundary. No inferred cross-product.';
 comment on function public.bump_jarvis_service_availability_taxonomy() is
   'Advances the bounded Jarvis availability generation after a Core catalogue or explicit-pair mutation.';
-
-commit;

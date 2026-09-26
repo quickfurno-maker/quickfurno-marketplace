@@ -1,0 +1,125 @@
+{
+  "phase": "QF-PHASE3-CLIENT-JOURNEY-CERTIFICATION-20260926",
+  "status": "CORE_CLIENT_JOURNEY_CERTIFIED_RELEASE_GATE_BLOCKED_BY_QUARANTINED_PACKAGE_UI",
+  "environment": {
+    "stagingProjectRef": "uckafzuochmbvtiodmcl",
+    "productionProjectRef": "yqpgcsduqbxulrlzwzap",
+    "productionReadOnly": true
+  },
+  "executionModel": {
+    "live": "staging database authority, triggers, automation, recovery, delivery persistence",
+    "serviceLayer": "offline repository harnesses",
+    "reason": "Local .env.local points to production and contains no staging service-role key; production credentials were not reused."
+  },
+  "fixture": {
+    "leadId": "00fcea8e-c638-4b2d-8573-32bf022848da",
+    "matchingRunId": "deaf8b03-7316-4157-81b8-fe97c83880cf",
+    "operationId": "e0dc685c-d089-4322-a391-4abcf07baa9b",
+    "assignmentIds": [
+      "d2728a2f-1ada-4632-8d73-184f2daccfba",
+      "669f166a-555c-4068-94d9-6080c932fef3",
+      "879a1367-6ee5-4160-a024-ee17899fc0b0"
+    ],
+    "synthetic": true,
+    "city": "Pune",
+    "service": "Interior Designers",
+    "quality": {
+      "score": 90,
+      "class": "A+",
+      "status": "qualified",
+      "recommendedAction": "auto_distribute"
+    }
+  },
+  "liveResults": {
+    "assignmentCount": 3,
+    "creditTransitions": [
+      [
+        29,
+        28
+      ],
+      [
+        19,
+        18
+      ],
+      [
+        9,
+        8
+      ]
+    ],
+    "assignmentReplay": "already_applied",
+    "operationCountAfterReplay": 1,
+    "clientLeadConfirmationAuthorized": 1,
+    "vendorLeadOfferAuthorized": 3,
+    "clientMatchingUpdateAuthorized": 1,
+    "clientLeadStatusUpdateAuthorized": 1,
+    "dashboardDeliveryRows": 3,
+    "whatsappPreviewRows": 3,
+    "clientPreviewRows": 1,
+    "transactionalFollowups": 5,
+    "followupCadenceHours": 24,
+    "connectionAssurance": {
+      "vendorOutcome": "no_response",
+      "clientResponded": true,
+      "riyaHandoffStatus": "cancelled"
+    },
+    "whatsappProvider": {
+      "activationStatus": "disabled",
+      "outboundEnabled": false,
+      "webhookProcessingEnabled": false,
+      "healthCheckEnabled": false
+    },
+    "communicationMessagesForFixture": 0,
+    "sentMessagesForFixture": 0,
+    "productionFixtureLeadCount": 0,
+    "productionFixtureAssignmentCount": 0
+  },
+  "serviceSuites": {
+    "cleanPass": [
+      "test:mvp:assignment-authority",
+      "test:phase3b",
+      "test:phase4",
+      "test:mvp:75-01",
+      "test:mvp:75-02",
+      "test:mvp:75-03",
+      "test:mvp:75-04",
+      "test:mvp:80-15c",
+      "test:mvp:50-8",
+      "test:mvp:80-16b",
+      "test:mvp:80-16c",
+      "test:mvp:80-17a",
+      "test:mvp:80-17a-r1",
+      "test:automation-native"
+    ],
+    "historicalScopeGuardOnly": [
+      {
+        "script": "test:phase3a",
+        "businessLogic": "pass",
+        "scopeFailures": [
+          "migration worktree changed",
+          "UI worktree changed"
+        ]
+      },
+      {
+        "script": "test:phase3b:aos",
+        "businessLogic": "pass",
+        "scopeFailures": [
+          "migration worktree changed",
+          "UI worktree changed"
+        ]
+      }
+    ]
+  },
+  "releaseGate": {
+    "typecheck": "blocked",
+    "build": "compiled_then_blocked_at_types",
+    "blocker": "quarantined concurrent PackageEditorModal/package-governance work",
+    "errors": [
+      "adminUpdatePackage export missing",
+      "PackageRow.description missing",
+      "PackageRow.sort_order missing",
+      "PackageRow.category_ids missing",
+      "PackageRow.city_ids missing"
+    ],
+    "phase3BackendDefect": false
+  }
+}

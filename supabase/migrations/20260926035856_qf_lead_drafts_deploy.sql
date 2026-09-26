@@ -38,4 +38,6 @@ create index if not exists lead_drafts_created_at_idx on public.lead_drafts (cre
 create index if not exists lead_drafts_stage_idx on public.lead_drafts (stage);
 
 alter table public.lead_drafts enable row level security;
+revoke all on table public.lead_drafts from public, anon, authenticated;
+grant select, insert, update on table public.lead_drafts to service_role;
 -- Deliberately no RLS policies: anon/authenticated clients get nothing.

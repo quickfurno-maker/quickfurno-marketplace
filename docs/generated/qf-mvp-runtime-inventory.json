@@ -3,13 +3,13 @@
   "generator": "scripts/mvp/inventory/run.mjs",
   "note": "Repository-derived, read-only. Presence of code proves EXISTENCE, not that it is wired/configured/deployed/active. No DB/provider/network access.",
   "counts": {
-    "apiRoutes": 42,
-    "pages": 33,
-    "services": 96,
-    "libModules": 291,
-    "providerAdapters": 20,
-    "components": 170,
-    "packageScripts": 177
+    "apiRoutes": 40,
+    "pages": 46,
+    "services": 112,
+    "libModules": 319,
+    "providerAdapters": 23,
+    "components": 182,
+    "packageScripts": 172
   },
   "routes": {
     "api": [
@@ -42,6 +42,25 @@
           "@/app/actions",
           "@/lib/aos/v2/runtime",
           "@/services/aosV2AdminService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "GET",
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/admin/automation-studio/route.ts",
+        "url": "/api/admin/automation-studio",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/lib/automation/studioContract",
+          "@/services/automationStudioService"
         ],
         "kind": "api_route",
         "methods": [
@@ -110,9 +129,7 @@
         "url": "/api/admin/lead-assignment-approval",
         "audience": "api",
         "directives": [],
-        "external": [
-          "n8n_automation"
-        ],
+        "external": [],
         "supabase": [],
         "envRefs": [],
         "internalImports": [
@@ -217,9 +234,7 @@
         "url": "/api/admin/process-due-lead-assignment-queue",
         "audience": "api",
         "directives": [],
-        "external": [
-          "n8n_automation"
-        ],
+        "external": [],
         "supabase": [],
         "envRefs": [
           "NODE_ENV"
@@ -324,70 +339,6 @@
         ]
       },
       {
-        "path": "app/api/aos/events/route.ts",
-        "url": "/api/aos/events",
-        "audience": "api",
-        "directives": [],
-        "external": [
-          "n8n_automation"
-        ],
-        "supabase": [],
-        "envRefs": [],
-        "internalImports": [],
-        "kind": "api_route",
-        "methods": [
-          "POST"
-        ]
-      },
-      {
-        "path": "app/api/aos/failure/route.ts",
-        "url": "/api/aos/failure",
-        "audience": "api",
-        "directives": [],
-        "external": [
-          "n8n_automation"
-        ],
-        "supabase": [],
-        "envRefs": [],
-        "internalImports": [],
-        "kind": "api_route",
-        "methods": [
-          "POST"
-        ]
-      },
-      {
-        "path": "app/api/aos/process-lead/route.ts",
-        "url": "/api/aos/process-lead",
-        "audience": "api",
-        "directives": [],
-        "external": [
-          "n8n_automation"
-        ],
-        "supabase": [],
-        "envRefs": [],
-        "internalImports": [],
-        "kind": "api_route",
-        "methods": [
-          "POST"
-        ]
-      },
-      {
-        "path": "app/api/aos/whatsapp-status/route.ts",
-        "url": "/api/aos/whatsapp-status",
-        "audience": "api",
-        "directives": [],
-        "external": [
-          "n8n_automation"
-        ],
-        "supabase": [],
-        "envRefs": [],
-        "internalImports": [],
-        "kind": "api_route",
-        "methods": [
-          "POST"
-        ]
-      },
-      {
         "path": "app/api/auth/hooks/supabase-send-sms/route.ts",
         "url": "/api/auth/hooks/supabase-send-sms",
         "audience": "api",
@@ -438,21 +389,23 @@
         ]
       },
       {
-        "path": "app/api/internal/automation/n8n/cancel-orphan/route.ts",
-        "url": "/api/internal/automation/n8n/cancel-orphan",
+        "path": "app/api/internal/jarvis/aarohi-projection/route.ts",
+        "url": "/api/internal/jarvis/aarohi-projection",
         "audience": "api",
         "directives": [],
         "external": [
-          "n8n_automation"
+          "jarvis"
         ],
         "supabase": [],
-        "envRefs": [],
+        "envRefs": [
+          "QF_JARVIS_AAROHI_PROJECTION_ENABLED",
+          "QF_JARVIS_CORE_VERIFICATION_KEYS_JSON"
+        ],
         "internalImports": [
-          "@/lib/automation/orphanCancellationContract",
-          "@/lib/automation/transportAuth",
-          "@/lib/automation/transportTypes",
-          "@/services/automationOrphanCancellationService",
-          "@/services/automationTransportService"
+          "@/lib/jarvis/aarohiProjectionContract",
+          "@/lib/jarvis/coreDecisionAuth",
+          "@/lib/jarvis/signedRequestAuth",
+          "@/services/jarvisAarohiProjectionService"
         ],
         "kind": "api_route",
         "methods": [
@@ -460,21 +413,23 @@
         ]
       },
       {
-        "path": "app/api/internal/automation/n8n/cancel-stale/route.ts",
-        "url": "/api/internal/automation/n8n/cancel-stale",
+        "path": "app/api/internal/jarvis/action-request/route.ts",
+        "url": "/api/internal/jarvis/action-request",
         "audience": "api",
         "directives": [],
         "external": [
-          "n8n_automation"
+          "jarvis"
         ],
         "supabase": [],
-        "envRefs": [],
+        "envRefs": [
+          "QF_JARVIS_CORE_VERIFICATION_KEYS_JSON"
+        ],
         "internalImports": [
-          "@/lib/automation/staleBusinessContract",
-          "@/lib/automation/transportAuth",
-          "@/lib/automation/transportTypes",
-          "@/services/automationStaleBusinessCancellationService",
-          "@/services/automationTransportService"
+          "@/lib/jarvis/actionRequestContract",
+          "@/lib/jarvis/coreDecisionAuth",
+          "@/lib/jarvis/runtimePolicy",
+          "@/lib/jarvis/signedRequestAuth",
+          "@/services/jarvisRecommendationService"
         ],
         "kind": "api_route",
         "methods": [
@@ -482,19 +437,23 @@
         ]
       },
       {
-        "path": "app/api/internal/automation/n8n/claim/route.ts",
-        "url": "/api/internal/automation/n8n/claim",
+        "path": "app/api/internal/jarvis/context/route.ts",
+        "url": "/api/internal/jarvis/context",
         "audience": "api",
         "directives": [],
         "external": [
-          "n8n_automation"
+          "jarvis"
         ],
         "supabase": [],
-        "envRefs": [],
+        "envRefs": [
+          "QF_JARVIS_CORE_VERIFICATION_KEYS_JSON"
+        ],
         "internalImports": [
-          "@/lib/automation/transportAuth",
-          "@/lib/automation/transportTypes",
-          "@/services/automationTransportService"
+          "@/lib/jarvis/contextContract",
+          "@/lib/jarvis/coreDecisionAuth",
+          "@/lib/jarvis/runtimePolicy",
+          "@/lib/jarvis/signedRequestAuth",
+          "@/services/jarvisContextService"
         ],
         "kind": "api_route",
         "methods": [
@@ -502,20 +461,22 @@
         ]
       },
       {
-        "path": "app/api/internal/automation/n8n/complete/route.ts",
-        "url": "/api/internal/automation/n8n/complete",
+        "path": "app/api/internal/jarvis/core-decision/route.ts",
+        "url": "/api/internal/jarvis/core-decision",
         "audience": "api",
         "directives": [],
         "external": [
-          "n8n_automation"
+          "jarvis"
         ],
         "supabase": [],
-        "envRefs": [],
+        "envRefs": [
+          "QF_JARVIS_CORE_VERIFICATION_KEYS_JSON"
+        ],
         "internalImports": [
-          "@/lib/automation/completionContract",
-          "@/lib/automation/transportAuth",
-          "@/lib/automation/transportTypes",
-          "@/services/automationTransportService"
+          "@/lib/jarvis/coreDecisionAuth",
+          "@/lib/jarvis/coreDecisionContract",
+          "@/lib/jarvis/runtimePolicy",
+          "@/services/jarvisCoreDecisionService"
         ],
         "kind": "api_route",
         "methods": [
@@ -523,21 +484,24 @@
         ]
       },
       {
-        "path": "app/api/internal/automation/n8n/execute-campaign/route.ts",
-        "url": "/api/internal/automation/n8n/execute-campaign",
+        "path": "app/api/internal/jarvis/service-availability/route.ts",
+        "url": "/api/internal/jarvis/service-availability",
         "audience": "api",
         "directives": [],
         "external": [
-          "n8n_automation"
+          "jarvis"
         ],
         "supabase": [],
-        "envRefs": [],
+        "envRefs": [
+          "QF_JARVIS_CORE_VERIFICATION_KEYS_JSON",
+          "QF_JARVIS_TENANT_ID"
+        ],
         "internalImports": [
-          "@/lib/automation/familyExecutionContract",
-          "@/lib/automation/transportAuth",
-          "@/lib/automation/transportTypes",
-          "@/services/automationCampaignExecutionService",
-          "@/services/automationTransportService"
+          "@/lib/jarvis/coreDecisionAuth",
+          "@/lib/jarvis/runtimePolicy",
+          "@/lib/jarvis/serviceAvailabilityContract",
+          "@/lib/jarvis/signedRequestAuth",
+          "@/services/jarvisServiceAvailabilityService"
         ],
         "kind": "api_route",
         "methods": [
@@ -545,21 +509,24 @@
         ]
       },
       {
-        "path": "app/api/internal/automation/n8n/execute-client/route.ts",
-        "url": "/api/internal/automation/n8n/execute-client",
+        "path": "app/api/internal/jarvis/whatsapp-reply/route.ts",
+        "url": "/api/internal/jarvis/whatsapp-reply",
         "audience": "api",
         "directives": [],
         "external": [
-          "n8n_automation"
+          "jarvis"
         ],
         "supabase": [],
-        "envRefs": [],
+        "envRefs": [
+          "QF_JARVIS_CORE_VERIFICATION_KEYS_JSON",
+          "QF_JARVIS_WHATSAPP_ENABLED"
+        ],
         "internalImports": [
-          "@/lib/automation/clientExecutionContract",
-          "@/lib/automation/transportAuth",
-          "@/lib/automation/transportTypes",
-          "@/services/automationClientExecutionService",
-          "@/services/automationTransportService"
+          "@/lib/jarvis/coreDecisionAuth",
+          "@/lib/jarvis/runtimePolicy",
+          "@/lib/jarvis/signedRequestAuth",
+          "@/lib/jarvis/whatsAppReplyContract",
+          "@/services/conversationalWhatsAppService"
         ],
         "kind": "api_route",
         "methods": [
@@ -567,65 +534,24 @@
         ]
       },
       {
-        "path": "app/api/internal/automation/n8n/execute-vendor/route.ts",
-        "url": "/api/internal/automation/n8n/execute-vendor",
+        "path": "app/api/internal/jarvis/whatsapp-turn-material/route.ts",
+        "url": "/api/internal/jarvis/whatsapp-turn-material",
         "audience": "api",
         "directives": [],
         "external": [
-          "n8n_automation"
+          "jarvis"
         ],
         "supabase": [],
-        "envRefs": [],
+        "envRefs": [
+          "QF_JARVIS_CORE_VERIFICATION_KEYS_JSON",
+          "QF_JARVIS_WHATSAPP_ENABLED"
+        ],
         "internalImports": [
-          "@/lib/automation/familyExecutionContract",
-          "@/lib/automation/transportAuth",
-          "@/lib/automation/transportTypes",
-          "@/services/automationTransportService",
-          "@/services/automationVendorExecutionService"
-        ],
-        "kind": "api_route",
-        "methods": [
-          "POST"
-        ]
-      },
-      {
-        "path": "app/api/internal/automation/n8n/reconcile/route.ts",
-        "url": "/api/internal/automation/n8n/reconcile",
-        "audience": "api",
-        "directives": [],
-        "external": [
-          "n8n_automation"
-        ],
-        "supabase": [],
-        "envRefs": [],
-        "internalImports": [
-          "@/lib/automation/recoveryContract",
-          "@/lib/automation/transportAuth",
-          "@/lib/automation/transportTypes",
-          "@/services/automationRecoveryService",
-          "@/services/automationTransportService"
-        ],
-        "kind": "api_route",
-        "methods": [
-          "POST"
-        ]
-      },
-      {
-        "path": "app/api/internal/automation/n8n/recover/route.ts",
-        "url": "/api/internal/automation/n8n/recover",
-        "audience": "api",
-        "directives": [],
-        "external": [
-          "n8n_automation"
-        ],
-        "supabase": [],
-        "envRefs": [],
-        "internalImports": [
-          "@/lib/automation/recoveryContract",
-          "@/lib/automation/transportAuth",
-          "@/lib/automation/transportTypes",
-          "@/services/automationRecoveryService",
-          "@/services/automationTransportService"
+          "@/lib/jarvis/coreDecisionAuth",
+          "@/lib/jarvis/runtimePolicy",
+          "@/lib/jarvis/signedRequestAuth",
+          "@/lib/jarvis/whatsAppTurnMaterialContract",
+          "@/services/conversationalWhatsAppService"
         ],
         "kind": "api_route",
         "methods": [
@@ -752,6 +678,54 @@
         ]
       },
       {
+        "path": "app/api/vendor/package-payment/checkout/route.ts",
+        "url": "/api/vendor/package-payment/checkout",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/services/vendorPackagePaymentService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/vendor/package-payment/verify/route.ts",
+        "url": "/api/vendor/package-payment/verify",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/services/vendorPackagePaymentService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
+        "path": "app/api/webhooks/razorpay/vendor-package/route.ts",
+        "url": "/api/webhooks/razorpay/vendor-package",
+        "audience": "api",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/services/vendorPackagePaymentService"
+        ],
+        "kind": "api_route",
+        "methods": [
+          "POST"
+        ]
+      },
+      {
         "path": "app/api/webhooks/whatsapp/meta/route.ts",
         "url": "/api/webhooks/whatsapp/meta",
         "audience": "api",
@@ -800,6 +774,172 @@
           "@/components/admin/adminConfig",
           "@/components/admin/sections/LeadsDirectory",
           "@/components/admin/sections/VendorsSection"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/aarohi/analytics/page.tsx",
+        "url": "/admin/aarohi/analytics",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/components/admin/aarohi/AarohiPrimitives",
+          "@/services/aarohiCrmService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/aarohi/campaigns/page.tsx",
+        "url": "/admin/aarohi/campaigns",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "../actions",
+          "@/components/admin/aarohi/AarohiPrimitives",
+          "@/services/aarohiCrmService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/aarohi/conversations/page.tsx",
+        "url": "/admin/aarohi/conversations",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/components/admin/aarohi/AarohiPrimitives",
+          "@/services/aarohiCrmService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/aarohi/discovery/page.tsx",
+        "url": "/admin/aarohi/discovery",
+        "audience": "admin",
+        "directives": [],
+        "external": [
+          "jarvis"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/components/admin/aarohi/AarohiPrimitives",
+          "@/services/aarohiCrmService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/aarohi/inbox/page.tsx",
+        "url": "/admin/aarohi/inbox",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/components/admin/aarohi/AarohiPrimitives",
+          "@/services/aarohiCrmService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/aarohi/page.tsx",
+        "url": "/admin/aarohi",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/components/admin/aarohi/AarohiPrimitives",
+          "@/services/aarohiCrmService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/aarohi/pipeline/page.tsx",
+        "url": "/admin/aarohi/pipeline",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/components/admin/aarohi/AarohiPrimitives",
+          "@/services/aarohiCrmService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/aarohi/prospects/[id]/page.tsx",
+        "url": "/admin/aarohi/prospects/[id]",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "../../actions",
+          "@/components/admin/aarohi/AarohiPrimitives",
+          "@/services/aarohiCrmService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/aarohi/prospects/page.tsx",
+        "url": "/admin/aarohi/prospects",
+        "audience": "admin",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "../actions",
+          "@/components/admin/aarohi/AarohiPrimitives",
+          "@/services/aarohiCrmService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/aarohi/settings/page.tsx",
+        "url": "/admin/aarohi/settings",
+        "audience": "admin",
+        "directives": [],
+        "external": [
+          "jarvis"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/components/admin/aarohi/AarohiPrimitives",
+          "@/lib/aarohi/permissions",
+          "@/services/aarohiCrmService"
+        ],
+        "kind": "page"
+      },
+      {
+        "path": "app/admin/aarohi/tasks/page.tsx",
+        "url": "/admin/aarohi/tasks",
+        "audience": "admin",
+        "directives": [],
+        "external": [
+          "jarvis"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "../actions",
+          "@/components/admin/aarohi/AarohiPrimitives",
+          "@/services/aarohiCrmService"
         ],
         "kind": "page"
       },
@@ -971,6 +1111,23 @@
         "kind": "page"
       },
       {
+        "path": "app/admin/whatsapp/human-desk/page.tsx",
+        "url": "/admin/whatsapp/human-desk",
+        "audience": "admin",
+        "directives": [],
+        "external": [
+          "jarvis"
+        ],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [
+          "@/app/actions",
+          "@/components/admin/AdminPrimitives",
+          "@/services/whatsAppHumanDeskService"
+        ],
+        "kind": "page"
+      },
+      {
         "path": "app/admin/whatsapp/page.tsx",
         "url": "/admin/whatsapp",
         "audience": "admin",
@@ -995,13 +1152,14 @@
         "supabase": [],
         "envRefs": [],
         "internalImports": [
-          "../vendor-listing-v2.css",
+          "../category-v3.css",
           "@/components/ClientEnquiryModal",
           "@/components/Footer",
           "@/components/Header",
           "@/components/StickyMobileCTA",
-          "@/components/public-listing/VendorDiscovery",
-          "@/components/public-listing/categoryArtwork",
+          "@/components/category/CategoryHero",
+          "@/components/category/CategoryListing",
+          "@/components/category/icons",
           "@/lib/lead-assignment/runtimeSettings",
           "@/lib/quickfurno-data",
           "@/services/publicVendorService"
@@ -1055,12 +1213,7 @@
         "supabase": [],
         "envRefs": [],
         "internalImports": [
-          "@/components/Footer",
-          "@/components/Header",
-          "@/components/StickyMobileCTA",
-          "@/components/home/HomeHeroSlider",
-          "@/components/home/HomeSectionsV2",
-          "@/components/home/HomeServiceLauncher"
+          "@/components/home/PuneLaunchHomepage"
         ],
         "kind": "page"
       },
@@ -1110,6 +1263,17 @@
       {
         "path": "app/vendor/dashboard/leads/page.tsx",
         "url": "/vendor/dashboard/leads",
+        "audience": "vendor",
+        "directives": [],
+        "external": [],
+        "supabase": [],
+        "envRefs": [],
+        "internalImports": [],
+        "kind": "page"
+      },
+      {
+        "path": "app/vendor/dashboard/matching/page.tsx",
+        "url": "/vendor/dashboard/matching",
         "audience": "vendor",
         "directives": [],
         "external": [],
@@ -1269,6 +1433,7 @@
           "@/components/StickyMobileCTA",
           "@/components/public-vendor/VendorProfileActions",
           "@/components/public-vendor/VendorProfileSections",
+          "@/components/public-vendor/VendorReviews",
           "@/components/public-vendor/profileModel",
           "@/lib/lead-assignment/runtimeSettings",
           "@/lib/quickfurno-data",
@@ -1297,10 +1462,12 @@
         "supabase": [],
         "envRefs": [],
         "internalImports": [
-          "./vendors.module.css",
+          "./vendors-pro.css",
+          "@/components/ClientEnquiryModal",
           "@/components/Footer",
           "@/components/Header",
-          "@/components/StickyMobileCTA"
+          "@/lib/config",
+          "@/lib/quickfurno-data"
         ],
         "kind": "page"
       },
@@ -1318,6 +1485,47 @@
     ]
   },
   "services": [
+    {
+      "path": "services/aarohiCrmService.ts",
+      "name": "aarohiCrmService",
+      "exports": [
+        "addAarohiCampaignMember",
+        "completeAarohiHandoff",
+        "createAarohiCampaign",
+        "createAarohiTask",
+        "createManualAarohiProspect",
+        "getAarohiAnalytics",
+        "getAarohiDiscoverySummary",
+        "getAarohiOverview",
+        "getAarohiProspect",
+        "listAarohiAttention",
+        "listAarohiCampaigns",
+        "listAarohiConversations",
+        "listAarohiProspects",
+        "listAarohiTasks",
+        "listActiveAarohiCities",
+        "listActivePackages",
+        "reviewAarohiIdentityMatch",
+        "scoreAarohiProspect",
+        "selectAarohiPackage",
+        "setAarohiPaused",
+        "setAarohiSuppressed",
+        "setAarohiTakeover",
+        "updateAarohiTask",
+        "updateAarohiWorkflow"
+      ],
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "@/lib/aarohi/contracts",
+        "@/lib/supabase"
+      ]
+    },
     {
       "path": "services/adminAuditService.ts",
       "name": "adminAuditService",
@@ -1383,17 +1591,15 @@
         "deriveLaunchReadiness",
         "getOperationsLaunchSnapshot"
       ],
-      "external": [
-        "n8n_automation"
-      ],
+      "external": [],
       "supabase": [],
       "envRefs": [],
       "internalImports": [
-        "../lib/aos/runtime/aosRuntimeSettings",
         "../lib/errors",
         "../lib/lead-assignment/runtimeSettings",
         "../lib/supabase",
-        "./adminOperationsService"
+        "./adminOperationsService",
+        "./nativeAutomationRuntimeService"
       ]
     },
     {
@@ -1501,6 +1707,7 @@
       "envRefs": [],
       "internalImports": [
         "../lib/errors",
+        "../lib/locations/launchCityPolicy",
         "../lib/supabase",
         "../lib/types"
       ]
@@ -1600,6 +1807,7 @@
         "getAosV2AdminSnapshot"
       ],
       "external": [
+        "jarvis",
         "supabase"
       ],
       "supabase": [
@@ -1608,6 +1816,7 @@
       "envRefs": [],
       "internalImports": [
         "@/lib/aos/v2/agentCapabilities",
+        "@/lib/aos/v2/architectureBoundary",
         "@/lib/aos/v2/runtime",
         "@/lib/supabase"
       ]
@@ -1735,7 +1944,7 @@
       "exports": [
         "CAMPAIGN_EXECUTION_WORKFLOW_FAMILY",
         "ExecuteCampaignAutomationInput",
-        "executeCampaignAutomationForN8nTransport"
+        "executeCampaignAutomationAttempt"
       ],
       "external": [
         "n8n_automation",
@@ -1765,7 +1974,7 @@
       "exports": [
         "ExecuteClientAutomationInput",
         "ExecuteClientAutomationResult",
-        "executeClientAutomationForN8nTransport"
+        "executeClientAutomationAttempt"
       ],
       "external": [
         "n8n_automation",
@@ -1790,27 +1999,6 @@
         "@/services/automationPersistenceService",
         "@/services/automationTransportService",
         "@/services/runtimeCommunicationService"
-      ]
-    },
-    {
-      "path": "services/automationOrphanCancellationService.ts",
-      "name": "automationOrphanCancellationService",
-      "exports": [
-        "AutomationCancelOrphanTransportInput",
-        "cancelOrphanAutomationJobForN8nTransport"
-      ],
-      "external": [
-        "n8n_automation",
-        "supabase"
-      ],
-      "supabase": [
-        "lib_supabase_import"
-      ],
-      "envRefs": [],
-      "internalImports": [
-        "@/lib/automation/orphanCancellationContract",
-        "@/lib/automation/transportTypes",
-        "@/lib/supabase"
       ]
     },
     {
@@ -1852,7 +2040,7 @@
       "name": "automationRecoveryService",
       "exports": [
         "AutomationRecoveryTransportInput",
-        "reconcileStaleAutomationAttemptForN8nTransport",
+        "reconcileStaleAutomationAttempt",
         "recoverDueAutomationRetryForN8nTransport"
       ],
       "external": [
@@ -1872,11 +2060,18 @@
       ]
     },
     {
-      "path": "services/automationStaleBusinessCancellationService.ts",
-      "name": "automationStaleBusinessCancellationService",
+      "path": "services/automationStudioService.ts",
+      "name": "automationStudioService",
       "exports": [
-        "AutomationCancelStaleTransportInput",
-        "cancelStaleBusinessAutomationJobForN8nTransport"
+        "getAutomationStudioOverview",
+        "getAutomationStudioWorkflowKeyForFamily",
+        "isAutomationStudioGlobalEnabled",
+        "isAutomationStudioWorkflowEnabled",
+        "publishAutomationStudioDraft",
+        "rollbackAutomationStudioWorkflow",
+        "saveAutomationStudioDraft",
+        "setAutomationStudioGlobalEnabled",
+        "setAutomationStudioWorkflowEnabled"
       ],
       "external": [
         "n8n_automation",
@@ -1887,23 +2082,28 @@
       ],
       "envRefs": [],
       "internalImports": [
-        "@/lib/automation/staleBusinessContract",
-        "@/lib/automation/transportTypes",
-        "@/lib/supabase"
+        "@/lib/automation/actionRegistry",
+        "@/lib/automation/studioContract",
+        "@/lib/supabase",
+        "@/services/nativeAutomationRuntimeService"
       ]
     },
     {
       "path": "services/automationTransportService.ts",
       "name": "automationTransportService",
       "exports": [
+        "AutomationCompletionEvidenceResult",
         "CompleteAutomationAttemptForN8nTransportInput",
+        "CompleteAutomationAttemptFromEvidenceInput",
         "N8nCompletionTransportResult",
         "RecordedClientExecutionIdentity",
         "claimAutomationJobForFamilyN8nTransport",
         "claimAutomationJobForN8nTransport",
+        "completeAutomationAttempt",
         "completeAutomationAttemptForN8nTransport",
-        "getAutomationTransportRuntimeConfig",
+        "getRecordedAutomationExecutionIdentity",
         "getRecordedClientExecutionIdentity",
+        "recordAutomationExecutionIdentity",
         "recordClientExecutionTransportIdentity"
       ],
       "external": [
@@ -1913,13 +2113,7 @@
       "supabase": [
         "lib_supabase_import"
       ],
-      "envRefs": [
-        "QF_AUTOMATION_RUNTIME_ENV",
-        "QF_CORE_TO_N8N_HMAC_SECRET",
-        "QF_N8N_TO_CORE_HMAC_SECRET",
-        "QF_N8N_TRANSPORT_MODE",
-        "QF_N8N_WORKER_ID"
-      ],
+      "envRefs": [],
       "internalImports": [
         "@/lib/automation/clientDispatchRegistry",
         "@/lib/automation/completionContract",
@@ -1935,7 +2129,7 @@
       "exports": [
         "ExecuteVendorAutomationInput",
         "VENDOR_EXECUTION_WORKFLOW_FAMILY",
-        "executeVendorAutomationForN8nTransport"
+        "executeVendorAutomationAttempt"
       ],
       "external": [
         "n8n_automation",
@@ -2045,6 +2239,28 @@
       "envRefs": [],
       "internalImports": [
         "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/categoryRuntimeService.ts",
+      "name": "categoryRuntimeService",
+      "exports": [
+        "getActiveCategoryPolicyBySlug",
+        "getActiveCategoryTreePolicies",
+        "getRuntimeCategoryPolicies",
+        "requireAutomationReadyCategory",
+        "resolveActiveCategoryPolicy"
+      ],
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "@/lib/categories/runtimeCategoryPolicy",
+        "@/lib/supabase"
       ]
     },
     {
@@ -2531,14 +2747,59 @@
       ]
     },
     {
+      "path": "services/conversationalWhatsAppService.ts",
+      "name": "conversationalWhatsAppService",
+      "exports": [
+        "ConversationalResult",
+        "JarvisWhatsAppReplyClaimResult",
+        "JarvisWhatsAppReplyFinalizeResult",
+        "claimJarvisWhatsAppReplyReceipt",
+        "conversationOutboxBodyAad",
+        "dispatchConversationalOutbox",
+        "dispatchNextConversationalOutbox",
+        "finalizeJarvisWhatsAppReplyReceipt",
+        "queueHumanConversationReply",
+        "queueJarvisConversationReply",
+        "readJarvisWhatsAppTurnMaterial",
+        "recordConversationalInbound",
+        "releaseHumanConversationToAi",
+        "signalConversationalWhatsAppPresence"
+      ],
+      "external": [
+        "jarvis",
+        "meta_whatsapp"
+      ],
+      "supabase": [],
+      "envRefs": [
+        "QF_JARVIS_WHATSAPP_ENABLED"
+      ],
+      "internalImports": [
+        "../lib/communication/conversationSeal",
+        "../lib/communication/httpTransport",
+        "../lib/communication/phone",
+        "../lib/communication/providers/metaCloudWhatsAppConfig",
+        "../lib/communication/providers/metaCloudWhatsAppProvider",
+        "../lib/communication/providers/providerOutcome",
+        "../lib/communication/whatsAppConciergeRouting",
+        "../lib/jarvis/whatsAppExperience",
+        "../lib/jarvis/whatsAppInboundMaterial",
+        "../lib/supabase",
+        "./communicationProviderRuntimeService"
+      ]
+    },
+    {
       "path": "services/delayedLeadFillService.ts",
       "name": "delayedLeadFillService",
       "exports": [
         "DELAYED_FILL_AFTER_PREFERRED",
+        "DELAYED_FILL_PARTIAL_WAITING",
+        "DELAYED_FILL_RETRY_PREFIX",
+        "DELAYED_FILL_WAITING_CONSENT",
+        "DELAYED_FILL_WAITING_NO_VENDORS",
         "DELAYED_FILL_WINDOW_MINUTES",
         "DelayedFillRowResult",
         "PREFERRED_NO_CREDITS_PENDING_FALLBACK",
-        "PROCESSOR_QUEUE_REASONS",
+        "PROCESSOR_QUEUE_REASON_FILTER",
         "ProcessDueResult",
         "QueuePreferredDelayedFillInput",
         "processDueLeadAssignmentQueue",
@@ -2667,11 +2928,152 @@
       "envRefs": [],
       "internalImports": [
         "../lib/communication/dbErrors",
+        "../lib/communication/inboundConsentCommandInput",
         "../lib/communication/providers/metaCloudWhatsAppProvider",
         "../lib/communication/providers/metaWhatsAppInbound",
         "../lib/communication/providers/metaWhatsAppWebhook",
         "../lib/supabase",
+        "./conversationalWhatsAppService",
         "./inboundIdentityResolutionService"
+      ]
+    },
+    {
+      "path": "services/jarvisAarohiProjectionService.ts",
+      "name": "jarvisAarohiProjectionService",
+      "exports": [
+        "applyJarvisAarohiProjection"
+      ],
+      "external": [
+        "jarvis",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "@/lib/aarohi/contracts",
+        "@/lib/jarvis/aarohiProjectionContract",
+        "@/lib/supabase"
+      ]
+    },
+    {
+      "path": "services/jarvisContextService.ts",
+      "name": "jarvisContextService",
+      "exports": [
+        "readJarvisSanitizedContext"
+      ],
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/jarvis/contextContract",
+        "../lib/jarvis/contextRead",
+        "../lib/jarvis/runtimePolicy",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/jarvisCoreDecisionService.ts",
+      "name": "jarvisCoreDecisionService",
+      "exports": [
+        "JarvisCoreAuthorizer",
+        "JarvisCoreAuthorizerDecision",
+        "decideJarvisCoreCommand"
+      ],
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/jarvis/coreDecisionContract",
+        "../lib/jarvis/runtimePolicy"
+      ]
+    },
+    {
+      "path": "services/jarvisRecommendationService.ts",
+      "name": "jarvisRecommendationService",
+      "exports": [
+        "JarvisPromotionResult",
+        "promoteJarvisRecommendationToCore",
+        "submitJarvisRecommendation"
+      ],
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/automation/actionContract",
+        "../lib/automation/actionRegistry",
+        "../lib/jarvis/actionRequestContract",
+        "../lib/jarvis/recommendationIntake",
+        "../lib/jarvis/runtimePolicy",
+        "../lib/supabase",
+        "./automationPersistenceService"
+      ]
+    },
+    {
+      "path": "services/jarvisRiyaWebGatewayService.ts",
+      "name": "jarvisRiyaWebGatewayService",
+      "exports": [
+        "JarvisRiyaGatewayResult",
+        "JarvisRiyaWebGatewayConfig",
+        "QfjHttpPost",
+        "QfjHttpResponse",
+        "sendRiyaWebTurn"
+      ],
+      "external": [
+        "http_fetch",
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/jarvis/privateRiyaIngressContract",
+        "../lib/jarvis/runtimePolicy"
+      ]
+    },
+    {
+      "path": "services/jarvisServiceAvailabilityService.ts",
+      "name": "jarvisServiceAvailabilityService",
+      "exports": [
+        "readJarvisServiceAvailabilitySnapshot"
+      ],
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/jarvis/serviceAvailabilityContract",
+        "../lib/supabase"
+      ]
+    },
+    {
+      "path": "services/jarvisWhatsAppGatewayService.ts",
+      "name": "jarvisWhatsAppGatewayService",
+      "exports": [
+        "JarvisWhatsAppGatewayResult",
+        "dispatchNextJarvisWhatsAppTurn",
+        "sendJarvisWhatsAppTurn"
+      ],
+      "external": [
+        "http_fetch",
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": [
+        "QF_JARVIS_WHATSAPP_ENABLED"
+      ],
+      "internalImports": [
+        "../lib/communication/providers/metaWhatsAppInbound",
+        "../lib/jarvis/whatsAppTurnContract",
+        "../lib/supabase",
+        "./conversationalWhatsAppService"
       ]
     },
     {
@@ -2769,6 +3171,21 @@
         "../lib/errors",
         "../lib/supabase",
         "./canonicalAssignmentAuthority"
+      ]
+    },
+    {
+      "path": "services/leadDraftService.ts",
+      "name": "leadDraftService",
+      "exports": [
+        "LeadDraftInput",
+        "LeadDraftStage",
+        "upsertLeadDraft"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/supabase"
       ]
     },
     {
@@ -2992,6 +3409,7 @@
         "../lib/config",
         "../lib/errors",
         "../lib/leads/leadContactContract",
+        "../lib/locations/launchCityPolicy",
         "../lib/supabase",
         "../lib/supabaseLogging",
         "../lib/types",
@@ -3077,6 +3495,7 @@
       "internalImports": [
         "../lib/communication/httpTransport",
         "../lib/communication/inboundProviderAccountAttribution",
+        "../lib/communication/providers/metaCallbackIdentityRegistry",
         "../lib/communication/providers/metaCloudWhatsAppConfig",
         "../lib/communication/providers/metaCloudWhatsAppProvider",
         "../lib/communication/providers/metaWebhookAccountIdentity",
@@ -3090,6 +3509,102 @@
         "./inboundWhatsAppMessageService",
         "./leadAssignmentResultService",
         "./outboundConsentEnforcementService"
+      ]
+    },
+    {
+      "path": "services/nativeAutomationAuthorityService.ts",
+      "name": "nativeAutomationAuthorityService",
+      "exports": [
+        "NativeRecoveredAttempt",
+        "cancelNativeOrphanAutomationJob",
+        "cancelNativeStaleAutomationJob",
+        "claimNativeAutomationJob",
+        "hasNativeStaleAutomationCandidate",
+        "recoverNativeAutomationRetry"
+      ],
+      "external": [
+        "n8n_automation",
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [],
+      "internalImports": [
+        "@/lib/automation/actionRegistry",
+        "@/lib/automation/persistenceTypes",
+        "@/lib/automation/recoveryContract",
+        "@/lib/supabase"
+      ]
+    },
+    {
+      "path": "services/nativeAutomationEngineService.ts",
+      "name": "nativeAutomationEngineService",
+      "exports": [
+        "NativeAutomationCycleResult",
+        "NativeAutomationCycleState",
+        "runNativeConsentAckCycle",
+        "runNativeDelayedFillCycle",
+        "runNativeFamilyClaimCycle",
+        "runNativeLeadAssignmentDispatchCycle",
+        "runNativeOrphanCleanupCycle",
+        "runNativeReconcileCycle",
+        "runNativeRecoveryCycle",
+        "runNativeStaleCleanupCycle"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "@/lib/automation/actionRegistry",
+        "@/services/automationCampaignExecutionService",
+        "@/services/automationClientExecutionService",
+        "@/services/automationRecoveryService",
+        "@/services/automationTransportService",
+        "@/services/automationVendorExecutionService",
+        "@/services/consentAckWorkerService",
+        "@/services/delayedLeadFillService",
+        "@/services/leadAssignmentDispatchService",
+        "@/services/nativeAutomationAuthorityService"
+      ]
+    },
+    {
+      "path": "services/nativeAutomationRuntimeService.ts",
+      "name": "nativeAutomationRuntimeService",
+      "exports": [
+        "NATIVE_AUTOMATION_ENGINE_KEY",
+        "NATIVE_AUTOMATION_RUNTIME_SETTING_KEY",
+        "NativeAutomationLaneTimes",
+        "NativeAutomationMode",
+        "NativeAutomationRuntimeConfig",
+        "NativeAutomationRuntimeSnapshot",
+        "NativeAutomationWorkerState",
+        "getNativeAutomationRuntimeConfig",
+        "readNativeAutomationRuntimeSnapshot",
+        "writeNativeAutomationRuntimeSnapshot"
+      ],
+      "external": [
+        "supabase"
+      ],
+      "supabase": [
+        "lib_supabase_import"
+      ],
+      "envRefs": [
+        "QF_NATIVE_AUTOMATION_CONSENT_ACK_BATCH",
+        "QF_NATIVE_AUTOMATION_DELAYED_FILL_BATCH",
+        "QF_NATIVE_AUTOMATION_DELAYED_FILL_MS",
+        "QF_NATIVE_AUTOMATION_HEARTBEAT_MS",
+        "QF_NATIVE_AUTOMATION_IDLE_POLL_MS",
+        "QF_NATIVE_AUTOMATION_LEAD_DISPATCH_BATCH",
+        "QF_NATIVE_AUTOMATION_MAINTENANCE_MS",
+        "QF_NATIVE_AUTOMATION_MAX_DRAIN",
+        "QF_NATIVE_AUTOMATION_MODE",
+        "QF_NATIVE_AUTOMATION_RECOVERY_MS",
+        "QF_NATIVE_AUTOMATION_SYSTEM_MS",
+        "QF_NATIVE_AUTOMATION_WORKER_ID"
+      ],
+      "internalImports": [
+        "@/lib/supabase"
       ]
     },
     {
@@ -3205,10 +3720,13 @@
       "envRefs": [],
       "internalImports": [
         "@/lib/lead-assignment/runtimeSettings",
+        "@/lib/locality",
+        "@/lib/locations/launchCityPolicy",
         "@/lib/quickfurno-data",
         "@/lib/supabase",
         "@/lib/vendors/vendorEligibility",
-        "@/lib/vendors/vendorVisibility"
+        "@/lib/vendors/vendorVisibility",
+        "@/services/vendorReviewService"
       ]
     },
     {
@@ -3753,6 +4271,31 @@
       ]
     },
     {
+      "path": "services/vendorPackagePaymentService.ts",
+      "name": "vendorPackagePaymentService",
+      "exports": [
+        "VendorPackageCheckout",
+        "createVendorPackageRazorpayCheckout",
+        "handleVendorPackageRazorpayWebhook",
+        "verifyVendorPackageRazorpayCheckout"
+      ],
+      "external": [
+        "http_fetch"
+      ],
+      "supabase": [],
+      "envRefs": [
+        "RAZORPAY_TEST_KEY_ID",
+        "RAZORPAY_TEST_KEY_SECRET",
+        "RAZORPAY_TEST_WEBHOOK_SECRET"
+      ],
+      "internalImports": [
+        "../lib/errors",
+        "../lib/payments/vendorPackageRazorpay",
+        "../lib/supabase",
+        "./vendorAccessService"
+      ]
+    },
+    {
       "path": "services/vendorPasswordResetService.ts",
       "name": "vendorPasswordResetService",
       "exports": [
@@ -3830,6 +4373,30 @@
       ]
     },
     {
+      "path": "services/vendorReviewService.ts",
+      "name": "vendorReviewService",
+      "exports": [
+        "AdminReviewsQuery",
+        "PublicVendorReview",
+        "SubmitVendorReviewInput",
+        "VendorReviewStats",
+        "VendorReviewSummary",
+        "getAdminReviewsPage",
+        "getApprovedReviewStatsForVendors",
+        "getApprovedReviewsForVendor",
+        "moderateVendorReview",
+        "submitVerifiedVendorReview"
+      ],
+      "external": [],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/adminPaging",
+        "../lib/errors",
+        "../lib/supabase"
+      ]
+    },
+    {
       "path": "services/vendorSegmentService.ts",
       "name": "vendorSegmentService",
       "exports": [
@@ -3865,12 +4432,13 @@
       "exports": [
         "LEAD_REPORT_REASONS",
         "LeadReportReasonCode",
+        "VendorClientResponseOutcome",
         "getVendorAssignedLeads",
         "getVendorDashboardStats",
+        "recordVendorClientResponse",
         "registerVendor",
         "reportBadLead",
         "submitStructuredLeadReport",
-        "updateVendorLeadStatus",
         "updateVendorVisibility"
       ],
       "external": [],
@@ -3886,6 +4454,7 @@
       "internalImports": [
         "../lib/errors",
         "../lib/lead-assignment/runtimeSettings",
+        "../lib/locations/launchCityPolicy",
         "../lib/supabase",
         "../lib/supabaseLogging",
         "../lib/types",
@@ -3946,6 +4515,28 @@
       ]
     },
     {
+      "path": "services/whatsAppHumanDeskService.ts",
+      "name": "whatsAppHumanDeskService",
+      "exports": [
+        "HumanDeskConversation",
+        "HumanDeskThread",
+        "HumanDeskThreadEvent",
+        "getHumanDeskThread",
+        "listHumanDeskConversations"
+      ],
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": [],
+      "internalImports": [
+        "../lib/communication/conversationSeal",
+        "../lib/jarvis/whatsAppExperience",
+        "../lib/supabase",
+        "./conversationalWhatsAppService"
+      ]
+    },
+    {
       "path": "services/whatsAppProviderSelection.ts",
       "name": "whatsAppProviderSelection",
       "exports": [
@@ -3991,6 +4582,13 @@
       "external": [
         "meta_whatsapp"
       ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaCallbackIdentityRegistry.ts",
+      "name": "metaCallbackIdentityRegistry",
+      "external": [],
       "supabase": [],
       "envRefs": []
     },
@@ -4048,8 +4646,23 @@
       "path": "lib/communication/providers/metaWhatsAppInbound.ts",
       "name": "metaWhatsAppInbound",
       "external": [
+        "jarvis",
         "meta_whatsapp"
       ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaWhatsAppInteractive.ts",
+      "name": "metaWhatsAppInteractive",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaWhatsAppRich.ts",
+      "name": "metaWhatsAppRich",
+      "external": [],
       "supabase": [],
       "envRefs": []
     },
@@ -4120,7 +4733,9 @@
     {
       "path": "lib/communication/providers/whatsappProvider.ts",
       "name": "whatsappProvider",
-      "external": [],
+      "external": [
+        "jarvis"
+      ],
       "supabase": [],
       "envRefs": []
     },
@@ -4133,16 +4748,17 @@
     }
   ],
   "libGroupCounts": {
+    "aarohi": 2,
     "admin": 1,
     "adminPaging.ts": 1,
     "agents": 3,
     "analytics": 3,
-    "aos": 137,
+    "aos": 133,
     "auth": 3,
-    "automation": 18,
-    "categories": 2,
+    "automation": 19,
+    "categories": 3,
     "categories.ts": 1,
-    "communication": 50,
+    "communication": 55,
     "config.ts": 1,
     "crm": 13,
     "errors.ts": 1,
@@ -4150,14 +4766,20 @@
     "geo": 6,
     "geo.ts": 1,
     "google-maps": 3,
+    "homepage-content.ts": 1,
+    "homepage-images.ts": 1,
     "identity": 17,
     "images.ts": 1,
+    "jarvis": 16,
     "lead-assignment": 4,
     "lead-quality": 3,
     "leads": 2,
-    "locations": 2,
-    "marketplace": 1,
+    "locality.ts": 1,
+    "locations": 3,
+    "marketplace": 2,
     "matchcore": 4,
+    "packages": 1,
+    "payments": 1,
     "quickfurno-data.ts": 1,
     "siteUrl.ts": 1,
     "supabase.ts": 1,
@@ -4167,6 +4789,20 @@
     "vendors": 6
   },
   "lib": [
+    {
+      "path": "lib/aarohi/contracts.ts",
+      "group": "aarohi",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aarohi/permissions.ts",
+      "group": "aarohi",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
     {
       "path": "lib/admin/whatsappSourceCatalogue.ts",
       "group": "admin",
@@ -4409,9 +5045,7 @@
     {
       "path": "lib/aos/config/featureFlags.ts",
       "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
+      "external": [],
       "supabase": [],
       "envRefs": [
         "ANTHROPIC_API_KEY",
@@ -4420,11 +5054,23 @@
       ]
     },
     {
+      "path": "lib/aos/events/automationEventTypes.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/events/automationWorkflowMap.ts",
+      "group": "aos",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
       "path": "lib/aos/events/emitLeadAssignmentApprovedEvent.ts",
       "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
+      "external": [],
       "supabase": [],
       "envRefs": []
     },
@@ -4438,9 +5084,7 @@
     {
       "path": "lib/aos/events/emitLeadCreatedEvent.ts",
       "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
+      "external": [],
       "supabase": [],
       "envRefs": []
     },
@@ -4466,38 +5110,9 @@
       "envRefs": []
     },
     {
-      "path": "lib/aos/events/n8nEventTypes.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/events/n8nPreviewWorkflowMap.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
-      "path": "lib/aos/events/n8nWorkflowMap.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
       "path": "lib/aos/events/safeAgentEventPipeline.ts",
       "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
+      "external": [],
       "supabase": [],
       "envRefs": []
     },
@@ -4725,18 +5340,6 @@
       "envRefs": []
     },
     {
-      "path": "lib/aos/runtime/aosRuntimeSettings.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation",
-        "supabase"
-      ],
-      "supabase": [
-        "lib_supabase_import"
-      ],
-      "envRefs": []
-    },
-    {
       "path": "lib/aos/runtime/assignmentLedgerService.ts",
       "group": "aos",
       "external": [
@@ -4770,32 +5373,11 @@
       "envRefs": []
     },
     {
-      "path": "lib/aos/sync/n8nSyncService.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
       "path": "lib/aos/tools/emailTool.ts",
       "group": "aos",
       "external": [],
       "supabase": [],
       "envRefs": []
-    },
-    {
-      "path": "lib/aos/tools/n8nTool.ts",
-      "group": "aos",
-      "external": [
-        "http_fetch",
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": [
-        "NODE_ENV"
-      ]
     },
     {
       "path": "lib/aos/tools/supabaseTool.ts",
@@ -4824,6 +5406,16 @@
       "path": "lib/aos/v2/agentCapabilities.ts",
       "group": "aos",
       "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/aos/v2/architectureBoundary.ts",
+      "group": "aos",
+      "external": [
+        "jarvis",
+        "n8n_automation"
+      ],
       "supabase": [],
       "envRefs": []
     },
@@ -4863,7 +5455,6 @@
       "path": "lib/aos/v2/runtime.ts",
       "group": "aos",
       "external": [
-        "n8n_automation",
         "supabase"
       ],
       "supabase": [
@@ -5285,15 +5876,6 @@
       "envRefs": []
     },
     {
-      "path": "lib/aos/workflows/processLeadWorkflow.ts",
-      "group": "aos",
-      "external": [
-        "n8n_automation"
-      ],
-      "supabase": [],
-      "envRefs": []
-    },
-    {
       "path": "lib/auth/authAttemptOutcomeMapping.ts",
       "group": "auth",
       "external": [
@@ -5388,6 +5970,16 @@
       "envRefs": []
     },
     {
+      "path": "lib/automation/conversationTriggerPolicy.ts",
+      "group": "automation",
+      "external": [
+        "jarvis",
+        "n8n_automation"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
       "path": "lib/automation/familyExecutionContract.ts",
       "group": "automation",
       "external": [
@@ -5440,11 +6032,9 @@
       "envRefs": []
     },
     {
-      "path": "lib/automation/transportAuth.ts",
+      "path": "lib/automation/studioContract.ts",
       "group": "automation",
-      "external": [
-        "n8n_automation"
-      ],
+      "external": [],
       "supabase": [],
       "envRefs": []
     },
@@ -5490,6 +6080,13 @@
       "supabase": [
         "lib_supabase_import"
       ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/categories/runtimeCategoryPolicy.ts",
+      "group": "categories",
+      "external": [],
+      "supabase": [],
       "envRefs": []
     },
     {
@@ -5609,6 +6206,13 @@
       "envRefs": []
     },
     {
+      "path": "lib/communication/conversationSeal.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
       "path": "lib/communication/dbErrors.ts",
       "group": "communication",
       "external": [],
@@ -5628,7 +6232,8 @@
       "path": "lib/communication/inboundConsentCommandInput.ts",
       "group": "communication",
       "external": [
-        "exotel_sms"
+        "exotel_sms",
+        "jarvis"
       ],
       "supabase": [],
       "envRefs": []
@@ -5726,6 +6331,13 @@
       "envRefs": []
     },
     {
+      "path": "lib/communication/providers/metaCallbackIdentityRegistry.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
       "path": "lib/communication/providers/metaCloudWhatsAppConfig.ts",
       "group": "communication",
       "external": [
@@ -5779,8 +6391,23 @@
       "path": "lib/communication/providers/metaWhatsAppInbound.ts",
       "group": "communication",
       "external": [
+        "jarvis",
         "meta_whatsapp"
       ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaWhatsAppInteractive.ts",
+      "group": "communication",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/providers/metaWhatsAppRich.ts",
+      "group": "communication",
+      "external": [],
       "supabase": [],
       "envRefs": []
     },
@@ -5851,7 +6478,9 @@
     {
       "path": "lib/communication/providers/whatsappProvider.ts",
       "group": "communication",
-      "external": [],
+      "external": [
+        "jarvis"
+      ],
       "supabase": [],
       "envRefs": []
     },
@@ -5883,6 +6512,15 @@
       "supabase": [
         "service_role"
       ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/communication/whatsAppConciergeRouting.ts",
+      "group": "communication",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
       "envRefs": []
     },
     {
@@ -6088,6 +6726,20 @@
       "envRefs": []
     },
     {
+      "path": "lib/homepage-content.ts",
+      "group": "homepage-content.ts",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/homepage-images.ts",
+      "group": "homepage-images.ts",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
       "path": "lib/identity/authPrincipalMarker.ts",
       "group": "identity",
       "external": [],
@@ -6218,6 +6870,146 @@
       "envRefs": []
     },
     {
+      "path": "lib/jarvis/aarohiProjectionContract.ts",
+      "group": "jarvis",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/jarvis/actionRequestContract.ts",
+      "group": "jarvis",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/jarvis/contextContract.ts",
+      "group": "jarvis",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/jarvis/contextRead.ts",
+      "group": "jarvis",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/jarvis/coreDecisionAuth.ts",
+      "group": "jarvis",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/jarvis/coreDecisionContract.ts",
+      "group": "jarvis",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/jarvis/privateRiyaIngressContract.ts",
+      "group": "jarvis",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/jarvis/recommendationIntake.ts",
+      "group": "jarvis",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/jarvis/runtimePolicy.ts",
+      "group": "jarvis",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/jarvis/serviceAvailabilityContract.ts",
+      "group": "jarvis",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/jarvis/signedRequestAuth.ts",
+      "group": "jarvis",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/jarvis/whatsAppExperience.ts",
+      "group": "jarvis",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/jarvis/whatsAppInboundMaterial.ts",
+      "group": "jarvis",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/jarvis/whatsAppReplyContract.ts",
+      "group": "jarvis",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/jarvis/whatsAppTurnContract.ts",
+      "group": "jarvis",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/jarvis/whatsAppTurnMaterialContract.ts",
+      "group": "jarvis",
+      "external": [
+        "jarvis"
+      ],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
       "path": "lib/lead-assignment/autoAssignmentEngine.ts",
       "group": "lead-assignment",
       "external": [
@@ -6300,6 +7092,13 @@
       "envRefs": []
     },
     {
+      "path": "lib/locality.ts",
+      "group": "locality.ts",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
       "path": "lib/locations/cityService.ts",
       "group": "locations",
       "external": [
@@ -6309,6 +7108,13 @@
       "supabase": [
         "lib_supabase_import"
       ],
+      "envRefs": []
+    },
+    {
+      "path": "lib/locations/launchCityPolicy.ts",
+      "group": "locations",
+      "external": [],
+      "supabase": [],
       "envRefs": []
     },
     {
@@ -6322,6 +7128,13 @@
     },
     {
       "path": "lib/marketplace/canonicalAssignmentContract.ts",
+      "group": "marketplace",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/marketplace/leadGenerationBoundary.ts",
       "group": "marketplace",
       "external": [],
       "supabase": [],
@@ -6351,6 +7164,20 @@
     {
       "path": "lib/matchcore/selectionPlan.ts",
       "group": "matchcore",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/packages/packageApplicability.ts",
+      "group": "packages",
+      "external": [],
+      "supabase": [],
+      "envRefs": []
+    },
+    {
+      "path": "lib/payments/vendorPackageRazorpay.ts",
+      "group": "payments",
       "external": [],
       "supabase": [],
       "envRefs": []
@@ -6453,7 +7280,7 @@
     }
   ],
   "components": {
-    "count": 170,
+    "count": 182,
     "paths": [
       "components/AdminDashboard.tsx",
       "components/AdminLoginForm.tsx",
@@ -6501,6 +7328,7 @@
       "components/admin/AosAutomationControl.tsx",
       "components/admin/AssignmentLedgerPanels.tsx",
       "components/admin/AttentionCenter.tsx",
+      "components/admin/AutomationStudio.tsx",
       "components/admin/CRMDashboard.tsx",
       "components/admin/CategoryManager.tsx",
       "components/admin/LeadAssignmentApprovalControl.tsx",
@@ -6508,6 +7336,8 @@
       "components/admin/ManualLeadAssignmentPanel.tsx",
       "components/admin/Pagination.tsx",
       "components/admin/RequirementGroupsPanel.tsx",
+      "components/admin/aarohi/AarohiNav.tsx",
+      "components/admin/aarohi/AarohiPrimitives.tsx",
       "components/admin/adminConfig.ts",
       "components/admin/adminTypes.ts",
       "components/admin/adminUtils.ts",
@@ -6519,7 +7349,6 @@
       "components/admin/crm/campaigns/VendorCampaignEditor.tsx",
       "components/admin/crm/lead/LeadCrmAssignmentQueue.tsx",
       "components/admin/crm/lead/LeadCrmDrawer.tsx",
-      "components/admin/crm/lead/LeadCrmFollowUps.tsx",
       "components/admin/crm/lead/LeadCrmInbox.tsx",
       "components/admin/crm/lead/LeadCrmNurture.tsx",
       "components/admin/crm/lead/LeadCrmPipeline.tsx",
@@ -6546,6 +7375,7 @@
       "components/admin/sections/LeadsDirectory.tsx",
       "components/admin/sections/LeadsSection.tsx",
       "components/admin/sections/MiscSections.tsx",
+      "components/admin/sections/PackageEditorModal.tsx",
       "components/admin/sections/PackagesSection.tsx",
       "components/admin/sections/PaymentsSection.tsx",
       "components/admin/sections/ReportsSection.tsx",
@@ -6566,13 +7396,21 @@
       "components/admin/whatsapp/WhatsAppTemplatesTab.tsx",
       "components/admin/whatsapp/whatsappAdminTypes.ts",
       "components/admin/whatsapp/whatsappShared.tsx",
+      "components/category/CategoryHero.tsx",
+      "components/category/CategoryListing.tsx",
+      "components/category/VendorCard.tsx",
+      "components/category/icons.tsx",
       "components/client-enquiry/enquiryDisplay.ts",
+      "components/home/FinalHomepage.tsx",
       "components/home/HomeCategoryGrid.tsx",
       "components/home/HomeHeroSlider.tsx",
+      "components/home/HomeMobileBottomNav.tsx",
       "components/home/HomeSearchBar.tsx",
       "components/home/HomeSections.tsx",
       "components/home/HomeSectionsV2.tsx",
       "components/home/HomeServiceLauncher.tsx",
+      "components/home/LaunchSections.tsx",
+      "components/home/PuneLaunchHomepage.tsx",
       "components/home/StatsCounter.tsx",
       "components/home/TestimonialsCarousel.tsx",
       "components/location/GooglePlaceAutocomplete.tsx",
@@ -6584,6 +7422,7 @@
       "components/public-vendor/VendorProfileActions.tsx",
       "components/public-vendor/VendorProfileMedia.tsx",
       "components/public-vendor/VendorProfileSections.tsx",
+      "components/public-vendor/VendorReviews.tsx",
       "components/public-vendor/profileModel.ts",
       "components/vendor-dashboard-v2/VendorAccessStatus.tsx",
       "components/vendor-dashboard-v2/VendorAttentionLeads.tsx",
@@ -6601,13 +7440,13 @@
       "components/vendor-dashboard-v2/icons.tsx",
       "components/vendor-dashboard-v2/leads/VendorLeadAccessNotice.tsx",
       "components/vendor-dashboard-v2/leads/VendorLeadCard.tsx",
-      "components/vendor-dashboard-v2/leads/VendorLeadStatusControl.tsx",
       "components/vendor-dashboard-v2/leads/VendorLeadsBoard.tsx",
       "components/vendor-dashboard-v2/leads/VendorLeadsFeedback.tsx",
       "components/vendor-dashboard-v2/leads/leadsModel.ts",
       "components/vendor-dashboard-v2/navigation.ts",
       "components/vendor-dashboard-v2/notifications/VendorNotificationsWorkspace.tsx",
       "components/vendor-dashboard-v2/notifications/notificationsModel.ts",
+      "components/vendor-dashboard-v2/package/VendorPackagePayButton.tsx",
       "components/vendor-dashboard-v2/package/VendorPackageWorkspace.tsx",
       "components/vendor-dashboard-v2/package/packageModel.ts",
       "components/vendor-dashboard-v2/profile/VendorProfileEditor.tsx",
@@ -6630,6 +7469,7 @@
   "packageScripts": {
     "bootstrap:local:qa": "node scripts/mvp/local/bootstrap-qf-canonical-local-qa.mjs",
     "build": "next build",
+    "build:automation-worker": "esbuild worker/nativeAutomationWorker.ts --bundle --platform=node --format=esm --target=node20 --packages=external --alias:server-only=./worker/serverOnlyShim.ts --tsconfig=tsconfig.json --outfile=dist/automation-worker.mjs",
     "build:staging:safe": "node scripts/mvp/build/build-staging-safe.mjs",
     "canary:mvp:40": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/activate-meta-staging-canary-cli.mjs",
     "create:mvp:40-r7b-once": "node scripts/mvp/communication/create-meta-staging-vendor-onboarding-reminder-once.mjs",
@@ -6656,6 +7496,8 @@
     "seed:mvp:40-12": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/seed-meta-staging-inactive-mappings.mjs",
     "seed:mvp:40-marketing-mapping": "node scripts/mvp/communication/seed-meta-marketing-mapping-once.mjs",
     "start": "next start",
+    "start:automation-worker": "node dist/automation-worker.mjs",
+    "test:aarohi:crm": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/aarohi/validate-qf-aarohi-crm.mjs",
     "test:admin:c4": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-c4-vendor-crm-profile.mjs",
     "test:admin:c5": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-c5-responsive-accessibility.mjs",
     "test:admin:c6": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-c6-integrated-admin.mjs",
@@ -6664,6 +7506,8 @@
     "test:admin:cwa1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-c-wa1-whatsapp-control-center.mjs",
     "test:admin:cwa1b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/admin/validate-cwa1b-whatsapp-billing.mjs",
     "test:aos:v2": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/aos/validate-qf-aos-v2.mjs",
+    "test:automation-native": "node scripts/mvp/automation/validate-qf-native-automation.mjs",
+    "test:automation-studio": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-automation-studio.mjs",
     "test:crm:30-1b": "node scripts/mvp/crm/validate-qf-mvp-30-1b.mjs",
     "test:crm:30-2": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/crm/validate-qf-mvp-30-2.mjs",
     "test:crm:30-3": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/crm/validate-qf-mvp-30-3.mjs",
@@ -6674,6 +7518,7 @@
     "test:crm:30-5b2b": "node scripts/mvp/crm/validate-qf-mvp-30-5b2b.mjs",
     "test:crm:30-5c1": "node scripts/mvp/crm/validate-qf-mvp-30-5c1.mjs",
     "test:crm:blueprint": "node scripts/mvp/crm/validate-qf-mvp-30-blueprint.mjs",
+    "test:launch:pune-only": "node scripts/mvp/launch/validate-pune-only-launch.mjs",
     "test:mvp": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/run.mjs marketplace assignment-authority communication",
     "test:mvp:20-4a": "node scripts/mvp/reconciliation/validate-qf-mvp-20-4a.mjs",
     "test:mvp:20-4c": "node scripts/mvp/reconciliation/validate-qf-mvp-20-4c.mjs",
@@ -6710,25 +7555,12 @@
     "test:mvp:40-r8c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-actual-staging-remaining-seven-one-shot.mjs",
     "test:mvp:50-1a": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-1a.mjs",
     "test:mvp:50-1b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-1b.mjs",
-    "test:mvp:50-1c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-1c.mjs",
-    "test:mvp:50-2-final": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-2-final.mjs",
-    "test:mvp:50-2a": "node scripts/mvp/automation/validate-qf-mvp-50-2a.mjs",
-    "test:mvp:50-2b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-2b.mjs",
-    "test:mvp:50-2c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-2c.mjs",
     "test:mvp:50-2c-s2-g1": "node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs",
-    "test:mvp:50-2d": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-2d.mjs",
-    "test:mvp:50-2e": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-2e.mjs",
-    "test:mvp:50-3": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-3.mjs",
     "test:mvp:50-3-50-4-bridge": "node scripts/mvp/automation/validate-qf-mvp-50-3-50-4-policy-config-bridge.mjs",
-    "test:mvp:50-3-50-4-cert": "node scripts/mvp/automation/validate-qf-mvp-50-3-50-4-staging-orchestration-certification.mjs",
     "test:mvp:50-3-50-4-forensic": "node scripts/mvp/automation/validate-qf-mvp-50-3-50-4-staging-forensic-reconciliation.mjs",
-    "test:mvp:50-4": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-4.mjs",
-    "test:mvp:50-5": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-5.mjs",
-    "test:mvp:50-6": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-6.mjs",
-    "test:mvp:50-7": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-mvp-50-7.mjs",
-    "test:mvp:50-7-toctou": "node scripts/mvp/automation/local-toctou-qf-mvp-50-7.mjs",
     "test:mvp:50-8": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/communication/validate-qf-mvp-50-8-lead-destination.mjs",
-    "test:mvp:50-9": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/automation/validate-qf-mvp-50-9.mjs",
+    "test:mvp:60": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-mvp-60-integration.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-mvp-60-context-recommendations.mjs",
+    "test:mvp:60-availability": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-mvp-60-service-availability.mjs",
     "test:mvp:70-01": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/admin/validate-qf-mvp-70-01-operations.mjs",
     "test:mvp:70-02": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/admin/validate-qf-mvp-70-02-attention-detail.mjs",
     "test:mvp:70-03": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/admin/validate-qf-mvp-70-03-launch-control.mjs",
@@ -6744,7 +7576,6 @@
     "test:mvp:80-13a": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-qf-mvp-80-13a.mjs",
     "test:mvp:80-13b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/communication/validate-qf-mvp-80-13b.mjs",
     "test:mvp:80-14a": "node scripts/mvp/communication/validate-qf-mvp-80-14a.mjs",
-    "test:mvp:80-14c": "node scripts/mvp/communication/validate-qf-mvp-80-14c-production-scheduler.mjs",
     "test:mvp:80-15c": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/qf-mvp-80-15c-assigned-contact-entitlement-harness.mjs",
     "test:mvp:80-15c-local": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/local/qf-mvp-80-15c-local-contact-entitlement-integration.mjs",
     "test:mvp:80-16b": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/communication/validate-qf-mvp-80-16b-vendor-destination.mjs",
@@ -6763,6 +7594,9 @@
     "test:mvp:e": "node scripts/mvp/staging/validate-qf-mvp-20-3e.mjs",
     "test:mvp:marketplace": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/run.mjs marketplace",
     "test:mvp:r1": "node scripts/qf-mvp-20-3r1-consumer-migration-harness.mjs",
+    "test:mvp:whatsapp-essential": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-essential-features.mjs",
+    "test:mvp:whatsapp-human-desk": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-human-desk.mjs",
+    "test:mvp:whatsapp-jarvis": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-jarvis-readiness.mjs",
     "test:phase1a": "node scripts/phase1a-workflow-foundation-verify.mjs",
     "test:phase1b": "node scripts/phase1b-workflow-kernel-harness.mjs",
     "test:phase1b:runtime": "node scripts/phase1b-workflow-runtime-db-harness.mjs",
@@ -6817,16 +7651,20 @@
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
+    "dotenv": "^16.6.1",
     "next": "14.2.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "standardwebhooks": "^1.0.0"
+    "standardwebhooks": "^1.0.0",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@types/node": "^20.16.5",
     "@types/react": "^18.3.8",
     "@types/react-dom": "^18.3.0",
+    "@types/ws": "^8.18.1",
     "autoprefixer": "^10.4.20",
+    "esbuild": "^0.25.12",
     "eslint": "8.57.0",
     "eslint-config-next": "14.2.15",
     "postcss": "^8.4.47",

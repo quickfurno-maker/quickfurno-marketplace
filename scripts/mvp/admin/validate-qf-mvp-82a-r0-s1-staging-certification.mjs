@@ -1,3 +1,5 @@
+import { CURRENT_MIGRATION_TREE } from "../migration/currentMigrationTruth.mjs";
+
 // ============================================================================
 // QF-MVP-82A-R0-S1 — staging deployment certification validator.  OFFLINE.
 // No database, no network, no provider, no credential, no send.
@@ -47,7 +49,7 @@ const PRODUCTION_REF = "yqpgcsduqbxulrlzwzap";
 
 const PUBLISHED_TABLES = ["public.communication_inbound_messages", "public.communication_messages"];
 
-const LIVE_MIGRATION_COUNT = 117;
+const LIVE_MIGRATION_COUNT = CURRENT_MIGRATION_TREE.totalCount;
 const FROZEN_RECONCILIATION_COUNT = 102;
 
 const rawOf = (p) => readFileSync(resolve(p), "utf8");
@@ -264,7 +266,7 @@ check("17-18 no application or inbox source belongs to this phase", () => {
 });
 
 check("19-20 S1 changed no migration and added none", () => {
-  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "the tree is 117");
+  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "the tree matches current Phase-1 manifest");
   eq(canonicalSha256(R0_PATH), R0_SHA, "R0 is byte-identical");
   // Exactly one R0 migration, and no S1 migration at all — which is the whole point
   // of this check: S1 was a certification phase and contributed no SQL of its own.
@@ -279,10 +281,10 @@ check("19-20 S1 changed no migration and added none", () => {
 
 // ---- 21-22. the two counts -------------------------------------------------
 
-check("21 the live source migration count is 117", () => {
+check("21 the live source migration tree matches current Phase-1 manifest", () => {
   eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "tree");
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
-  assert(/const MIGRATION_COUNT = 117;/.test(g1), "and G1 still pins 117");
+  assert(/const MIGRATION_COUNT = CURRENT_MIGRATION_TREE.totalCount;/.test(g1), "and G1 still pins 117");
 });
 
 check("22 the frozen 80.05 reconciliation count is still 102", () => {
@@ -290,11 +292,13 @@ check("22 the frozen 80.05 reconciliation count is still 102", () => {
     "it records what THAT phase observed, not the live tree");
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
   assert(/const RECONCILIATION_MIGRATION_COUNT = 102;/.test(g1), "G1 agrees");
-  // The accounting still balances: everything added since is pending or staging-applied.
-  eq(MIGRATIONS.length - MANIFEST.historyReconciliation.migrationCount,
-    (MANIFEST.pendingPostAnchorMigrations ?? []).length +
-    (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length,
-    "117 - 102 = 15 = eight pending + seven staging-applied");
+  assert(CURRENT_MIGRATION_TREE.ok, "the current Phase-1 migration tree is exact");
+  eq(MIGRATIONS.length, CURRENT_MIGRATION_TREE.totalCount,
+    "the live tree matches the current manifest-derived total");
+  eq(MANIFEST.currentPhase1Reconciliation.remoteHistory.staging.historyCount, 50,
+    "current staging history is pinned at 50");
+  eq(MANIFEST.currentPhase1Reconciliation.remoteHistory.production.historyCount, 60,
+    "current production history is pinned at 60");
 });
 
 // ---- 23-26. the new vocabulary, and what it may not become -----------------

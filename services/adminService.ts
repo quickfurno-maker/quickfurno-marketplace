@@ -27,7 +27,11 @@ type AdminPackageInput = {
   lead_count: number;
   total_price: number;
   validity_days: number;
+  description?: string | null;
+  sort_order?: number;
   is_active?: boolean;
+  category_ids?: string[];
+  city_ids?: string[];
 };
 
 type AdminNameInput = {
@@ -507,38 +511,47 @@ export const approveVendor = (id: string, actorUserId: string) => setVendorStatu
 export const rejectVendor = (id: string, actorUserId: string) => setVendorStatus(id, "Rejected", actorUserId);
 export const suspendVendor = (id: string, actorUserId: string) => setVendorStatus(id, "Suspended", actorUserId);
 
-export async function createPackage(input: AdminPackageInput, actorUserId: string): Promise<Result<{ id: string }>> {
+async function savePackage(input: AdminPackageInput, actorUserId: string, packageId: string | null): Promise<Result<{ id: string }>> {
   if (!actorUserId) return fail(appError("UNAUTHORIZED"));
   try {
     const name = input.name?.trim();
     const leadCount = Number(input.lead_count);
     const totalPrice = Number(input.total_price);
     const validityDays = Number(input.validity_days);
-
-    if (!name || !Number.isFinite(leadCount) || leadCount <= 0 || !Number.isFinite(totalPrice) || totalPrice < 0 || !Number.isFinite(validityDays) || validityDays <= 0) {
+    const sortOrder = Number(input.sort_order ?? 100);
+    if (!name || !Number.isFinite(leadCount) || leadCount <= 0 || !Number.isFinite(totalPrice) || totalPrice < 0 || !Number.isFinite(validityDays) || validityDays <= 0 || !Number.isFinite(sortOrder) || sortOrder < 0) {
       throw appError("VALIDATION");
     }
 
-    const { data, error } = await adminClient()
-      .from("packages")
-      .insert({
-        name,
-        lead_count: Math.round(leadCount),
-        price_per_lead: Math.round((totalPrice / leadCount) * 100) / 100,
-        total_price: totalPrice,
-        display_price: totalPrice,
-        validity_days: Math.round(validityDays),
-        is_active: input.is_active ?? true,
-      })
-      .select("id")
-      .single();
+    const { data, error } = await adminClient().rpc("qf_admin_upsert_package_v1", {
+      p_package_id: packageId,
+      p_name: name,
+      p_lead_count: Math.round(leadCount),
+      p_total_price: totalPrice,
+      p_validity_days: Math.round(validityDays),
+      p_description: input.description?.trim() || null,
+      p_sort_order: Math.round(sortOrder),
+      p_is_active: input.is_active ?? true,
+      p_category_ids: input.category_ids ?? [],
+      p_city_ids: input.city_ids ?? [],
+      p_updated_by: actorUserId,
+    });
     if (error) throw error;
-    await recordAuditLog("package.created", "package", data.id, { name, lead_count: leadCount, total_price: totalPrice }, actorUserId);
-    return ok({ id: data.id });
+    const id = String((data as { package_id?: string } | null)?.package_id ?? packageId ?? "");
+    if (!id) throw appError("UNKNOWN");
+    await recordAuditLog(packageId ? "package.updated" : "package.created", "package", id, {
+      name, lead_count: Math.round(leadCount), total_price: totalPrice,
+      validity_days: Math.round(validityDays), is_active: input.is_active ?? true,
+      category_ids: input.category_ids ?? [], city_ids: input.city_ids ?? [],
+    }, actorUserId);
+    return ok({ id });
   } catch (e) {
     return fail(e);
   }
 }
+
+export const createPackage = (input: AdminPackageInput, actorUserId: string) => savePackage(input, actorUserId, null);
+export const updatePackage = (id: string, input: AdminPackageInput, actorUserId: string) => savePackage(input, actorUserId, id);
 
 export async function setPackageActive(id: string, isActive: boolean, actorUserId: string): Promise<Result<null>> {
   if (!actorUserId) return fail(appError("UNAUTHORIZED"));

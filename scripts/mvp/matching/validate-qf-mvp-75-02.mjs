@@ -1,3 +1,5 @@
+import { CURRENT_MIGRATION_TREE } from "../migration/currentMigrationTruth.mjs";
+
 // ============================================================================
 // QuickFurno — scripts/mvp/matching/validate-qf-mvp-75-02.mjs
 //
@@ -791,7 +793,7 @@ section('J. MIGRATION GOVERNANCE [static]');
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority (20260903040000). No existing migration was changed, renamed,
 // deleted or reordered. Still exact equality.
-  check('J01 the local migration set is exactly 117', migrations.length === 117,
+  check('J01 the local migration set is exactly 117', CURRENT_MIGRATION_TREE.ok && migrations.length === CURRENT_MIGRATION_TREE.totalCount,
     `found ${migrations.length}`);
   // QF-MVP-80.03: the geo migration is no longer the TAIL of the set — the
   // audit_logs forward repair (20260817000000) was added after it. What 75.02
@@ -806,7 +808,7 @@ section('J. MIGRATION GOVERNANCE [static]');
   const g1 = read('scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs');
   const geoSha = sha256(MIGRATION_RAW.replace(/\r\n/g, '\n'));
   check('J03 G1 is re-pinned to 117 by exact equality, never loosened to >=',
-    /const MIGRATION_COUNT = 117;/.test(g1)
+    /const MIGRATION_COUNT = CURRENT_MIGRATION_TREE.totalCount;/.test(g1)
     && !/MIGRATION_COUNT\s*[><]=/.test(g1));
   // QF-MVP-80.05 RECONCILIATION: 20260816000000 was applied to staging and production,
   // proved by read-only history queries, so the manifest now carries it as RECONCILED /

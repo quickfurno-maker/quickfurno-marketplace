@@ -1,3 +1,5 @@
+import { CURRENT_MIGRATION_TREE } from "../migration/currentMigrationTruth.mjs";
+
 // ============================================================================
 // QF-MVP-70.01 — Operations Control Center invariants harness.
 //
@@ -190,7 +192,7 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority (20260903040000). This phase still adds no migration of its
 // own; the count is re-pinned by exact equality, never loosened.
-check("migration count is re-pinned at 117", migrations.length === 117);
+check("migration tree matches current Phase-1 manifest", CURRENT_MIGRATION_TREE.ok && migrations.length === CURRENT_MIGRATION_TREE.totalCount);
 check("QF-MVP-70 added no migration", !migrations.some((f) => /qf_mvp_70|mvp70|operations/i.test(f)));
 check("no source creates a table", allSources.every((s) => !/create table/i.test(s)));
 check("no source creates a function, index or policy", allSources.every((s) => !/create (or replace )?function|create index|create policy/i.test(s)));

@@ -3453,21 +3453,9 @@
 }
 
 /* ==========================================================================
-   FINAL COMPACT HEADER + MOBILE BOTTOM NAV — 2026-09-26
+   FINAL COMPACT MOBILE HEADER + BOTTOM NAV — 2026-09-26
+   Desktop navigation intentionally keeps the established homepage sizing.
    ========================================================================== */
-.qfp-header-inner {
-  min-height: 64px;
-  height: 64px;
-  gap: 28px;
-}
-.qfp-nav { gap: 28px; }
-.qfp-nav a { font-size: 14px; }
-.qfp-header-cta {
-  min-height: 40px;
-  padding: 9px 18px;
-  font-size: 13.5px;
-}
-
 @media (max-width: 760px) {
   .qfp-header-inner {
     min-height: 48px;

@@ -41,6 +41,7 @@ const PUBLIC_HEADER = "components/Header.tsx";
 const VENDORS_PAGE = "app/vendors/page.tsx";
 const VENDORS_CSS = "app/vendors/vendors-v2.css";
 const FOOTER_CSS = "app/footer-v2.css";
+const SHARED_JOURNEY = "components/home/MadeInPune.tsx";
 
 /** Strip block and line comments, then collapse whitespace runs. */
 function code(path) {
@@ -70,6 +71,7 @@ const PUBLIC_HEADER_SRC = code(PUBLIC_HEADER);
 const VENDORS_PAGE_SRC = code(VENDORS_PAGE);
 const VENDORS_CSS_SRC = code(VENDORS_CSS);
 const FOOTER_CSS_SRC = code(FOOTER_CSS);
+const SHARED_JOURNEY_SRC = code(SHARED_JOURNEY);
 
 const checks = [];
 const check = (name, fn) => checks.push({ name, fn });
@@ -442,6 +444,19 @@ check("25V [semantic] vendor mobile density stays scoped and compact", () => {
     "vendor sticky conversion bar compaction is missing");
   assert(/qv-vendors-page[\s\S]{0,500}qv-foot-ctas/.test(FOOTER_CSS_SRC),
     "vendor-only footer compaction is missing");
+});
+
+check("25W [semantic] homepage and vendors share one journey implementation", () => {
+  assert(/import \{ MadeInPune \} from "@\/components\/home\/MadeInPune"/.test(FINAL_HOME_SRC),
+    "homepage no longer imports the shared journey section");
+  assert(/import \{ MadeInPune \} from "@\/components\/home\/MadeInPune"/.test(VENDORS_PAGE_SRC),
+    "vendors page no longer imports the shared journey section");
+  assert(/<MadeInPune\s*\/>/.test(FINAL_HOME_SRC) && /<MadeInPune\s*\/>/.test(VENDORS_PAGE_SRC),
+    "homepage and vendors must both render the shared journey section");
+  assert(/qfp-page qfp-section qfp-cities qfp2-cities/.test(SHARED_JOURNEY_SRC),
+    "shared journey lost the homepage design-system scope");
+  assert(!/qfv-cities/.test(VENDORS_PAGE_SRC),
+    "vendors page reintroduced its old private journey markup");
 });
 
 check("25A [semantic] generic public quote CTAs do not bypass the main modal", () => {

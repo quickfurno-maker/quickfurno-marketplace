@@ -8,6 +8,7 @@ import { categoryImage, heroImage, optionalRealImage } from "@/lib/homepage-imag
 import { getPublicVendorCountsByCategory } from "@/services/publicVendorService";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { MadeInPune } from "@/components/home/MadeInPune";
 import { whatsappLink } from "@/lib/config";
 
 // ============================================================================
@@ -284,24 +285,6 @@ const FALLBACK_CATEGORY_IMAGE = (slug: string) => `/assets/quickfurno/images/cat
 
 // Verification steps — same four checks as lib/homepage-content VERIFY_STEPS,
 // with the tighter one-line copy from the approved mockup.
-
-// The approved mockup's journey section: Pune live, the rest on the roadmap.
-//
-// This was reduced to Pune alone during the Pune-only launch hardening, which
-// also added a CI rule banning the string "Mumbai" from every active surface.
-// The launch IS Pune-only and stays that way — nothing here is selectable, and
-// no lead or vendor can be created outside Pune. These names are a roadmap
-// shown to a visitor, which is a different thing from a city the product will
-// transact in, and the guard now draws that line instead of banning the word
-// outright. See scripts/mvp/launch/validate-pune-only-launch.mjs.
-const CITIES = [
-  { name: "Pune", file: "pune", live: true },
-  { name: "Delhi NCR", file: "delhi-ncr", live: false },
-  { name: "Mumbai", file: "mumbai", live: false },
-  { name: "Hyderabad", file: "hyderabad", live: false },
-  { name: "Kolkata", file: "kolkata", live: false },
-  { name: "Bengaluru", file: "bengaluru", live: false },
-];
 
 // Areas: the mockup shows 11 pills + "+ N more" on desktop, 7 + "+ N more" on
 // mobile. The remaining pills are revealed by a CSS-only toggle (no client JS).
@@ -855,36 +838,6 @@ function HowItWorks() {
           </EnquiryModalTrigger>
           <p>No homeowner fee. No obligation to hire.</p>
         </div>
-      </div>
-    </section>
-  );
-}
-
-function MadeInPune() {
-  return (
-    <section className="qfp-section qfp-cities qfp2-cities" aria-labelledby="qfp-cities-title">
-      <span className="qfp-cities-glow" aria-hidden="true" />
-      <div className="qfp-shell">
-        <div className="qfp-head-center" data-reveal>
-          <span className="qfp-kicker qfp-kicker--coral">Our journey</span>
-          <h2 id="qfp-cities-title">Made in Pune. <span>Coming to your city next.</span></h2>
-          <p className="qfp-cities-lead">We are building QuickFurno where we live — then bringing verified home professionals to more of India.</p>
-        </div>
-        <ul className="qfp-city-grid" data-reveal-group>
-          {CITIES.map((city) => (
-            <li className="qfp-city" key={city.name}>
-              <span className="qfp-city-badge">
-                <Image src={`${LAUNCH_IMG}/cities/${city.file}.jpg`} alt="" fill sizes="104px" />
-              </span>
-              <strong>{city.name}</strong>
-              {city.live ? (
-                <span className="qfp-city-status qfp-city-status--live"><i aria-hidden="true" />Live now</span>
-              ) : (
-                <span className="qfp-city-status">Coming soon</span>
-              )}
-            </li>
-          ))}
-        </ul>
       </div>
     </section>
   );

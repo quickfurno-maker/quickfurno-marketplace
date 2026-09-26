@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { MadeInPune } from "@/components/home/MadeInPune";
 import { Icon } from "@/components/qf-icon";
 import { categories, categorySlug } from "@/lib/quickfurno-data";
 import "./vendors-pro.css";
@@ -45,8 +45,8 @@ const TRADE_SLUGS = TRADES.map((trade) => categorySlug(trade));
 // approved ranking order, homeowner consent before contact sharing, reviews
 // only from matched homeowners. No invented counts, ratings or testimonials.
 //
-// "Made in Pune" is the only band still carrying the pre-redesign markup; it
-// has not been through a board yet.
+// "Made in Pune" is shared directly with the homepage, which is the design
+// authority for that public journey band on every viewport.
 // ============================================================================
 
 export const metadata: Metadata = {
@@ -63,15 +63,6 @@ export const metadata: Metadata = {
     type: "website",
   },
 };
-
-const CITIES = [
-  { name: "Pune", image: "/assets/quickfurno/images/launch/cities/pune.jpg", live: true },
-  { name: "Delhi NCR", image: "/assets/quickfurno/images/launch/cities/delhi-ncr.jpg" },
-  { name: "Mumbai", image: "/assets/quickfurno/images/launch/cities/mumbai.jpg" },
-  { name: "Hyderabad", image: "/assets/quickfurno/images/launch/cities/hyderabad.jpg" },
-  { name: "Kolkata", image: "/assets/quickfurno/images/launch/cities/kolkata.jpg" },
-  { name: "Bengaluru", image: "/assets/quickfurno/images/launch/cities/bengaluru.jpg" },
-];
 
 export default function VendorsPage() {
   // the structured data is generated from the same array the page renders, so
@@ -113,38 +104,7 @@ export default function VendorsPage() {
         <PromiseV2 />
         <AreasV2 />
 
-        {/* ==================== MADE IN PUNE (not yet redesigned) ==================== */}
-        <section className="qfv-cities qfv-section">
-          <div className="qfv-shell">
-            <div className="qfv-cities-head">
-              <span className="qfv-kicker" style={{ color: "#FF8A5C" }}>
-                Our journey
-              </span>
-              <h2 className="qfv-h2">Made in Pune. Coming to your city next.</h2>
-              <p>
-                We are building QuickFurno where we live — then bringing verified home professionals to more of India.
-              </p>
-            </div>
-            <div className="qfv-city-grid">
-              {CITIES.map((city) => (
-                <div className="qfv-city" key={city.name}>
-                  <span className="qfv-city-photo">
-                    <Image src={city.image} alt={city.name} width={104} height={104} sizes="104px" />
-                  </span>
-                  <b>{city.name}</b>
-                  {city.live ? (
-                    <span className="qfv-city-live">
-                      <i className="qfv-dot" style={{ width: 7, height: 7 }} />
-                      Live now
-                    </span>
-                  ) : (
-                    <span className="qfv-city-soon">Coming soon</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+        <MadeInPune />
 
         <FaqV2 />
         <ApplyV2 />

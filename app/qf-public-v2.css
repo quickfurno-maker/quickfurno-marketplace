@@ -1448,3 +1448,100 @@
     gap: 8px;
   }
 }
+
+
+/* ==========================================================================
+   QF-UI-20260926 — universal topbar scale + desktop active section
+   ========================================================================== */
+@media (min-width: 880px) {
+  .qf-site-header .qf-header-shell {
+    min-height: 78px;
+    max-width: 1260px;
+    padding-inline: 24px;
+    gap: 18px;
+  }
+
+  .qf-site-header .qf-nav {
+    gap: 12px;
+  }
+
+  .qf-site-header .qf-nav-link {
+    padding: 10px 13px;
+    border-radius: 999px;
+    font-size: 13.5px;
+    transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  }
+
+  .qf-site-header .qf-nav-link[data-active="true"] {
+    background: #c94a16;
+    color: #fff;
+    box-shadow: 0 7px 18px -12px rgba(201,74,22,.8);
+  }
+
+  .qf-site-header .qf-nav-link[data-active="true"]:hover {
+    background: #af3e10;
+    color: #fff;
+  }
+
+  .qf-site-header .qf-location-pill,
+  .qf-site-header .qf-header-cta {
+    min-height: 42px;
+    font-size: 12.5px;
+  }
+
+  .qf-site-header .qf-location-pill {
+    padding-inline: 14px;
+  }
+
+  .qf-site-header .qf-header-cta {
+    padding-inline: 17px;
+  }
+}
+
+@media (max-width: 879px) {
+  .qf-site-header .qf-header-shell {
+    min-height: 50px;
+    grid-template-columns: 58px minmax(0, 1fr) 58px;
+    padding-inline: 8px;
+    gap: 2px;
+  }
+
+  .qf-site-header .qf-nav-toggle {
+    width: 34px;
+    height: 34px;
+  }
+
+  .qf-site-header .qf-nav-toggle span {
+    width: 16px;
+  }
+
+  .qf-site-header .qf-location-pill {
+    min-height: 32px;
+    padding-inline: 7px;
+    font-size: 10.5px;
+  }
+
+  .qf-site-header .qf-location-pill svg {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+@media (max-width: 380px) {
+  .qf-site-header .qf-header-shell {
+    min-height: 48px;
+    grid-template-columns: 52px minmax(0, 1fr) 52px;
+    padding-inline: 6px;
+  }
+
+  .qf-site-header .qf-nav-toggle {
+    width: 32px;
+    height: 32px;
+  }
+
+  .qf-site-header .qf-location-pill {
+    min-height: 30px;
+    padding-inline: 6px;
+    font-size: 10px;
+  }
+}

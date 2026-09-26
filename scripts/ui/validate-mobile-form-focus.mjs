@@ -437,6 +437,20 @@ check("25U [semantic] public content pages use the universal Header", () => {
   }
 });
 
+check("25UA [semantic] universal public topbar keeps approved responsive scale and active state", () => {
+  assert(/usePathname\(\)/.test(PUBLIC_HEADER_SRC) &&
+    /data-active=\{activeHref === link\.href \? "true" : undefined\}/.test(PUBLIC_HEADER_SRC),
+    "universal header lost route/section-aware desktop highlighting");
+  assert(/@media \(min-width:\s*880px\)[\s\S]{0,260}\.qf-site-header \.qf-header-shell[\s\S]{0,120}min-height:\s*78px/.test(CSS_SRC),
+    "desktop public topbar is no longer enlarged to the approved height");
+  assert(/\.qf-site-header \.qf-nav-link\[data-active="true"\][\s\S]{0,120}background:\s*#c94a16/.test(CSS_SRC),
+    "desktop active section no longer has the orange highlight");
+  assert(/@media \(max-width:\s*879px\)[\s\S]{0,220}\.qf-site-header \.qf-header-shell[\s\S]{0,100}min-height:\s*50px/.test(CSS_SRC),
+    "mobile public topbar is no longer compact");
+  assert(/\.qf-site-header \.qf-nav-toggle[\s\S]{0,80}width:\s*34px[\s\S]{0,80}height:\s*34px/.test(CSS_SRC),
+    "mobile topbar menu control drifted from the compact scale");
+});
+
 check("25V [semantic] vendor mobile density stays scoped and compact", () => {
   assert(/className="qv-vendors-page"/.test(VENDORS_PAGE_SRC),
     "vendors page lost its scoping wrapper");

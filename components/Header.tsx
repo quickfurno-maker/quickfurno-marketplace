@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { Wordmark } from "@/components/Wordmark";
@@ -18,8 +19,10 @@ const NAV_LINKS = [
 ];
 
 export function Header() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [activeHref, setActiveHref] = useState("/");
 
   /**
    * QF-UI-V2-14: Escape did not dismiss the mobile menu. This is a disclosure
@@ -55,6 +58,55 @@ export function Header() {
     };
   }, []);
 
+  // Desktop orientation: keep one nav item visibly active. On the homepage
+  // this follows the section currently under the sticky header; on routed
+  // public pages it maps the page back to its parent navigation section.
+  useEffect(() => {
+    if (pathname !== "/") {
+      if (pathname === "/vendors" || pathname.startsWith("/vendors/")) {
+        setActiveHref("/vendors");
+      } else if (pathname.startsWith("/category/")) {
+        setActiveHref("/#services");
+      } else {
+        setActiveHref("");
+      }
+      return;
+    }
+
+    let raf = 0;
+    const sections = [
+      { id: "services", href: "/#services" },
+      { id: "how-it-works", href: "/#how-it-works" },
+      { id: "why-quickfurno", href: "/#why-quickfurno" },
+    ] as const;
+
+    const updateActiveSection = () => {
+      const threshold = Math.min(180, window.innerHeight * 0.28);
+      let nextHref = "/";
+      for (const section of sections) {
+        const element = document.getElementById(section.id);
+        if (element && element.getBoundingClientRect().top <= threshold) {
+          nextHref = section.href;
+        }
+      }
+      setActiveHref((current) => (current === nextHref ? current : nextHref));
+      raf = 0;
+    };
+
+    const onViewportChange = () => {
+      if (!raf) raf = window.requestAnimationFrame(updateActiveSection);
+    };
+
+    updateActiveSection();
+    window.addEventListener("scroll", onViewportChange, { passive: true });
+    window.addEventListener("resize", onViewportChange);
+    return () => {
+      window.removeEventListener("scroll", onViewportChange);
+      window.removeEventListener("resize", onViewportChange);
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, [pathname]);
+
   return (
     <header className={`qf-site-header${scrolled ? " qf-site-header--scrolled" : ""}`}>
       <div className="qf-header-shell">
@@ -80,7 +132,13 @@ export function Header() {
 
         <nav className="qf-nav" aria-label="Primary navigation">
           {NAV_LINKS.map((link) => (
-            <Link key={link.label} href={link.href} className="qf-nav-link">
+            <Link
+              key={link.label}
+              href={link.href}
+              className="qf-nav-link"
+              aria-current={activeHref === link.href ? "page" : undefined}
+              data-active={activeHref === link.href ? "true" : undefined}
+            >
               {link.label}
             </Link>
           ))}
@@ -102,6 +160,7 @@ export function Header() {
               key={link.label}
               href={link.href}
               className="qf-mobile-nav-link"
+              aria-current={activeHref === link.href ? "page" : undefined}
               onClick={() => setOpen(false)}
             >
               {link.label}

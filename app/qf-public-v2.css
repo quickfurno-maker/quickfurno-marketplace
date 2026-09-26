@@ -1267,3 +1267,184 @@
   .qf-site-header .qf-header-actions { left:auto !important; right:1rem; transform:none !important; }
   .qf-site-header .qf-brand { margin-inline:auto; }
 }
+
+
+/* ==========================================================================
+   QF-UI-20260926 — UNIVERSAL PUBLIC TOPBAR
+   One compact header for every public content page. The homepage now uses
+   components/Header.tsx too; vendor/admin application shells remain separate.
+   ========================================================================== */
+.qf-site-header.qf-site-header {
+  background: rgba(255,255,255,.97);
+  border-bottom: 1px solid #eee4d8;
+  box-shadow: none;
+  backdrop-filter: blur(14px);
+}
+
+.qf-site-header.qf-site-header--scrolled {
+  background: rgba(255,255,255,.985);
+  border-bottom-color: #eadfd2;
+  box-shadow: 0 10px 26px -24px rgba(31,24,17,.55);
+}
+
+.qf-site-header .qf-header-shell {
+  min-height: 62px;
+  max-width: 1200px;
+  padding-inline: 18px;
+  gap: 16px;
+}
+
+.qf-site-header .qf-brand {
+  justify-self: start;
+  color: #171512;
+}
+
+.qf-site-header .qf-location-pill {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #e8ddd1;
+  border-radius: 999px;
+  background: #fffdfa;
+  color: #171512;
+  font-size: 12px;
+  font-weight: 750;
+  box-shadow: 0 3px 10px -8px rgba(31,24,17,.45);
+}
+
+.qf-site-header .qf-location-pill svg {
+  width: 14px;
+  height: 14px;
+  color: #171512;
+}
+
+.qf-site-header .qf-header-cta {
+  min-height: 38px;
+  padding-inline: 14px;
+  border: 0;
+  border-radius: 9px;
+  background: #c94a16;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: none;
+}
+
+.qf-site-header .qf-header-cta:hover {
+  background: #af3e10;
+}
+
+.qf-site-header .qf-nav-link {
+  padding: 7px 9px;
+  color: #5f5a53;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.qf-site-header .qf-nav-link:hover {
+  background: #fbf6ef;
+  color: #171512;
+}
+
+@media (max-width: 879px) {
+  .qf-site-header .qf-header-shell {
+    width: 100%;
+    min-height: 56px;
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr) 72px;
+    align-items: center;
+    gap: 4px;
+    padding-inline: 10px;
+  }
+
+  .qf-site-header .qf-nav-toggle {
+    position: static;
+    grid-column: 1;
+    justify-self: start;
+    width: 40px;
+    height: 40px;
+    border: 1px solid #e6dacd;
+    border-radius: 999px;
+    background: #fffdfa;
+  }
+
+  .qf-site-header .qf-nav-toggle span {
+    width: 18px;
+    height: 2px;
+    background: #171512;
+  }
+
+  .qf-site-header .qf-brand {
+    grid-column: 2;
+    justify-self: center;
+    min-width: 0;
+  }
+
+  .qf-site-header .qf-header-actions {
+    position: static;
+    grid-column: 3;
+    justify-self: end;
+    min-width: 0;
+  }
+
+  .qf-site-header .qf-location-pill {
+    min-height: 38px;
+    padding: 0 8px;
+    font-size: 11.5px;
+  }
+
+  .qf-site-header .qf-header-cta {
+    display: none;
+  }
+
+  .qf-site-header .qf-mobile-nav {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    width: 100%;
+    margin: 0;
+    padding: 7px 10px 10px;
+    border: 0;
+    border-top: 1px solid #f0e7dc;
+    border-radius: 0 0 16px 16px;
+    background: rgba(255,255,255,.99);
+    box-shadow: 0 18px 32px -22px rgba(31,24,17,.55);
+  }
+
+  .qf-site-header .qf-mobile-nav-link {
+    min-height: 42px;
+    padding-inline: 11px;
+    border-radius: 9px;
+    color: #39342e;
+    font-size: 13px;
+    font-weight: 650;
+  }
+
+  .qf-site-header .qf-mobile-nav .qf-header-cta {
+    display: inline-flex;
+    min-height: 44px;
+    margin-top: 4px;
+    font-size: 13px;
+  }
+}
+
+@media (min-width: 880px) {
+  .qf-site-header .qf-header-shell {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .qf-site-header .qf-nav {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .qf-site-header .qf-nav-toggle {
+    display: none;
+  }
+
+  .qf-site-header .qf-header-actions {
+    gap: 8px;
+  }
+}

@@ -37,6 +37,7 @@ const FINAL_HOME_CSS = "app/home-pune-launch.css";
 const LEGACY_BRAND = "components/Brand.tsx";
 const FOOTER = "components/Footer.tsx";
 const HOME_ENQUIRY = "components/HomeEnquiryForm.tsx";
+const PUBLIC_HEADER = "components/Header.tsx";
 
 /** Strip block and line comments, then collapse whitespace runs. */
 function code(path) {
@@ -62,6 +63,7 @@ const FINAL_HOME_CSS_FLAT = flat(FINAL_HOME_CSS_SRC);
 const LEGACY_BRAND_SRC = code(LEGACY_BRAND);
 const FOOTER_SRC = code(FOOTER);
 const HOME_ENQUIRY_SRC = code(HOME_ENQUIRY);
+const PUBLIC_HEADER_SRC = code(PUBLIC_HEADER);
 
 const checks = [];
 const check = (name, fn) => checks.push({ name, fn });
@@ -386,9 +388,11 @@ check("24 [semantic] the approved hero quote entry point is present exactly once
 });
 
 check("25 [semantic] homepage CTAs all use the shared enquiry modal authority", () => {
-  assert(/EnquiryModalTrigger/.test(FINAL_HOME_SRC), "PuneLaunchHomepage no longer uses EnquiryModalTrigger");
+  assert(/import \{ Header \} from "@\/components\/Header"/.test(FINAL_HOME_SRC),
+    "homepage no longer uses the universal public Header");
+  assert(!/className="qfp-header"/.test(FINAL_HOME_SRC),
+    "homepage reintroduced a page-specific header");
   for (const source of [
-    "Homepage header",
     "Homepage hero quote bar",
     "Homepage not-sure card",
     "Homepage how it works",
@@ -396,10 +400,31 @@ check("25 [semantic] homepage CTAs all use the shared enquiry modal authority", 
   ]) {
     assert(FINAL_HOME_SRC.includes(`source="${source}"`), `missing approved conversion entry point: ${source}`);
   }
+  assert(/source="Global public header"/.test(PUBLIC_HEADER_SRC),
+    "universal public header CTA no longer uses the shared enquiry modal");
+  assert(/source="Global public mobile menu"/.test(PUBLIC_HEADER_SRC),
+    "universal public mobile menu CTA no longer uses the shared enquiry modal");
   assert(
     /<EnquiryModalTrigger[\s\S]{0,240}source="Homepage how it works"[\s\S]{0,240}Start free enquiry[\s\S]{0,120}<\/EnquiryModalTrigger>/.test(FINAL_HOME_SRC),
     "How it works 'Start free enquiry' no longer opens the shared enquiry modal",
   );
+});
+
+check("25U [semantic] public content pages use the universal Header", () => {
+  const publicPages = [
+    "app/vendors/page.tsx",
+    "app/vendors/[id]/page.tsx",
+    "app/category/[slug]/page.tsx",
+    "app/enquiry/page.tsx",
+    "app/privacy/page.tsx",
+    "app/terms/page.tsx",
+  ];
+  for (const page of publicPages) {
+    const src = code(page);
+    assert(/import \{ Header \} from "@\/components\/Header"/.test(src),
+      `${page} no longer imports the universal public Header`);
+    assert(/<Header\s*\/>/.test(src), `${page} no longer renders the universal public Header`);
+  }
 });
 
 check("25A [semantic] generic public quote CTAs do not bypass the main modal", () => {
@@ -426,9 +451,12 @@ check("26 [semantic] the approved mobile bottom navigation remains mounted", () 
 });
 
 check("27 [semantic] homepage keeps multiple non-duplicate conversion entry points", () => {
-  const hits = FINAL_HOME_SRC.match(/<EnquiryModalTrigger/g) || [];
-  assert(hits.length >= 5, `expected at least 5 enquiry entry points, found ${hits.length}`);
-  assert(/Get up to 3 matches/.test(FINAL_HOME_SRC), "bounded matching CTA copy is gone");
+  const pageHits = FINAL_HOME_SRC.match(/<EnquiryModalTrigger/g) || [];
+  const headerHits = PUBLIC_HEADER_SRC.match(/<EnquiryModalTrigger/g) || [];
+  const total = pageHits.length + headerHits.length;
+  assert(total >= 5, `expected at least 5 enquiry entry points including the universal header, found ${total}`);
+  assert(/Get up to 3 matches/.test(FINAL_HOME_SRC) || /Get up to 3 matches/.test(PUBLIC_HEADER_SRC),
+    "bounded matching CTA copy is gone");
   assert(/Homepage not-sure card/.test(FINAL_HOME_SRC), "the alternate homeowner entry point is gone");
 });
 

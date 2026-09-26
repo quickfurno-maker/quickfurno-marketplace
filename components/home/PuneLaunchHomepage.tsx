@@ -7,7 +7,7 @@ import { HOME_FAQ, PUNE_AREAS } from "@/lib/homepage-content";
 import { categoryImage, heroImage, optionalRealImage } from "@/lib/homepage-images";
 import { getPublicVendorCountsByCategory } from "@/services/publicVendorService";
 import { Footer } from "@/components/Footer";
-import { Wordmark } from "@/components/Wordmark";
+import { Header } from "@/components/Header";
 import { whatsappLink } from "@/lib/config";
 
 // ============================================================================
@@ -308,56 +308,9 @@ const CITIES = [
 const AREAS_VISIBLE_DESKTOP = 11;
 const AREAS_VISIBLE_MOBILE = 7;
 
-const NAV_LINKS = [
-  { href: "#services", label: "Services" },
-  { href: "#why-quickfurno", label: "Why QuickFurno" },
-  { href: "/vendors", label: "For professionals" },
-];
-
-function Logo() {
-  return (
-    <Link href="/" className="qfp-logo" aria-label="QuickFurno home">
-      <Wordmark height={27} priority />
-    </Link>
-  );
-}
-
 // ============================================================================
 // Sections
 // ============================================================================
-
-function Header() {
-  return (
-    <header className="qfp-header">
-      <div className="qfp-shell qfp-header-inner">
-        <Logo />
-        <nav className="qfp-nav" aria-label="Homepage navigation">
-          {NAV_LINKS.map((link, index) => (
-            <Link key={link.href} href={link.href} className={index === 0 ? "is-active" : undefined}>
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-        <EnquiryModalTrigger className="qfp-btn qfp-btn--primary qfp-header-cta" source="Homepage header">
-          Get up to 3 matches
-        </EnquiryModalTrigger>
-        <details className="qfp-menu">
-          <summary className="qfp-menu-button" aria-label="Open navigation">
-            <i /><i /><i />
-          </summary>
-          <nav className="qfp-menu-panel" aria-label="Mobile menu">
-            {NAV_LINKS.map((link) => (
-              <Link key={link.href} href={link.href}>{link.label}</Link>
-            ))}
-            <EnquiryModalTrigger className="qfp-btn qfp-btn--primary" source="Homepage mobile menu">
-              Get up to 3 matches
-            </EnquiryModalTrigger>
-          </nav>
-        </details>
-      </div>
-    </header>
-  );
-}
 
 // ---- Hero ------------------------------------------------------------------
 // Board: kicker rule, two-tone headline, a four-point trust row, and the

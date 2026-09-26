@@ -75,7 +75,7 @@ export function Header() {
             wordmark (.qfp-logo) because the logo file the site had was an
             older mark with different lettering; that file is now replaced. */}
         <Link href="/" className="qf-brand" aria-label="QuickFurno home" onClick={() => setOpen(false)}>
-          <Wordmark height={26} priority />
+          <Wordmark height={24} priority />
         </Link>
 
         <nav className="qf-nav" aria-label="Primary navigation">
@@ -88,8 +88,8 @@ export function Header() {
 
         <div className="qf-header-actions">
           <span className="qf-location-pill"><QFIcon name="pin" /> Pune</span>
-          <EnquiryModalTrigger className="qf-header-cta" source="Header CTA">
-            Get a Free Quote
+          <EnquiryModalTrigger className="qf-header-cta" source="Global public header">
+            Get up to 3 matches
           </EnquiryModalTrigger>
 
         </div>
@@ -109,10 +109,10 @@ export function Header() {
           ))}
           <EnquiryModalTrigger
             className="qf-header-cta qf-header-cta--block"
-            source="Header CTA"
+            source="Global public mobile menu"
             onClick={() => setOpen(false)}
           >
-            Get a Free Quote
+            Get up to 3 matches
           </EnquiryModalTrigger>
         </nav>
       ) : null}

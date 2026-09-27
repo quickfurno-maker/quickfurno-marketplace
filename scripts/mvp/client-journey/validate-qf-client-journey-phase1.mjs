@@ -133,6 +133,13 @@ const stagingQualificationMapping = fs.readFileSync(
   ),
   "utf8",
 );
+const productionTemplateOperator = fs.readFileSync(
+  path.join(
+    repo,
+    "scripts/mvp/client-journey/create-production-clarification-template-once.mjs",
+  ),
+  "utf8",
+);
 
 check("interactive answers stay exact-request scoped", () => {
   assert.match(enrichmentWhatsApp, /const ANSWER_PREFIX = "qfcla1"/);
@@ -179,6 +186,21 @@ check("staging qualification mapping is exact, inactive and utility-only", () =>
     stagingQualificationMapping,
     /values\s*\(\s*'clarification_reminder'/i,
   );
+});
+
+check("production template operator is one-shot, Core-only and send-incapable", () => {
+  assert.match(productionTemplateOperator, /EXPECTED_WABA_ID = "27861262223494153"/);
+  assert.match(productionTemplateOperator, /EXPECTED_PHONE_NUMBER_ID = "1333595106493545"/);
+  assert.match(productionTemplateOperator, /TARGET_NAME = "qf_clarification_request_v2"/);
+  assert.match(productionTemplateOperator, /TARGET_CATEGORY = "UTILITY"/);
+  assert.match(productionTemplateOperator, /TARGET_FINGERPRINT =/);
+  assert.match(productionTemplateOperator, /method: "POST"/);
+  assert.match(productionTemplateOperator, /\/message_templates/);
+  assert.doesNotMatch(
+    productionTemplateOperator.replaceAll("message_templates", ""),
+    /\/messages\b/,
+  );
+  assert.doesNotMatch(productionTemplateOperator, /method:\s*"(PUT|PATCH|DELETE)"/);
 });
 
 console.log(`QF Client Journey V2 Phase 1: ${passed}/${passed} PASS`);

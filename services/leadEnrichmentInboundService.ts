@@ -34,10 +34,15 @@ import {
   markLeadQualificationBlocked,
   recalculateStoredLeadQualification,
 } from "./leadQualificationService";
-import { canAutoDistributeLead } from "./leadQualityService";
+import {
+  canAutoDistributeLead,
+  type LeadQualityScoreResult,
+} from "./leadQualityService";
 import { runAutoLeadMatchingForLead } from "./leadMatchingEngine";
 import { routePreferredVendorLead } from "./preferredVendorLeadService";
 import { queueSystemConversationExperience } from "./conversationalWhatsAppService";
+import { runAosV2LeadIntelligence } from "./aosV2IntelligenceService";
+import type { AosV2CoreMatchEvidence } from "@/lib/aos/v2/contracts";
 
 const ACTIVE_REQUEST_STATUSES = [
   "preview_prepared",
@@ -669,6 +674,9 @@ async function finalizeCompletedRequest(
     })
     .eq("id", context.lead.id);
 
+  const refreshed = await readLead(context.lead.id);
+  if (!refreshed) throw new Error("LEAD_NOT_FOUND_AFTER_ENRICHMENT");
+
   if (!canMatch) {
     await markLeadQualificationBlocked(
       context.lead.id,
@@ -676,6 +684,7 @@ async function finalizeCompletedRequest(
         ? "nurture"
         : "manual_review",
     );
+    void observeAosAfterEnrichment(refreshed, scored.data, null);
     await queueExperience(
       context.conversationId,
       item.receipt.inboundMessageId,
@@ -690,8 +699,7 @@ async function finalizeCompletedRequest(
     .update({ journey_state: "matching" })
     .eq("id", context.lead.id);
 
-  const refreshed = await readLead(context.lead.id);
-  if (!refreshed) throw new Error("LEAD_NOT_FOUND_AFTER_ENRICHMENT");
+  let coreMatch: AosV2CoreMatchEvidence | null = null;
 
   if (
     String(refreshed.lead_intent ?? "") === "preferred_vendor" &&
@@ -724,12 +732,20 @@ async function finalizeCompletedRequest(
       await markLeadQualificationBlocked(context.lead.id, "manual_review");
       throw new Error("LEAD_ENRICHMENT_MATCH_FAILED");
     }
+    coreMatch = {
+      status: matching.data.status,
+      eligibleVendorCount: matching.data.eligibleVendorCount,
+      selectedVendorIds: matching.data.selectedVendorIds,
+      failureReason: matching.data.failureReason ?? null,
+    };
     await markLeadMatchingOutcome(context.lead.id, {
       status: matching.data.status,
       assignedCount: matching.data.assignedVendors.length,
       eligibleVendorCount: matching.data.eligibleVendorCount,
     });
   }
+
+  void observeAosAfterEnrichment(refreshed, scored.data, coreMatch);
 
   await queueExperience(
     context.conversationId,
@@ -747,6 +763,37 @@ async function readLead(leadId: string): Promise<LeadRow | null> {
     .maybeSingle();
   if (error) throw error;
   return (data as LeadRow | null) ?? null;
+}
+
+function observeAosAfterEnrichment(
+  lead: LeadRow,
+  quality: LeadQualityScoreResult,
+  coreMatch: AosV2CoreMatchEvidence | null,
+): void {
+  void runAosV2LeadIntelligence({
+    lead: {
+      leadId: lead.id,
+      city: typeof lead.city === "string" ? lead.city : null,
+      area: typeof lead.area === "string" ? lead.area : null,
+      serviceRequired:
+        typeof lead.service_required === "string" ? lead.service_required : null,
+      budget: typeof lead.budget === "string" ? lead.budget : null,
+      isDuplicate: lead.is_duplicate === true,
+      shareConsent: lead.share_consent === true,
+      leadIntent: typeof lead.lead_intent === "string" ? lead.lead_intent : null,
+      assignmentIntent:
+        typeof lead.assignment_intent === "string" ? lead.assignment_intent : null,
+      targetVendorId:
+        typeof lead.target_vendor_id === "string" ? lead.target_vendor_id : null,
+    },
+    quality,
+    coreMatch,
+  }).catch((error) => {
+    console.warn("[aos-v2] post-enrichment observation failed safely", {
+      leadId: lead.id,
+      code: error instanceof Error ? error.message.slice(0, 120) : "AOS_POST_ENRICHMENT_ERROR",
+    });
+  });
 }
 
 async function markPreferredJourney(

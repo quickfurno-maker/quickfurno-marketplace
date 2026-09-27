@@ -86,6 +86,13 @@ export async function createClarificationRequestForLead(leadId: string): Promise
     const preset = getClarificationPresetForLead(lead);
     const questions = preset.questions.length ? preset.questions : buildClarificationQuestions(lead);
     const missingFields = preset.missingFields.length ? preset.missingFields : detectMissingClarificationFields(lead);
+    if (questions.length === 0 || missingFields.length === 0) {
+      return {
+        ok: false,
+        code: "CLARIFICATION_NOT_REQUIRED",
+        error: "No structured clarification question is available for this lead.",
+      };
+    }
     const previewMessage = preset.previewMessage || buildClarificationPreviewMessage(lead, questions);
     const destinationHash = leadWhatsAppDestinationHash(lead.phone);
     if (!destinationHash) throw appError("VALIDATION");

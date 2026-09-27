@@ -281,6 +281,12 @@ export async function scoreAndStoreLead(leadId: string, input: LeadQualityInput)
   });
   if (scoreError) throw scoreError;
 
+  const fraudStatus =
+    score.hard_block_reason === "fake_or_test_name" ||
+    score.hard_block_reason === "spam_or_junk_message"
+      ? "suspicious"
+      : "clear";
+
   const { error: updateError } = await db.from("leads").update({
     lead_quality_score: score.total_score,
     lead_quality_class: score.score_class,
@@ -288,6 +294,7 @@ export async function scoreAndStoreLead(leadId: string, input: LeadQualityInput)
     lead_quality_hard_block_reason: score.hard_block_reason,
     lead_quality_recommended_action: score.recommended_action,
     lead_quality_checked_at: new Date().toISOString(),
+    fraud_status: fraudStatus,
     verification_status: decision.verificationStatus,
     status: decision.leadStatus,
   }).eq("id", leadId);

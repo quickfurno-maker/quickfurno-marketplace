@@ -421,6 +421,14 @@ export async function createLead(
       },
       quality: scoreResult,
       coreMatch,
+    }).catch((error) => {
+      console.warn("[aos-v2] initial lead observation failed safely", {
+        leadId: data.id,
+        code:
+          error instanceof Error
+            ? error.message.slice(0, 120)
+            : "AOS_INITIAL_OBSERVATION_ERROR",
+      });
     });
 
     return ok({ id: data.id, is_duplicate: data.is_duplicate, preferred_vendor: preferredVendor });

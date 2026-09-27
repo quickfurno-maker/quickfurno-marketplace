@@ -1425,8 +1425,8 @@
     "status": "CURRENT_READ_ONLY_HISTORY_RECONCILED_AND_TWO_FORWARD_MIGRATIONS_APPLIED",
     "observedDate": "2026-09-26",
     "source": {
-      "filesystemMigrationCount": 128,
-      "canonicalMigrationCount": 125,
+      "filesystemMigrationCount": 130,
+      "canonicalMigrationCount": 127,
       "canonicalMigrations": [
         {
           "version": "20260620000001",
@@ -2052,6 +2052,16 @@
           "version": "20260926035856",
           "filename": "20260926035856_qf_lead_drafts_deploy.sql",
           "sha256": "8f60b3d90d213a6c6026149d93b2d3d1dab15c9f58fd5a3feff889beda504961"
+        },
+        {
+          "version": "20260927113000",
+          "filename": "20260927113000_qf_client_journey_phase1_foundation.sql",
+          "sha256": "5f20904a229717d10e2d1cb5e6f6ee82257427ecebf7f2f611d501b6ad35be87"
+        },
+        {
+          "version": "20260927150000",
+          "filename": "20260927150000_qf_client_journey_phase1_meta_qualification.sql",
+          "sha256": "86b95c0f871141b40a32e126998a96a1cc2ba7af5fed1ae9de245cb5f195ae2b"
         }
       ],
       "worktreeInProgressExcludedMigrations": [
@@ -2659,7 +2669,7 @@
   "currentPhase2StagingParity": {
     "phase": "QF-PHASE2-STAGING-PRODUCTION-PARITY-20260926",
     "status": "CORE_PRODUCTION_REHEARSAL_PARITY_COMPLETE",
-    "observedDate": "2026-09-26",
+    "observedDate": "2026-09-27",
     "productionReadOnly": true,
     "stagingProjectRef": "uckafzuochmbvtiodmcl",
     "productionProjectRef": "yqpgcsduqbxulrlzwzap",
@@ -2674,7 +2684,7 @@
       "operatorRecord": "supabase/staging-history/qf-phase2-staging-parity-data.sql"
     },
     "stagingHistory": {
-      "historyCount": 57,
+      "historyCount": 59,
       "parityMigrations": [
         {
           "version": "20260926045741",
@@ -2718,6 +2728,24 @@
           "canonicalFile": "supabase/staging-history/qf-phase2-staging-rls-parity.sql",
           "exactCanonicalSqlApplied": true
         }
+      ],
+      "postParityMigrations": [
+        {
+          "version": "20260927072347",
+          "name": "qf_client_journey_phase1_foundation",
+          "canonicalFile": "20260927113000_qf_client_journey_phase1_foundation.sql",
+          "exactCanonicalSqlApplied": true,
+          "whatsappOutboundRemainedDisabled": true
+        },
+        {
+          "version": "20260927090306",
+          "name": "qf_client_journey_phase1_meta_qualification",
+          "canonicalFile": "20260927150000_qf_client_journey_phase1_meta_qualification.sql",
+          "exactCanonicalSqlApplied": true,
+          "activationRefusedAsExpected": "QF_CJ_META_CORE_ACCOUNT_NOT_READY",
+          "mappingRemainedInactive": true,
+          "whatsappOutboundRemainedDisabled": true
+        }
       ]
     },
     "coreParity": {
@@ -2734,6 +2762,21 @@
       },
       "rlsPolicyDefinitionsMatchProduction": true,
       "performanceAdvisorInitplanWarnings": 0
+    },
+    "clientJourneyPhase1QualificationMapping": {
+      "status": "STAGING_INACTIVE_MAPPING_CERTIFIED",
+      "observedDate": "2026-09-27",
+      "operatorRecord": "supabase/staging-history/qf-client-journey-phase1-qualification-mapping.sql",
+      "internalTemplateKey": "clarification_request",
+      "providerTemplateName": "qf_clarification_request_v2",
+      "providerTemplateId": "1374658884649762",
+      "providerCategory": "utility",
+      "approvalStatus": "approved",
+      "bindingVersion": 1,
+      "mappingActive": false,
+      "clarificationReminderMappingCount": 0,
+      "providerEvidence": "docs/provider-manifests/meta-staging-clarification-request-v2-reconciliation.json",
+      "whatsappOutboundRemainedDisabled": true
     },
     "intentionalEnvironmentDifferences": [
       "META_WHATSAPP_RUNTIME_DISABLED_IN_STAGING",

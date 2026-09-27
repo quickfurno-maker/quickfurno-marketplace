@@ -38,6 +38,7 @@ async function main() {
   const studio = await import("@/services/automationStudioService");
   const jarvisWhatsApp = await import("@/services/jarvisWhatsAppGatewayService");
   const conversationalWhatsApp = await import("@/services/conversationalWhatsAppService");
+  const leadEnrichmentMaintenance = await import("@/services/leadEnrichmentMaintenanceService");
   const cfg = runtime.getNativeAutomationRuntimeConfig();
   const startedAt = new Date().toISOString();
   let stopping = false;
@@ -196,6 +197,16 @@ async function main() {
           const stale = await engine.runNativeStaleCleanupCycle(cfg.workerId);
           markResult("stale_cleanup", stale);
           didWork ||= stale.state !== "idle";
+        }
+
+        if (await studio.isAutomationStudioWorkflowEnabled("client_journey")) {
+          const enrichment =
+            await leadEnrichmentMaintenance.runLeadEnrichmentNoResponseSweep();
+          if (enrichment.nurtured > 0) {
+            didWork = true;
+            snapshot.lastSuccessAt = new Date().toISOString();
+            snapshot.lastSafeCode = "NATIVE_LEAD_ENRICHMENT_NURTURE";
+          }
         }
         nextMaintenanceAt = now + cfg.maintenanceIntervalMs;
       }

@@ -1,0 +1,30 @@
+{
+  "artifact": "QuickFurno production clarification_request Meta reconciliation",
+  "observed_at_utc": "2026-09-27T09:05:10Z",
+  "environment": "production",
+  "provider": "meta_whatsapp_cloud",
+  "provider_account_role": "transactional",
+  "provider_account_alias": "core",
+  "operation_mode": "RECONCILE_ONLY",
+  "source_operator_commit": "ef4d70d",
+  "template": {
+    "internal_template_key": "clarification_request",
+    "provider_template_name": "qf_clarification_request_v2",
+    "provider_template_id": "1374658884649762",
+    "provider_category": "UTILITY",
+    "remote_status": "APPROVED",
+    "payload_fingerprint": "b1211ade37ded439861d9ddb8297d9e5c7cb73c4959e68363ab53c5e76933c77",
+    "semantic_match": true
+  },
+  "create_post_count": 0,
+  "safety": {
+    "message_send_performed": false,
+    "template_create_performed": false,
+    "template_edit_performed": false,
+    "template_delete_performed": false,
+    "token_recorded": false,
+    "waba_id_recorded": false,
+    "phone_number_recorded": false
+  },
+  "outcome": "RECONCILED_APPROVED"
+}

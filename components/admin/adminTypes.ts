@@ -27,6 +27,17 @@ export type Lead = {
   lead_quality_hard_block_reason?: string | null;
   lead_quality_recommended_action?: string | null;
   lead_quality_checked_at?: string | null;
+  // Client Journey V2 / Phase 1 — orthogonal qualification dimensions.
+  journey_state?: string | null;
+  completeness_status?: string | null;
+  completeness_percent?: number | null;
+  completeness_missing_fields?: string[] | null;
+  enrichment_missing_fields?: string[] | null;
+  match_readiness_status?: string | null;
+  reachability_status?: string | null;
+  fraud_status?: string | null;
+  qualification_field_states?: Record<string, string> | null;
+  qualification_checked_at?: string | null;
   clarification_status?: string | null;
   clarification_required?: boolean | null;
   clarification_missing_fields?: string[] | null;

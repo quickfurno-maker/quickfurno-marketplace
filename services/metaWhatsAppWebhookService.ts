@@ -72,6 +72,7 @@ import { reconcileLeadAssignmentDeliveryResults } from "./leadAssignmentResultSe
 import { handleInboundWhatsAppMessages } from "./inboundWhatsAppMessageService";
 import { processInboundConsentCommands } from "./inboundConsentCommandService";
 import { enqueueConsentCommandResponses } from "./consentCommandResponseService";
+import { processLeadEnrichmentInboundMessages } from "./leadEnrichmentInboundService";
 
 const CHANNEL = "whatsapp";
 
@@ -165,6 +166,7 @@ export interface MetaWebhookDeps {
     reason: "ignored_non_delivery" | "ignored_unknown"
   ) => Promise<void>;
   readonly processCommands: typeof processInboundConsentCommands;
+  readonly processLeadEnrichment: typeof processLeadEnrichmentInboundMessages;
   readonly enqueueAcks: typeof enqueueConsentCommandResponses;
 }
 
@@ -185,6 +187,8 @@ export function defaultMetaWebhookDeps(): MetaWebhookDeps {
     reconcileLeadAssignmentResults: (args) => reconcileLeadAssignmentDeliveryResults(args),
     recordIgnored: (rawBody, payload, reason) => recordIgnoredReceipt(rawBody, payload, reason),
     processCommands: (processed) => processInboundConsentCommands(processed),
+    processLeadEnrichment: (processed) =>
+      processLeadEnrichmentInboundMessages(processed),
     enqueueAcks: (input) => enqueueConsentCommandResponses(input),
   };
 }
@@ -370,6 +374,16 @@ async function processVerifiedExpectedMetaWebhook(
     // ACKNOWLEDGED below — the persisted row is their durable record, and retrying could never help.
     const commands = await deps.processCommands(inbound.result.processed);
     if (!commands.ok) return { status: 500, code: "inbound_command_processing_failed" };
+
+    // Client Journey V2 / Phase 1 — deterministic lead-enrichment interpretation.
+    // This consumes ONLY the durable minimized inbound projection. STOP/START/HELP
+    // are ignored here and remain owned by the consent-command path above.
+    // Provider sends are still forbidden inside the webhook: this processor may
+    // only persist Core state and enqueue governed conversational outbox rows.
+    const enrichment = await deps.processLeadEnrichment(inbound.result.processed);
+    if (!enrichment.ok) {
+      return { status: 500, code: "lead_enrichment_processing_failed" };
+    }
 
     // Phase 5F-D4-C — DURABLE ENQUEUE, strictly AFTER the authoritative command flow has COMPLETED.
     //

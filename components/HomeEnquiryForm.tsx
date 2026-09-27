@@ -2,10 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { submitLead } from "@/app/actions";
-import { ENQUIRY_SERVICES, BUDGETS, TIMELINES, trackEvent } from "@/lib/config";
+import { ENQUIRY_SERVICES, trackEvent } from "@/lib/config";
+import { isIndianLeadMobile } from "@/lib/leads/indianMobile";
 import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useActiveCities";
 
 export function HomeEnquiryForm({ defaultService }: { defaultService?: string }) {
+  const inferredService =
+    defaultService && (ENQUIRY_SERVICES as readonly string[]).includes(defaultService)
+      ? defaultService
+      : null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -16,7 +21,7 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
 
   const [f, setF] = useState({
     name: "", phone: "", city: "", area: "",
-    service_required: defaultService && (ENQUIRY_SERVICES as readonly string[]).includes(defaultService) ? defaultService : ENQUIRY_SERVICES[0],
+    service_required: inferredService ?? ENQUIRY_SERVICES[0],
     budget: "", timeline: "", message: "",
   });
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
@@ -32,11 +37,20 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
     if (busy) return;
 
     setError(null);
-    if (!f.name.trim() || !f.phone.trim() || !f.city || !f.service_required) {
-      setError("Please add your name, phone, city and the service you need.");
+    if (
+      !f.name.trim() ||
+      !f.phone.trim() ||
+      !f.city ||
+      !f.area.trim() ||
+      !f.service_required
+    ) {
+      setError("Please add your name, WhatsApp number, area and the service you need.");
       return;
     }
-    if (f.phone.replace(/\D/g, "").length < 10) { setError("Please enter a valid phone number."); return; }
+    if (!isIndianLeadMobile(f.phone)) {
+      setError("Please enter a valid 10-digit WhatsApp number.");
+      return;
+    }
     if (!shareConsent) {
       setError("Please agree to share your enquiry with up to 3 verified vendors.");
       return;
@@ -74,7 +88,7 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
         <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-gold/50 bg-gold/15 text-gold">✓</div>
         <h3 className="mt-5 text-2xl text-ivory">Thank you!</h3>
         <p className="mx-auto mt-3 max-w-md font-sans text-sm text-muted">
-          Your requirement has been received. Our team will verify and match you with suitable professionals.
+          Your enquiry is captured. We&apos;ll complete any missing project details on WhatsApp before matching you with suitable professionals.
         </p>
       </div>
     );
@@ -89,12 +103,17 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <L label="Full name"><input className="field" value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="Your name" /></L>
-        <L label="Phone number"><input className="field" value={f.phone} onChange={(e) => set("phone", e.target.value)} inputMode="tel" placeholder="+91…" /></L>
-        <L label="City"><select className="field" value={f.city} onChange={(e) => set("city", e.target.value)} disabled={activeCities.length === 0}>{activeCities.length === 0 ? <option value="" className="bg-navy-deep">{citiesLoading ? "Loading cities…" : NO_ACTIVE_CITIES_MESSAGE}</option> : activeCities.map((c) => <option key={c} className="bg-navy-deep">{c}</option>)}</select></L>
+        <L label="WhatsApp number"><input className="field" value={f.phone} onChange={(e) => set("phone", e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" maxLength={10} placeholder="10-digit WhatsApp number" /></L>
+        {activeCities.length === 1 ? null : (
+          <L label="City"><select className="field" value={f.city} onChange={(e) => set("city", e.target.value)} disabled={activeCities.length === 0}>{activeCities.length === 0 ? <option value="" className="bg-navy-deep">{citiesLoading ? "Loading cities…" : NO_ACTIVE_CITIES_MESSAGE}</option> : activeCities.map((c) => <option key={c} className="bg-navy-deep">{c}</option>)}</select></L>
+        )}
         <L label="Area / locality"><input className="field" value={f.area} onChange={(e) => set("area", e.target.value)} placeholder="e.g. Kharadi" /></L>
-        <L label="Service required"><select className="field" value={f.service_required} onChange={(e) => set("service_required", e.target.value)}>{ENQUIRY_SERVICES.map((s) => <option key={s} className="bg-navy-deep">{s}</option>)}</select></L>
-        <L label="Budget"><select className="field" value={f.budget} onChange={(e) => set("budget", e.target.value)}><option value="" className="bg-navy-deep">Select budget</option>{BUDGETS.map((b) => <option key={b} className="bg-navy-deep">{b}</option>)}</select></L>
-        <L label="Timeline"><select className="field" value={f.timeline} onChange={(e) => set("timeline", e.target.value)}><option value="" className="bg-navy-deep">Select timeline</option>{TIMELINES.map((t) => <option key={t} className="bg-navy-deep">{t}</option>)}</select></L>
+        {inferredService ? null : (
+          <L label="Service required"><select className="field" value={f.service_required} onChange={(e) => set("service_required", e.target.value)}>{ENQUIRY_SERVICES.map((s) => <option key={s} className="bg-navy-deep">{s}</option>)}</select></L>
+        )}
+        <div className="sm:col-span-2 font-sans text-xs text-muted">
+          We&apos;ll ask only the missing project details on WhatsApp after you submit.
+        </div>
       </div>
       <label className="mt-5 flex items-start gap-3 font-sans text-xs leading-5 text-muted">
         <input

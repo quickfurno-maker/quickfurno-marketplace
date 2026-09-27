@@ -99,7 +99,10 @@ export const CLIENT_DISPATCH_REGISTRY: Readonly<
 > = Object.freeze({
   "client.lead_confirmation": definition("client.lead_confirmation", "lead_received"),
   "client.requirement_collection": definition("client.requirement_collection", "clarification_request"),
-  "client.missing_information_reminder": definition("client.missing_information_reminder", "clarification_reminder"),
+  // Reuse the same approved Utility contract for the +24h reminder. The old
+  // clarification_reminder Meta candidate was recategorized as Marketing and is
+  // deliberately never selected by Client Journey V2.
+  "client.missing_information_reminder": definition("client.missing_information_reminder", "clarification_request"),
   "client.matching_update": definition("client.matching_update", "client_matching_update"),
   "client.lead_status_update": definition("client.lead_status_update", "client_lead_status_update"),
   "client.transactional_followup": definition("client.transactional_followup", "client_vendor_connection_reminder"),

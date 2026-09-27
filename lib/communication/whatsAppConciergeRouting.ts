@@ -166,9 +166,21 @@ export function resolveWhatsAppConciergeRouting(input: ConciergeRoutingInput): C
     });
   }
 
-  if (input.currentState === "PAUSED") {
+  if (input.currentState === "PAUSED" || input.currentHumanTakeover === true) {
     const paused = existingDecision(input);
     if (paused) return paused;
+  }
+
+  // Client Journey V2 / Phase 1 owns request-bound qualification tokens. Keep
+  // the durable conversation/identity stable, but suppress both the generic
+  // concierge menu and Jarvis so only the deterministic enrichment processor
+  // can answer this turn.
+  if (token !== null && /^(qfclar|qfcla1):/.test(token)) {
+    const stable = identityDecision(input) ?? existingDecision(input);
+    if (stable && stable.assignedActor !== "HUMAN" && stable.assignedActor !== "SYSTEM") {
+      return route(stable.subjectType, stable.assignedActor, stable.source, { suppress: true });
+    }
+    return route(input.currentSubjectType ?? "unknown", "SYSTEM", "existing", { suppress: true });
   }
 
   const nonText = nonTextDecision(input);

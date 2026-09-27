@@ -198,6 +198,22 @@ export function LeadDrawer({
 
         <DrawerSection title="Readiness">
           <InfoGrid rows={[
+            ["Journey", String(lead.journey_state || "captured").replace(/_/g, " ")],
+            [
+              "Completeness",
+              `${Number(lead.completeness_percent ?? 0)}% · ${String(
+                lead.completeness_status || "incomplete",
+              ).replace(/_/g, " ")}`,
+            ],
+            [
+              "Qualification missing",
+              Array.isArray(lead.completeness_missing_fields)
+                ? lead.completeness_missing_fields.join(", ") || "None"
+                : "None",
+            ],
+            ["Match readiness", String(lead.match_readiness_status || "not_ready").replace(/_/g, " ")],
+            ["Reachability", String(lead.reachability_status || "unverified").replace(/_/g, " ")],
+            ["Fraud / junk", String(lead.fraud_status || "unchecked").replace(/_/g, " ")],
             ["Score", lead.lead_quality_score != null ? `${lead.lead_quality_score}/100` : "Not scored"],
             ["Class", lead.lead_quality_class || "Not scored"],
             ["Quality status", (lead.lead_quality_status || "Not set").replace(/_/g, " ")],

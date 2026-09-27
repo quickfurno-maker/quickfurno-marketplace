@@ -179,6 +179,13 @@ export async function executeClientAutomationAttempt(
   if (existingEvidence) {
     // A row exists. Core does not classify, does not finalize and does not
     // re-execute: the persisted status is the only authority from here on.
+    // Client Journey V2 may mirror successful clarification communication
+    // evidence back onto the exact request; this is derived bookkeeping only
+    // and never changes the communication verdict.
+    await syncClarificationCommunicationEvidence(
+      job.action_request_id,
+      existingEvidence,
+    );
     return evidenceResult(
       input.requestId,
       existingEvidence,
@@ -357,6 +364,7 @@ export async function executeClientAutomationAttempt(
   // -------------------------------------------------------------------------
   const evidence = await readCommunicationEvidence(communicationIdempotencyKey);
   if (evidence) {
+    await syncClarificationCommunicationEvidence(job.action_request_id, evidence);
     return evidenceResult(input.requestId, evidence, reservationReplayed);
   }
 
@@ -481,6 +489,94 @@ async function readCommunicationEvidence(
 
   if (error) throw error;
   return (data as CommunicationEvidence | null) ?? null;
+}
+
+const CLARIFICATION_OUTBOUND_EVIDENCE_STATUSES = new Set([
+  "accepted",
+  "sent",
+  "delivered",
+  "read",
+]);
+
+async function syncClarificationCommunicationEvidence(
+  actionRequestId: string,
+  evidence: CommunicationEvidence,
+): Promise<void> {
+  if (!CLARIFICATION_OUTBOUND_EVIDENCE_STATUSES.has(evidence.status)) return;
+
+  const { data: action, error: actionError } = await adminClient()
+    .from("automation_action_requests")
+    .select("action_type,entity_type,entity_id,idempotency_key,decision_status")
+    .eq("id", actionRequestId)
+    .maybeSingle();
+  if (actionError) throw actionError;
+  if (
+    !action ||
+    action.decision_status !== "authorized" ||
+    action.entity_type !== "lead" ||
+    typeof action.entity_id !== "string" ||
+    typeof action.idempotency_key !== "string" ||
+    !isClarificationActionType(action.action_type)
+  ) {
+    return;
+  }
+
+  const identity = parseClarificationRequestIdentity({
+    actionType: action.action_type,
+    leadId: action.entity_id,
+    idempotencyKey: action.idempotency_key,
+  });
+  if (!identity.ok) return;
+
+  const { data: request, error: requestError } = await adminClient()
+    .from("lead_clarification_requests")
+    .select("id,lead_id,status,sent_preview_at,reminder_sent_at")
+    .eq("id", identity.requestId)
+    .maybeSingle();
+  if (requestError) throw requestError;
+  if (!request || request.lead_id !== action.entity_id) return;
+
+  const now = new Date().toISOString();
+  if (action.action_type === "client.requirement_collection") {
+    const { error } = await adminClient()
+      .from("lead_clarification_requests")
+      .update({
+        status: "preview_sent",
+        sent_preview_at: request.sent_preview_at ?? now,
+        initial_communication_message_id: evidence.id,
+        updated_at: now,
+      })
+      .eq("id", identity.requestId)
+      .eq("lead_id", action.entity_id)
+      .in("status", ["preview_prepared", "preview_sent"]);
+    if (error) throw error;
+
+    const { error: leadError } = await adminClient()
+      .from("leads")
+      .update({
+        clarification_status: "preview_sent",
+        journey_state: "awaiting_client",
+        match_readiness_status: "needs_enrichment",
+        clarification_checked_at: now,
+      })
+      .eq("id", action.entity_id)
+      .eq("clarification_last_request_id", identity.requestId)
+      .eq("clarification_required", true);
+    if (leadError) throw leadError;
+    return;
+  }
+
+  const { error } = await adminClient()
+    .from("lead_clarification_requests")
+    .update({
+      reminder_communication_message_id: evidence.id,
+      reminder_sent_at: request.reminder_sent_at ?? now,
+      updated_at: now,
+    })
+    .eq("id", identity.requestId)
+    .eq("lead_id", action.entity_id)
+    .eq("status", "preview_sent");
+  if (error) throw error;
 }
 
 type PreparedIntent =
@@ -635,9 +731,10 @@ async function proveExecutionTimeEligibility(
       if (row.clarification_required !== true) {
         return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
       }
-      // `preview_prepared` is the outstanding state the producer fired on. Any
-      // later state means the clarification has moved on and the reminder is moot.
-      if (row.clarification_status !== "preview_prepared") {
+      // The reminder is eligible only after the initial clarification message
+      // has been proven sent and the request moved to preview_sent. The exact
+      // request/message evidence is re-proved again below before dispatch.
+      if (row.clarification_status !== "preview_sent") {
         return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
       }
       return { ok: true };
@@ -852,7 +949,7 @@ async function resolveClarificationExecutionFacts(
   // The EXACT row, by primary key. Only the fields this decision needs.
   const requestRead = await adminClient()
     .from("lead_clarification_requests")
-    .select("id, lead_id, status, questions_json, missing_fields")
+    .select("id, lead_id, status, questions_json, missing_fields, initial_communication_message_id")
     .eq("id", identity.requestId)
     .maybeSingle();
 
@@ -867,6 +964,7 @@ async function resolveClarificationExecutionFacts(
     status: string | null;
     questions_json: unknown;
     missing_fields: unknown;
+    initial_communication_message_id: string | null;
   } | null;
 
   // The sealed evidence names a request that does not exist: nothing can be
@@ -895,15 +993,47 @@ async function resolveClarificationExecutionFacts(
   } | null;
   if (!leadRow) return { ok: false, code: "QF_EXEC_LEAD_NOT_FOUND" };
 
-  if (request.status !== "preview_prepared") {
+  const allowedRequestStatuses =
+    definition.actionType === "client.requirement_collection"
+      ? new Set(["preview_prepared"])
+      : new Set(["preview_sent"]);
+  const allowedLeadStatuses =
+    definition.actionType === "client.requirement_collection"
+      ? new Set(["preview_prepared"])
+      : new Set(["preview_sent"]);
+
+  if (!allowedRequestStatuses.has(String(request.status ?? ""))) {
     return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
   }
   if (leadRow.clarification_required !== true) {
     return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
   }
-  if (leadRow.clarification_status !== "preview_prepared") {
+  if (!allowedLeadStatuses.has(String(leadRow.clarification_status ?? ""))) {
     return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
   }
+
+  if (definition.actionType === "client.missing_information_reminder") {
+    if (!request.initial_communication_message_id) {
+      return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+    }
+    const initialMessageRead = await adminClient()
+      .from("communication_messages")
+      .select("status")
+      .eq("id", request.initial_communication_message_id)
+      .maybeSingle();
+    if (initialMessageRead.error) {
+      return { ok: false, code: "QF_EXEC_LEAD_LOOKUP_FAILED" };
+    }
+    if (
+      !initialMessageRead.data ||
+      !["sent", "delivered", "read"].includes(
+        String(initialMessageRead.data.status ?? ""),
+      )
+    ) {
+      return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+    }
+  }
+
   // The decisive one: a NEWER clarification request must never authorize this
   // older job. The lead's current request has to be exactly the sealed one.
   if (leadRow.clarification_last_request_id !== identity.requestId) {
@@ -914,10 +1044,43 @@ async function resolveClarificationExecutionFacts(
   // Derived from the persisted question KEYS of the exact request, through the
   // closed label registry. `missing_fields` is not consulted: it is a mutable
   // convenience column, while questions_json is what was actually asked.
-  const derived = deriveOutstandingItem(request.questions_json);
+  //
+  // For the +24h reminder, subtract responses that Core has actually applied so
+  // we never ask the client for a detail they already supplied. The same filter
+  // is harmless for the initial request (there are no applied answers yet).
+  const appliedRead = await adminClient()
+    .from("lead_clarification_responses")
+    .select("question_key")
+    .eq("request_id", identity.requestId)
+    .not("applied_at", "is", null);
+  if (appliedRead.error) {
+    return { ok: false, code: "QF_EXEC_LEAD_LOOKUP_FAILED" };
+  }
+  const answeredKeys = new Set(
+    (appliedRead.data ?? [])
+      .map((row) => String(row.question_key ?? "").trim())
+      .filter(Boolean),
+  );
+  const remainingQuestions = Array.isArray(request.questions_json)
+    ? request.questions_json.filter((question) => {
+        if (!question || typeof question !== "object" || Array.isArray(question)) {
+          return false;
+        }
+        const key = String((question as { key?: unknown }).key ?? "").trim();
+        return key.length > 0 && !answeredKeys.has(key);
+      })
+    : [];
+
+  if (remainingQuestions.length === 0) {
+    return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+  }
+  const derived = deriveOutstandingItem(remainingQuestions);
   if (!derived.ok) return { ok: false, code: "QF_EXEC_VARIABLES_UNRESOLVED" };
 
-  return { ok: true, outstandingItem: derived.outstandingItem };
+  return {
+    ok: true,
+    outstandingItem: derived.outstandingItem,
+  };
 }
 
 type VariableInputResult =
@@ -972,11 +1135,15 @@ function resolveVariableInput(
       };
     case "client.requirement_collection":
     case "client.missing_information_reminder":
-      // The builders remain the final variable-contract authority: they still
-      // validate every field and still prove the emitted key set equals their
-      // declared contract exactly. This only supplies the proven input.
+      // The builders remain the final variable-contract authority. The first
+      // inbound reply is correlated through the request's privacy-safe
+      // destination hash, so the approved text template needs only its two
+      // provider variables and no hidden action token.
       if (outstandingItem === null) return unresolved;
-      return { ok: true, input: { clientName: lead.name, outstandingItem } };
+      return {
+        ok: true,
+        input: { clientName: lead.name, outstandingItem },
+      };
     default:
       return unresolved;
   }

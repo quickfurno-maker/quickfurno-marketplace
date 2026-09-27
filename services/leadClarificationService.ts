@@ -10,6 +10,7 @@ import {
   type ClarificationQuestion,
 } from "../lib/lead-quality/clarificationPresets";
 import { scoreAndStoreLead, type LeadQualityScoreResult } from "./leadQualityService";
+import { leadWhatsAppDestinationHash } from "../lib/leads/leadWhatsAppIdentity";
 
 export type LeadClarificationRequest = {
   id: string;
@@ -85,7 +86,16 @@ export async function createClarificationRequestForLead(leadId: string): Promise
     const preset = getClarificationPresetForLead(lead);
     const questions = preset.questions.length ? preset.questions : buildClarificationQuestions(lead);
     const missingFields = preset.missingFields.length ? preset.missingFields : detectMissingClarificationFields(lead);
+    if (questions.length === 0 || missingFields.length === 0) {
+      return {
+        ok: false,
+        code: "CLARIFICATION_NOT_REQUIRED",
+        error: "No structured clarification question is available for this lead.",
+      };
+    }
     const previewMessage = preset.previewMessage || buildClarificationPreviewMessage(lead, questions);
+    const destinationHash = leadWhatsAppDestinationHash(lead.phone);
+    if (!destinationHash) throw appError("VALIDATION");
     const now = new Date().toISOString();
 
     const { data, error } = await adminClient()
@@ -101,8 +111,9 @@ export async function createClarificationRequestForLead(leadId: string): Promise
         missing_fields: missingFields,
         questions_json: questions,
         preview_message: previewMessage,
+        destination_hash: destinationHash,
         status: "preview_prepared",
-        sent_preview_at: now,
+        sent_preview_at: null,
         created_by: "system",
       })
       .select("*")
@@ -116,6 +127,99 @@ export async function createClarificationRequestForLead(leadId: string): Promise
       clarification_last_request_id: data.id,
       clarification_checked_at: now,
     }).eq("id", leadId);
+
+    return ok(normalizeRequest(data));
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * Client Journey V2 / Phase 1 — completeness-driven enrichment producer.
+ *
+ * Unlike the legacy B-score helper above, this path is triggered by missing
+ * structured data. It reuses the proven clarification tables/question presets
+ * so the Automation Worker and CRM keep one durable request ledger.
+ */
+export async function createEnrichmentRequestForLead(
+  leadId: string,
+): Promise<Result<LeadClarificationRequest>> {
+  try {
+    const existing = await getLatestClarificationRequest(leadId);
+    if (
+      existing.ok &&
+      existing.data &&
+      ["preview_prepared", "preview_sent"].includes(String(existing.data.status ?? ""))
+    ) {
+      return ok(existing.data);
+    }
+
+    const lead = await loadLeadForClarification(leadId);
+    if (!lead) throw appError("LEAD_NOT_FOUND");
+    if (lead.is_duplicate || lead.share_consent !== true) {
+      return {
+        ok: false,
+        code: "CLARIFICATION_NOT_REQUIRED",
+        error: "Enrichment is not allowed for duplicate or non-consented leads.",
+      };
+    }
+
+    const preset = getClarificationPresetForLead(lead);
+    const questions = preset.questions.length
+      ? preset.questions
+      : buildClarificationQuestions(lead);
+    const missingFields = preset.missingFields.length
+      ? preset.missingFields
+      : detectMissingClarificationFields(lead);
+    const destinationHash = leadWhatsAppDestinationHash(lead.phone);
+    if (!destinationHash) throw appError("VALIDATION");
+
+    if (questions.length === 0 || missingFields.length === 0) {
+      return {
+        ok: false,
+        code: "CLARIFICATION_NOT_REQUIRED",
+        error: "No enrichable lead information is missing.",
+      };
+    }
+
+    const now = new Date().toISOString();
+    const { data, error } = await adminClient()
+      .from("lead_clarification_requests")
+      .insert({
+        lead_id: leadId,
+        score_before: lead.lead_quality_score ?? null,
+        score_class_before: lead.lead_quality_class ?? null,
+        parent_category_group: preset.parentCategoryGroup,
+        marketplace_category: preset.marketplaceCategory,
+        service_required: preset.serviceRequired,
+        subcategory: preset.subcategory,
+        missing_fields: missingFields,
+        questions_json: questions,
+        preview_message:
+          preset.previewMessage ||
+          buildClarificationPreviewMessage(lead, questions),
+        destination_hash: destinationHash,
+        status: "preview_prepared",
+        sent_preview_at: null,
+        created_by: "client_journey_v2",
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+
+    const { error: updateError } = await adminClient()
+      .from("leads")
+      .update({
+        clarification_required: true,
+        clarification_status: "preview_prepared",
+        clarification_missing_fields: missingFields,
+        clarification_last_request_id: data.id,
+        clarification_checked_at: now,
+        journey_state: "awaiting_client",
+        match_readiness_status: "needs_enrichment",
+      })
+      .eq("id", leadId);
+    if (updateError) throw updateError;
 
     return ok(normalizeRequest(data));
   } catch (e) {
@@ -236,7 +340,14 @@ export async function applyClarificationResponsesToLead(leadId: string, response
 
     if (detailLines.length > 0) {
       const current = text(lead.message);
-      patch.message = [current, ...detailLines].filter(Boolean).join("\n");
+      const existingLines = new Set(
+        current
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean),
+      );
+      const newLines = detailLines.filter((line) => !existingLines.has(line.trim()));
+      patch.message = [current, ...newLines].filter(Boolean).join("\n");
     }
 
     if (Object.keys(patch).length > 0) {

@@ -9,17 +9,15 @@
 //
 // TWO DELIBERATELY SEPARATE PATHS:
 //
-//   A. Actions whose template is one of the five APPROVED ordinary business
-//      templates delegate to the QF-MVP-40.12-R1 authority in
-//      `lib/communication/businessTemplateVariables.ts`. Their source-key
-//      semantics are owned there and are not restated here.
+//   A. Actions whose template has an approved ordinary-business variable
+//      contract delegate to `lib/communication/businessTemplateVariables.ts`.
+//      Client Journey V2 promotes `clarification_request` into that same
+//      authority because its positional binding is now proven end-to-end.
 //
 //   B. Actions whose template is still a DRAFT or does not yet exist as a
 //      provider candidate declare their intended source keys here instead.
 //      Knowing what authoritative Core data an action needs is not the same as
-//      claiming an approved provider binding — and must never be mistaken for
-//      it. BUSINESS_TEMPLATE_CONTRACTS stays at five; promoting a draft into
-//      provider binding authority is a separately governed 40.x act.
+//      claiming an approved provider binding — and must never be mistaken for it.
 //
 // Pure module: no database, network, environment, clock or provider import.
 // ============================================================================
@@ -28,6 +26,7 @@ import {
   BusinessSourceKey,
   BusinessVariableReason,
   MAX_BUSINESS_VARIABLE_LENGTH,
+  buildClarificationRequestVariables as buildCanonicalClarificationRequestVariables,
   buildClientLeadStatusUpdateVariables,
   buildClientMatchingUpdateVariables,
   buildLeadReceivedVariables,
@@ -53,25 +52,13 @@ type ClientDraftSourceKey =
   | (typeof ClientDraftOnlySourceKey)[keyof typeof ClientDraftOnlySourceKey];
 
 /**
- * The intended source keys for the three client actions whose provider template is
- * NOT an approved QF-MVP-40.12 binding.
- *
- * `clarification_request`, `clarification_reminder`, and the vendor-specific
- * `client_vendor_connection_reminder` require exact provider contracts/mappings before
- * a real send can succeed. The action name remains historical compatibility only;
- * message content is governed by the connection-reminder template key below.
+ * Intended source keys for client templates that still lack an approved ordinary
+ * business binding. Qualification no longer belongs here: both the initial ask
+ * and its reminder use the approved `clarification_request` contract.
  */
 export const CLIENT_DRAFT_TEMPLATE_SOURCE_KEYS: Readonly<
   Record<string, readonly ClientDraftSourceKey[]>
 > = Object.freeze({
-  clarification_request: Object.freeze([
-    BusinessSourceKey.CLIENT_NAME,
-    BusinessSourceKey.OUTSTANDING_ITEM,
-  ]),
-  clarification_reminder: Object.freeze([
-    BusinessSourceKey.CLIENT_NAME,
-    BusinessSourceKey.OUTSTANDING_ITEM,
-  ]),
   client_vendor_connection_reminder: Object.freeze([
     BusinessSourceKey.CLIENT_NAME,
     ClientDraftOnlySourceKey.VENDOR_NAME,
@@ -126,25 +113,22 @@ function assembleDraft(
 }
 
 // ---------------------------------------------------------------------------
-// B — draft / not-yet-existing provider templates
+// B — client qualification wrappers + remaining draft provider template
 // ---------------------------------------------------------------------------
 
 export function buildClarificationRequestVariables(
   input: { clientName: unknown; outstandingItem: unknown },
 ): BusinessVariableResult {
-  return assembleDraft("clarification_request", [
-    [BusinessSourceKey.CLIENT_NAME, text(input?.clientName, "clientName")],
-    [BusinessSourceKey.OUTSTANDING_ITEM, text(input?.outstandingItem, "outstandingItem")],
-  ]);
+  return buildCanonicalClarificationRequestVariables(input);
 }
 
 export function buildClarificationReminderVariables(
   input: { clientName: unknown; outstandingItem: unknown },
 ): BusinessVariableResult {
-  return assembleDraft("clarification_reminder", [
-    [BusinessSourceKey.CLIENT_NAME, text(input?.clientName, "clientName")],
-    [BusinessSourceKey.OUTSTANDING_ITEM, text(input?.outstandingItem, "outstandingItem")],
-  ]);
+  // The reminder intentionally reuses the same approved Utility provider
+  // contract; the old clarification_reminder provider candidate was reclassified
+  // as Marketing and remains quarantined.
+  return buildCanonicalClarificationRequestVariables(input);
 }
 
 export function buildClientVendorConnectionReminderVariables(

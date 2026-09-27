@@ -175,6 +175,7 @@
     "start:automation-worker": "node dist/automation-worker.mjs",
     "test:mvp:50-2c-s2-g1": "node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs",
     "test:automation-native": "node scripts/mvp/automation/validate-qf-native-automation.mjs",
+    "test:client-journey:phase1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/client-journey/validate-qf-client-journey-phase1.mjs",
     "test:aarohi:crm": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/aarohi/validate-qf-aarohi-crm.mjs",
     "test:mvp:whatsapp-essential": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-essential-features.mjs",
     "test:mvp:whatsapp-human-desk": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-human-desk.mjs",

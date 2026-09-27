@@ -2664,7 +2664,7 @@
   "currentPhase2StagingParity": {
     "phase": "QF-PHASE2-STAGING-PRODUCTION-PARITY-20260926",
     "status": "CORE_PRODUCTION_REHEARSAL_PARITY_COMPLETE",
-    "observedDate": "2026-09-26",
+    "observedDate": "2026-09-27",
     "productionReadOnly": true,
     "stagingProjectRef": "uckafzuochmbvtiodmcl",
     "productionProjectRef": "yqpgcsduqbxulrlzwzap",
@@ -2679,7 +2679,7 @@
       "operatorRecord": "supabase/staging-history/qf-phase2-staging-parity-data.sql"
     },
     "stagingHistory": {
-      "historyCount": 57,
+      "historyCount": 58,
       "parityMigrations": [
         {
           "version": "20260926045741",
@@ -2722,6 +2722,15 @@
           "name": "qf_phase2_staging_rls_initplan_parity",
           "canonicalFile": "supabase/staging-history/qf-phase2-staging-rls-parity.sql",
           "exactCanonicalSqlApplied": true
+        }
+      ],
+      "postParityMigrations": [
+        {
+          "version": "20260927072347",
+          "name": "qf_client_journey_phase1_foundation",
+          "canonicalFile": "20260927113000_qf_client_journey_phase1_foundation.sql",
+          "exactCanonicalSqlApplied": true,
+          "whatsappOutboundRemainedDisabled": true
         }
       ]
     },

@@ -60,6 +60,10 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
   // cities and active categories.
   const { cities: activeCities, loading: citiesLoading } = useActiveCities();
   const { categories: activeCategories, loading: categoriesLoading } = useActiveCategories();
+  const inferredService =
+    defaultService && activeCategories.includes(defaultService)
+      ? defaultService
+      : null;
 
   const [form, setForm] = useState({
     name: "", phone: "", city: "",
@@ -192,23 +196,27 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
             autoComplete="tel"
           />
         </Field>
-        <Field label="City">
-          <select value={form.city} onChange={(e) => set("city", e.target.value)} disabled={activeCities.length === 0}>
-            {activeCities.length === 0
-              ? <option value="">{citiesLoading ? "Loading cities…" : NO_ACTIVE_CITIES_MESSAGE}</option>
-              : activeCities.map((c) => <option key={c}>{c}</option>)}
-          </select>
-        </Field>
+        {activeCities.length === 1 ? null : (
+          <Field label="City">
+            <select value={form.city} onChange={(e) => set("city", e.target.value)} disabled={activeCities.length === 0}>
+              {activeCities.length === 0
+                ? <option value="">{citiesLoading ? "Loading cities…" : NO_ACTIVE_CITIES_MESSAGE}</option>
+                : activeCities.map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </Field>
+        )}
         <Field label="Area / locality">
           <input value={form.area} onChange={(e) => set("area", e.target.value)} placeholder="e.g. Kharadi" />
         </Field>
-        <Field label="Service needed">
-          <select value={form.service_required} onChange={(e) => set("service_required", e.target.value)} disabled={activeCategories.length === 0}>
-            {activeCategories.length === 0
-              ? <option value="">{categoriesLoading ? "Loading services…" : NO_ACTIVE_CATEGORIES_MESSAGE}</option>
-              : activeCategories.map((s) => <option key={s}>{s}</option>)}
-          </select>
-        </Field>
+        {inferredService ? null : (
+          <Field label="Service needed">
+            <select value={form.service_required} onChange={(e) => set("service_required", e.target.value)} disabled={activeCategories.length === 0}>
+              {activeCategories.length === 0
+                ? <option value="">{categoriesLoading ? "Loading services…" : NO_ACTIVE_CATEGORIES_MESSAGE}</option>
+                : activeCategories.map((s) => <option key={s}>{s}</option>)}
+            </select>
+          </Field>
+        )}
         <div className="qf-enqpage-field qf-enqpage-field--wide">
           <span>Quick qualification happens after submission</span>
           <p>

@@ -22,6 +22,7 @@ import { canAutoDistributeLead, scoreAndStoreLead, type LeadQualityScoreResult }
 import {
   evaluateAndStoreLeadQualification,
   markLeadAwaitingClient,
+  markLeadDuplicate,
   markLeadMatchReady,
   markLeadMatchingOutcome,
   markLeadQualificationBlocked,
@@ -233,8 +234,9 @@ export async function createLead(
 
       if (Boolean(data.is_duplicate)) {
         // Duplicate truth is independent of completeness/quality. Preserve the
-        // captured record for audit/CRM, but never enrich or distribute it.
-        await markLeadQualificationBlocked(data.id, "manual_review");
+        // captured row and linkage for audit/CRM, but never enrich or distribute
+        // it as a competing lead.
+        await markLeadDuplicate(data.id);
       } else if (qualificationSnapshot.completenessStatus !== "complete") {
         // Missing information is enrichment work, NOT low quality. Do not run
         // Quality V2 yet because its legacy score still contains completeness

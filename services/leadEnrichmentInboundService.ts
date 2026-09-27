@@ -8,9 +8,8 @@
 // ============================================================================
 
 import { adminClient } from "@/lib/supabase";
-import { hashPhoneE164, normalizePhoneE164 } from "@/lib/communication/phone";
 import { normalizeConsentCommand } from "@/lib/communication/consentCommand";
-import { isIndianLeadMobile } from "@/lib/leads/indianMobile";
+import { leadWhatsAppDestinationHash } from "@/lib/leads/leadWhatsAppIdentity";
 import {
   buildLeadEnrichmentCompleteExperience,
   buildLeadEnrichmentNeedsReviewExperience,
@@ -40,7 +39,11 @@ import { runAutoLeadMatchingForLead } from "./leadMatchingEngine";
 import { routePreferredVendorLead } from "./preferredVendorLeadService";
 import { queueSystemConversationExperience } from "./conversationalWhatsAppService";
 
-const ACTIVE_REQUEST_STATUSES = ["preview_prepared", "preview_sent"] as const;
+const ACTIVE_REQUEST_STATUSES = [
+  "preview_prepared",
+  "preview_sent",
+  "expired_no_response",
+] as const;
 const CONTROL_CHARS = /[\r\n\t]/;
 
 type LeadRow = Record<string, unknown> & {
@@ -60,6 +63,7 @@ type RequestRow = {
   lead_id: string;
   status: string | null;
   questions_json: ClarificationQuestion[];
+  destination_hash: string | null;
   conversation_id: string | null;
 };
 
@@ -209,7 +213,28 @@ async function loadExactRequestContext(input: {
   inboundMessageId: string;
 }): Promise<RequestContext | null> {
   const request = await readRequest(input.requestId);
-  if (!request) return null;
+  if (!request || request.destination_hash !== input.senderHash) return null;
+
+  if (request.status === "expired_no_response") {
+    // A late client reply reactivates the SAME requirement. It never creates a
+    // competing lead and never loses the original no-response/send evidence.
+    const now = new Date().toISOString();
+    const { error: reopenError } = await adminClient()
+      .from("leads")
+      .update({
+        clarification_required: true,
+        clarification_status: "late_response",
+        journey_state: "awaiting_client",
+        match_readiness_status: "needs_enrichment",
+        reachability_status: "reachable",
+        clarification_checked_at: now,
+      })
+      .eq("id", request.lead_id)
+      .eq("clarification_last_request_id", request.id)
+      .eq("is_duplicate", false);
+    if (reopenError) throw reopenError;
+  }
+
   const lead = await readEligibleLead(request.lead_id, request.id, input.senderHash);
   if (!lead) return null;
 
@@ -253,18 +278,42 @@ async function loadConversationRequestContext(input: {
   senderHash: string;
   inboundMessageId: string;
 }): Promise<RequestContext | null> {
-  const { data, error } = await adminClient()
+  const { data: bound, error: boundError } = await adminClient()
     .from("lead_clarification_requests")
     .select("id")
     .eq("conversation_id", input.conversationId)
     .in("status", [...ACTIVE_REQUEST_STATUSES])
     .order("created_at", { ascending: false })
     .limit(2);
-  if (error) throw error;
-  if (!Array.isArray(data) || data.length !== 1 || !data[0]?.id) return null;
+  if (boundError) throw boundError;
+
+  if (Array.isArray(bound) && bound.length === 1 && bound[0]?.id) {
+    return loadExactRequestContext({
+      requestId: String(bound[0].id),
+      conversationId: input.conversationId,
+      senderHash: input.senderHash,
+      inboundMessageId: input.inboundMessageId,
+    });
+  }
+  if (Array.isArray(bound) && bound.length > 1) return null;
+
+  // First client reply after the approved outbound template: bind only when the
+  // privacy-safe destination hash identifies exactly one active unbound request.
+  // Two simultaneous requirements for the same WhatsApp identity are ambiguous
+  // and deliberately fall through to human/Riya handling rather than guessing.
+  const { data: unbound, error: unboundError } = await adminClient()
+    .from("lead_clarification_requests")
+    .select("id")
+    .eq("destination_hash", input.senderHash)
+    .is("conversation_id", null)
+    .in("status", [...ACTIVE_REQUEST_STATUSES])
+    .order("created_at", { ascending: false })
+    .limit(2);
+  if (unboundError) throw unboundError;
+  if (!Array.isArray(unbound) || unbound.length !== 1 || !unbound[0]?.id) return null;
 
   return loadExactRequestContext({
-    requestId: String(data[0].id),
+    requestId: String(unbound[0].id),
     conversationId: input.conversationId,
     senderHash: input.senderHash,
     inboundMessageId: input.inboundMessageId,
@@ -274,7 +323,7 @@ async function loadConversationRequestContext(input: {
 async function readRequest(requestId: string): Promise<RequestRow | null> {
   const { data, error } = await adminClient()
     .from("lead_clarification_requests")
-    .select("id,lead_id,status,questions_json,conversation_id")
+    .select("id,lead_id,status,questions_json,destination_hash,conversation_id")
     .eq("id", requestId)
     .maybeSingle();
   if (error) throw error;
@@ -293,6 +342,8 @@ async function readRequest(requestId: string): Promise<RequestRow | null> {
     lead_id: String(data.lead_id),
     status: data.status == null ? null : String(data.status),
     questions_json: data.questions_json as ClarificationQuestion[],
+    destination_hash:
+      typeof data.destination_hash === "string" ? data.destination_hash : null,
     conversation_id:
       typeof data.conversation_id === "string" ? data.conversation_id : null,
   };
@@ -321,20 +372,9 @@ async function readEligibleLead(
     return null;
   }
 
-  const destinationHash = leadDestinationHash(lead.phone);
+  const destinationHash = leadWhatsAppDestinationHash(lead.phone);
   if (!destinationHash || destinationHash !== senderHash) return null;
   return lead;
-}
-
-function leadDestinationHash(phone: unknown): string | null {
-  if (typeof phone !== "string") return null;
-  const trimmed = phone.trim();
-  const e164 = isIndianLeadMobile(trimmed)
-    ? `+91${trimmed}`
-    : normalizePhoneE164(trimmed).ok
-      ? (normalizePhoneE164(trimmed) as { ok: true; e164: string }).e164
-      : null;
-  return e164 ? hashPhoneE164(e164) : null;
 }
 
 async function answeredQuestionKeys(requestId: string): Promise<Set<string>> {

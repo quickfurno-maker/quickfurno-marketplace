@@ -75,6 +75,19 @@ export async function markLeadMatchReady(leadId: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function markLeadDuplicate(leadId: string): Promise<void> {
+  const { error } = await adminClient()
+    .from("leads")
+    .update({
+      journey_state: "duplicate",
+      match_readiness_status: "blocked",
+      qualification_checked_at: new Date().toISOString(),
+    })
+    .eq("id", leadId);
+
+  if (error) throw error;
+}
+
 export async function markLeadAwaitingClient(leadId: string): Promise<void> {
   const { error } = await adminClient()
     .from("leads")

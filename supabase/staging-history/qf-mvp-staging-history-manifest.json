@@ -2056,7 +2056,7 @@
         {
           "version": "20260927113000",
           "filename": "20260927113000_qf_client_journey_phase1_foundation.sql",
-          "sha256": "9111e93b65573d9c1f53bf53df945c188ab4b4cae187db44d319a6b45b223d4b"
+          "sha256": "5f20904a229717d10e2d1cb5e6f6ee82257427ecebf7f2f611d501b6ad35be87"
         }
       ],
       "worktreeInProgressExcludedMigrations": [

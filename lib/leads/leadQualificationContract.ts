@@ -25,6 +25,7 @@ export type LeadMatchReadinessStatus =
 
 export type LeadJourneyState =
   | "captured"
+  | "duplicate"
   | "enrichment_required"
   | "awaiting_client"
   | "ready_for_qualification"

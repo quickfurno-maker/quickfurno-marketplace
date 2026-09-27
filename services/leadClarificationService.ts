@@ -10,6 +10,7 @@ import {
   type ClarificationQuestion,
 } from "../lib/lead-quality/clarificationPresets";
 import { scoreAndStoreLead, type LeadQualityScoreResult } from "./leadQualityService";
+import { leadWhatsAppDestinationHash } from "../lib/leads/leadWhatsAppIdentity";
 
 export type LeadClarificationRequest = {
   id: string;
@@ -86,6 +87,8 @@ export async function createClarificationRequestForLead(leadId: string): Promise
     const questions = preset.questions.length ? preset.questions : buildClarificationQuestions(lead);
     const missingFields = preset.missingFields.length ? preset.missingFields : detectMissingClarificationFields(lead);
     const previewMessage = preset.previewMessage || buildClarificationPreviewMessage(lead, questions);
+    const destinationHash = leadWhatsAppDestinationHash(lead.phone);
+    if (!destinationHash) throw appError("VALIDATION");
     const now = new Date().toISOString();
 
     const { data, error } = await adminClient()
@@ -101,8 +104,9 @@ export async function createClarificationRequestForLead(leadId: string): Promise
         missing_fields: missingFields,
         questions_json: questions,
         preview_message: previewMessage,
+        destination_hash: destinationHash,
         status: "preview_prepared",
-        sent_preview_at: now,
+        sent_preview_at: null,
         created_by: "system",
       })
       .select("*")
@@ -160,6 +164,8 @@ export async function createEnrichmentRequestForLead(
     const missingFields = preset.missingFields.length
       ? preset.missingFields
       : detectMissingClarificationFields(lead);
+    const destinationHash = leadWhatsAppDestinationHash(lead.phone);
+    if (!destinationHash) throw appError("VALIDATION");
 
     if (questions.length === 0 || missingFields.length === 0) {
       return {
@@ -185,8 +191,9 @@ export async function createEnrichmentRequestForLead(
         preview_message:
           preset.previewMessage ||
           buildClarificationPreviewMessage(lead, questions),
+        destination_hash: destinationHash,
         status: "preview_prepared",
-        sent_preview_at: now,
+        sent_preview_at: null,
         created_by: "client_journey_v2",
       })
       .select("*")

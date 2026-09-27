@@ -1131,11 +1131,10 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
    * location metadata and tracking are unchanged.
    *
    * Field order is fixed and mobile-first. Contact + location comes first,
-   * followed by project details, then the unchanged consent and submit action:
-   *   [1 Contact & location] name -> phone -> WhatsApp -> OTP UI -> city -> area -> GPS
-   *   [2 Project details]   service -> budget -> property type -> timeline -> message
-   * OTP is presentation-only until the backend verification phase; it does not
-   * change the current lead payload or submission gate.
+   * followed by optional project enrichment, then consent and submit:
+   *   [1 Contact & location] name -> WhatsApp -> city (only when choice exists) -> area
+   *   [2 Project details]   service when not inferred -> optional details
+   * Missing project details are completed after capture through WhatsApp.
    */
   function sectionHead(n: number, title: string, hint: string, required = false) {
     return (
@@ -1217,28 +1216,30 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
               {phoneUi.showError ? <span className="qf-rf-field-err">{phoneUi.error}</span> : null}
             </div>
 
-            <label className={"qf-sf-field qf-sf-field--full" + (cityUi.showError ? " has-error" : "")} htmlFor="qf-sf-city">
-              <span className="qf-sf-label">City <b aria-hidden="true">*</b></span>
-              <select
-                id="qf-sf-city"
-                value={form.city}
-                onChange={(e) => {
-                  set("city", e.target.value);
-                  markTouched("city");
-                }}
-                onBlur={() => markTouched("city")}
-                disabled={citiesLoading && activeCities.length === 0}
-              >
-                <option value="">{citiesLoading && !citiesLoaded ? "Loading cities…" : "Select your city"}</option>
-                {form.city && !activeCities.includes(form.city) ? <option value={form.city}>{form.city}</option> : null}
-                {activeCities.map((city) => <option key={city} value={city}>{city}</option>)}
-              </select>
-              {citiesLoaded && activeCities.length === 0 ? (
-                <span className="qf-rf-field-err">{NO_ACTIVE_CITIES_MESSAGE}</span>
-              ) : cityUi.showError ? (
-                <span className="qf-rf-field-err">{cityUi.error}</span>
-              ) : null}
-            </label>
+            {activeCities.length === 1 ? null : (
+              <label className={"qf-sf-field qf-sf-field--full" + (cityUi.showError ? " has-error" : "")} htmlFor="qf-sf-city">
+                <span className="qf-sf-label">City <b aria-hidden="true">*</b></span>
+                <select
+                  id="qf-sf-city"
+                  value={form.city}
+                  onChange={(e) => {
+                    set("city", e.target.value);
+                    markTouched("city");
+                  }}
+                  onBlur={() => markTouched("city")}
+                  disabled={citiesLoading && activeCities.length === 0}
+                >
+                  <option value="">{citiesLoading && !citiesLoaded ? "Loading cities…" : "Select your city"}</option>
+                  {form.city && !activeCities.includes(form.city) ? <option value={form.city}>{form.city}</option> : null}
+                  {activeCities.map((city) => <option key={city} value={city}>{city}</option>)}
+                </select>
+                {citiesLoaded && activeCities.length === 0 ? (
+                  <span className="qf-rf-field-err">{NO_ACTIVE_CITIES_MESSAGE}</span>
+                ) : cityUi.showError ? (
+                  <span className="qf-rf-field-err">{cityUi.error}</span>
+                ) : null}
+              </label>
+            )}
 
             <label className={"qf-sf-field qf-sf-area qf-sf-field--full" + (areaUi.showError ? " has-error" : "")}>
               <span className="qf-sf-label">Area / locality <b aria-hidden="true">*</b></span>

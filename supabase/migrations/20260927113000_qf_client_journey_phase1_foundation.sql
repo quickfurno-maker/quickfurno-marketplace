@@ -25,6 +25,7 @@ alter table public.leads
   add constraint leads_journey_state_check
   check (journey_state in (
     'captured',
+    'duplicate',
     'enrichment_required',
     'awaiting_client',
     'ready_for_qualification',
@@ -96,13 +97,30 @@ create index if not exists idx_leads_reachability_status
 -- clarification request to the governed conversation. Plain-text replies can
 -- then resolve that request without phone-number guessing.
 alter table public.lead_clarification_requests
+  add column if not exists destination_hash text null,
   add column if not exists conversation_id uuid null
     references public.communication_conversations(id) on delete set null,
-  add column if not exists interaction_started_at timestamptz null;
+  add column if not exists interaction_started_at timestamptz null,
+  add column if not exists initial_communication_message_id uuid null
+    references public.communication_messages(id) on delete set null,
+  add column if not exists reminder_communication_message_id uuid null
+    references public.communication_messages(id) on delete set null,
+  add column if not exists reminder_sent_at timestamptz null;
+
+alter table public.lead_clarification_requests
+  drop constraint if exists lead_clarification_requests_destination_hash_check;
+alter table public.lead_clarification_requests
+  add constraint lead_clarification_requests_destination_hash_check
+  check (destination_hash is null or destination_hash ~ '^[0-9a-f]{64}$');
 
 create index if not exists idx_lead_clarification_requests_conversation
   on public.lead_clarification_requests(conversation_id)
   where conversation_id is not null;
+
+create index if not exists idx_lead_clarification_requests_active_destination
+  on public.lead_clarification_requests(destination_hash, created_at desc)
+  where destination_hash is not null
+    and status in ('preview_prepared', 'preview_sent');
 
 -- A WhatsApp reply is derived from an already durable inbound message. Binding
 -- the response to that row gives Phase 1 an exact retry/redelivery fence without
@@ -123,6 +141,8 @@ alter table public.lead_clarification_responses
   add constraint lead_clarification_response_source_check
   check (response_source in ('admin', 'whatsapp', 'riya'));
 
+comment on column public.lead_clarification_requests.destination_hash is
+  'SHA-256 of the canonical WhatsApp E.164 destination. Used only to bind the first inbound reply to one unambiguous active enrichment request without storing new plaintext PII.';
 comment on column public.lead_clarification_responses.inbound_message_id is
   'Exact durable inbound WhatsApp message that supplied this answer; unique for replay safety.';
 comment on column public.lead_clarification_responses.response_source is

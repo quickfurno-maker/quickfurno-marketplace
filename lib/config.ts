@@ -71,13 +71,17 @@ export const BUDGETS = [
   "₹3–7 lakh",
   "₹7–15 lakh",
   "₹15 lakh+",
+  "Not decided",
 ] as const;
 
 export const TIMELINES = [
   "Immediately",
   "Within 15 days",
   "Within 1 month",
-  "Just exploring",
+  "1–2 months",
+  "2–3 months",
+  "3+ months",
+  "Flexible / not sure",
 ] as const;
 
 // ---- Service category cards (homepage) -------------------------------------

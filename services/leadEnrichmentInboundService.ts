@@ -3,10 +3,12 @@
 //
 // Verified inbound persistence happens BEFORE this service. This layer consumes
 // only durable minimized messages, exact Core request tokens, and the governed
-// conversation id already linked to the inbound row. Riya is intentionally not
-// involved in this phase.
+// conversation id already linked to the inbound row. Phase 1 remains deterministic;
+// Phase 2 may ask Riya to interpret only an otherwise-unresolved text answer, and
+// Core still owns validation, persistence, qualification and matching.
 // ============================================================================
 
+import { createHash } from "crypto";
 import { adminClient } from "@/lib/supabase";
 import { normalizeConsentCommand } from "@/lib/communication/consentCommand";
 import { leadWhatsAppDestinationHash } from "@/lib/leads/leadWhatsAppIdentity";
@@ -43,6 +45,13 @@ import { routePreferredVendorLead } from "./preferredVendorLeadService";
 import { queueSystemConversationExperience } from "./conversationalWhatsAppService";
 import { runAosV2LeadIntelligence } from "./aosV2IntelligenceService";
 import type { AosV2CoreMatchEvidence } from "@/lib/aos/v2/contracts";
+import { resolveQfJarvisRuntimePolicy } from "@/lib/jarvis/runtimePolicy";
+import { resolveJarvisSigningPrivateKey } from "@/lib/jarvis/signingPrivateKeySource";
+import type { QfjRiyaQualificationTarget } from "@/lib/jarvis/privateRiyaIngressContract";
+import {
+  sendRiyaQualificationInterpretation,
+  type JarvisRiyaWebGatewayConfig,
+} from "./jarvisRiyaWebGatewayService";
 
 const ACTIVE_REQUEST_STATUSES = [
   "preview_prepared",
@@ -50,6 +59,14 @@ const ACTIVE_REQUEST_STATUSES = [
   "expired_no_response",
 ] as const;
 const CONTROL_CHARS = /[\r\n\t]/;
+const JARVIS_ID = /^[A-Za-z0-9._:-]{1,128}$/;
+
+type ResolvedLeadEnrichmentAnswer = {
+  question: ClarificationQuestion;
+  value: string;
+  label: string;
+  source: "whatsapp" | "riya";
+};
 
 type LeadRow = Record<string, unknown> & {
   id: string;
@@ -77,6 +94,7 @@ type RequestContext = {
   lead: LeadRow;
   conversationId: string;
   inboundMessageId: string;
+  inboundReceivedAt: string;
 };
 
 export type LeadEnrichmentInboundOutcome =
@@ -131,6 +149,7 @@ async function processOne(item: InboundProcessedMessage): Promise<boolean> {
       conversationId: inbound.conversationId,
       senderHash: inbound.senderHash,
       inboundMessageId: item.receipt.inboundMessageId,
+      receivedAt: inbound.receivedAt,
     });
   } else if (type === "text") {
     // Plain text is accepted only after an exact request has already been bound
@@ -139,6 +158,7 @@ async function processOne(item: InboundProcessedMessage): Promise<boolean> {
       conversationId: inbound.conversationId,
       senderHash: inbound.senderHash,
       inboundMessageId: item.receipt.inboundMessageId,
+      receivedAt: inbound.receivedAt,
     });
   }
 
@@ -156,7 +176,7 @@ async function processOne(item: InboundProcessedMessage): Promise<boolean> {
     return true;
   }
 
-  const answer = resolveAnswer({
+  let answer = resolveAnswer({
     token,
     messageType: type,
     content: item.message.contentMinimized,
@@ -164,11 +184,23 @@ async function processOne(item: InboundProcessedMessage): Promise<boolean> {
     answered,
   });
 
+  if (!answer && type === "text") {
+    const next = firstUnansweredQuestion(questions, answered);
+    if (next) {
+      answer = await resolveAmbiguousTextWithRiya({
+        context,
+        inboundMessageId: item.receipt.inboundMessageId,
+        question: next.question,
+        content: item.message.contentMinimized,
+      });
+    }
+  }
+
   if (!answer) {
     const next = firstUnansweredQuestion(questions, answered);
     if (!next) return finalizeCompletedRequest(context, item);
-    // Deterministic Phase 1 fallback: repeat the exact predefined question.
-    // Riya will own ambiguous free-form interpretation only in Phase 2.
+    // Safe fallback: when Riya is disabled, unavailable, uncertain, or returns
+    // anything outside the requested field, repeat the exact Core-authored question.
     await queueQuestion(context, item.receipt.inboundMessageId, next.index, next.question);
     return true;
   }
@@ -180,6 +212,7 @@ async function processOne(item: InboundProcessedMessage): Promise<boolean> {
     question: answer.question,
     answerValue: answer.value,
     answerLabel: answer.label,
+    responseSource: answer.source,
   });
   if (!persisted) throw new Error("LEAD_ENRICHMENT_RESPONSE_NOT_PERSISTED");
 
@@ -196,18 +229,26 @@ async function processOne(item: InboundProcessedMessage): Promise<boolean> {
 async function readInboundContext(inboundMessageId: string): Promise<{
   conversationId: string | null;
   senderHash: string;
+  receivedAt: string;
 } | null> {
   const { data, error } = await adminClient()
     .from("communication_inbound_messages")
-    .select("id,conversation_id,sender_hash")
+    .select("id,conversation_id,sender_hash,received_at")
     .eq("id", inboundMessageId)
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
+  const receivedAtRaw =
+    typeof data.received_at === "string" ? data.received_at : "";
+  const receivedAtMs = Date.parse(receivedAtRaw);
+  if (!Number.isFinite(receivedAtMs)) {
+    throw new Error("LEAD_ENRICHMENT_INBOUND_RECEIVED_AT_INVALID");
+  }
   return {
     conversationId:
       typeof data.conversation_id === "string" ? data.conversation_id : null,
     senderHash: String(data.sender_hash ?? ""),
+    receivedAt: new Date(receivedAtMs).toISOString(),
   };
 }
 
@@ -216,6 +257,7 @@ async function loadExactRequestContext(input: {
   conversationId: string;
   senderHash: string;
   inboundMessageId: string;
+  receivedAt: string;
 }): Promise<RequestContext | null> {
   const request = await readRequest(input.requestId);
   if (!request || request.destination_hash !== input.senderHash) return null;
@@ -275,6 +317,7 @@ async function loadExactRequestContext(input: {
     lead,
     conversationId: input.conversationId,
     inboundMessageId: input.inboundMessageId,
+    inboundReceivedAt: input.receivedAt,
   };
 }
 
@@ -282,6 +325,7 @@ async function loadConversationRequestContext(input: {
   conversationId: string;
   senderHash: string;
   inboundMessageId: string;
+  receivedAt: string;
 }): Promise<RequestContext | null> {
   const { data: bound, error: boundError } = await adminClient()
     .from("lead_clarification_requests")
@@ -298,6 +342,7 @@ async function loadConversationRequestContext(input: {
       conversationId: input.conversationId,
       senderHash: input.senderHash,
       inboundMessageId: input.inboundMessageId,
+      receivedAt: input.receivedAt,
     });
   }
   if (Array.isArray(bound) && bound.length > 1) return null;
@@ -322,6 +367,7 @@ async function loadConversationRequestContext(input: {
     conversationId: input.conversationId,
     senderHash: input.senderHash,
     inboundMessageId: input.inboundMessageId,
+    receivedAt: input.receivedAt,
   });
 }
 
@@ -413,7 +459,7 @@ function resolveAnswer(input: {
   content: Record<string, unknown>;
   questions: readonly ClarificationQuestion[];
   answered: ReadonlySet<string>;
-}): { question: ClarificationQuestion; value: string; label: string } | null {
+}): ResolvedLeadEnrichmentAnswer | null {
   if (input.token?.kind === "answer") {
     const question = input.questions[input.token.questionIndex];
     const option = question?.options?.[input.token.optionIndex];
@@ -422,6 +468,7 @@ function resolveAnswer(input: {
       question,
       value: option.value,
       label: option.label,
+      source: "whatsapp",
     };
   }
 
@@ -432,7 +479,12 @@ function resolveAnswer(input: {
   const next = firstUnansweredQuestion(input.questions, input.answered);
   if (!next) return null;
   if (next.question.type === "free_text_later") {
-    return { question: next.question, value: raw, label: raw };
+    return {
+      question: next.question,
+      value: raw,
+      label: raw,
+      source: "whatsapp",
+    };
   }
 
   const options = next.question.options ?? [];
@@ -446,8 +498,178 @@ function resolveAnswer(input: {
         candidate.value.trim().toLowerCase() === normalized,
     );
   return option
-    ? { question: next.question, value: option.value, label: option.label }
+    ? {
+        question: next.question,
+        value: option.value,
+        label: option.label,
+        source: "whatsapp",
+      }
     : null;
+}
+
+
+function qualificationTargetForQuestion(
+  question: ClarificationQuestion,
+): QfjRiyaQualificationTarget | null {
+  if (question.key === "budget") return "budget";
+  if (question.key === "timeline") return "timeline";
+  if (question.key === "property_type") return "propertyType";
+  return null;
+}
+
+function stableJarvisQualificationId(
+  prefix: "qfqual" | "qfmsg",
+  ...parts: string[]
+): string {
+  const digest = createHash("sha256")
+    .update(parts.join("\u0000"), "utf8")
+    .digest("hex")
+    .slice(0, 32);
+  return `${prefix}:${digest}`;
+}
+
+function qualificationGatewayConfig(): JarvisRiyaWebGatewayConfig | null {
+  const baseUrl = process.env.QF_JARVIS_BASE_URL?.trim();
+  const keyId = process.env.QF_JARVIS_SIGNING_KEY_ID?.trim();
+  const privateKeyPem = resolveJarvisSigningPrivateKey();
+  if (!baseUrl || !keyId || !privateKeyPem) return null;
+  return { baseUrl, keyId, privateKeyPem, timeoutMs: 4_000 };
+}
+
+function qualificationProposalIsGrounded(
+  clientText: string,
+  proposedValue: string,
+): boolean {
+  const normalize = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[₹,]/g, " ")
+      .replace(/[-‐-―−/]+/g, " ")
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const client = normalize(clientText);
+  const proposed = normalize(proposedValue);
+  if (!client || !proposed) return false;
+  if (client.includes(proposed) || proposed.includes(client)) return true;
+
+  const uncertainty =
+    /\b(not sure|not decided|undecided|depends on|need estimate|to be decided|flexible)\b/i;
+  if (uncertainty.test(clientText) && uncertainty.test(proposedValue)) {
+    return true;
+  }
+
+  const clientTokens = new Set(
+    client.split(" ").filter((token) => token.length >= 3),
+  );
+  const proposedTokens = proposed
+    .split(" ")
+    .filter((token) => token.length >= 3);
+  return proposedTokens.some((token) => clientTokens.has(token));
+}
+
+async function resolveAmbiguousTextWithRiya(input: {
+  context: RequestContext;
+  inboundMessageId: string;
+  question: ClarificationQuestion;
+  content: Record<string, unknown>;
+}): Promise<ResolvedLeadEnrichmentAnswer | null> {
+  const raw =
+    typeof input.content.text === "string" ? input.content.text.trim() : "";
+  if (
+    !raw ||
+    raw.length > 200 ||
+    CONTROL_CHARS.test(raw) ||
+    input.question.type !== "single_choice"
+  ) {
+    return null;
+  }
+
+  const target = qualificationTargetForQuestion(input.question);
+  const options = input.question.options ?? [];
+  if (!target || options.length < 2 || options.length > 12) return null;
+  const allowedOptions = options.map((option) => option.value);
+  if (allowedOptions.some((value) => !value || value.length > 128)) return null;
+
+  const policy = resolveQfJarvisRuntimePolicy();
+  if (
+    policy.mode !== "active" ||
+    !policy.riyaEnabled ||
+    !policy.riyaWebTurnEnabled ||
+    !policy.riyaQualificationEnabled
+  ) {
+    return null;
+  }
+
+  const tenantId = process.env.QF_JARVIS_TENANT_ID?.trim() ?? "";
+  const config = qualificationGatewayConfig();
+  if (!config || !JARVIS_ID.test(tenantId)) return null;
+
+  const stableParts = [
+    input.context.request.id,
+    input.inboundMessageId,
+    input.question.key,
+  ];
+  const conversationId = stableJarvisQualificationId("qfqual", ...stableParts);
+  const messageId = stableJarvisQualificationId(
+    "qfmsg",
+    ...stableParts,
+    "message",
+  );
+  const requestId = stableJarvisQualificationId(
+    "qfqual",
+    ...stableParts,
+    "request",
+  );
+  const now = new Date().toISOString();
+
+  try {
+    const interpreted = await sendRiyaQualificationInterpretation({
+      policy,
+      config,
+      request: {
+        requestId,
+        issuedAt: now,
+        tenantId,
+        conversationId,
+        messageId,
+        receivedAt: input.context.inboundReceivedAt,
+        webTurnRef: `lead-qualification:${input.inboundMessageId}`,
+        qualificationTarget: target,
+        questionText: input.question.text,
+        allowedOptions,
+        answerText: raw,
+      },
+    });
+    if (!interpreted.ok) return null;
+
+    const proposal = interpreted.response.qualificationProposal;
+    if (
+      interpreted.response.disposition !== "PROCESSED" ||
+      !proposal ||
+      proposal.field !== target ||
+      proposal.operation !== "SET" ||
+      proposal.provenance !== "user_stated" ||
+      !qualificationProposalIsGrounded(raw, proposal.value)
+    ) {
+      return null;
+    }
+
+    const option = options.find((candidate) => candidate.value === proposal.value);
+    if (!option) return null;
+
+    // Core persists only the canonical option that it supplied in the signed
+    // request. Riya never writes arbitrary model text into an authoritative field.
+    return {
+      question: input.question,
+      value: option.value,
+      label: option.label,
+      source: "riya",
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function persistAnswer(input: {
@@ -457,6 +679,7 @@ async function persistAnswer(input: {
   question: ClarificationQuestion;
   answerValue: string;
   answerLabel: string;
+  responseSource: "whatsapp" | "riya";
 }): Promise<boolean> {
   let response = await readResponseByInbound(input.inboundMessageId);
   const mapped = mapClarificationAnswerToLeadField(
@@ -476,9 +699,12 @@ async function persistAnswer(input: {
         answer_label: input.answerLabel,
         mapped_field: mapped.mapped_field ?? null,
         mapped_value: mapped.mapped_value ?? null,
-        raw_payload: { message_type: input.messageType },
+        raw_payload: {
+          message_type: input.messageType,
+          interpreted_by: input.responseSource === "riya" ? "riya" : null,
+        },
         inbound_message_id: input.inboundMessageId,
-        response_source: "whatsapp",
+        response_source: input.responseSource,
       })
       .select("id,lead_id,request_id,question_key,answer_value,answer_label,applied_at")
       .maybeSingle();
@@ -506,7 +732,7 @@ async function persistAnswer(input: {
       answer_value: String(response.answer_value),
       answer_label:
         response.answer_label == null ? null : String(response.answer_label),
-      raw_payload: { source: "whatsapp" },
+      raw_payload: { source: input.responseSource },
     };
     const applied = await applyClarificationResponsesToLead(
       input.context.lead.id,

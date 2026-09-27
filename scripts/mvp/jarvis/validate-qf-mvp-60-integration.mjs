@@ -24,11 +24,16 @@ import {
   QFJ_RIYA_INGRESS_PATH,
   QFJ_RIYA_INGRESS_SIGNING_DOMAIN,
   buildQfjPrivateRiyaIngressRequest,
+  buildQfjPrivateRiyaQualificationIngressRequest,
   parseQfjPrivateRiyaIngressResponse,
+  parseQfjPrivateRiyaQualificationIngressResponse,
   qfjRiyaIngressSigningInput,
   signQfjPrivateRiyaIngressBody,
 } from "../../../lib/jarvis/privateRiyaIngressContract.ts";
-import { sendRiyaWebTurn } from "../../../services/jarvisRiyaWebGatewayService.ts";
+import {
+  sendRiyaQualificationInterpretation,
+  sendRiyaWebTurn,
+} from "../../../services/jarvisRiyaWebGatewayService.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 let passed = 0;
@@ -122,6 +127,121 @@ check("32 browser authority field cannot enter Riya request builder", !Object.pr
 const wireResponse = { protocol: "qfj.riya.web.ingress", version: 1, requestId: "req-1", tenantId: "quickfurno", conversationId: "conv-1", messageId: "msg-1", disposition: "PROCESSED", reason: null, authorizedReply: { version: 1, proposalId: "prop-1", boundRevision: 7, proposalKind: "REPLY", replyBody: "Authorized response" } };
 check("33 valid minimal Riya response parses", parseQfjPrivateRiyaIngressResponse(wireResponse)?.authorizedReply?.replyBody === "Authorized response");
 check("34 extra Riya response key refused", parseQfjPrivateRiyaIngressResponse({ ...wireResponse, model: "forbidden" }) === null);
+const qualificationReq = buildQfjPrivateRiyaQualificationIngressRequest({
+  requestId: "qual-req-1",
+  issuedAt: now,
+  tenantId: "quickfurno",
+  conversationId: "qual-conv-1",
+  messageId: "qual-msg-1",
+  receivedAt: now,
+  webTurnRef: "lead-qualification:00000000-0000-0000-0000-000000000001",
+  qualificationTarget: "budget",
+  questionText: "Budget range?",
+  allowedOptions: ["₹3–7 lakh", "Not decided"],
+  answerText: "Budget depends on the design",
+});
+check("34a qualification ingress uses signed V2 without business authority fields",
+  qualificationReq.version === 2 &&
+  qualificationReq.qualificationTarget === "budget" &&
+  !Object.prototype.hasOwnProperty.call(qualificationReq, "leadId") &&
+  !Object.prototype.hasOwnProperty.call(qualificationReq, "canSubmit"));
+
+const qualificationWireResponse = {
+  protocol: "qfj.riya.web.ingress",
+  version: 2,
+  requestId: "qual-req-1",
+  tenantId: "quickfurno",
+  conversationId: "qual-conv-1",
+  messageId: "qual-msg-1",
+  disposition: "PROCESSED",
+  reason: null,
+  authorizedReply: null,
+  qualificationProposal: {
+    field: "budget",
+    operation: "SET",
+    value: "Not decided",
+    provenance: "user_stated",
+  },
+};
+check("34b valid qualification response parses only user-stated bounded proposal",
+  parseQfjPrivateRiyaQualificationIngressResponse(qualificationWireResponse)?.qualificationProposal?.field === "budget");
+check("34c inferred qualification response is refused",
+  parseQfjPrivateRiyaQualificationIngressResponse({
+    ...qualificationWireResponse,
+    qualificationProposal: { ...qualificationWireResponse.qualificationProposal, provenance: "model_inferred" },
+  }) === null);
+
+let qualificationShadowCalls = 0;
+const qualificationShadowPolicy = resolveQfJarvisRuntimePolicy({
+  QF_JARVIS_MODE: "shadow",
+  QF_JARVIS_RIYA_ENABLED: "true",
+  QF_JARVIS_RIYA_WEB_TURN_ENABLED: "true",
+  QF_JARVIS_RIYA_QUALIFICATION_ENABLED: "true",
+});
+const qualificationShadow = await sendRiyaQualificationInterpretation({
+  policy: qualificationShadowPolicy,
+  config: {
+    baseUrl: "https://jarvis.internal/",
+    keyId,
+    privateKeyPem,
+    httpPost: async () => {
+      qualificationShadowCalls += 1;
+      throw new Error("must not call");
+    },
+  },
+  request: {
+    requestId: qualificationReq.requestId,
+    issuedAt: qualificationReq.issuedAt,
+    tenantId: qualificationReq.tenantId,
+    conversationId: qualificationReq.conversationId,
+    messageId: qualificationReq.messageId,
+    receivedAt: qualificationReq.receivedAt,
+    webTurnRef: qualificationReq.webTurnRef,
+    qualificationTarget: qualificationReq.qualificationTarget,
+    questionText: qualificationReq.questionText,
+    allowedOptions: qualificationReq.allowedOptions,
+    answerText: qualificationReq.answerText,
+  },
+});
+check("34d qualification shadow mode cannot call Jarvis",
+  !qualificationShadow.ok && qualificationShadow.reason === "disabled" && qualificationShadowCalls === 0);
+
+const qualificationActivePolicy = resolveQfJarvisRuntimePolicy({
+  QF_JARVIS_MODE: "active",
+  QF_JARVIS_RIYA_ENABLED: "true",
+  QF_JARVIS_RIYA_WEB_TURN_ENABLED: "true",
+  QF_JARVIS_RIYA_QUALIFICATION_ENABLED: "true",
+});
+let qualificationActiveCalls = 0;
+const qualificationActive = await sendRiyaQualificationInterpretation({
+  policy: qualificationActivePolicy,
+  config: {
+    baseUrl: "https://jarvis.internal/",
+    keyId,
+    privateKeyPem,
+    httpPost: async () => {
+      qualificationActiveCalls += 1;
+      return { status: 200, text: async () => JSON.stringify(qualificationWireResponse) };
+    },
+  },
+  request: {
+    requestId: qualificationReq.requestId,
+    issuedAt: qualificationReq.issuedAt,
+    tenantId: qualificationReq.tenantId,
+    conversationId: qualificationReq.conversationId,
+    messageId: qualificationReq.messageId,
+    receivedAt: qualificationReq.receivedAt,
+    webTurnRef: qualificationReq.webTurnRef,
+    qualificationTarget: qualificationReq.qualificationTarget,
+    questionText: qualificationReq.questionText,
+    allowedOptions: qualificationReq.allowedOptions,
+    answerText: qualificationReq.answerText,
+  },
+});
+check("34e qualification active mode calls once and accepts identity-bound V2 response",
+  qualificationActive.ok && qualificationActiveCalls === 1 &&
+  qualificationActive.response.qualificationProposal?.provenance === "user_stated");
+
 let disabledCalls = 0;
 const gatewayOff = await sendRiyaWebTurn({ policy: off, config: { baseUrl: "https://jarvis.internal/", keyId, privateKeyPem, httpPost: async () => { disabledCalls += 1; throw new Error("must not call"); } }, request: { requestId: "req-1", issuedAt: now, tenantId: "quickfurno", conversationId: "conv-1", messageId: "msg-1", receivedAt: now, webTurnRef: "webturn:1", normalizedText: "hello" } });
 check("35 gateway off means zero network calls", !gatewayOff.ok && gatewayOff.reason === "disabled" && disabledCalls === 0);

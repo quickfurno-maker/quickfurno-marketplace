@@ -230,8 +230,13 @@ function answerState(value?: string | null): QualificationFieldState {
   if (
     normalized === "not sure yet" ||
     normalized === "not sure" ||
+    normalized === "not decided" ||
     normalized === "undecided" ||
-    normalized === "flexible"
+    normalized === "flexible" ||
+    normalized.includes("flexible / not sure") ||
+    normalized.includes("depends on") ||
+    normalized.includes("need estimate") ||
+    normalized.includes("to be decided")
   ) {
     return "undecided";
   }

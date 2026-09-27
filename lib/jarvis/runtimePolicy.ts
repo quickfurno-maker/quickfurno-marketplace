@@ -9,6 +9,7 @@ export interface QfJarvisRuntimePolicy {
   readonly riyaEnabled: boolean;
   readonly anishaEnabled: boolean;
   readonly riyaWebTurnEnabled: boolean;
+  readonly riyaQualificationEnabled: boolean;
   readonly contextReadEnabled: boolean;
   readonly serviceAvailabilityEnabled: boolean;
   readonly recommendationIntakeEnabled: boolean;
@@ -31,6 +32,7 @@ export function resolveQfJarvisRuntimePolicy(env: Env = process.env): QfJarvisRu
   return Object.freeze({ mode,
     coreDecisionEnabled: enabled(env.QF_JARVIS_CORE_DECISION_ENABLED), riyaEnabled: enabled(env.QF_JARVIS_RIYA_ENABLED),
     anishaEnabled: enabled(env.QF_JARVIS_ANISHA_ENABLED), riyaWebTurnEnabled: enabled(env.QF_JARVIS_RIYA_WEB_TURN_ENABLED),
+    riyaQualificationEnabled: enabled(env.QF_JARVIS_RIYA_QUALIFICATION_ENABLED),
     contextReadEnabled: enabled(env.QF_JARVIS_CONTEXT_READ_ENABLED), serviceAvailabilityEnabled: enabled(env.QF_JARVIS_SERVICE_AVAILABILITY_ENABLED), recommendationIntakeEnabled: enabled(env.QF_JARVIS_RECOMMENDATION_INTAKE_ENABLED),
     actionProposalEnabled: enabled(env.QF_JARVIS_ACTION_PROPOSALS_ENABLED), enabledActionTypes: actionTypes(env.QF_JARVIS_ENABLED_ACTION_TYPES),
   });

@@ -17,6 +17,14 @@ export interface QfjPrivateRiyaIngressRequestV1 {
   readonly conversationId: string; readonly messageId: string; readonly receivedAt: string; readonly webTurnRef: string;
   readonly subjectRef?: string; readonly normalizedText?: string;
 }
+export const QFJ_RIYA_QUALIFICATION_TARGETS = ["budget","timeline","propertyType"] as const;
+export type QfjRiyaQualificationTarget = (typeof QFJ_RIYA_QUALIFICATION_TARGETS)[number];
+export interface QfjPrivateRiyaQualificationIngressRequestV2 {
+  readonly protocol: typeof QFJ_RIYA_INGRESS_PROTOCOL; readonly version: 2; readonly caller: typeof QFJ_RIYA_INGRESS_CALLER;
+  readonly audience: typeof QFJ_RIYA_INGRESS_AUDIENCE; readonly requestId: string; readonly issuedAt: string; readonly tenantId: string;
+  readonly conversationId: string; readonly messageId: string; readonly receivedAt: string; readonly webTurnRef: string;
+  readonly qualificationTarget: QfjRiyaQualificationTarget; readonly questionText: string; readonly allowedOptions: readonly string[]; readonly answerText: string;
+}
 export interface QfjPrivateRiyaAuthorizedReplyV1 {
   readonly version: 1; readonly proposalId: string; readonly boundRevision: number;
   readonly proposalKind: "REPLY" | "FOLLOW_UP"; readonly replyBody: string;
@@ -25,6 +33,15 @@ export interface QfjPrivateRiyaIngressResponseV1 {
   readonly protocol: typeof QFJ_RIYA_INGRESS_PROTOCOL; readonly version: 1; readonly requestId: string; readonly tenantId: string;
   readonly conversationId: string; readonly messageId: string; readonly disposition: "PROCESSED" | "REFUSED" | "NOT_READY";
   readonly reason: string | null; readonly authorizedReply: QfjPrivateRiyaAuthorizedReplyV1 | null;
+}
+export interface QfjPrivateRiyaQualificationProposalV2 {
+  readonly field: QfjRiyaQualificationTarget; readonly operation: "SET"; readonly value: string; readonly provenance: "user_stated";
+}
+export interface QfjPrivateRiyaQualificationIngressResponseV2 {
+  readonly protocol: typeof QFJ_RIYA_INGRESS_PROTOCOL; readonly version: 2; readonly requestId: string; readonly tenantId: string;
+  readonly conversationId: string; readonly messageId: string; readonly disposition: "PROCESSED" | "REFUSED" | "NOT_READY";
+  readonly reason: string | null; readonly authorizedReply: QfjPrivateRiyaAuthorizedReplyV1 | null;
+  readonly qualificationProposal: QfjPrivateRiyaQualificationProposalV2 | null;
 }
 function instant(value: string): boolean { return INSTANT.test(value) && Number.isFinite(Date.parse(value)); }
 function exact(record: Record<string, unknown>, keys: readonly string[]): boolean {
@@ -37,6 +54,14 @@ export function buildQfjPrivateRiyaIngressRequest(input: Omit<QfjPrivateRiyaIngr
   if (input.normalizedText !== undefined && input.normalizedText.length > 4096) throw new Error("INVALID_RIYA_INGRESS_REQUEST");
   return Object.freeze({ protocol: QFJ_RIYA_INGRESS_PROTOCOL, version: 1, caller: QFJ_RIYA_INGRESS_CALLER, audience: QFJ_RIYA_INGRESS_AUDIENCE, ...input });
 }
+export function buildQfjPrivateRiyaQualificationIngressRequest(input: Omit<QfjPrivateRiyaQualificationIngressRequestV2, "protocol" | "version" | "caller" | "audience">): QfjPrivateRiyaQualificationIngressRequestV2 {
+  for (const id of [input.requestId, input.tenantId, input.conversationId, input.messageId]) if (!ID.test(id)) throw new Error("INVALID_RIYA_QUALIFICATION_REQUEST");
+  if (!instant(input.issuedAt) || !instant(input.receivedAt) || input.webTurnRef.length < 1 || input.webTurnRef.length > 256) throw new Error("INVALID_RIYA_QUALIFICATION_REQUEST");
+  if (!(QFJ_RIYA_QUALIFICATION_TARGETS as readonly string[]).includes(input.qualificationTarget)) throw new Error("INVALID_RIYA_QUALIFICATION_REQUEST");
+  if (input.questionText.trim().length < 1 || input.questionText.length > 512 || input.answerText.trim().length < 1 || input.answerText.length > 512) throw new Error("INVALID_RIYA_QUALIFICATION_REQUEST");
+  if (input.allowedOptions.length < 2 || input.allowedOptions.length > 12 || input.allowedOptions.some((value) => value.trim().length < 1 || value.length > 128)) throw new Error("INVALID_RIYA_QUALIFICATION_REQUEST");
+  return Object.freeze({ protocol: QFJ_RIYA_INGRESS_PROTOCOL, version: 2, caller: QFJ_RIYA_INGRESS_CALLER, audience: QFJ_RIYA_INGRESS_AUDIENCE, ...input });
+}
 export function parseQfjPrivateRiyaIngressResponse(value: unknown): QfjPrivateRiyaIngressResponseV1 | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null; const r = value as Record<string, unknown>;
   if (!exact(r, ["protocol","version","requestId","tenantId","conversationId","messageId","disposition","reason","authorizedReply"])) return null;
@@ -48,6 +73,23 @@ export function parseQfjPrivateRiyaIngressResponse(value: unknown): QfjPrivateRi
     if (!exact(a, ["version","proposalId","boundRevision","proposalKind","replyBody"]) || a.version !== 1 || typeof a.proposalId !== "string" || !ID.test(a.proposalId) || typeof a.boundRevision !== "number" || !Number.isSafeInteger(a.boundRevision) || a.boundRevision < 0 || (a.proposalKind !== "REPLY" && a.proposalKind !== "FOLLOW_UP") || typeof a.replyBody !== "string" || a.replyBody.length < 1 || a.replyBody.length > 8192) return null;
   }
   return r as unknown as QfjPrivateRiyaIngressResponseV1;
+}
+export function parseQfjPrivateRiyaQualificationIngressResponse(value: unknown): QfjPrivateRiyaQualificationIngressResponseV2 | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null; const r = value as Record<string, unknown>;
+  if (!exact(r, ["protocol","version","requestId","tenantId","conversationId","messageId","disposition","reason","authorizedReply","qualificationProposal"])) return null;
+  if (r.protocol !== QFJ_RIYA_INGRESS_PROTOCOL || r.version !== 2 || typeof r.requestId !== "string" || !ID.test(r.requestId) || typeof r.tenantId !== "string" || !ID.test(r.tenantId) || typeof r.conversationId !== "string" || !ID.test(r.conversationId) || typeof r.messageId !== "string" || !ID.test(r.messageId)) return null;
+  if (r.disposition !== "PROCESSED" && r.disposition !== "REFUSED" && r.disposition !== "NOT_READY") return null;
+  if (r.reason !== null && (typeof r.reason !== "string" || r.reason.length > 128)) return null;
+  if (r.qualificationProposal !== null) {
+    if (!r.qualificationProposal || typeof r.qualificationProposal !== "object" || Array.isArray(r.qualificationProposal)) return null;
+    const q = r.qualificationProposal as Record<string, unknown>;
+    if (!exact(q, ["field","operation","value","provenance"]) || !(QFJ_RIYA_QUALIFICATION_TARGETS as readonly unknown[]).includes(q.field) || q.operation !== "SET" || q.provenance !== "user_stated" || typeof q.value !== "string" || q.value.trim().length < 1 || q.value.length > 512) return null;
+  }
+  if (r.authorizedReply !== null) {
+    if (!r.authorizedReply || typeof r.authorizedReply !== "object" || Array.isArray(r.authorizedReply)) return null; const a = r.authorizedReply as Record<string, unknown>;
+    if (!exact(a, ["version","proposalId","boundRevision","proposalKind","replyBody"]) || a.version !== 1 || typeof a.proposalId !== "string" || !ID.test(a.proposalId) || typeof a.boundRevision !== "number" || !Number.isSafeInteger(a.boundRevision) || a.boundRevision < 0 || (a.proposalKind !== "REPLY" && a.proposalKind !== "FOLLOW_UP") || typeof a.replyBody !== "string" || a.replyBody.length < 1 || a.replyBody.length > 8192) return null;
+  }
+  return r as unknown as QfjPrivateRiyaQualificationIngressResponseV2;
 }
 export function qfjRiyaIngressSigningInput(args: { requestId: string; issuedAt: string; keyId: string; bodyDigest: string }): string {
   return [QFJ_RIYA_INGRESS_SIGNING_DOMAIN,QFJ_RIYA_INGRESS_METHOD,QFJ_RIYA_INGRESS_PATH,QFJ_RIYA_INGRESS_CALLER,QFJ_RIYA_INGRESS_AUDIENCE,args.requestId,args.issuedAt,args.keyId,args.bodyDigest].join("\n");

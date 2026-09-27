@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { evaluateLeadQualification } from "../../../lib/leads/leadQualificationContract.ts";
+import { BUDGETS, TIMELINES } from "../../../lib/config.ts";
 import { leadWhatsAppDestinationHash } from "../../../lib/leads/leadWhatsAppIdentity.ts";
 import {
   buildClarificationRequestVariables,
@@ -21,6 +22,11 @@ function check(name, fn) {
   passed += 1;
   console.log("PASS", name);
 }
+
+const budgetFitCode = fs.readFileSync(
+  path.join(process.cwd(), "lib/lead-quality/budgetFit.ts"),
+  "utf8",
+);
 
 const base = {
   name: "Asha Kulkarni",
@@ -49,6 +55,41 @@ check("explicit undecided answers are not treated as missing", () => {
   assert.equal(q.fieldStates.budget, "undecided");
   assert.equal(q.fieldStates.timeline, "undecided");
   assert.equal(q.matchReadinessStatus, "not_ready");
+});
+
+check("canonical form choices expose not-decided budget and future/flexible timelines", () => {
+  assert.ok(BUDGETS.includes("Not decided"));
+  assert.ok(TIMELINES.includes("1–2 months"));
+  assert.ok(TIMELINES.includes("2–3 months"));
+  assert.ok(TIMELINES.includes("3+ months"));
+  assert.ok(TIMELINES.includes("Flexible / not sure"));
+});
+
+check("not-decided budget is complete data but earns no budget-fit quality boost", () => {
+  const q = evaluateLeadQualification({
+    ...base,
+    budget: "Not decided",
+    timeline: "1–2 months",
+  });
+  assert.equal(q.fieldStates.budget, "undecided");
+  assert.equal(q.completenessStatus, "complete");
+  assert.match(budgetFitCode, /not decided/);
+  assert.match(
+    budgetFitCode,
+    /maxRupees == null[\s\S]{0,180}hasBudget: false[\s\S]{0,180}points: 0/,
+  );
+});
+
+check("natural undecided budget text is treated as answered without inventing a value", () => {
+  const q = evaluateLeadQualification({
+    ...base,
+    budget: "Budget depends on the design",
+    timeline: "Flexible / not sure",
+  });
+  assert.equal(q.fieldStates.budget, "undecided");
+  assert.equal(q.fieldStates.timeline, "undecided");
+  assert.equal(q.completenessStatus, "complete");
+  assert.match(budgetFitCode, /depends on/);
 });
 
 check("missing area remains a capture blocker", () => {
@@ -140,6 +181,7 @@ const productionTemplateOperator = fs.readFileSync(
   ),
   "utf8",
 );
+const envExample = fs.readFileSync(path.join(repo, ".env.example"), "utf8");
 
 check("interactive answers stay exact-request scoped", () => {
   assert.match(enrichmentWhatsApp, /const ANSWER_PREFIX = "qfcla1"/);
@@ -172,6 +214,19 @@ check("late replies reactivate the same expired request", () => {
   assert.match(inbound, /"expired_no_response"/);
   assert.match(inbound, /clarification_status: "late_response"/);
   assert.match(inbound, /clarification_last_request_id/);
+});
+
+check("Phase 2 Riya interpretation is active-only and preserves Core authority", () => {
+  assert.match(envExample, /QF_JARVIS_RIYA_QUALIFICATION_ENABLED=false/);
+  assert.match(inbound, /policy\.mode !== "active"/);
+  assert.match(inbound, /sendRiyaQualificationInterpretation/);
+  assert.match(inbound, /proposal\.provenance !== "user_stated"/);
+  assert.match(inbound, /allowedOptions/);
+  assert.match(inbound, /options\.find\(\(candidate\) => candidate\.value === proposal\.value\)/);
+  assert.match(inbound, /value: option\.value/);
+  assert.match(inbound, /source: "riya"/);
+  assert.match(inbound, /response_source: input\.responseSource/);
+  assert.match(inbound, /mapClarificationAnswerToLeadField/);
 });
 
 check("staging qualification mapping is exact, inactive and utility-only", () => {

@@ -53,7 +53,7 @@ export type BudgetFit = {
   tier: BudgetFitTier;
 };
 
-const NOT_SURE_RE = /\b(not sure|unknown|na|n\/a|free|explor|tbd|to be decided)\b/i;
+const NOT_SURE_RE = /\b(not sure|not decided|undecided|unknown|na|n\/a|free|explor|tbd|to be decided|depends on|need estimate)\b/i;
 
 /**
  * Parse the largest ₹ amount from a budget string. Handles raw-rupee ranges

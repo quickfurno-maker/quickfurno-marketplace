@@ -1,8 +1,10 @@
 // ============================================================================
 // QF-MVP-40.12-R1 — business template binding governance validator.  OFFLINE.
 //
-// Proves MANIFEST <-> CODE <-> RENDERER parity for the five approved ordinary business
-// templates. It does not grep for expected words: it exercises the REAL builders and the
+// Proves MANIFEST <-> CODE <-> RENDERER parity for the original five approved ordinary
+// business templates, while also pinning the later Client Journey clarification contract as
+// the one permitted extension. It does not grep for expected words: it exercises the REAL
+// builders and the
 // REAL renderWhatsAppTemplateComponents, so a manifest edit alone can never satisfy it.
 //
 // No network, no database, no credential, no send.
@@ -64,8 +66,12 @@ const bodyTexts = (r) => (r.components ?? []).find((c) => c.type === "body")?.pa
 
 const R = {
   // ---- A. Contract shape ---------------------------------------------------
-  exactFiveKeys: () => BUSINESS_TEMPLATE_KEYS.length === 5
-    && BUSINESS_TEMPLATE_KEYS.slice().sort().join(",") === Object.keys(EXPECTED).sort().join(","),
+  exactGovernedKeys: () => {
+    const expected = [...Object.keys(EXPECTED), "clarification_request"].sort();
+    return BUSINESS_TEMPLATE_KEYS.length === 6
+      && BUSINESS_TEMPLATE_KEYS.slice().sort().join(",") === expected.join(",")
+      && sourceKeysFor("clarification_request").join(",") === "client_name,outstanding_item";
+  },
   exactSourceKeySets: () => Object.entries(EXPECTED).every(([k, pairs]) =>
     sourceKeysFor(k).join(",") === pairs.map(([, s]) => s).join(",")),
   exactPositions: () => Object.entries(EXPECTED).every(([k, pairs]) => {
@@ -261,7 +267,7 @@ const R = {
 };
 
 const RULES = [
-  ["B1  the contract names exactly five templates", R.exactFiveKeys],
+  ["B1  the contract is the original five plus governed clarification_request", R.exactGovernedKeys],
   ["B2  each template's source-key set is exact", R.exactSourceKeySets],
   ["B3  each binding declares an exact body position", R.exactPositions],
   ["B4  every parameter type is text on the body", R.everyParameterTypeIsText],

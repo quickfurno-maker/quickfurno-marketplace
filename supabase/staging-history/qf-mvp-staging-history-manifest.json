@@ -1425,8 +1425,8 @@
     "status": "CURRENT_READ_ONLY_HISTORY_RECONCILED_AND_TWO_FORWARD_MIGRATIONS_APPLIED",
     "observedDate": "2026-09-26",
     "source": {
-      "filesystemMigrationCount": 129,
-      "canonicalMigrationCount": 126,
+      "filesystemMigrationCount": 130,
+      "canonicalMigrationCount": 127,
       "canonicalMigrations": [
         {
           "version": "20260620000001",
@@ -2057,6 +2057,11 @@
           "version": "20260927113000",
           "filename": "20260927113000_qf_client_journey_phase1_foundation.sql",
           "sha256": "5f20904a229717d10e2d1cb5e6f6ee82257427ecebf7f2f611d501b6ad35be87"
+        },
+        {
+          "version": "20260927150000",
+          "filename": "20260927150000_qf_client_journey_phase1_meta_qualification.sql",
+          "sha256": "86b95c0f871141b40a32e126998a96a1cc2ba7af5fed1ae9de245cb5f195ae2b"
         }
       ],
       "worktreeInProgressExcludedMigrations": [
@@ -2679,7 +2684,7 @@
       "operatorRecord": "supabase/staging-history/qf-phase2-staging-parity-data.sql"
     },
     "stagingHistory": {
-      "historyCount": 58,
+      "historyCount": 59,
       "parityMigrations": [
         {
           "version": "20260926045741",
@@ -2730,6 +2735,15 @@
           "name": "qf_client_journey_phase1_foundation",
           "canonicalFile": "20260927113000_qf_client_journey_phase1_foundation.sql",
           "exactCanonicalSqlApplied": true,
+          "whatsappOutboundRemainedDisabled": true
+        },
+        {
+          "version": "20260927090306",
+          "name": "qf_client_journey_phase1_meta_qualification",
+          "canonicalFile": "20260927150000_qf_client_journey_phase1_meta_qualification.sql",
+          "exactCanonicalSqlApplied": true,
+          "activationRefusedAsExpected": "QF_CJ_META_CORE_ACCOUNT_NOT_READY",
+          "mappingRemainedInactive": true,
           "whatsappOutboundRemainedDisabled": true
         }
       ]

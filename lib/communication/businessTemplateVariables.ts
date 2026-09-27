@@ -13,7 +13,7 @@
 // refused to fabricate one (BINDING_SCHEMA_UNPROVEN).
 //
 // This module IS that authority. It is the ONLY accepted construction path for these
-// five templates' variables, and the mapping `variables_schema` is derived from the same
+// six templates' variables, and the mapping `variables_schema` is derived from the same
 // contract — so the names in the database and the names a caller supplies cannot drift.
 //
 // WHAT THIS IS NOT

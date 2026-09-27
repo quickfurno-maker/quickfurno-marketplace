@@ -45,6 +45,7 @@ const FORBIDDEN_TEXT = /[\r\n\t]/;
  * the frozen QF-MVP-40.12 ordinary-business vocabulary.
  */
 const ClientDraftOnlySourceKey = Object.freeze({
+  ACTION_TOKEN: "action_token",
   VENDOR_NAME: "vendor_name",
   VENDOR_PHONE: "vendor_phone",
 } as const);
@@ -67,10 +68,12 @@ export const CLIENT_DRAFT_TEMPLATE_SOURCE_KEYS: Readonly<
   clarification_request: Object.freeze([
     BusinessSourceKey.CLIENT_NAME,
     BusinessSourceKey.OUTSTANDING_ITEM,
+    ClientDraftOnlySourceKey.ACTION_TOKEN,
   ]),
   clarification_reminder: Object.freeze([
     BusinessSourceKey.CLIENT_NAME,
     BusinessSourceKey.OUTSTANDING_ITEM,
+    ClientDraftOnlySourceKey.ACTION_TOKEN,
   ]),
   client_vendor_connection_reminder: Object.freeze([
     BusinessSourceKey.CLIENT_NAME,
@@ -130,20 +133,22 @@ function assembleDraft(
 // ---------------------------------------------------------------------------
 
 export function buildClarificationRequestVariables(
-  input: { clientName: unknown; outstandingItem: unknown },
+  input: { clientName: unknown; outstandingItem: unknown; actionToken: unknown },
 ): BusinessVariableResult {
   return assembleDraft("clarification_request", [
     [BusinessSourceKey.CLIENT_NAME, text(input?.clientName, "clientName")],
     [BusinessSourceKey.OUTSTANDING_ITEM, text(input?.outstandingItem, "outstandingItem")],
+    [ClientDraftOnlySourceKey.ACTION_TOKEN, text(input?.actionToken, "actionToken")],
   ]);
 }
 
 export function buildClarificationReminderVariables(
-  input: { clientName: unknown; outstandingItem: unknown },
+  input: { clientName: unknown; outstandingItem: unknown; actionToken: unknown },
 ): BusinessVariableResult {
   return assembleDraft("clarification_reminder", [
     [BusinessSourceKey.CLIENT_NAME, text(input?.clientName, "clientName")],
     [BusinessSourceKey.OUTSTANDING_ITEM, text(input?.outstandingItem, "outstandingItem")],
+    [ClientDraftOnlySourceKey.ACTION_TOKEN, text(input?.actionToken, "actionToken")],
   ]);
 }
 

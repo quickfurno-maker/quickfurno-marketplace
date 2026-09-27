@@ -942,7 +942,7 @@ export async function finalizeJarvisWhatsAppReplyReceipt(input: {
   return { ok: false, reason: "conflict" };
 }
 
-async function queueSystemConversationExperience(input: {
+export async function queueSystemConversationExperience(input: {
   readonly conversationId: string;
   readonly expectedRevision: number;
   readonly inboundMessageId: string;

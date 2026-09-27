@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { submitLead } from "@/app/actions";
-import { BUDGETS } from "@/lib/config";
+
 // QF-UI-TRACKING-01: shared attribution authority — the same one the modal uses.
 import { resolveLeadTracking } from "@/lib/analytics/leadTracking";
 import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useActiveCities";
@@ -95,12 +95,18 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
     if (busy) return;
 
     setError(null);
-    if (!form.name.trim() || !form.phone.trim() || !form.city || !form.service_required) {
-      setError("Please add your name, phone, city and the service you need.");
+    if (
+      !form.name.trim() ||
+      !form.phone.trim() ||
+      !form.city ||
+      !form.area.trim() ||
+      !form.service_required
+    ) {
+      setError("Please add your name, WhatsApp number, area and the service you need.");
       return;
     }
     if (!isPhoneValid(form.phone)) {
-      setError("Enter a valid 10-digit mobile number starting with 6, 7, 8 or 9.");
+      setError("Enter a valid 10-digit WhatsApp number starting with 6, 7, 8 or 9.");
       return;
     }
     if (!consent) {
@@ -152,8 +158,8 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
         </span>
         <h2>Your enquiry is submitted</h2>
         <p>
-          QuickFurno will share your requirement with up to 3 relevant eligible vendors that match
-          your service and area.
+          We&apos;ve captured your enquiry. If any project details are missing, we&apos;ll complete
+          them with you on WhatsApp before matching you with suitable professionals.
         </p>
         <Link href="/" className="qf-pub-btn qf-pub-btn--secondary">
           Back to home
@@ -176,7 +182,7 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
         <Field label="Your name">
           <input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Asha Kulkarni" autoComplete="name" />
         </Field>
-        <Field label="Phone (WhatsApp)">
+        <Field label="WhatsApp number">
           <input
             value={form.phone}
             onChange={(e) => set("phone", sanitizePhone(e.target.value))}
@@ -203,21 +209,13 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
               : activeCategories.map((s) => <option key={s}>{s}</option>)}
           </select>
         </Field>
-        <Field label="Budget (optional)">
-          <select value={form.budget} onChange={(e) => set("budget", e.target.value)}>
-            <option value="">Not sure yet</option>
-            {BUDGETS.map((b) => <option key={b}>{b}</option>)}
-          </select>
-        </Field>
-        <Field label="Property type (optional)">
-          <input value={form.property_type} onChange={(e) => set("property_type", e.target.value)} placeholder="2BHK, villa…" />
-        </Field>
-        <Field label="Timeline (optional)">
-          <input value={form.timeline} onChange={(e) => set("timeline", e.target.value)} placeholder="Within 2 months" />
-        </Field>
-        <Field label="Anything else (optional)" wide>
-          <textarea value={form.message} onChange={(e) => set("message", e.target.value)} placeholder="Tell the vendors about your space…" />
-        </Field>
+        <div className="qf-enqpage-field qf-enqpage-field--wide">
+          <span>Quick qualification happens after submission</span>
+          <p>
+            We&apos;ll ask only the missing project details on WhatsApp so you
+            don&apos;t have to complete a long form.
+          </p>
+        </div>
       </div>
 
       <label className="qf-enqpage-consent">

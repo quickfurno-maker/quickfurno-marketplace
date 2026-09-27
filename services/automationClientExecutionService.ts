@@ -64,6 +64,7 @@ import { RECIPIENT_REFERENCE_DESTINATION } from "@/lib/communication/types";
 import type { CommunicationIntent } from "@/lib/communication/types";
 import type { BusinessVariableResult } from "@/lib/communication/businessTemplateVariables";
 import { deriveLeadReference } from "@/lib/communication/leadReference";
+import { buildLeadEnrichmentStartToken } from "@/lib/leads/leadEnrichmentWhatsApp";
 import type { N8nExecuteClientSuccessBody } from "@/lib/automation/transportTypes";
 
 /** The exact shape `getClientActionVariableBuilder` returns. */
@@ -540,6 +541,7 @@ async function buildClientCommunicationIntent(args: {
     args.definition,
     facts.lead,
     clarification.outstandingItem,
+    clarification.actionToken,
     connection.facts,
   );
   if (!variableInput.ok) return { ok: false, code: variableInput.code };
@@ -828,7 +830,7 @@ async function readLeadFacts(leadId: string): Promise<LeadFactsResult> {
  *     still required to point at THIS request).
  */
 type ClarificationExecutionResult =
-  | { ok: true; outstandingItem: string | null }
+  | { ok: true; outstandingItem: string | null; actionToken: string | null }
   | { ok: false; code: string };
 
 async function resolveClarificationExecutionFacts(
@@ -839,7 +841,7 @@ async function resolveClarificationExecutionFacts(
 ): Promise<ClarificationExecutionResult> {
   // Every other client action is untouched and carries no clarification facts.
   if (!isClarificationActionType(definition.actionType)) {
-    return { ok: true, outstandingItem: null };
+    return { ok: true, outstandingItem: null, actionToken: null };
   }
 
   const identity = parseClarificationRequestIdentity({
@@ -914,10 +916,46 @@ async function resolveClarificationExecutionFacts(
   // Derived from the persisted question KEYS of the exact request, through the
   // closed label registry. `missing_fields` is not consulted: it is a mutable
   // convenience column, while questions_json is what was actually asked.
-  const derived = deriveOutstandingItem(request.questions_json);
-  if (!derived.ok) return { ok: false, code: "QF_EXEC_VARIABLES_UNRESOLVED" };
+  //
+  // For the +24h reminder, subtract responses that Core has actually applied so
+  // we never ask the client for a detail they already supplied. The same filter
+  // is harmless for the initial request (there are no applied answers yet).
+  const appliedRead = await adminClient()
+    .from("lead_clarification_responses")
+    .select("question_key")
+    .eq("request_id", identity.requestId)
+    .not("applied_at", "is", null);
+  if (appliedRead.error) {
+    return { ok: false, code: "QF_EXEC_LEAD_LOOKUP_FAILED" };
+  }
+  const answeredKeys = new Set(
+    (appliedRead.data ?? [])
+      .map((row) => String(row.question_key ?? "").trim())
+      .filter(Boolean),
+  );
+  const remainingQuestions = Array.isArray(request.questions_json)
+    ? request.questions_json.filter((question) => {
+        if (!question || typeof question !== "object" || Array.isArray(question)) {
+          return false;
+        }
+        const key = String((question as { key?: unknown }).key ?? "").trim();
+        return key.length > 0 && !answeredKeys.has(key);
+      })
+    : [];
 
-  return { ok: true, outstandingItem: derived.outstandingItem };
+  if (remainingQuestions.length === 0) {
+    return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
+  }
+  const derived = deriveOutstandingItem(remainingQuestions);
+  if (!derived.ok) return { ok: false, code: "QF_EXEC_VARIABLES_UNRESOLVED" };
+  const actionToken = buildLeadEnrichmentStartToken(identity.requestId);
+  if (!actionToken) return { ok: false, code: "QF_EXEC_VARIABLES_UNRESOLVED" };
+
+  return {
+    ok: true,
+    outstandingItem: derived.outstandingItem,
+    actionToken,
+  };
 }
 
 type VariableInputResult =
@@ -940,6 +978,7 @@ function resolveVariableInput(
   definition: ClientAutomationDispatchDefinition,
   lead: LeadFacts,
   outstandingItem: string | null,
+  actionToken: string | null,
   connectionFacts: ConnectionAssuranceFacts | null,
 ): VariableInputResult {
   const unresolved: VariableInputResult = {
@@ -975,8 +1014,11 @@ function resolveVariableInput(
       // The builders remain the final variable-contract authority: they still
       // validate every field and still prove the emitted key set equals their
       // declared contract exactly. This only supplies the proven input.
-      if (outstandingItem === null) return unresolved;
-      return { ok: true, input: { clientName: lead.name, outstandingItem } };
+      if (outstandingItem === null || actionToken === null) return unresolved;
+      return {
+        ok: true,
+        input: { clientName: lead.name, outstandingItem, actionToken },
+      };
     default:
       return unresolved;
   }

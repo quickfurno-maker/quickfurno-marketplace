@@ -1425,8 +1425,8 @@
     "status": "CURRENT_READ_ONLY_HISTORY_RECONCILED_AND_TWO_FORWARD_MIGRATIONS_APPLIED",
     "observedDate": "2026-09-26",
     "source": {
-      "filesystemMigrationCount": 128,
-      "canonicalMigrationCount": 125,
+      "filesystemMigrationCount": 129,
+      "canonicalMigrationCount": 126,
       "canonicalMigrations": [
         {
           "version": "20260620000001",
@@ -2052,6 +2052,11 @@
           "version": "20260926035856",
           "filename": "20260926035856_qf_lead_drafts_deploy.sql",
           "sha256": "8f60b3d90d213a6c6026149d93b2d3d1dab15c9f58fd5a3feff889beda504961"
+        },
+        {
+          "version": "20260927113000",
+          "filename": "20260927113000_qf_client_journey_phase1_foundation.sql",
+          "sha256": "9111e93b65573d9c1f53bf53df945c188ab4b4cae187db44d319a6b45b223d4b"
         }
       ],
       "worktreeInProgressExcludedMigrations": [

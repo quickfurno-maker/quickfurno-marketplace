@@ -13,8 +13,20 @@ import { logSupabaseInsertError } from "../lib/supabaseLogging";
 import { normalizeLeadContactForStorage } from "../lib/leads/leadContactContract";
 import { MAX_VENDORS_PER_LEAD } from "../lib/config";
 import { runAutoLeadMatchingForLead } from "./leadMatchingEngine";
-import { createClarificationRequestForLead, shouldCreateClarificationForLead } from "./leadClarificationService";
+import {
+  createClarificationRequestForLead,
+  createEnrichmentRequestForLead,
+  shouldCreateClarificationForLead,
+} from "./leadClarificationService";
 import { canAutoDistributeLead, scoreAndStoreLead, type LeadQualityScoreResult } from "./leadQualityService";
+import {
+  evaluateAndStoreLeadQualification,
+  markLeadAwaitingClient,
+  markLeadMatchReady,
+  markLeadMatchingOutcome,
+  markLeadQualificationBlocked,
+} from "./leadQualificationService";
+import type { LeadQualificationSnapshot } from "../lib/leads/leadQualificationContract";
 import { runAosV2LeadIntelligence } from "./aosV2IntelligenceService";
 import type { AosV2CoreMatchEvidence } from "../lib/aos/v2/contracts";
 import {
@@ -51,7 +63,14 @@ export async function createLead(
     const message = firstText(input.message, input.requirement);
     const source = firstText(input.source) || "Website";
 
-    if (!name || !phone || !city || !serviceRequired) throw appError("VALIDATION");
+    const area = firstText(input.area);
+
+    // Client Journey V2 / Phase 1 capture contract: secure the enquiry with the
+    // smallest set of facts needed to identify, contact and locate the client.
+    // Budget/timeline/property details are enrichment, never capture blockers.
+    if (!name || !phone || !city || !area || !serviceRequired || input.share_consent !== true) {
+      throw appError("VALIDATION");
+    }
 
     // QF-MVP-50.8 — the lead-contact contract is enforced HERE, before the
     // duplicate probe and before the INSERT, because the server is the only
@@ -91,7 +110,7 @@ export async function createLead(
       name,
       phone: storedPhone,
       city,
-      area: input.area ?? null,
+      area,
       service_required: serviceRequired,
       budget: budget || null,
       property_type: input.property_type ?? null,
@@ -191,35 +210,89 @@ export async function createLead(
       source,
     });
 
-    let scoreResult: LeadQualityScoreResult | null = null;
-    try {
-      scoreResult = await scoreAndStoreLead(data.id, {
-        ...input,
-        name,
-        phone,
-        city,
-        area: input.area ?? null,
-        service_required: serviceRequired,
-        budget,
-        message,
-        is_duplicate: Boolean(data.is_duplicate),
-      });
+    const normalizedLeadInput: CreateLeadInput = {
+      ...input,
+      name,
+      phone,
+      city,
+      area,
+      service_required: serviceRequired,
+      budget,
+      message,
+      share_consent: true,
+    };
 
-      if (shouldCreateClarificationForLead({ is_duplicate: Boolean(data.is_duplicate) }, scoreResult)) {
-        const clarification = await createClarificationRequestForLead(data.id);
-        if (!clarification.ok) {
-          console.warn("[lead clarification] preparation skipped", {
+    let qualificationSnapshot: LeadQualificationSnapshot | null = null;
+    let scoreResult: LeadQualityScoreResult | null = null;
+
+    try {
+      qualificationSnapshot = await evaluateAndStoreLeadQualification(
+        data.id,
+        normalizedLeadInput,
+      );
+
+      if (Boolean(data.is_duplicate)) {
+        // Duplicate truth is independent of completeness/quality. Preserve the
+        // captured record for audit/CRM, but never enrich or distribute it.
+        await markLeadQualificationBlocked(data.id, "manual_review");
+      } else if (qualificationSnapshot.completenessStatus !== "complete") {
+        // Missing information is enrichment work, NOT low quality. Do not run
+        // Quality V2 yet because its legacy score still contains completeness
+        // points; doing so would incorrectly downgrade genuine incomplete leads.
+        const enrichment = await createEnrichmentRequestForLead(data.id);
+        if (!enrichment.ok) {
+          console.warn("[lead enrichment] preparation skipped", {
             lead_id: data.id,
-            code: clarification.code,
-            error: clarification.error,
+            code: enrichment.code,
+            error: enrichment.error,
           });
         }
+      } else {
+        scoreResult = await scoreAndStoreLead(data.id, {
+          ...normalizedLeadInput,
+          is_duplicate: false,
+        });
+
+        // Legacy B-quality clarification remains a secondary path for genuinely
+        // complete leads where the existing category preset can still improve
+        // vendor usefulness. Completeness-driven enrichment above is primary.
+        if (shouldCreateClarificationForLead({ is_duplicate: false }, scoreResult)) {
+          const clarification = await createClarificationRequestForLead(data.id);
+          if (!clarification.ok) {
+            console.warn("[lead clarification] preparation skipped", {
+              lead_id: data.id,
+              code: clarification.code,
+              error: clarification.error,
+            });
+            await markLeadQualificationBlocked(data.id, "manual_review");
+          } else {
+            await markLeadAwaitingClient(data.id);
+          }
+        } else if (!canAutoDistributeLead(scoreResult)) {
+          await markLeadQualificationBlocked(
+            data.id,
+            scoreResult.recommended_action === "nurture"
+              ? "nurture"
+              : "manual_review",
+          );
+        }
       }
-    } catch (qualityError) {
-      console.warn("[lead quality] scoring failed; distribution held to protect vendor trust", {
+    } catch (qualificationError) {
+      // Fail closed for distribution, never for capture. The enquiry is already
+      // durable and visible in CRM; a broken qualification layer must not lose it.
+      console.warn("[lead qualification] processing failed; distribution held", {
         lead_id: data.id,
-        message: qualityError instanceof Error ? qualityError.message : "Unknown error",
+        message:
+          qualificationError instanceof Error
+            ? qualificationError.message
+            : "Unknown error",
       });
+      try {
+        await markLeadQualificationBlocked(data.id, "manual_review");
+      } catch {
+        // The qualification migration itself may be unavailable. The existing
+        // New/Quality Pending row still remains safely unassigned.
+      }
     }
 
     // Phase 26A-2D: a client-selected-vendor enquiry must NOT trigger the
@@ -231,13 +304,34 @@ export async function createLead(
     // match, and never a fan-out to other vendors in this phase.
     const preferredVendorId = firstText(input.target_vendor_id);
     const isPreferredVendorIntent = input.lead_intent === "preferred_vendor" && Boolean(preferredVendorId);
-    const qualityGatePassed = scoreResult ? canAutoDistributeLead(scoreResult) : false;
+    const dataReady =
+      qualificationSnapshot?.completenessStatus === "complete" &&
+      !Boolean(data.is_duplicate);
+    let matchGatePassed =
+      dataReady && scoreResult ? canAutoDistributeLead(scoreResult) : false;
+
+    // The new MatchCore gate is persisted BEFORE routing. If Core cannot persist
+    // that authorization, fail closed and leave the durable lead for recovery.
+    if (matchGatePassed) {
+      try {
+        await markLeadMatchReady(data.id);
+      } catch (readinessError) {
+        matchGatePassed = false;
+        console.warn("[lead qualification] match-ready persistence failed; distribution held", {
+          lead_id: data.id,
+          message:
+            readinessError instanceof Error
+              ? readinessError.message
+              : "Unknown error",
+        });
+      }
+    }
 
     let preferredVendor: PreferredVendorRoutingResult | undefined;
     let coreMatch: AosV2CoreMatchEvidence | null = null;
 
     if (isPreferredVendorIntent) {
-      if (qualityGatePassed) {
+      if (matchGatePassed) {
         preferredVendor = await routePreferredVendorLead({
           leadId: data.id,
           vendorId: preferredVendorId,
@@ -260,10 +354,13 @@ export async function createLead(
           subcategory: input.target_vendor_subcategory ?? input.subcategory,
           isDuplicate: Boolean(data.is_duplicate),
           fallbackAllowed: input.fallback_allowed,
-          reason: scoreResult?.hard_block_reason ?? "lead_quality_scoring_unavailable",
+          reason:
+            qualificationSnapshot?.completenessStatus !== "complete"
+              ? "lead_enrichment_required"
+              : scoreResult?.hard_block_reason ?? "lead_quality_scoring_unavailable",
         });
       }
-    } else if (qualityGatePassed && !isClientSelectedIntent) {
+    } else if (matchGatePassed && !isClientSelectedIntent) {
       const matching = await runAutoLeadMatchingForLead(data.id);
       if (matching.ok) {
         coreMatch = {
@@ -272,6 +369,23 @@ export async function createLead(
           selectedVendorIds: matching.data.selectedVendorIds,
           failureReason: matching.data.failureReason ?? null,
         };
+        try {
+          await markLeadMatchingOutcome(data.id, {
+            status: matching.data.status,
+            assignedCount: matching.data.assignedVendors.length,
+            eligibleVendorCount: matching.data.eligibleVendorCount,
+          });
+        } catch (journeyError) {
+          // Assignment authority already committed independently; never roll it
+          // back because a derived CRM journey marker could not be persisted.
+          console.warn("[lead journey] matching outcome marker failed", {
+            lead_id: data.id,
+            message:
+              journeyError instanceof Error
+                ? journeyError.message
+                : "Unknown error",
+          });
+        }
       } else {
         coreMatch = {
           status: "failed",
@@ -294,7 +408,7 @@ export async function createLead(
       lead: {
         leadId: data.id,
         city,
-        area: input.area ?? null,
+        area,
         serviceRequired,
         budget: budget || null,
         isDuplicate: Boolean(data.is_duplicate),

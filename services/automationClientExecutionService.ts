@@ -731,9 +731,10 @@ async function proveExecutionTimeEligibility(
       if (row.clarification_required !== true) {
         return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
       }
-      // `preview_prepared` is the outstanding state the producer fired on. Any
-      // later state means the clarification has moved on and the reminder is moot.
-      if (row.clarification_status !== "preview_prepared") {
+      // The reminder is eligible only after the initial clarification message
+      // has been proven sent and the request moved to preview_sent. The exact
+      // request/message evidence is re-proved again below before dispatch.
+      if (row.clarification_status !== "preview_sent") {
         return { ok: false, code: "QF_EXEC_BUSINESS_NO_LONGER_ELIGIBLE" };
       }
       return { ok: true };

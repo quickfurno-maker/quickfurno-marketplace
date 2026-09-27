@@ -1,7 +1,7 @@
 // ============================================================================
 // QuickFurno — lib/communication/businessTemplateVariables.ts
-// QF-MVP-40.12-R1 — canonical transport-variable contract for the five approved
-// ORDINARY BUSINESS templates.  PURE.  OFFLINE.
+// QF-MVP-40.12-R1 + Client Journey V2 — canonical transport-variable contract
+// for approved ORDINARY BUSINESS templates.  PURE.  OFFLINE.
 //
 // WHY THIS EXISTS
 // A provider mapping's `variables_schema` binds each Meta positional parameter to a
@@ -94,6 +94,15 @@ export const BUSINESS_TEMPLATE_CONTRACTS: Readonly<Record<string, BusinessTempla
       bindingVersion: TEMPLATE_BINDING_VERSION,
       profile: ComponentProfile.STANDARD_TEXT,
       bindings: Object.freeze([body(1, BusinessSourceKey.CLIENT_NAME)]),
+    }),
+    clarification_request: Object.freeze({
+      templateKey: "clarification_request",
+      bindingVersion: TEMPLATE_BINDING_VERSION,
+      profile: ComponentProfile.STANDARD_TEXT,
+      bindings: Object.freeze([
+        body(1, BusinessSourceKey.CLIENT_NAME),
+        body(2, BusinessSourceKey.OUTSTANDING_ITEM),
+      ]),
     }),
     client_lead_status_update: Object.freeze({
       templateKey: "client_lead_status_update",
@@ -215,6 +224,15 @@ export function buildLeadReceivedVariables(input: { clientName: unknown }): Busi
   ]);
 }
 
+export function buildClarificationRequestVariables(
+  input: { clientName: unknown; outstandingItem: unknown }
+): BusinessVariableResult {
+  return assemble("clarification_request", [
+    [BusinessSourceKey.CLIENT_NAME, text(input?.clientName, "clientName")],
+    [BusinessSourceKey.OUTSTANDING_ITEM, text(input?.outstandingItem, "outstandingItem")],
+  ]);
+}
+
 export function buildClientLeadStatusUpdateVariables(
   input: { clientName: unknown; leadStatusLabel: unknown }
 ): BusinessVariableResult {
@@ -253,6 +271,7 @@ export function buildVendorOnboardingReminderVariables(
 export const BUSINESS_VARIABLE_BUILDERS: Readonly<Record<string, (input: never) => BusinessVariableResult>> =
   Object.freeze({
     lead_received: buildLeadReceivedVariables as (input: never) => BusinessVariableResult,
+    clarification_request: buildClarificationRequestVariables as (input: never) => BusinessVariableResult,
     client_lead_status_update: buildClientLeadStatusUpdateVariables as (input: never) => BusinessVariableResult,
     client_matching_update: buildClientMatchingUpdateVariables as (input: never) => BusinessVariableResult,
     lead_assignment_alert: buildLeadAssignmentAlertVariables as (input: never) => BusinessVariableResult,

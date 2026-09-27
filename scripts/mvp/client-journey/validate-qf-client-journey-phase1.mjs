@@ -8,6 +8,8 @@ import {
   buildClarificationRequestVariables,
   buildClarificationReminderVariables,
 } from "../../../lib/automation/clientDispatchVariables.ts";
+import { CLIENT_DISPATCH_REGISTRY } from "../../../lib/automation/clientDispatchRegistry.ts";
+import { sourceKeysFor } from "../../../lib/communication/businessTemplateVariables.ts";
 import {
   buildLeadEnrichmentAnswerToken,
   parseLeadEnrichmentReplyToken,
@@ -81,6 +83,28 @@ check("clarification reminder uses the same two business variables", () => {
   assert.deepEqual(Object.keys(built.variables).sort(), ["client_name", "outstanding_item"]);
 });
 
+check("clarification provider binding is explicit and positional", () => {
+  assert.deepEqual(sourceKeysFor("clarification_request"), [
+    "client_name",
+    "outstanding_item",
+  ]);
+});
+
+check("initial ask and +24h reminder both select the approved Utility request template", () => {
+  assert.equal(
+    CLIENT_DISPATCH_REGISTRY["client.requirement_collection"].templateKey,
+    "clarification_request",
+  );
+  assert.equal(
+    CLIENT_DISPATCH_REGISTRY["client.missing_information_reminder"].templateKey,
+    "clarification_request",
+  );
+  assert.notEqual(
+    CLIENT_DISPATCH_REGISTRY["client.missing_information_reminder"].templateKey,
+    "clarification_reminder",
+  );
+});
+
 const repo = process.cwd();
 const migration = fs.readFileSync(
   path.join(repo, "supabase/migrations/20260927113000_qf_client_journey_phase1_foundation.sql"),
@@ -100,6 +124,13 @@ const execution = fs.readFileSync(
 );
 const enrichmentWhatsApp = fs.readFileSync(
   path.join(repo, "lib/leads/leadEnrichmentWhatsApp.ts"),
+  "utf8",
+);
+const stagingQualificationMapping = fs.readFileSync(
+  path.join(
+    repo,
+    "supabase/staging-history/qf-client-journey-phase1-qualification-mapping.sql",
+  ),
   "utf8",
 );
 
@@ -134,6 +165,20 @@ check("late replies reactivate the same expired request", () => {
   assert.match(inbound, /"expired_no_response"/);
   assert.match(inbound, /clarification_status: "late_response"/);
   assert.match(inbound, /clarification_last_request_id/);
+});
+
+check("staging qualification mapping is exact, inactive and utility-only", () => {
+  assert.match(stagingQualificationMapping, /qf_clarification_request_v2/);
+  assert.match(stagingQualificationMapping, /1374658884649762/);
+  assert.match(stagingQualificationMapping, /'approved', 'unknown', '1\.0'/);
+  assert.match(stagingQualificationMapping, /'utility'/);
+  assert.match(stagingQualificationMapping, /now\(\), false/);
+  assert.match(stagingQualificationMapping, /QF_PHASE1_MARKETING_REMINDER_MAPPING_FORBIDDEN/);
+  assert.match(stagingQualificationMapping, /QF_PHASE1_STAGING_META_MUST_REMAIN_DISABLED/);
+  assert.doesNotMatch(
+    stagingQualificationMapping,
+    /values\s*\(\s*'clarification_reminder'/i,
+  );
 });
 
 console.log(`QF Client Journey V2 Phase 1: ${passed}/${passed} PASS`);

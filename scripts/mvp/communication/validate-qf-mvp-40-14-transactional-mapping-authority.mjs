@@ -102,6 +102,13 @@ const CLOSED_SET = [
   "vendor_onboarding_reminder",
 ];
 
+/**
+ * Later phases may add proven business contracts without retroactively widening
+ * this historical activation authority. Every such extension must be named
+ * explicitly here; an unreviewed seventh contract still breaks this validator.
+ */
+const POST_40_14_CONTRACT_EXTENSIONS = ["clarification_request"];
+
 /** The already-live lane this phase must leave completely alone. */
 const ANCHOR_KEY = "lead_assignment_alert";
 const ANCHOR_NAME = "quickfurno_vendor_lead_assignment_alert_v1";
@@ -545,9 +552,14 @@ const RULES = {
       return JSON.stringify(provenKeys) === JSON.stringify(declared);
     });
   },
-  "F06 the four keys are exactly the business contracts minus the live anchor": () => {
-    const contracts = Object.keys(BUSINESS_TEMPLATE_CONTRACTS).filter((k) => k !== ANCHOR_KEY).sort();
-    return JSON.stringify(contracts) === JSON.stringify([...CLOSED_SET].sort());
+  "F06 the historical four stay closed while only explicit later contracts may extend the registry": () => {
+    const contracts = Object.keys(BUSINESS_TEMPLATE_CONTRACTS)
+      .filter((k) => k !== ANCHOR_KEY)
+      .sort();
+    const expected = [...CLOSED_SET, ...POST_40_14_CONTRACT_EXTENSIONS].sort();
+    return JSON.stringify(contracts) === JSON.stringify(expected) &&
+      POST_40_14_CONTRACT_EXTENSIONS.length === 1 &&
+      POST_40_14_CONTRACT_EXTENSIONS[0] === "clarification_request";
   },
 
   // ---- G. excluded keys are structurally unreachable ---------------------------

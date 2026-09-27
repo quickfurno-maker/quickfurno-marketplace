@@ -2749,6 +2749,21 @@
       "rlsPolicyDefinitionsMatchProduction": true,
       "performanceAdvisorInitplanWarnings": 0
     },
+    "clientJourneyPhase1QualificationMapping": {
+      "status": "STAGING_INACTIVE_MAPPING_CERTIFIED",
+      "observedDate": "2026-09-27",
+      "operatorRecord": "supabase/staging-history/qf-client-journey-phase1-qualification-mapping.sql",
+      "internalTemplateKey": "clarification_request",
+      "providerTemplateName": "qf_clarification_request_v2",
+      "providerTemplateId": "1374658884649762",
+      "providerCategory": "utility",
+      "approvalStatus": "approved",
+      "bindingVersion": 1,
+      "mappingActive": false,
+      "clarificationReminderMappingCount": 0,
+      "providerEvidence": "docs/provider-manifests/meta-staging-clarification-request-v2-reconciliation.json",
+      "whatsappOutboundRemainedDisabled": true
+    },
     "intentionalEnvironmentDifferences": [
       "META_WHATSAPP_RUNTIME_DISABLED_IN_STAGING",
       "PRODUCTION_META_ACTIVATION_MIGRATION_NOT_APPLIED",

@@ -44,6 +44,7 @@ import {
 
 const read = (p) => fs.readFileSync(p, "utf8");
 const migration = read("supabase/migrations/20260918120000_whatsapp_conversational_jarvis_foundation.sql");
+const sharedNumberMigration = read("supabase/migrations/20260929154156_shared_single_number_jarvis_access.sql");
 const callbackReplayMigration = read("supabase/migrations/20260918180500_jarvis_whatsapp_callback_replay_receipts.sql");
 const conversationService = read("services/conversationalWhatsAppService.ts");
 const gatewayService = read("services/jarvisWhatsAppGatewayService.ts");
@@ -70,6 +71,13 @@ await test("conversational provider accounts are proposal-only, never Jarvis-own
   assert.match(migration, /account_role in \('transactional','conversational'\)/);
   assert.match(migration, /jarvis_access_mode in \('denied','proposal_only'\)/);
   assert.match(migration, /jarvis_access_mode='denied' or account_role='conversational'/);
+});
+await test("shared-number migration permits transactional provider accounts to be proposal-only", () => {
+  assert.match(sharedNumberMigration, /drop constraint if exists communication_provider_account_jarvis_role_chk/);
+  assert.match(sharedNumberMigration, /jarvis_access_mode = 'proposal_only'/);
+  assert.match(sharedNumberMigration, /account_role in \('transactional','conversational'\)/);
+  assert.match(conversationService, /function isJarvisConversationAccount/);
+  assert.match(conversationService, /account\.jarvis_access_mode === "proposal_only"/);
 });
 await test("conversation state owns service-window and takeover authority", () => {
   assert.match(migration, /service_window_expires_at timestamptz/);
@@ -348,6 +356,17 @@ await test("concierge routes exact clients/vendors and explicit prospects determ
   assert.equal(vendor.subjectType, "vendor");
   assert.equal(prospect.assignedActor, "AAROHI");
   assert.equal(prospect.subjectType, "prospect");
+});
+await test("unknown first-contact can explicitly enter bounded Riya onboarding", () => {
+  const routed = resolveWhatsAppConciergeRouting({
+    identityConfidence: "unknown", principalType: null, messageType: "text",
+    contentMinimized: { text: "Hello Riya" }, isNewConversation: true,
+  });
+  assert.equal(routed.subjectType, "client");
+  assert.equal(routed.assignedActor, "RIYA");
+  assert.equal(routed.jarvisEnabled, true);
+  assert.equal(routed.suppressJarvisTurn, false);
+  assert.equal(routed.humanTakeover, false);
 });
 await test("unknown greeting receives system-owned Concierge menu without Jarvis turn", () => {
   const routed = resolveWhatsAppConciergeRouting({

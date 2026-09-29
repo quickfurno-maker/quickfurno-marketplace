@@ -170,6 +170,18 @@
         "production": true
       },
       "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29"
+    },
+    {
+      "version": "20260929154156",
+      "name": "shared_single_number_jarvis_access",
+      "filename": "20260929154156_shared_single_number_jarvis_access.sql",
+      "path": "supabase/migrations/20260929154156_shared_single_number_jarvis_access.sql",
+      "canonicalSha256": "38dde7d10dae5b84f0f1cd8594e76e1953936b700ba41a4cf8b8573bf1205cab",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-09-29_BEFORE_DEPLOYMENT"
     }
   ],
   "supersededLegacyPins": [

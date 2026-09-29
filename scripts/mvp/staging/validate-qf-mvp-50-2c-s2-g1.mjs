@@ -670,7 +670,7 @@ function validateState(state) {
     extension?.evidenceProjects?.staging?.projectRef === "uckafzuochmbvtiodmcl" &&
     extension?.evidenceProjects?.production?.projectRef === "yqpgcsduqbxulrlzwzap");
   check("post-G1 extension records are unique, exact and hash-pinned",
-    extensionRecords.length === 13 &&
+    extensionRecords.length === 14 &&
     new Set(extensionRecords.map((record) => record.version)).size === extensionRecords.length &&
     extensionRecords.every((record) => {
       const local = localByVersion.get(record.version);
@@ -679,7 +679,15 @@ function validateState(state) {
         local?.filename === record.filename &&
         record.path === `supabase/migrations/${record.filename}` &&
         local?.sha256 === record.canonicalSha256 &&
-        record.evidence === "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29" &&
+        (
+          record.evidence === "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29" ||
+          (
+            record.version === "20260929154156" &&
+            record.evidence === "SOURCE_PIN_CREATED_2026-09-29_BEFORE_DEPLOYMENT" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false
+          )
+        ) &&
         typeof record.exactVersionPresence?.staging === "boolean" &&
         typeof record.exactVersionPresence?.production === "boolean";
     }));

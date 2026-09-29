@@ -36,6 +36,7 @@ export interface ConciergeRoutingDecision {
 }
 const GREETINGS = new Set(["hi", "hello", "hey", "hii", "hiii", "namaste", "start", "menu"]);
 const HUMAN = new Set(["human", "agent", "talk to human", "talk to a person", "talk to quickfurno"]);
+const RIYA_CALLS = new Set(["riya", "hi riya", "hii riya", "hiii riya", "hello riya", "hey riya", "namaste riya"]);
 const CLIENT_PHRASES = [
   "find furniture", "need furniture", "looking for furniture", "office chair", "office chairs",
   "office desk", "office desks", "workstation", "sofa", "table", "chairs", "furniture requirement",
@@ -199,6 +200,13 @@ export function resolveWhatsAppConciergeRouting(input: ConciergeRoutingInput): C
       });
     }
     return exactIdentity;
+  }
+
+  // One shared QuickFurno number: an unknown first-contact user may explicitly ask
+  // for Riya. This creates only an in-progress client conversation; it does not
+  // fabricate a client identity or grant business-state authority.
+  if (token !== null && RIYA_CALLS.has(token)) {
+    return route("client", "RIYA", "choice");
   }
   if (token === QF_CONCIERGE_ACTIONS.VENDOR || (token !== null && containsAny(token, VENDOR_PHRASES))) {
     return route("unknown", "SYSTEM", "menu", {

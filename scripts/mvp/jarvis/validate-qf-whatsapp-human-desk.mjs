@@ -48,7 +48,9 @@ await test("return-to-AI derives actor only from trusted subject type", () => {
   assert.match(service, /subjectType === "vendor" \? "ANISHA"/);
   assert.match(service, /subjectType === "prospect" \? "AAROHI"/);
   assert.match(service, /if \(!actor\) return \{ ok: false, reason: "conversation_not_sendable" \}/);
-  assert.match(service, /account\.jarvis_access_mode !== "proposal_only"/);
+  assert.match(service, /function isJarvisConversationAccount/);
+  assert.match(service, /account\.jarvis_access_mode === "proposal_only"/);
+  assert.match(service, /if \(!isJarvisConversationAccount\(account\)\)/);
   assert.match(service, /human_takeover: false/);
   assert.match(service, /assigned_actor: actor/);
   assert.match(service, /revision,/);

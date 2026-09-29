@@ -31,6 +31,7 @@ import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "no
 import { createRequire } from "node:module";
 import path, { resolve } from "node:path";
 import crypto from "node:crypto";
+import { EXPECTED_LIVE_MIGRATION_COUNT } from "./mvp/staging/live-migration-ledger.mjs";
 
 const outDir = resolve(".qf-80-03-audit-build");
 rmSync(outDir, { recursive: true, force: true });
@@ -621,22 +622,12 @@ check("39 [static] no historical backfill and no new migration", () => {
     assert(!/update\([^)]*admin_user_id/.test(src), "existing audit rows must never be updated");
     assert(!/from\("audit_logs"\)[\s\S]{0,120}\.(update|delete)\(/.test(src), "no update/delete on audit_logs");
   }
-  // QF-MVP-80.14A. "PR C adds no migration" was expressed as a hard-coded global
-  // count, so a later slice adding a legitimate, explicitly pinned migration made
-  // it fail — a false failure about someone else's work. The count is now
-  // delegated to the ONE authority for it, G1's MIGRATION_COUNT, rather than
-  // duplicated as a literal here. An UNPINNED migration still fails this check,
-  // and fails G1's 153 mutants first.
+  // This phase adds no migration of its own. The global live count comes from the
+  // fail-closed post-G1 ledger; the old G1 constant remains a historical pin only.
   const migrations = readdirSync(path.join(process.cwd(), "supabase", "migrations")).filter((f) => f.endsWith(".sql"));
-  const g1 = readFileSync(
-    path.join(process.cwd(), "scripts", "mvp", "staging", "validate-qf-mvp-50-2c-s2-g1.mjs"),
-    "utf8"
-  );
-  const pinned = /const MIGRATION_COUNT = (\d+);/.exec(g1);
-  assert(pinned !== null, "G1 no longer pins a migration count");
   assert(
-    migrations.length === Number(pinned[1]),
-    `tree has ${migrations.length} migrations but G1 pins ${pinned[1]}`
+    migrations.length === EXPECTED_LIVE_MIGRATION_COUNT,
+    `tree has ${migrations.length} migrations but the explicit live ledger pins ${EXPECTED_LIVE_MIGRATION_COUNT}`
   );
 });
 

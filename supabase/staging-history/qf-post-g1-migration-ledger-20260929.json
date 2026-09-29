@@ -1,0 +1,214 @@
+{
+  "manifestVersion": 1,
+  "purpose": "POST_G1_EXPLICIT_MIGRATION_PIN_EXTENSION",
+  "observedDate": "2026-09-29",
+  "databaseMutationAuthorized": false,
+  "productionDeploymentAuthorized": false,
+  "evidenceProjects": {
+    "staging": {
+      "name": "QuickFurno Staging",
+      "projectRef": "uckafzuochmbvtiodmcl"
+    },
+    "production": {
+      "name": "QuickFurno",
+      "projectRef": "yqpgcsduqbxulrlzwzap"
+    }
+  },
+  "records": [
+    {
+      "version": "20260912010000",
+      "name": "qf_vendor_package_razorpay_testmode",
+      "filename": "20260912010000_qf_vendor_package_razorpay_testmode.sql",
+      "path": "supabase/migrations/20260912010000_qf_vendor_package_razorpay_testmode.sql",
+      "canonicalSha256": "bd16bfb3cf28a7c87b579efaae3c6c543eb78e241bb1b03e7ff95075c3e056a8",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29"
+    },
+    {
+      "version": "20260912020000",
+      "name": "qf_package_scope_governance",
+      "filename": "20260912020000_qf_package_scope_governance.sql",
+      "path": "supabase/migrations/20260912020000_qf_package_scope_governance.sql",
+      "canonicalSha256": "43a36f21af0c9cb5c16648dafd20a8e1a3f50c0d85f59ed3c9f21a145dd1a0f0",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29"
+    },
+    {
+      "version": "20260912021527",
+      "name": "qf_launch_pune_only_city_activation",
+      "filename": "20260912021527_qf_launch_pune_only_city_activation.sql",
+      "path": "supabase/migrations/20260912021527_qf_launch_pune_only_city_activation.sql",
+      "canonicalSha256": "f5c3db995a609b2155b5a615ddfe6d637642d7e1ae54d7a07e29b5b7b8625e30",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": true
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29"
+    },
+    {
+      "version": "20260912024734",
+      "name": "qf_active_city_authority_hardening",
+      "filename": "20260912024734_qf_active_city_authority_hardening.sql",
+      "path": "supabase/migrations/20260912024734_qf_active_city_authority_hardening.sql",
+      "canonicalSha256": "391d43b96d107338f1a27688fd7b3f2581b1fb6d65ea27201079d37690b71a52",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": true
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29"
+    },
+    {
+      "version": "20260912030000",
+      "name": "qf_category_runtime_governance",
+      "filename": "20260912030000_qf_category_runtime_governance.sql",
+      "path": "supabase/migrations/20260912030000_qf_category_runtime_governance.sql",
+      "canonicalSha256": "0df55d8a507de01325a32cfa4d4709e9a51c73bd05b57e1e158369caeea14483",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29"
+    },
+    {
+      "version": "20260921054654",
+      "name": "qf_audit_security_hardening",
+      "filename": "20260921054654_qf_audit_security_hardening.sql",
+      "path": "supabase/migrations/20260921054654_qf_audit_security_hardening.sql",
+      "canonicalSha256": "ba1a56d01f6afafcc7c9ff2549f297172a31192464d0a1afdd1b2f1fd6c8d487",
+      "exactVersionPresence": {
+        "staging": true,
+        "production": true
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29"
+    },
+    {
+      "version": "20260921055639",
+      "name": "qf_audit_rpc_surface_hardening",
+      "filename": "20260921055639_qf_audit_rpc_surface_hardening.sql",
+      "path": "supabase/migrations/20260921055639_qf_audit_rpc_surface_hardening.sql",
+      "canonicalSha256": "154ad29a9330e75e6eedb1e31502808d55d7e9a4c4b03e80721f5c68dc7f9838",
+      "exactVersionPresence": {
+        "staging": true,
+        "production": true
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29"
+    },
+    {
+      "version": "20260923170217",
+      "name": "vendor_media_bucket",
+      "filename": "20260923170217_vendor_media_bucket.sql",
+      "path": "supabase/migrations/20260923170217_vendor_media_bucket.sql",
+      "canonicalSha256": "5cc1f5890e2d595dd546734579c10e86e23e02a314cb716cb66400db1afe8843",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": true
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29"
+    },
+    {
+      "version": "20260926035801",
+      "name": "qf_jarvis_service_availability_deploy",
+      "filename": "20260926035801_qf_jarvis_service_availability_deploy.sql",
+      "path": "supabase/migrations/20260926035801_qf_jarvis_service_availability_deploy.sql",
+      "canonicalSha256": "b606a14b6bfab2b9e5505a8215e823277dbe5abe0f7e884cd8a916895ab054f6",
+      "exactVersionPresence": {
+        "staging": true,
+        "production": true
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29"
+    },
+    {
+      "version": "20260926035856",
+      "name": "qf_lead_drafts_deploy",
+      "filename": "20260926035856_qf_lead_drafts_deploy.sql",
+      "path": "supabase/migrations/20260926035856_qf_lead_drafts_deploy.sql",
+      "canonicalSha256": "8f60b3d90d213a6c6026149d93b2d3d1dab15c9f58fd5a3feff889beda504961",
+      "exactVersionPresence": {
+        "staging": true,
+        "production": true
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29"
+    },
+    {
+      "version": "20260927113000",
+      "name": "qf_client_journey_phase1_foundation",
+      "filename": "20260927113000_qf_client_journey_phase1_foundation.sql",
+      "path": "supabase/migrations/20260927113000_qf_client_journey_phase1_foundation.sql",
+      "canonicalSha256": "5f20904a229717d10e2d1cb5e6f6ee82257427ecebf7f2f611d501b6ad35be87",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29"
+    },
+    {
+      "version": "20260927150000",
+      "name": "qf_client_journey_phase1_meta_qualification",
+      "filename": "20260927150000_qf_client_journey_phase1_meta_qualification.sql",
+      "path": "supabase/migrations/20260927150000_qf_client_journey_phase1_meta_qualification.sql",
+      "canonicalSha256": "86b95c0f871141b40a32e126998a96a1cc2ba7af5fed1ae9de245cb5f195ae2b",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29"
+    },
+    {
+      "version": "20260929094500",
+      "name": "qf_riya_qualification_worker_lane",
+      "filename": "20260929094500_qf_riya_qualification_worker_lane.sql",
+      "path": "supabase/migrations/20260929094500_qf_riya_qualification_worker_lane.sql",
+      "canonicalSha256": "b079859e54e96327b12236e10764ac66e66f1149569e32d844bb235b50862182",
+      "exactVersionPresence": {
+        "staging": true,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29"
+    }
+  ],
+  "supersededLegacyPins": [
+    {
+      "legacyVersion": "20260915120000",
+      "legacyName": "qf_jarvis_service_availability",
+      "legacyPath": "supabase/migrations/20260915120000_qf_jarvis_service_availability.sql",
+      "legacyCanonicalSha256": "32e2480dab0126e797bde4aaf14a5f8d1cc844350870afe13af6fcfb8e67189c",
+      "replacementVersion": "20260926035801",
+      "replacementName": "qf_jarvis_service_availability_deploy",
+      "replacementPath": "supabase/migrations/20260926035801_qf_jarvis_service_availability_deploy.sql",
+      "replacementCanonicalSha256": "b606a14b6bfab2b9e5505a8215e823277dbe5abe0f7e884cd8a916895ab054f6",
+      "replacementExactVersionPresence": {
+        "staging": true,
+        "production": true
+      },
+      "classification": "SUPERSEDED_SOURCE_IDENTITY_DEPLOYED_UNDER_REPLACEMENT_VERSION",
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29"
+    }
+  ],
+  "allowedStagingHistorySqlFiles": [
+    {
+      "filename": "qf-client-journey-phase1-qualification-mapping.sql",
+      "sha256": "327cbe7d6eead05903f799d0a8a757d05887cedaa709ed2464e7d46a6d98842a"
+    },
+    {
+      "filename": "qf-phase2-staging-parity-data.sql",
+      "sha256": "aa1b44dd603f30f23f1611b83de09d7666f6f3e32a68f631e72047c2c087ff9f"
+    },
+    {
+      "filename": "qf-phase2-staging-rls-parity.sql",
+      "sha256": "4dbc9d616b0e321fb8556a9b619f321900272de3975306b2464cb2b1f3cf5358"
+    }
+  ],
+  "safety": {
+    "exactPinsRequired": true,
+    "unlistedMigrationForbidden": true,
+    "hashDriftForbidden": true,
+    "genericFutureMigrationAllowanceForbidden": true,
+    "legacyManifestRewritten": false
+  }
+}

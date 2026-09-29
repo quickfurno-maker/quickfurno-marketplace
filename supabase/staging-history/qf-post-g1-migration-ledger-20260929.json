@@ -167,7 +167,7 @@
       "canonicalSha256": "b079859e54e96327b12236e10764ac66e66f1149569e32d844bb235b50862182",
       "exactVersionPresence": {
         "staging": true,
-        "production": false
+        "production": true
       },
       "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29"
     }

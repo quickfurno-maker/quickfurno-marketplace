@@ -2,6 +2,12 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  EXPECTED_LIVE_MIGRATION_COUNT,
+  POST_G1_EXTENSION_FILENAMES,
+  POST_G1_EXTENSION_RECORDS,
+  SUPERSEDED_LEGACY_VERSIONS,
+} from "../staging/live-migration-ledger.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const MANIFEST_PATH = path.join(ROOT, "supabase/staging-history/qf-mvp-staging-history-manifest.json");
@@ -25,14 +31,17 @@ export function validateCurrentMigrationTree() {
   const source = current.source;
   const canonical = source.canonicalMigrations ?? [];
   const excluded = source.worktreeInProgressExcludedMigrations ?? [];
-  const expectedFiles = [...canonical.map((x) => x.filename), ...excluded.map((x) => x.filename)].sort();
+  const legacyExpectedFiles = [...canonical.map((x) => x.filename), ...excluded.map((x) => x.filename)].sort();
+  const retainedLegacyFiles = legacyExpectedFiles.filter((filename) =>
+    !SUPERSEDED_LEGACY_VERSIONS.some((version) => filename.startsWith(`${version}_`)));
+  const expectedFiles = [...new Set([...retainedLegacyFiles, ...POST_G1_EXTENSION_FILENAMES])].sort();
   const actualFiles = readdirSync(MIGRATIONS_DIR)
     .filter((name) => name.endsWith(".sql"))
     .sort();
   const checks = [];
   const check = (name, ok, detail = "") => checks.push({ name, ok: Boolean(ok), detail });
-  check("manifest filesystem count matches", source.filesystemMigrationCount === actualFiles.length,
-    `manifest=${source.filesystemMigrationCount} actual=${actualFiles.length}`);
+  check("extended filesystem count matches", EXPECTED_LIVE_MIGRATION_COUNT === actualFiles.length,
+    `expected=${EXPECTED_LIVE_MIGRATION_COUNT} actual=${actualFiles.length}`);
   check("manifest canonical count matches records", source.canonicalMigrationCount === canonical.length);
   check("exact migration filename set matches manifest", JSON.stringify(actualFiles) === JSON.stringify(expectedFiles));
   const allVersions = actualFiles.map((name) => /^(\d{14})_.+\.sql$/.exec(name)?.[1] ?? null);
@@ -43,6 +52,11 @@ export function validateCurrentMigrationTree() {
   for (const record of canonical) {
     const bytes = readFileSync(path.join(MIGRATIONS_DIR, record.filename));
     check(`canonical source hash ${record.version}`, sha256(canonicalBytes(bytes)) === record.sha256, record.filename);
+  }
+  for (const record of POST_G1_EXTENSION_RECORDS) {
+    const bytes = readFileSync(path.join(MIGRATIONS_DIR, record.filename));
+    check(`post-G1 source hash ${record.version}`,
+      sha256(canonicalBytes(bytes)) === record.canonicalSha256, record.filename);
   }
   check("excluded worktree migrations are deployment-forbidden",
     excluded.length === 3 && excluded.every((x) => x.deploymentAuthorized === false));

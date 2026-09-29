@@ -83,6 +83,14 @@ async function providerAccount(providerAccountId: string) {
   return error || !data ? null : data as any;
 }
 
+function isJarvisConversationAccount(account: any): boolean {
+  return !!account &&
+    account.provider_key === META_WHATSAPP_CLOUD_PROVIDER_KEY &&
+    account.channel === CHANNEL &&
+    account.jarvis_access_mode === "proposal_only" &&
+    (account.account_role === "transactional" || account.account_role === "conversational");
+}
+
 const SUBJECT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type JarvisAuthorityActor = "AAROHI" | "ANISHA" | "RIYA" | "HUMAN" | "SYSTEM";
@@ -165,12 +173,7 @@ export async function signalConversationalWhatsAppPresence(input: {
   ) return "skipped";
 
   const account = await providerAccount(String(conversation.provider_account_id));
-  if (
-    !account ||
-    account.provider_key !== META_WHATSAPP_CLOUD_PROVIDER_KEY ||
-    account.channel !== CHANNEL ||
-    account.account_role !== "conversational"
-  ) return "skipped";
+  if (!isJarvisConversationAccount(account)) return "skipped";
 
   const config = resolveConversationalMetaConfig();
   if (!config.ok) return "skipped";
@@ -207,7 +210,7 @@ export async function recordConversationalInbound(input: {
   readonly suppressJarvisTurn?: boolean;
 }): Promise<ConversationalResult<{ conversationId: string; revision: number; jarvisEnabled: boolean }>> {
   const account = await providerAccount(input.providerAccountId);
-  if (!account || account.provider_key !== META_WHATSAPP_CLOUD_PROVIDER_KEY || account.channel !== CHANNEL || account.account_role !== "conversational") {
+  if (!isJarvisConversationAccount(account)) {
     return { ok: false, reason: "provider_account_not_conversational" };
   }
 
@@ -744,7 +747,7 @@ async function queueConversationExperience(input: {
   if (consent.kind !== "allow") return { ok: false, reason: "consent_unavailable" };
 
   const account = await providerAccount(conversation.provider_account_id);
-  if (!account || account.account_role !== "conversational" || account.jarvis_access_mode !== "proposal_only") {
+  if (!isJarvisConversationAccount(account)) {
     return { ok: false, reason: "provider_account_not_conversational" };
   }
 
@@ -950,7 +953,7 @@ export async function releaseHumanConversationToAi(input: {
   const actor = actorForSubject(String(conversation.subject_type));
   if (!actor) return { ok: false, reason: "conversation_not_sendable" };
   const account = await providerAccount(String(conversation.provider_account_id));
-  if (!account || account.account_role !== "conversational" || account.jarvis_access_mode !== "proposal_only") {
+  if (!isJarvisConversationAccount(account)) {
     return { ok: false, reason: "provider_account_not_conversational" };
   }
 
@@ -1212,7 +1215,7 @@ export async function dispatchConversationalOutbox(
   }
 
   const account = await providerAccount(conversation.provider_account_id);
-  if (!account || account.account_role !== "conversational" || account.jarvis_access_mode !== "proposal_only") {
+  if (!isJarvisConversationAccount(account)) {
     await failOutbox(claimed.id, "cancelled", "PROVIDER_ACCOUNT_NOT_CONVERSATIONAL");
     return { ok: false, reason: "provider_account_not_conversational" };
   }

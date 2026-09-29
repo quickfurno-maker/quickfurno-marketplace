@@ -17,6 +17,10 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  EXPECTED_LIVE_MIGRATION_COUNT,
+  extendLegacyFilenames,
+} from "../staging/live-migration-ledger.mjs";
 
 // QF-MVP-50.7 RE-PIN: 105 -> 106, adding ONLY the SOURCE-PENDING stale-business
 // terminalization authority (20260906000000). No existing migration was changed,
@@ -72,7 +76,6 @@ const FROZEN = [
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority. No existing migration was changed, renamed, deleted or
 // reordered. Still exact equality.
-const MIGRATION_COUNT = 119;
 const PRODUCTION_ACTIVATION_NAME =
   "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql";
 // QF-MVP-82A-R0: the newest SOURCE-PENDING migration — Realtime publication
@@ -154,25 +157,27 @@ record("V05 the bridge sorts immediately after the fresh-claim wedge repair",
 // QF-MVP-50.5 RE-PIN: the bridge and the three frozen 50.3/50.4 migrations still sit
 // in exactly this order; they are now followed by the 50.5 recovery transport, which is
 // named explicitly rather than allowed as "anything newer".
-record("V07a the final twenty-seven versions are in exact chronological order",
-  same(migrationFiles.slice(-27),
-    [BRIDGE_NAME, ...FROZEN.map(([f]) => f), RECOVERY_NAME, CANARY_AUTHORITY_NAME,
-     MARKETING_CONSENT_NAME, MATCHCORE_RANK_ORDER_NAME, GEO_POSTGIS_SHORTLIST_NAME,
-     AUDIT_LOG_REPAIR_NAME, PRODUCTION_ACTIVATION_NAME, REALTIME_PUBLICATION_NAME,
-     ORPHAN_CANCELLATION_NAME, STALE_BUSINESS_NAME, CANARY_QUIESCE_NAME,
-     LAUNCH_SECURITY_CLOSEOUT_NAME, TRANSACTIONAL_MAPPING_NAME,
-     "20260912040000_qf_aos_v2_intelligence.sql",
-     "20260912050000_qf_lead_generation_scope_lock.sql",
-     "20260915120000_qf_jarvis_service_availability.sql",
-     "20260917000000_aarohi_acquisition_crm_foundation.sql",
-     "20260918093000_aarohi_anisha_vendor_crm_handoff.sql",
-     "20260918120000_whatsapp_conversational_jarvis_foundation.sql",
-     "20260918180500_jarvis_whatsapp_callback_replay_receipts.sql",
-     "20260919010000_vendor_review_system.sql",
-     FALSE_CEILING_NAME,
-     "20260924183000_jarvis_os_operator_command_receipts.sql"]));
-record("V07 the local migration set is exactly 119",
-  migrationFiles.length === MIGRATION_COUNT);
+const expectedMigrationTail = extendLegacyFilenames(
+  [BRIDGE_NAME, ...FROZEN.map(([f]) => f), RECOVERY_NAME, CANARY_AUTHORITY_NAME,
+   MARKETING_CONSENT_NAME, MATCHCORE_RANK_ORDER_NAME, GEO_POSTGIS_SHORTLIST_NAME,
+   AUDIT_LOG_REPAIR_NAME, PRODUCTION_ACTIVATION_NAME, REALTIME_PUBLICATION_NAME,
+   ORPHAN_CANCELLATION_NAME, STALE_BUSINESS_NAME, CANARY_QUIESCE_NAME,
+   LAUNCH_SECURITY_CLOSEOUT_NAME, TRANSACTIONAL_MAPPING_NAME,
+   "20260912040000_qf_aos_v2_intelligence.sql",
+   "20260912050000_qf_lead_generation_scope_lock.sql",
+   "20260915120000_qf_jarvis_service_availability.sql",
+   "20260917000000_aarohi_acquisition_crm_foundation.sql",
+   "20260918093000_aarohi_anisha_vendor_crm_handoff.sql",
+   "20260918120000_whatsapp_conversational_jarvis_foundation.sql",
+   "20260918180500_jarvis_whatsapp_callback_replay_receipts.sql",
+   "20260919010000_vendor_review_system.sql",
+   FALSE_CEILING_NAME,
+   "20260924183000_jarvis_os_operator_command_receipts.sql"],
+);
+record("V07a the governed migration tail is in exact chronological order",
+  same(migrationFiles.slice(-expectedMigrationTail.length), expectedMigrationTail));
+record(`V07 the local migration set is exactly ${EXPECTED_LIVE_MIGRATION_COUNT}`,
+  migrationFiles.length === EXPECTED_LIVE_MIGRATION_COUNT);
 
 // ---------------------------------------------------------------------------
 // I. IMMUTABILITY — nothing historical or already-merged may move

@@ -315,22 +315,21 @@ check("18 [semantic] every required control is present in the one form", () => {
   assert(/GooglePlaceAutocomplete/.test(body), "the Area field lost its Google autocomplete");
   assert(/onManualChange=\{onAreaManualChange\}/.test(body), "the Area manual fallback is gone");
   assert(/type="checkbox"[\s\S]{0,200}form\.shareConsent/.test(body), "the consent checkbox is gone");
-  assert(/form\.whatsappSame/.test(body), "the WhatsApp same-as-phone control is gone");
+  assert(!/form\.whatsappSame/.test(body), "a duplicate same-as-phone control returned to the single-WhatsApp form");
   assert(!/qf-sf-message/.test(body), "the removed message/additional-details field returned");
   assert(!/Project details \(optional\)|Tell us about your space/.test(HOME_ENQUIRY_SRC),
     "the legacy enquiry form reintroduced the removed message/additional-details field");
 });
 
-check("18A [semantic] contact/location is first and OTP UI stays presentation-only", () => {
+check("18A [semantic] contact/location is first and Phase-1 capture has no premature OTP UI", () => {
   const body = MODAL_SRC.slice(MODAL_SRC.indexOf("function renderSingleForm"));
   const contactAt = body.indexOf('"Contact & location"');
   const projectAt = body.indexOf('"Project details"');
   assert(contactAt >= 0 && projectAt > contactAt, "contact/location is no longer the first visual form section");
-  assert(/qf-sf-otp-send/.test(body) && /qf-sf-otp-verify/.test(body), "OTP UI controls are missing");
-  assert(/otpUiSeconds\s*>\s*0/.test(MODAL_SRC), "the 60-second resend countdown UI is missing");
-  assert(/3 attempts remaining/.test(body), "the OTP attempts display is missing");
-  assert(/OTP delivery will be connected in the backend phase/.test(MODAL_SRC),
-    "OTP UI is no longer explicitly isolated from backend verification");
+  assert(!/qf-sf-otp-send|qf-sf-otp-verify|otpUiSeconds|attempts remaining/i.test(body),
+    "OTP presentation controls returned before a verified backend OTP authority exists");
+  assert(/Please complete your name, WhatsApp number, area and service\./.test(MODAL_SRC),
+    "the Phase-1 minimal capture contract is no longer enforced in runtime UI");
 });
 
 check("19 [semantic] service and city are real selects bound to the shared sources", () => {

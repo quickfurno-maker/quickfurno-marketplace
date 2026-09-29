@@ -657,8 +657,8 @@ export const suite = {
         assertTrue(/budgetMin: "",/.test(src), 'budgetMin starts empty');
         assertTrue(/budgetMax: "",/.test(src), 'budgetMax starts empty');
         assertTrue(/budgetNotSure: false,/.test(src), 'budgetNotSure starts false');
-        assertTrue(src.includes('<option value="">Select a budget range</option>'),
-          'the budget select opens on an empty option');
+        assertTrue(src.includes('<option value="">Skip for now</option>'),
+          'the optional budget select opens on the empty skip option');
         // The select is bound to the DERIVED band, never to a hardcoded default.
         assertTrue(src.includes('value={currentBudgetBandId()}'), 'band select reads derived state');
         assertFalse(/currentBudgetBandId\(\) \|\| "[a-z0-9+-]/.test(src), 'no fallback band is forced');
@@ -1132,7 +1132,7 @@ export const suite = {
       run: () => {
         // The shared components must still carry their homeowner behaviour.
         const header = readFileSync('components/Header.tsx', 'utf8');
-        assertTrue(header.includes('Get a Free Quote'), 'public header keeps the approved quote CTA');
+        assertTrue(header.includes('Get up to 3 matches'), 'public header keeps the approved matching CTA');
         assertTrue(header.includes('Toggle navigation menu'), 'public header keeps its menu toggle');
         const footer = readFileSync('components/Footer.tsx', 'utf8');
         assertTrue(footer.includes('Approved active vendors · Up to 3 active matches · Free to enquire'), 'public footer keeps its truthful summary');
@@ -1300,7 +1300,7 @@ export const suite = {
       run: () => {
         // The phase is admin-only; these approved surfaces must be unchanged.
         const header = readFileSync('components/Header.tsx', 'utf8');
-        assertTrue(header.includes('Get a Free Quote'), 'public header CTA intact');
+        assertTrue(header.includes('Get up to 3 matches'), 'public header matching CTA intact');
         const vHeader = readFileSync('components/vendor/VendorPortalHeader.tsx', 'utf8');
         assertTrue(vHeader.includes('Vendor Portal'), 'vendor chrome intact');
         assertFalse(vHeader.includes('qfa-'), 'admin tokens did not leak into vendor chrome');

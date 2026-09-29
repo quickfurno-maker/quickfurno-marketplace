@@ -22,6 +22,12 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
+import {
+  EXPECTED_LIVE_MIGRATION_COUNT,
+  EXPECTED_POST_RECONCILIATION_ADDITIONS,
+  POST_G1_EXTENSION_RECORDS,
+  SUPERSEDED_LEGACY_VERSIONS,
+} from "../staging/live-migration-ledger.mjs";
 
 // QF-MVP-50.7 RE-PIN: 105 -> 106, adding ONLY the SOURCE-PENDING stale-business
 // terminalization authority (20260906000000). No existing migration was changed,
@@ -48,7 +54,6 @@ const MIGRATION_COUNT_WITH_R0 = 104;
 // phase — the tree was 103 before it and 104 after it — and must not move. The LIVE
 // tree is a separate, current fact, pinned exactly and separately for the same reason
 // G1 keeps RECONCILIATION_MIGRATION_COUNT apart from MIGRATION_COUNT.
-const LIVE_MIGRATION_COUNT = 119;
 
 const rawOf = (p) => readFileSync(resolve(p), "utf8");
 /**
@@ -221,8 +226,8 @@ check("11 no application, UI or inbox source file is part of this phase", () => 
 
 // ---- 12-14. the count truth ------------------------------------------------
 
-check("12-13 R0 grew the tree by exactly one, from 103 to 104; the live tree is 119", () => {
-  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "the live tree is 119");
+check(`12-13 R0 grew the tree by exactly one, from 103 to 104; the live tree is ${EXPECTED_LIVE_MIGRATION_COUNT}`, () => {
+  eq(MIGRATIONS.length, EXPECTED_LIVE_MIGRATION_COUNT, "the live tree matches the explicit ledger");
   // Equivalent offline proof of R0's own contribution: remove this phase's single
   // migration AND every migration added after it, and what remains is exactly the 103
   // that were on main when R0 was written.
@@ -237,20 +242,21 @@ check("12-13 R0 grew the tree by exactly one, from 103 to 104; the live tree is 
   assert(withoutR0.every((f, i) => i === 0 || withoutR0[i - 1] < f), "and the set is still ordered");
 });
 
-check("14 the G1 live pin is the truthful current count", () => {
+check("14 the frozen reconciliation plus explicit extension accounts for the current live tree", () => {
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
-  assert(/const MIGRATION_COUNT = 119;/.test(g1), "G1 pins the live tree at 119");
-  // The 80.05 reconciliation count is a HISTORICAL observation and must NOT move:
-  // G1 says so itself, and the pending accounting depends on the difference.
+  assert(/const MIGRATION_COUNT = 119;/.test(g1), "G1 preserves the historical legacy pin at 119");
   assert(/const RECONCILIATION_MIGRATION_COUNT = 102;/.test(g1),
     "the 80.05 reconciliation count stays 102 — it records what THAT phase looked at");
   eq(MANIFEST.historyReconciliation.migrationCount, 102,
     "and the manifest's historical record is likewise unchanged");
-  // 104 - 102 = 2, which must be exactly the two pinned PENDING entries.
   eq(MIGRATIONS.length - MANIFEST.historyReconciliation.migrationCount,
+    EXPECTED_POST_RECONCILIATION_ADDITIONS,
+    "the live-minus-reconciliation delta matches the explicit ledger");
+  eq(EXPECTED_POST_RECONCILIATION_ADDITIONS,
     (MANIFEST.pendingPostAnchorMigrations ?? []).length +
-    (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length,
-    "every migration added since that reconciliation is accounted for as PENDING or STAGING-APPLIED");
+    (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length -
+    SUPERSEDED_LEGACY_VERSIONS.length + POST_G1_EXTENSION_RECORDS.length,
+    "legacy pending/staging-applied truth plus extension and supersession accounts for every addition");
 });
 
 // ---- 15-22. the manifest entry ---------------------------------------------
@@ -363,12 +369,16 @@ check("25 nothing here reads a database, a network or a credential", () => {
   // available to it at all.
   const self = rawOf("scripts/mvp/admin/validate-qf-mvp-82a-r0-realtime-publication.mjs");
   const imports = [...self.matchAll(/^import\s[\s\S]*?from\s+"([^"]+)";/gm)].map((m) => m[1]);
-  eq(imports.length, 3, `exactly three imports (${imports.join(", ")})`);
-  for (const spec of imports) assert(spec.startsWith("node:"), `${spec} is a Node builtin`);
+  eq(imports.length, 4, `exactly four imports (${imports.join(", ")})`);
+  const localImports = imports.filter((spec) => !spec.startsWith("node:"));
+  eq(localImports.length, 1, "exactly one local helper import");
+  eq(localImports[0], "../staging/live-migration-ledger.mjs", "the only local import is the fail-closed migration ledger");
+  for (const spec of imports.filter((entry) => entry.startsWith("node:"))) {
+    assert(["node:fs", "node:crypto", "node:path"].includes(spec), `${spec} is an approved Node builtin`);
+  }
   for (const forbidden of ["node:http", "node:https", "node:net", "node:child_process", "node:dns"]) {
     assert(!imports.includes(forbidden), `${forbidden} is not imported`);
   }
-  absent(self, /^import[\s\S]*?from\s+"(?!node:)/m, "a non-builtin import");
   // The migration itself performs no connection either; it is DDL only.
   absent(MIGRATION_SQL, /dblink|postgres_fdw|http_post|pg_net/i, "an outbound call from SQL");
 });

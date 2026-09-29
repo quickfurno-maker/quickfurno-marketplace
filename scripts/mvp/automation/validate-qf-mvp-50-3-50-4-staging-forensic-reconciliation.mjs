@@ -6,6 +6,10 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  EXPECTED_LIVE_MIGRATION_COUNT,
+  extendLegacyFilenames,
+} from "../staging/live-migration-ledger.mjs";
 
 // QF-MVP-50.7 RE-PIN: 105 -> 106, adding ONLY the SOURCE-PENDING stale-business
 // terminalization authority (20260906000000). No existing migration was changed,
@@ -51,7 +55,6 @@ const UNKNOWN_PROVENANCE = "UNKNOWN";
 // renamed, deleted or reordered. Still exact equality.
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority. Still exact equality.
-const MIGRATION_COUNT = 119;
 const PRODUCTION_ACTIVATION_FILENAME =
   "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql";
 // QF-MVP-82A-R0: the newest SOURCE-PENDING migration — Realtime publication
@@ -172,33 +175,34 @@ function validateState(state) {
     ? manifest.reconciledPostAnchorMigrations
     : null;
 
-  check("migration count is exactly 119", state.migrationFiles.length === MIGRATION_COUNT);
-  // QF-MVP-50.6 RE-PIN: the tail grows from twelve to thirteen, adding ONLY the
-  // source-only orphan cancellation authority. Still an EXACT ordered comparison.
-  // QF-MVP-40.14 RE-PIN: the tail grows from sixteen to seventeen, adding ONLY the
-  // source-only Meta transactional mapping seed + activation authority. Still an
-  // EXACT ordered comparison.
-  check("the exact final four forensic migration filenames are frozen, followed only by the later governed migrations through the Jarvis OS receipt authority",
-    same(state.migrationFiles.slice(-27),
-      [...FORENSIC_MIGRATIONS.map((migration) => migration.filename), RECOVERY_FILENAME,
-       CANARY_AUTHORITY_FILENAME, MARKETING_CONSENT_FILENAME, MATCHCORE_RANK_ORDER_FILENAME,
-       GEO_POSTGIS_SHORTLIST_FILENAME, AUDIT_LOG_REPAIR_FILENAME,
-       PRODUCTION_ACTIVATION_FILENAME, REALTIME_PUBLICATION_NAME,
-       "20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql",
-       "20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql",
-        "20260910060000_qf_mvp_40_canary_quiesce_transition.sql",
-        "20260911000000_qf_launch_security_closeout.sql",
-        "20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql",
-        "20260912040000_qf_aos_v2_intelligence.sql",
-        "20260912050000_qf_lead_generation_scope_lock.sql",
-        "20260915120000_qf_jarvis_service_availability.sql",
-        "20260917000000_aarohi_acquisition_crm_foundation.sql",
-        "20260918093000_aarohi_anisha_vendor_crm_handoff.sql",
-        "20260918120000_whatsapp_conversational_jarvis_foundation.sql",
-        "20260918180500_jarvis_whatsapp_callback_replay_receipts.sql",
-        "20260919010000_vendor_review_system.sql",
-        "20260922120000_false_ceiling_category.sql",
-        "20260924183000_jarvis_os_operator_command_receipts.sql"]));
+  check(`migration count is exactly ${EXPECTED_LIVE_MIGRATION_COUNT}`,
+    state.migrationFiles.length === EXPECTED_LIVE_MIGRATION_COUNT);
+  const expectedMigrationTail = extendLegacyFilenames(
+    [...FORENSIC_MIGRATIONS.map((migration) => migration.filename), RECOVERY_FILENAME,
+     CANARY_AUTHORITY_FILENAME, MARKETING_CONSENT_FILENAME, MATCHCORE_RANK_ORDER_FILENAME,
+     GEO_POSTGIS_SHORTLIST_FILENAME, AUDIT_LOG_REPAIR_FILENAME,
+     PRODUCTION_ACTIVATION_FILENAME, REALTIME_PUBLICATION_NAME,
+     "20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql",
+     "20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql",
+     "20260910060000_qf_mvp_40_canary_quiesce_transition.sql",
+     "20260911000000_qf_launch_security_closeout.sql",
+     "20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql",
+     "20260912040000_qf_aos_v2_intelligence.sql",
+     "20260912050000_qf_lead_generation_scope_lock.sql",
+     "20260915120000_qf_jarvis_service_availability.sql",
+     "20260917000000_aarohi_acquisition_crm_foundation.sql",
+     "20260918093000_aarohi_anisha_vendor_crm_handoff.sql",
+     "20260918120000_whatsapp_conversational_jarvis_foundation.sql",
+     "20260918180500_jarvis_whatsapp_callback_replay_receipts.sql",
+     "20260919010000_vendor_review_system.sql",
+     "20260922120000_false_ceiling_category.sql",
+     "20260924183000_jarvis_os_operator_command_receipts.sql"],
+  );
+  check("the forensic migration tail plus the explicit post-G1 extension is exact",
+    same(
+      state.migrationFiles.slice(-expectedMigrationTail.length),
+      expectedMigrationTail,
+    ));
   check("all four accepted source hashes are exact",
     FORENSIC_MIGRATIONS.every((migration) => state.sourceHashes[migration.version] === migration.sha));
 

@@ -16,8 +16,16 @@ export type JarvisWhatsAppGatewayResult =
   | { readonly ok: true; readonly status: "accepted" }
   | { readonly ok: false; readonly reason: "disabled" | "config_missing" | "unavailable" | "refused" };
 
+function qualificationEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.QF_JARVIS_RIYA_QUALIFICATION_ENABLED?.trim().toLowerCase() === "true";
+}
+function conversationEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.QF_JARVIS_WHATSAPP_ENABLED?.trim().toLowerCase() === "true";
+}
+function turnEnabled(purpose: QfjWhatsAppTurnV1["turnPurpose"], env: NodeJS.ProcessEnv): boolean {
+  return purpose === "lead_qualification" ? qualificationEnabled(env) : conversationEnabled(env);
+}
 function gatewayConfig(env: NodeJS.ProcessEnv = process.env) {
-  if (env.QF_JARVIS_WHATSAPP_ENABLED?.trim().toLowerCase() !== "true") return null;
   const baseUrl = env.QF_JARVIS_BASE_URL?.trim();
   const keyId = env.QF_JARVIS_SIGNING_KEY_ID?.trim();
   const privateKeyPem = resolveJarvisSigningPrivateKey(env);
@@ -34,7 +42,7 @@ export async function sendJarvisWhatsAppTurn(
   input: Omit<QfjWhatsAppTurnV1,"protocol"|"version"|"caller"|"audience">,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<JarvisWhatsAppGatewayResult> {
-  if (env.QF_JARVIS_WHATSAPP_ENABLED?.trim().toLowerCase() !== "true") return { ok: false, reason: "disabled" };
+  if (!turnEnabled(input.turnPurpose ?? "conversation", env)) return { ok: false, reason: "disabled" };
   const cfg = gatewayConfig(env);
   if (!cfg) return { ok: false, reason: "config_missing" };
   const turn = buildQfjWhatsAppTurn(input);
@@ -65,15 +73,20 @@ export async function sendJarvisWhatsAppTurn(
 }
 
 export async function dispatchNextJarvisWhatsAppTurn(): Promise<{ processed: boolean; status: string }> {
-  if (process.env.QF_JARVIS_WHATSAPP_ENABLED?.trim().toLowerCase() !== "true") {
+  const genericOn = conversationEnabled();
+  const qualificationOn = qualificationEnabled();
+  if (!genericOn && !qualificationOn) {
     return { processed: false, status: "disabled" };
   }
   const now = new Date().toISOString();
-  const { data: rows } = await adminClient()
+  let query = adminClient()
     .from("communication_jarvis_turn_outbox")
     .select("id")
     .in("status", ["pending", "retry_scheduled"])
-    .or(`next_retry_at.is.null,next_retry_at.lte.${now}`)
+    .or(`next_retry_at.is.null,next_retry_at.lte.${now}`);
+  if (!genericOn && qualificationOn) query = query.eq("turn_purpose", "lead_qualification");
+  if (genericOn && !qualificationOn) query = query.eq("turn_purpose", "conversation");
+  const { data: rows } = await query
     .order("created_at", { ascending: true })
     .limit(1);
   const id = Array.isArray(rows) && rows.length ? rows[0]?.id : null;
@@ -98,11 +111,17 @@ export async function dispatchNextJarvisWhatsAppTurn(): Promise<{ processed: boo
       .maybeSingle(),
   ]);
 
+  const qualificationTurn = claimed.turn_purpose === "lead_qualification";
+  const laneValid = qualificationTurn
+    ? qualificationOn &&
+      claimed.assigned_actor === "RIYA" &&
+      typeof claimed.qualification_request_id === "string"
+    : genericOn && conversation?.jarvis_enabled === true;
   if (
     !conversation || !inbound ||
     conversation.state !== "OPEN" ||
     conversation.human_takeover === true ||
-    conversation.jarvis_enabled !== true ||
+    !laneValid ||
     Number(conversation.revision) !== Number(claimed.conversation_revision)
   ) {
     await adminClient().from("communication_jarvis_turn_outbox").update({
@@ -136,6 +155,10 @@ export async function dispatchNextJarvisWhatsAppTurn(): Promise<{ processed: boo
     receivedAt: inbound.received_at,
     assignedActor: claimed.assigned_actor,
     subjectType: conversation.subject_type,
+    turnPurpose: qualificationTurn ? "lead_qualification" : "conversation",
+    ...(qualificationTurn
+      ? { qualificationRequestId: String(claimed.qualification_request_id) }
+      : {}),
     ...(text ? { normalizedText: text } : {}),
   });
 

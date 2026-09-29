@@ -22,6 +22,8 @@ export interface QfjWhatsAppTurnV1 {
   readonly receivedAt: string;
   readonly assignedActor: "AAROHI" | "ANISHA" | "RIYA";
   readonly subjectType: "unknown" | "prospect" | "client" | "vendor";
+  readonly turnPurpose?: "conversation" | "lead_qualification";
+  readonly qualificationRequestId?: string;
   readonly normalizedText?: string;
 }
 

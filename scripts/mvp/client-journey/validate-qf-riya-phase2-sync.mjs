@@ -190,10 +190,18 @@ const gatewayCode = fs.readFileSync(
   path.join(root, "services/jarvisRiyaWebGatewayService.ts"),
   "utf8",
 );
+const replyRouteCode = fs.readFileSync(
+  path.join(root, "app/api/internal/jarvis/whatsapp-reply/route.ts"),
+  "utf8",
+);
+const workerLaneMigration = fs.readFileSync(
+  path.join(root, "supabase/migrations/20260929094500_qf_riya_qualification_worker_lane.sql"),
+  "utf8",
+);
 
 check("Core invokes Riya only after deterministic answer resolution fails", () => {
   const deterministic = enrichmentCode.indexOf("let answer = resolveAnswer");
-  const riya = enrichmentCode.indexOf("resolveAmbiguousTextWithRiya");
+  const riya = enrichmentCode.indexOf("enqueueRiyaQualificationTurn");
   assert.ok(deterministic >= 0 && riya > deterministic);
 });
 
@@ -206,10 +214,10 @@ check("Core restricts Riya qualification to budget timeline and standard propert
   assert.doesNotMatch(enrichmentCode, /question\.key === "area_location"[\s\S]{0,120}return "propertyType"/);
 });
 
-check("Core signs exact allowed options and revalidates proposal against them", () => {
-  assert.match(enrichmentCode, /allowedOptions = options\.map/);
-  assert.match(enrichmentCode, /allowedOptions,/);
-  assert.match(enrichmentCode, /candidate\.value === proposal\.value/);
+check("Core seals exact allowed options and revalidates callback against them", () => {
+  assert.match(enrichmentCode, /const allowedOptions = options\.map/);
+  assert.match(enrichmentCode, /qualification_request_id/);
+  assert.match(enrichmentCode, /candidate\.value === input\.value/);
 });
 
 check("Riya-derived answers remain auditable and Core-applied", () => {
@@ -225,6 +233,21 @@ check("Riya failure falls back to the deterministic Core question", () => {
 check("qualification gateway has no database or provider-send authority", () => {
   assert.doesNotMatch(gatewayCode, /adminClient|createClient|SUPABASE_SERVICE_ROLE_KEY/);
   assert.doesNotMatch(gatewayCode, /WHATSAPP_ACCESS_TOKEN|META_ACCESS_TOKEN|\/messages/);
+});
+
+check("qualification callback is independently gated from generic Jarvis WhatsApp replies", () => {
+  assert.match(replyRouteCode, /parsed\.version === 3 && !qualificationEnabled/);
+  assert.match(replyRouteCode, /parsed\.version !== 3 && !conversationEnabled/);
+  assert.match(replyRouteCode, /applyRiyaQualificationCallback/);
+  assert.match(replyRouteCode, /finalizeJarvisQualificationReplyReceipt/);
+});
+
+check("worker-lane migration is additive and constrains qualification to Riya plus callback V3", () => {
+  assert.match(workerLaneMigration, /add column if not exists turn_purpose/);
+  assert.match(workerLaneMigration, /turn_purpose in \('conversation','lead_qualification'\)/);
+  assert.match(workerLaneMigration, /assigned_actor='RIYA'/);
+  assert.match(workerLaneMigration, /request_version in \(1,2,3\)/);
+  assert.match(workerLaneMigration, /qualification_request_id is not null and finalized_at is not null/);
 });
 
 console.log(`QF Riya Phase 2 sync: ${passed}/${passed} PASS`);

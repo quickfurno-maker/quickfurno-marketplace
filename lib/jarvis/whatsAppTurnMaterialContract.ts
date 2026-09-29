@@ -19,6 +19,8 @@ export interface QfjWhatsAppAuthorityReadRequestV2 extends QfjWhatsAppAuthorityR
 export interface QfjWhatsAppBoundTurnMaterialRequestV2 extends QfjWhatsAppAuthorityReadBaseV2 {
   readonly inboundMessageId: string;
   readonly expectedRevision: number;
+  readonly turnPurpose?: "lead_qualification";
+  readonly qualificationRequestId?: string;
 }
 
 export type QfjWhatsAppTurnMaterialRequestV2 =
@@ -76,12 +78,24 @@ export function parseQfjWhatsAppTurnMaterialRequest(
     });
   }
 
-  if (!exactKeys(value, [...base, "inboundMessageId", "expectedRevision"])) return null;
+  const ordinary = exactKeys(value, [...base, "inboundMessageId", "expectedRevision"]);
+  const qualification = exactKeys(value, [
+    ...base, "inboundMessageId", "expectedRevision", "turnPurpose", "qualificationRequestId",
+  ]);
+  if (!ordinary && !qualification) return null;
   if (typeof value.inboundMessageId !== "string" || !UUID.test(value.inboundMessageId)) return null;
   if (
     typeof value.expectedRevision !== "number" ||
     !Number.isSafeInteger(value.expectedRevision) ||
     value.expectedRevision < 0
+  ) return null;
+  if (
+    qualification &&
+    (
+      value.turnPurpose !== "lead_qualification" ||
+      typeof value.qualificationRequestId !== "string" ||
+      !UUID.test(value.qualificationRequestId)
+    )
   ) return null;
 
   return Object.freeze({
@@ -95,5 +109,11 @@ export function parseQfjWhatsAppTurnMaterialRequest(
     conversationId: value.conversationId as string,
     inboundMessageId: value.inboundMessageId,
     expectedRevision: value.expectedRevision,
+    ...(qualification
+      ? {
+          turnPurpose: "lead_qualification" as const,
+          qualificationRequestId: value.qualificationRequestId as string,
+        }
+      : {}),
   });
 }

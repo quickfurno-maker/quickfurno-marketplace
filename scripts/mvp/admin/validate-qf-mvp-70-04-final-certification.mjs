@@ -20,6 +20,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { EXPECTED_LIVE_MIGRATION_COUNT } from "../staging/live-migration-ledger.mjs";
 
 // QF-MVP-50.7 RE-PIN: 105 -> 106, adding ONLY the SOURCE-PENDING stale-business
 // terminalization authority (20260906000000). No existing migration was changed,
@@ -660,7 +661,8 @@ const migrations = readdirSync(join(root, "supabase", "migrations")).filter((f) 
 // QF-MVP-80.14A RE-PIN: 102 -> 103, adding ONLY the SOURCE-PENDING Meta production
 // activation authority (20260903040000). This phase still adds no migration of its
 // own; the count is re-pinned by exact equality, never loosened.
-check("migration count is re-pinned at 119", migrations.length === 119);
+check(`migration count matches the explicit live ledger (${EXPECTED_LIVE_MIGRATION_COUNT})`,
+  migrations.length === EXPECTED_LIVE_MIGRATION_COUNT);
 check(
   "no Phase 70 migration exists",
   !migrations.some((f) => /qf_mvp_70|mvp_?70|operations_control|launch_control|launch_readiness|attention_queue/i.test(f)),

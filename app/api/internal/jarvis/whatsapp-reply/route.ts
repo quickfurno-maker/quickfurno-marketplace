@@ -10,9 +10,11 @@ import {
 import { resolveQfJarvisRuntimePolicy } from "@/lib/jarvis/runtimePolicy";
 import {
   claimJarvisWhatsAppReplyReceipt,
+  finalizeJarvisQualificationReplyReceipt,
   finalizeJarvisWhatsAppReplyReceipt,
   queueJarvisConversationReply,
 } from "@/services/conversationalWhatsAppService";
+import { applyRiyaQualificationCallback } from "@/services/leadEnrichmentInboundService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +24,7 @@ const reply = (status: number, body: unknown) =>
 
 export async function POST(request: Request): Promise<Response> {
   const policy = resolveQfJarvisRuntimePolicy();
-  if (policy.mode !== "active" || process.env.QF_JARVIS_WHATSAPP_ENABLED?.trim().toLowerCase() !== "true") {
+  if (policy.mode !== "active") {
     return reply(503, { error: "service_unavailable" });
   }
 
@@ -34,6 +36,13 @@ export async function POST(request: Request): Promise<Response> {
   try { parsedJson = JSON.parse(Buffer.from(raw).toString("utf8")); } catch { return reply(400, { error: "invalid_request" }); }
   const parsed = parseQfjWhatsAppReplyRequest(parsedJson);
   if (!parsed) return reply(400, { error: "invalid_request" });
+  const qualificationEnabled =
+    process.env.QF_JARVIS_RIYA_QUALIFICATION_ENABLED?.trim().toLowerCase() === "true";
+  const conversationEnabled =
+    process.env.QF_JARVIS_WHATSAPP_ENABLED?.trim().toLowerCase() === "true";
+  if ((parsed.version === 3 && !qualificationEnabled) || (parsed.version !== 3 && !conversationEnabled)) {
+    return reply(503, { error: "service_unavailable" });
+  }
 
   const keys = parseQfjVerificationKeys(process.env.QF_JARVIS_CORE_VERIFICATION_KEYS_JSON);
   if (!keys) return reply(503, { error: "service_unavailable" });
@@ -67,6 +76,44 @@ export async function POST(request: Request): Promise<Response> {
       });
     }
     return reply(503, { error: "service_unavailable" });
+  }
+
+  if (parsed.version === 3) {
+    const applied = await applyRiyaQualificationCallback({
+      conversationId: parsed.conversationId,
+      expectedRevision: parsed.expectedRevision,
+      inboundMessageId: parsed.inboundMessageId,
+      qualificationRequestId: parsed.qualificationRequestId,
+      target: parsed.target,
+      outcome: parsed.outcome,
+      ...(parsed.outcome === "matched" ? { value: parsed.value } : {}),
+    });
+    if (!applied.ok) {
+      const status = applied.reason === "stale_or_invalid" ? 409
+        : applied.reason === "invalid_option" ? 422
+        : 503;
+      return reply(status, {
+        protocol: QFJ_WHATSAPP_REPLY_PROTOCOL,
+        version: parsed.version,
+        requestId: parsed.requestId,
+        status: applied.reason,
+      });
+    }
+    const receipt = await finalizeJarvisQualificationReplyReceipt({
+      requestId: parsed.requestId,
+      requestDigest: claim.requestDigest,
+      idempotencyKey: parsed.idempotencyKey,
+      qualificationRequestId: applied.qualificationRequestId,
+    });
+    if (!receipt.ok) return reply(503, { error: "service_unavailable" });
+    return reply(202, {
+      protocol: QFJ_WHATSAPP_REPLY_PROTOCOL,
+      version: parsed.version,
+      requestId: parsed.requestId,
+      status: "applied",
+      qualificationRequestId: applied.qualificationRequestId,
+      providerAuthority: "quickfurno-core",
+    });
   }
 
   const queued = await queueJarvisConversationReply({

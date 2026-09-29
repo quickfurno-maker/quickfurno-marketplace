@@ -864,7 +864,7 @@ export type JarvisWhatsAppReplyClaimResult =
 
 export async function claimJarvisWhatsAppReplyReceipt(input: {
   readonly requestId: string;
-  readonly version: 1 | 2;
+  readonly version: 1 | 2 | 3;
   readonly issuedAt: string;
   readonly idempotencyKey: string;
   readonly rawBody: Uint8Array;
@@ -886,7 +886,7 @@ export async function claimJarvisWhatsAppReplyReceipt(input: {
 
   const { data: prior, error: priorError } = await db
     .from("communication_jarvis_callback_receipts")
-    .select("request_version,request_digest,idempotency_key,outbox_id")
+    .select("request_version,request_digest,idempotency_key,outbox_id,qualification_request_id")
     .eq("request_id", input.requestId)
     .maybeSingle();
   if (priorError || !prior) return { ok: false, reason: "unavailable" };
@@ -897,7 +897,7 @@ export async function claimJarvisWhatsAppReplyReceipt(input: {
   ) {
     return { ok: false, reason: "conflict" };
   }
-  if (prior.outbox_id) return { ok: false, reason: "replay" };
+  if (prior.outbox_id || prior.qualification_request_id) return { ok: false, reason: "replay" };
   return { ok: true, status: "resume", requestDigest };
 }
 
@@ -936,6 +936,51 @@ export async function finalizeJarvisWhatsAppReplyReceipt(input: {
     prior.request_digest === input.requestDigest &&
     prior.idempotency_key === input.idempotencyKey &&
     prior.outbox_id === input.outboxId
+  ) {
+    return { ok: true, status: "finalized" };
+  }
+  return { ok: false, reason: "conflict" };
+}
+
+export async function finalizeJarvisQualificationReplyReceipt(input: {
+  readonly requestId: string;
+  readonly requestDigest: string;
+  readonly idempotencyKey: string;
+  readonly qualificationRequestId: string;
+}): Promise<JarvisWhatsAppReplyFinalizeResult> {
+  const db = adminClient();
+  const finalizedAt = new Date().toISOString();
+  const { data: rows, error } = await db
+    .from("communication_jarvis_callback_receipts")
+    .update({
+      qualification_request_id: input.qualificationRequestId,
+      finalized_at: finalizedAt,
+    })
+    .eq("request_id", input.requestId)
+    .eq("request_digest", input.requestDigest)
+    .eq("idempotency_key", input.idempotencyKey)
+    .is("outbox_id", null)
+    .is("qualification_request_id", null)
+    .select("qualification_request_id");
+  if (error) return { ok: false, reason: "unavailable" };
+  if (
+    Array.isArray(rows) &&
+    rows.length === 1 &&
+    rows[0]?.qualification_request_id === input.qualificationRequestId
+  ) {
+    return { ok: true, status: "finalized" };
+  }
+  const { data: prior, error: priorError } = await db
+    .from("communication_jarvis_callback_receipts")
+    .select("request_digest,idempotency_key,outbox_id,qualification_request_id")
+    .eq("request_id", input.requestId)
+    .maybeSingle();
+  if (priorError || !prior) return { ok: false, reason: "unavailable" };
+  if (
+    prior.request_digest === input.requestDigest &&
+    prior.idempotency_key === input.idempotencyKey &&
+    !prior.outbox_id &&
+    prior.qualification_request_id === input.qualificationRequestId
   ) {
     return { ok: true, status: "finalized" };
   }

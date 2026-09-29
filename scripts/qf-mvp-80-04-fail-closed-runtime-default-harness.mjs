@@ -30,6 +30,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path, { resolve } from "node:path";
+import { EXPECTED_LIVE_MIGRATION_COUNT } from "./mvp/staging/live-migration-ledger.mjs";
 
 const outDir = resolve(".qf-80-04-build");
 rmSync(outDir, { recursive: true, force: true });
@@ -262,25 +263,15 @@ check("22 [static] this slice adds no migration and no seed", () => {
   // just defers it.
   //
   // Re-pinned to what this slice can actually claim, without losing coverage:
-  //   (1) NO migration belongs to the 80.04 slice — the real scope statement, and
-  //       true forever;
-  //   (2) the tree size still equals the ONE pinned authority for it, G1's
-  //       MIGRATION_COUNT, read from G1's source rather than duplicated here. An
-  //       unpinned migration therefore still fails this check, and it fails G1's
-  //       153 mutants first.
+  //   (1) NO migration belongs to the 80.04 slice — the real scope statement;
+  //   (2) the global tree size equals the fail-closed explicit live ledger.
   assert(
     migrations.filter((f) => /80_04/.test(f)).length === 0,
     `QF-MVP-80.04 must add no migration; found ${migrations.filter((f) => /80_04/.test(f)).join(", ")}`
   );
-  const g1 = readFileSync(
-    path.join(process.cwd(), "scripts", "mvp", "staging", "validate-qf-mvp-50-2c-s2-g1.mjs"),
-    "utf8"
-  );
-  const pinned = /const MIGRATION_COUNT = (\d+);/.exec(g1);
-  assert(pinned !== null, "G1 no longer pins a migration count");
   assert(
-    migrations.length === Number(pinned[1]),
-    `tree has ${migrations.length} migrations but G1 pins ${pinned[1]}`
+    migrations.length === EXPECTED_LIVE_MIGRATION_COUNT,
+    `tree has ${migrations.length} migrations but the explicit live ledger pins ${EXPECTED_LIVE_MIGRATION_COUNT}`
   );
 
   assert(!/upsert\(|insert\(/.test(SETTINGS_SRC.split("updateMarketplaceRuntimeSetting")[0]),

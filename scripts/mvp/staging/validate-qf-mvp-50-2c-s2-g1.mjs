@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const MANIFEST_PATH = "supabase/staging-history/qf-mvp-staging-history-manifest.json";
+const EXTENSION_PATH = "supabase/staging-history/qf-post-g1-migration-ledger-20260929.json";
 const BASELINE_PATH = "supabase/staging-baseline/20260722000100_qf_mvp_staging_baseline_269c9265.sql";
 const TARGET_PATH = "supabase/migrations/20260803000000_qf_mvp_50_2c_lead_communication_recipient.sql";
 const S1_PATH = "docs/QF-MVP-50-2C-S1-STAGING-PREFLIGHT-EVIDENCE.md";
@@ -570,6 +571,7 @@ function walk(relativeDirectory) {
 
 function loadState() {
   const manifestText = read(MANIFEST_PATH);
+  const extensionText = read(EXTENSION_PATH);
   const migrationFiles = readdirSync(path.join(ROOT, "supabase/migrations"), { withFileTypes: true })
     .filter((entry) => entry.isFile())
     .map((entry) => entry.name)
@@ -586,8 +588,16 @@ function loadState() {
     };
   });
 
+  const stagingHistoryFiles = walk("supabase/staging-history");
+  const stagingHistorySqlSha256 = Object.fromEntries(
+    stagingHistoryFiles
+      .filter((file) => file.toLowerCase().endsWith(".sql"))
+      .map((file) => [path.posix.basename(file), sha256(readFileSync(path.join(ROOT, file)))]),
+  );
+
   return {
     manifest: JSON.parse(manifestText),
+    extension: JSON.parse(extensionText),
     migrations,
     baselineExists: existsSync(path.join(ROOT, BASELINE_PATH)),
     baselineSha: sha256(readFileSync(path.join(ROOT, BASELINE_PATH))),
@@ -612,9 +622,10 @@ function loadState() {
     applicationReport: read(APPLICATION_REPORT_PATH),
     packageJson: JSON.parse(read("package.json")),
     workflow: read(WORKFLOW_PATH),
-    stagingHistoryFiles: walk("supabase/staging-history"),
+    stagingHistoryFiles,
+    stagingHistorySqlSha256,
     reconciliationDoc: read(RECONCILIATION_DOC_PATH),
-    governanceFiles: [MANIFEST_PATH, S1_PATH, GOVERNANCE_PATH, README_PATH, APPLICATION_REPORT_PATH, RECONCILIATION_DOC_PATH]
+    governanceFiles: [MANIFEST_PATH, EXTENSION_PATH, S1_PATH, GOVERNANCE_PATH, README_PATH, APPLICATION_REPORT_PATH, RECONCILIATION_DOC_PATH]
       .map((file) => ({ file, text: read(file) })),
   };
 }
@@ -623,17 +634,64 @@ function validateState(state) {
   const results = [];
   const check = (name, passed, detail = "") => results.push({ name, passed: Boolean(passed), detail });
   const manifest = state.manifest;
+  const extension = state.extension;
+  const extensionRecords = Array.isArray(extension?.records) ? extension.records : [];
+  const supersededLegacyPins = Array.isArray(extension?.supersededLegacyPins) ? extension.supersededLegacyPins : [];
+  const supersededVersions = new Set(supersededLegacyPins.map((record) => record.legacyVersion));
   const validMigrations = state.migrations.filter((record) => !record.malformed);
   const versions = validMigrations.map((record) => record.version);
   const duplicates = [...new Set(versions.filter((version, index) => versions.indexOf(version) !== index))];
   const preBaseline = validMigrations.filter((record) => record.version < BASELINE_VERSION);
   const postByVersion = new Map(manifest.postBaselineApplied.map((record) => [record.version, record]));
   const localByVersion = new Map(validMigrations.map((record) => [record.version, record]));
+  const extensionByVersion = new Map(extensionRecords.map((record) => [record.version, record]));
   const expectedPreRecords = preBaseline.map(({ version, filename, sha256: hash }) => ({ version, filename, sha256: hash }));
   const newestVersion = [...versions].sort().at(-1);
+  const currentPostAnchorOrder = [
+    ...POST_ANCHOR_ORDER.filter((version) => !supersededVersions.has(version)),
+    ...extensionRecords.map((record) => record.version),
+  ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const expectedLiveMigrationCount = MIGRATION_COUNT - supersededLegacyPins.length + extensionRecords.length;
+  const expectedCurrentPostAnchorCount = POST_ANCHOR_ORDER.length - supersededLegacyPins.length + extensionRecords.length;
 
   check("manifest parses with manifestVersion=1", manifest.manifestVersion === 1);
   check("manifest scope is source-only G1", manifest.scope?.phase === "QF-MVP-50.2C-S2-G1" && manifest.scope?.databaseMutationAuthorized === false);
+  check("post-G1 extension ledger is explicit and non-authorizing",
+    extension?.manifestVersion === 1 &&
+    extension?.purpose === "POST_G1_EXPLICIT_MIGRATION_PIN_EXTENSION" &&
+    extension?.databaseMutationAuthorized === false &&
+    extension?.productionDeploymentAuthorized === false &&
+    extension?.safety?.exactPinsRequired === true &&
+    extension?.safety?.unlistedMigrationForbidden === true &&
+    extension?.safety?.hashDriftForbidden === true &&
+    extension?.safety?.genericFutureMigrationAllowanceForbidden === true &&
+    extension?.safety?.legacyManifestRewritten === false);
+  check("post-G1 extension project identities are exact",
+    extension?.evidenceProjects?.staging?.projectRef === "uckafzuochmbvtiodmcl" &&
+    extension?.evidenceProjects?.production?.projectRef === "yqpgcsduqbxulrlzwzap");
+  check("post-G1 extension records are unique, exact and hash-pinned",
+    extensionRecords.length === 13 &&
+    new Set(extensionRecords.map((record) => record.version)).size === extensionRecords.length &&
+    extensionRecords.every((record) => {
+      const local = localByVersion.get(record.version);
+      return local?.version === record.version &&
+        local?.name === record.name &&
+        local?.filename === record.filename &&
+        record.path === `supabase/migrations/${record.filename}` &&
+        local?.sha256 === record.canonicalSha256 &&
+        record.evidence === "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29" &&
+        typeof record.exactVersionPresence?.staging === "boolean" &&
+        typeof record.exactVersionPresence?.production === "boolean";
+    }));
+  check("legacy service-availability identity is explicitly superseded",
+    supersededLegacyPins.length === 1 &&
+    supersededLegacyPins[0]?.legacyVersion === "20260915120000" &&
+    supersededLegacyPins[0]?.legacyName === "qf_jarvis_service_availability" &&
+    supersededLegacyPins[0]?.replacementVersion === "20260926035801" &&
+    supersededLegacyPins[0]?.replacementName === "qf_jarvis_service_availability_deploy" &&
+    supersededLegacyPins[0]?.replacementExactVersionPresence?.staging === true &&
+    supersededLegacyPins[0]?.replacementExactVersionPresence?.production === true &&
+    supersededLegacyPins[0]?.classification === "SUPERSEDED_SOURCE_IDENTITY_DEPLOYED_UNDER_REPLACEMENT_VERSION");
   check("migration source hash policy exists", typeof manifest.migrationSourceHashPolicy === "object" && manifest.migrationSourceHashPolicy !== null);
   check("migration source hash algorithm is sha256", manifest.migrationSourceHashPolicy?.algorithm === "sha256");
   check("migration source canonicalization is UTF8_LINE_ENDINGS_TO_LF", manifest.migrationSourceHashPolicy?.canonicalization === "UTF8_LINE_ENDINGS_TO_LF");
@@ -662,7 +720,9 @@ function validateState(state) {
   check("baseline remains undiscoverable by migration chain", manifest.baseline?.migrationChainDiscoverable === false && manifest.baseline?.normalDbPushMustNeverDiscoverBaseline === true && !manifest.baseline?.sourcePath.startsWith("supabase/migrations/"));
   check("external apply-workspace bytes are recorded unavailable", manifest.baseline?.externalApplyWorkspaceBytesRetained === false);
   check("baseline version is absent under migrations", !state.migrations.some((record) => record.version === BASELINE_VERSION));
-  check(`direct migration count is ${MIGRATION_COUNT}`, state.migrations.length === MIGRATION_COUNT, `actual=${state.migrations.length}`);
+  check(`direct migration count matches legacy pins plus explicit post-G1 extension (${expectedLiveMigrationCount})`,
+    state.migrations.length === expectedLiveMigrationCount,
+    `actual=${state.migrations.length}`);
   check("migration filenames are all well formed", state.migrations.every((record) => !record.malformed));
   check("migration timestamps have no duplicates", duplicates.length === 0, duplicates.join(","));
   check("pre-baseline source count is 68", preBaseline.length === 68, `actual=${preBaseline.length}`);
@@ -705,9 +765,12 @@ function validateState(state) {
   const stagingAppliedPins = Array.isArray(manifest.stagingAppliedPostAnchorMigrations) ? manifest.stagingAppliedPostAnchorMigrations : null;
   const appliedTruth = [...(appliedPins ?? []), ...(reconciledPins ?? [])];
 
-  check("exactly thirty-two local migrations are newer than the anchor", postAnchorLocal.length === 32, `actual=${postAnchorLocal.length}`);
-  check("the post-anchor migrations appear in exact pinned order", same(postAnchorLocal.map((record) => record.version), POST_ANCHOR_ORDER));
-  check("anchor records the same post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 32);
+  check(`exactly ${expectedCurrentPostAnchorCount} local migrations are newer than the anchor after explicit supersession/extension`,
+    postAnchorLocal.length === expectedCurrentPostAnchorCount,
+    `actual=${postAnchorLocal.length}`);
+  check("the post-anchor migrations appear in exact legacy-plus-extension pinned order",
+    same(postAnchorLocal.map((record) => record.version), currentPostAnchorOrder));
+  check("anchor preserves its historical post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 32);
   check("manifest declares exactly ten APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 10, `actual=${appliedPins?.length}`);
   check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
   check("manifest declares exactly five RECONCILED post-anchor migrations", reconciledPins !== null && reconciledPins.length === 5, `actual=${reconciledPins?.length}`);
@@ -896,14 +959,21 @@ function validateState(state) {
   // so block order no longer equals version order — but the property being asserted
   // was always "every post-anchor migration is accounted for exactly once", and that
   // is what a sorted comparison states.
-  check("applied, staging-applied and pending truth together account for every post-anchor migration, with no overlap",
+  check("legacy manifest plus explicit extension account for every post-anchor migration, with no overlap",
     appliedTruth.length === 15 &&
-    same([...appliedTruth.map((r) => r.version), ...(pendingPins ?? []).map((r) => r.version),
-          ...(stagingAppliedPins ?? []).map((r) => r.version)]
-           .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)), POST_ANCHOR_ORDER) &&
-    !(pendingPins ?? []).some((p) => appliedTruth.some((a) => a.version === p.version)) &&
+    same([
+      ...appliedTruth.map((r) => r.version),
+      ...(pendingPins ?? []).map((r) => r.version).filter((version) => !supersededVersions.has(version)),
+      ...(stagingAppliedPins ?? []).map((r) => r.version),
+      ...extensionRecords.map((r) => r.version),
+    ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)), currentPostAnchorOrder) &&
+    !(pendingPins ?? []).some((p) => !supersededVersions.has(p.version) && appliedTruth.some((a) => a.version === p.version)) &&
     !(stagingAppliedPins ?? []).some((s) => appliedTruth.some((a) => a.version === s.version)) &&
-    !(stagingAppliedPins ?? []).some((s) => (pendingPins ?? []).some((p) => p.version === s.version)));
+    !(stagingAppliedPins ?? []).some((s) => (pendingPins ?? []).some((p) => p.version === s.version)) &&
+    extensionRecords.every((e) =>
+      !appliedTruth.some((a) => a.version === e.version) &&
+      !(pendingPins ?? []).some((p) => p.version === e.version) &&
+      !(stagingAppliedPins ?? []).some((s) => s.version === e.version)));
 
   for (const expected of POST_ANCHOR_RECONCILED) {
     const label = `${expected.phase} ${expected.version}`;
@@ -947,15 +1017,31 @@ function validateState(state) {
     const local = postAnchorLocal.find((record) => record.version === expected.version);
     const pin = pendingPins?.find((record) => record.version === expected.version);
     const disk = state.postAnchorOnDisk?.[expected.version];
+    const supersession = supersededLegacyPins.find((record) => record.legacyVersion === expected.version);
+    const replacementLocal = supersession ? localByVersion.get(supersession.replacementVersion) : undefined;
+    const replacementExtension = supersession ? extensionByVersion.get(supersession.replacementVersion) : undefined;
+    const exactLegacyOrSupersededIdentity = local
+      ? local.version === expected.version && local.name === expected.name && local.filename === expected.filename
+      : supersession?.legacyName === expected.name &&
+        supersession?.legacyPath === expected.path &&
+        replacementLocal?.version === supersession.replacementVersion &&
+        replacementLocal?.name === supersession.replacementName &&
+        replacementExtension?.canonicalSha256 === supersession.replacementCanonicalSha256;
 
-    check(`${label}: local migration is exactly the pinned version/name/file`,
-      local?.version === expected.version && local?.name === expected.name && local?.filename === expected.filename);
+    check(`${label}: local migration is exactly pinned or explicitly superseded by a pinned replacement`,
+      exactLegacyOrSupersededIdentity);
     check(`${label}: manifest entry matches the pinned identity`,
       pin?.version === expected.version && pin?.name === expected.name && pin?.path === expected.path && pin?.phase === expected.phase);
-    check(`${label}: source exists and raw/canonical SHA are exact`,
-      disk?.exists === true && disk?.sha === expected.sha && disk?.canonicalSha === expected.sha);
-    check(`${label}: manifest SHA equals the on-disk SHA`,
-      pin?.sha256 === expected.sha && pin?.sha256 === local?.sha256);
+    check(`${label}: source hash is exact or supersession preserves the legacy hash and pins replacement hash`,
+      (disk?.exists === true && disk?.sha === expected.sha && disk?.canonicalSha === expected.sha) ||
+      (supersession !== undefined &&
+        disk?.exists === false &&
+        supersession.legacyCanonicalSha256 === expected.sha &&
+        replacementLocal?.sha256 === supersession.replacementCanonicalSha256 &&
+        replacementExtension?.canonicalSha256 === supersession.replacementCanonicalSha256));
+    check(`${label}: manifest SHA equals the active source identity or preserved legacy pin`,
+      pin?.sha256 === expected.sha &&
+      (pin?.sha256 === local?.sha256 || supersession?.legacyCanonicalSha256 === expected.sha));
     check(`${label}: is PENDING and is never also claimed applied`,
       pin?.operationalStatus === "PENDING" &&
       !appliedTruth.some((record) => record.version === expected.version));
@@ -1027,9 +1113,10 @@ function validateState(state) {
     manifest.historyReconciliation?.databaseMutationAuthorized === false);
   // ...and the live tree is exactly the pinned tree, one migration larger, with the
   // difference accounted for as an explicitly pinned PENDING entry and nothing else.
-  check("every migration added since that reconciliation is explicitly pinned as pending or staging-applied",
-    MIGRATION_COUNT - RECONCILIATION_MIGRATION_COUNT === POST_ANCHOR_PENDING.length + POST_ANCHOR_STAGING_APPLIED.length &&
-    state.migrations.length === MIGRATION_COUNT);
+  check("every migration added since that reconciliation is explicitly pinned by legacy truth or the post-G1 extension",
+    expectedLiveMigrationCount - RECONCILIATION_MIGRATION_COUNT ===
+      (POST_ANCHOR_PENDING.length - supersededLegacyPins.length) + POST_ANCHOR_STAGING_APPLIED.length + extensionRecords.length &&
+    state.migrations.length === expectedLiveMigrationCount);
   check("the reconciliation authorizes no production apply and names both project refs correctly",
     manifest.historyReconciliation?.productionApplyAuthorized === false &&
     manifest.historyReconciliation?.staging?.projectRef === "uckafzuochmbvtiodmcl" &&
@@ -1052,7 +1139,8 @@ function validateState(state) {
     (appliedPins ?? []).filter((record) => record.appliedByThisPhase === true).length === 1 &&
     (appliedPins ?? []).find((record) => record.appliedByThisPhase === true)?.version === "20260812000000");
   check("G1 still claims no database access of its own", manifest.evidence?.g1PerformsDatabaseAccess === false);
-  check("newest local migration is the newest pinned post-anchor migration", newestVersion === POST_ANCHOR_ORDER[POST_ANCHOR_ORDER.length - 1]);
+  check("newest local migration is the newest explicitly pinned legacy-plus-extension migration",
+    newestVersion === currentPostAnchorOrder[currentPostAnchorOrder.length - 1]);
   check("no generic future-migration allowance is granted", manifest.safety?.genericFutureMigrationAllowanceForbidden === true && manifest.safety?.postAnchorMigrationsMustBeExplicitlyPinned === true && manifest.safety?.postAnchorMigrationsRequireOwnStagingGate === true);
   check("S1 evidence file exists", state.s1Exists);
   check("S1 provenance and historical main are exact", state.s1.includes("IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD") && state.s1.includes("Not generated by G1") && state.s1.includes("e511166119703c6044a73d4629a031a6685a3415"));
@@ -1074,7 +1162,18 @@ function validateState(state) {
   check("application-report checksum correction is present", state.applicationReport.includes("Checksum provenance correction — QF-MVP-50.2C-S2-G1") && state.applicationReport.includes(BASELINE_SHA) && state.applicationReport.includes("40/40"));
   const correctionText = `${state.readme}\n${state.applicationReport}`;
   check("corrections do not positively bind external bytes to 101ac", !/external[^.\n]{0,160}(?:byte-identical|hash(?:es|ed)? to)[^.\n]{0,100}101ac/i.test(correctionText));
-  check("staging-history directory contains no SQL", state.stagingHistoryFiles.every((file) => !file.toLowerCase().endsWith(".sql")));
+  const allowedStagingHistorySqlFiles = Array.isArray(extension?.allowedStagingHistorySqlFiles)
+    ? extension.allowedStagingHistorySqlFiles
+    : [];
+  const observedStagingHistorySqlFiles = Object.entries(state.stagingHistorySqlSha256)
+    .map(([filename, sha256]) => ({ filename, sha256 }))
+    .sort((a, b) => a.filename.localeCompare(b.filename));
+  check("staging-history SQL helpers are an exact hash-pinned allowlist",
+    allowedStagingHistorySqlFiles.length === 3 &&
+    same(
+      observedStagingHistorySqlFiles,
+      [...allowedStagingHistorySqlFiles].sort((a, b) => a.filename.localeCompare(b.filename)),
+    ));
   const credentialPatterns = [
     /sbp_[A-Za-z0-9_-]{8,}/,
     /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,

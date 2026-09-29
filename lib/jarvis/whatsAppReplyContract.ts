@@ -6,9 +6,11 @@ import {
 export const QFJ_WHATSAPP_REPLY_PROTOCOL = "qfj.whatsapp.reply" as const;
 export const QFJ_WHATSAPP_REPLY_LEGACY_VERSION = 1 as const;
 export const QFJ_WHATSAPP_REPLY_VERSION = 2 as const;
+export const QFJ_WHATSAPP_REPLY_QUALIFICATION_VERSION = 3 as const;
 export const QFJ_WHATSAPP_REPLY_PATH = "/api/internal/jarvis/whatsapp-reply" as const;
 export const QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN_V1 = "qfj.whatsapp.reply.http.sig.v1" as const;
 export const QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN = "qfj.whatsapp.reply.http.sig.v2" as const;
+export const QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN_V3 = "qfj.whatsapp.reply.http.sig.v3" as const;
 
 interface QfjWhatsAppReplyBase {
   readonly protocol: typeof QFJ_WHATSAPP_REPLY_PROTOCOL;
@@ -32,7 +34,19 @@ export interface QfjWhatsAppReplyRequestV2 extends QfjWhatsAppReplyBase {
   readonly experience: QfWhatsAppExperienceV1;
 }
 
-export type QfjWhatsAppReplyRequest = QfjWhatsAppReplyRequestV1 | QfjWhatsAppReplyRequestV2;
+export interface QfjWhatsAppQualificationReplyRequestV3 extends QfjWhatsAppReplyBase {
+  readonly version: 3;
+  readonly actor: "RIYA";
+  readonly inboundMessageId: string;
+  readonly qualificationRequestId: string;
+  readonly target: "budget" | "timeline" | "propertyType";
+  readonly outcome: "matched" | "no_match";
+  readonly value?: string;
+}
+export type QfjWhatsAppReplyRequest =
+  | QfjWhatsAppReplyRequestV1
+  | QfjWhatsAppReplyRequestV2
+  | QfjWhatsAppQualificationReplyRequestV3;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,239}$/;
@@ -71,6 +85,34 @@ export function parseQfjWhatsAppReplyRequest(value: unknown): QfjWhatsAppReplyRe
       proposalId: value.proposalId as string, body: value.body.trim(), idempotencyKey: value.idempotencyKey as string,
     });
   }
+  if (value.version === 3) {
+    const common = [
+      "protocol", "version", "caller", "audience", "requestId", "issuedAt",
+      "conversationId", "expectedRevision", "proposalId", "actor",
+      "inboundMessageId", "qualificationRequestId", "target", "outcome", "idempotencyKey",
+    ];
+    const matched = value.outcome === "matched";
+    if (!exactKeys(value, matched ? [...common, "value"] : common)) return null;
+    if (
+      value.actor !== "RIYA" ||
+      typeof value.inboundMessageId !== "string" || !UUID.test(value.inboundMessageId) ||
+      typeof value.qualificationRequestId !== "string" || !UUID.test(value.qualificationRequestId) ||
+      typeof value.target !== "string" || !["budget","timeline","propertyType"].includes(value.target) ||
+      (value.outcome !== "matched" && value.outcome !== "no_match") ||
+      (matched && (typeof value.value !== "string" || value.value.length < 1 || value.value.length > 128))
+    ) return null;
+    return Object.freeze({
+      protocol: QFJ_WHATSAPP_REPLY_PROTOCOL, version: 3, caller: "qf-jarvis", audience: "quickfurno-core",
+      requestId: value.requestId as string, issuedAt: value.issuedAt as string,
+      conversationId: value.conversationId as string, expectedRevision: value.expectedRevision as number,
+      proposalId: value.proposalId as string, actor: "RIYA",
+      inboundMessageId: value.inboundMessageId, qualificationRequestId: value.qualificationRequestId,
+      target: value.target as "budget" | "timeline" | "propertyType",
+      outcome: value.outcome as "matched" | "no_match",
+      ...(matched ? { value: value.value as string } : {}),
+      idempotencyKey: value.idempotencyKey as string,
+    });
+  }
   if (value.version !== 2) return null;
   if (!exactKeys(value, [
     "protocol", "version", "caller", "audience", "requestId", "issuedAt",
@@ -87,6 +129,10 @@ export function parseQfjWhatsAppReplyRequest(value: unknown): QfjWhatsAppReplyRe
     experience, idempotencyKey: value.idempotencyKey as string,
   });
 }
-export function qfjWhatsAppReplySigningDomain(version: 1 | 2): string {
-  return version === 1 ? QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN_V1 : QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN;
+export function qfjWhatsAppReplySigningDomain(version: 1 | 2 | 3): string {
+  return version === 1
+    ? QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN_V1
+    : version === 3
+      ? QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN_V3
+      : QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN;
 }

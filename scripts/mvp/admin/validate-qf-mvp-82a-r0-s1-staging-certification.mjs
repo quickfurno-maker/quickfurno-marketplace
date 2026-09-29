@@ -24,6 +24,12 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
+import {
+  EXPECTED_LIVE_MIGRATION_COUNT,
+  EXPECTED_POST_RECONCILIATION_ADDITIONS,
+  POST_G1_EXTENSION_RECORDS,
+  SUPERSEDED_LEGACY_VERSIONS,
+} from "../staging/live-migration-ledger.mjs";
 
 // QF-MVP-50.7 RE-PIN: 105 -> 106, adding ONLY the SOURCE-PENDING stale-business
 // terminalization authority (20260906000000). No existing migration was changed,
@@ -47,7 +53,6 @@ const PRODUCTION_REF = "yqpgcsduqbxulrlzwzap";
 
 const PUBLISHED_TABLES = ["public.communication_inbound_messages", "public.communication_messages"];
 
-const LIVE_MIGRATION_COUNT = 119;
 const FROZEN_RECONCILIATION_COUNT = 102;
 
 const rawOf = (p) => readFileSync(resolve(p), "utf8");
@@ -264,7 +269,7 @@ check("17-18 no application or inbox source belongs to this phase", () => {
 });
 
 check("19-20 S1 changed no migration and added none", () => {
-  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "the tree is 119");
+  eq(MIGRATIONS.length, EXPECTED_LIVE_MIGRATION_COUNT, "the tree matches the explicit live ledger");
   eq(canonicalSha256(R0_PATH), R0_SHA, "R0 is byte-identical");
   // Exactly one R0 migration, and no S1 migration at all — which is the whole point
   // of this check: S1 was a certification phase and contributed no SQL of its own.
@@ -279,10 +284,10 @@ check("19-20 S1 changed no migration and added none", () => {
 
 // ---- 21-22. the two counts -------------------------------------------------
 
-check("21 the live source migration count is 119", () => {
-  eq(MIGRATIONS.length, LIVE_MIGRATION_COUNT, "tree");
+check(`21 the live source migration count is ${EXPECTED_LIVE_MIGRATION_COUNT}`, () => {
+  eq(MIGRATIONS.length, EXPECTED_LIVE_MIGRATION_COUNT, "tree");
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
-  assert(/const MIGRATION_COUNT = 119;/.test(g1), "and G1 still pins 119");
+  assert(/const MIGRATION_COUNT = 119;/.test(g1), "G1 preserves its historical legacy pin");
 });
 
 check("22 the frozen 80.05 reconciliation count is still 102", () => {
@@ -290,11 +295,15 @@ check("22 the frozen 80.05 reconciliation count is still 102", () => {
     "it records what THAT phase observed, not the live tree");
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
   assert(/const RECONCILIATION_MIGRATION_COUNT = 102;/.test(g1), "G1 agrees");
-  // The accounting still balances: everything added since is pending or staging-applied.
+  // The accounting still balances after explicit post-G1 pins and one superseded legacy identity.
   eq(MIGRATIONS.length - MANIFEST.historyReconciliation.migrationCount,
+    EXPECTED_POST_RECONCILIATION_ADDITIONS,
+    "live-minus-reconciliation delta matches the explicit ledger");
+  eq(EXPECTED_POST_RECONCILIATION_ADDITIONS,
     (MANIFEST.pendingPostAnchorMigrations ?? []).length +
-    (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length,
-    "119 - 102 = 17 = nine pending + eight staging-applied");
+    (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length -
+    SUPERSEDED_LEGACY_VERSIONS.length + POST_G1_EXTENSION_RECORDS.length,
+    "legacy sets plus extension and supersession account for every addition");
 });
 
 // ---- 23-26. the new vocabulary, and what it may not become -----------------

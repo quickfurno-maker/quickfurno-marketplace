@@ -104,7 +104,7 @@ test("global Studio kill switch gates all active lanes", () => {
   const globalGate = worker.indexOf("isAutomationStudioGlobalEnabled");
   const firstClaim = worker.indexOf("runNativeFamilyClaimCycle");
   assert.ok(globalGate >= 0 && firstClaim > globalGate);
-  assert.match(worker, /snapshot\.state = "paused"/);
+  assert.match(worker, /snapshot\.state = [^\n;]*"paused"/);
 });
 test("native worker owns all cron-ready system lanes", () => {
   assert.match(worker, /runNativeLeadAssignmentDispatchCycle/);

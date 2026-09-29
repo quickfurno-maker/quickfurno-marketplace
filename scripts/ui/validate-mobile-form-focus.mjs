@@ -620,7 +620,7 @@ check("31 [static] native dispatch scheduling keeps refusal observability saniti
     "the native scheduler lost bounded aggregate dispatch observability");
   assert(!/summary\.outcomes|JSON\.stringify\(summary\)|console\./.test(body),
     "the native scheduler exposes raw dispatch outcomes or logs the raw summary");
-  assert(/runNativeLeadAssignmentDispatchCycle\(cfg\.leadDispatchBatch\)/.test(NATIVE_WORKER),
+  assert(/runNativeLeadAssignmentDispatchCycle\(\s*cfg\.leadDispatchBatch\s*,?\s*\)/.test(NATIVE_WORKER),
     "the native worker no longer owns the lead-assignment dispatch schedule");
 });
 

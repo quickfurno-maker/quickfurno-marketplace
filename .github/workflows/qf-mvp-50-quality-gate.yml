@@ -99,6 +99,12 @@ jobs:
       - name: QuickFurno Native Automation Engine guard
         run: npm run test:automation-native
 
+      - name: QuickFurno conversation fast-path guard
+        run: npm run test:mvp:conversation-fastpath
+
+      - name: Build conversation transport worker
+        run: npm run build:conversation-transport
+
       - name: Automation Studio control-plane guard
         run: npm run test:automation-studio
 

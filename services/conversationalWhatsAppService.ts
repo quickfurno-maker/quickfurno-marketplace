@@ -566,6 +566,139 @@ export async function readJarvisWhatsAppTurnMaterial(input: {
   }};
 }
 
+export interface JarvisWhatsAppConversationContext {
+  readonly version: 1;
+  readonly authority: "NON_AUTHORITATIVE_CONVERSATION_CONTEXT";
+  readonly text: string;
+  readonly includedTurns: number;
+  readonly truncated: boolean;
+}
+
+type JarvisConversationContextEvent = {
+  readonly id: string;
+  readonly role: "USER" | "ASSISTANT";
+  readonly occurredAt: string;
+  readonly text: string;
+};
+
+function normalizeConversationContextText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function buildConversationContext(
+  events: readonly JarvisConversationContextEvent[],
+): JarvisWhatsAppConversationContext {
+  const ordered = [...events]
+    .filter((event) => event.text.length > 0)
+    .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt) || a.id.localeCompare(b.id))
+    .slice(-12);
+  const selected: string[] = [];
+  let chars = 0;
+  let truncated = events.length > ordered.length;
+
+  for (let index = ordered.length - 1; index >= 0; index -= 1) {
+    const event = ordered[index];
+    if (!event) continue;
+    const normalized = normalizeConversationContextText(event.text);
+    if (!normalized) continue;
+    const capped = normalized.length > 2000 ? normalized.slice(0, 2000) : normalized;
+    if (capped.length !== normalized.length) truncated = true;
+    const line = `${event.role}: ${capped}`;
+    const addition = line.length + (selected.length === 0 ? 0 : 1);
+    if (chars + addition > 4000) {
+      truncated = true;
+      continue;
+    }
+    selected.unshift(line);
+    chars += addition;
+  }
+
+  return Object.freeze({
+    version: 1 as const,
+    authority: "NON_AUTHORITATIVE_CONVERSATION_CONTEXT" as const,
+    text: selected.join("\n"),
+    includedTurns: selected.length,
+    truncated,
+  });
+}
+
+export async function readJarvisWhatsAppConversationContext(input: {
+  readonly tenantId: string;
+  readonly conversationId: string;
+  readonly inboundMessageId: string;
+  readonly expectedRevision: number;
+}): Promise<ConversationalResult<JarvisWhatsAppConversationContext>> {
+  const material = await readJarvisWhatsAppTurnMaterial(input);
+  if (!material.ok) return material;
+  if (material.value.dataClass !== "HOSTED_ALLOWED") {
+    return { ok: true, value: buildConversationContext([]) };
+  }
+
+  const [inboundResult, outboxResult] = await Promise.all([
+    adminClient()
+      .from("communication_inbound_messages")
+      .select("id,received_at,message_type,content_minimized")
+      .eq("conversation_id", input.conversationId)
+      .neq("id", input.inboundMessageId)
+      .order("received_at", { ascending: false })
+      .limit(12),
+    adminClient()
+      .from("communication_conversation_outbox")
+      .select("id,created_at,proposal_source,expected_revision,body_digest,sealed_body_ciphertext,sealed_body_nonce,sealed_body_auth_tag,encryption_key_id")
+      .eq("conversation_id", input.conversationId)
+      .lt("expected_revision", input.expectedRevision)
+      .order("created_at", { ascending: false })
+      .limit(12),
+  ]);
+  if (inboundResult.error || outboxResult.error) {
+    return { ok: false, reason: "conversation_not_found" };
+  }
+
+  const events: JarvisConversationContextEvent[] = [];
+  for (const raw of (inboundResult.data ?? []) as Record<string, unknown>[]) {
+    if (classifyQfWhatsAppDataClass(String(raw.message_type ?? "")) !== "HOSTED_ALLOWED") continue;
+    const inbound = deriveQfWhatsAppInboundMaterial({
+      messageType: raw.message_type,
+      contentMinimized: (raw.content_minimized ?? {}) as Record<string, unknown>,
+    });
+    const text = inbound.normalizedText;
+    if (!text) continue;
+    events.push({
+      id: String(raw.id ?? ""),
+      role: "USER",
+      occurredAt: String(raw.received_at ?? ""),
+      text,
+    });
+  }
+
+  for (const raw of (outboxResult.data ?? []) as Record<string, unknown>[]) {
+    if (!["JARVIS", "SYSTEM"].includes(String(raw.proposal_source ?? ""))) continue;
+    const id = String(raw.id ?? "");
+    const revision = Number(raw.expected_revision ?? -1);
+    const digest = String(raw.body_digest ?? "");
+    if (!id || revision < 0 || !/^[0-9a-f]{64}$/.test(digest)) continue;
+    const opened = openConversationValue({
+      ciphertext: String(raw.sealed_body_ciphertext ?? ""),
+      nonce: String(raw.sealed_body_nonce ?? ""),
+      authTag: String(raw.sealed_body_auth_tag ?? ""),
+      keyId: String(raw.encryption_key_id ?? ""),
+    }, conversationOutboxBodyAad(id, input.conversationId, revision, digest));
+    if (!opened.ok) continue;
+    const experience = parseSerializedQfWhatsAppExperience(opened.value);
+    if (!experience) continue;
+    const text = renderQfWhatsAppExperienceFallback(experience);
+    if (!text) continue;
+    events.push({
+      id,
+      role: "ASSISTANT",
+      occurredAt: String(raw.created_at ?? ""),
+      text,
+    });
+  }
+
+  return { ok: true, value: buildConversationContext(events) };
+}
+
 type ConversationProposalSource = "JARVIS" | "SYSTEM" | "HUMAN";
 type AiConversationActor = "AAROHI" | "ANISHA" | "RIYA";
 

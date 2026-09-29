@@ -36,6 +36,10 @@ import {
   isQfjWhatsAppBoundTurnMaterialRequest,
   parseQfjWhatsAppTurnMaterialRequest,
 } from "../../../lib/jarvis/whatsAppTurnMaterialContract.ts";
+import {
+  QFJ_WHATSAPP_CONVERSATION_CONTEXT_SIGNING_DOMAIN,
+  parseQfjWhatsAppConversationContextRequest,
+} from "../../../lib/jarvis/whatsAppConversationContextContract.ts";
 
 
 const read = (p) => fs.readFileSync(p, "utf8");
@@ -45,6 +49,7 @@ const conversationService = read("services/conversationalWhatsAppService.ts");
 const gatewayService = read("services/jarvisWhatsAppGatewayService.ts");
 const replyRoute = read("app/api/internal/jarvis/whatsapp-reply/route.ts");
 const materialRoute = read("app/api/internal/jarvis/whatsapp-turn-material/route.ts");
+const contextRoute = read("app/api/internal/jarvis/whatsapp-conversation-context/route.ts");
 const authorityPolicy = read("lib/jarvis/whatsAppAuthorityPolicy.ts");
 const consentEnforcement = read("services/outboundConsentEnforcementService.ts");
 const webhookService = read("services/metaWhatsAppWebhookService.ts");
@@ -158,6 +163,25 @@ await test("WhatsApp authority/material v2 supports live state reads and exact t
   assert.equal(isQfjWhatsAppBoundTurnMaterialRequest(bound), true);
   assert.equal(parseQfjWhatsAppTurnMaterialRequest({ ...base, tenantId: "other" }), null);
   assert.equal(parseQfjWhatsAppTurnMaterialRequest({ ...base, dataClass: "HOSTED_ALLOWED" }), null);
+});
+await test("conversation context is a separately signed, revision-bound and non-authoritative read", () => {
+  assert.equal(QFJ_WHATSAPP_CONVERSATION_CONTEXT_SIGNING_DOMAIN, "qfj.whatsapp.conversation-context.http.sig.v1");
+  const request = parseQfjWhatsAppConversationContextRequest({
+    protocol: "qfj.whatsapp.conversation-context", version: 1, caller: "qf-jarvis", audience: "quickfurno-core",
+    requestId: crypto.randomUUID(), issuedAt: new Date().toISOString(), tenantId: "quickfurno",
+    conversationId: crypto.randomUUID(), inboundMessageId: crypto.randomUUID(), expectedRevision: 7,
+  });
+  assert.ok(request);
+  assert.equal(parseQfjWhatsAppConversationContextRequest({ ...request, tenantId: "other" }), null);
+  assert.match(contextRoute, /readJarvisWhatsAppConversationContext/);
+  assert.match(contextRoute, /verifyQfjSignedRequestSignature/);
+  assert.match(conversationService, /NON_AUTHORITATIVE_CONVERSATION_CONTEXT/);
+  assert.match(conversationService, /communication_inbound_messages/);
+  assert.match(conversationService, /communication_conversation_outbox/);
+  assert.match(conversationService, /openConversationValue/);
+  assert.match(conversationService, /classifyQfWhatsAppDataClass/);
+  assert.match(conversationService, /JARVIS.*SYSTEM/);
+  assert.doesNotMatch(conversationService, /communication_conversation_summary/);
 });
 await test("authority material is derived from live QuickFurno state rather than permissive constants", () => {
   assert.match(materialRoute, /readJarvisWhatsAppAuthorityState/);

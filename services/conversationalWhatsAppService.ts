@@ -73,6 +73,11 @@ function safeOccurredAt(value: string | null | undefined): Date {
   if (!Number.isFinite(ms) || ms > now + 5 * 60 * 1000) return new Date(now);
   return parsed;
 }
+function canonicalConversationInstant(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+}
 
 async function providerAccount(providerAccountId: string) {
   const { data, error } = await adminClient()
@@ -486,6 +491,9 @@ export async function readJarvisWhatsAppAuthorityState(input: {
     messageType = typeof currentInbound?.message_type === "string" ? currentInbound.message_type : null;
   }
 
+  const observedAt = canonicalConversationInstant(conversation.updated_at);
+  if (!observedAt) return { ok: false, reason: "conversation_not_sendable" };
+
   const actor = String(conversation.assigned_actor) as JarvisAuthorityActor;
   const subjectType = String(conversation.subject_type) as JarvisWhatsAppAuthorityState["subjectType"];
   const subject = await readSubjectAuthority(conversation);
@@ -511,7 +519,7 @@ export async function readJarvisWhatsAppAuthorityState(input: {
     cancelled: subject.cancelled,
     subjectStatus: subject.subjectStatus,
     ...(subject.subjectRef ? { subjectRef: subject.subjectRef } : {}),
-    observedAt: String(conversation.updated_at),
+    observedAt,
   }};
 }
 
@@ -559,11 +567,13 @@ export async function readJarvisWhatsAppTurnMaterial(input: {
     contentMinimized: (inbound.content_minimized ?? {}) as Record<string, unknown>,
   });
   const normalizedText = inboundMaterial.normalizedText;
+  const receivedAt = canonicalConversationInstant(inbound.received_at);
+  if (!receivedAt) return { ok: false, reason: "conversation_not_sendable" };
 
   return { ok: true, value: {
     ...authority.value,
     inboundMessageId: input.inboundMessageId,
-    receivedAt: String(inbound.received_at),
+    receivedAt,
     inbound: inboundMaterial,
     ...(normalizedText ? { normalizedText } : {}),
   }};

@@ -445,6 +445,13 @@ await test("QuickFurno to Jarvis gateway carries conversation facts but no provi
   assert.doesNotMatch(gatewayService, /WHATSAPP_APP_SECRET/);
   assert.doesNotMatch(gatewayService, /WHATSAPP_PHONE_NUMBER_ID/);
 });
+await test("QuickFurno material timestamps are canonicalized before Jarvis parsing", () => {
+  assert.match(conversationService, /function canonicalConversationInstant\(value: unknown\)/);
+  assert.match(conversationService, /const observedAt = canonicalConversationInstant\(conversation\.updated_at\)/);
+  assert.match(conversationService, /const receivedAt = canonicalConversationInstant\(inbound\.received_at\)/);
+  assert.doesNotMatch(conversationService, /observedAt: String\(conversation\.updated_at\)/);
+  assert.doesNotMatch(conversationService, /receivedAt: String\(inbound\.received_at\)/);
+});
 await test("Jarvis turn timestamps are canonicalized before strict gateway validation", () => {
   assert.match(gatewayService, /function canonicalInstant\(value: unknown\)/);
   assert.match(

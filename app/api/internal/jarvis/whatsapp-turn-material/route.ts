@@ -15,6 +15,7 @@ import {
   readJarvisWhatsAppTurnMaterial,
   type JarvisWhatsAppAuthorityState,
 } from "@/services/conversationalWhatsAppService";
+import { readRiyaQualificationTurnMaterial } from "@/services/leadEnrichmentInboundService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,7 +48,10 @@ function authorityResponse(requestId: string, value: JarvisWhatsAppAuthorityStat
 
 export async function POST(request: Request): Promise<Response> {
   const policy = resolveQfJarvisRuntimePolicy();
-  if (policy.mode !== "active" || process.env.QF_JARVIS_WHATSAPP_ENABLED?.trim().toLowerCase() !== "true") {
+  const genericEnabled = process.env.QF_JARVIS_WHATSAPP_ENABLED?.trim().toLowerCase() === "true";
+  const qualificationEnabled =
+    process.env.QF_JARVIS_RIYA_QUALIFICATION_ENABLED?.trim().toLowerCase() === "true";
+  if (policy.mode !== "active" || (!genericEnabled && !qualificationEnabled)) {
     return reply(503, { error: "service_unavailable" });
   }
   let raw: Uint8Array;
@@ -77,6 +81,47 @@ export async function POST(request: Request): Promise<Response> {
   if (!authenticated) return reply(401, { error: "authentication_failed" });
 
   if (isQfjWhatsAppBoundTurnMaterialRequest(parsed)) {
+    if (parsed.turnPurpose === "lead_qualification") {
+      if (!qualificationEnabled || !parsed.qualificationRequestId) {
+        return reply(503, { error: "service_unavailable" });
+      }
+      const qualification = await readRiyaQualificationTurnMaterial({
+        tenantId: parsed.tenantId,
+        conversationId: parsed.conversationId,
+        inboundMessageId: parsed.inboundMessageId,
+        expectedRevision: parsed.expectedRevision,
+        qualificationRequestId: parsed.qualificationRequestId,
+      });
+      if (!qualification.ok) {
+        return reply(qualification.reason === "stale_or_invalid" ? 409 : 503, {
+          protocol: QFJ_WHATSAPP_TURN_MATERIAL_PROTOCOL,
+          version: QFJ_WHATSAPP_TURN_MATERIAL_VERSION,
+          requestId: parsed.requestId,
+          status: qualification.reason,
+        });
+      }
+      return reply(200, {
+        protocol: QFJ_WHATSAPP_TURN_MATERIAL_PROTOCOL,
+        version: QFJ_WHATSAPP_TURN_MATERIAL_VERSION,
+        requestId: parsed.requestId,
+        tenantId: "quickfurno",
+        conversationId: qualification.value.conversationId,
+        revision: qualification.value.revision,
+        purpose: "lead_qualification",
+        assignedActor: "RIYA",
+        inboundMessageId: qualification.value.inboundMessageId,
+        receivedAt: qualification.value.receivedAt,
+        dataClass: "HOSTED_ALLOWED",
+        qualification: {
+          requestId: qualification.value.qualificationRequestId,
+          target: qualification.value.target,
+          questionText: qualification.value.questionText,
+          allowedOptions: qualification.value.allowedOptions,
+          answerText: qualification.value.answerText,
+        },
+      });
+    }
+    if (!genericEnabled) return reply(503, { error: "service_unavailable" });
     const material = await readJarvisWhatsAppTurnMaterial({
       tenantId: parsed.tenantId,
       conversationId: parsed.conversationId,

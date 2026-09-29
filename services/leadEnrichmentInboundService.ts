@@ -8,7 +8,6 @@
 // Core still owns validation, persistence, qualification and matching.
 // ============================================================================
 
-import { createHash } from "crypto";
 import { adminClient } from "@/lib/supabase";
 import { normalizeConsentCommand } from "@/lib/communication/consentCommand";
 import { leadWhatsAppDestinationHash } from "@/lib/leads/leadWhatsAppIdentity";
@@ -45,13 +44,6 @@ import { routePreferredVendorLead } from "./preferredVendorLeadService";
 import { queueSystemConversationExperience } from "./conversationalWhatsAppService";
 import { runAosV2LeadIntelligence } from "./aosV2IntelligenceService";
 import type { AosV2CoreMatchEvidence } from "@/lib/aos/v2/contracts";
-import { resolveQfJarvisRuntimePolicy } from "@/lib/jarvis/runtimePolicy";
-import { resolveJarvisSigningPrivateKey } from "@/lib/jarvis/signingPrivateKeySource";
-import type { QfjRiyaQualificationTarget } from "@/lib/jarvis/privateRiyaIngressContract";
-import {
-  sendRiyaQualificationInterpretation,
-  type JarvisRiyaWebGatewayConfig,
-} from "./jarvisRiyaWebGatewayService";
 
 const ACTIVE_REQUEST_STATUSES = [
   "preview_prepared",
@@ -59,7 +51,7 @@ const ACTIVE_REQUEST_STATUSES = [
   "expired_no_response",
 ] as const;
 const CONTROL_CHARS = /[\r\n\t]/;
-const JARVIS_ID = /^[A-Za-z0-9._:-]{1,128}$/;
+type RiyaQualificationTarget = "budget" | "timeline" | "propertyType";
 
 type ResolvedLeadEnrichmentAnswer = {
   question: ClarificationQuestion;
@@ -171,7 +163,7 @@ async function processOne(item: InboundProcessedMessage): Promise<boolean> {
 
   if (token?.kind === "start") {
     const next = firstUnansweredQuestion(questions, answered);
-    if (!next) return finalizeCompletedRequest(context, item);
+    if (!next) return finalizeCompletedRequest(context, item.receipt.inboundMessageId);
     await queueQuestion(context, item.receipt.inboundMessageId, next.index, next.question);
     return true;
   }
@@ -187,20 +179,20 @@ async function processOne(item: InboundProcessedMessage): Promise<boolean> {
   if (!answer && type === "text") {
     const next = firstUnansweredQuestion(questions, answered);
     if (next) {
-      answer = await resolveAmbiguousTextWithRiya({
+      const queued = await enqueueRiyaQualificationTurn({
         context,
         inboundMessageId: item.receipt.inboundMessageId,
         question: next.question,
         content: item.message.contentMinimized,
       });
+      if (queued) return true;
     }
   }
 
   if (!answer) {
     const next = firstUnansweredQuestion(questions, answered);
-    if (!next) return finalizeCompletedRequest(context, item);
-    // Safe fallback: when Riya is disabled, unavailable, uncertain, or returns
-    // anything outside the requested field, repeat the exact Core-authored question.
+    if (!next) return finalizeCompletedRequest(context, item.receipt.inboundMessageId);
+    // Safe fallback: qualification disabled/unavailable/not eligible -> deterministic re-ask.
     await queueQuestion(context, item.receipt.inboundMessageId, next.index, next.question);
     return true;
   }
@@ -223,7 +215,7 @@ async function processOne(item: InboundProcessedMessage): Promise<boolean> {
     return true;
   }
 
-  return finalizeCompletedRequest(context, item);
+  return finalizeCompletedRequest(context, item.receipt.inboundMessageId);
 }
 
 async function readInboundContext(inboundMessageId: string): Promise<{
@@ -510,166 +502,83 @@ function resolveAnswer(input: {
 
 function qualificationTargetForQuestion(
   question: ClarificationQuestion,
-): QfjRiyaQualificationTarget | null {
+): RiyaQualificationTarget | null {
   if (question.key === "budget") return "budget";
   if (question.key === "timeline") return "timeline";
   if (question.key === "property_type") return "propertyType";
   return null;
 }
 
-function stableJarvisQualificationId(
-  prefix: "qfqual" | "qfmsg",
-  ...parts: string[]
-): string {
-  const digest = createHash("sha256")
-    .update(parts.join("\u0000"), "utf8")
-    .digest("hex")
-    .slice(0, 32);
-  return `${prefix}:${digest}`;
-}
-
-function qualificationGatewayConfig(): JarvisRiyaWebGatewayConfig | null {
-  const baseUrl = process.env.QF_JARVIS_BASE_URL?.trim();
-  const keyId = process.env.QF_JARVIS_SIGNING_KEY_ID?.trim();
-  const privateKeyPem = resolveJarvisSigningPrivateKey();
-  if (!baseUrl || !keyId || !privateKeyPem) return null;
-  return { baseUrl, keyId, privateKeyPem, timeoutMs: 4_000 };
-}
-
-function qualificationProposalIsGrounded(
-  clientText: string,
-  proposedValue: string,
-): boolean {
-  const normalize = (value: string) =>
-    value
-      .toLowerCase()
-      .replace(/[₹,]/g, " ")
-      .replace(/[-‐-―−/]+/g, " ")
-      .replace(/[^a-z0-9\s]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-
-  const client = normalize(clientText);
-  const proposed = normalize(proposedValue);
-  if (!client || !proposed) return false;
-  if (client.includes(proposed) || proposed.includes(client)) return true;
-
-  const uncertainty =
-    /\b(not sure|not decided|undecided|depends on|need estimate|to be decided|flexible)\b/i;
-  if (uncertainty.test(clientText) && uncertainty.test(proposedValue)) {
-    return true;
-  }
-
-  const clientTokens = new Set(
-    client.split(" ").filter((token) => token.length >= 3),
-  );
-  const proposedTokens = proposed
-    .split(" ")
-    .filter((token) => token.length >= 3);
-  return proposedTokens.some((token) => clientTokens.has(token));
-}
-
-async function resolveAmbiguousTextWithRiya(input: {
+async function enqueueRiyaQualificationTurn(input: {
   context: RequestContext;
   inboundMessageId: string;
   question: ClarificationQuestion;
   content: Record<string, unknown>;
-}): Promise<ResolvedLeadEnrichmentAnswer | null> {
-  const raw =
-    typeof input.content.text === "string" ? input.content.text.trim() : "";
+}): Promise<boolean> {
+  if (process.env.QF_JARVIS_RIYA_QUALIFICATION_ENABLED?.trim().toLowerCase() !== "true") {
+    return false;
+  }
+  const raw = typeof input.content.text === "string" ? input.content.text.trim() : "";
+  const target = qualificationTargetForQuestion(input.question);
+  const options = input.question.options ?? [];
   if (
     !raw ||
     raw.length > 200 ||
     CONTROL_CHARS.test(raw) ||
-    input.question.type !== "single_choice"
+    input.question.type !== "single_choice" ||
+    !target ||
+    options.length < 2 ||
+    options.length > 12 ||
+    options.some((option) => !option.value || option.value.length > 128)
   ) {
-    return null;
+    return false;
   }
 
-  const target = qualificationTargetForQuestion(input.question);
-  const options = input.question.options ?? [];
-  if (!target || options.length < 2 || options.length > 12) return null;
-  const allowedOptions = options.map((option) => option.value);
-  if (allowedOptions.some((value) => !value || value.length > 128)) return null;
-
-  const policy = resolveQfJarvisRuntimePolicy();
+  const { data: conversation, error: conversationError } = await adminClient()
+    .from("communication_conversations")
+    .select("id,state,human_takeover,revision")
+    .eq("id", input.context.conversationId)
+    .maybeSingle();
   if (
-    policy.mode !== "active" ||
-    !policy.riyaEnabled ||
-    !policy.riyaWebTurnEnabled ||
-    !policy.riyaQualificationEnabled
+    conversationError ||
+    !conversation ||
+    conversation.state !== "OPEN" ||
+    conversation.human_takeover === true ||
+    !Number.isSafeInteger(Number(conversation.revision)) ||
+    Number(conversation.revision) < 0
   ) {
-    return null;
+    return false;
   }
 
-  const tenantId = process.env.QF_JARVIS_TENANT_ID?.trim() ?? "";
-  const config = qualificationGatewayConfig();
-  if (!config || !JARVIS_ID.test(tenantId)) return null;
+  const row = {
+    conversation_id: input.context.conversationId,
+    inbound_message_id: input.inboundMessageId,
+    conversation_revision: Number(conversation.revision),
+    assigned_actor: "RIYA",
+    turn_purpose: "lead_qualification",
+    qualification_request_id: input.context.request.id,
+    status: "pending",
+    attempt_count: 0,
+  };
+  const { error } = await adminClient()
+    .from("communication_jarvis_turn_outbox")
+    .insert(row);
+  if (!error) return true;
+  if (error.code !== "23505") return false;
 
-  const stableParts = [
-    input.context.request.id,
-    input.inboundMessageId,
-    input.question.key,
-  ];
-  const conversationId = stableJarvisQualificationId("qfqual", ...stableParts);
-  const messageId = stableJarvisQualificationId(
-    "qfmsg",
-    ...stableParts,
-    "message",
+  const { data: existing, error: existingError } = await adminClient()
+    .from("communication_jarvis_turn_outbox")
+    .select("turn_purpose,qualification_request_id,conversation_id,conversation_revision,assigned_actor")
+    .eq("inbound_message_id", input.inboundMessageId)
+    .maybeSingle();
+  if (existingError || !existing) return false;
+  return (
+    existing.turn_purpose === "lead_qualification" &&
+    existing.qualification_request_id === input.context.request.id &&
+    existing.conversation_id === input.context.conversationId &&
+    Number(existing.conversation_revision) === Number(conversation.revision) &&
+    existing.assigned_actor === "RIYA"
   );
-  const requestId = stableJarvisQualificationId(
-    "qfqual",
-    ...stableParts,
-    "request",
-  );
-  const now = new Date().toISOString();
-
-  try {
-    const interpreted = await sendRiyaQualificationInterpretation({
-      policy,
-      config,
-      request: {
-        requestId,
-        issuedAt: now,
-        tenantId,
-        conversationId,
-        messageId,
-        receivedAt: input.context.inboundReceivedAt,
-        webTurnRef: `lead-qualification:${input.inboundMessageId}`,
-        qualificationTarget: target,
-        questionText: input.question.text,
-        allowedOptions,
-        answerText: raw,
-      },
-    });
-    if (!interpreted.ok) return null;
-
-    const proposal = interpreted.response.qualificationProposal;
-    if (
-      interpreted.response.disposition !== "PROCESSED" ||
-      !proposal ||
-      proposal.field !== target ||
-      proposal.operation !== "SET" ||
-      proposal.provenance !== "user_stated" ||
-      !qualificationProposalIsGrounded(raw, proposal.value)
-    ) {
-      return null;
-    }
-
-    const option = options.find((candidate) => candidate.value === proposal.value);
-    if (!option) return null;
-
-    // Core persists only the canonical option that it supplied in the signed
-    // request. Riya never writes arbitrary model text into an authoritative field.
-    return {
-      question: input.question,
-      value: option.value,
-      label: option.label,
-      source: "riya",
-    };
-  } catch {
-    return null;
-  }
 }
 
 async function persistAnswer(input: {
@@ -835,7 +744,7 @@ async function queueExperience(
 
 async function finalizeCompletedRequest(
   context: RequestContext,
-  item: InboundProcessedMessage,
+  inboundMessageId: string,
 ): Promise<boolean> {
   const now = new Date().toISOString();
   const qualification = await recalculateStoredLeadQualification(context.lead.id);
@@ -864,7 +773,7 @@ async function finalizeCompletedRequest(
     await createEnrichmentRequestForLead(context.lead.id);
     await queueExperience(
       context.conversationId,
-      item.receipt.inboundMessageId,
+      inboundMessageId,
       buildLeadEnrichmentNeedsReviewExperience(),
     );
     return true;
@@ -913,7 +822,7 @@ async function finalizeCompletedRequest(
     void observeAosAfterEnrichment(refreshed, scored.data, null);
     await queueExperience(
       context.conversationId,
-      item.receipt.inboundMessageId,
+      inboundMessageId,
       buildLeadEnrichmentCompleteExperience(),
     );
     return true;
@@ -975,10 +884,188 @@ async function finalizeCompletedRequest(
 
   await queueExperience(
     context.conversationId,
-    item.receipt.inboundMessageId,
+    inboundMessageId,
     buildLeadEnrichmentCompleteExperience(),
   );
   return true;
+}
+
+type RiyaQualificationContext = {
+  context: RequestContext;
+  questionIndex: number;
+  question: ClarificationQuestion;
+  target: RiyaQualificationTarget;
+  allowedOptions: readonly string[];
+  answerText: string;
+};
+
+async function qualificationContext(input: {
+  conversationId: string;
+  inboundMessageId: string;
+  expectedRevision: number;
+  qualificationRequestId: string;
+}): Promise<RiyaQualificationContext | null> {
+  if (process.env.QF_JARVIS_RIYA_QUALIFICATION_ENABLED?.trim().toLowerCase() !== "true") {
+    return null;
+  }
+  const [{ data: conversation, error: conversationError }, { data: inbound, error: inboundError }] =
+    await Promise.all([
+      adminClient()
+        .from("communication_conversations")
+        .select("id,state,human_takeover,revision")
+        .eq("id", input.conversationId)
+        .maybeSingle(),
+      adminClient()
+        .from("communication_inbound_messages")
+        .select("id,conversation_id,sender_hash,received_at,content_minimized")
+        .eq("id", input.inboundMessageId)
+        .maybeSingle(),
+    ]);
+  if (
+    conversationError || inboundError || !conversation || !inbound ||
+    conversation.state !== "OPEN" ||
+    conversation.human_takeover === true ||
+    Number(conversation.revision) !== input.expectedRevision ||
+    inbound.conversation_id !== input.conversationId
+  ) return null;
+
+  const request = await readRequest(input.qualificationRequestId);
+  if (
+    !request ||
+    request.conversation_id !== input.conversationId ||
+    request.destination_hash !== String(inbound.sender_hash ?? "")
+  ) return null;
+  const lead = await readEligibleLead(
+    request.lead_id,
+    request.id,
+    String(inbound.sender_hash ?? ""),
+  );
+  if (!lead) return null;
+
+  const answered = await answeredQuestionKeys(request.id);
+  const next = firstUnansweredQuestion(request.questions_json, answered);
+  if (!next || next.question.type !== "single_choice") return null;
+  const target = qualificationTargetForQuestion(next.question);
+  const options = next.question.options ?? [];
+  if (!target || options.length < 2 || options.length > 12) return null;
+  const allowedOptions = options.map((option) => option.value);
+  if (allowedOptions.some((value) => !value || value.length > 128)) return null;
+  const content =
+    inbound.content_minimized && typeof inbound.content_minimized === "object"
+      ? inbound.content_minimized as Record<string, unknown>
+      : {};
+  const answerText = typeof content.text === "string" ? content.text.trim() : "";
+  if (!answerText || answerText.length > 200 || CONTROL_CHARS.test(answerText)) return null;
+  const receivedAtMs = Date.parse(String(inbound.received_at ?? ""));
+  if (!Number.isFinite(receivedAtMs)) return null;
+
+  return {
+    context: {
+      request,
+      lead,
+      conversationId: input.conversationId,
+      inboundMessageId: input.inboundMessageId,
+      inboundReceivedAt: new Date(receivedAtMs).toISOString(),
+    },
+    questionIndex: next.index,
+    question: next.question,
+    target,
+    allowedOptions,
+    answerText,
+  };
+}
+
+export async function readRiyaQualificationTurnMaterial(input: {
+  tenantId: string;
+  conversationId: string;
+  inboundMessageId: string;
+  expectedRevision: number;
+  qualificationRequestId: string;
+}): Promise<
+  | { ok: true; value: {
+      conversationId: string;
+      revision: number;
+      inboundMessageId: string;
+      receivedAt: string;
+      target: RiyaQualificationTarget;
+      qualificationRequestId: string;
+      questionText: string;
+      allowedOptions: readonly string[];
+      answerText: string;
+    } }
+  | { ok: false; reason: "not_available" | "stale_or_invalid" }
+> {
+  if (input.tenantId !== "quickfurno") return { ok: false, reason: "not_available" };
+  const resolved = await qualificationContext(input);
+  if (!resolved) return { ok: false, reason: "stale_or_invalid" };
+  return {
+    ok: true,
+    value: {
+      conversationId: input.conversationId,
+      revision: input.expectedRevision,
+      inboundMessageId: input.inboundMessageId,
+      receivedAt: resolved.context.inboundReceivedAt,
+      target: resolved.target,
+      qualificationRequestId: input.qualificationRequestId,
+      questionText: resolved.question.text,
+      allowedOptions: resolved.allowedOptions,
+      answerText: resolved.answerText,
+    },
+  };
+}
+
+export async function applyRiyaQualificationCallback(input: {
+  conversationId: string;
+  expectedRevision: number;
+  inboundMessageId: string;
+  qualificationRequestId: string;
+  target: RiyaQualificationTarget;
+  outcome: "matched" | "no_match";
+  value?: string;
+}): Promise<
+  | { ok: true; qualificationRequestId: string }
+  | { ok: false; reason: "stale_or_invalid" | "invalid_option" | "apply_failed" }
+> {
+  const resolved = await qualificationContext(input);
+  if (!resolved || resolved.target !== input.target) {
+    return { ok: false, reason: "stale_or_invalid" };
+  }
+  if (input.outcome === "no_match") {
+    await queueQuestion(
+      resolved.context,
+      input.inboundMessageId,
+      resolved.questionIndex,
+      resolved.question,
+    );
+    return { ok: true, qualificationRequestId: input.qualificationRequestId };
+  }
+
+  const option = resolved.question.options?.find((candidate) => candidate.value === input.value);
+  if (!option) return { ok: false, reason: "invalid_option" };
+  const persisted = await persistAnswer({
+    context: resolved.context,
+    inboundMessageId: input.inboundMessageId,
+    messageType: "text",
+    question: resolved.question,
+    answerValue: option.value,
+    answerLabel: option.label,
+    responseSource: "riya",
+  });
+  if (!persisted) return { ok: false, reason: "apply_failed" };
+
+  const after = await answeredQuestionKeys(input.qualificationRequestId);
+  const next = firstUnansweredQuestion(resolved.context.request.questions_json, after);
+  if (next) {
+    await queueQuestion(
+      resolved.context,
+      input.inboundMessageId,
+      next.index,
+      next.question,
+    );
+  } else {
+    await finalizeCompletedRequest(resolved.context, input.inboundMessageId);
+  }
+  return { ok: true, qualificationRequestId: input.qualificationRequestId };
 }
 
 async function readLead(leadId: string): Promise<LeadRow | null> {

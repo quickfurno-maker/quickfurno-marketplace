@@ -216,15 +216,15 @@ check("late replies reactivate the same expired request", () => {
   assert.match(inbound, /clarification_last_request_id/);
 });
 
-check("Phase 2 Riya interpretation is active-only and preserves Core authority", () => {
+check("Phase 2 Riya qualification lane is kill-switched and preserves Core authority", () => {
   assert.match(envExample, /QF_JARVIS_RIYA_QUALIFICATION_ENABLED=false/);
-  assert.match(inbound, /policy\.mode !== "active"/);
-  assert.match(inbound, /sendRiyaQualificationInterpretation/);
-  assert.match(inbound, /proposal\.provenance !== "user_stated"/);
-  assert.match(inbound, /allowedOptions/);
-  assert.match(inbound, /options\.find\(\(candidate\) => candidate\.value === proposal\.value\)/);
-  assert.match(inbound, /value: option\.value/);
-  assert.match(inbound, /source: "riya"/);
+  assert.match(inbound, /QF_JARVIS_RIYA_QUALIFICATION_ENABLED/);
+  assert.match(inbound, /enqueueRiyaQualificationTurn/);
+  assert.match(inbound, /turn_purpose: "lead_qualification"/);
+  assert.match(inbound, /assigned_actor: "RIYA"/);
+  assert.match(inbound, /const allowedOptions = options\.map/);
+  assert.match(inbound, /options\?\.find\(\(candidate\) => candidate\.value === input\.value\)/);
+  assert.match(inbound, /responseSource: "riya"/);
   assert.match(inbound, /response_source: input\.responseSource/);
   assert.match(inbound, /mapClarificationAnswerToLeadField/);
 });

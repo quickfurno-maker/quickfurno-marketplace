@@ -14,17 +14,34 @@ import {
 
 export type JarvisWhatsAppGatewayResult =
   | { readonly ok: true; readonly status: "accepted" }
-  | { readonly ok: false; readonly reason: "disabled" | "config_missing" | "unavailable" | "refused" };
+  | {
+      readonly ok: false;
+      readonly reason:
+        "disabled" | "config_missing" | "unavailable" | "refused";
+    };
 
 function qualificationEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.QF_JARVIS_RIYA_QUALIFICATION_ENABLED?.trim().toLowerCase() === "true";
+  return (
+    env.QF_JARVIS_RIYA_QUALIFICATION_ENABLED?.trim().toLowerCase() === "true"
+  );
 }
 function conversationEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.QF_JARVIS_WHATSAPP_ENABLED?.trim().toLowerCase() === "true";
 }
-function turnEnabled(purpose: QfjWhatsAppTurnV1["turnPurpose"], env: NodeJS.ProcessEnv): boolean {
-  return purpose === "lead_qualification" ? qualificationEnabled(env) : conversationEnabled(env);
+function turnEnabled(
+  purpose: QfjWhatsAppTurnV1["turnPurpose"],
+  env: NodeJS.ProcessEnv,
+): boolean {
+  return purpose === "lead_qualification"
+    ? qualificationEnabled(env)
+    : conversationEnabled(env);
 }
+function canonicalInstant(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+}
+
 function gatewayConfig(env: NodeJS.ProcessEnv = process.env) {
   const baseUrl = env.QF_JARVIS_BASE_URL?.trim();
   const keyId = env.QF_JARVIS_SIGNING_KEY_ID?.trim();
@@ -32,25 +49,48 @@ function gatewayConfig(env: NodeJS.ProcessEnv = process.env) {
   if (!baseUrl || !keyId || !privateKeyPem) return null;
   try {
     const url = new URL(baseUrl);
-    const loopback = ["127.0.0.1","localhost","::1"].includes(url.hostname);
-    if ((url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) || url.username || url.password || url.search || url.hash || url.pathname !== "/") return null;
+    const loopback = ["127.0.0.1", "localhost", "::1"].includes(url.hostname);
+    if (
+      (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.pathname !== "/"
+    )
+      return null;
     return { baseUrl: url.toString(), keyId, privateKeyPem };
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 export async function sendJarvisWhatsAppTurn(
-  input: Omit<QfjWhatsAppTurnV1,"protocol"|"version"|"caller"|"audience">,
+  input: Omit<
+    QfjWhatsAppTurnV1,
+    "protocol" | "version" | "caller" | "audience"
+  >,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<JarvisWhatsAppGatewayResult> {
-  if (!turnEnabled(input.turnPurpose ?? "conversation", env)) return { ok: false, reason: "disabled" };
+  if (!turnEnabled(input.turnPurpose ?? "conversation", env))
+    return { ok: false, reason: "disabled" };
   const cfg = gatewayConfig(env);
   if (!cfg) return { ok: false, reason: "config_missing" };
   const turn = buildQfjWhatsAppTurn(input);
   const body = JSON.stringify(turn);
   const raw = Buffer.from(body, "utf8");
   let signature: string;
-  try { signature = signQfjWhatsAppTurn(raw, turn.requestId, turn.issuedAt, cfg.keyId, cfg.privateKeyPem); }
-  catch { return { ok: false, reason: "config_missing" }; }
+  try {
+    signature = signQfjWhatsAppTurn(
+      raw,
+      turn.requestId,
+      turn.issuedAt,
+      cfg.keyId,
+      cfg.privateKeyPem,
+    );
+  } catch {
+    return { ok: false, reason: "config_missing" };
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5_000);
   try {
@@ -65,14 +105,22 @@ export async function sendJarvisWhatsAppTurn(
       },
       body,
     });
-    if (response.status === 202 || response.status === 200) return { ok: true, status: "accepted" };
-    if (response.status >= 400 && response.status < 500) return { ok: false, reason: "refused" };
+    if (response.status === 202 || response.status === 200)
+      return { ok: true, status: "accepted" };
+    if (response.status >= 400 && response.status < 500)
+      return { ok: false, reason: "refused" };
     return { ok: false, reason: "unavailable" };
-  } catch { return { ok: false, reason: "unavailable" }; }
-  finally { clearTimeout(timer); }
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
-export async function dispatchNextJarvisWhatsAppTurn(): Promise<{ processed: boolean; status: string }> {
+export async function dispatchNextJarvisWhatsAppTurn(): Promise<{
+  processed: boolean;
+  status: string;
+}> {
   const genericOn = conversationEnabled();
   const qualificationOn = qualificationEnabled();
   if (!genericOn && !qualificationOn) {
@@ -84,8 +132,10 @@ export async function dispatchNextJarvisWhatsAppTurn(): Promise<{ processed: boo
     .select("id")
     .in("status", ["pending", "retry_scheduled"])
     .or(`next_retry_at.is.null,next_retry_at.lte.${now}`);
-  if (!genericOn && qualificationOn) query = query.eq("turn_purpose", "lead_qualification");
-  if (genericOn && !qualificationOn) query = query.eq("turn_purpose", "conversation");
+  if (!genericOn && qualificationOn)
+    query = query.eq("turn_purpose", "lead_qualification");
+  if (genericOn && !qualificationOn)
+    query = query.eq("turn_purpose", "conversation");
   const { data: rows } = await query
     .order("created_at", { ascending: true })
     .limit(1);
@@ -104,9 +154,16 @@ export async function dispatchNextJarvisWhatsAppTurn(): Promise<{ processed: boo
   const claimed: any = claimedRows[0];
 
   const [{ data: conversation }, { data: inbound }] = await Promise.all([
-    adminClient().from("communication_conversations").select("*").eq("id", claimed.conversation_id).maybeSingle(),
-    adminClient().from("communication_inbound_messages")
-      .select("id,provider_message_id,message_type,content_minimized,received_at")
+    adminClient()
+      .from("communication_conversations")
+      .select("*")
+      .eq("id", claimed.conversation_id)
+      .maybeSingle(),
+    adminClient()
+      .from("communication_inbound_messages")
+      .select(
+        "id,provider_message_id,message_type,content_minimized,received_at",
+      )
       .eq("id", claimed.inbound_message_id)
       .maybeSingle(),
   ]);
@@ -118,23 +175,35 @@ export async function dispatchNextJarvisWhatsAppTurn(): Promise<{ processed: boo
       typeof claimed.qualification_request_id === "string"
     : genericOn && conversation?.jarvis_enabled === true;
   if (
-    !conversation || !inbound ||
+    !conversation ||
+    !inbound ||
     conversation.state !== "OPEN" ||
     conversation.human_takeover === true ||
     !laneValid ||
     Number(conversation.revision) !== Number(claimed.conversation_revision)
   ) {
-    await adminClient().from("communication_jarvis_turn_outbox").update({
-      status: "cancelled", last_safe_code: "TURN_STALE_OR_NOT_SENDABLE", completed_at: now, updated_at: now,
-    }).eq("id", claimed.id).eq("status", "claimed");
+    await adminClient()
+      .from("communication_jarvis_turn_outbox")
+      .update({
+        status: "cancelled",
+        last_safe_code: "TURN_STALE_OR_NOT_SENDABLE",
+        completed_at: now,
+        updated_at: now,
+      })
+      .eq("id", claimed.id)
+      .eq("status", "claimed");
     return { processed: true, status: "cancelled" };
   }
 
-  const text = deriveJarvisNormalizedText(
-    String(inbound.message_type),
-    (inbound.content_minimized ?? {}) as Record<string, unknown>,
-  ) ?? undefined;
-  if (Number(claimed.attempt_count ?? 0) === 0 && typeof inbound.provider_message_id === "string") {
+  const text =
+    deriveJarvisNormalizedText(
+      String(inbound.message_type),
+      (inbound.content_minimized ?? {}) as Record<string, unknown>,
+    ) ?? undefined;
+  if (
+    Number(claimed.attempt_count ?? 0) === 0 &&
+    typeof inbound.provider_message_id === "string"
+  ) {
     try {
       await signalConversationalWhatsAppPresence({
         conversationId: conversation.id,
@@ -146,13 +215,31 @@ export async function dispatchNextJarvisWhatsAppTurn(): Promise<{ processed: boo
     }
   }
 
+  const receivedAt = canonicalInstant(inbound.received_at);
+  if (!receivedAt) {
+    const failedAt = new Date().toISOString();
+    await adminClient()
+      .from("communication_jarvis_turn_outbox")
+      .update({
+        status: "failed",
+        attempt_count: Number(claimed.attempt_count ?? 0) + 1,
+        next_retry_at: null,
+        last_safe_code: "TURN_INBOUND_TIME_INVALID",
+        completed_at: failedAt,
+        updated_at: failedAt,
+      })
+      .eq("id", claimed.id)
+      .eq("status", "claimed");
+    return { processed: true, status: "failed" };
+  }
+
   const result = await sendJarvisWhatsAppTurn({
     requestId: randomUUID(),
     issuedAt: new Date().toISOString(),
     conversationId: conversation.id,
     conversationRevision: Number(conversation.revision),
     inboundMessageId: inbound.id,
-    receivedAt: inbound.received_at,
+    receivedAt,
     assignedActor: claimed.assigned_actor,
     subjectType: conversation.subject_type,
     turnPurpose: qualificationTurn ? "lead_qualification" : "conversation",
@@ -164,36 +251,52 @@ export async function dispatchNextJarvisWhatsAppTurn(): Promise<{ processed: boo
 
   if (result.ok) {
     const completedAt = new Date().toISOString();
-    await adminClient().from("communication_jarvis_turn_outbox").update({
-      status: "accepted",
-      attempt_count: Number(claimed.attempt_count ?? 0) + 1,
-      last_safe_code: "JARVIS_TURN_ACCEPTED",
-      completed_at: completedAt,
-      updated_at: completedAt,
-    }).eq("id", claimed.id).eq("status", "claimed");
-    await adminClient().from("communication_conversation_events").insert({
-      conversation_id: conversation.id,
-      event_type: "jarvis.turn_accepted",
-      actor_type: "SYSTEM",
-      safe_summary: "QuickFurno delivered a normalized WhatsApp turn to the separate Jarvis service.",
-      reference_type: "inbound_message",
-      reference_id: inbound.id,
-      event_data: { actor: claimed.assigned_actor },
-    });
+    await adminClient()
+      .from("communication_jarvis_turn_outbox")
+      .update({
+        status: "accepted",
+        attempt_count: Number(claimed.attempt_count ?? 0) + 1,
+        last_safe_code: "JARVIS_TURN_ACCEPTED",
+        completed_at: completedAt,
+        updated_at: completedAt,
+      })
+      .eq("id", claimed.id)
+      .eq("status", "claimed");
+    await adminClient()
+      .from("communication_conversation_events")
+      .insert({
+        conversation_id: conversation.id,
+        event_type: "jarvis.turn_accepted",
+        actor_type: "SYSTEM",
+        safe_summary:
+          "QuickFurno delivered a normalized WhatsApp turn to the separate Jarvis service.",
+        reference_type: "inbound_message",
+        reference_id: inbound.id,
+        event_data: { actor: claimed.assigned_actor },
+      });
     return { processed: true, status: "accepted" };
   }
 
   const attempt = Number(claimed.attempt_count ?? 0) + 1;
   const retryable = result.reason === "unavailable" && attempt < 5;
-  const delayMs = Math.min(120_000, 5_000 * Math.pow(2, Math.max(0, attempt - 1)));
-  await adminClient().from("communication_jarvis_turn_outbox").update({
-    status: retryable ? "retry_scheduled" : "failed",
-    attempt_count: attempt,
-    next_retry_at: retryable ? new Date(Date.now() + delayMs).toISOString() : null,
-    last_safe_code: `JARVIS_TURN_${result.reason.toUpperCase()}`,
-    completed_at: retryable ? null : new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }).eq("id", claimed.id).eq("status", "claimed");
+  const delayMs = Math.min(
+    120_000,
+    5_000 * Math.pow(2, Math.max(0, attempt - 1)),
+  );
+  await adminClient()
+    .from("communication_jarvis_turn_outbox")
+    .update({
+      status: retryable ? "retry_scheduled" : "failed",
+      attempt_count: attempt,
+      next_retry_at: retryable
+        ? new Date(Date.now() + delayMs).toISOString()
+        : null,
+      last_safe_code: `JARVIS_TURN_${result.reason.toUpperCase()}`,
+      completed_at: retryable ? null : new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", claimed.id)
+    .eq("status", "claimed");
 
   return { processed: true, status: retryable ? "retry_scheduled" : "failed" };
 }

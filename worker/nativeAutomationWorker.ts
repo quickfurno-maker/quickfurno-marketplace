@@ -7,7 +7,9 @@ import type { NativeAutomationRuntimeSnapshot } from "@/services/nativeAutomatio
 
 function loadEnvironment() {
   const explicit = process.env.QF_ENV_FILE?.trim();
-  const candidates = [explicit, ".env.local", ".env.production", ".env"].filter(Boolean) as string[];
+  const candidates = [explicit, ".env.local", ".env.production", ".env"].filter(
+    Boolean,
+  ) as string[];
   for (const candidate of candidates) {
     const path = resolve(process.cwd(), candidate);
     if (!existsSync(path)) continue;
@@ -30,15 +32,19 @@ if (typeof globalThis.WebSocket === "undefined") {
 }
 
 const ENGINE_VERSION = "native-v1";
-const sleep = (ms: number) => new Promise<void>((resolveSleep) => setTimeout(resolveSleep, ms));
+const sleep = (ms: number) =>
+  new Promise<void>((resolveSleep) => setTimeout(resolveSleep, ms));
 
 async function main() {
   const runtime = await import("@/services/nativeAutomationRuntimeService");
   const engine = await import("@/services/nativeAutomationEngineService");
   const studio = await import("@/services/automationStudioService");
-  const jarvisWhatsApp = await import("@/services/jarvisWhatsAppGatewayService");
-  const conversationalWhatsApp = await import("@/services/conversationalWhatsAppService");
-  const leadEnrichmentMaintenance = await import("@/services/leadEnrichmentMaintenanceService");
+  const jarvisWhatsApp =
+    await import("@/services/jarvisWhatsAppGatewayService");
+  const conversationalWhatsApp =
+    await import("@/services/conversationalWhatsAppService");
+  const leadEnrichmentMaintenance =
+    await import("@/services/leadEnrichmentMaintenanceService");
   const cfg = runtime.getNativeAutomationRuntimeConfig();
   const startedAt = new Date().toISOString();
   let stopping = false;
@@ -46,13 +52,19 @@ async function main() {
   let nextRecoveryAt = 0;
   let nextMaintenanceAt = 0;
   let nextSystemLanesAt = 0;
+  let nextConversationTransportAt = 0;
   let nextDelayedFillAt = 0;
   const snapshot: NativeAutomationRuntimeSnapshot = {
     schemaVersion: 1 as const,
     engine: runtime.NATIVE_AUTOMATION_ENGINE_KEY,
     mode: cfg.mode,
     workerId: cfg.workerId,
-    state: cfg.mode === "shadow" ? "shadow" as const : cfg.mode === "off" ? "paused" as const : "starting" as const,
+    state:
+      cfg.mode === "shadow"
+        ? ("shadow" as const)
+        : cfg.mode === "off"
+          ? ("paused" as const)
+          : ("starting" as const),
     engineVersion: ENGINE_VERSION,
     startedAt,
     heartbeatAt: startedAt,
@@ -83,7 +95,10 @@ async function main() {
     await runtime.writeNativeAutomationRuntimeSnapshot(snapshot);
     lastHeartbeatWrite = now;
   };
-  const markResult = (lane: keyof typeof snapshot.laneLastRunAt, result: NativeAutomationCycleResult) => {
+  const markResult = (
+    lane: keyof typeof snapshot.laneLastRunAt,
+    result: NativeAutomationCycleResult,
+  ) => {
     const now = new Date().toISOString();
     snapshot.laneLastRunAt[lane] = now;
     snapshot.lastSafeCode = result.safeCode;
@@ -99,7 +114,9 @@ async function main() {
     }
   };
 
-  const stop = () => { stopping = true; };
+  const stop = () => {
+    stopping = true;
+  };
   process.once("SIGTERM", stop);
   process.once("SIGINT", stop);
 
@@ -128,19 +145,59 @@ async function main() {
         continue;
       }
 
-      const globalEnabled = await studio.isAutomationStudioGlobalEnabled();
-      if (!globalEnabled) {
-        snapshot.state = "paused";
-        await writeHeartbeat();
-        await sleep(cfg.idlePollMs);
-        continue;
+      let didWork = false;
+      const transportNow = Date.now();
+      if (transportNow >= nextConversationTransportAt) {
+        try {
+          const jarvisTurn =
+            await jarvisWhatsApp.dispatchNextJarvisWhatsAppTurn();
+          didWork ||= jarvisTurn.processed;
+        } catch (error) {
+          snapshot.state = "degraded";
+          snapshot.lastErrorAt = new Date().toISOString();
+          snapshot.lastSafeCode =
+            error instanceof Error
+              ? error.message.slice(0, 160)
+              : "JARVIS_TURN_TRANSPORT_UNKNOWN_ERROR";
+          console.error("[qf-native-automation] Jarvis turn transport failed", {
+            code: snapshot.lastSafeCode,
+          });
+        }
+        try {
+          const conversationalReply =
+            await conversationalWhatsApp.dispatchNextConversationalOutbox();
+          didWork ||= conversationalReply.processed;
+        } catch (error) {
+          snapshot.state = "degraded";
+          snapshot.lastErrorAt = new Date().toISOString();
+          snapshot.lastSafeCode =
+            error instanceof Error
+              ? error.message.slice(0, 160)
+              : "JARVIS_REPLY_TRANSPORT_UNKNOWN_ERROR";
+          console.error(
+            "[qf-native-automation] Jarvis reply transport failed",
+            {
+              code: snapshot.lastSafeCode,
+            },
+          );
+        }
+        nextConversationTransportAt = transportNow + cfg.systemLaneIntervalMs;
       }
 
-      let didWork = false;
+      const globalEnabled = await studio.isAutomationStudioGlobalEnabled();
+      if (!globalEnabled) {
+        snapshot.state = snapshot.state === "degraded" ? "degraded" : "paused";
+        await writeHeartbeat();
+        await sleep(didWork ? 50 : cfg.idlePollMs);
+        continue;
+      }
       for (const [lane, family] of familyLanes) {
         if (!(await studio.isAutomationStudioWorkflowEnabled(lane))) continue;
         for (let i = 0; i < cfg.maxDrainPerFamily && !stopping; i += 1) {
-          const result = await engine.runNativeFamilyClaimCycle({ workerId: cfg.workerId, family });
+          const result = await engine.runNativeFamilyClaimCycle({
+            workerId: cfg.workerId,
+            family,
+          });
           markResult(lane, result);
           if (result.state === "idle") break;
           didWork = true;
@@ -149,7 +206,10 @@ async function main() {
       }
 
       const now = Date.now();
-      if (now >= nextRecoveryAt && await studio.isAutomationStudioWorkflowEnabled("recovery")) {
+      if (
+        now >= nextRecoveryAt &&
+        (await studio.isAutomationStudioWorkflowEnabled("recovery"))
+      ) {
         const recovered = await engine.runNativeRecoveryCycle(cfg.workerId);
         markResult("recovery", recovered);
         didWork ||= recovered.state !== "idle";
@@ -157,26 +217,26 @@ async function main() {
       }
 
       if (now >= nextSystemLanesAt) {
-        const dispatched = await engine.runNativeLeadAssignmentDispatchCycle(cfg.leadDispatchBatch);
+        const dispatched = await engine.runNativeLeadAssignmentDispatchCycle(
+          cfg.leadDispatchBatch,
+        );
         markResult("lead_assignment_dispatch", dispatched);
         didWork ||= dispatched.state !== "idle";
 
-        const acknowledgements = await engine.runNativeConsentAckCycle(cfg.workerId, cfg.consentAckBatch);
+        const acknowledgements = await engine.runNativeConsentAckCycle(
+          cfg.workerId,
+          cfg.consentAckBatch,
+        );
         markResult("consent_ack", acknowledgements);
         didWork ||= acknowledgements.state !== "idle";
-
-        // QuickFurno remains the transport authority. These two queues are inert
-        // unless the conversational account and Jarvis feature gates are enabled.
-        const jarvisTurn = await jarvisWhatsApp.dispatchNextJarvisWhatsAppTurn();
-        didWork ||= jarvisTurn.processed;
-        const conversationalReply = await conversationalWhatsApp.dispatchNextConversationalOutbox();
-        didWork ||= conversationalReply.processed;
 
         nextSystemLanesAt = now + cfg.systemLaneIntervalMs;
       }
 
       if (now >= nextDelayedFillAt) {
-        const delayedFill = await engine.runNativeDelayedFillCycle(cfg.delayedFillBatch);
+        const delayedFill = await engine.runNativeDelayedFillCycle(
+          cfg.delayedFillBatch,
+        );
         markResult("delayed_fill", delayedFill);
         didWork ||= delayedFill.state !== "idle";
         nextDelayedFillAt = now + cfg.delayedFillIntervalMs;
@@ -189,7 +249,9 @@ async function main() {
           didWork ||= reconciled.state !== "idle";
         }
         if (await studio.isAutomationStudioWorkflowEnabled("orphan_cleanup")) {
-          const orphaned = await engine.runNativeOrphanCleanupCycle(cfg.workerId);
+          const orphaned = await engine.runNativeOrphanCleanupCycle(
+            cfg.workerId,
+          );
           markResult("orphan_cleanup", orphaned);
           didWork ||= orphaned.state !== "idle";
         }
@@ -217,8 +279,13 @@ async function main() {
     } catch (error) {
       snapshot.state = "degraded";
       snapshot.lastErrorAt = new Date().toISOString();
-      snapshot.lastSafeCode = error instanceof Error ? error.message.slice(0, 160) : "NATIVE_WORKER_UNKNOWN_ERROR";
-      console.error("[qf-native-automation] cycle failed", { code: snapshot.lastSafeCode });
+      snapshot.lastSafeCode =
+        error instanceof Error
+          ? error.message.slice(0, 160)
+          : "NATIVE_WORKER_UNKNOWN_ERROR";
+      console.error("[qf-native-automation] cycle failed", {
+        code: snapshot.lastSafeCode,
+      });
       await writeHeartbeat(true).catch(() => undefined);
       await sleep(Math.max(cfg.idlePollMs, 5000));
     }
@@ -226,13 +293,20 @@ async function main() {
 
   snapshot.state = "stopping";
   snapshot.heartbeatAt = new Date().toISOString();
-  await runtime.writeNativeAutomationRuntimeSnapshot(snapshot).catch(() => undefined);
-  console.info("[qf-native-automation] worker stopped", { workerId: cfg.workerId });
+  await runtime
+    .writeNativeAutomationRuntimeSnapshot(snapshot)
+    .catch(() => undefined);
+  console.info("[qf-native-automation] worker stopped", {
+    workerId: cfg.workerId,
+  });
 }
 
 main().catch((error) => {
   console.error("[qf-native-automation] fatal startup failure", {
-    code: error instanceof Error ? error.message.slice(0, 160) : "NATIVE_WORKER_FATAL",
+    code:
+      error instanceof Error
+        ? error.message.slice(0, 160)
+        : "NATIVE_WORKER_FATAL",
   });
   process.exitCode = 1;
 });

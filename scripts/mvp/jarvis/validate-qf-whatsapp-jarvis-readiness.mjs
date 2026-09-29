@@ -41,25 +41,45 @@ import {
   parseQfjWhatsAppConversationContextRequest,
 } from "../../../lib/jarvis/whatsAppConversationContextContract.ts";
 
-
 const read = (p) => fs.readFileSync(p, "utf8");
-const migration = read("supabase/migrations/20260918120000_whatsapp_conversational_jarvis_foundation.sql");
-const sharedNumberMigration = read("supabase/migrations/20260929154156_shared_single_number_jarvis_access.sql");
-const callbackReplayMigration = read("supabase/migrations/20260918180500_jarvis_whatsapp_callback_replay_receipts.sql");
+const migration = read(
+  "supabase/migrations/20260918120000_whatsapp_conversational_jarvis_foundation.sql",
+);
+const sharedNumberMigration = read(
+  "supabase/migrations/20260929154156_shared_single_number_jarvis_access.sql",
+);
+const callbackReplayMigration = read(
+  "supabase/migrations/20260918180500_jarvis_whatsapp_callback_replay_receipts.sql",
+);
 const conversationService = read("services/conversationalWhatsAppService.ts");
 const gatewayService = read("services/jarvisWhatsAppGatewayService.ts");
+const automationWorker = read("worker/nativeAutomationWorker.ts");
 const replyRoute = read("app/api/internal/jarvis/whatsapp-reply/route.ts");
-const materialRoute = read("app/api/internal/jarvis/whatsapp-turn-material/route.ts");
-const contextRoute = read("app/api/internal/jarvis/whatsapp-conversation-context/route.ts");
+const materialRoute = read(
+  "app/api/internal/jarvis/whatsapp-turn-material/route.ts",
+);
+const contextRoute = read(
+  "app/api/internal/jarvis/whatsapp-conversation-context/route.ts",
+);
 const authorityPolicy = read("lib/jarvis/whatsAppAuthorityPolicy.ts");
-const consentEnforcement = read("services/outboundConsentEnforcementService.ts");
+const consentEnforcement = read(
+  "services/outboundConsentEnforcementService.ts",
+);
 const webhookService = read("services/metaWhatsAppWebhookService.ts");
-const metaProviderSource = read("lib/communication/providers/metaCloudWhatsAppProvider.ts");
+const metaProviderSource = read(
+  "lib/communication/providers/metaCloudWhatsAppProvider.ts",
+);
 
 let passed = 0;
 const test = async (name, fn) => {
-  try { await fn(); passed += 1; console.log("PASS", name); }
-  catch (e) { console.error("FAIL", name); throw e; }
+  try {
+    await fn();
+    passed += 1;
+    console.log("PASS", name);
+  } catch (e) {
+    console.error("FAIL", name);
+    throw e;
+  }
 };
 
 await test("core provider account is explicitly protected from Jarvis", () => {
@@ -68,16 +88,31 @@ await test("core provider account is explicitly protected from Jarvis", () => {
   assert.match(migration, /jarvis_access_mode='denied'/);
 });
 await test("conversational provider accounts are proposal-only, never Jarvis-owned", () => {
-  assert.match(migration, /account_role in \('transactional','conversational'\)/);
+  assert.match(
+    migration,
+    /account_role in \('transactional','conversational'\)/,
+  );
   assert.match(migration, /jarvis_access_mode in \('denied','proposal_only'\)/);
-  assert.match(migration, /jarvis_access_mode='denied' or account_role='conversational'/);
+  assert.match(
+    migration,
+    /jarvis_access_mode='denied' or account_role='conversational'/,
+  );
 });
 await test("shared-number migration permits transactional provider accounts to be proposal-only", () => {
-  assert.match(sharedNumberMigration, /drop constraint if exists communication_provider_account_jarvis_role_chk/);
+  assert.match(
+    sharedNumberMigration,
+    /drop constraint if exists communication_provider_account_jarvis_role_chk/,
+  );
   assert.match(sharedNumberMigration, /jarvis_access_mode = 'proposal_only'/);
-  assert.match(sharedNumberMigration, /account_role in \('transactional','conversational'\)/);
+  assert.match(
+    sharedNumberMigration,
+    /account_role in \('transactional','conversational'\)/,
+  );
   assert.match(conversationService, /function isJarvisConversationAccount/);
-  assert.match(conversationService, /account\.jarvis_access_mode === "proposal_only"/);
+  assert.match(
+    conversationService,
+    /account\.jarvis_access_mode === "proposal_only"/,
+  );
 });
 await test("conversation state owns service-window and takeover authority", () => {
   assert.match(migration, /service_window_expires_at timestamptz/);
@@ -94,93 +129,185 @@ await test("conversation destination and reply body are sealed, not plaintext co
 });
 await test("new conversation tables are browser-denied and service-role scoped", () => {
   assert.match(migration, /alter table public\.%I enable row level security/);
-  assert.match(migration, /revoke all on public\.%I from public,anon,authenticated/);
-  assert.match(migration, /grant select,insert,update on public\.communication_conversations to service_role/);
-  assert.match(migration, /grant select,insert,update on public\.communication_conversation_outbox to service_role/);
+  assert.match(
+    migration,
+    /revoke all on public\.%I from public,anon,authenticated/,
+  );
+  assert.match(
+    migration,
+    /grant select,insert,update on public\.communication_conversations to service_role/,
+  );
+  assert.match(
+    migration,
+    /grant select,insert,update on public\.communication_conversation_outbox to service_role/,
+  );
 });
 await test("reply outbox is one-shot after a provider attempt", () => {
-  assert.match(migration, /attempt_count integer not null default 0 check \(attempt_count between 0 and 1\)/);
+  assert.match(
+    migration,
+    /attempt_count integer not null default 0 check \(attempt_count between 0 and 1\)/,
+  );
   assert.match(conversationService, /outcome_unknown/);
   assert.doesNotMatch(conversationService, /retry_scheduled/);
 });
 await test("reply outbox idempotency converges only on exact proposal identity", () => {
-  assert.match(conversationService, /select\("id,conversation_id,provider_account_id,proposal_source,proposal_id,expected_revision,body_digest"\)/);
-  assert.match(conversationService, /existing\.conversation_id === input\.conversationId/);
-  assert.match(conversationService, /existing\.provider_account_id === conversation\.provider_account_id/);
-  assert.match(conversationService, /existing\.proposal_source === input\.source/);
-  assert.match(conversationService, /existing\.proposal_id === input\.proposalId/);
-  assert.match(conversationService, /Number\(existing\.expected_revision\) === input\.expectedRevision/);
+  assert.match(
+    conversationService,
+    /select\("id,conversation_id,provider_account_id,proposal_source,proposal_id,expected_revision,body_digest"\)/,
+  );
+  assert.match(
+    conversationService,
+    /existing\.conversation_id === input\.conversationId/,
+  );
+  assert.match(
+    conversationService,
+    /existing\.provider_account_id === conversation\.provider_account_id/,
+  );
+  assert.match(
+    conversationService,
+    /existing\.proposal_source === input\.source/,
+  );
+  assert.match(
+    conversationService,
+    /existing\.proposal_id === input\.proposalId/,
+  );
+  assert.match(
+    conversationService,
+    /Number\(existing\.expected_revision\) === input\.expectedRevision/,
+  );
   assert.match(conversationService, /existing\.body_digest === digest/);
 });
 await test("24 hour service window is Core-owned and enforced at queue and dispatch", () => {
   assert.match(conversationService, /24 \* 60 \* 60 \* 1000/);
-  const occurrences = (conversationService.match(/service_window_closed/g) ?? []).length;
+  const occurrences = (
+    conversationService.match(/service_window_closed/g) ?? []
+  ).length;
   assert.ok(occurrences >= 3);
 });
 await test("human takeover and optimistic revision are rechecked before send", () => {
   assert.match(conversationService, /conversation\.human_takeover/);
-  assert.match(conversationService, /Number\(conversation\.revision\) !== Number\(claimed\.expected_revision\)/);
+  assert.match(
+    conversationService,
+    /Number\(conversation\.revision\) !== Number\(claimed\.expected_revision\)/,
+  );
 });
 await test("canonical consent authority is checked before queue and again before Meta send", () => {
-  const occurrences = (conversationService.match(/authorizeConversationalWhatsAppConsent\(/g) ?? []).length;
+  const occurrences = (
+    conversationService.match(/authorizeConversationalWhatsAppConsent\(/g) ?? []
+  ).length;
   assert.ok(occurrences >= 2);
   assert.doesNotMatch(conversationService, /activeSuppression\(/);
   assert.match(conversationService, /CONSENT_SUPPRESSED/);
   assert.match(conversationService, /CONSENT_AUTHORITY_UNAVAILABLE/);
 });
 await test("free-form conversational consent delegates to D2-C with fixed transactional scope", () => {
-  assert.match(consentEnforcement, /export async function authorizeConversationalWhatsAppConsent/);
+  assert.match(
+    consentEnforcement,
+    /export async function authorizeConversationalWhatsAppConsent/,
+  );
   assert.match(consentEnforcement, /channel:\s*"whatsapp"/);
   assert.match(consentEnforcement, /scope:\s*"transactional"/);
   assert.match(consentEnforcement, /deps\.decide/);
-  assert.doesNotMatch(consentEnforcement, /authorizeConversationalWhatsAppConsent[\s\S]{0,1800}resolveOutboundConsentScope/);
+  assert.doesNotMatch(
+    consentEnforcement,
+    /authorizeConversationalWhatsAppConsent[\s\S]{0,1800}resolveOutboundConsentScope/,
+  );
 });
 await test("Jarvis reply contracts cannot select phone, provider account, WABA or token", () => {
   const base = {
-    protocol: "qfj.whatsapp.reply", caller: "qf-jarvis", audience: "quickfurno-core",
-    requestId: crypto.randomUUID(), issuedAt: new Date().toISOString(), conversationId: crypto.randomUUID(),
-    expectedRevision: 3, proposalId: "proposal.1", idempotencyKey: "a".repeat(64),
+    protocol: "qfj.whatsapp.reply",
+    caller: "qf-jarvis",
+    audience: "quickfurno-core",
+    requestId: crypto.randomUUID(),
+    issuedAt: new Date().toISOString(),
+    conversationId: crypto.randomUUID(),
+    expectedRevision: 3,
+    proposalId: "proposal.1",
+    idempotencyKey: "a".repeat(64),
   };
   const v1 = { ...base, version: 1, body: "Hello" };
   const v2 = {
-    ...base, version: 2, actor: "RIYA",
+    ...base,
+    version: 2,
+    actor: "RIYA",
     experience: { version: 1, actor: "RIYA", kind: "text", body: "Hello" },
   };
   assert.ok(parseQfjWhatsAppReplyRequest(v1));
   assert.ok(parseQfjWhatsAppReplyRequest(v2));
-  for (const field of ["phoneNumberId","providerAccountId","wabaId","accessToken","to"]) {
+  for (const field of [
+    "phoneNumberId",
+    "providerAccountId",
+    "wabaId",
+    "accessToken",
+    "to",
+  ]) {
     assert.equal(parseQfjWhatsAppReplyRequest({ ...v1, [field]: "x" }), null);
     assert.equal(parseQfjWhatsAppReplyRequest({ ...v2, [field]: "x" }), null);
   }
 });
 await test("WhatsApp authority/material v2 supports live state reads and exact turn-bound reads", () => {
   assert.equal(QFJ_WHATSAPP_TURN_MATERIAL_VERSION, 2);
-  assert.equal(QFJ_WHATSAPP_TURN_MATERIAL_SIGNING_DOMAIN, "qfj.whatsapp.turn-material.http.sig.v2");
+  assert.equal(
+    QFJ_WHATSAPP_TURN_MATERIAL_SIGNING_DOMAIN,
+    "qfj.whatsapp.turn-material.http.sig.v2",
+  );
   const base = {
-    protocol: "qfj.whatsapp.turn-material", version: 2, caller: "qf-jarvis", audience: "quickfurno-core",
-    requestId: crypto.randomUUID(), issuedAt: new Date().toISOString(), tenantId: "quickfurno",
+    protocol: "qfj.whatsapp.turn-material",
+    version: 2,
+    caller: "qf-jarvis",
+    audience: "quickfurno-core",
+    requestId: crypto.randomUUID(),
+    issuedAt: new Date().toISOString(),
+    tenantId: "quickfurno",
     conversationId: crypto.randomUUID(),
   };
   const authority = parseQfjWhatsAppTurnMaterialRequest(base);
   assert.ok(authority);
   assert.equal(isQfjWhatsAppBoundTurnMaterialRequest(authority), false);
   const bound = parseQfjWhatsAppTurnMaterialRequest({
-    ...base, inboundMessageId: crypto.randomUUID(), expectedRevision: 7,
+    ...base,
+    inboundMessageId: crypto.randomUUID(),
+    expectedRevision: 7,
   });
   assert.ok(bound);
   assert.equal(isQfjWhatsAppBoundTurnMaterialRequest(bound), true);
-  assert.equal(parseQfjWhatsAppTurnMaterialRequest({ ...base, tenantId: "other" }), null);
-  assert.equal(parseQfjWhatsAppTurnMaterialRequest({ ...base, dataClass: "HOSTED_ALLOWED" }), null);
+  assert.equal(
+    parseQfjWhatsAppTurnMaterialRequest({ ...base, tenantId: "other" }),
+    null,
+  );
+  assert.equal(
+    parseQfjWhatsAppTurnMaterialRequest({
+      ...base,
+      dataClass: "HOSTED_ALLOWED",
+    }),
+    null,
+  );
 });
 await test("conversation context is a separately signed, revision-bound and non-authoritative read", () => {
-  assert.equal(QFJ_WHATSAPP_CONVERSATION_CONTEXT_SIGNING_DOMAIN, "qfj.whatsapp.conversation-context.http.sig.v1");
+  assert.equal(
+    QFJ_WHATSAPP_CONVERSATION_CONTEXT_SIGNING_DOMAIN,
+    "qfj.whatsapp.conversation-context.http.sig.v1",
+  );
   const request = parseQfjWhatsAppConversationContextRequest({
-    protocol: "qfj.whatsapp.conversation-context", version: 1, caller: "qf-jarvis", audience: "quickfurno-core",
-    requestId: crypto.randomUUID(), issuedAt: new Date().toISOString(), tenantId: "quickfurno",
-    conversationId: crypto.randomUUID(), inboundMessageId: crypto.randomUUID(), expectedRevision: 7,
+    protocol: "qfj.whatsapp.conversation-context",
+    version: 1,
+    caller: "qf-jarvis",
+    audience: "quickfurno-core",
+    requestId: crypto.randomUUID(),
+    issuedAt: new Date().toISOString(),
+    tenantId: "quickfurno",
+    conversationId: crypto.randomUUID(),
+    inboundMessageId: crypto.randomUUID(),
+    expectedRevision: 7,
   });
   assert.ok(request);
-  assert.equal(parseQfjWhatsAppConversationContextRequest({ ...request, tenantId: "other" }), null);
+  assert.equal(
+    parseQfjWhatsAppConversationContextRequest({
+      ...request,
+      tenantId: "other",
+    }),
+    null,
+  );
   assert.match(contextRoute, /readJarvisWhatsAppConversationContext/);
   assert.match(contextRoute, /verifyQfjSignedRequestSignature/);
   assert.match(conversationService, /NON_AUTHORITATIVE_CONVERSATION_CONTEXT/);
@@ -189,7 +316,10 @@ await test("conversation context is a separately signed, revision-bound and non-
   assert.match(conversationService, /openConversationValue/);
   assert.match(conversationService, /classifyQfWhatsAppDataClass/);
   assert.match(conversationService, /JARVIS.*SYSTEM/);
-  assert.doesNotMatch(conversationService, /communication_conversation_summary/);
+  assert.doesNotMatch(
+    conversationService,
+    /communication_conversation_summary/,
+  );
 });
 await test("authority material is derived from live QuickFurno state rather than permissive constants", () => {
   assert.match(materialRoute, /readJarvisWhatsAppAuthorityState/);
@@ -197,10 +327,16 @@ await test("authority material is derived from live QuickFurno state rather than
   assert.match(materialRoute, /revision: value\.revision/);
   assert.match(materialRoute, /subjectStatus: value\.subjectStatus/);
   assert.match(materialRoute, /jarvisAllowed: value\.jarvisAllowed/);
-  assert.doesNotMatch(conversationService, /tenantId:\s*"quickfurno\.marketplace"/);
+  assert.doesNotMatch(
+    conversationService,
+    /tenantId:\s*"quickfurno\.marketplace"/,
+  );
   assert.doesNotMatch(conversationService, /dataClass:\s*"HOSTED_ALLOWED"/);
   assert.match(conversationService, /communication_jarvis_turn_outbox/);
-  assert.match(conversationService, /inbound\.provider_message_id !== conversation\.last_inbound_provider_message_id/);
+  assert.match(
+    conversationService,
+    /inbound\.provider_message_id !== conversation\.last_inbound_provider_message_id/,
+  );
 });
 await test("processing class and subject status fail closed outside proven eligible subjects", () => {
   assert.equal(classifyQfWhatsAppDataClass("text"), "HOSTED_ALLOWED");
@@ -208,19 +344,44 @@ await test("processing class and subject status fail closed outside proven eligi
   for (const type of ["image", "document", "audio", "video", "sticker"]) {
     assert.equal(classifyQfWhatsAppDataClass(type), "LOCAL_ONLY");
   }
-  for (const type of ["location", "contact", "order", "system", "unsupported", null]) {
+  for (const type of [
+    "location",
+    "contact",
+    "order",
+    "system",
+    "unsupported",
+    null,
+  ]) {
     assert.equal(classifyQfWhatsAppDataClass(type), "HUMAN_ONLY");
   }
   assert.equal(deriveQfJarvisSubjectStatus({}), "in-progress");
-  assert.equal(deriveQfJarvisSubjectStatus({ subjectRef: crypto.randomUUID() }), "in-progress");
-  assert.equal(deriveQfJarvisSubjectStatus({ subjectRef: crypto.randomUUID(), subjectEligible: true }), "clear");
-  assert.doesNotMatch(authorityPolicy, /subjectRef === undefined\) return "clear"/);
+  assert.equal(
+    deriveQfJarvisSubjectStatus({ subjectRef: crypto.randomUUID() }),
+    "in-progress",
+  );
+  assert.equal(
+    deriveQfJarvisSubjectStatus({
+      subjectRef: crypto.randomUUID(),
+      subjectEligible: true,
+    }),
+    "clear",
+  );
+  assert.doesNotMatch(
+    authorityPolicy,
+    /subjectRef === undefined\) return "clear"/,
+  );
 });
 
 await test("Jarvis reply route is signed and feature-gated off by default", () => {
   assert.equal(QFJ_WHATSAPP_REPLY_PATH, "/api/internal/jarvis/whatsapp-reply");
-  assert.equal(QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN_V1, "qfj.whatsapp.reply.http.sig.v1");
-  assert.equal(QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN, "qfj.whatsapp.reply.http.sig.v2");
+  assert.equal(
+    QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN_V1,
+    "qfj.whatsapp.reply.http.sig.v1",
+  );
+  assert.equal(
+    QFJ_WHATSAPP_REPLY_SIGNING_DOMAIN,
+    "qfj.whatsapp.reply.http.sig.v2",
+  );
   assert.match(replyRoute, /QF_JARVIS_WHATSAPP_ENABLED/);
   assert.match(replyRoute, /policy\.mode !== "active"/);
   assert.match(replyRoute, /verifyQfjSignedRequestSignature/);
@@ -228,26 +389,52 @@ await test("Jarvis reply route is signed and feature-gated off by default", () =
 });
 
 await test("Jarvis callback replay identity is claimed before queueing and finalized after", () => {
-  assert.match(callbackReplayMigration, /create table public\.communication_jarvis_callback_receipts/);
+  assert.match(
+    callbackReplayMigration,
+    /create table public\.communication_jarvis_callback_receipts/,
+  );
   assert.match(callbackReplayMigration, /request_id uuid primary key/);
-  assert.match(callbackReplayMigration, /outbox_id uuid references public\.communication_conversation_outbox/);
+  assert.match(
+    callbackReplayMigration,
+    /outbox_id uuid references public\.communication_conversation_outbox/,
+  );
   assert.doesNotMatch(callbackReplayMigration, /outbox_id uuid not null/);
   assert.match(callbackReplayMigration, /finalized_at timestamptz/);
-  assert.match(callbackReplayMigration, /communication_jarvis_callback_receipt_finalize_chk/);
-  assert.match(callbackReplayMigration, /alter table public\.communication_jarvis_callback_receipts enable row level security/);
-  assert.match(callbackReplayMigration, /revoke all on public\.communication_jarvis_callback_receipts from public,anon,authenticated/);
-  assert.match(callbackReplayMigration, /grant select,insert,update on public\.communication_jarvis_callback_receipts to service_role/);
+  assert.match(
+    callbackReplayMigration,
+    /communication_jarvis_callback_receipt_finalize_chk/,
+  );
+  assert.match(
+    callbackReplayMigration,
+    /alter table public\.communication_jarvis_callback_receipts enable row level security/,
+  );
+  assert.match(
+    callbackReplayMigration,
+    /revoke all on public\.communication_jarvis_callback_receipts from public,anon,authenticated/,
+  );
+  assert.match(
+    callbackReplayMigration,
+    /grant select,insert,update on public\.communication_jarvis_callback_receipts to service_role/,
+  );
   assert.match(conversationService, /claimJarvisWhatsAppReplyReceipt/);
   assert.match(conversationService, /finalizeJarvisWhatsAppReplyReceipt/);
   assert.match(conversationService, /error\.code !== "23505"/);
   assert.match(conversationService, /prior\.request_digest !== requestDigest/);
-  assert.match(conversationService, /prior\.idempotency_key !== input\.idempotencyKey/);
+  assert.match(
+    conversationService,
+    /prior\.idempotency_key !== input\.idempotencyKey/,
+  );
   assert.match(conversationService, /status: "resume"/);
   const claimAt = replyRoute.indexOf("await claimJarvisWhatsAppReplyReceipt");
   const queuedAt = replyRoute.indexOf("await queueJarvisConversationReply");
-  const finalizeAt = replyRoute.indexOf("await finalizeJarvisWhatsAppReplyReceipt");
+  const finalizeAt = replyRoute.indexOf(
+    "await finalizeJarvisWhatsAppReplyReceipt",
+  );
   assert.ok(claimAt >= 0 && queuedAt > claimAt && finalizeAt > queuedAt);
-  assert.match(replyRoute, /status: claim\.reason === "replay" \? "replay_rejected" : "request_id_conflict"/);
+  assert.match(
+    replyRoute,
+    /status: claim\.reason === "replay" \? "replay_rejected" : "request_id_conflict"/,
+  );
 });
 await test("QuickFurno to Jarvis gateway carries conversation facts but no provider secrets", () => {
   assert.match(gatewayService, /QF_JARVIS_BASE_URL/);
@@ -258,56 +445,159 @@ await test("QuickFurno to Jarvis gateway carries conversation facts but no provi
   assert.doesNotMatch(gatewayService, /WHATSAPP_APP_SECRET/);
   assert.doesNotMatch(gatewayService, /WHATSAPP_PHONE_NUMBER_ID/);
 });
+await test("Jarvis turn timestamps are canonicalized before strict gateway validation", () => {
+  assert.match(gatewayService, /function canonicalInstant\(value: unknown\)/);
+  assert.match(
+    gatewayService,
+    /const receivedAt = canonicalInstant\(inbound\.received_at\)/,
+  );
+  assert.match(gatewayService, /last_safe_code: "TURN_INBOUND_TIME_INVALID"/);
+  assert.doesNotMatch(gatewayService, /receivedAt: inbound\.received_at/);
+});
+await test("Jarvis transport is independent of Automation Studio runtime availability", () => {
+  const turnTransportAt = automationWorker.indexOf(
+    "dispatchNextJarvisWhatsAppTurn()",
+  );
+  const replyTransportAt = automationWorker.indexOf(
+    "dispatchNextConversationalOutbox()",
+  );
+  const studioGateAt = automationWorker.indexOf(
+    "isAutomationStudioGlobalEnabled()",
+  );
+  assert.ok(
+    turnTransportAt >= 0 &&
+      replyTransportAt >= 0 &&
+      studioGateAt > turnTransportAt &&
+      studioGateAt > replyTransportAt,
+  );
+  assert.match(automationWorker, /JARVIS_TURN_TRANSPORT_UNKNOWN_ERROR/);
+  assert.match(automationWorker, /JARVIS_REPLY_TRANSPORT_UNKNOWN_ERROR/);
+});
 await test("Jarvis signing key source accepts exactly one bounded source and fails closed", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qf-jarvis-signing-"));
   const file = path.join(dir, "signing.pem");
   fs.writeFileSync(file, "FILE_PRIVATE_KEY\n", { mode: 0o600 });
   try {
-    assert.equal(resolveJarvisSigningPrivateKey({ QF_JARVIS_SIGNING_PRIVATE_KEY_FILE: file }), "FILE_PRIVATE_KEY");
-    assert.equal(resolveJarvisSigningPrivateKey({ QF_JARVIS_SIGNING_PRIVATE_KEY_PEM: "INLINE\\nPRIVATE" }), "INLINE\nPRIVATE");
-    assert.equal(resolveJarvisSigningPrivateKey({ QF_JARVIS_SIGNING_PRIVATE_KEY_FILE: "relative.pem" }), null);
-    assert.equal(resolveJarvisSigningPrivateKey({
-      QF_JARVIS_SIGNING_PRIVATE_KEY_FILE: file,
-      QF_JARVIS_SIGNING_PRIVATE_KEY_PEM: "INLINE",
-    }), null);
+    assert.equal(
+      resolveJarvisSigningPrivateKey({
+        QF_JARVIS_SIGNING_PRIVATE_KEY_FILE: file,
+      }),
+      "FILE_PRIVATE_KEY",
+    );
+    assert.equal(
+      resolveJarvisSigningPrivateKey({
+        QF_JARVIS_SIGNING_PRIVATE_KEY_PEM: "INLINE\\nPRIVATE",
+      }),
+      "INLINE\nPRIVATE",
+    );
+    assert.equal(
+      resolveJarvisSigningPrivateKey({
+        QF_JARVIS_SIGNING_PRIVATE_KEY_FILE: "relative.pem",
+      }),
+      null,
+    );
+    assert.equal(
+      resolveJarvisSigningPrivateKey({
+        QF_JARVIS_SIGNING_PRIVATE_KEY_FILE: file,
+        QF_JARVIS_SIGNING_PRIVATE_KEY_PEM: "INLINE",
+      }),
+      null,
+    );
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 await test("multi-account callback gate admits either exact configured identity", () => {
-  const p1 = { object:"whatsapp_business_account", entry:[{ id:"111", changes:[{ field:"messages", value:{ metadata:{ phone_number_id:"222" }}}]}]};
-  const p2 = { object:"whatsapp_business_account", entry:[{ id:"111", changes:[{ field:"messages", value:{ metadata:{ phone_number_id:"333" }}}]}]};
-  const registry = { identities:[{wabaId:"111",phoneNumberId:"222"},{wabaId:"111",phoneNumberId:"333"}] };
+  const p1 = {
+    object: "whatsapp_business_account",
+    entry: [
+      {
+        id: "111",
+        changes: [
+          {
+            field: "messages",
+            value: { metadata: { phone_number_id: "222" } },
+          },
+        ],
+      },
+    ],
+  };
+  const p2 = {
+    object: "whatsapp_business_account",
+    entry: [
+      {
+        id: "111",
+        changes: [
+          {
+            field: "messages",
+            value: { metadata: { phone_number_id: "333" } },
+          },
+        ],
+      },
+    ],
+  };
+  const registry = {
+    identities: [
+      { wabaId: "111", phoneNumberId: "222" },
+      { wabaId: "111", phoneNumberId: "333" },
+    ],
+  };
   assert.equal(decideCallbackIdentityRegistry(p1, registry).kind, "authorized");
   assert.equal(decideCallbackIdentityRegistry(p2, registry).kind, "authorized");
 });
 await test("mixed callback identities remain rejected", () => {
-  const mixed = { object:"whatsapp_business_account", entry:[{ id:"111", changes:[
-    { field:"messages", value:{ metadata:{ phone_number_id:"222" }}},
-    { field:"messages", value:{ metadata:{ phone_number_id:"333" }}},
-  ]}]};
-  const registry = { identities:[{wabaId:"111",phoneNumberId:"222"},{wabaId:"111",phoneNumberId:"333"}] };
-  assert.equal(decideCallbackIdentityRegistry(mixed, registry).kind, "rejected");
+  const mixed = {
+    object: "whatsapp_business_account",
+    entry: [
+      {
+        id: "111",
+        changes: [
+          {
+            field: "messages",
+            value: { metadata: { phone_number_id: "222" } },
+          },
+          {
+            field: "messages",
+            value: { metadata: { phone_number_id: "333" } },
+          },
+        ],
+      },
+    ],
+  };
+  const registry = {
+    identities: [
+      { wabaId: "111", phoneNumberId: "222" },
+      { wabaId: "111", phoneNumberId: "333" },
+    ],
+  };
+  assert.equal(
+    decideCallbackIdentityRegistry(mixed, registry).kind,
+    "rejected",
+  );
 });
 await test("webhook identity registry keeps existing single-account behavior when conversational vars absent", () => {
-  const env = { WHATSAPP_WABA_ID:"111", WHATSAPP_PHONE_NUMBER_ID:"222" };
+  const env = { WHATSAPP_WABA_ID: "111", WHATSAPP_PHONE_NUMBER_ID: "222" };
   const res = resolveWebhookIdentityRegistryConfig(env);
   assert.ok(res.ok);
   assert.equal(res.identities.length, 1);
 });
 await test("partial conversational webhook identity fails closed", () => {
-  const env = { WHATSAPP_WABA_ID:"111", WHATSAPP_PHONE_NUMBER_ID:"222", WHATSAPP_CONVERSATIONAL_PHONE_NUMBER_ID:"333" };
+  const env = {
+    WHATSAPP_WABA_ID: "111",
+    WHATSAPP_PHONE_NUMBER_ID: "222",
+    WHATSAPP_CONVERSATIONAL_PHONE_NUMBER_ID: "333",
+  };
   const res = resolveWebhookIdentityRegistryConfig(env);
   assert.equal(res.ok, false);
 });
 await test("conversational Meta config is separate from Core credentials", () => {
   const env = {
-    WHATSAPP_CONVERSATIONAL_ACCESS_TOKEN:"token",
-    WHATSAPP_CONVERSATIONAL_PHONE_NUMBER_ID:"333",
-    WHATSAPP_CONVERSATIONAL_WABA_ID:"111",
-    WHATSAPP_GRAPH_API_VERSION:"v26.0",
-    WHATSAPP_AUTH_HTTP_TIMEOUT_MS:"3000",
-    WHATSAPP_HTTP_TIMEOUT_MS:"10000",
+    WHATSAPP_CONVERSATIONAL_ACCESS_TOKEN: "token",
+    WHATSAPP_CONVERSATIONAL_PHONE_NUMBER_ID: "333",
+    WHATSAPP_CONVERSATIONAL_WABA_ID: "111",
+    WHATSAPP_GRAPH_API_VERSION: "v26.0",
+    WHATSAPP_AUTH_HTTP_TIMEOUT_MS: "3000",
+    WHATSAPP_HTTP_TIMEOUT_MS: "10000",
   };
   const res = resolveConversationalMetaConfig(env);
   assert.ok(res.ok);
@@ -315,7 +605,10 @@ await test("conversational Meta config is separate from Core credentials", () =>
 });
 await test("conversation AES-GCM seal round-trips and rejects wrong AAD", () => {
   const key = crypto.randomBytes(32).toString("base64url");
-  const env = { QF_CONVERSATION_SEAL_PRIMARY_KEY_ID:"v1", QF_CONVERSATION_SEAL_KEYS:JSON.stringify({v1:key}) };
+  const env = {
+    QF_CONVERSATION_SEAL_PRIMARY_KEY_ID: "v1",
+    QF_CONVERSATION_SEAL_KEYS: JSON.stringify({ v1: key }),
+  };
   const sealed = sealConversationValue("+919999999999", "aad-A", env);
   assert.ok(sealed.ok);
   const opened = openConversationValue(sealed.value, "aad-A", env);
@@ -326,7 +619,10 @@ await test("conversation AES-GCM seal round-trips and rejects wrong AAD", () => 
 await test("Meta adapter has a bounded text lane with optional reply context", () => {
   assert.match(metaProviderSource, /export function buildMetaTextPayload/);
   assert.match(metaProviderSource, /type: "text"/);
-  assert.match(metaProviderSource, /payload\.context = \{ message_id: replyToProviderMessageId \}/);
+  assert.match(
+    metaProviderSource,
+    /payload\.context = \{ message_id: replyToProviderMessageId \}/,
+  );
   assert.match(metaProviderSource, /text\.length < 1 \|\| text\.length > 4096/);
   assert.match(metaProviderSource, /async sendTextMessage/);
 });
@@ -336,20 +632,43 @@ await test("webhook service uses registry authority before downstream processing
 });
 await test("STOP START HELP are persisted controls but never Jarvis turns", () => {
   const candidate = (text) => ({
-    provider: "meta_whatsapp_cloud", providerMessageId: "wamid.control", messageType: "text",
-    contentMinimized: { text }, providerOccurredAt: null,
+    provider: "meta_whatsapp_cloud",
+    providerMessageId: "wamid.control",
+    messageType: "text",
+    contentMinimized: { text },
+    providerOccurredAt: null,
   });
   for (const text of ["STOP", " stop ", "START", "UNSTOP", "HELP", "INFO"]) {
     assert.equal(isConsentControlMessage(candidate(text)), true, text);
   }
   assert.equal(isConsentControlMessage(candidate("hello riya")), false);
-  assert.equal(isConsentControlMessage({ ...candidate("STOP"), messageType: "button" }), false);
+  assert.equal(
+    isConsentControlMessage({ ...candidate("STOP"), messageType: "button" }),
+    false,
+  );
 });
 await test("concierge routes exact clients/vendors and explicit prospects deterministically", () => {
-  const base = { messageType: "text", contentMinimized: { text: "hello" }, isNewConversation: true };
-  const client = resolveWhatsAppConciergeRouting({ ...base, identityConfidence: "exact", principalType: "client" });
-  const vendor = resolveWhatsAppConciergeRouting({ ...base, identityConfidence: "exact", principalType: "vendor" });
-  const prospect = resolveWhatsAppConciergeRouting({ ...base, identityConfidence: "unknown", principalType: null, contentMinimized: { text: "I want to become a supplier" } });
+  const base = {
+    messageType: "text",
+    contentMinimized: { text: "hello" },
+    isNewConversation: true,
+  };
+  const client = resolveWhatsAppConciergeRouting({
+    ...base,
+    identityConfidence: "exact",
+    principalType: "client",
+  });
+  const vendor = resolveWhatsAppConciergeRouting({
+    ...base,
+    identityConfidence: "exact",
+    principalType: "vendor",
+  });
+  const prospect = resolveWhatsAppConciergeRouting({
+    ...base,
+    identityConfidence: "unknown",
+    principalType: null,
+    contentMinimized: { text: "I want to become a supplier" },
+  });
   assert.equal(client.assignedActor, "RIYA");
   assert.equal(client.subjectType, "client");
   assert.equal(vendor.assignedActor, "ANISHA");
@@ -359,8 +678,11 @@ await test("concierge routes exact clients/vendors and explicit prospects determ
 });
 await test("unknown first-contact can explicitly enter bounded Riya onboarding", () => {
   const routed = resolveWhatsAppConciergeRouting({
-    identityConfidence: "unknown", principalType: null, messageType: "text",
-    contentMinimized: { text: "Hello Riya" }, isNewConversation: true,
+    identityConfidence: "unknown",
+    principalType: null,
+    messageType: "text",
+    contentMinimized: { text: "Hello Riya" },
+    isNewConversation: true,
   });
   assert.equal(routed.subjectType, "client");
   assert.equal(routed.assignedActor, "RIYA");
@@ -370,8 +692,11 @@ await test("unknown first-contact can explicitly enter bounded Riya onboarding",
 });
 await test("unknown greeting receives system-owned Concierge menu without Jarvis turn", () => {
   const routed = resolveWhatsAppConciergeRouting({
-    identityConfidence: "unknown", principalType: null, messageType: "text",
-    contentMinimized: { text: "Hi" }, isNewConversation: true,
+    identityConfidence: "unknown",
+    principalType: null,
+    messageType: "text",
+    contentMinimized: { text: "Hi" },
+    isNewConversation: true,
   });
   assert.equal(routed.assignedActor, "SYSTEM");
   assert.equal(routed.jarvisEnabled, false);
@@ -380,8 +705,11 @@ await test("unknown greeting receives system-owned Concierge menu without Jarvis
 });
 await test("unverified existing-vendor request cannot acquire Anisha", () => {
   const routed = resolveWhatsAppConciergeRouting({
-    identityConfidence: "unknown", principalType: null, messageType: "button_reply",
-    contentMinimized: { replyId: QF_CONCIERGE_ACTIONS.VENDOR }, isNewConversation: true,
+    identityConfidence: "unknown",
+    principalType: null,
+    messageType: "button_reply",
+    contentMinimized: { replyId: QF_CONCIERGE_ACTIONS.VENDOR },
+    isNewConversation: true,
   });
   assert.equal(routed.assignedActor, "SYSTEM");
   assert.notEqual(routed.assignedActor, "ANISHA");
@@ -389,9 +717,14 @@ await test("unverified existing-vendor request cannot acquire Anisha", () => {
 });
 await test("paused specialist conversations remain paused on ordinary inbound", () => {
   const routed = resolveWhatsAppConciergeRouting({
-    identityConfidence: "exact", principalType: "client", messageType: "text",
-    contentMinimized: { text: "Any update?" }, currentSubjectType: "client",
-    currentActor: "RIYA", currentState: "PAUSED", currentHumanTakeover: false,
+    identityConfidence: "exact",
+    principalType: "client",
+    messageType: "text",
+    contentMinimized: { text: "Any update?" },
+    currentSubjectType: "client",
+    currentActor: "RIYA",
+    currentState: "PAUSED",
+    currentHumanTakeover: false,
     isNewConversation: false,
   });
   assert.equal(routed.assignedActor, "RIYA");
@@ -402,8 +735,11 @@ await test("paused specialist conversations remain paused on ordinary inbound", 
 
 await test("human request enters takeover and suppresses Jarvis", () => {
   const routed = resolveWhatsAppConciergeRouting({
-    identityConfidence: "unknown", principalType: null, messageType: "text",
-    contentMinimized: { text: "talk to a person" }, isNewConversation: true,
+    identityConfidence: "unknown",
+    principalType: null,
+    messageType: "text",
+    contentMinimized: { text: "talk to a person" },
+    isNewConversation: true,
   });
   assert.equal(routed.assignedActor, "HUMAN");
   assert.equal(routed.humanTakeover, true);
@@ -413,12 +749,16 @@ await test("human request enters takeover and suppresses Jarvis", () => {
 
 await test("premium Concierge renders a bounded Meta list payload", () => {
   const experience = buildQuickFurnoConciergeMenu();
-  const payload = buildMetaInteractivePayload("+919999999999", {
-    heading: experience.heading,
-    body: experience.body,
-    actions: experience.actions,
-    menuButtonText: "View options",
-  }, "wamid.reply");
+  const payload = buildMetaInteractivePayload(
+    "+919999999999",
+    {
+      heading: experience.heading,
+      body: experience.body,
+      actions: experience.actions,
+      menuButtonText: "View options",
+    },
+    "wamid.reply",
+  );
   assert.equal(payload.type, "interactive");
   assert.equal(payload.context.message_id, "wamid.reply");
   assert.equal(payload.interactive.type, "list");
@@ -426,20 +766,41 @@ await test("premium Concierge renders a bounded Meta list payload", () => {
 });
 
 await test("conversation service gates Jarvis enqueue on consent, state, takeover and feature flags", () => {
-  assert.match(conversationService, /input\.suppressJarvisTurn !== true[\s\S]{0,700}communication_jarvis_turn_outbox/);
+  assert.match(
+    conversationService,
+    /input\.suppressJarvisTurn !== true[\s\S]{0,700}communication_jarvis_turn_outbox/,
+  );
   assert.match(conversationService, /conversation\.state === "OPEN"/);
   assert.match(conversationService, /conversation\.human_takeover !== true/);
   assert.match(conversationService, /QF_JARVIS_WHATSAPP_ENABLED/);
 });
 await test("conversation projection binds request-memory sender to the durable inbound row", () => {
-  assert.match(conversationService, /select\("id,provider_account_id,provider_message_id,sender_hash,conversation_id"\)/);
-  assert.match(conversationService, /durableInbound\.provider_account_id !== input\.providerAccountId/);
-  assert.match(conversationService, /durableInbound\.provider_message_id !== input\.providerMessageId/);
-  assert.match(conversationService, /durableInbound\.sender_hash !== requestDestinationHash/);
+  assert.match(
+    conversationService,
+    /select\("id,provider_account_id,provider_message_id,sender_hash,conversation_id"\)/,
+  );
+  assert.match(
+    conversationService,
+    /durableInbound\.provider_account_id !== input\.providerAccountId/,
+  );
+  assert.match(
+    conversationService,
+    /durableInbound\.provider_message_id !== input\.providerMessageId/,
+  );
+  assert.match(
+    conversationService,
+    /durableInbound\.sender_hash !== requestDestinationHash/,
+  );
 });
 await test("Meta redelivery is idempotent once the durable inbound is linked", () => {
-  assert.match(conversationService, /if \(durableInbound\.conversation_id\)[\s\S]{0,900}conversationId: linked\.id/);
-  assert.match(conversationService, /last_inbound_provider_message_id === input\.providerMessageId/);
+  assert.match(
+    conversationService,
+    /if \(durableInbound\.conversation_id\)[\s\S]{0,900}conversationId: linked\.id/,
+  );
+  assert.match(
+    conversationService,
+    /last_inbound_provider_message_id === input\.providerMessageId/,
+  );
   assert.match(conversationService, /\.eq\("revision", existing\.revision\)/);
 });
 await test("migration never auto-labels multiple pre-existing Meta accounts as Core", () => {

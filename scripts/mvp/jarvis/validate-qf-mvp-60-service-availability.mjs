@@ -31,7 +31,7 @@ const off=resolveQfJarvisRuntimePolicy({});
 check("availability defaults off", off.mode === "off" && off.serviceAvailabilityEnabled === false);
 const shadow=resolveQfJarvisRuntimePolicy({QF_JARVIS_MODE:"shadow",QF_JARVIS_SERVICE_AVAILABILITY_ENABLED:"true"});
 check("shadow can enable read without active authority", shadow.mode === "shadow" && shadow.serviceAvailabilityEnabled === true && shadow.actionProposalEnabled === false);
-const migration=fs.readFileSync("supabase/migrations/20260915120000_qf_jarvis_service_availability.sql","utf8");
+const migration=fs.readFileSync("supabase/migrations/20260926035801_qf_jarvis_service_availability_deploy.sql","utf8");
 check("migration creates explicit pair registry", /jarvis_service_availability_pairs/.test(migration));
 check("pair registry references Core city", /city_id uuid not null references public\.cities\(id\)/.test(migration));
 check("pair registry references Core service", /service_category_id uuid not null references public\.service_categories\(id\)/.test(migration));

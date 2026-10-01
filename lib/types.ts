@@ -83,6 +83,8 @@ export interface PublicVendorCard {
   business_name: string;
   city: string;
   areas_covered: string[] | null;
+  covers_full_city: boolean | null;
+  service_radius_km: number | null;
   service_categories: string[] | null;
   experience: string | null;
   portfolio_urls: string[] | null;
@@ -194,6 +196,11 @@ export interface VendorProfileSummary {
   // The legacy DB column still exists but is no longer selected or displayed.
   office_latitude: number | null;
   office_longitude: number | null;
+  google_place_id: string | null;
+  formatted_address: string | null;
+  area_normalized: string | null;
+  sublocality: string | null;
+  neighborhood: string | null;
   status: string;
   verification_status: string | null;
   paid_status: string | null;

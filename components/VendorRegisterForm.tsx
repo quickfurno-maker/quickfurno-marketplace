@@ -47,6 +47,7 @@ const CATEGORY_MIN_RATE: Partial<Record<QuickFurnoCategory, number>> = {
 };
 
 const BUSINESS_TYPE_OPTIONS = ["Showroom", "Factory", "Studio", "Workshop", "Home-based / On-site"];
+const SERVICE_RADIUS_OPTIONS = [5, 10, 15, 20, 30, 50] as const;
 
 const STEP_NAMES = [
   "Business Identity",
@@ -91,6 +92,7 @@ type WizardState = {
   rateValue: string;
   businessType: string;
   coversFullCity: boolean;
+  serviceRadiusKm: string;
 };
 
 // QF-MVP-80.16C. The same Indian-mobile contract the server now enforces in
@@ -131,6 +133,7 @@ const initialState: WizardState = {
   rateValue: "",
   businessType: "",
   coversFullCity: false,
+  serviceRadiusKm: "",
 };
 
 /** Lightweight email sanity check (real validation happens at account creation). */

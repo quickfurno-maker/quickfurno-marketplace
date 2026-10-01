@@ -230,9 +230,12 @@ export async function approveVendorProfileChangeRequest(
       .single();
     if (error) throw error;
 
+    const locationOnly = request.request_type === "location_update";
     await createVendorNotification(request.vendor_id, {
-      title: "Profile changes approved",
-      message: "Your public profile changes were approved and are now live.",
+      title: locationOnly ? "Business location approved" : "Profile changes approved",
+      message: locationOnly
+        ? "Your exact office location and service coverage were approved for matching."
+        : "Your public profile changes were approved and are now live.",
       type: "profile",
       priority: "normal",
       cta_label: "View profile",
@@ -367,6 +370,34 @@ function mapApprovedChangesToVendorUpdate(changes: Record<string, unknown>) {
   if ("profile_image_url" in changes) update.profile_image_url = changes.profile_image_url;
   if ("cover_image_url" in changes) update.cover_image_url = changes.cover_image_url;
   if ("portfolio_image_urls" in changes) update.portfolio_urls = changes.portfolio_image_urls;
+
+  if ("office_google_place_id" in changes) {
+    const office = normalizeVendorOfficeEvidence({
+      office_latitude: changes.office_latitude as number | null | undefined,
+      office_longitude: changes.office_longitude as number | null | undefined,
+      google_place_id: changes.office_google_place_id as string | null | undefined,
+      formatted_address: changes.office_formatted_address as string | null | undefined,
+      area_normalized: changes.office_area_normalized as string | null | undefined,
+      sublocality: changes.office_sublocality as string | null | undefined,
+      neighborhood: changes.office_neighborhood as string | null | undefined,
+    });
+    const fullCity = changes.office_covers_full_city === true;
+    const radius = Number(changes.office_service_radius_km ?? 0);
+    const validCoverage = fullCity || SERVICE_RADIUS_OPTIONS.has(radius);
+
+    if (office.verified && validCoverage) {
+      update.google_place_id = office.google_place_id;
+      update.formatted_address = office.formatted_address;
+      update.area_normalized = office.area_normalized;
+      update.sublocality = office.sublocality;
+      update.neighborhood = office.neighborhood;
+      update.office_latitude = office.office_latitude;
+      update.office_longitude = office.office_longitude;
+      update.covers_full_city = fullCity;
+      update.service_radius_km = fullCity ? null : radius;
+    }
+  }
+
   return update;
 }
 

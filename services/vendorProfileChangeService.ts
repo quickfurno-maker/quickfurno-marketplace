@@ -166,14 +166,20 @@ export async function createVendorProfileChangeRequest(
     const summary = await getVendorApprovedProfileSummary(vendorId);
     if (!summary.ok) return fail(summary.error);
 
+    const requestType = classifyProfileRequest(proposed);
+    const currentSnapshot =
+      requestType === "location_update"
+        ? locationSnapshotFromSummary(summary.data)
+        : summary.data;
+
     const { data, error } = await adminClient()
       .from("vendor_profile_change_requests")
       .insert({
         vendor_id: vendorId,
         requested_by: requestedBy,
-        request_type: "profile_update",
+        request_type: requestType,
         proposed_changes: proposed,
-        current_snapshot: summary.data,
+        current_snapshot: currentSnapshot,
         status: "pending",
       })
       .select("*")
@@ -283,6 +289,29 @@ export async function rejectVendorProfileChangeRequest(
   } catch (e) {
     return fail(e);
   }
+}
+
+function classifyProfileRequest(changes: Record<string, unknown>): string {
+  const keys = Object.keys(changes);
+  const hasLocation = keys.some((key) => LOCATION_CHANGE_KEYS.has(key));
+  const hasPublicProfile = keys.some((key) => !LOCATION_CHANGE_KEYS.has(key));
+  if (hasLocation && !hasPublicProfile) return "location_update";
+  if (hasLocation && hasPublicProfile) return "profile_and_location_update";
+  return "profile_update";
+}
+
+function locationSnapshotFromSummary(summary: VendorApprovedProfileSummary): Record<string, unknown> {
+  return {
+    office_formatted_address: summary.formatted_address,
+    office_google_place_id: summary.google_place_id,
+    office_latitude: summary.office_latitude,
+    office_longitude: summary.office_longitude,
+    office_area_normalized: summary.area_normalized,
+    office_sublocality: summary.sublocality,
+    office_neighborhood: summary.neighborhood,
+    office_covers_full_city: summary.covers_full_city,
+    office_service_radius_km: summary.service_radius_km,
+  };
 }
 
 function sanitizeProfileInput(input: VendorProfileChangeInput): Record<string, unknown> {

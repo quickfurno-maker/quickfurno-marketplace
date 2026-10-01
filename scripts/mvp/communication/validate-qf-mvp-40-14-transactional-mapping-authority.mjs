@@ -917,14 +917,14 @@ const RULES = {
       "npm run test:mvp:50-3-50-4-bridge", "npm run test:mvp:50-3-50-4-forensic",
       "npm run test:mvp:70-01", "npm run test:mvp:70-02", "npm run test:mvp:70-03",
       "npm run test:mvp:70-04", "npm run test:mvp:75-01", "npm run test:mvp:75-02",
-      "npm run test:mvp:75-03", "npm run test:mvp:80-02-gate06", "npm run test:mvp:80-03-audit",
+      "npm run test:mvp:location-straight-line", "npm run test:mvp:80-02-gate06", "npm run test:mvp:80-03-audit",
       "npm run test:mvp:80-04", "npm run test:mvp:80-14a", "npm run test:mvp:40-14",
       "npm run test:mvp:marketplace", "npm run test:mvp:assignment-authority", "npm run test:phase4",
       "npm run test:mvp:80-16b", "npm run test:mvp:80-16c", "npm run test:mvp:80-17a",
       "npm run test:mvp:80-17a-r1", "npm run test:mvp:80-17a-r1-loader",
       "npm run test:mvp:82a-r0", "npm run test:mvp:82a-r0-s1",
       "npm run test:ui:mobile-form-focus", "npm run test:ui:lead-attribution",
-      "npm run test:launch:pune-only", "npm run typecheck", "npm run build",
+      "npm run test:launch:city-authority", "npm run typecheck", "npm run build",
     ];
     const retiredExternalRuntime = [
       "npm run test:mvp:50-1c", "npm run test:mvp:50-2a", "npm run test:mvp:50-2b",

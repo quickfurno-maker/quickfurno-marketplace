@@ -22,7 +22,7 @@
 // Mirrors SCORE_MODEL_VERSION in services/leadQualityService.ts.
 export const EXPECTED_SCORE_MODEL_VERSION = "lead_quality_v2";
 // Mirrors MATCHING_MODEL_VERSION in services/leadMatchingEngine.ts.
-export const EXPECTED_MATCHING_MODEL_VERSION = "distance_category_matching_phase2";
+export const EXPECTED_MATCHING_MODEL_VERSION = "verified_location_straight_line_v1";
 // Deterministic contract for matching runs created before Phase 3A tagging.
 export const LEGACY_MATCHING_MODEL_VERSION = "legacy_or_unknown";
 // vendor_credit_logs has NO lead_id / assignment_id (audited), so per-lead credit

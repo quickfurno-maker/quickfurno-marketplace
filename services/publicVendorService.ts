@@ -36,7 +36,7 @@ import { getVendorPublicVisibility } from "@/lib/vendors/vendorVisibility";
 import { normalizeStatus } from "@/lib/vendors/vendorEligibility";
 import { type QuickFurnoCategory, type Vendor } from "@/lib/quickfurno-data";
 import { normalizeLocalities } from "@/lib/locality";
-import { LAUNCH_CITY, normalizeLaunchCity } from "@/lib/locations/launchCityPolicy";
+import { getActiveCities, type ActiveCity } from "@/lib/locations/cityService";
 import {
   getApprovedReviewsForVendor,
   getApprovedReviewStatsForVendors,
@@ -153,13 +153,14 @@ export async function getPublicVendorsForCategory(
 ): Promise<Vendor[] | null> {
   try {
     const runtimeSettings = settings ?? (await loadMarketplaceRuntimeSettings());
+    const activeCities = await getActiveCities();
+    if (activeCities.length === 0) return [];
 
     const { data, error } = await adminClient()
       .from("vendors")
       .select("*")
-      .ilike("city", LAUNCH_CITY)
       .order("rating", { ascending: false })
-      .limit(250);
+      .limit(500);
 
     if (error || !Array.isArray(data)) {
       console.warn("[public vendors] vendors table unavailable; falling back to static", {
@@ -168,7 +169,7 @@ export async function getPublicVendorsForCategory(
       return null;
     }
 
-    const rows = data as VendorRow[];
+    const rows = (data as VendorRow[]).filter((row) => Boolean(normalizeCity(row, activeCities)));
     const candidates = rows
       .filter((row) => matchesPublicCategory(row, category))
       .flatMap((row) => {
@@ -181,7 +182,7 @@ export async function getPublicVendorsForCategory(
     const mapped = candidates.flatMap(({ row, visibilityType }) => {
       const id = asText(row.id);
       const stats = id ? reviewStats.get(id) : undefined;
-      const vendor = mapToPublicVendor(row, category, visibilityType, stats ? { ...stats, reviews: [] } : undefined);
+      const vendor = mapToPublicVendor(row, category, visibilityType, activeCities, stats ? { ...stats, reviews: [] } : undefined);
       return vendor ? [vendor] : [];
     });
 
@@ -221,12 +222,13 @@ export async function getPublicVendorCountsByCategory(
 ): Promise<Map<QuickFurnoCategory, number> | null> {
   try {
     const runtimeSettings = settings ?? (await loadMarketplaceRuntimeSettings());
+    const activeCities = await getActiveCities();
+    if (activeCities.length === 0) return new Map();
 
     const { data, error } = await adminClient()
       .from("vendors")
       .select("*")
-      .ilike("city", LAUNCH_CITY)
-      .limit(500);
+      .limit(1000);
 
     if (error || !Array.isArray(data)) {
       console.warn("[public vendor counts] vendors table unavailable", { message: error?.message });
@@ -234,7 +236,9 @@ export async function getPublicVendorCountsByCategory(
     }
 
     const visible = (data as VendorRow[]).filter(
-      (row) => getVendorPublicVisibility(row, runtimeSettings).isPubliclyVisible,
+      (row) =>
+        Boolean(normalizeCity(row, activeCities)) &&
+        getVendorPublicVisibility(row, runtimeSettings).isPubliclyVisible,
     );
 
     const counts = new Map<QuickFurnoCategory, number>();
@@ -279,6 +283,8 @@ export async function getPublicVendorProfileBySlugOrId(
   const runtimeSettings = settings ?? (await loadMarketplaceRuntimeSettings());
 
   try {
+    const activeCities = await getActiveCities();
+    if (activeCities.length === 0) return null;
     // Our public links use the vendor id (uuid). Only query by id for uuids to
     // avoid a uuid-cast error, and try optional slug columns otherwise — each
     // guarded so a not-yet-existing column simply yields "not found".
@@ -287,13 +293,13 @@ export async function getPublicVendorProfileBySlugOrId(
       : (await fetchVendorRowByColumn("slug", key)) ?? (await fetchVendorRowByColumn("public_slug", key));
 
     if (row) {
-      if (!normalizeCity(row)) return null;
+      if (!normalizeCity(row, activeCities)) return null;
       const visibility = getVendorPublicVisibility(row, runtimeSettings);
       if (!visibility.isPubliclyVisible) return null;
       const id = asText(row.id);
       if (!id) return null;
       const reviewSummary = await getApprovedReviewsForVendor(id);
-      return mapToPublicVendor(row, resolveVendorCategory(row), visibility.visibilityType, reviewSummary);
+      return mapToPublicVendor(row, resolveVendorCategory(row), visibility.visibilityType, activeCities, reviewSummary);
     }
   } catch (error) {
     console.warn("[public vendor profile] unexpected error; failing closed (404)", {
@@ -330,12 +336,13 @@ function mapToPublicVendor(
   row: VendorRow,
   category: QuickFurnoCategory,
   visibilityType: string,
+  activeCities: readonly ActiveCity[],
   reviewSummary?: VendorReviewSummary,
 ): Vendor | null {
   const id = asText(row.id);
   if (!id) return null;
 
-  const city = normalizeCity(row);
+  const city = normalizeCity(row, activeCities);
   if (!city) return null;
   // Paid + trial vendors use the standard (QuickFurno-brokered) contact path;
   // free/unpaid vendors get activePaidPlan=false so the card only exposes the
@@ -556,11 +563,15 @@ function coerceServiceValues(value: unknown): string[] {
   return text.split(",").map((part) => part.trim()).filter(Boolean);
 }
 
-/** Public city is Pune-only during launch; unsupported explicit cities fail closed. */
-function normalizeCity(row: VendorRow): "Pune" | null {
-  const serviceCity = asText(row.city);
-  if (serviceCity) return normalizeLaunchCity(serviceCity);
-  return normalizeLaunchCity(row.office_city);
+/** Resolve the vendor's stored city against the currently ACTIVE admin city rows. */
+function normalizeCity(row: VendorRow, activeCities: readonly ActiveCity[]): string | null {
+  const raw = asText(row.city) ?? asText(row.office_city);
+  if (!raw) return null;
+  const wanted = normalizeText(raw);
+  const match = activeCities.find(
+    (city) => normalizeText(city.name) === wanted || normalizeText(city.slug) === wanted,
+  );
+  return match?.name ?? null;
 }
 
 function normalizeText(value: unknown): string {

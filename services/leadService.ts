@@ -36,7 +36,8 @@ import {
   type PreferredVendorRoutingResult,
 } from "./preferredVendorLeadService";
 import type { CreateLeadInput, PublicVendorCard, AssignResult } from "../lib/types";
-import { normalizeLaunchCity } from "../lib/locations/launchCityPolicy";
+import { resolveActiveCity } from "../lib/locations/cityService";
+import { isOutsideServiceArea, verifyLocationForServiceArea } from "./locationVerificationService";
 
 function firstText(...values: Array<string | undefined>): string {
   return values.map((value) => value?.trim()).find(Boolean) ?? "";
@@ -58,7 +59,8 @@ export async function createLead(
   try {
     const name = firstText(input.name);
     const phone = firstText(input.phone);
-    const city = normalizeLaunchCity(input.city);
+    const activeCity = await resolveActiveCity(input.city);
+    const city = activeCity?.name ?? null;
     const serviceRequired = firstText(input.service_required, input.service_category, input.serviceCategory);
     const budget = firstText(input.budget, input.budget_range, input.budgetRange);
     const message = firstText(input.message, input.requirement);
@@ -88,6 +90,15 @@ export async function createLead(
     const storedPhone = contact.storage;
 
     const db = adminClient();
+
+    const locationVerification = await verifyLocationForServiceArea({
+      latitude: input.latitude,
+      longitude: input.longitude,
+      googleCity: input.google_city,
+    });
+    if (isOutsideServiceArea(locationVerification)) {
+      throw appError("OUTSIDE_SERVICE_AREA");
+    }
 
     console.info("[lead submit] starting", {
       source,
@@ -160,10 +171,15 @@ export async function createLead(
       location_source: input.location_source ?? null,
       location_captured_at: input.location_captured_at ?? null,
       google_place_id: input.google_place_id ?? null,
+      google_city: input.google_city ?? null,
       formatted_address: input.formatted_address ?? null,
       area_normalized: input.area_normalized ?? null,
       sublocality: input.sublocality ?? null,
       neighborhood: input.neighborhood ?? null,
+      service_zone_id: locationVerification.serviceZoneId,
+      location_verification_status: locationVerification.status,
+      location_verification_method: locationVerification.method,
+      location_verified_at: locationVerification.verifiedAt,
       // postal_code intentionally not written (Phase 1: pincode retired as a
       // location signal). Legacy DB column remains, unused for new leads.
     };

@@ -23,7 +23,7 @@ export type VendorReviewItem = {
 export type Vendor = {
   slug: string;
   businessName: string;
-  city: "Pune";
+  city: string;
   category: QuickFurnoCategory;
   subCategory: string;
   /** Approved-review average only. 0 means no approved reviews. */

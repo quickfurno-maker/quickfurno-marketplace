@@ -79,6 +79,7 @@ type WizardState = {
   baseArea: string;
   baseAreaNormalized: string;
   googlePlaceId: string;
+  googleCity: string;
   formattedAddress: string;
   sublocality: string;
   neighborhood: string;
@@ -119,6 +120,7 @@ const initialState: WizardState = {
   baseArea: "",
   baseAreaNormalized: "",
   googlePlaceId: "",
+  googleCity: "",
   formattedAddress: "",
   sublocality: "",
   neighborhood: "",
@@ -163,7 +165,7 @@ export function VendorRegisterForm({
     return preset ? { ...initialState, ...preset } : initialState;
   });
   // Phase 14B: city chips come only from admin-managed active cities.
-  const { cities: activeCities, loading: citiesLoading } = useActiveCities();
+  const { cities: activeCities, records: activeCityRecords, loading: citiesLoading } = useActiveCities();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -341,6 +343,7 @@ export function VendorRegisterForm({
       baseArea: value,
       baseAreaNormalized: value.trim().toLowerCase(),
       googlePlaceId: "",
+      googleCity: "",
       formattedAddress: "",
       sublocality: "",
       neighborhood: "",
@@ -353,7 +356,14 @@ export function VendorRegisterForm({
   // A Google place was picked. City-consistency guard: never overwrite anything
   // if the place clearly belongs to a different city than the one selected.
   function onBaseAreaPlace(place: NormalizedGooglePlace) {
-    if (f.city && !isPlaceCompatibleWithSelectedCity(place, f.city)) {
+    const selectedCityRecord = activeCityRecords.find(
+      (city) => city.name.toLowerCase() === f.city.toLowerCase(),
+    );
+    const acceptedLabels = selectedCityRecord?.acceptedCityLabels ?? (f.city ? [f.city] : []);
+    if (
+      f.city &&
+      !isPlaceCompatibleWithSelectedCity(place, f.city, acceptedLabels)
+    ) {
       setError(`Please select a base area within ${f.city}.`);
       return;
     }
@@ -363,6 +373,7 @@ export function VendorRegisterForm({
       baseArea: place.area ?? current.baseArea,
       baseAreaNormalized: place.areaNormalized ?? (place.area ? place.area.toLowerCase() : ""),
       googlePlaceId: place.placeId ?? "",
+      googleCity: place.city ?? "",
       formattedAddress: place.formattedAddress ?? "",
       sublocality: place.sublocality ?? "",
       neighborhood: place.neighborhood ?? "",
@@ -646,6 +657,7 @@ export function VendorRegisterForm({
         experience: f.yearsExperience || undefined,
         // Google business base area — structured identity + normalized fields.
         google_place_id: f.googlePlaceId || undefined,
+        google_city: f.googleCity || undefined,
         formatted_address: f.formattedAddress || undefined,
         area_normalized: f.baseAreaNormalized || undefined,
         sublocality: f.sublocality || undefined,
@@ -1018,8 +1030,8 @@ export function VendorRegisterForm({
               </div>
             ) : null}
 
-            {/* 2. Google business base area / locality (manual fallback preserved) */}
-            <p className="qf-vrf-subhead">Business base area / locality</p>
+            {/* 2. Exact Google office/base location (manual fallback preserved) */}
+            <p className="qf-vrf-subhead">Exact office / business location</p>
             {(() => {
               const baseTouched = touched.baseArea || showErrors;
               const baseValid = baseAreaValue.length >= 2;
@@ -1027,16 +1039,16 @@ export function VendorRegisterForm({
               const wrapperClass = `qf-rf-field${baseInvalid ? " has-error" : ""}${baseValid ? " is-valid" : ""}`;
               return (
                 <label className={wrapperClass} ref={bindField("baseArea")}>
-                  <span>Business base area / locality</span>
+                  <span>Exact office / business location</span>
                   <div className="qf-rf-input-wrapper">
                     <GooglePlaceAutocomplete
                       value={f.baseArea}
                       city={f.city}
-                      mode="locality"
+                      mode="address"
                       onManualChange={onBaseAreaManual}
                       onPlaceSelected={onBaseAreaPlace}
                       onBlur={() => setTouched((prev) => ({ ...prev, baseArea: true }))}
-                      placeholder={hasCitySelected ? "e.g. Baner, Kharadi" : "Select a city first"}
+                      placeholder={hasCitySelected ? "Search building, street, society or area" : "Select a city first"}
                       disabled={!hasCitySelected}
                       autoComplete="off"
                     />
@@ -1060,18 +1072,18 @@ export function VendorRegisterForm({
                   ) : null}
                   {f.baseLatitude != null && f.baseLongitude != null ? (
                     <span className="qf-rf-loc-note qf-rf-loc-note--ok" style={{ marginTop: "0.25rem" }}>
-                      Base location set from your selected area.
+                      Precise office/base coordinates captured from your selected place.
                     </span>
                   ) : (
                     <span className="qf-rf-loc-note" style={{ marginTop: "0.25rem" }}>
-                      Pick a suggestion for precise matching, or type your area manually.
+                      Pick a Google suggestion for precise matching. Manual entry remains available.
                     </span>
                   )}
                 </label>
               );
             })()}
 
-            {/* 3. Office / Business Address (profile/contact only — not matching) */}
+            {/* 3. Postal/contact address. The Google place above is the canonical matching point. */}
             <p className="qf-vrf-subhead">Office / Business Address</p>
             <div className="qf-rf-fields">
               {renderInputField({

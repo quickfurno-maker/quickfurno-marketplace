@@ -84,12 +84,14 @@ export function normalizeGooglePlace(
   // fallback. If Google provides none of these, city stays null.
   const city = locality ?? postalTown ?? adminArea2;
 
-  // Human-facing "area" label. In locality mode the picked prediction name is
-  // the best answer (e.g. "Baner"); in address mode prefer the finer locality.
+  // Human-facing location label. In address mode preserve the picked place /
+  // building name so the user sees the exact project/office location they chose.
+  // The normalized area key remains locality-shaped for soft affinity only.
   const area =
     mode === "address"
-      ? sublocality ?? neighborhood ?? locality ?? placeName
+      ? placeName ?? sublocality ?? neighborhood ?? locality
       : placeName ?? sublocality ?? neighborhood ?? locality;
+  const areaKey = sublocality ?? neighborhood ?? locality ?? placeName;
 
   const rawLoc: PlaceLatLngLike | null | undefined = place?.location ?? place?.geometry?.location;
   const lat = rawLoc ? readCoord(rawLoc.lat) : null;
@@ -100,7 +102,7 @@ export function normalizeGooglePlace(
     formattedAddress: clean(place?.formattedAddress ?? place?.formatted_address),
     city,
     area,
-    areaNormalized: area ? area.toLowerCase() : null,
+    areaNormalized: areaKey ? areaKey.toLowerCase() : null,
     sublocality,
     neighborhood,
     state,
@@ -131,18 +133,25 @@ function cityKey(value: string | null | undefined): string {
 export function isPlaceCompatibleWithSelectedCity(
   place: Pick<NormalizedGooglePlace, "city" | "formattedAddress">,
   selectedCity: string,
+  acceptedAliases: readonly string[] = [],
 ): boolean {
   const wanted = cityKey(selectedCity);
   if (!wanted) return true; // no city chosen yet → nothing to conflict with
 
+  const accepted = new Set([
+    wanted,
+    ...acceptedAliases.map((alias) => cityKey(alias)).filter(Boolean),
+  ]);
   const placeCity = cityKey(place.city);
-  if (placeCity && placeCity === wanted) return true;
+  if (placeCity && accepted.has(placeCity)) return true;
 
   const addr = cityKey(place.formattedAddress);
   if (addr) {
-    // Whole-word match avoids false positives like "punexyz" matching "pune".
-    const escaped = wanted.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    if (new RegExp(`\\b${escaped}\\b`).test(addr)) return true;
+    // Whole-word matching avoids false positives like "punexyz" matching "pune".
+    for (const city of accepted) {
+      const escaped = city.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (new RegExp(`\\b${escaped}\\b`).test(addr)) return true;
+    }
   }
   return false;
 }

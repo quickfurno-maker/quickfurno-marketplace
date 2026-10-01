@@ -83,6 +83,10 @@ export const AUTOMATIC_MATCH_REJECT_REASONS = [
   "not_accepting_leads",
   "no_credits",
   "city_mismatch",
+  "outside_service_area",
+  "service_zone_mismatch",
+  "service_zone_unresolved",
+  "service_zone_matching_disabled",
   "category_mismatch",
 ] as const;
 

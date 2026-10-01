@@ -106,7 +106,7 @@ function renderSection(
     case "categories":
       return <CategoriesPage categories={payload?.categories ?? []} notify={helpers.notify} />;
     case "cities":
-      return <CitiesPage cities={payload?.cities ?? []} notify={helpers.notify} ask={helpers.ask} />;
+      return <CitiesPage cities={payload?.cities ?? []} serviceZones={payload?.serviceZones ?? []} notify={helpers.notify} ask={helpers.ask} runAction={helpers.runAction} />;
     case "payments":
       return <PaymentsPage data={payload} />;
     case "lead-distribution":

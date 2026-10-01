@@ -25,6 +25,7 @@ const MESSAGES: Record<string, string> = {
   PACKAGE_NOT_FOUND: "Package not found.",
   PACKAGE_NOT_AVAILABLE: "This package is not available for your city or service category.",
   VALIDATION: "Some required fields are missing or invalid.",
+  OUTSIDE_SERVICE_AREA: "This location is outside QuickFurno's currently active service area.",
   REPORT_WINDOW_CLOSED: "Bad-lead reports must be filed within the allowed window.",
   UNKNOWN: "Something went wrong. Please try again.",
 };

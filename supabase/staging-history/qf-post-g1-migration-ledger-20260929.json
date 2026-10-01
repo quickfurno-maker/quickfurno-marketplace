@@ -182,6 +182,42 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-09-29_BEFORE_DEPLOYMENT"
+    },
+    {
+      "version": "20261001144025",
+      "name": "qf_verified_location_geofence_straight_line",
+      "filename": "20261001144025_qf_verified_location_geofence_straight_line.sql",
+      "path": "supabase/migrations/20261001144025_qf_verified_location_geofence_straight_line.sql",
+      "canonicalSha256": "774c7a10db9d35af6c9bea35ac8e7c88136b02edcfa9ce2935db4697fc9306c4",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"
+    },
+    {
+      "version": "20261001153000",
+      "name": "qf_multi_city_service_zone_authority",
+      "filename": "20261001153000_qf_multi_city_service_zone_authority.sql",
+      "path": "supabase/migrations/20261001153000_qf_multi_city_service_zone_authority.sql",
+      "canonicalSha256": "59c6a3c42701df069ae5b3405ac9732de9c47dc44e7dff18dfb857647c86c871",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"
+    },
+    {
+      "version": "20261001154500",
+      "name": "qf_city_market_runtime_controls",
+      "filename": "20261001154500_qf_city_market_runtime_controls.sql",
+      "path": "supabase/migrations/20261001154500_qf_city_market_runtime_controls.sql",
+      "canonicalSha256": "4883ce30f177515d2d8f1feed347bc4bc6ccc607b6acdef9fb43df9225aab070",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"
     }
   ],
   "supersededLegacyPins": [

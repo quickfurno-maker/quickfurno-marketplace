@@ -180,10 +180,13 @@ export default function GooglePlaceAutocomplete({
     const baseRequest: AutocompleteRequest = {
       input: query,
       sessionToken: ensureSessionToken() ?? undefined,
-      includedRegionCodes: ["in"], // India-only; no guessed city bounds
+      includedRegionCodes: ["in"], // India-only; service-zone enforcement happens in QuickFurno
       language: "en",
       region: "IN",
-      includedPrimaryTypes: modeRef.current === "address" ? ["geocode"] : ["(regions)"],
+      // Locality mode is intentionally region-only. Address mode is intentionally
+      // broad: buildings, societies, establishments and street addresses are all
+      // useful precise project/office points, so no primary-type filter is applied.
+      ...(modeRef.current === "locality" ? { includedPrimaryTypes: ["(regions)"] } : {}),
       // locationBias / locationRestriction are intentionally left unset — a clean
       // extension point for FUTURE city-specific biasing (never guessed here).
     };

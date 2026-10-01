@@ -8,8 +8,11 @@
 // restriction, invalid API setup — it resolves to `null` so every caller keeps
 // its normal manual behaviour. It NEVER throws and NEVER logs the API key.
 //
-// Only the PUBLIC browser key (NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY) is used, and
-// only on the client. No server key is ever referenced here.
+// The browser-restricted Google key is public by design. We prefer the normal
+// NEXT_PUBLIC_* build-time value when available, but self-hosted production can
+// also provide it at request time through /api/public/google-maps-config. This
+// avoids silently disabling Places when PM2/runtime env exists but the key was
+// not present during `next build`.
 // ============================================================================
 import type { PlacesLibrary } from "./types";
 
@@ -22,11 +25,40 @@ declare global {
 }
 
 const SCRIPT_ID = "qf-google-maps-js";
+const RUNTIME_CONFIG_URL = "/api/public/google-maps-config";
 
-/** The public browser key, trimmed — or null when it is missing/blank. */
+/** Build-time browser key, trimmed — or null when it was not embedded. */
 export function getGoogleMapsBrowserKey(): string | null {
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY;
   return key && key.trim() ? key.trim() : null;
+}
+
+/**
+ * Resolve the public browser key without assuming it existed during `next build`.
+ * The endpoint only returns a browser-restricted public key; it never returns a
+ * server credential. Failures deliberately degrade to the manual location flow.
+ */
+async function resolveGoogleMapsBrowserKey(): Promise<string | null> {
+  const buildTimeKey = getGoogleMapsBrowserKey();
+  if (buildTimeKey) return buildTimeKey;
+
+  try {
+    const response = await fetch(RUNTIME_CONFIG_URL, {
+      method: "GET",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) return null;
+
+    const payload = (await response.json()) as {
+      configured?: unknown;
+      browserKey?: unknown;
+    };
+    const key = typeof payload.browserKey === "string" ? payload.browserKey.trim() : "";
+    return payload.configured === true && key ? key : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Runtime check that the loaded library exposes the Places NEW surface we use. */
@@ -53,59 +85,55 @@ export function loadGoogleMaps(): Promise<PlacesLibrary | null> {
   // A load is already in flight (or previously completed) — reuse it.
   if (window.__qfGooglePlacesPromise) return window.__qfGooglePlacesPromise;
 
-  const key = getGoogleMapsBrowserKey();
-  if (!key) {
-    // No key configured → silent, safe manual fallback everywhere. Cache the
-    // resolved null so we don't re-check on every field mount.
-    window.__qfGooglePlacesPromise = Promise.resolve(null);
-    return window.__qfGooglePlacesPromise;
-  }
+  const promise = (async (): Promise<PlacesLibrary | null> => {
+    const key = await resolveGoogleMapsBrowserKey();
+    if (!key) return null;
 
-  const promise = new Promise<PlacesLibrary | null>((resolve) => {
-    const importPlaces = async () => {
-      try {
-        const importLibrary = window.google?.maps?.importLibrary;
-        if (typeof importLibrary !== "function") {
+    return new Promise<PlacesLibrary | null>((resolve) => {
+      const importPlaces = async () => {
+        try {
+          const importLibrary = window.google?.maps?.importLibrary;
+          if (typeof importLibrary !== "function") {
+            resolve(null);
+            return;
+          }
+          const lib = await importLibrary("places");
+          resolve(isUsablePlaces(lib) ? lib : null);
+        } catch {
           resolve(null);
+        }
+      };
+
+      try {
+        const existing = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
+        if (existing) {
+          if (typeof window.google?.maps?.importLibrary === "function") {
+            void importPlaces();
+          } else {
+            existing.addEventListener("load", () => void importPlaces(), { once: true });
+            existing.addEventListener("error", () => resolve(null), { once: true });
+          }
           return;
         }
-        const lib = await importLibrary("places");
-        resolve(isUsablePlaces(lib) ? lib : null);
+
+        const script = document.createElement("script");
+        script.id = SCRIPT_ID;
+        script.async = true;
+        script.defer = true;
+        // `loading=async` is the recommended mode for importLibrary(); region/
+        // language bias the whole API to India + English.
+        script.src =
+          "https://maps.googleapis.com/maps/api/js" +
+          `?key=${encodeURIComponent(key)}` +
+          "&loading=async&language=en&region=IN&libraries=places";
+        script.addEventListener("load", () => void importPlaces(), { once: true });
+        script.addEventListener("error", () => resolve(null), { once: true });
+        document.head.appendChild(script);
       } catch {
         resolve(null);
       }
-    };
-
-    try {
-      const existing = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
-      if (existing) {
-        if (typeof window.google?.maps?.importLibrary === "function") {
-          void importPlaces();
-        } else {
-          existing.addEventListener("load", () => void importPlaces(), { once: true });
-          existing.addEventListener("error", () => resolve(null), { once: true });
-        }
-        return;
-      }
-
-      const script = document.createElement("script");
-      script.id = SCRIPT_ID;
-      script.async = true;
-      script.defer = true;
-      // `loading=async` is the recommended mode for importLibrary(); region/
-      // language bias the whole API to India + English.
-      script.src =
-        "https://maps.googleapis.com/maps/api/js" +
-        `?key=${encodeURIComponent(key)}` +
-        "&loading=async&language=en&region=IN&libraries=places";
-      script.addEventListener("load", () => void importPlaces(), { once: true });
-      script.addEventListener("error", () => resolve(null), { once: true });
-      document.head.appendChild(script);
-    } catch {
-      // Any unexpected DOM error → fall back to manual entry.
-      resolve(null);
-    }
-  }).catch(() => null);
+    });
+  })().catch(() => null);
 
   window.__qfGooglePlacesPromise = promise;
   return promise;

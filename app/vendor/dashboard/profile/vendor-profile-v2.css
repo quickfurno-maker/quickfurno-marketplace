@@ -759,3 +759,76 @@
 .qf-vendor-v2-profile-upload-btn[data-busy] { opacity: 0.75; cursor: progress; }
 .qf-vendor-v2-profile-upload-btn[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }
 .qf-vendor-v2-profile-hint[data-tone="error"] { color: var(--qfd-orange-text, #a82f0a); font-weight: 600; }
+
+
+/* ==========================================================================
+   Exact office location — operational matching evidence
+   ========================================================================== */
+.qf-vendor-v2-profile-location-state {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--v2-warn-line);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-warn-tint);
+}
+
+.qf-vendor-v2-profile-location-state[data-verified="true"] {
+  border-color: var(--v2-ok-line);
+  background: var(--v2-ok-tint);
+}
+
+.qf-vendor-v2-profile-location-state strong {
+  font-size: 0.812rem;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-profile-location-state span {
+  font-size: 0.766rem;
+  line-height: 1.45;
+  color: var(--v2-muted);
+  overflow-wrap: anywhere;
+}
+
+.qf-vendor-v2-profile-coverage-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.72rem 0.8rem;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-inset);
+  cursor: pointer;
+}
+
+.qf-vendor-v2-profile-coverage-check input {
+  margin-top: 0.15rem;
+}
+
+.qf-vendor-v2-profile-coverage-check span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.qf-vendor-v2-profile-coverage-check strong {
+  font-size: 0.812rem;
+  color: var(--v2-ink);
+}
+
+.qf-vendor-v2-profile-coverage-check small {
+  font-size: 0.766rem;
+  line-height: 1.45;
+  color: var(--v2-muted);
+}
+
+.qf-vendor-v2-profile-location-submit {
+  display: grid;
+  gap: 0.4rem;
+  justify-items: start;
+  padding-top: 0.2rem;
+}
+
+.qf-vendor-v2-profile-location-submit .qf-vendor-v2-btn[disabled] {
+  opacity: 0.52;
+  cursor: not-allowed;
+}

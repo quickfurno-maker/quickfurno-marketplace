@@ -334,7 +334,7 @@ export function VendorsPage({ data, error }: { data: VendorsDirectoryData | null
 
       <SectionCard
         title="Profile Change Requests"
-        description="Review vendor-submitted public profile changes. Approval applies only safe public fields."
+        description="Review vendor-submitted public profile and exact office-location changes. Approval applies only whitelisted fields."
       >
         <DataTable
           rows={profileChangeRequests}
@@ -801,8 +801,19 @@ export function SupportThreadMessages({ messages }: { messages: VendorSupportMes
   );
 }
 
+const PROFILE_CHANGE_INTERNAL_KEYS = new Set([
+  "office_google_place_id",
+  "office_latitude",
+  "office_longitude",
+  "office_area_normalized",
+  "office_sublocality",
+  "office_neighborhood",
+]);
+
 export function ProfileChangeSnapshot({ value }: { value?: Record<string, unknown> | null }) {
-  const entries = Object.entries(value ?? {}).slice(0, 6);
+  const entries = Object.entries(value ?? {})
+    .filter(([key]) => !PROFILE_CHANGE_INTERNAL_KEYS.has(key))
+    .slice(0, 6);
   if (!entries.length) return <span className="text-xs text-slate-500">No values</span>;
   return (
     <div className="grid min-w-64 gap-1 text-xs text-slate-600">
@@ -817,6 +828,12 @@ export function ProfileChangeSnapshot({ value }: { value?: Record<string, unknow
 }
 
 export function profileChangeLabel(key: string) {
+  const labels: Record<string, string> = {
+    office_formatted_address: "Office location",
+    office_covers_full_city: "Full-city coverage",
+    office_service_radius_km: "Service radius (km)",
+  };
+  if (labels[key]) return labels[key];
   return key
     .replace(/^public_/, "")
     .replace(/_/g, " ")

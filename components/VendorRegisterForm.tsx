@@ -7,8 +7,9 @@ import { QFIcon } from "@/components/QuickFurnoIcons";
 import { mainCategories, signupSelectionForCategory, type MainCategory } from "@/lib/categories";
 import { type QuickFurnoCategory } from "@/lib/quickfurno-data";
 import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useActiveCities";
-// Phase 1: reuse the SAME Google autocomplete the client form uses (no second
-// system) for the vendor's Google business base area / locality.
+// Reuse the SAME Google autocomplete the client form uses (no second system)
+// for the vendor's exact office/business place. Its coordinates are the
+// canonical vendor base point; service coverage remains a separate concept.
 import GooglePlaceAutocomplete from "@/components/location/GooglePlaceAutocomplete";
 import { isPlaceCompatibleWithSelectedCity } from "@/lib/google-maps/normalizePlace";
 import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
@@ -26,9 +27,9 @@ import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
 // and public category pages show the correct category.
 // ---------------------------------------------------------------------------
 
-// Phase 1: static per-city service-area chips (CITY_SERVICE_AREAS) were removed.
-// Vendors now set a single Google business base area/locality (with manual
-// fallback), which produces canonical base coordinates for future matching.
+// Static per-city service-area chips (CITY_SERVICE_AREAS) were removed.
+// Vendors now select an exact Google office/business place (with manual fallback)
+// that produces the canonical base coordinates used by geographic matching.
 // Phase 14B: active cities come from the admin-managed cities table (via the
 // shared useActiveCities hook), so the vendor form never drifts from the
 // homepage / client enquiry modal. No custom-city entry allowed.
@@ -46,6 +47,7 @@ const CATEGORY_MIN_RATE: Partial<Record<QuickFurnoCategory, number>> = {
 };
 
 const BUSINESS_TYPE_OPTIONS = ["Showroom", "Factory", "Studio", "Workshop", "Home-based / On-site"];
+const SERVICE_RADIUS_OPTIONS = [5, 10, 15, 20, 30, 50] as const;
 
 const STEP_NAMES = [
   "Business Identity",
@@ -75,7 +77,7 @@ type WizardState = {
   addressLine2: string;
   landmark: string;
   stateName: string;
-  // Google business base area / locality (Phase 1). Manual fallback preserved.
+  // Canonical Google office/business place. Manual fallback remains available.
   baseArea: string;
   baseAreaNormalized: string;
   googlePlaceId: string;
@@ -90,6 +92,7 @@ type WizardState = {
   rateValue: string;
   businessType: string;
   coversFullCity: boolean;
+  serviceRadiusKm: string;
 };
 
 // QF-MVP-80.16C. The same Indian-mobile contract the server now enforces in
@@ -130,6 +133,7 @@ const initialState: WizardState = {
   rateValue: "",
   businessType: "",
   coversFullCity: false,
+  serviceRadiusKm: "",
 };
 
 /** Lightweight email sanity check (real validation happens at account creation). */
@@ -331,9 +335,9 @@ export function VendorRegisterForm({
     }));
   }
 
-  // ── Phase 1: Google business base area / locality (manual fallback preserved) ──
-  // Manual typing keeps a free-text base area and clears any stale Google identity
-  // + canonical coordinates so the saved text never disagrees with a picked place.
+  // ── Canonical vendor office/base location ───────────────────────────────────
+  // Manual typing keeps free-text context but clears any stale Google identity
+  // + canonical coordinates so text can never masquerade as a verified place.
   function onBaseAreaManual(value: string) {
     setError("");
     setF((current) => ({
@@ -354,7 +358,7 @@ export function VendorRegisterForm({
   // if the place clearly belongs to a different city than the one selected.
   function onBaseAreaPlace(place: NormalizedGooglePlace) {
     if (f.city && !isPlaceCompatibleWithSelectedCity(place, f.city)) {
-      setError(`Please select a base area within ${f.city}.`);
+      setError(`Please select an office / business location within ${f.city}.`);
       return;
     }
     setError("");
@@ -366,6 +370,9 @@ export function VendorRegisterForm({
       formattedAddress: place.formattedAddress ?? "",
       sublocality: place.sublocality ?? "",
       neighborhood: place.neighborhood ?? "",
+      // Keep profile/contact address aligned with the canonical place by default.
+      // The vendor can still refine the address-line fields afterwards.
+      addressLine1: place.formattedAddress ?? current.addressLine1,
       // Canonical vendor base coordinates come from THIS place only. If the newly
       // picked place has no coordinates we store null — never retain the previous
       // place's coords, so base identity + area + coordinates stay consistent.
@@ -432,10 +439,18 @@ export function VendorRegisterForm({
           e.push({ key: "city", message: "Select your city." });
         }
         if (baseAreaStr.length < 2) {
-          e.push({ key: "baseArea", message: "Enter your business base area / locality." });
+          e.push({ key: "baseArea", message: "Enter your office or business location." });
         }
         if (address1Str.length < 5) {
           e.push({ key: "addressLine1", message: "Enter your office or business address." });
+        }
+        if (
+          !f.coversFullCity &&
+          !SERVICE_RADIUS_OPTIONS.includes(
+            Number(f.serviceRadiusKm) as (typeof SERVICE_RADIUS_OPTIONS)[number],
+          )
+        ) {
+          e.push({ key: "serviceRadius", message: "Select how far you normally serve from your office." });
         }
         if (!stateStr) {
           e.push({ key: "state", message: "Enter your state." });
@@ -514,9 +529,9 @@ export function VendorRegisterForm({
   const cityValue = String(f.city ?? "").trim();
   const baseAreaValue = String(f.baseArea ?? "").trim();
   const hasCitySelected = Boolean(f.city);
-  // Phase 1: areas_covered is derived from the single Google business base area
-  // (keeps the existing exact-area match path alive without touching the RPC).
-  // covers_full_city continues to widen coverage city-wide.
+  // areas_covered remains the locality derived from the exact Google office
+  // place, preserving the existing area-affinity path. covers_full_city is a
+  // separate service-coverage decision and never changes the office coordinate.
   const derivedAreasCovered = baseAreaValue ? [baseAreaValue] : [];
 
   // Resolve the final marketplace category (leaf or chosen subcategory), then map
@@ -626,10 +641,10 @@ export function VendorRegisterForm({
         whatsapp_number: whatsappDigits || undefined,
         email: emailStr,
         city: cityValue,
-        // Detailed office / business address (Step 3) — kept for profile/contact
-        // only; it does NOT drive matching. office_city mirrors the service city.
-        // Pincode removed (Phase 1). office_lat/long are now the CANONICAL vendor
-        // base coordinates, sourced from the Google business base area place.
+        // Detailed office / business address remains editable profile/contact
+        // text. office_city mirrors the service city. office_lat/long are the
+        // CANONICAL matching coordinates sourced only from the selected Google
+        // office/business place.
         office_address_line1: address1Str || undefined,
         office_address_line2: String(f.addressLine2 ?? "").trim() || undefined,
         office_landmark: String(f.landmark ?? "").trim() || undefined,
@@ -637,14 +652,17 @@ export function VendorRegisterForm({
         office_state: stateStr || undefined,
         office_latitude: f.baseLatitude,
         office_longitude: f.baseLongitude,
-        // Phase 1: derived from the single Google base area (keeps existing
-        // area-match path). covers_full_city still widens coverage city-wide.
+        // Derived locality keeps the existing area-affinity path. Coverage stays
+        // separate: covers_full_city can widen eligibility without moving the
+        // canonical office/base point.
         areas_covered: derivedAreasCovered,
         covers_full_city: f.coversFullCity,
-        // service_radius_km intentionally not sent (no hardcoded 20; DB default applies).
+        // Coverage is independent of the office/base point. Full-city coverage
+        // wins; otherwise store the vendor-selected operating radius.
+        service_radius_km: f.coversFullCity ? undefined : Number(f.serviceRadiusKm) || undefined,
         service_categories: matchingServices,
         experience: f.yearsExperience || undefined,
-        // Google business base area — structured identity + normalized fields.
+        // Exact Google office/business place — structured identity + normalized fields.
         google_place_id: f.googlePlaceId || undefined,
         formatted_address: f.formattedAddress || undefined,
         area_normalized: f.baseAreaNormalized || undefined,
@@ -947,7 +965,7 @@ export function VendorRegisterForm({
           <div className="qf-rf-question">
             <span className="qf-rf-qcount">Step 3 of 6</span>
             <h2>Where do you serve clients?</h2>
-            <p className="qf-rf-qhint">Pick your city and your business base area. You can update this later from your dashboard.</p>
+            <p className="qf-rf-qhint">Select your city and exact office, shop, studio or workshop location. Service coverage is configured separately.</p>
 
             {/* 1. City selection */}
             <div className={`qf-rf-chips${fieldError("city") ? " has-error" : ""}`} ref={bindField("city")}>
@@ -976,8 +994,12 @@ export function VendorRegisterForm({
                           neighborhood: "",
                           baseLatitude: null,
                           baseLongitude: null,
+                          addressLine1: "",
+                          addressLine2: "",
+                          landmark: "",
                           stateName: "Maharashtra",
                           coversFullCity: false,
+                          serviceRadiusKm: "",
                         }));
                         setError("");
                         setTouched((prev) => ({ ...prev, city: true }));
@@ -999,7 +1021,12 @@ export function VendorRegisterForm({
                     type="checkbox"
                     checked={f.coversFullCity}
                     onChange={(e) => {
-                      set("coversFullCity", e.target.checked);
+                      const checked = e.target.checked;
+                      setF((current) => ({
+                        ...current,
+                        coversFullCity: checked,
+                        serviceRadiusKm: checked ? "" : current.serviceRadiusKm,
+                      }));
                     }}
                     className="qf-rf-coverage-checkbox"
                   />
@@ -1012,35 +1039,60 @@ export function VendorRegisterForm({
                 </label>
                 {f.coversFullCity ? (
                   <p className="qf-rf-coverage-helper">
-                    “Your profile will be eligible across the city. Your business base area is still used to prioritise nearby requests.”
+                    “Your service coverage is city-wide. Your exact office location is still used to prioritise nearby requests.”
                   </p>
+                ) : null}
+                {!f.coversFullCity ? (
+                  <label className="qf-rf-field" ref={bindField("serviceRadius")}>
+                    <span>Service radius from office</span>
+                    <select
+                      value={f.serviceRadiusKm}
+                      onChange={(e) => set("serviceRadiusKm", e.target.value)}
+                    >
+                      <option value="">Select service radius</option>
+                      {SERVICE_RADIUS_OPTIONS.map((km) => (
+                        <option key={km} value={String(km)}>{km} km</option>
+                      ))}
+                    </select>
+                    {fieldError("serviceRadius") ? (
+                      <span className="qf-rf-field-err">{fieldError("serviceRadius")}</span>
+                    ) : (
+                      <span className="qf-rf-loc-note">
+                        Operating coverage is separate from your exact office location.
+                      </span>
+                    )}
+                  </label>
                 ) : null}
               </div>
             ) : null}
 
-            {/* 2. Google business base area / locality (manual fallback preserved) */}
-            <p className="qf-vrf-subhead">Business base area / locality</p>
+            {/* 2. Canonical Google office/business place (manual fallback preserved) */}
+            <p className="qf-vrf-subhead">Exact office / business location</p>
             {(() => {
               const baseTouched = touched.baseArea || showErrors;
               const baseValid = baseAreaValue.length >= 2;
+              const basePrecise =
+                Boolean(f.googlePlaceId) &&
+                f.baseLatitude != null &&
+                f.baseLongitude != null;
               const baseInvalid = baseTouched && !baseValid;
-              const wrapperClass = `qf-rf-field${baseInvalid ? " has-error" : ""}${baseValid ? " is-valid" : ""}`;
+              const wrapperClass = `qf-rf-field${baseInvalid ? " has-error" : ""}${basePrecise ? " is-valid" : ""}`;
               return (
                 <label className={wrapperClass} ref={bindField("baseArea")}>
-                  <span>Business base area / locality</span>
+                  <span>Exact office / business location</span>
                   <div className="qf-rf-input-wrapper">
                     <GooglePlaceAutocomplete
-                      value={f.baseArea}
+                      value={f.formattedAddress || f.baseArea}
                       city={f.city}
-                      mode="locality"
+                      mode="address"
                       onManualChange={onBaseAreaManual}
                       onPlaceSelected={onBaseAreaPlace}
                       onBlur={() => setTouched((prev) => ({ ...prev, baseArea: true }))}
-                      placeholder={hasCitySelected ? "e.g. Baner, Kharadi" : "Select a city first"}
+                      placeholder={hasCitySelected ? "Search office, shop, studio or building" : "Select a city first"}
                       disabled={!hasCitySelected}
-                      autoComplete="off"
+                      autoComplete="street-address"
                     />
-                    {baseValid ? (
+                    {basePrecise ? (
                       <span className="qf-rf-input-icon qf-rf-input-icon--valid">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#19a55a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="20 6 9 17 4 12"></polyline>
@@ -1058,20 +1110,22 @@ export function VendorRegisterForm({
                   {baseInvalid && fieldError("baseArea") ? (
                     <span className="qf-rf-field-err">{fieldError("baseArea")}</span>
                   ) : null}
-                  {f.baseLatitude != null && f.baseLongitude != null ? (
+                  {basePrecise ? (
                     <span className="qf-rf-loc-note qf-rf-loc-note--ok" style={{ marginTop: "0.25rem" }}>
-                      Base location set from your selected area.
+                      Exact office location verified for precise nearby-client matching.
                     </span>
                   ) : (
                     <span className="qf-rf-loc-note" style={{ marginTop: "0.25rem" }}>
-                      Pick a suggestion for precise matching, or type your area manually.
+                      Select a Google suggestion for precise matching. Manual text is saved but treated as unverified.
                     </span>
                   )}
                 </label>
               );
             })()}
 
-            {/* 3. Office / Business Address (profile/contact only — not matching) */}
+            {/* 3. Office / Business Address details. The canonical matching point
+                is the verified Google place above; these fields remain editable
+                profile/contact text. */}
             <p className="qf-vrf-subhead">Office / Business Address</p>
             <div className="qf-rf-fields">
               {renderInputField({

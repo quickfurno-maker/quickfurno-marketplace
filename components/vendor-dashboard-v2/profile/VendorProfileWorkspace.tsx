@@ -6,6 +6,7 @@ import type {
 } from "@/services/vendorProfileChangeService";
 import { VendorIcon } from "../icons";
 import { VendorProfileEditor } from "./VendorProfileEditor";
+import { VendorOfficeLocationEditor } from "./VendorOfficeLocationEditor";
 import { VendorProfileFeedback } from "./VendorProfileFeedback";
 import {
   VendorProfileAccountDetails,
@@ -108,6 +109,7 @@ export function VendorProfileWorkspace({
         </div>
 
         <div className="qf-vendor-v2-profile-main">
+          <VendorOfficeLocationEditor vendor={vendor} />
           <VendorProfileEditor current={current} />
           <VendorProfileAccountDetails vendor={vendor} />
           <VendorProfileRequestHistory requests={requests} />

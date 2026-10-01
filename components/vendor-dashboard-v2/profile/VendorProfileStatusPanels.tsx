@@ -130,6 +130,25 @@ export function VendorProfileAccountDetails({ vendor }: { vendor: VendorProfileS
     { label: "WhatsApp", value: vendor.whatsapp_number || vendor.phone || "—" },
     { label: "Email", value: vendor.email || "—" },
     { label: "Business city", value: vendor.city || "—" },
+    {
+      label: "Office location",
+      value: vendor.formatted_address || vendor.office_address_line1 || "Not verified",
+    },
+    {
+      label: "Matching location",
+      value:
+        vendor.google_place_id && vendor.office_latitude != null && vendor.office_longitude != null
+          ? "Google verified"
+          : "Precise location needed",
+    },
+    {
+      label: "Service coverage",
+      value: vendor.covers_full_city
+        ? "Full city"
+        : vendor.service_radius_km != null
+          ? `${vendor.service_radius_km} km from office`
+          : "Not set",
+    },
     { label: "Business type", value: vendor.business_type || "—" },
     {
       label: "Verification",
@@ -150,9 +169,9 @@ export function VendorProfileAccountDetails({ vendor }: { vendor: VendorProfileS
         ))}
       </dl>
       <p className="qf-vendor-v2-profile-hint">
-        These are not part of your public listing.{" "}
-        <Link href="/vendor/dashboard/support">Contact QuickFurno support</Link> if they need
-        correcting.
+        These are not part of your public listing. Exact office location and coverage can be
+        submitted above for approval.{" "}
+        <Link href="/vendor/dashboard/support">Contact QuickFurno support</Link> for other corrections.
       </p>
     </section>
   );

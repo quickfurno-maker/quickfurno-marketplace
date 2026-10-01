@@ -223,6 +223,9 @@ const PROPOSED_FIELD_LABELS: Record<string, string> = {
   profile_image_url: "Profile photo",
   cover_image_url: "Cover photo",
   portfolio_image_urls: "Portfolio photos",
+  office_formatted_address: "Office location",
+  office_covers_full_city: "Full-city coverage",
+  office_service_radius_km: "Service radius (km)",
 };
 
 export interface ProposedChangeSummary {

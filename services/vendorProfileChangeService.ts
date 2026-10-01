@@ -6,6 +6,7 @@
 import { adminClient } from "../lib/supabase";
 import { appError, fail, ok, type Result } from "../lib/errors";
 import { createVendorNotification } from "./vendorNotificationService";
+import { normalizeVendorOfficeEvidence } from "../lib/locations/locationEvidence";
 
 export type VendorProfileChangeInput = {
   public_business_name?: string;
@@ -18,6 +19,15 @@ export type VendorProfileChangeInput = {
   profile_image_url?: string;
   cover_image_url?: string;
   portfolio_image_urls?: string[];
+  office_google_place_id?: string;
+  office_formatted_address?: string;
+  office_latitude?: number;
+  office_longitude?: number;
+  office_area_normalized?: string;
+  office_sublocality?: string;
+  office_neighborhood?: string;
+  office_covers_full_city?: boolean;
+  office_service_radius_km?: number;
 };
 
 export type VendorProfileChangeRequest = {
@@ -47,6 +57,15 @@ export type VendorApprovedProfileSummary = {
   profile_image_url: string | null;
   cover_image_url: string | null;
   portfolio_urls: string[] | null;
+  google_place_id: string | null;
+  formatted_address: string | null;
+  area_normalized: string | null;
+  sublocality: string | null;
+  neighborhood: string | null;
+  office_latitude: number | null;
+  office_longitude: number | null;
+  covers_full_city: boolean | null;
+  service_radius_km: number | null;
 };
 
 const VENDOR_PUBLIC_SELECT = [
@@ -60,6 +79,15 @@ const VENDOR_PUBLIC_SELECT = [
   "profile_image_url",
   "cover_image_url",
   "portfolio_urls",
+  "google_place_id",
+  "formatted_address",
+  "area_normalized",
+  "sublocality",
+  "neighborhood",
+  "office_latitude",
+  "office_longitude",
+  "covers_full_city",
+  "service_radius_km",
 ].join(", ");
 
 const ALLOWED_CATEGORIES = new Set([
@@ -72,6 +100,20 @@ const ALLOWED_CATEGORIES = new Set([
   "Civil Work",
   "False Ceiling",
 ]);
+
+const LOCATION_CHANGE_KEYS = new Set([
+  "office_google_place_id",
+  "office_formatted_address",
+  "office_latitude",
+  "office_longitude",
+  "office_area_normalized",
+  "office_sublocality",
+  "office_neighborhood",
+  "office_covers_full_city",
+  "office_service_radius_km",
+]);
+
+const SERVICE_RADIUS_OPTIONS = new Set([5, 10, 15, 20, 30, 50]);
 
 export async function getVendorApprovedProfileSummary(vendorId: string): Promise<Result<VendorApprovedProfileSummary>> {
   try {
@@ -124,14 +166,20 @@ export async function createVendorProfileChangeRequest(
     const summary = await getVendorApprovedProfileSummary(vendorId);
     if (!summary.ok) return fail(summary.error);
 
+    const requestType = classifyProfileRequest(proposed);
+    const currentSnapshot =
+      requestType === "location_update"
+        ? locationSnapshotFromSummary(summary.data)
+        : summary.data;
+
     const { data, error } = await adminClient()
       .from("vendor_profile_change_requests")
       .insert({
         vendor_id: vendorId,
         requested_by: requestedBy,
-        request_type: "profile_update",
+        request_type: requestType,
         proposed_changes: proposed,
-        current_snapshot: summary.data,
+        current_snapshot: currentSnapshot,
         status: "pending",
       })
       .select("*")
@@ -182,9 +230,12 @@ export async function approveVendorProfileChangeRequest(
       .single();
     if (error) throw error;
 
+    const locationOnly = request.request_type === "location_update";
     await createVendorNotification(request.vendor_id, {
-      title: "Profile changes approved",
-      message: "Your public profile changes were approved and are now live.",
+      title: locationOnly ? "Business location approved" : "Profile changes approved",
+      message: locationOnly
+        ? "Your exact office location and service coverage were approved for matching."
+        : "Your public profile changes were approved and are now live.",
       type: "profile",
       priority: "normal",
       cta_label: "View profile",
@@ -243,6 +294,29 @@ export async function rejectVendorProfileChangeRequest(
   }
 }
 
+function classifyProfileRequest(changes: Record<string, unknown>): string {
+  const keys = Object.keys(changes);
+  const hasLocation = keys.some((key) => LOCATION_CHANGE_KEYS.has(key));
+  const hasPublicProfile = keys.some((key) => !LOCATION_CHANGE_KEYS.has(key));
+  if (hasLocation && !hasPublicProfile) return "location_update";
+  if (hasLocation && hasPublicProfile) return "profile_and_location_update";
+  return "profile_update";
+}
+
+function locationSnapshotFromSummary(summary: VendorApprovedProfileSummary): Record<string, unknown> {
+  return {
+    office_formatted_address: summary.formatted_address,
+    office_google_place_id: summary.google_place_id,
+    office_latitude: summary.office_latitude,
+    office_longitude: summary.office_longitude,
+    office_area_normalized: summary.area_normalized,
+    office_sublocality: summary.sublocality,
+    office_neighborhood: summary.neighborhood,
+    office_covers_full_city: summary.covers_full_city,
+    office_service_radius_km: summary.service_radius_km,
+  };
+}
+
 function sanitizeProfileInput(input: VendorProfileChangeInput): Record<string, unknown> {
   const output: Record<string, unknown> = {};
   setText(output, "public_business_name", input.public_business_name, 100);
@@ -255,6 +329,32 @@ function sanitizeProfileInput(input: VendorProfileChangeInput): Record<string, u
   setSafeUrl(output, "cover_image_url", input.cover_image_url);
   setTextArray(output, "services_offered", input.services_offered, 12, 80);
   setUrlArray(output, "portfolio_image_urls", input.portfolio_image_urls, 12);
+
+  const office = normalizeVendorOfficeEvidence({
+    office_latitude: input.office_latitude,
+    office_longitude: input.office_longitude,
+    google_place_id: input.office_google_place_id,
+    formatted_address: input.office_formatted_address,
+    area_normalized: input.office_area_normalized,
+    sublocality: input.office_sublocality,
+    neighborhood: input.office_neighborhood,
+  });
+  const fullCity = input.office_covers_full_city === true;
+  const radius = Number(input.office_service_radius_km ?? 0);
+  const validCoverage = fullCity || SERVICE_RADIUS_OPTIONS.has(radius);
+
+  if (office.verified && validCoverage) {
+    output.office_formatted_address = office.formatted_address;
+    output.office_google_place_id = office.google_place_id;
+    output.office_latitude = office.office_latitude;
+    output.office_longitude = office.office_longitude;
+    output.office_area_normalized = office.area_normalized;
+    output.office_sublocality = office.sublocality;
+    output.office_neighborhood = office.neighborhood;
+    output.office_covers_full_city = fullCity;
+    output.office_service_radius_km = fullCity ? null : radius;
+  }
+
   return output;
 }
 
@@ -270,6 +370,34 @@ function mapApprovedChangesToVendorUpdate(changes: Record<string, unknown>) {
   if ("profile_image_url" in changes) update.profile_image_url = changes.profile_image_url;
   if ("cover_image_url" in changes) update.cover_image_url = changes.cover_image_url;
   if ("portfolio_image_urls" in changes) update.portfolio_urls = changes.portfolio_image_urls;
+
+  if ("office_google_place_id" in changes) {
+    const office = normalizeVendorOfficeEvidence({
+      office_latitude: changes.office_latitude as number | null | undefined,
+      office_longitude: changes.office_longitude as number | null | undefined,
+      google_place_id: changes.office_google_place_id as string | null | undefined,
+      formatted_address: changes.office_formatted_address as string | null | undefined,
+      area_normalized: changes.office_area_normalized as string | null | undefined,
+      sublocality: changes.office_sublocality as string | null | undefined,
+      neighborhood: changes.office_neighborhood as string | null | undefined,
+    });
+    const fullCity = changes.office_covers_full_city === true;
+    const radius = Number(changes.office_service_radius_km ?? 0);
+    const validCoverage = fullCity || SERVICE_RADIUS_OPTIONS.has(radius);
+
+    if (office.verified && validCoverage) {
+      update.google_place_id = office.google_place_id;
+      update.formatted_address = office.formatted_address;
+      update.area_normalized = office.area_normalized;
+      update.sublocality = office.sublocality;
+      update.neighborhood = office.neighborhood;
+      update.office_latitude = office.office_latitude;
+      update.office_longitude = office.office_longitude;
+      update.covers_full_city = fullCity;
+      update.service_radius_km = fullCity ? null : radius;
+    }
+  }
+
   return update;
 }
 

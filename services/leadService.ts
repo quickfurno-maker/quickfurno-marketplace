@@ -37,6 +37,7 @@ import {
 } from "./preferredVendorLeadService";
 import type { CreateLeadInput, PublicVendorCard, AssignResult } from "../lib/types";
 import { normalizeLaunchCity } from "../lib/locations/launchCityPolicy";
+import { normalizeLeadLocationEvidence } from "../lib/locations/locationEvidence";
 
 function firstText(...values: Array<string | undefined>): string {
   return values.map((value) => value?.trim()).find(Boolean) ?? "";
@@ -147,26 +148,14 @@ export async function createLead(
       subcategory: input.subcategory ?? null,
     };
 
-    // Phase 1 (Google area foundation): structured lead location + Google Place
-    // identity. Additive/optional — persisted once migration
-    // 20260704000040_google_area_location_foundation.sql runs. The existing
-    // missing-column fallback below drops these together with the tracking
-    // fields, so lead capture is never blocked on a not-yet-migrated database.
-    // Foundation only: matching/quality/duplicate logic is unchanged this phase.
-    const locationPayload = {
-      latitude: input.latitude ?? null,
-      longitude: input.longitude ?? null,
-      location_accuracy_meters: input.location_accuracy_meters ?? null,
-      location_source: input.location_source ?? null,
-      location_captured_at: input.location_captured_at ?? null,
-      google_place_id: input.google_place_id ?? null,
-      formatted_address: input.formatted_address ?? null,
-      area_normalized: input.area_normalized ?? null,
-      sublocality: input.sublocality ?? null,
-      neighborhood: input.neighborhood ?? null,
-      // postal_code intentionally not written (Phase 1: pincode retired as a
-      // location signal). Legacy DB column remains, unused for new leads.
-    };
+    // Canonical client geographic evidence. The server never trusts arbitrary
+    // coordinates just because the browser sent them:
+    //   Google Place => valid coords + Place ID
+    //   Browser GPS / reverse geocode => valid coords, no stale Google identity
+    //   Manual / malformed => text only, no canonical coordinates
+    // This keeps matching evidence internally consistent even if a public form is
+    // bypassed or a stale client submits mixed-source location fields.
+    const locationPayload = normalizeLeadLocationEvidence(input);
 
     const insertLead = (payload: Record<string, unknown>) =>
       db.from("leads").insert(payload).select("id, is_duplicate").single();

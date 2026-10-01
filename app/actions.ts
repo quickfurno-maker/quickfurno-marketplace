@@ -171,7 +171,7 @@ export async function getMyVendor(): Promise<Result<import("../lib/types").Vendo
   const { data } = await sb
     .from("vendors")
     .select(
-      "id, business_name, owner_name, phone, whatsapp_number, email, city, areas_covered, service_categories, selected_category, business_type, office_address_line1, office_address_line2, office_landmark, office_city, office_state, office_latitude, office_longitude, status, verification_status, paid_status, remaining_credits, total_credits, public_visibility, is_active",
+      "id, business_name, owner_name, phone, whatsapp_number, email, city, areas_covered, covers_full_city, service_radius_km, service_categories, selected_category, business_type, office_address_line1, office_address_line2, office_landmark, office_city, office_state, office_latitude, office_longitude, google_place_id, formatted_address, area_normalized, sublocality, neighborhood, status, verification_status, paid_status, remaining_credits, total_credits, public_visibility, is_active",
     )
     .eq("user_id", u.id)
     .maybeSingle();
@@ -486,6 +486,13 @@ export async function vendorSubmitProfileChangeRequest(formData: FormData) {
   const me = await getMyVendor();
   if (!me.ok || !me.data) redirect("/vendor/dashboard/profile?request=no-vendor");
 
+  const optionalNumber = (key: string): number | undefined => {
+    const raw = String(formData.get(key) ?? "").trim();
+    if (!raw) return undefined;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : undefined;
+  };
+
   const u = await currentUser();
   const result = await vendorProfileChanges.createVendorProfileChangeRequest(me.data.id, u?.id ?? null, {
     public_business_name: String(formData.get("public_business_name") ?? ""),
@@ -498,6 +505,15 @@ export async function vendorSubmitProfileChangeRequest(formData: FormData) {
     profile_image_url: String(formData.get("profile_image_url") ?? ""),
     cover_image_url: String(formData.get("cover_image_url") ?? ""),
     portfolio_image_urls: String(formData.get("portfolio_image_urls") ?? "").split(/\r?\n|,/),
+    office_google_place_id: String(formData.get("office_google_place_id") ?? ""),
+    office_formatted_address: String(formData.get("office_formatted_address") ?? ""),
+    office_latitude: optionalNumber("office_latitude"),
+    office_longitude: optionalNumber("office_longitude"),
+    office_area_normalized: String(formData.get("office_area_normalized") ?? ""),
+    office_sublocality: String(formData.get("office_sublocality") ?? ""),
+    office_neighborhood: String(formData.get("office_neighborhood") ?? ""),
+    office_covers_full_city: String(formData.get("office_covers_full_city") ?? "") === "true",
+    office_service_radius_km: optionalNumber("office_service_radius_km"),
   });
 
   revalidatePath("/vendor/dashboard/profile");
@@ -570,6 +586,7 @@ export async function adminApproveVendorProfileChangeRequest(requestId: string, 
     const result = await vendorProfileChanges.approveVendorProfileChangeRequest(requestId, user.id, adminNotes);
     revalidatePath("/admin/vendors");
     revalidatePath("/vendors");
+    revalidatePath("/vendor/dashboard/profile");
     return result;
   });
 }

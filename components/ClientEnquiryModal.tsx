@@ -131,6 +131,7 @@ type RFState = {
   // These map to the Phase 1 optional CreateLeadInput fields; when empty they
   // are simply omitted from the payload, so the manual flow is unchanged.
   googlePlaceId: string;
+  googleCity: string;
   formattedAddress: string;
   areaNormalized: string;
   sublocality: string;
@@ -160,6 +161,7 @@ const initialState: RFState = {
   shareConsent: false,
   // Phase 2 structured-location defaults (empty = manual-only, unchanged flow).
   googlePlaceId: "",
+  googleCity: "",
   formattedAddress: "",
   areaNormalized: "",
   sublocality: "",
@@ -399,7 +401,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   const [form, setForm] = useState<RFState>(initialState);
   // Admin-managed active cities (single source of truth for city options AND the
   // supported-city check after a Google place is picked). Never hardcoded here.
-  const { cities: activeCities, loading: citiesLoading, loaded: citiesLoaded } = useActiveCities();
+  const { cities: activeCities, records: activeCityRecords, loading: citiesLoading, loaded: citiesLoaded } = useActiveCities();
   const [modalOptions, setModalOptions] = useState<EnquiryModalOptions>({});
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -758,6 +760,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         areaNormalized: value.trim().toLowerCase(),
         // Google place identity never survives manual editing of the area text.
         googlePlaceId: "",
+        googleCity: "",
         formattedAddress: "",
         sublocality: "",
         neighborhood: "",
@@ -790,7 +793,14 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   // message and let them pick again or type an area manually. This prevents ever
   // saving city = X with coordinates from another city.
   function onAreaPlaceSelected(place: NormalizedGooglePlace) {
-    if (form.city && !isPlaceCompatibleWithSelectedCity(place, form.city)) {
+    const selectedCityRecord = activeCityRecords.find(
+      (city) => city.name.toLowerCase() === form.city.toLowerCase(),
+    );
+    const acceptedLabels = selectedCityRecord?.acceptedCityLabels ?? (form.city ? [form.city] : []);
+    if (
+      form.city &&
+      !isPlaceCompatibleWithSelectedCity(place, form.city, acceptedLabels)
+    ) {
       setError(`Please select an area within ${form.city}.`);
       return; // keep the form exactly as-is; manual typing remains available
     }
@@ -799,7 +809,11 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       // Only accept a place city that is one of the admin-managed active cities
       // (case-insensitive), and store it in the canonical casing from that list.
       const matchedCity = place.city
-        ? activeCities.find((c) => c.toLowerCase() === place.city!.toLowerCase())
+        ? activeCityRecords.find((record) =>
+            record.acceptedCityLabels.some(
+              (label) => label.toLowerCase() === place.city!.toLowerCase(),
+            ),
+          )?.name
         : undefined;
       const nextCity = matchedCity ?? current.city;
       return {
@@ -812,6 +826,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         lat: place.lat,
         lng: place.lng,
         googlePlaceId: place.placeId ?? "",
+        googleCity: place.city ?? "",
         formattedAddress: place.formattedAddress ?? "",
         areaNormalized: place.areaNormalized ?? (place.area ? place.area.toLowerCase() : ""),
         sublocality: place.sublocality ?? "",
@@ -1006,6 +1021,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       location_source: form.locationSource || undefined,
       location_captured_at: form.locationCapturedAt || undefined,
       google_place_id: form.googlePlaceId || undefined,
+      google_city: form.googleCity || undefined,
       formatted_address: form.formattedAddress || undefined,
       area_normalized: form.areaNormalized || undefined,
       sublocality: form.sublocality || undefined,
@@ -1242,21 +1258,21 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
             )}
 
             <label className={"qf-sf-field qf-sf-area qf-sf-field--full" + (areaUi.showError ? " has-error" : "")}>
-              <span className="qf-sf-label">Area / locality <b aria-hidden="true">*</b></span>
+              <span className="qf-sf-label">Project location <b aria-hidden="true">*</b></span>
               <div className="qf-rf-input-wrapper">
                 <GooglePlaceAutocomplete
                   value={form.area}
                   city={form.city}
-                  mode="locality"
+                  mode="address"
                   onManualChange={onAreaManualChange}
                   onPlaceSelected={onAreaPlaceSelected}
                   onBlur={() => markTouched("area")}
-                  placeholder="Enter your area or locality"
+                  placeholder="Search building, society, street or area"
                   autoComplete="off"
                 />
                 <ValidationIcon state={areaUi.iconState} />
               </div>
-              <small className="qf-sf-example">e.g. Kharadi, Baner, Andheri</small>
+              <small className="qf-sf-example">Pick a Google suggestion for precise matching. Manual entry remains available.</small>
               {areaUi.showError ? <span className="qf-rf-field-err">{areaUi.error}</span> : null}
             </label>
 

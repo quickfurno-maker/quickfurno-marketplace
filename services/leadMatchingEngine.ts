@@ -26,24 +26,6 @@ import {
 } from "../lib/geo/canonicalCoordinate";
 import { buildGeoMatchEvidence } from "../lib/geo/geoShortlistContract";
 import { fetchGeoVendorShortlist } from "./geoVendorShortlistService";
-// QF-MVP-75.03 — route travel time is the PRIMARY geography measure. The
-// provider seam, the bounded candidate domain and the Tmin/GeoRegret frontier
-// live outside this file; what happens here is exactly two things: the ranked
-// list is reordered by the frontier when route-time authority engages, and the
-// non-secret evidence is recorded. Neither can widen or narrow `eligible`.
-import { measureLeadRouteTimes } from "./leadRouteTimeService";
-import { reorderByGeoFrontier } from "../lib/matchcore/geoFrontierDecision";
-// QF-MVP-75.04 — the GeoFair secondary contract and the PRIMARY/RESERVES plan.
-// Both are PURE. Neither can widen or narrow `eligible`, neither writes anything
-// and neither is an assignment authority; what happens here is one more
-// membership-preserving in-place ordering pass plus one sanitized evidence
-// block. Fairness is resolved NEUTRAL — see the call site for the source proof.
-import {
-  buildGeoFairEvidence,
-  neutralGeoFairness,
-  reorderByGeoFairSecondary,
-  resolveGeoFairnessScope,
-} from "../lib/matchcore/geoFairSecondaryDecision";
 import { buildSelectionPlan } from "../lib/matchcore/selectionPlan";
 // QF-MVP-80.01 — the marketplace kill switch. The canonical settings reader and
 // the canonical reason code both live in lib/lead-assignment/runtimeSettings, so
@@ -95,11 +77,25 @@ export type LeadForMatching = {
   // provenance in the matching snapshot.
   location_source?: string | null;
   google_place_id?: string | null;
+  service_zone_id?: string | null;
+  location_verification_status?: string | null;
   share_consent?: boolean | null;
   is_duplicate?: boolean | null;
 };
 
 export type CoordinateSource = "office_coordinates" | "legacy_coordinates" | "none";
+
+type ServiceZoneRuntimePolicy = {
+  knownZoneIds: ReadonlySet<string>;
+  matchingEnabledZoneIds: ReadonlySet<string>;
+  strictZoneIds: ReadonlySet<string>;
+};
+
+const EMPTY_SERVICE_ZONE_POLICY: ServiceZoneRuntimePolicy = {
+  knownZoneIds: new Set<string>(),
+  matchingEnabledZoneIds: new Set<string>(),
+  strictZoneIds: new Set<string>(),
+};
 
 export type EligibleMatchedVendor = {
   id: string;
@@ -187,7 +183,7 @@ const MAX_SKIPPED_AUDIT_ENTRIES = 40;
 // METADATA ONLY — it never affects ranking, filtering, tiers, distance, area
 // affinity, selection order, max-3, or the RPC call. Must mirror
 // EXPECTED_MATCHING_MODEL_VERSION in services/leadProcessingDiagnosticsCore.ts.
-const MATCHING_MODEL_VERSION = "distance_category_matching_phase2";
+const MATCHING_MODEL_VERSION = "verified_location_straight_line_v1";
 
 export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result<AutoLeadMatchingResult>> {
   let runId: string | null = null;
@@ -195,7 +191,7 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
     const db = adminClient();
     const { data: lead, error: leadError } = await db
       .from("leads")
-      .select("id, name, phone, city, area, service_required, category, subcategory, budget, timeline, message, latitude, longitude, location_source, google_place_id, share_consent, is_duplicate")
+      .select("id, name, phone, city, area, service_required, category, subcategory, budget, timeline, message, latitude, longitude, location_source, google_place_id, service_zone_id, location_verification_status, share_consent, is_duplicate")
       .eq("id", leadId)
       .maybeSingle();
     if (leadError) throw leadError;
@@ -320,9 +316,36 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
       });
     }
 
+    // Capture is intentionally tolerant of unverified/manual locations, but an
+    // explicit service-zone rejection is authoritative and can never enter the
+    // automatic assignment path.
+    if (asText(leadRow.location_verification_status) === "outside_service_area") {
+      await updateMatchingRun(runId, {
+        run_status: "skipped",
+        eligible_vendor_count: 0,
+        selected_vendor_ids: [],
+        assigned_vendor_ids: [],
+        failure_reason: "outside_service_area",
+        matching_snapshot: {
+          matching_model_version: MATCHING_MODEL_VERSION,
+          lead: summarizeLead(leadRow),
+          location_verification_status: "outside_service_area",
+          service_zone_id: asText(leadRow.service_zone_id),
+        },
+      });
+      return ok({
+        leadId,
+        status: "skipped",
+        eligibleVendorCount: 0,
+        selectedVendorIds: [],
+        assignedVendors: [],
+        failureReason: "outside_service_area",
+      });
+    }
+
     const evaluation = await evaluateVendorsForLead(leadRow);
     if (!evaluation.ok) return { ok: false, code: evaluation.code, error: evaluation.error };
-    const { eligible, skipped, skippedReasonCounts, eligibleCoordinates } = evaluation.data;
+    const { eligible, skipped, skippedReasonCounts } = evaluation.data;
 
     // QF-MVP-75.02 — bounded read-only PostGIS geo DISCOVERY, recorded as
     // evidence and nothing else.
@@ -350,91 +373,32 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
       cityEligibleVendorCount: eligible.length,
     });
 
-    // QF-MVP-75.03 — ROUTE TRAVEL TIME, the primary geography measure.
-    //
-    // Read this ordering as carefully as the QF-MVP-75.02 block above, because
-    // it is the whole safety argument for making geography lexicographically
-    // primary:
-    //
-    //   The routing domain is EXACTLY `eligible` — the hard-eligible set already
-    //   gated by commercial eligibility, the city hard gate and CATEGORY
-    //   COMPATIBILITY. Nothing is filtered by distance, tier, package or PostGIS
-    //   before routing, so the category-blind exclusion QF-MVP-75.02 refused to
-    //   risk cannot occur: the category gate ran upstream and is untouched.
-    //
-    //   What the frontier changes is the ORDER of that set, never its MEMBERSHIP.
-    //   `eligible` is reordered in place; not one candidate is added or removed,
-    //   so the bounded pool below is still built from exactly the same vendors,
-    //   the same 20-candidate transport ceiling applies, and the authority still
-    //   decides every outcome under the same active cap of 3.
-    //
-    //   Every abnormal outcome — provider off, no server credential, no lead
-    //   coordinate, too small a domain, too few results, too little coverage, any
-    //   infrastructure failure, or a bound that leaves the domain unproven —
-    //   leaves `route.route_authority_engaged` false and the pre-75.03 order
-    //   completely untouched. A provider outage can never reorder a lead.
-    const routeOutcome = await measureLeadRouteTimes({
-      leadOrigin:
-        leadPoint.latitude !== null && leadPoint.longitude !== null
-          ? { latitude: leadPoint.latitude, longitude: leadPoint.longitude }
-          : null,
-      candidates: eligible.map((vendor) => {
-        const point = eligibleCoordinates.find((entry) => entry.vendor_id === vendor.id);
-        return {
-          id: vendor.id,
-          latitude: point?.latitude ?? null,
-          longitude: point?.longitude ?? null,
-          distance_km: vendor.distance_km,
-        };
-      }),
-    });
-    const routeOrderedVendorIds = routeOutcome.decision.engaged
-      ? reorderByGeoFrontier(eligible, routeOutcome.placements)
-      : eligible.map((vendor) => vendor.id);
-    const routeEvidence = { ...routeOutcome.evidence, route_ordered_vendor_ids: routeOrderedVendorIds };
+    // Final geography model: direct WGS84 line distance only.
+    // MatchCore has already ranked the hard-eligible set using haversine
+    // kilometres from the verified lead point to each vendor's canonical office
+    // point. No road graph, traffic model, route matrix or third-party routing
+    // call can participate in this path.
+    const straightLineOrderedVendorIds = eligible.map((vendor) => vendor.id);
+    const directLineEvidence = {
+      geography_model: "straight_line_wgs84_v1",
+      lead_has_coordinates: leadPoint.source !== "none",
+      ordered_vendor_ids: straightLineOrderedVendorIds,
+      external_route_provider_used: false,
+      route_provider_call_count: 0,
+      google_routes_required: false,
+    };
 
-    // QF-MVP-75.04 — GEOFAIR SECONDARY ORDER + PRIMARY/RESERVES SELECTION PLAN.
-    //
-    // Read this the same way as the two blocks above, because the safety
-    // argument is the same shape:
-    //
-    //   The input is `eligible` AFTER the 75.03 frontier has spoken. Membership
-    //   is untouched — this pass sorts the same array and adds nothing and
-    //   removes nothing — so the bounded pool below is still built from exactly
-    //   the same vendors under the same 20-candidate transport ceiling, and the
-    //   authority still decides every outcome under the same active cap of 3.
-    //
-    //   Fairness resolves NEUTRAL, with the explicit reason
-    //   DELIVERY_EXPOSURE_UNAVAILABLE: this database has no canonical DELIVERED
-    //   fact to count. The lifecycle vocabulary has 'delivered' but nothing ever
-    //   writes it; the authority writes 'assigned'; the WhatsApp intent it
-    //   queues is never dispatched or reconciled; and lead_delivery_logs carries
-    //   a hardcoded 'delivered' literal that can never be false. Counting any of
-    //   those would charge fairness on SELECTION, which the locked rule forbids.
-    //   A NEUTRAL decision gives every candidate the same fairness key, so this
-    //   pass is order-preserving by construction and 75.04 changes no assignment
-    //   outcome. See lib/matchcore/geoFairSecondaryDecision.
-    //
-    //   The geography gate is passed through unchanged: on a run where route
-    //   authority did NOT engage, the geography and secondary keys are suppressed
-    //   entirely, so a provider outage still cannot reorder a lead.
-    //
-    //   The selection plan is a PURE naming of the first three ranked positions.
-    //   A role is NOT a delivery fact, consumes no fairness, mutates nothing, and
-    //   is never submitted in place of the ranked pool.
-    const fairness = neutralGeoFairness(resolveGeoFairnessScope(leadRow), "DELIVERY_EXPOSURE_UNAVAILABLE");
-    const geoFairOrderedVendorIds = reorderByGeoFairSecondary(eligible, {
-      geographyEngaged: routeOutcome.decision.engaged,
-      placements: routeOutcome.placements,
-      fairness,
-    });
-    const selectionPlan = buildSelectionPlan(geoFairOrderedVendorIds);
-    const geoFairEvidence = buildGeoFairEvidence({
-      geographyEngaged: routeOutcome.decision.engaged,
-      fairness,
-      orderedVendorIds: geoFairOrderedVendorIds,
-      selectionPlan,
-    });
+    // The current fairness signal is the existing deterministic
+    // last_assigned_at tiebreak inside MatchCore. It runs only after category,
+    // direct-line distance and area affinity. A delivery-exposure fairness model
+    // can replace this later once canonical delivered events exist.
+    const selectionPlan = buildSelectionPlan(straightLineOrderedVendorIds);
+    const fairnessEvidence = {
+      fairness_model: "last_assignment_tiebreak_v1",
+      position_after: ["match_tier", "direct_line_distance_km", "area_affinity"],
+      delivery_exposure_active: false,
+      reason: "DELIVERY_EXPOSURE_UNAVAILABLE",
+    };
 
     // Ranked candidate POOL. Recorded as selected_vendor_ids so diagnostics keep
     // `assigned ⊆ selected`; the authority caps SUCCESSFUL at 3.
@@ -467,18 +431,17 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
       // lib/geo/geoShortlistContract. Never route distance, never route time,
       // never an authority.
       geo: geoEvidence,
-      // QF-MVP-75.03 route evidence. Travel time is the PRIMARY measure and the
-      // one this block records; the straight-line numbers above remain
-      // supporting discovery evidence. Carries no API key, no auth header, no
-      // raw provider body and no lead coordinate.
-      route: routeEvidence,
-      // QF-MVP-75.04 GeoFair evidence: the secondary decision components, the
-      // fairness MODE and REASON (never a per-vendor exposure map), the geo
-      // scope identifier, and the PRIMARY/RESERVES selection plan. Carries no
-      // provider payload, no credential, no coordinate and no PII, and states
-      // its own standing negatives — not an assignment authority, not an
-      // eligibility authority, not package-weighted, and not delivery evidence.
-      geofair: geoFairEvidence,
+      // Direct-line geography is final. Historical route modules remain in
+      // the repository only for backwards auditability; the live matcher never
+      // calls them and cannot incur a Routes API request.
+      direct_line: directLineEvidence,
+      route: {
+        decommissioned: true,
+        route_authority_engaged: false,
+        provider_call_count: 0,
+      },
+      fairness: fairnessEvidence,
+      selection_plan: selectionPlan,
     };
     if (selectedVendorIds.length === 0) {
       await createClientAssignedVendorsPreview(leadId, []);
@@ -648,7 +611,8 @@ export async function evaluateVendorsForLead(lead: LeadForMatching): Promise<Res
       }
     }
 
-    return ok(rankVendorsForLead(lead, rows));
+    const serviceZonePolicy = await loadServiceZoneRuntimePolicy();
+    return ok(rankVendorsForLead(lead, rows, serviceZonePolicy));
   } catch (e) {
     return fail(e);
   }
@@ -665,6 +629,7 @@ export async function evaluateVendorsForLead(lead: LeadForMatching): Promise<Res
 export function rankVendorsForLead(
   lead: LeadForMatching,
   rows: Array<Record<string, unknown>>,
+  serviceZonePolicy: ServiceZoneRuntimePolicy = EMPTY_SERVICE_ZONE_POLICY,
 ): VendorMatchEvaluation {
   const eligible: RankableCandidate[] = [];
   const skipped: SkippedVendorAudit[] = [];
@@ -703,8 +668,37 @@ export function rankVendorsForLead(
     const wallet = evaluateVendorAutomaticLeadEligibility(vendor, { nowMs });
     const reasons: AutomaticMatchRejectReason[] = [...wallet.reasons];
 
-    // City HARD gate — normalized text comparison (not exact-case).
-    if (!cityMatches(vendor, lead)) reasons.push("city_mismatch");
+    // service_zone_id is the long-term geographic authority. When both
+    // sides are resolved, same-zone membership replaces city-text equality.
+    // City text remains a compatibility fallback only while either side is
+    // unresolved, so one future market can legitimately contain labels such as
+    // Mumbai + Navi Mumbai + Thane without false city_mismatch rejections.
+    if (asText(vendor.location_verification_status) === "outside_service_area") {
+      reasons.push("outside_service_area");
+    }
+    const leadZoneId = asText(lead.service_zone_id);
+    const vendorZoneId = asText(vendor.service_zone_id);
+
+    const knownZoneIds = [leadZoneId, vendorZoneId].filter(
+      (zoneId): zoneId is string => Boolean(zoneId && serviceZonePolicy.knownZoneIds.has(zoneId)),
+    );
+    if (
+      knownZoneIds.some(
+        (zoneId) => !serviceZonePolicy.matchingEnabledZoneIds.has(zoneId),
+      )
+    ) {
+      reasons.push("service_zone_matching_disabled");
+    }
+
+    if (leadZoneId && vendorZoneId) {
+      if (leadZoneId !== vendorZoneId) reasons.push("service_zone_mismatch");
+    } else {
+      const resolvedZoneId = leadZoneId ?? vendorZoneId;
+      if (resolvedZoneId && serviceZonePolicy.strictZoneIds.has(resolvedZoneId)) {
+        reasons.push("service_zone_unresolved");
+      }
+      if (!cityMatches(vendor, lead)) reasons.push("city_mismatch");
+    }
 
     // Category tier: 0 = exact/synonym/subcategory (best), 1 = same parent group
     // fallback. Neither → not category compatible (hard reject).
@@ -787,6 +781,36 @@ export function rankVendorsForLead(
 }
 
 export { assignLeadToMatchedVendors } from "./leadDeliveryService";
+
+async function loadServiceZoneRuntimePolicy(): Promise<ServiceZoneRuntimePolicy> {
+  try {
+    const { data, error } = await adminClient()
+      .from("marketplace_service_zones")
+      .select("id,is_active,matching_enabled,requires_resolved_location");
+    if (error || !Array.isArray(data)) return EMPTY_SERVICE_ZONE_POLICY;
+
+    const knownZoneIds = new Set<string>();
+    const matchingEnabledZoneIds = new Set<string>();
+    const strictZoneIds = new Set<string>();
+
+    for (const row of data as Array<Record<string, unknown>>) {
+      const id = asText(row.id);
+      if (!id) continue;
+      knownZoneIds.add(id);
+      if (row.is_active === true && row.matching_enabled === true) {
+        matchingEnabledZoneIds.add(id);
+      }
+      if (row.requires_resolved_location === true) {
+        strictZoneIds.add(id);
+      }
+    }
+
+    return { knownZoneIds, matchingEnabledZoneIds, strictZoneIds };
+  } catch {
+    // The DB assignment gate remains the final authority if this read is unavailable.
+    return EMPTY_SERVICE_ZONE_POLICY;
+  }
+}
 
 async function createMatchingRun(lead: LeadForMatching): Promise<string | null> {
   try {

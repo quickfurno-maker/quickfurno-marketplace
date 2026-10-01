@@ -1,72 +1,254 @@
-"use client";
-
-// ============================================================================
-// C-PERF2: narrow section contract — the complete (small) city config set
-// only. The previous demand/supply figures were counted from the latest-50
-// lead/vendor snapshot subsets and could masquerade as marketplace truth, so
-// they are removed rather than restyled; real per-city aggregates can return
-// later behind purpose-built count queries.
-// ============================================================================
-
+import { useMemo, useState } from "react";
 import {
+  adminCreateCity,
   adminSetCityActive,
+  adminSetCityMatchingEnabled,
+  adminSetCityStrictLocation,
+  adminUpdateCityMarketSettings,
 } from "@/app/actions";
 import {
-  ActionMenu,
   DataTable,
+  PrimaryButton,
+  SecondaryButton,
   StatCard,
   StatusBadge,
   ToggleSwitch,
 } from "../AdminPrimitives";
-import { type City } from "../adminTypes";
-import {
-  formatNumber,
-  shortId,
-} from "../adminUtils";
+import { type City, type MarketplaceServiceZone } from "../adminTypes";
+import { formatNumber, shortId } from "../adminUtils";
 import { Strong } from "./shared";
 
-export function CitiesPage({ cities, notify, ask }: { cities: City[]; notify: (message: string) => void; ask: any }) {
+type ActionResult = Promise<{ ok: boolean; error?: string }>;
+
+function MarketConfigEditor({
+  city,
+  zone,
+  runAction,
+}: {
+  city: City;
+  zone: MarketplaceServiceZone;
+  runAction: (title: string, action: () => ActionResult) => void;
+}) {
+  const [labels, setLabels] = useState((zone.accepted_city_labels ?? [city.name ?? ""]).join(", "));
+  const [priority, setPriority] = useState(String(zone.resolution_priority ?? 100));
+
+  function save() {
+    const accepted = labels.split(",").map((value) => value.trim()).filter(Boolean);
+    const numericPriority = Number(priority);
+    runAction("Save market settings", () =>
+      adminUpdateCityMarketSettings(city.id, {
+        accepted_city_labels: accepted,
+        resolution_priority: numericPriority,
+      }),
+    );
+  }
+
+  return (
+    <div className="min-w-[250px] space-y-2">
+      <input
+        value={labels}
+        onChange={(event) => setLabels(event.target.value)}
+        aria-label={`Google city labels for ${city.name ?? "city"}`}
+        className="qfa-focus h-8 w-full rounded-[var(--qfa-radius-sm)] border border-[color:var(--qfa-line)] bg-white px-2 text-xs text-slate-800"
+        placeholder="Mumbai, Navi Mumbai, Thane"
+      />
+      <div className="flex items-center gap-2">
+        <label className="flex items-center gap-1 text-[11px] text-slate-500">
+          Priority
+          <input
+            value={priority}
+            onChange={(event) => setPriority(event.target.value.replace(/\D/g, "").slice(0, 5))}
+            inputMode="numeric"
+            className="qfa-focus h-8 w-16 rounded-[var(--qfa-radius-sm)] border border-[color:var(--qfa-line)] bg-white px-2 text-xs text-slate-800"
+          />
+        </label>
+        <SecondaryButton size="sm" onClick={save} disabled={!labels.trim() || priority === ""}>
+          Save
+        </SecondaryButton>
+      </div>
+    </div>
+  );
+}
+
+export function CitiesPage({
+  cities,
+  serviceZones,
+  ask,
+  runAction,
+}: {
+  cities: City[];
+  serviceZones: MarketplaceServiceZone[];
+  notify: (message: string) => void;
+  ask: (title: string, message: string, action: () => ActionResult) => void;
+  runAction: (title: string, action: () => ActionResult) => void;
+}) {
+  const [newCity, setNewCity] = useState("");
+  const zonesByCity = useMemo(
+    () => new Map(serviceZones.map((zone) => [zone.city_id, zone])),
+    [serviceZones],
+  );
+
   const active = cities.filter((city) => city.is_active).length;
-  const comingSoon = cities.filter((city) => city.launch_status === "Coming Soon").length;
+  const matching = serviceZones.filter((zone) => zone.is_active && zone.matching_enabled).length;
+  const polygonBacked = serviceZones.filter((zone) => Boolean(zone.boundary)).length;
+
+  function addCity() {
+    const name = newCity.trim();
+    if (!name) return;
+    runAction("Add city", async () => {
+      const result = await adminCreateCity({ name, is_active: false });
+      if (result.ok) setNewCity("");
+      return result;
+    });
+  }
 
   return (
     <div className="space-y-5">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Cities" value={formatNumber(cities.length)} helper="All configured cities" icon="cities" />
-        <StatCard label="Active Cities" value={formatNumber(active)} helper="Accepting leads" icon="cities" tone="emerald" />
-        <StatCard label="Coming Soon" value={formatNumber(comingSoon)} helper="Visible but paused" icon="notifications" tone="amber" />
-        <StatCard label="Hidden" value={formatNumber(cities.length - active)} helper="Not shown on public forms" icon="reports" tone="slate" />
+        <StatCard label="Configured Cities" value={formatNumber(cities.length)} helper="Real rows in Supabase" icon="cities" />
+        <StatCard label="Public Active" value={formatNumber(active)} helper="Shown in city selectors" icon="cities" tone="emerald" />
+        <StatCard label="Matching Enabled" value={formatNumber(matching)} helper="Markets allowed to match" icon="reports" tone="amber" />
+        <StatCard label="Polygon Geofences" value={formatNumber(polygonBacked)} helper="Reviewed boundaries loaded" icon="reports" tone="slate" />
+      </section>
+
+      <section className="qfa-panel p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="min-w-0 flex-1">
+            <span className="mb-1 block text-xs font-semibold text-slate-700">Add marketplace city</span>
+            <input
+              value={newCity}
+              onChange={(event) => setNewCity(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  addCity();
+                }
+              }}
+              placeholder="e.g. Mumbai"
+              className="qfa-focus h-[var(--qfa-control-h)] w-full rounded-[var(--qfa-radius)] border border-[color:var(--qfa-line)] bg-white px-3 text-[13px] text-slate-900"
+            />
+          </label>
+          <PrimaryButton onClick={addCity} disabled={!newCity.trim()}>
+            Add city
+          </PrimaryButton>
+        </div>
+        <p className="mt-2 text-[11px] leading-4 text-slate-500">
+          New cities are created disabled for matching. Enable the city first, then enable matching when its service market is ready.
+        </p>
       </section>
 
       <DataTable
         rows={cities}
         getRowKey={(item) => item.id}
-        emptyTitle="No cities found"
-        emptyMessage="Cities from Supabase will appear here. Only active cities should show in public lead forms."
+        emptyTitle="No cities configured"
+        emptyMessage="Add the first marketplace city above."
         columns={[
-          { header: "City", cell: (item) => <Strong title={item.name || "Unnamed city"} subtitle={item.slug || shortId(item.id)} /> },
-          { header: "State", cell: (item) => item.state || "Maharashtra" },
-          { header: "Launch Status", cell: (item) => <StatusBadge value={item.launch_status || (item.is_active ? "Active" : "Hidden")} /> },
-          { header: "Homepage", cell: (item) => <ToggleSwitch checked={Boolean(item.show_on_homepage ?? true)} /> },
           {
-            header: "Actions",
+            header: "City",
+            cell: (item) => {
+              const zone = zonesByCity.get(item.id);
+              return (
+                <Strong
+                  title={item.name || "Unnamed city"}
+                  subtitle={zone?.slug || item.slug || shortId(item.id)}
+                />
+              );
+            },
+          },
+          {
+            header: "Public Active",
             cell: (item) => (
-              <ActionMenu
-                actions={[
-                  {
-                    label: item.is_active ? "Disable" : "Enable",
-                    onClick: () => ask("Update city", "This changes public form city visibility.", () => adminSetCityActive(item.id, !item.is_active)),
-                  },
-                ]}
+              <ToggleSwitch
+                checked={Boolean(item.is_active)}
+                label={item.is_active ? "Active" : "Disabled"}
+                onChange={(next) =>
+                  ask(
+                    next ? "Enable city" : "Disable city",
+                    next
+                      ? "This city will become available to public city selectors. Matching remains independently controlled."
+                      : "This removes the city from public selectors and automatically disables matching for its market.",
+                    () => adminSetCityActive(item.id, next),
+                  )
+                }
               />
             ),
+          },
+          {
+            header: "Matching",
+            cell: (item) => {
+              const zone = zonesByCity.get(item.id);
+              const enabled = Boolean(zone?.matching_enabled);
+              return (
+                <ToggleSwitch
+                  checked={enabled}
+                  disabled={!item.is_active || !zone}
+                  label={enabled ? "Enabled" : "Off"}
+                  onChange={(next) =>
+                    ask(
+                      next ? "Enable city matching" : "Disable city matching",
+                      next
+                        ? "Automatic matching may use this service market. Service-zone rules and straight-line distance remain authoritative."
+                        : "Automatic matching for this city will be stopped.",
+                      () => adminSetCityMatchingEnabled(item.id, next),
+                    )
+                  }
+                />
+              );
+            },
+          },
+          {
+            header: "Location Authority",
+            cell: (item) => {
+              const zone = zonesByCity.get(item.id);
+              if (!zone) return <StatusBadge value="Missing zone" />;
+              return zone.boundary
+                ? <StatusBadge value="Polygon verified" />
+                : <StatusBadge value="Provisional city evidence" />;
+            },
+          },
+          {
+            header: "Require resolved zone",
+            cell: (item) => {
+              const zone = zonesByCity.get(item.id);
+              if (!zone) return "—";
+              return (
+                <ToggleSwitch
+                  checked={Boolean(zone.requires_resolved_location)}
+                  label={zone.requires_resolved_location ? "Strict" : "Backfill mode"}
+                  onChange={(next) =>
+                    ask(
+                      next ? "Require resolved service zone" : "Allow unresolved legacy locations",
+                      next
+                        ? "Automatic assignment will require both client and vendor to resolve to this market. A polygon gives verified geofence resolution; until then Google city evidence can resolve provisionally."
+                        : "Legacy unresolved locations can continue through city compatibility fallback while you finish backfill.",
+                      () => adminSetCityStrictLocation(item.id, next),
+                    )
+                  }
+                />
+              );
+            },
+          },
+          {
+            header: "Market config",
+            cell: (item) => {
+              const zone = zonesByCity.get(item.id);
+              if (!zone) return "—";
+              return <MarketConfigEditor city={item} zone={zone} runAction={runAction} />;
+            },
+          },
+          {
+            header: "Boundary",
+            cell: (item) => {
+              const zone = zonesByCity.get(item.id);
+              if (!zone) return "—";
+              return zone.boundary_version || zone.boundary_source || "Not loaded";
+            },
           },
         ]}
       />
 
-      <p className="text-[11px] text-slate-500">
-        Per-city demand/supply analytics are not shown here: the previous figures were derived from a latest-rows
-        subset and could misrepresent marketplace totals. Locality management is not built yet.
+      <p className="text-[11px] leading-4 text-slate-500">
+        City and matching state shown here are live Supabase controls. There are no prefilled Mumbai/Delhi/Bengaluru launch values in application code.
       </p>
     </div>
   );

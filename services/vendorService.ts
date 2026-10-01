@@ -10,7 +10,8 @@ import { evaluateAssignedLeadContactAccess } from "../lib/vendors/assignedLeadCo
 // QF-MVP-80.16C — the Indian mobile contract, stated once in a pure module so
 // the server authority, the live form and the notification lane cannot drift.
 import { isValidIndianMobile } from "../lib/vendors/vendorContactContract";
-import { normalizeLaunchCity } from "../lib/locations/launchCityPolicy";
+import { resolveActiveCity } from "../lib/locations/cityService";
+import { isOutsideServiceArea, verifyLocationForServiceArea } from "./locationVerificationService";
 import type {
   VendorRegistrationInput, VendorDashboardStats,
 } from "../lib/types";
@@ -28,7 +29,8 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
     const businessNameClean = (input.business_name ?? "").trim();
     const ownerNameClean = (input.owner_name ?? "").trim();
     const emailClean = (input.email ?? "").trim();
-    const cityClean = normalizeLaunchCity(input.city);
+    const activeCity = await resolveActiveCity(input.city);
+    const cityClean = activeCity?.name ?? null;
 
     // Check if it's the full onboarding registration wizard or simple form.
     // (Pincode removed from this signal in Phase 1 — location is now Google-based.)
@@ -66,8 +68,16 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       }
     }
 
+    const locationVerification = await verifyLocationForServiceArea({
+      latitude: input.office_latitude,
+      longitude: input.office_longitude,
+      googleCity: input.google_city,
+    });
+    const outsideServiceArea = isOutsideServiceArea(locationVerification);
+
     // Exact column set written to public.vendors (matches the onboarding wizard).
-    // Status/consent defaults are forced here regardless of input.
+    // Outside-area applications are retained for future expansion but cannot
+    // become operational in the current marketplace.
     const payload = {
       business_name: businessNameClean,
       owner_name: ownerNameClean,
@@ -79,7 +89,7 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       office_address_line1: input.office_address_line1 ?? null,
       office_address_line2: input.office_address_line2 ?? null,
       office_landmark: input.office_landmark ?? null,
-      office_city: normalizeLaunchCity(input.office_city) ?? cityClean,
+      office_city: (await resolveActiveCity(input.office_city))?.name ?? cityClean,
       office_state: input.office_state ?? null,
       // office_pincode intentionally not written (Phase 1: pincode retired). The
       // legacy column stays in the schema; existing vendor rows are untouched.
@@ -106,7 +116,8 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       status: "Pending",
       verification_status: "Pending",
       paid_status: "Unpaid",
-      is_active: true,
+      is_active: !outsideServiceArea,
+      accepting_leads: !outsideServiceArea,
       public_visibility: false,
       source_url: input.source_url ?? null,
       utm_source: input.utm_source ?? null,
@@ -123,10 +134,15 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
     // vendor via the missing-column fallback below. Not used by matching yet.
     const googleLocationPayload = {
       google_place_id: input.google_place_id ?? null,
+      google_city: input.google_city ?? null,
       formatted_address: input.formatted_address ?? null,
       area_normalized: input.area_normalized ?? null,
       sublocality: input.sublocality ?? null,
       neighborhood: input.neighborhood ?? null,
+      service_zone_id: locationVerification.serviceZoneId,
+      location_verification_status: locationVerification.status,
+      location_verification_method: locationVerification.method,
+      location_verified_at: locationVerification.verifiedAt,
     };
 
     if (process.env.NODE_ENV === "development") {

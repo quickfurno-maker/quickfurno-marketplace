@@ -454,7 +454,7 @@ const RULES = {
       "npm run test:automation-native", "npm run test:automation-studio",
       "npm run test:mvp:70-01", "npm run test:mvp:70-02", "npm run test:mvp:70-03",
       "npm run test:mvp:70-04", "npm run test:mvp:75-01", "npm run test:mvp:75-02",
-      "npm run test:mvp:75-03", "npm run test:mvp:80-02-gate06",
+      "npm run test:mvp:location-straight-line", "npm run test:mvp:80-02-gate06",
       "npm run test:mvp:80-03-audit", "npm run test:mvp:80-04",
       "npm run test:mvp:marketplace", "npm run test:mvp:assignment-authority",
       "npm run test:phase4", "npm run typecheck", "npm run build",

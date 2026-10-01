@@ -218,6 +218,22 @@ export type City = {
   sort_order?: number | null;
 };
 
+export type MarketplaceServiceZone = {
+  id: string;
+  city_id: string;
+  slug?: string | null;
+  name?: string | null;
+  canonical_city?: string | null;
+  accepted_city_labels?: string[] | null;
+  boundary?: unknown;
+  boundary_version?: string | null;
+  boundary_source?: string | null;
+  is_active?: boolean | null;
+  matching_enabled?: boolean | null;
+  resolution_priority?: number | null;
+  requires_resolved_location?: boolean | null;
+};
+
 export type Profile = {
   id: string;
   created_at?: string | null;

@@ -5,7 +5,6 @@
 import { adminClient } from "../lib/supabase";
 import { appError, type Result, ok, fail, isMissingRelationError } from "../lib/errors";
 import type { AdminDashboardStats } from "../lib/types";
-import { isLaunchCity } from "../lib/locations/launchCityPolicy";
 
 const head = (q: any) => q.select("id", { count: "exact", head: true });
 
@@ -600,14 +599,22 @@ export async function createCity(input: AdminNameInput, actorUserId: string): Pr
   try {
     const name = input.name?.trim();
     if (!name) throw appError("VALIDATION");
-    const { data, error } = await adminClient()
-      .from("cities")
-      .insert({ name, slug: slugify(name), is_active: isLaunchCity(name) ? (input.is_active ?? true) : false })
-      .select("id")
-      .single();
+    const slug = slugify(name);
+    if (!slug) throw appError("VALIDATION");
+
+    const { data, error } = await adminClient().rpc("qf_admin_create_city_market_v1", {
+      p_name: name,
+      p_slug: slug,
+      // New markets are safe-by-default. The operator explicitly enables the
+      // city and then matching from Admin → Cities & Locations.
+      p_initial_active: input.is_active === true,
+    });
     if (error) throw error;
-    await recordAuditLog("city.created", "city", data.id, { name }, actorUserId);
-    return ok({ id: data.id });
+    const id = typeof data === "string" ? data : "";
+    if (!id) throw appError("UNKNOWN");
+
+    await recordAuditLog("city.created", "city", id, { name, slug, initial_active: input.is_active === true }, actorUserId);
+    return ok({ id });
   } catch (e) {
     return fail(e);
   }
@@ -616,15 +623,81 @@ export async function createCity(input: AdminNameInput, actorUserId: string): Pr
 export async function setCityActive(id: string, isActive: boolean, actorUserId: string): Promise<Result<null>> {
   if (!actorUserId) return fail(appError("UNAUTHORIZED"));
   try {
-    const db = adminClient();
-    if (isActive) {
-      const { data: city, error: readError } = await db.from("cities").select("name, slug").eq("id", id).single();
-      if (readError) throw readError;
-      if (!city || (!isLaunchCity(city.name) && !isLaunchCity(city.slug))) throw appError("VALIDATION");
-    }
-    const { error } = await db.from("cities").update({ is_active: isActive }).eq("id", id);
+    const { error } = await adminClient().rpc("qf_admin_set_city_active_v1", {
+      p_city_id: id,
+      p_active: isActive,
+    });
     if (error) throw error;
     await recordAuditLog(isActive ? "city.enabled" : "city.disabled", "city", id, {}, actorUserId);
+    return ok(null);
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function setCityMatchingEnabled(id: string, enabled: boolean, actorUserId: string): Promise<Result<null>> {
+  if (!actorUserId) return fail(appError("UNAUTHORIZED"));
+  try {
+    const { error } = await adminClient().rpc("qf_admin_set_city_matching_v1", {
+      p_city_id: id,
+      p_enabled: enabled,
+    });
+    if (error) throw error;
+    await recordAuditLog(enabled ? "city.matching_enabled" : "city.matching_disabled", "city", id, {}, actorUserId);
+    return ok(null);
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function updateCityMarketSettings(
+  id: string,
+  input: { accepted_city_labels: string[]; resolution_priority: number },
+  actorUserId: string,
+): Promise<Result<null>> {
+  if (!actorUserId) return fail(appError("UNAUTHORIZED"));
+  try {
+    const labels = Array.from(
+      new Set(
+        (Array.isArray(input.accepted_city_labels) ? input.accepted_city_labels : [])
+          .map((value) => String(value ?? "").trim())
+          .filter(Boolean),
+      ),
+    );
+    const priority = Number(input.resolution_priority);
+    if (!Number.isInteger(priority) || priority < 0 || priority > 10000) {
+      throw appError("VALIDATION");
+    }
+
+    const { error } = await adminClient().rpc("qf_admin_update_city_market_v1", {
+      p_city_id: id,
+      p_accepted_city_labels: labels,
+      p_resolution_priority: priority,
+    });
+    if (error) throw error;
+
+    await recordAuditLog(
+      "city.market_settings_updated",
+      "city",
+      id,
+      { accepted_city_labels: labels, resolution_priority: priority },
+      actorUserId,
+    );
+    return ok(null);
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function setCityStrictLocation(id: string, enabled: boolean, actorUserId: string): Promise<Result<null>> {
+  if (!actorUserId) return fail(appError("UNAUTHORIZED"));
+  try {
+    const { error } = await adminClient().rpc("qf_admin_set_city_strict_location_v1", {
+      p_city_id: id,
+      p_enabled: enabled,
+    });
+    if (error) throw error;
+    await recordAuditLog(enabled ? "city.strict_location_enabled" : "city.strict_location_disabled", "city", id, {}, actorUserId);
     return ok(null);
   } catch (e) {
     return fail(e);

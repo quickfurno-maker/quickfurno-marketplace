@@ -716,9 +716,42 @@ export const adminCreateCategory = async (input: { name: string; is_active?: boo
 export const adminSetCategoryActive = async (id: string, isActive: boolean) =>
   asAdmin((actor) => admin.setCategoryActive(id, isActive, actor));
 export const adminCreateCity = async (input: { name: string; is_active?: boolean }) =>
-  asAdmin((actor) => admin.createCity(input, actor));
+  asAdmin(async (actor) => {
+    const result = await admin.createCity(input, actor);
+    revalidatePath("/admin/cities");
+    revalidatePath("/api/cities");
+    return result;
+  });
 export const adminSetCityActive = async (id: string, isActive: boolean) =>
-  asAdmin((actor) => admin.setCityActive(id, isActive, actor));
+  asAdmin(async (actor) => {
+    const result = await admin.setCityActive(id, isActive, actor);
+    revalidatePath("/admin/cities");
+    revalidatePath("/api/cities");
+    return result;
+  });
+export const adminSetCityMatchingEnabled = async (id: string, enabled: boolean) =>
+  asAdmin(async (actor) => {
+    const result = await admin.setCityMatchingEnabled(id, enabled, actor);
+    revalidatePath("/admin/cities");
+    return result;
+  });
+export const adminUpdateCityMarketSettings = async (
+  id: string,
+  input: { accepted_city_labels: string[]; resolution_priority: number },
+) =>
+  asAdmin(async (actor) => {
+    const result = await admin.updateCityMarketSettings(id, input, actor);
+    revalidatePath("/admin/cities");
+    revalidatePath("/api/cities");
+    return result;
+  });
+export const adminSetCityStrictLocation = async (id: string, enabled: boolean) =>
+  asAdmin(async (actor) => {
+    const result = await admin.setCityStrictLocation(id, enabled, actor);
+    revalidatePath("/admin/cities");
+    revalidatePath("/api/cities");
+    return result;
+  });
 export const adminApproveBadLead  = async (id: string, note?: string) => asAdmin(() => admin.approveBadLeadReport(id, note));
 export const adminRejectBadLead   = async (id: string, note?: string) => asAdmin(() => admin.rejectBadLeadReport(id, note));
 export const adminBadLeadReports  = async () => asAdmin(() => admin.getPendingBadLeadReports());

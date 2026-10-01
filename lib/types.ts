@@ -72,6 +72,7 @@ export interface CreateLeadInput {
   location_source?: "manual" | "browser_gps" | "google_place" | "reverse_geocode" | string;
   location_captured_at?: string;
   google_place_id?: string;
+  google_city?: string;
   formatted_address?: string;
   area_normalized?: string;
   sublocality?: string;
@@ -165,6 +166,7 @@ export interface VendorRegistrationInput {
   // falls back gracefully (retries without them) if the columns are missing.
   // Not required for registration and not used by matching yet.
   google_place_id?: string;
+  google_city?: string;
   formatted_address?: string;
   area_normalized?: string;
   sublocality?: string;

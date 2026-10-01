@@ -964,7 +964,7 @@ export function VendorRegisterForm({
         return (
           <div className="qf-rf-question">
             <span className="qf-rf-qcount">Step 3 of 6</span>
-            <h2>Where is your business based?</h2>
+            <h2>Where do you serve clients?</h2>
             <p className="qf-rf-qhint">Select your city and exact office, shop, studio or workshop location. Service coverage is configured separately.</p>
 
             {/* 1. City selection */}

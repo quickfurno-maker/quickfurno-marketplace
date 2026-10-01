@@ -29,9 +29,9 @@ import { QFIcon } from "@/components/QuickFurnoIcons";
 // Phase 2 hardening: cities come from the admin-managed active-city source of
 // truth (same hook vendor registration uses), never a hardcoded list.
 import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useActiveCities";
-// Google area enhancement; manual fallback preserved. The Area / Locality input
-// upgrades to Google Places suggestions when a public key is present, and stays a
-// plain input (unchanged behaviour) whenever Google is missing or blocked.
+// Precise client-site location capture. Google address/place selection is the
+// preferred source, browser GPS is an equally valid coordinate source, and
+// manual text remains a fail-safe fallback when Google/GPS is unavailable.
 import GooglePlaceAutocomplete from "@/components/location/GooglePlaceAutocomplete";
 import { isPlaceCompatibleWithSelectedCity } from "@/lib/google-maps/normalizePlace";
 import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
@@ -781,8 +781,10 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     markTouched("area");
   }
 
-  // A Google prediction was picked: fill structured location and update city only
-  // when it is safe (a city we actually serve). Pincode is no longer captured.
+  // A Google project/site prediction was picked: fill structured location and
+  // update city only when it is safe (a city we actually serve). The visible
+  // field shows the formatted address while the canonical `area` stays locality-
+  // shaped for the existing area-affinity path.
   //
   // STRICT CITY CONSISTENCY: if the client already chose a city and the picked
   // place clearly belongs to a different city, we DO NOT overwrite ANY field
@@ -791,7 +793,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   // saving city = X with coordinates from another city.
   function onAreaPlaceSelected(place: NormalizedGooglePlace) {
     if (form.city && !isPlaceCompatibleWithSelectedCity(place, form.city)) {
-      setError(`Please select an area within ${form.city}.`);
+      setError(`Please select a project / site location within ${form.city}.`);
       return; // keep the form exactly as-is; manual typing remains available
     }
     setError("");
@@ -833,12 +835,18 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setLocStatus("locating");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        // Keep existing behaviour (store lat/lng) and additionally tag the
-        // structured source + accuracy + timestamp. No reverse geocoding here.
+        // GPS becomes the canonical coordinate source for this capture. Clear a
+        // previously selected Google identity so a Place ID can never describe a
+        // different coordinate pair. Keep the locality text for human context.
         setForm((current) => ({
           ...current,
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
+          googlePlaceId: "",
+          formattedAddress: "",
+          sublocality: "",
+          neighborhood: "",
+          areaNormalized: current.area.trim().toLowerCase(),
           locationAccuracyMeters: Number.isFinite(pos.coords.accuracy)
             ? pos.coords.accuracy
             : current.locationAccuracyMeters,
@@ -1242,21 +1250,23 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
             )}
 
             <label className={"qf-sf-field qf-sf-area qf-sf-field--full" + (areaUi.showError ? " has-error" : "")}>
-              <span className="qf-sf-label">Area / locality <b aria-hidden="true">*</b></span>
+              <span className="qf-sf-label">Project / site location <b aria-hidden="true">*</b></span>
               <div className="qf-rf-input-wrapper">
                 <GooglePlaceAutocomplete
-                  value={form.area}
+                  value={form.formattedAddress || form.area}
                   city={form.city}
-                  mode="locality"
+                  mode="address"
                   onManualChange={onAreaManualChange}
                   onPlaceSelected={onAreaPlaceSelected}
                   onBlur={() => markTouched("area")}
-                  placeholder="Enter your area or locality"
-                  autoComplete="off"
+                  placeholder="Search project address, society or building"
+                  autoComplete="street-address"
                 />
                 <ValidationIcon state={areaUi.iconState} />
               </div>
-              <small className="qf-sf-example">e.g. Kharadi, Baner, Andheri</small>
+              <small className="qf-sf-example">
+                Select a Google suggestion for precise matching, or use your current location.
+              </small>
               {areaUi.showError ? <span className="qf-rf-field-err">{areaUi.error}</span> : null}
             </label>
 
@@ -1266,10 +1276,10 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                 {locStatus === "locating" ? "Getting location…" : "Use my current location"}
               </button>
               {locStatus === "captured" ? (
-                <p className="qf-sf-note qf-sf-note--ok">Location captured — we&apos;ll use this as one matching signal for eligible vendors.</p>
+                <p className="qf-sf-note qf-sf-note--ok">Precise GPS location captured for nearby-vendor matching.</p>
               ) : null}
-              {locStatus === "denied" ? <p className="qf-sf-note">No problem — your city and area above are enough.</p> : null}
-              {locStatus === "unsupported" ? <p className="qf-sf-note">Your browser does not support location — your city and area are enough.</p> : null}
+              {locStatus === "denied" ? <p className="qf-sf-note">You can continue with the typed location; it will be treated as unverified.</p> : null}
+              {locStatus === "unsupported" ? <p className="qf-sf-note">You can continue with the typed location; it will be treated as unverified.</p> : null}
             </div>
           </div>
         </section>

@@ -218,6 +218,18 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"
+    },
+    {
+      "version": "20261001165000",
+      "name": "qf_admin_service_zone_boundary_control",
+      "filename": "20261001165000_qf_admin_service_zone_boundary_control.sql",
+      "path": "supabase/migrations/20261001165000_qf_admin_service_zone_boundary_control.sql",
+      "canonicalSha256": "68f6109d3ba99e3ca3be09b2f54d457f18e8a021a694a572e88a9a942b2731ee",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"
     }
   ],
   "supersededLegacyPins": [

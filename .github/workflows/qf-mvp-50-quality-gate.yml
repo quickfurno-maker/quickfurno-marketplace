@@ -261,6 +261,9 @@ jobs:
       - name: Database-backed city and service-zone authority
         run: npm run test:launch:city-authority
 
+      - name: Admin service-zone boundary control
+        run: npm run test:launch:service-zone-boundary
+
       - name: Aarohi Acquisition CRM guard
         run: npm run test:aarohi:crm
 

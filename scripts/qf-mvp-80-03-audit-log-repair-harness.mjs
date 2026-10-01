@@ -610,7 +610,7 @@ check("37 [static] the actor is never sourced from untrusted input", () => {
 
 check("38 [static] every human-admin audit writer threads an actor", () => {
   const calls = ADMIN_SVC_C.match(/await recordAuditLog\([^;]*?\);/gs) ?? [];
-  assert(calls.length === 11, `expected 11 recordAuditLog call sites, found ${calls.length}`);
+  assert(calls.length === 13, `expected 13 recordAuditLog call sites, found ${calls.length}`);
   for (const c of calls) assert(/actorUserId\s*,?\s*\)/.test(c), `call site lacks the actor: ${c.slice(0, 80)}`);
   const vcalls = VENDOR_SVC_C.match(/await bestEffortAudit\([^;]*?\);/gs) ?? [];
   assert(vcalls.length === 3, `expected 3 bestEffortAudit call sites, found ${vcalls.length}`);

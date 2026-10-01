@@ -225,9 +225,11 @@ export type MarketplaceServiceZone = {
   name?: string | null;
   canonical_city?: string | null;
   accepted_city_labels?: string[] | null;
-  boundary?: unknown;
   boundary_version?: string | null;
   boundary_source?: string | null;
+  boundary_configured?: boolean | null;
+  boundary_npoints?: number | null;
+  boundary_area_sq_km?: number | string | null;
   is_active?: boolean | null;
   matching_enabled?: boolean | null;
   resolution_priority?: number | null;

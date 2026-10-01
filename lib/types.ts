@@ -83,8 +83,6 @@ export interface PublicVendorCard {
   business_name: string;
   city: string;
   areas_covered: string[] | null;
-  covers_full_city: boolean | null;
-  service_radius_km: number | null;
   service_categories: string[] | null;
   experience: string | null;
   portfolio_urls: string[] | null;
@@ -183,6 +181,8 @@ export interface VendorProfileSummary {
   email: string | null;
   city: string | null;
   areas_covered: string[] | null;
+  covers_full_city: boolean | null;
+  service_radius_km: number | null;
   service_categories: string[] | null;
   selected_category: string | null;
   business_type: string | null;

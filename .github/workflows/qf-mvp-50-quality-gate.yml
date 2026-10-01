@@ -265,6 +265,9 @@ jobs:
       - name: Pune-only launch geography guard
         run: npm run test:launch:pune-only
 
+      - name: Precise client/vendor location evidence
+        run: npm run test:location:precise
+
       - name: Aarohi Acquisition CRM guard
         run: npm run test:aarohi:crm
 

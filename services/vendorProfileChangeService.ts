@@ -326,6 +326,32 @@ function sanitizeProfileInput(input: VendorProfileChangeInput): Record<string, u
   setSafeUrl(output, "cover_image_url", input.cover_image_url);
   setTextArray(output, "services_offered", input.services_offered, 12, 80);
   setUrlArray(output, "portfolio_image_urls", input.portfolio_image_urls, 12);
+
+  const office = normalizeVendorOfficeEvidence({
+    office_latitude: input.office_latitude,
+    office_longitude: input.office_longitude,
+    google_place_id: input.office_google_place_id,
+    formatted_address: input.office_formatted_address,
+    area_normalized: input.office_area_normalized,
+    sublocality: input.office_sublocality,
+    neighborhood: input.office_neighborhood,
+  });
+  const fullCity = input.office_covers_full_city === true;
+  const radius = Number(input.office_service_radius_km ?? 0);
+  const validCoverage = fullCity || SERVICE_RADIUS_OPTIONS.has(radius);
+
+  if (office.verified && validCoverage) {
+    output.office_formatted_address = office.formatted_address;
+    output.office_google_place_id = office.google_place_id;
+    output.office_latitude = office.office_latitude;
+    output.office_longitude = office.office_longitude;
+    output.office_area_normalized = office.area_normalized;
+    output.office_sublocality = office.sublocality;
+    output.office_neighborhood = office.neighborhood;
+    output.office_covers_full_city = fullCity;
+    output.office_service_radius_km = fullCity ? null : radius;
+  }
+
   return output;
 }
 

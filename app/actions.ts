@@ -745,6 +745,21 @@ export const adminUpdateCityMarketSettings = async (
     revalidatePath("/api/cities");
     return result;
   });
+export const adminSetCityBoundary = async (
+  id: string,
+  input: { geojson: unknown; source?: string | null; version?: string | null },
+) =>
+  asAdmin(async (actor) => {
+    const result = await admin.setCityBoundary(id, input, actor);
+    revalidatePath("/admin/cities");
+    return result;
+  });
+export const adminClearCityBoundary = async (id: string) =>
+  asAdmin(async (actor) => {
+    const result = await admin.clearCityBoundary(id, actor);
+    revalidatePath("/admin/cities");
+    return result;
+  });
 export const adminSetCityStrictLocation = async (id: string, enabled: boolean) =>
   asAdmin(async (actor) => {
     const result = await admin.setCityStrictLocation(id, enabled, actor);

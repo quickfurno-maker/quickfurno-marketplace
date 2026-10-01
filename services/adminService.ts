@@ -689,6 +689,83 @@ export async function updateCityMarketSettings(
   }
 }
 
+export async function setCityBoundary(
+  id: string,
+  input: { geojson: unknown; source?: string | null; version?: string | null },
+  actorUserId: string,
+): Promise<Result<{ point_count: number | null; area_sq_km: number | null; boundary_version: string | null }>> {
+  if (!actorUserId) return fail(appError("UNAUTHORIZED"));
+  try {
+    if (!input.geojson || typeof input.geojson !== "object" || Array.isArray(input.geojson)) {
+      throw appError("VALIDATION");
+    }
+
+    const serialized = JSON.stringify(input.geojson);
+    if (serialized.length > 2_000_000) throw appError("VALIDATION");
+
+    const source = String(input.source ?? "").trim().slice(0, 200);
+    const version = String(input.version ?? "").trim().slice(0, 100);
+
+    const { data, error } = await adminClient().rpc("qf_admin_set_city_boundary_v1", {
+      p_city_id: id,
+      p_geojson: input.geojson,
+      p_source: source || null,
+      p_version: version || null,
+    });
+    if (error) throw error;
+
+    const payload = data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : {};
+
+    const pointCount = typeof payload.point_count === "number" ? payload.point_count : null;
+    const areaSqKm = typeof payload.area_sq_km === "number"
+      ? payload.area_sq_km
+      : Number.isFinite(Number(payload.area_sq_km))
+        ? Number(payload.area_sq_km)
+        : null;
+    const boundaryVersion = typeof payload.boundary_version === "string"
+      ? payload.boundary_version
+      : null;
+
+    await recordAuditLog(
+      "city.boundary_updated",
+      "city",
+      id,
+      {
+        boundary_source: source || "admin_geojson",
+        boundary_version: boundaryVersion,
+        point_count: pointCount,
+        area_sq_km: areaSqKm,
+      },
+      actorUserId,
+    );
+
+    return ok({
+      point_count: pointCount,
+      area_sq_km: areaSqKm,
+      boundary_version: boundaryVersion,
+    });
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function clearCityBoundary(id: string, actorUserId: string): Promise<Result<null>> {
+  if (!actorUserId) return fail(appError("UNAUTHORIZED"));
+  try {
+    const { error } = await adminClient().rpc("qf_admin_clear_city_boundary_v1", {
+      p_city_id: id,
+    });
+    if (error) throw error;
+
+    await recordAuditLog("city.boundary_cleared", "city", id, {}, actorUserId);
+    return ok(null);
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 export async function setCityStrictLocation(id: string, enabled: boolean, actorUserId: string): Promise<Result<null>> {
   if (!actorUserId) return fail(appError("UNAUTHORIZED"));
   try {

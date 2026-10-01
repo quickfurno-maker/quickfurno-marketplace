@@ -199,11 +199,7 @@ export async function getAdminCitiesPage(): Promise<Result<Row>> {
       safeAggregateRows("cities.all", db.from("cities").select("*").order("name", { ascending: true })),
       safeAggregateRows(
         "cities.service_zones",
-        db
-          .from("marketplace_service_zones")
-          .select("id,city_id,slug,name,canonical_city,accepted_city_labels,boundary_version,boundary_source,is_active,matching_enabled,resolution_priority,requires_resolved_location,boundary")
-          .order("resolution_priority", { ascending: true })
-          .order("slug", { ascending: true }),
+        db.rpc("qf_admin_service_zone_summaries_v1"),
       ),
     ]);
     return ok({ cities, serviceZones });

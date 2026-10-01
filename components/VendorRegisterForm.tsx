@@ -444,6 +444,14 @@ export function VendorRegisterForm({
         if (address1Str.length < 5) {
           e.push({ key: "addressLine1", message: "Enter your office or business address." });
         }
+        if (
+          !f.coversFullCity &&
+          !SERVICE_RADIUS_OPTIONS.includes(
+            Number(f.serviceRadiusKm) as (typeof SERVICE_RADIUS_OPTIONS)[number],
+          )
+        ) {
+          e.push({ key: "serviceRadius", message: "Select how far you normally serve from your office." });
+        }
         if (!stateStr) {
           e.push({ key: "state", message: "Enter your state." });
         }
@@ -649,7 +657,9 @@ export function VendorRegisterForm({
         // canonical office/base point.
         areas_covered: derivedAreasCovered,
         covers_full_city: f.coversFullCity,
-        // service_radius_km intentionally not sent (no hardcoded 20; DB default applies).
+        // Coverage is independent of the office/base point. Full-city coverage
+        // wins; otherwise store the vendor-selected operating radius.
+        service_radius_km: f.coversFullCity ? undefined : Number(f.serviceRadiusKm) || undefined,
         service_categories: matchingServices,
         experience: f.yearsExperience || undefined,
         // Exact Google office/business place — structured identity + normalized fields.
@@ -989,6 +999,7 @@ export function VendorRegisterForm({
                           landmark: "",
                           stateName: "Maharashtra",
                           coversFullCity: false,
+                          serviceRadiusKm: "",
                         }));
                         setError("");
                         setTouched((prev) => ({ ...prev, city: true }));
@@ -1010,7 +1021,12 @@ export function VendorRegisterForm({
                     type="checkbox"
                     checked={f.coversFullCity}
                     onChange={(e) => {
-                      set("coversFullCity", e.target.checked);
+                      const checked = e.target.checked;
+                      setF((current) => ({
+                        ...current,
+                        coversFullCity: checked,
+                        serviceRadiusKm: checked ? "" : current.serviceRadiusKm,
+                      }));
                     }}
                     className="qf-rf-coverage-checkbox"
                   />
@@ -1025,6 +1041,27 @@ export function VendorRegisterForm({
                   <p className="qf-rf-coverage-helper">
                     “Your service coverage is city-wide. Your exact office location is still used to prioritise nearby requests.”
                   </p>
+                ) : null}
+                {!f.coversFullCity ? (
+                  <label className="qf-rf-field" ref={bindField("serviceRadius")}>
+                    <span>Service radius from office</span>
+                    <select
+                      value={f.serviceRadiusKm}
+                      onChange={(e) => set("serviceRadiusKm", e.target.value)}
+                    >
+                      <option value="">Select service radius</option>
+                      {SERVICE_RADIUS_OPTIONS.map((km) => (
+                        <option key={km} value={String(km)}>{km} km</option>
+                      ))}
+                    </select>
+                    {fieldError("serviceRadius") ? (
+                      <span className="qf-rf-field-err">{fieldError("serviceRadius")}</span>
+                    ) : (
+                      <span className="qf-rf-loc-note">
+                        Operating coverage is separate from your exact office location.
+                      </span>
+                    )}
+                  </label>
                 ) : null}
               </div>
             ) : null}

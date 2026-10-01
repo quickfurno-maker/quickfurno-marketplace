@@ -96,3 +96,25 @@ assert.match(vendor, /Exact office location verified for precise nearby-client m
 assert.match(vendor, /addressLine1: place\.formattedAddress \?\? current\.addressLine1/);
 
 console.log("Precise client/vendor location capture: PASS");
+
+const vendorDashboard = fs.readFileSync(
+  "components/vendor-dashboard-v2/profile/VendorOfficeLocationEditor.tsx",
+  "utf8",
+);
+assert.match(vendorDashboard, /mode="address"/);
+assert.match(vendorDashboard, /Submit location for approval/);
+assert.match(vendorDashboard, /SERVICE_RADIUS_OPTIONS = \[5, 10, 15, 20, 30, 50\]/);
+assert.match(vendorDashboard, /Typed text alone is not trusted for geographic matching/);
+
+const approvalService = fs.readFileSync("services/vendorProfileChangeService.ts", "utf8");
+assert.match(approvalService, /request_type: requestType/);
+assert.match(approvalService, /return "location_update"/);
+assert.match(approvalService, /update\.office_latitude = office\.office_latitude/);
+assert.match(approvalService, /update\.service_radius_km = fullCity \? null : radius/);
+
+const vendorRegistration = fs.readFileSync("components/VendorRegisterForm.tsx", "utf8");
+assert.match(vendorRegistration, /service_radius_km: f\.coversFullCity \? undefined : Number\(f\.serviceRadiusKm\)/);
+assert.match(vendorRegistration, /Service radius from office/);
+
+console.log("Governed vendor location backfill: PASS");
+

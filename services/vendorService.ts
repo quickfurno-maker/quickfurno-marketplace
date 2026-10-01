@@ -11,6 +11,10 @@ import { evaluateAssignedLeadContactAccess } from "../lib/vendors/assignedLeadCo
 // the server authority, the live form and the notification lane cannot drift.
 import { isValidIndianMobile } from "../lib/vendors/vendorContactContract";
 import { normalizeLaunchCity } from "../lib/locations/launchCityPolicy";
+import {
+  normalizeGpsCoordinates,
+  normalizeVendorOfficeEvidence,
+} from "../lib/locations/locationEvidence";
 import type {
   VendorRegistrationInput, VendorDashboardStats,
 } from "../lib/types";
@@ -66,6 +70,20 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       }
     }
 
+    // Canonical office coordinates are accepted ONLY when bound to a Google
+    // Place ID. Optional browser GPS is range-checked separately and never
+    // substitutes for the office/base point used by geographic matching.
+    const officeEvidence = normalizeVendorOfficeEvidence(input);
+    const browserGps = normalizeGpsCoordinates(input.latitude, input.longitude);
+    const locationPermissionStatus =
+      input.location_permission_status === "granted" &&
+      browserGps.latitude != null &&
+      browserGps.longitude != null
+        ? "granted"
+        : input.location_permission_status === "denied"
+          ? "denied"
+          : "not_requested";
+
     // Exact column set written to public.vendors (matches the onboarding wizard).
     // Status/consent defaults are forced here regardless of input.
     const payload = {
@@ -83,8 +101,8 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       office_state: input.office_state ?? null,
       // office_pincode intentionally not written (Phase 1: pincode retired). The
       // legacy column stays in the schema; existing vendor rows are untouched.
-      office_latitude: input.office_latitude ?? null,
-      office_longitude: input.office_longitude ?? null,
+      office_latitude: officeEvidence.office_latitude,
+      office_longitude: officeEvidence.office_longitude,
       areas_covered: input.areas_covered ?? [],
       covers_full_city: input.covers_full_city ?? false,
       service_categories: input.service_categories ?? [],
@@ -92,9 +110,9 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       portfolio_urls: input.portfolio_urls ?? [],
       gst_number: input.gst_number ?? null,
       message: input.message ?? null,
-      location_permission_status: input.location_permission_status ?? "not_requested",
-      latitude: input.latitude ?? null,
-      longitude: input.longitude ?? null,
+      location_permission_status: locationPermissionStatus,
+      latitude: locationPermissionStatus === "granted" ? browserGps.latitude : null,
+      longitude: locationPermissionStatus === "granted" ? browserGps.longitude : null,
       // service_radius_km no longer hardcoded to 20 (Phase 1). Only written when
       // explicitly provided; otherwise the DB column default applies. Matching
       // does not use this value in Phase 1.
@@ -117,16 +135,16 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       user_id: input.user_id ?? null,
     };
 
-    // Phase 1 (Google area foundation): optional Google Place identity + normalized
-    // location fields. Additive and non-required. Split out so a not-yet-migrated
-    // database (20260704000040_google_area_location_foundation.sql) still saves the
-    // vendor via the missing-column fallback below. Not used by matching yet.
+    // Google identity and normalized location are persisted from the SAME
+    // verified office evidence used for canonical coordinates. Manual text can
+    // still provide area_normalized, but it cannot masquerade as a verified
+    // Google office point.
     const googleLocationPayload = {
-      google_place_id: input.google_place_id ?? null,
-      formatted_address: input.formatted_address ?? null,
-      area_normalized: input.area_normalized ?? null,
-      sublocality: input.sublocality ?? null,
-      neighborhood: input.neighborhood ?? null,
+      google_place_id: officeEvidence.google_place_id,
+      formatted_address: officeEvidence.formatted_address,
+      area_normalized: officeEvidence.area_normalized,
+      sublocality: officeEvidence.sublocality,
+      neighborhood: officeEvidence.neighborhood,
     };
 
     if (process.env.NODE_ENV === "development") {

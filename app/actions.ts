@@ -171,7 +171,7 @@ export async function getMyVendor(): Promise<Result<import("../lib/types").Vendo
   const { data } = await sb
     .from("vendors")
     .select(
-      "id, business_name, owner_name, phone, whatsapp_number, email, city, areas_covered, service_categories, selected_category, business_type, office_address_line1, office_address_line2, office_landmark, office_city, office_state, office_latitude, office_longitude, status, verification_status, paid_status, remaining_credits, total_credits, public_visibility, is_active",
+      "id, business_name, owner_name, phone, whatsapp_number, email, city, areas_covered, covers_full_city, service_radius_km, service_categories, selected_category, business_type, office_address_line1, office_address_line2, office_landmark, office_city, office_state, office_latitude, office_longitude, google_place_id, formatted_address, area_normalized, sublocality, neighborhood, status, verification_status, paid_status, remaining_credits, total_credits, public_visibility, is_active",
     )
     .eq("user_id", u.id)
     .maybeSingle();

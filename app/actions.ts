@@ -486,6 +486,13 @@ export async function vendorSubmitProfileChangeRequest(formData: FormData) {
   const me = await getMyVendor();
   if (!me.ok || !me.data) redirect("/vendor/dashboard/profile?request=no-vendor");
 
+  const optionalNumber = (key: string): number | undefined => {
+    const raw = String(formData.get(key) ?? "").trim();
+    if (!raw) return undefined;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : undefined;
+  };
+
   const u = await currentUser();
   const result = await vendorProfileChanges.createVendorProfileChangeRequest(me.data.id, u?.id ?? null, {
     public_business_name: String(formData.get("public_business_name") ?? ""),
@@ -498,6 +505,15 @@ export async function vendorSubmitProfileChangeRequest(formData: FormData) {
     profile_image_url: String(formData.get("profile_image_url") ?? ""),
     cover_image_url: String(formData.get("cover_image_url") ?? ""),
     portfolio_image_urls: String(formData.get("portfolio_image_urls") ?? "").split(/\r?\n|,/),
+    office_google_place_id: String(formData.get("office_google_place_id") ?? ""),
+    office_formatted_address: String(formData.get("office_formatted_address") ?? ""),
+    office_latitude: optionalNumber("office_latitude"),
+    office_longitude: optionalNumber("office_longitude"),
+    office_area_normalized: String(formData.get("office_area_normalized") ?? ""),
+    office_sublocality: String(formData.get("office_sublocality") ?? ""),
+    office_neighborhood: String(formData.get("office_neighborhood") ?? ""),
+    office_covers_full_city: String(formData.get("office_covers_full_city") ?? "") === "true",
+    office_service_radius_km: optionalNumber("office_service_radius_km"),
   });
 
   revalidatePath("/vendor/dashboard/profile");
@@ -570,6 +586,7 @@ export async function adminApproveVendorProfileChangeRequest(requestId: string, 
     const result = await vendorProfileChanges.approveVendorProfileChangeRequest(requestId, user.id, adminNotes);
     revalidatePath("/admin/vendors");
     revalidatePath("/vendors");
+    revalidatePath("/vendor/dashboard/profile");
     return result;
   });
 }

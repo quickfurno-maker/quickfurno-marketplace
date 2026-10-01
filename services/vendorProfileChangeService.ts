@@ -6,6 +6,7 @@
 import { adminClient } from "../lib/supabase";
 import { appError, fail, ok, type Result } from "../lib/errors";
 import { createVendorNotification } from "./vendorNotificationService";
+import { normalizeVendorOfficeEvidence } from "../lib/locations/locationEvidence";
 
 export type VendorProfileChangeInput = {
   public_business_name?: string;
@@ -18,6 +19,15 @@ export type VendorProfileChangeInput = {
   profile_image_url?: string;
   cover_image_url?: string;
   portfolio_image_urls?: string[];
+  office_google_place_id?: string;
+  office_formatted_address?: string;
+  office_latitude?: number;
+  office_longitude?: number;
+  office_area_normalized?: string;
+  office_sublocality?: string;
+  office_neighborhood?: string;
+  office_covers_full_city?: boolean;
+  office_service_radius_km?: number;
 };
 
 export type VendorProfileChangeRequest = {
@@ -47,6 +57,15 @@ export type VendorApprovedProfileSummary = {
   profile_image_url: string | null;
   cover_image_url: string | null;
   portfolio_urls: string[] | null;
+  google_place_id: string | null;
+  formatted_address: string | null;
+  area_normalized: string | null;
+  sublocality: string | null;
+  neighborhood: string | null;
+  office_latitude: number | null;
+  office_longitude: number | null;
+  covers_full_city: boolean | null;
+  service_radius_km: number | null;
 };
 
 const VENDOR_PUBLIC_SELECT = [
@@ -60,6 +79,15 @@ const VENDOR_PUBLIC_SELECT = [
   "profile_image_url",
   "cover_image_url",
   "portfolio_urls",
+  "google_place_id",
+  "formatted_address",
+  "area_normalized",
+  "sublocality",
+  "neighborhood",
+  "office_latitude",
+  "office_longitude",
+  "covers_full_city",
+  "service_radius_km",
 ].join(", ");
 
 const ALLOWED_CATEGORIES = new Set([
@@ -72,6 +100,20 @@ const ALLOWED_CATEGORIES = new Set([
   "Civil Work",
   "False Ceiling",
 ]);
+
+const LOCATION_CHANGE_KEYS = new Set([
+  "office_google_place_id",
+  "office_formatted_address",
+  "office_latitude",
+  "office_longitude",
+  "office_area_normalized",
+  "office_sublocality",
+  "office_neighborhood",
+  "office_covers_full_city",
+  "office_service_radius_km",
+]);
+
+const SERVICE_RADIUS_OPTIONS = new Set([5, 10, 15, 20, 30, 50]);
 
 export async function getVendorApprovedProfileSummary(vendorId: string): Promise<Result<VendorApprovedProfileSummary>> {
   try {

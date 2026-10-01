@@ -52,7 +52,7 @@ const SERVICE_RADIUS_OPTIONS = [5, 10, 15, 20, 30, 50] as const;
 const STEP_NAMES = [
   "Business Identity",
   "Service Category",
-  "City & Office",
+  "City & Base Area",
   "Location",
   "Business Strength",
   "Review",

@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
-import { PUNE_ZONES } from "@/lib/locality";
-import { IconArrow, IconCheck, IconChevron, IconPin } from "./icons";
+import { PublicGoogleLocationInput } from "@/components/location/PublicGoogleLocationInput";
+import { IconArrow, IconCheck, IconPin } from "./icons";
 
 // ============================================================================
 // Category hero — dark band, breadcrumb, title, match bar, trust row.
@@ -32,8 +31,8 @@ export type CategoryHeroProps = {
   description: string;
   enquiryService: string;
   vendorCount: number;
-  /** Localities that at least one listed vendor actually covers. */
-  areas: string[];
+  /** Canonical city for this city-specific category page. */
+  city: string;
   /**
    * The page's <h1>, passed in rather than rendered here. The route owns its
    * heading: it is the page's one h1, and the launch guard in
@@ -51,17 +50,8 @@ export type CategoryHeroProps = {
 };
 
 export function CategoryHero({
-  categoryName, description, enquiryService, vendorCount, areas, heading, artwork,
+  categoryName, description, enquiryService, vendorCount, city, heading, artwork,
 }: CategoryHeroProps) {
-  const [area, setArea] = useState("");
-
-  // Group the vendor-covered areas under their Pune zone, so a long list reads
-  // as a map rather than an alphabet.
-  const grouped = PUNE_ZONES
-    .map(({ zone, areas: zoneAreas }) => ({ zone, areas: zoneAreas.filter((a) => areas.includes(a)) }))
-    .filter((g) => g.areas.length > 0);
-  const ungrouped = areas.filter((a) => !grouped.some((g) => g.areas.includes(a)));
-
   return (
     <section className="qfd-section qfd-section--dark qfc-hero">
       <span className="qfd-glow qfd-glow--on-dark qfd-glow--tr" aria-hidden="true" />
@@ -92,7 +82,7 @@ export function CategoryHero({
           ) : null}
         </p>
 
-        <div className="qfc-matchbar">
+        <div className="qfc-matchbar" data-quote-bar>
           <div className="qfc-matchbar-cell qfc-matchbar-cell--locked">
             <span className="qfd-label qfc-matchbar-label">Service</span>
             <span className="qfc-matchbar-value">
@@ -104,25 +94,13 @@ export function CategoryHero({
             <label className="qfd-label qfc-matchbar-label" htmlFor="qfc-area">Your area</label>
             <span className="qfc-matchbar-select">
               <IconPin size={15} width={2.1} />
-              <select
+              <PublicGoogleLocationInput
                 id="qfc-area"
+                city={city}
                 className="qfc-select"
-                value={area}
-                onChange={(e) => setArea(e.target.value)}
-              >
-                <option value="">Choose your area in Pune</option>
-                {grouped.map((g) => (
-                  <optgroup key={g.zone} label={g.zone}>
-                    {g.areas.map((a) => <option key={a} value={a}>{a}</option>)}
-                  </optgroup>
-                ))}
-                {ungrouped.length > 0 ? (
-                  <optgroup label="Elsewhere in Pune">
-                    {ungrouped.map((a) => <option key={a} value={a}>{a}</option>)}
-                  </optgroup>
-                ) : null}
-              </select>
-              <IconChevron size={15} width={2.2} />
+                placeholder={`Search area or location in ${city}`}
+                ariaLabel={`Your project location in ${city}`}
+              />
             </span>
           </div>
 
@@ -130,7 +108,6 @@ export function CategoryHero({
             className="qfd-btn qfd-btn--primary qfc-matchbar-cta"
             modalTitle={`Get matched with verified ${categoryName}`}
             serviceCategory={enquiryService}
-            area={area || undefined}
             source={`Category hero: ${categoryName}`}
           >
             Get matched free

@@ -161,6 +161,9 @@ jobs:
       - name: Vendor location backfill authority
         run: npm run test:mvp:vendor-location-backfill
 
+      - name: Public Google location surfaces
+        run: npm run test:mvp:public-google-location
+
       - name: Vendor V1/V2 onboarding and commercial authority
         run: npm run test:mvp:vendor-v1-v2
 

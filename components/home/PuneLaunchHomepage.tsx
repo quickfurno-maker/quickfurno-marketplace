@@ -9,6 +9,7 @@ import { getPublicVendorCountsByCategory } from "@/services/publicVendorService"
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { MadeInPune } from "@/components/home/MadeInPune";
+import { PublicGoogleLocationInput } from "@/components/location/PublicGoogleLocationInput";
 import { whatsappLink } from "@/lib/config";
 
 // ============================================================================
@@ -369,22 +370,11 @@ function Hero() {
             </label>
             <label className="qfp-quote-field qfp-quote-field--area">
               <PinIcon size={18} stroke="#746D61" width={2} />
-              {/* A datalist rather than a <select>: the board draws a dropdown,
-                  but the marketplace accepts localities outside the listed set
-                  and the FAQ says so. Suggestions plus free text keeps both. */}
-              <input
-                type="text"
-                placeholder="Kharadi, Baner, Pune"
-                aria-label="Your locality"
-                autoComplete="off"
-                list="qfp-area-options"
-                data-quote-area
+              <PublicGoogleLocationInput
+                city="Pune"
+                placeholder="Search area or location"
+                ariaLabel="Your project location in Pune"
               />
-              <datalist id="qfp-area-options">
-                {PUNE_AREAS.map((area) => (
-                  <option key={area} value={area} />
-                ))}
-              </datalist>
             </label>
             <EnquiryModalTrigger className="qfp-btn qfp-btn--primary qfp-quote-btn" source="Homepage hero quote bar">
               Get up to 3 matches <ArrowIcon size={16} stroke="#fff" />

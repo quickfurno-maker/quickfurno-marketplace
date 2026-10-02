@@ -5,6 +5,9 @@ import { submitLead } from "@/app/actions";
 import { ENQUIRY_SERVICES, trackEvent } from "@/lib/config";
 import { isIndianLeadMobile } from "@/lib/leads/indianMobile";
 import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useActiveCities";
+import GooglePlaceAutocomplete from "@/components/location/GooglePlaceAutocomplete";
+import { isPlaceCompatibleWithSelectedCity } from "@/lib/google-maps/normalizePlace";
+import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
 
 export function HomeEnquiryForm({ defaultService }: { defaultService?: string }) {
   const inferredService =
@@ -17,14 +20,42 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
   const [shareConsent, setShareConsent] = useState(false);
 
   // Phase 14B: cities come only from admin-managed active cities.
-  const { cities: activeCities, loading: citiesLoading } = useActiveCities();
+  const { cities: activeCities, records: activeCityRecords, loading: citiesLoading } = useActiveCities();
 
   const [f, setF] = useState({
     name: "", phone: "", city: "", area: "",
     service_required: inferredService ?? ENQUIRY_SERVICES[0],
     budget: "", timeline: "", message: "",
   });
+  const [googlePlace, setGooglePlace] = useState<NormalizedGooglePlace | null>(null);
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
+
+  function setCity(value: string) {
+    setGooglePlace(null);
+    setF((current) => ({ ...current, city: value }));
+  }
+
+  function setAreaManual(value: string) {
+    setGooglePlace(null);
+    setF((current) => ({ ...current, area: value }));
+  }
+
+  function setAreaFromGoogle(place: NormalizedGooglePlace) {
+    const cityRecord = activeCityRecords.find(
+      (record) => record.name.toLowerCase() === f.city.toLowerCase(),
+    );
+    const aliases = cityRecord?.acceptedCityLabels ?? (f.city ? [f.city] : []);
+    if (f.city && !isPlaceCompatibleWithSelectedCity(place, f.city, aliases)) {
+      setError(`Please select a location within ${f.city}.`);
+      return;
+    }
+    setError(null);
+    setGooglePlace(place);
+    setF((current) => ({
+      ...current,
+      area: place.area ?? place.formattedAddress ?? current.area,
+    }));
+  }
 
   // Default to the first active city once the list loads; keep the user's pick
   // if it is still active.
@@ -64,7 +95,22 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
         has_budget_range: Boolean(f.budget),
         has_requirement: Boolean(f.message),
       });
-      const res = await submitLead({ ...f, source: "Homepage", share_consent: shareConsent });
+      const res = await submitLead({
+        ...f,
+        latitude: googlePlace?.lat ?? undefined,
+        longitude: googlePlace?.lng ?? undefined,
+        google_place_id: googlePlace?.placeId ?? undefined,
+        google_city: googlePlace?.city ?? undefined,
+        formatted_address: googlePlace?.formattedAddress ?? undefined,
+        area_normalized:
+          googlePlace?.areaNormalized ?? (f.area.trim() ? f.area.trim().toLowerCase() : undefined),
+        sublocality: googlePlace?.sublocality ?? undefined,
+        neighborhood: googlePlace?.neighborhood ?? undefined,
+        location_source: googlePlace ? "google_place" : "manual",
+        location_captured_at: googlePlace ? new Date().toISOString() : undefined,
+        source: "Homepage",
+        share_consent: shareConsent,
+      });
       if (!res.ok) { setError(res.error); return; }
       console.info("[home enquiry form] submission confirmed", {
         lead_id: res.data.id,
@@ -105,9 +151,21 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
         <L label="Full name"><input className="field" value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="Your name" /></L>
         <L label="WhatsApp number"><input className="field" value={f.phone} onChange={(e) => set("phone", e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" maxLength={10} placeholder="10-digit WhatsApp number" /></L>
         {activeCities.length === 1 ? null : (
-          <L label="City"><select className="field" value={f.city} onChange={(e) => set("city", e.target.value)} disabled={activeCities.length === 0}>{activeCities.length === 0 ? <option value="" className="bg-navy-deep">{citiesLoading ? "Loading cities…" : NO_ACTIVE_CITIES_MESSAGE}</option> : activeCities.map((c) => <option key={c} className="bg-navy-deep">{c}</option>)}</select></L>
+          <L label="City"><select className="field" value={f.city} onChange={(e) => setCity(e.target.value)} disabled={activeCities.length === 0}>{activeCities.length === 0 ? <option value="" className="bg-navy-deep">{citiesLoading ? "Loading cities…" : NO_ACTIVE_CITIES_MESSAGE}</option> : activeCities.map((c) => <option key={c} className="bg-navy-deep">{c}</option>)}</select></L>
         )}
-        <L label="Area / locality"><input className="field" value={f.area} onChange={(e) => set("area", e.target.value)} placeholder="e.g. Kharadi" /></L>
+        <L label="Area / locality">
+          <GooglePlaceAutocomplete
+            className="field"
+            value={f.area}
+            city={f.city}
+            mode="address"
+            suggestionsPortal
+            onManualChange={setAreaManual}
+            onPlaceSelected={setAreaFromGoogle}
+            placeholder={f.city ? `Search area or location in ${f.city}` : "Search area or location"}
+            autoComplete="off"
+          />
+        </L>
         {inferredService ? null : (
           <L label="Service required"><select className="field" value={f.service_required} onChange={(e) => set("service_required", e.target.value)}>{ENQUIRY_SERVICES.map((s) => <option key={s} className="bg-navy-deep">{s}</option>)}</select></L>
         )}

@@ -231,6 +231,7 @@ type EnquiryModalOptions = {
   serviceCategory?: string;
   city?: string;
   area?: string;
+  googlePlace?: NormalizedGooglePlace;
   requirement?: string;
   source?: string;
   // Phase 1 preferred-vendor routing. When leadIntent === "preferred_vendor" the
@@ -327,6 +328,7 @@ export function EnquiryModalTrigger({
   serviceCategory,
   city,
   area,
+  googlePlace,
   requirement,
   source,
   leadIntent,
@@ -343,6 +345,7 @@ export function EnquiryModalTrigger({
     serviceCategory,
     city,
     area,
+    googlePlace,
     requirement,
     source,
     leadIntent,
@@ -374,12 +377,45 @@ export function EnquiryModalTrigger({
           const picked = select instanceof HTMLSelectElement ? select.value : "";
           if (picked) resolvedOptions = { ...resolvedOptions, serviceCategory: picked };
         }
-        // Same convention for the locality: an optional [data-quote-area] text
-        // input inside the bar pre-fills the area field (Pune launch hero).
-        if (bar && !resolvedOptions.area) {
+        // Same convention for location: public quote bars expose their Google
+        // selection on the actual input. Manual text still pre-fills Area, while
+        // a selected Google prediction carries the exact place id + coordinates
+        // into the canonical enquiry form rather than degrading to plain text.
+        if (bar) {
           const areaInput = bar.querySelector("input[data-quote-area]");
-          const typed = areaInput instanceof HTMLInputElement ? areaInput.value.trim() : "";
-          if (typed) resolvedOptions = { ...resolvedOptions, area: typed };
+          if (areaInput instanceof HTMLInputElement) {
+            const typed = areaInput.value.trim();
+            const selectedCity = areaInput.dataset.quoteCity?.trim();
+            if (!resolvedOptions.city && selectedCity) {
+              resolvedOptions = { ...resolvedOptions, city: selectedCity };
+            }
+            if (!resolvedOptions.area && typed) {
+              resolvedOptions = { ...resolvedOptions, area: typed };
+            }
+
+            const placeId = areaInput.dataset.quotePlaceId?.trim();
+            if (!resolvedOptions.googlePlace && placeId) {
+              const coord = (value?: string) => {
+                const n = Number(value);
+                return Number.isFinite(n) ? n : null;
+              };
+              resolvedOptions = {
+                ...resolvedOptions,
+                googlePlace: {
+                  placeId,
+                  formattedAddress: areaInput.dataset.quoteFormattedAddress?.trim() || null,
+                  city: areaInput.dataset.quoteGoogleCity?.trim() || null,
+                  area: typed || null,
+                  areaNormalized: areaInput.dataset.quoteAreaNormalized?.trim() || null,
+                  sublocality: areaInput.dataset.quoteSublocality?.trim() || null,
+                  neighborhood: areaInput.dataset.quoteNeighborhood?.trim() || null,
+                  state: null,
+                  lat: coord(areaInput.dataset.quoteLat),
+                  lng: coord(areaInput.dataset.quoteLng),
+                },
+              };
+            }
+          }
         }
 
         if (context) {
@@ -483,7 +519,12 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     // Option A: skip category/subcategory (and city, when the vendor prefills it)
     // for a resolved preferred-vendor flow — land on the first field the client
     // still has to complete (budget when city is known, else the city/area step).
-    const hasCity = Boolean(options.city && options.city.trim());
+    const preselectedPlace = options.googlePlace;
+    const preselectedCity = options.city ?? preselectedPlace?.city ?? "";
+    const preselectedArea =
+      options.area ?? preselectedPlace?.area ?? preselectedPlace?.formattedAddress ?? "";
+    const hasGooglePlace = Boolean(preselectedPlace?.placeId);
+    const hasCity = Boolean(preselectedCity.trim());
     const startStep = preferredSelection ? (hasCity ? 3 : 2) : 0;
 
     setError("");
@@ -498,8 +539,19 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setModalOptions(options);
     setForm({
       ...initialState,
-      city: options.city ?? "",
-      area: options.area ?? "",
+      city: preselectedCity,
+      area: preselectedArea,
+      lat: preselectedPlace?.lat ?? null,
+      lng: preselectedPlace?.lng ?? null,
+      googlePlaceId: preselectedPlace?.placeId ?? "",
+      googleCity: preselectedPlace?.city ?? "",
+      formattedAddress: preselectedPlace?.formattedAddress ?? "",
+      areaNormalized:
+        preselectedPlace?.areaNormalized ?? (preselectedArea ? preselectedArea.toLowerCase() : ""),
+      sublocality: preselectedPlace?.sublocality ?? "",
+      neighborhood: preselectedPlace?.neighborhood ?? "",
+      locationSource: hasGooglePlace ? "google_place" : "",
+      locationCapturedAt: hasGooglePlace ? new Date().toISOString() : "",
       message: options.requirement ?? "",
       categoryId: presetCat?.id ?? "",
       categoryLabel: presetCat?.label ?? "",
@@ -514,7 +566,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         category: preferredSelection.categoryLabel,
         subcategory: options.targetVendorSubcategory ?? presetSub ?? null,
         has_city: hasCity,
-        has_area: Boolean(options.area && options.area.trim()),
+        has_area: Boolean(preselectedArea.trim()),
         start_step: startStep,
       });
     }

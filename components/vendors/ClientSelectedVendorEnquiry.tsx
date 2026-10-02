@@ -12,6 +12,10 @@
 import { useState } from "react";
 import { sendClientSelectedVendorEnquiry } from "@/app/actions";
 import { formatServiceLabels } from "@/components/client-enquiry/enquiryDisplay";
+import GooglePlaceAutocomplete from "@/components/location/GooglePlaceAutocomplete";
+import { useActiveCities } from "@/lib/locations/useActiveCities";
+import { isPlaceCompatibleWithSelectedCity } from "@/lib/google-maps/normalizePlace";
+import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
 
 type Props = {
   vendorId: string;
@@ -50,6 +54,8 @@ export function ClientSelectedVendorEnquiry({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [projectArea, setProjectArea] = useState(area ?? "");
+  const [googlePlace, setGooglePlace] = useState<NormalizedGooglePlace | null>(null);
+  const { records: activeCityRecords } = useActiveCities();
   const [budget, setBudget] = useState("");
   const [timeline, setTimeline] = useState("");
   const [requirement, setRequirement] = useState("");
@@ -57,6 +63,25 @@ export function ClientSelectedVendorEnquiry({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [doneMessage, setDoneMessage] = useState<string | null>(null);
+
+  function handleAreaManual(value: string) {
+    setProjectArea(value);
+    setGooglePlace(null);
+  }
+
+  function handleAreaPlace(place: NormalizedGooglePlace) {
+    const cityRecord = activeCityRecords.find(
+      (record) => record.name.toLowerCase() === city.toLowerCase(),
+    );
+    const aliases = cityRecord?.acceptedCityLabels ?? [city];
+    if (!isPlaceCompatibleWithSelectedCity(place, city, aliases)) {
+      setError(`Please select a project location within ${city}.`);
+      return;
+    }
+    setError("");
+    setGooglePlace(place);
+    setProjectArea(place.area ?? place.formattedAddress ?? projectArea);
+  }
 
   async function submit() {
     setError("");
@@ -71,6 +96,18 @@ export function ClientSelectedVendorEnquiry({
         phone,
         city,
         area: projectArea.trim() || area || undefined,
+        latitude: googlePlace?.lat ?? undefined,
+        longitude: googlePlace?.lng ?? undefined,
+        google_place_id: googlePlace?.placeId ?? undefined,
+        google_city: googlePlace?.city ?? undefined,
+        formatted_address: googlePlace?.formattedAddress ?? undefined,
+        area_normalized:
+          googlePlace?.areaNormalized ??
+          (projectArea.trim() ? projectArea.trim().toLowerCase() : undefined),
+        sublocality: googlePlace?.sublocality ?? undefined,
+        neighborhood: googlePlace?.neighborhood ?? undefined,
+        location_source: googlePlace ? "google_place" : "manual",
+        location_captured_at: googlePlace ? new Date().toISOString() : undefined,
         service_category: serviceCategory,
         subcategory,
         budget_range: budget || undefined,
@@ -150,10 +187,15 @@ export function ClientSelectedVendorEnquiry({
       </label>
       <label className="qf-cs-enquiry-field">
         <span>Project area / locality</span>
-        <input
+        <GooglePlaceAutocomplete
           value={projectArea}
-          onChange={(e) => setProjectArea(e.target.value)}
-          placeholder={area ? area : "e.g. Kharadi, Baner"}
+          city={city}
+          mode="address"
+          suggestionsPortal
+          onManualChange={handleAreaManual}
+          onPlaceSelected={handleAreaPlace}
+          placeholder={`Search area or location in ${city}`}
+          autoComplete="off"
         />
       </label>
       <label className="qf-cs-enquiry-field">

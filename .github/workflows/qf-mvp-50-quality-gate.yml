@@ -167,6 +167,9 @@ jobs:
       - name: Vendor package payment authority
         run: npm run test:mvp:vendor-package-payment
 
+      - name: Vendor V3-V5 delivery, recovery and intelligence authority
+        run: npm run test:mvp:vendor-v3-v5
+
       - name: QF-MVP-80.02 GATE-06 vendor login activation
         run: npm run test:mvp:80-02-gate06
 

@@ -66,6 +66,8 @@ export interface VendorLeadRawRow {
   assignment_type: string | null;
   assignment_source: string | null;
   is_bad_lead_reported: boolean | null;
+  lifecycle_status?: string | null;
+  lifecycle_updated_at?: string | null;
   connection_assurance_supported?: boolean | null;
   connection_assurance?: {
     vendor_outcome?: "responded" | "no_response" | null;
@@ -104,6 +106,9 @@ export interface VendorLeadView {
   assignedAt: string | null;
   assignedAgo: string | null;
   isReported: boolean;
+  lifecycleStatus: string | null;
+  canAcknowledge: boolean;
+  acknowledged: boolean;
   source: VendorLeadSource | null;
   name: string;
   service: string;
@@ -172,14 +177,18 @@ export function buildVendorLeadViews(
     const suppliedExpiryMs = assurance?.window_expires_at ? new Date(assurance.window_expires_at).getTime() : Number.NaN;
     const expiryMs = Number.isFinite(suppliedExpiryMs) ? suppliedExpiryMs : fallbackExpiryMs;
     const connectionWindowExpiresAt = Number.isFinite(expiryMs) ? new Date(expiryMs).toISOString() : null;
+    const deliveryConfirmed = row.lifecycle_status === "delivered" || row.lifecycle_status === "accepted";
     const connectionWindowOpen =
-      connectionAssuranceSupported && connectionOutcome === null && Number.isFinite(expiryMs) && now <= expiryMs;
+      deliveryConfirmed && connectionAssuranceSupported && connectionOutcome === null && Number.isFinite(expiryMs) && now <= expiryMs;
 
     views.push({
       id: row.id,
       assignedAt: row.assigned_at,
       assignedAgo: formatRelativeTime(row.assigned_at, now),
       isReported: row.is_bad_lead_reported === true,
+      lifecycleStatus: text(row.lifecycle_status),
+      canAcknowledge: row.lifecycle_status === "delivered",
+      acknowledged: row.lifecycle_status === "accepted",
       source: assignmentSourceBadge(row.assignment_source, row.assignment_type),
       name,
       service,

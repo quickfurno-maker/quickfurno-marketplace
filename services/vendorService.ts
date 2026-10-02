@@ -333,7 +333,7 @@ export async function getVendorAssignedLeads(vendorId: string): Promise<Result<u
         .order("assigned_at", { ascending: false });
 
     let { data, error } = await runQuery(
-      "id, assigned_at, assignment_type, assignment_source, is_bad_lead_reported, operation_id, credit_deducted",
+      "id, assigned_at, assignment_type, assignment_source, is_bad_lead_reported, operation_id, credit_deducted, lifecycle_status, lifecycle_updated_at",
     );
     if (error && isMissingColumnError(error)) {
       ({ data, error } = await runQuery(
@@ -427,6 +427,8 @@ function sanitizeAssignedLeadRow(
     assignment_type: row.assignment_type ?? null,
     assignment_source: row.assignment_source ?? null,
     is_bad_lead_reported: row.is_bad_lead_reported ?? null,
+    lifecycle_status: typeof row.lifecycle_status === "string" ? row.lifecycle_status : null,
+    lifecycle_updated_at: typeof row.lifecycle_updated_at === "string" ? row.lifecycle_updated_at : null,
     // The ONLY entitlement fact the browser is given. operation_id and
     // credit_deducted stay server-side.
     contact_allowed: access.contactAllowed,
@@ -469,6 +471,9 @@ export async function recordVendorClientResponse(
     );
     if (error) {
       const message = error.message ?? "";
+      if (message.includes("QF_CONNECTION_DELIVERY_REQUIRED")) {
+        return { ok: false, code: "CONNECTION_DELIVERY_REQUIRED", error: "Client-response tracking opens only after QuickFurno confirms lead delivery." };
+      }
       if (message.includes("QF_CONNECTION_WINDOW_CLOSED")) {
         return { ok: false, code: "CONNECTION_WINDOW_CLOSED", error: "The 24-hour client-response window has closed for this lead." };
       }

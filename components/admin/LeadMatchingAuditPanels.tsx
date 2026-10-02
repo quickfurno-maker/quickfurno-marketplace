@@ -2,13 +2,16 @@
 
 // ============================================================================
 // QuickFurno — Phase 26A-2 admin audit panels.
-// Read-mostly surfaces for lead matching runs, delivery logs, preview
-// messages, and bad-lead report review. WhatsApp stays preview/log only;
-// review actions never touch credits.
+// Read-mostly surfaces for lead matching runs and delivery truth, plus a
+// human-governed bad-lead recovery console. Recovery can restore one credit or
+// request a replacement only through Core's existing authorities and explicit
+// Superadmin confirmation; this component never mutates money directly.
 // ============================================================================
 import { useEffect, useMemo, useState } from "react";
 import {
   adminAddVendorLeadReportComment,
+  adminApplyBadLeadRecovery,
+  adminGenerateBadLeadRecoveryRecommendation,
   adminGetLeadMatchingAuditDetails,
   adminUpdateVendorLeadReportStatus,
 } from "@/app/actions";
@@ -475,10 +478,28 @@ export function BadLeadReportsReviewPanel({
     runAction("Report comment added", () => adminAddVendorLeadReportComment(report.id, comment));
   }
 
+  function generateRecoveryRecommendation(report: BadReport) {
+    runAction("Recovery recommendation generated", () => adminGenerateBadLeadRecoveryRecommendation(report.id));
+  }
+
+  function applyRecovery(
+    report: BadReport,
+    action: "restore_credit" | "replace" | "restore_credit_and_replace" | "reject",
+  ) {
+    const labels = {
+      restore_credit: "restore one credit",
+      replace: "approve a replacement match",
+      restore_credit_and_replace: "restore one credit and approve a replacement match",
+      reject: "reject recovery",
+    };
+    if (!window.confirm(`Confirm human recovery decision: ${labels[action]}? This uses Core's governed recovery authority.`)) return;
+    runAction("Recovery decision applied", () => adminApplyBadLeadRecovery(report.id, action));
+  }
+
   return (
     <SectionCard
       title="Bad Lead Reports Review"
-      description="Manual admin review. Marking a report Valid/Invalid/Resolved never refunds, adds, or deducts credits — credit corrections stay a separate manual admin action."
+      description="Human-governed recovery. Recommendations are advisory only; credit restoration and replacement require an explicit admin decision and use Core’s existing credit and assignment authorities."
     >
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {uniqueOptions(["Pending", "Under Review", "Valid", "Invalid", "Resolved", "Rejected", ...data.badReports.map((report) => report.status)]).map((option) => (
@@ -533,7 +554,20 @@ export function BadLeadReportsReviewPanel({
               />
             ),
           },
-          { header: "Credit", cell: (report: BadReport) => <StatusBadge value={report.credit_restored ? "Restored (manual)" : "No auto refund"} tone={report.credit_restored ? "emerald" : "slate"} /> },
+          {
+            header: "Recovery",
+            cell: (report: BadReport) => (
+              <div className="grid gap-1">
+                <StatusBadge
+                  value={report.recovery_status || "Not requested"}
+                  tone={report.recovery_status === "applied" ? "emerald" : report.recovery_status === "rejected" ? "rose" : "slate"}
+                />
+                {report.recovery_recommendation ? (
+                  <span className="text-[11px] text-slate-500">Recommended: {report.recovery_recommendation.replaceAll("_", " ")}</span>
+                ) : null}
+              </div>
+            ),
+          },
           {
             header: "Admin Notes",
             cell: (report: BadReport) => (
@@ -571,6 +605,11 @@ export function BadLeadReportsReviewPanel({
                     label: `Mark ${status.toLowerCase()}`,
                     onClick: () => updateStatus(report, status),
                   })),
+                  { label: "Generate recovery recommendation", onClick: () => generateRecoveryRecommendation(report) },
+                  { label: "Restore one credit", onClick: () => applyRecovery(report, "restore_credit") },
+                  { label: "Restore credit + replace", onClick: () => applyRecovery(report, "restore_credit_and_replace") },
+                  { label: "Replace only", onClick: () => applyRecovery(report, "replace") },
+                  { label: "Reject recovery", onClick: () => applyRecovery(report, "reject") },
                   { label: "Add admin comment", onClick: () => addComment(report) },
                 ]}
               />

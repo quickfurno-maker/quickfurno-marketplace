@@ -69,6 +69,7 @@ import {
 // after the canonical message lifecycle has been persisted, holds no delivery
 // authority of its own, and cannot send.
 import { reconcileLeadAssignmentDeliveryResults } from "./leadAssignmentResultService";
+import { projectLeadAssignmentLifecycleFromProviderMessages } from "./leadAssignmentLifecycleService";
 import { handleInboundWhatsAppMessages } from "./inboundWhatsAppMessageService";
 import { processInboundConsentCommands } from "./inboundConsentCommandService";
 import { enqueueConsentCommandResponses } from "./consentCommandResponseService";
@@ -184,7 +185,14 @@ export function defaultMetaWebhookDeps(): MetaWebhookDeps {
       const res = await service.processWebhook(rawBody, signature, appSecret, providerAccountId);
       return res.ok ? { ok: true, data: { duplicate: res.data.duplicate } } : { ok: false };
     },
-    reconcileLeadAssignmentResults: (args) => reconcileLeadAssignmentDeliveryResults(args),
+    reconcileLeadAssignmentResults: async (args) => {
+      const intentProjection = await reconcileLeadAssignmentDeliveryResults(args);
+      // V3 projection is strictly downstream of canonical provider truth. It
+      // cannot send, debit credits, or create assignments; it only advances
+      // assignment lifecycle/fairness after Meta says delivered/read.
+      const lifecycleProjection = await projectLeadAssignmentLifecycleFromProviderMessages(args);
+      return { intentProjection, lifecycleProjection };
+    },
     recordIgnored: (rawBody, payload, reason) => recordIgnoredReceipt(rawBody, payload, reason),
     processCommands: (processed) => processInboundConsentCommands(processed),
     processLeadEnrichment: (processed) =>

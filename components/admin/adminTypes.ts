@@ -264,6 +264,11 @@ export type BadReport = {
   reviewed_by?: string | null;
   reviewed_at?: string | null;
   updated_at?: string | null;
+  recovery_recommendation?: string | null;
+  recovery_status?: string | null;
+  credit_restoration_approval_id?: string | null;
+  replacement_request_id?: string | null;
+  recovery_applied_at?: string | null;
 };
 
 export type BadLeadReportComment = {

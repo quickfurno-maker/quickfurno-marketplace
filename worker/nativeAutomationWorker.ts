@@ -45,6 +45,8 @@ async function main() {
     await import("@/services/conversationalWhatsAppService");
   const leadEnrichmentMaintenance =
     await import("@/services/leadEnrichmentMaintenanceService");
+  const vendorIntelligence =
+    await import("@/services/vendorIntelligenceService");
   const cfg = runtime.getNativeAutomationRuntimeConfig();
   const startedAt = new Date().toISOString();
   let stopping = false;
@@ -268,6 +270,15 @@ async function main() {
             didWork = true;
             snapshot.lastSuccessAt = new Date().toISOString();
             snapshot.lastSafeCode = "NATIVE_LEAD_ENRICHMENT_NURTURE";
+          }
+        }
+        if (await studio.isAutomationStudioWorkflowEnabled("vendor_journey")) {
+          const vendorSignals =
+            await vendorIntelligence.runVendorIntelligenceMaintenance(100);
+          if (vendorSignals.noticesCreated > 0) {
+            didWork = true;
+            snapshot.lastSuccessAt = new Date().toISOString();
+            snapshot.lastSafeCode = "NATIVE_VENDOR_INTELLIGENCE_NOTICES";
           }
         }
         nextMaintenanceAt = now + cfg.maintenanceIntervalMs;

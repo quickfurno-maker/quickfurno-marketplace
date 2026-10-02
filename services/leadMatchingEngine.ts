@@ -388,16 +388,17 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
       google_routes_required: false,
     };
 
-    // The current fairness signal is the existing deterministic
-    // last_assigned_at tiebreak inside MatchCore. It runs only after category,
-    // direct-line distance and area affinity. A delivery-exposure fairness model
+    // The current fairness signal is provider-confirmed delivery exposure,
+    // projected into vendors.last_delivered_at and carried through MatchCore’s
+    // historical last_assigned_at decision field. It runs only after category,
+    // direct-line distance and area affinity. A richer exposure fairness model
     // can replace this later once canonical delivered events exist.
     const selectionPlan = buildSelectionPlan(straightLineOrderedVendorIds);
     const fairnessEvidence = {
-      fairness_model: "last_assignment_tiebreak_v1",
+      fairness_model: "provider_delivery_tiebreak_v1",
       position_after: ["match_tier", "direct_line_distance_km", "area_affinity"],
-      delivery_exposure_active: false,
-      reason: "DELIVERY_EXPOSURE_UNAVAILABLE",
+      delivery_exposure_active: true,
+      reason: "PROVIDER_CONFIRMED_DELIVERY_ONLY",
     };
 
     // Ranked candidate POOL. Recorded as selected_vendor_ids so diagnostics keep
@@ -752,7 +753,10 @@ export function rankVendorsForLead(
         coordinate_source: coords.source,
         distance_km: distanceKm,
         area_affinity: areaAffinity,
-        last_assigned_at: asText(vendor.last_assigned_at),
+        // MatchCore keeps its historical field name, but V4 fairness now
+        // consumes only provider-confirmed delivery exposure. Merely creating
+        // an assignment/debit no longer moves the fair-turn clock.
+        last_assigned_at: asText(vendor.last_delivered_at),
         rating: Number.isFinite(Number(vendor.rating)) ? Number(vendor.rating) : 0,
         rank_position: null,
       },

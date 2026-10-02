@@ -28,6 +28,8 @@ import * as aos from "../services/aosService";
 import * as vendorLoginActivation from "../services/vendorLoginActivationService";
 import * as vendorPrincipalProfiles from "../services/vendorPrincipalProfileService";
 import * as adminVendorLocation from "../services/adminVendorLocationService";
+import * as leadAssignmentLifecycle from "../services/leadAssignmentLifecycleService";
+import * as badLeadRecovery from "../services/badLeadRecoveryService";
 import {
   queueHumanConversationReply,
   releaseHumanConversationToAi,
@@ -410,6 +412,17 @@ export async function vendorDashboard(vendorId: string) {
 export async function vendorLeads(vendorId: string) {
   try { await requireVendorOwner(vendorId); } catch (e) { return fail(e); }
   return vendors.getVendorAssignedLeads(vendorId);
+}
+
+export async function vendorAcknowledgeLeadFromForm(formData: FormData) {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/matching?lead=no-vendor");
+  const assignmentId = String(formData.get("assignmentId") ?? "");
+  const result = await leadAssignmentLifecycle.acknowledgeVendorLead(me.data.id, assignmentId);
+  revalidatePath("/vendor/dashboard/matching");
+  revalidatePath("/vendor/dashboard");
+  if (!result.ok) redirect(`/vendor/dashboard/matching?lead=ack-failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/matching?lead=acknowledged");
 }
 
 export async function vendorRecordClientResponseFromForm(formData: FormData) {
@@ -801,6 +814,27 @@ export const adminUpdateVendorLeadReportStatus = async (reportId: string, input:
     const user = await requireSuperadmin();
     const result = await audit.updateVendorLeadReportStatus(reportId, input, user.id);
     revalidatePath("/admin/leads");
+    return result;
+  });
+
+export const adminRecommendBadLeadRecovery = async (
+  reportId: string,
+  recommendation: "none" | "restore_credit" | "replace" | "restore_credit_and_replace",
+) => asAdmin(() => badLeadRecovery.recommendBadLeadRecovery(reportId, recommendation));
+
+export const adminGenerateBadLeadRecoveryRecommendation = async (reportId: string) =>
+  asAdmin(() => badLeadRecovery.generateBadLeadRecoveryRecommendation(reportId));
+
+export const adminApplyBadLeadRecovery = async (
+  reportId: string,
+  action: badLeadRecovery.BadLeadRecoveryAction,
+) =>
+  asAdmin(async (actor) => {
+    const result = await badLeadRecovery.applyBadLeadRecovery(reportId, action, actor);
+    revalidatePath("/admin/leads");
+    revalidatePath("/admin/lead-distribution");
+    revalidatePath("/vendor/dashboard/matching");
+    revalidatePath("/vendor/dashboard");
     return result;
   });
 export const adminAddVendorLeadReportComment = async (reportId: string, comment: string, isInternal = false) =>

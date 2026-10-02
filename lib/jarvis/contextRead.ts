@@ -17,6 +17,19 @@ function packageBand(row: Record<string, unknown>): "UNKNOWN" | "NOT_ACTIVE" | "
   const credits = Number(row.remaining_credits); if (!Number.isFinite(credits)) return "UNKNOWN";
   return credits <= 3 ? "LOW_CREDITS" : "READY";
 }
+function safeCount(value: unknown): number {
+  const count = Number(value);
+  return Number.isSafeInteger(count) && count >= 0 ? Math.min(count, 1_000_000) : 0;
+}
+function expiryBand(value: unknown): "UNKNOWN" | "EXPIRED" | "DUE_7D" | "DUE_30D" | "HEALTHY" {
+  const raw = text(value); if (!raw) return "UNKNOWN";
+  const expiry = Date.parse(raw); if (!Number.isFinite(expiry)) return "UNKNOWN";
+  const days = Math.ceil((expiry - Date.now()) / 86_400_000);
+  if (days < 0) return "EXPIRED";
+  if (days <= 7) return "DUE_7D";
+  if (days <= 30) return "DUE_30D";
+  return "HEALTHY";
+}
 export async function readJarvisSanitizedContextFromSource(args: { readonly request: QfjContextReadRequestV1; readonly policy: QfJarvisRuntimePolicy; readonly source: JarvisContextDataSource }): Promise<JarvisContextResult> {
   const { request, policy, source } = args;
   if (policy.mode === "off" || !policy.contextReadEnabled || !actorEnabled(policy, request.actor)) return { ok:false, reason:"disabled" };
@@ -27,6 +40,6 @@ export async function readJarvisSanitizedContextFromSource(args: { readonly requ
       return { ok:true, context:Object.freeze({ kind:"client_lead", leadId:request.entityId, city:text(row.city), serviceRequired:text(row.service_required), budgetBand:text(row.budget), propertyType:text(row.property_type), timeline:text(row.timeline), leadStatus:text(row.status), verificationStatus:text(row.verification_status), isDuplicate:bool(row.is_duplicate) }) };
     }
     const row = await source.readVendor(request.entityId); if (!row) return { ok:false, reason:"not_found" };
-    return { ok:true, context:Object.freeze({ kind:"vendor_profile", vendorId:request.entityId, city:text(row.city), serviceCategories:categories(row.service_categories), vendorStatus:text(row.status), isActive:bool(row.is_active), publicVisibility:bool(row.public_visibility), paidStatus:text(row.paid_status), packageReadinessBand:packageBand(row) }) };
+    return { ok:true, context:Object.freeze({ kind:"vendor_profile", vendorId:request.entityId, city:text(row.city), serviceCategories:categories(row.service_categories), vendorStatus:text(row.status), isActive:bool(row.is_active), publicVisibility:bool(row.public_visibility), paidStatus:text(row.paid_status), packageReadinessBand:packageBand(row), packageExpiryBand:expiryBand(row.package_expires_at), locationVerificationStatus:text(row.location_verification_status), activeLeadCount:safeCount(row.active_lead_count), deliveredUnacknowledgedCount:safeCount(row.delivered_unacknowledged_count), pendingBadLeadReportCount:safeCount(row.pending_bad_lead_report_count), unreadNotificationCount:safeCount(row.unread_notification_count) }) };
   } catch { return { ok:false, reason:"unavailable" }; }
 }

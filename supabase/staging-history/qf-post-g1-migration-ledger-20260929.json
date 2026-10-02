@@ -278,6 +278,18 @@
         "production": false
       },
       "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-02"
+    },
+    {
+      "version": "20261002052224",
+      "name": "vendor_v3_db_delivery_projection",
+      "filename": "20261002052224_vendor_v3_db_delivery_projection.sql",
+      "path": "supabase/migrations/20261002052224_vendor_v3_db_delivery_projection.sql",
+      "canonicalSha256": "58c0b9221edf2cbb63166c5dae3c67fe471e9522cbdb8ddb1d7d6cbc32d131b5",
+      "exactVersionPresence": {
+        "staging": true,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-02"
     }
   ],
   "supersededLegacyPins": [

@@ -47,6 +47,7 @@ const FILTER_LABELS: Record<string, string> = {
   source: "Source",
   tagId: "Tag",
   taskState: "Tasks",
+  location: "Location",
 };
 
 export function VendorCrmDirectory({
@@ -96,6 +97,33 @@ export function VendorCrmDirectory({
           <StatusBadge value={r.is_active === false ? "Disabled" : "Enabled"} tone={r.is_active === false ? "rose" : "slate"} />
         </span>
       ),
+    },
+    {
+      header: "Location",
+      cell: (r: VendorCrmDirectoryRow) => {
+        const status = r.location_verification_status ?? "unverified";
+        const label =
+          status === "unverified" ? "Needs backfill" :
+          status === "provisional" ? "Provisional" :
+          status === "verified" ? "Verified" :
+          status === "outside_service_area" ? "Outside area" : status;
+        const tone =
+          status === "verified" ? "emerald" :
+          status === "provisional" ? "cyan" :
+          status === "outside_service_area" ? "rose" : "amber";
+        return (
+          <span className="flex flex-col items-start gap-1">
+            <StatusBadge value={label} tone={tone} />
+            <Muted>
+              {r.has_google_place && r.has_office_coordinates
+                ? "Google point stored"
+                : r.has_office_coordinates
+                  ? "Legacy coordinates only"
+                  : "No precise office point"}
+            </Muted>
+          </span>
+        );
+      },
     },
     {
       header: "Credits",
@@ -199,7 +227,7 @@ export function VendorCrmDirectory({
     },
   ];
 
-  const hasActiveFilter = ["search", "category", "city", "verification", "enabled", "onboarding_stage", "relationship_status", "source", "tagId", "taskState"].some((k) => query[k]);
+  const hasActiveFilter = ["search", "category", "city", "verification", "enabled", "location", "onboarding_stage", "relationship_status", "source", "tagId", "taskState"].some((k) => query[k]);
 
   const activeFilters = Object.keys(FILTER_LABELS)
     .filter((key) => query[key])
@@ -208,6 +236,12 @@ export function VendorCrmDirectory({
       let value = raw;
       if (key === "enabled") value = raw === "true" ? "Enabled" : "Disabled";
       if (key === "taskState") value = raw === "open" ? "Open" : "Overdue";
+      if (key === "location") {
+        value =
+          raw === "needs_backfill" ? "Needs backfill" :
+          raw === "outside_service_area" ? "Outside area" :
+          raw.charAt(0).toUpperCase() + raw.slice(1);
+      }
       if (key === "tagId") value = tags.find((t) => t.id === raw)?.name ?? raw;
       return { key, label: FILTER_LABELS[key], value };
     });
@@ -234,6 +268,23 @@ export function VendorCrmDirectory({
           <div className="flex flex-wrap gap-2">
             <SelectFilter label="Verification" value={selectVal("verification")} options={["All", "Pending", "Approved", "Rejected", "Suspended"]} onChange={(v) => apply({ verification: v })} />
             <SelectFilter label="Enabled" value={query.enabled === "true" ? "Enabled" : query.enabled === "false" ? "Disabled" : "All"} options={["All", "Enabled", "Disabled"]} onChange={(v) => apply({ enabled: v === "Enabled" ? "true" : v === "Disabled" ? "false" : undefined })} />
+            <SelectFilter
+              label="Location"
+              value={
+                query.location === "needs_backfill" ? "Needs backfill" :
+                query.location === "provisional" ? "Provisional" :
+                query.location === "verified" ? "Verified" :
+                query.location === "outside_service_area" ? "Outside area" : "All"
+              }
+              options={["All", "Needs backfill", "Provisional", "Verified", "Outside area"]}
+              onChange={(v) => apply({
+                location:
+                  v === "Needs backfill" ? "needs_backfill" :
+                  v === "Provisional" ? "provisional" :
+                  v === "Verified" ? "verified" :
+                  v === "Outside area" ? "outside_service_area" : undefined,
+              })}
+            />
             <SelectFilter label="Stage" value={selectVal("onboarding_stage")} options={["All", ...VENDOR_CRM_ONBOARDING_STAGES]} onChange={(v) => apply({ onboarding_stage: v })} />
             <SelectFilter label="Relationship" value={selectVal("relationship_status")} options={["All", ...VENDOR_CRM_RELATIONSHIP_STATUSES]} onChange={(v) => apply({ relationship_status: v })} />
             <SelectFilter label="Source" value={selectVal("source")} options={["All", ...VENDOR_CRM_ACQUISITION_SOURCES]} onChange={(v) => apply({ source: v })} />

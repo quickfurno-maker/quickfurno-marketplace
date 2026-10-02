@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import type { RazorpayVendorPackageMode } from "@/lib/payments/vendorPackageRazorpay";
 
 type Checkout = {
   localOrderId: string;
@@ -9,6 +11,7 @@ type Checkout = {
   amount: number;
   currency: "INR";
   packageName: string;
+  mode: RazorpayVendorPackageMode;
 };
 
 type RazorpaySuccess = {
@@ -29,9 +32,9 @@ declare global {
     Razorpay?: RazorpayConstructor;
   }
 }
+
 function loadRazorpayCheckout(): Promise<void> {
   if (window.Razorpay) return Promise.resolve();
-
   return new Promise((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>('script[data-qf-razorpay="1"]');
     if (existing) {
@@ -39,7 +42,6 @@ function loadRazorpayCheckout(): Promise<void> {
       existing.addEventListener("error", () => reject(new Error("CHECKOUT_LOAD_FAILED")), { once: true });
       return;
     }
-
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
@@ -52,15 +54,26 @@ function loadRazorpayCheckout(): Promise<void> {
 
 function friendlyError(code: string): string {
   const messages: Record<string, string> = {
+    PAYMENT_PROVIDER_DISABLED: "Online package payment is not enabled yet.",
+    PAYMENT_PROVIDER_CONFIG_INVALID: "Online payment configuration needs administrator attention.",
     PACKAGE_NOT_ACTIVE: "This package is no longer available. Create a new order.",
     PACKAGE_SNAPSHOT_DRIFT: "This package changed before payment started. Create a new order.",
+    PACKAGE_ORDER_MODE_MISMATCH: "This order belongs to a different payment environment. Create a new order.",
     PACKAGE_ORDER_CREATION_UNCERTAIN: "Payment setup needs review before you retry. No credits were activated.",
     PAYMENT_SIGNATURE_INVALID: "Payment verification failed. No credits were activated.",
-    PAYMENT_NOT_CAPTURED: "Payment is still processing. Credits will activate only after capture.",
+    PAYMENT_NOT_CAPTURED: "Payment is still processing. Credits activate only after Razorpay confirms capture.",
   };
   return messages[code] ?? "Payment could not be completed. Please try again or contact support.";
 }
-export function VendorPackagePayButton({ orderId }: { orderId: string }) {
+
+export function VendorPackagePayButton({
+  orderId,
+  mode,
+}: {
+  orderId: string;
+  mode: RazorpayVendorPackageMode;
+}) {
+  const router = useRouter();
   const [state, setState] = useState<"idle" | "loading" | "verifying" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
 
@@ -75,7 +88,8 @@ export function VendorPackagePayButton({ orderId }: { orderId: string }) {
     if (!verifyResponse.ok || !payload.ok) {
       throw new Error(payload.code || "PAYMENT_VERIFY_FAILED");
     }
-    window.location.assign("/vendor/dashboard/package?order=paid");
+    router.push("/vendor/dashboard/package?order=paid");
+    router.refresh();
   }
 
   async function startCheckout() {
@@ -95,6 +109,8 @@ export function VendorPackagePayButton({ orderId }: { orderId: string }) {
       if (!response.ok || !payload.ok || !payload.checkout) {
         throw new Error(payload.code || "CHECKOUT_CREATE_FAILED");
       }
+      if (payload.checkout.mode !== mode) throw new Error("PACKAGE_ORDER_MODE_MISMATCH");
+
       await loadRazorpayCheckout();
       if (!window.Razorpay) throw new Error("CHECKOUT_LOAD_FAILED");
 
@@ -104,7 +120,9 @@ export function VendorPackagePayButton({ orderId }: { orderId: string }) {
         amount: checkout.amount,
         currency: checkout.currency,
         name: "QuickFurno",
-        description: `${checkout.packageName} — TEST MODE`,
+        description: mode === "test"
+          ? `${checkout.packageName} — TEST MODE`
+          : checkout.packageName,
         order_id: checkout.providerOrderId,
         handler: (success: RazorpaySuccess) => {
           void verify(checkout.localOrderId, success).catch((error: Error) => {
@@ -113,15 +131,15 @@ export function VendorPackagePayButton({ orderId }: { orderId: string }) {
           });
         },
         modal: {
-          ondismiss: () => {
-            setState((current) => current === "verifying" ? current : "idle");
-          },
+          ondismiss: () => setState((current) => current === "verifying" ? current : "idle"),
         },
       });
 
       instance.on("payment.failed", () => {
         setState("error");
-        setMessage("The test payment failed. You can retry this order.");
+        setMessage(mode === "test"
+          ? "The test payment failed. You can retry this order."
+          : "The payment failed. No credits were activated; you can retry this order.");
       });
       setState("idle");
       instance.open();
@@ -131,6 +149,7 @@ export function VendorPackagePayButton({ orderId }: { orderId: string }) {
       setMessage(friendlyError(code));
     }
   }
+
   const busy = state === "loading" || state === "verifying";
   return (
     <div className="qf-vendor-v2-package-pay">
@@ -140,7 +159,13 @@ export function VendorPackagePayButton({ orderId }: { orderId: string }) {
         disabled={busy}
         onClick={() => void startCheckout()}
       >
-        {state === "loading" ? "Opening test checkout…" : state === "verifying" ? "Verifying payment…" : "Pay now · TEST MODE"}
+        {state === "loading"
+          ? "Opening checkout…"
+          : state === "verifying"
+            ? "Verifying payment…"
+            : mode === "test"
+              ? "Pay now · TEST MODE"
+              : "Pay securely"}
       </button>
       {message ? <p className="qf-vendor-v2-package-pay-error" role="alert">{message}</p> : null}
     </div>

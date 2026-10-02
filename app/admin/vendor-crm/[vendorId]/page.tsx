@@ -39,6 +39,7 @@ const PROFILE_TABS: readonly VendorCrmProfileTab[] = [
   "tags",
   "notes",
   "tasks",
+  "location",
   "core-context",
 ];
 

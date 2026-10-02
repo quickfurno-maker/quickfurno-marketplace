@@ -15,6 +15,7 @@ import {
   crmRemoveTag,
   crmUpsertProfile,
 } from "@/app/actions/vendorCrmActions";
+import { adminBackfillVendorLocation } from "@/app/actions";
 import type { Result } from "@/lib/errors";
 import type {
   PagedResult,
@@ -30,6 +31,7 @@ import type {
 } from "@/lib/crm/vendorCrmProfileTypes";
 import type { VendorTaskStatus } from "@/lib/crm/vendorCrmContracts";
 import { EmptyState, ProgressBar, StatusBadge, TabPanel, Tabs, Toast } from "../AdminPrimitives";
+import { VendorLocationBackfill } from "./VendorLocationBackfill";
 import {
   ContactsTab,
   CoreContextTab,
@@ -46,6 +48,7 @@ const TAB_LABELS: Record<VendorCrmProfileTab, string> = {
   tags: "Tags",
   notes: "Notes",
   tasks: "Tasks",
+  location: "Location",
   "core-context": "Core Context",
 };
 
@@ -219,6 +222,18 @@ export function VendorCrmProfile(props: VendorCrmProfileProps) {
               `task-cancel-${taskId}`,
               () => crmCancelTask(props.vendorId, taskId),
               "Task cancelled.",
+            )}
+          />
+        ) : null}
+
+        {props.activeTab === "location" ? (
+          <VendorLocationBackfill
+            core={core}
+            pending={actionKey === "location-backfill"}
+            onSave={(input) => runAction(
+              "location-backfill",
+              () => adminBackfillVendorLocation(props.vendorId, input),
+              "Vendor matching location verified and saved.",
             )}
           />
         ) : null}

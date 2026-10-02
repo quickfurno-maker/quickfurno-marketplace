@@ -303,6 +303,7 @@ export interface VendorCrmDirectoryQuery {
   source: VendorCrmAcquisitionSource | null;
   tagId: string | null;
   taskState: "open" | "overdue" | null;
+  location: "needs_backfill" | "provisional" | "verified" | "outside_service_area" | null;
 }
 export function validateDirectoryQuery(input: Record<string, unknown> = {}): VendorCrmDirectoryQuery {
   const page = Math.max(1, optInt(input.page, "page", 1) ?? 1);
@@ -322,5 +323,12 @@ export function validateDirectoryQuery(input: Record<string, unknown> = {}): Ven
     source: optInSet(input.source, VENDOR_CRM_ACQUISITION_SOURCES, "source"),
     tagId: input.tagId ? requireUuid(input.tagId, "tagId") : null,
     taskState: (input.taskState === "open" || input.taskState === "overdue") ? input.taskState : null,
+    location:
+      input.location === "needs_backfill" ||
+      input.location === "provisional" ||
+      input.location === "verified" ||
+      input.location === "outside_service_area"
+        ? input.location
+        : null,
   };
 }

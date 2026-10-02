@@ -230,6 +230,54 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"
+    },
+    {
+      "version": "20261002040748",
+      "name": "vendor_v2_commercial_activation",
+      "filename": "20261002040748_vendor_v2_commercial_activation.sql",
+      "path": "supabase/migrations/20261002040748_vendor_v2_commercial_activation.sql",
+      "canonicalSha256": "99f36775b35bceb82f451c7c702c0a88efd93678990ce89c1ccd02d83b2f8a36",
+      "exactVersionPresence": {
+        "staging": true,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-02"
+    },
+    {
+      "version": "20261002043238",
+      "name": "vendor_v3_v5_operating_flow",
+      "filename": "20261002043238_vendor_v3_v5_operating_flow.sql",
+      "path": "supabase/migrations/20261002043238_vendor_v3_v5_operating_flow.sql",
+      "canonicalSha256": "df3fa9df99b01610bfd1ce89700c41f45102da7b10c24b5ed857dc908eb398ac",
+      "exactVersionPresence": {
+        "staging": true,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-02"
+    },
+    {
+      "version": "20261002044054",
+      "name": "vendor_v3_connection_delivery_gate",
+      "filename": "20261002044054_vendor_v3_connection_delivery_gate.sql",
+      "path": "supabase/migrations/20261002044054_vendor_v3_connection_delivery_gate.sql",
+      "canonicalSha256": "9aeb1d9f37c6c6c239db482a3531b0d54bab16a6ea909b23ba3f8c92ca91a834",
+      "exactVersionPresence": {
+        "staging": true,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-02"
+    },
+    {
+      "version": "20261002045022",
+      "name": "vendor_v3_v5_fk_indexes",
+      "filename": "20261002045022_vendor_v3_v5_fk_indexes.sql",
+      "path": "supabase/migrations/20261002045022_vendor_v3_v5_fk_indexes.sql",
+      "canonicalSha256": "767d9a145f3e7b5267da4f8791d70268f4ced612edb598c7eea8c78b632bbed0",
+      "exactVersionPresence": {
+        "staging": true,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-02"
     }
   ],
   "supersededLegacyPins": [

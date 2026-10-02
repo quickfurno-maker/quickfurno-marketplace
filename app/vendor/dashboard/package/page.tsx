@@ -7,6 +7,7 @@ import {
   listAvailableVendorPackages,
   listVendorPackageOrders,
 } from "@/services/vendorPackageOrderService";
+import { getVendorPackagePaymentAvailability } from "@/services/vendorPackagePaymentService";
 import "./vendor-package-v2.css";
 
 export const metadata = { title: "Credits & package - QuickFurno" };
@@ -44,6 +45,7 @@ export default async function VendorPackagePage(props: VendorPackagePageProps) {
       packages={packagesRes.ok ? packagesRes.data : []}
       orders={ordersRes.ok ? ordersRes.data : []}
       feedback={readPackageFeedback(searchParams?.order)}
+      paymentAvailability={getVendorPackagePaymentAvailability()}
       loadError={!summaryRes.ok || !packagesRes.ok || !ordersRes.ok}
     />
   );

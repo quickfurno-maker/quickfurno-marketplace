@@ -6,10 +6,11 @@ import type {
   VendorPackageOption,
   VendorPackageOrder,
 } from "@/services/vendorPackageOrderService";
+import type { VendorPackagePaymentAvailability } from "@/services/vendorPackagePaymentService";
 import { VendorIcon } from "../icons";
+import { VendorPackagePayButton } from "./VendorPackagePayButton";
 import { VendorUtilityAlert, VendorUtilityEmpty, VendorUtilityHeader } from "../VendorUtilityChrome";
 import {
-  PAYMENT_NOT_CONNECTED_NOTICE,
   deriveCreditState,
   formatCount,
   formatDate,
@@ -24,12 +25,10 @@ import {
 /**
  * Credits & Package.
  *
- * Presentation only. The single action on this page is the existing
- * vendorCreatePackageOrder form, posting the same `packageId` field it always
- * has. That action creates an ORDER INTENT — it does not take payment, activate
- * a package or add credits — so every call to action says "Create order" and
- * carries the payment notice beside it. There is deliberately no Pay, Buy or
- * Activate wording anywhere on this page.
+ * Package selection still creates an immutable local ORDER INTENT first. A
+ * payable order then enters the hardened Razorpay authority: server-created
+ * provider order -> verified/captured payment -> atomic package/credit activation.
+ * The browser never marks an order paid and never grants credits.
  *
  * Shared with the visual-QA harness so screenshots cannot drift from what ships.
  */
@@ -39,6 +38,7 @@ export function VendorPackageWorkspace({
   packages,
   orders,
   feedback,
+  paymentAvailability,
   loadError,
 }: {
   vendor: VendorProfileSummary;
@@ -46,6 +46,7 @@ export function VendorPackageWorkspace({
   packages: VendorPackageOption[];
   orders: VendorPackageOrder[];
   feedback: PackageFeedback | null;
+  paymentAvailability: VendorPackagePaymentAvailability;
   loadError: boolean;
 }) {
   const credits = deriveCreditState(summary, {
@@ -147,8 +148,14 @@ export function VendorPackageWorkspace({
           </div>
         </header>
 
-        <VendorUtilityAlert tone="info" icon="lock">
-          {PAYMENT_NOT_CONNECTED_NOTICE}
+        <VendorUtilityAlert tone={paymentAvailability.enabled ? "info" : "error"} icon="lock">
+          {paymentAvailability.enabled
+            ? paymentAvailability.mode === "test"
+              ? "Razorpay TEST mode is active. Create an order, then use its Pay button below to run a sandbox payment."
+              : "Secure Razorpay payment is active. Create an order, then pay it from Order history. Credits activate only after captured payment is verified."
+            : paymentAvailability.reason === "invalid_config"
+              ? "Online payment is configured but not ready. QuickFurno support must complete the Razorpay credentials before payment can start."
+              : "Online package payment is currently disabled. You can create an order without being charged."}
         </VendorUtilityAlert>
 
         {packages.length === 0 ? (
@@ -245,6 +252,13 @@ export function VendorPackageWorkspace({
                       {reason}
                     </p>
                   ) : null}
+
+                  {paymentAvailability.enabled
+                    && paymentAvailability.mode
+                    && order.activation_status !== "activated"
+                    && order.order_status !== "completed" ? (
+                      <VendorPackagePayButton orderId={order.id} mode={paymentAvailability.mode} />
+                    ) : null}
                 </li>
               );
             })}

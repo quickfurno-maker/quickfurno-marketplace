@@ -4,9 +4,11 @@ import type {
   VendorApprovedProfileSummary,
   VendorProfileChangeRequest,
 } from "@/services/vendorProfileChangeService";
+import type { VendorContactVerificationSummary } from "@/services/vendorVerificationSummaryService";
 import { VendorIcon } from "../icons";
 import { VendorProfileEditor } from "./VendorProfileEditor";
 import { VendorProfileFeedback } from "./VendorProfileFeedback";
+import { VendorWhatsAppVerificationCard } from "./VendorWhatsAppVerificationCard";
 import {
   VendorProfileAccountDetails,
   VendorProfileApprovalStatus,
@@ -31,12 +33,14 @@ export function VendorProfileWorkspace({
   vendor,
   summary,
   requests,
+  contactVerification,
   feedback,
   loadError,
 }: {
   vendor: VendorProfileSummary;
   summary: VendorApprovedProfileSummary | null;
   requests: VendorProfileChangeRequest[];
+  contactVerification: VendorContactVerificationSummary | null;
   feedback: ProfileFeedback | null;
   loadError: boolean;
 }) {
@@ -108,6 +112,7 @@ export function VendorProfileWorkspace({
         </div>
 
         <div className="qf-vendor-v2-profile-main">
+          {contactVerification ? <VendorWhatsAppVerificationCard initial={contactVerification} /> : null}
           <VendorProfileEditor current={current} />
           <VendorProfileAccountDetails vendor={vendor} />
           <VendorProfileRequestHistory requests={requests} />

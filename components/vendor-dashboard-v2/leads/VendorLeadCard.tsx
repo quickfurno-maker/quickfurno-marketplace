@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { vendorRecordClientResponseFromForm } from "@/app/actions";
+import { vendorAcknowledgeLeadFromForm, vendorRecordClientResponseFromForm } from "@/app/actions";
 import { VendorLeadReportForm } from "@/components/vendors/VendorLeadReportForm";
 import { VendorIcon } from "../icons";
 import type { VendorLeadView } from "./leadsModel";
@@ -61,7 +61,9 @@ export function VendorLeadCard({
         <div className="qf-vendor-v2-leads-card-body">
           <div className="qf-vendor-v2-leads-card-title" id={headerId}>
             <h3>{lead.name}</h3>
-            <span className="qf-vendor-v2-leads-status">Client match</span>
+            <span className="qf-vendor-v2-leads-status">
+              {lead.acknowledged ? "Acknowledged" : lead.canAcknowledge ? "Delivered" : "Client match"}
+            </span>
           </div>
 
           <p className="qf-vendor-v2-leads-card-service">{lead.service}</p>
@@ -100,6 +102,15 @@ export function VendorLeadCard({
         </div>
 
         <div className="qf-vendor-v2-leads-card-actions">
+          {lead.canAcknowledge ? (
+            <form action={vendorAcknowledgeLeadFromForm}>
+              <input type="hidden" name="assignmentId" value={lead.id} />
+              <button type="submit" className="qf-vendor-v2-btn qf-vendor-v2-btn--primary">
+                <VendorIcon name="check" size={16} />
+                Acknowledge lead
+              </button>
+            </form>
+          ) : null}
           {lead.phone ? (
             <a className="qf-vendor-v2-btn qf-vendor-v2-btn--primary" href={`tel:${lead.phone}`}>
               <VendorIcon name="phone" size={16} />
@@ -128,6 +139,8 @@ export function VendorLeadCard({
             <span>Recorded: No response. QuickFurno is handling the bounded client connection-assistance sequence.</span>
           ) : !lead.connectionAssuranceSupported ? (
             <span>Connection check is not active on this environment yet.</span>
+          ) : lead.lifecycleStatus !== "delivered" && lead.lifecycleStatus !== "accepted" ? (
+            <span>Available after QuickFurno confirms lead delivery.</span>
           ) : connectionWindowOpen ? (
             <span>Available only during the first 24 hours after matching - {connectionTimeLabel}</span>
           ) : (

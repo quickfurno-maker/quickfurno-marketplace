@@ -158,6 +158,17 @@ jobs:
       # no Routes key, provider switch, matrix call or traffic dependency.
       - name: Verified location and straight-line geography
         run: npm run test:mvp:location-straight-line
+      - name: Vendor location backfill authority
+        run: npm run test:mvp:vendor-location-backfill
+
+      - name: Vendor V1/V2 onboarding and commercial authority
+        run: npm run test:mvp:vendor-v1-v2
+
+      - name: Vendor package payment authority
+        run: npm run test:mvp:vendor-package-payment
+
+      - name: Vendor V3-V5 delivery, recovery and intelligence authority
+        run: npm run test:mvp:vendor-v3-v5
 
       - name: QF-MVP-80.02 GATE-06 vendor login activation
         run: npm run test:mvp:80-02-gate06

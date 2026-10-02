@@ -42,5 +42,5 @@ export function parseQfjContextReadRequest(value: unknown): QfjContextReadReques
 }
 
 export type QfjLeadContext = Readonly<{ kind: "client_lead"; leadId: string; city: string | null; serviceRequired: string | null; budgetBand: string | null; propertyType: string | null; timeline: string | null; leadStatus: string | null; verificationStatus: string | null; isDuplicate: boolean }>;
-export type QfjVendorContext = Readonly<{ kind: "vendor_profile"; vendorId: string; city: string | null; serviceCategories: readonly string[]; vendorStatus: string | null; isActive: boolean; publicVisibility: boolean; paidStatus: string | null; packageReadinessBand: "UNKNOWN" | "NOT_ACTIVE" | "NO_PACKAGE" | "LOW_CREDITS" | "READY" }>;
+export type QfjVendorContext = Readonly<{ kind: "vendor_profile"; vendorId: string; city: string | null; serviceCategories: readonly string[]; vendorStatus: string | null; isActive: boolean; publicVisibility: boolean; paidStatus: string | null; packageReadinessBand: "UNKNOWN" | "NOT_ACTIVE" | "NO_PACKAGE" | "LOW_CREDITS" | "READY"; packageExpiryBand: "UNKNOWN" | "EXPIRED" | "DUE_7D" | "DUE_30D" | "HEALTHY"; locationVerificationStatus: string | null; activeLeadCount: number; deliveredUnacknowledgedCount: number; pendingBadLeadReportCount: number; unreadNotificationCount: number }>;
 export type QfjSanitizedContext = QfjLeadContext | QfjVendorContext;

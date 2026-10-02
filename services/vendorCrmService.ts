@@ -79,6 +79,9 @@ export interface VendorCrmDirectoryRow {
   open_task_count: number;
   overdue_task_count: number;
   primary_contact_name: string | null;
+  location_verification_status: string | null;
+  has_google_place: boolean;
+  has_office_coordinates: boolean;
 }
 export interface VendorCrmDirectoryResult {
   rows: VendorCrmDirectoryRow[];
@@ -121,7 +124,7 @@ export async function listVendorCrmDirectory(rawQuery: Record<string, unknown>):
 
   // 2. the Core vendor page (server-paged, deterministic sort, bounded).
   let vq = c.from("vendors")
-    .select("id, business_name, owner_name, phone, city, service_categories, status, is_active, remaining_credits, total_credits, created_at", { count: "exact" });
+    .select("id, business_name, owner_name, phone, city, service_categories, status, is_active, remaining_credits, total_credits, created_at, location_verification_status, google_place_id, office_latitude, office_longitude", { count: "exact" });
   if (crmIdFilter) vq = vq.in("id", crmIdFilter);
   // q.search arrives sanitized (sanitizeDirectorySearch): it can contain no
   // PostgREST grammar (, ( ) " \) and no LIKE wildcard (% _). The value is ALSO
@@ -137,6 +140,8 @@ export async function listVendorCrmDirectory(rawQuery: Record<string, unknown>):
   if (q.verification) vq = vq.eq("status", q.verification);
   if (q.enabled === "true") vq = vq.eq("is_active", true);
   if (q.enabled === "false") vq = vq.eq("is_active", false);
+  if (q.location === "needs_backfill") vq = vq.eq("location_verification_status", "unverified");
+  else if (q.location) vq = vq.eq("location_verification_status", q.location);
   const from = (q.page - 1) * q.pageSize;
   vq = vq.order("created_at", { ascending: false }).order("id", { ascending: true }).range(from, from + q.pageSize - 1);
   const { data: vendors, count, error } = await vq;
@@ -191,6 +196,10 @@ export async function listVendorCrmDirectory(rawQuery: Record<string, unknown>):
       open_task_count: openById.get(v.id as string) ?? 0,
       overdue_task_count: overdueById.get(v.id as string) ?? 0,
       primary_contact_name: primaryById.get(v.id as string) ?? null,
+      location_verification_status: (v.location_verification_status as string) ?? null,
+      has_google_place: typeof v.google_place_id === "string" && v.google_place_id.trim().length > 0,
+      has_office_coordinates:
+        Number.isFinite(Number(v.office_latitude)) && Number.isFinite(Number(v.office_longitude)),
     };
   });
   return { rows, page: q.page, pageSize: q.pageSize, total: count ?? rows.length };
@@ -213,7 +222,7 @@ export async function listVendorCrmDirectory(rawQuery: Record<string, unknown>):
 export async function getVendorCoreFacts(vendorId: string): Promise<VendorCoreFacts | null> {
   const id = requireUuid(vendorId, "vendorId");
   const { data, error } = await db().from("vendors")
-    .select("id, business_name, owner_name, phone, email, city, areas_covered, covers_full_city, service_categories, status, is_active, accepting_leads, total_credits, remaining_credits, last_assigned_at, created_at")
+    .select("id, business_name, owner_name, phone, email, city, areas_covered, covers_full_city, service_categories, status, is_active, accepting_leads, total_credits, remaining_credits, last_assigned_at, created_at, office_latitude, office_longitude, google_place_id, google_city, formatted_address, area_normalized, sublocality, neighborhood, service_zone_id, location_verification_status, location_verification_method, location_verified_at")
     .eq("id", id).maybeSingle();
   assertCrmRead(error, "core facts");
   return (data as VendorCoreFacts | null) ?? null;

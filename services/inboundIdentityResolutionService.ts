@@ -180,10 +180,11 @@ export function defaultInboundIdentityDeps(): InboundIdentityDeps {
           .filter((id): id is string => typeof id === "string" && id.trim() !== "");
       }
 
-      return [...verifiedActiveIds, ...(businessContacts.data ?? []).map(
-        (row) => String((row as { id: string }).id)
-      )]
-        .filter((id) => id.trim() !== "")
+      const businessContactIds = (businessContacts.data ?? [])
+        .map((row) => (row as { id?: unknown }).id)
+        .filter((id): id is string => typeof id === "string" && id.trim() !== "");
+
+      return [...verifiedActiveIds, ...businessContactIds]
         .map((id) => ({ principalType: InboundPrincipalType.VENDOR, principalId: id }));
     },
     // No authoritative admin/founder phone-identity table exists. Never invent one.

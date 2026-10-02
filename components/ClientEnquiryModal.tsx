@@ -1270,7 +1270,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                   placeholder="Search building, society, street or area"
                   autoComplete="off"
                 />
-                <ValidationIcon state={areaUi.iconState} />
+                <ValidationIcon state={form.googlePlaceId || (form.locationSource === "browser_gps" && form.lat != null && form.lng != null) ? "valid" : areaUi.showError ? "invalid" : "none"} />
               </div>
               <small className="qf-sf-example">Pick a Google suggestion for precise matching. Manual entry remains available.</small>
               {areaUi.showError ? <span className="qf-rf-field-err">{areaUi.error}</span> : null}

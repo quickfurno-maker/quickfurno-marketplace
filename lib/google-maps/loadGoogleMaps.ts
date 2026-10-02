@@ -72,18 +72,56 @@ function isUsablePlaces(lib: unknown): lib is PlacesLibrary {
   );
 }
 
+function cacheRecoverablePlacesPromise(
+  promise: Promise<PlacesLibrary | null>,
+): Promise<PlacesLibrary | null> {
+  let cached: Promise<PlacesLibrary | null>;
+  cached = promise.then((places) => {
+    // A null result is a transient/fallback outcome, never permanent browser
+    // state. Clear it so the next 3+ character interaction can retry.
+    if (!places && window.__qfGooglePlacesPromise === cached) {
+      window.__qfGooglePlacesPromise = undefined;
+    }
+    return places;
+  });
+  window.__qfGooglePlacesPromise = cached;
+  return cached;
+}
+
 /**
  * Load (once) the Google Maps JS bootstrap and the Places NEW library, resolving
  * the "places" library or `null` if it cannot be used. Safe to call repeatedly;
- * the result promise is cached on window. Does NOT require the legacy
+ * successful/in-flight work is cached on window, while failed/null loads are
+ * explicitly recoverable. Does NOT require the legacy
  * google.maps.places.Autocomplete widget.
  */
 export function loadGoogleMaps(): Promise<PlacesLibrary | null> {
   // SSR / non-browser — never touch window on the server.
   if (typeof window === "undefined") return Promise.resolve(null);
 
-  // A load is already in flight (or previously completed) — reuse it.
-  if (window.__qfGooglePlacesPromise) return window.__qfGooglePlacesPromise;
+  // If Google finished booting after a previous failed attempt, recover from
+  // the already-loaded global immediately instead of trusting stale cached state.
+  if (typeof window.google?.maps?.importLibrary === "function") {
+    const recovered = (async (): Promise<PlacesLibrary | null> => {
+      try {
+        const lib = await window.google!.maps!.importLibrary!("places");
+        return isUsablePlaces(lib) ? lib : null;
+      } catch {
+        return null;
+      }
+    })();
+    return cacheRecoverablePlacesPromise(recovered);
+  }
+
+  // A load is already in flight (or previously completed) — reuse it. If an
+  // earlier load resolved null, clear the poisoned cache and retry cleanly.
+  if (window.__qfGooglePlacesPromise) {
+    return window.__qfGooglePlacesPromise.then((places) => {
+      if (places) return places;
+      window.__qfGooglePlacesPromise = undefined;
+      return loadGoogleMaps();
+    });
+  }
 
   const promise = (async (): Promise<PlacesLibrary | null> => {
     const key = await resolveGoogleMapsBrowserKey();
@@ -135,6 +173,5 @@ export function loadGoogleMaps(): Promise<PlacesLibrary | null> {
     });
   })().catch(() => null);
 
-  window.__qfGooglePlacesPromise = promise;
-  return promise;
+  return cacheRecoverablePlacesPromise(promise);
 }

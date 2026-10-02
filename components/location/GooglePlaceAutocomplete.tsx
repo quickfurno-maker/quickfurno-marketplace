@@ -245,11 +245,28 @@ export default function GooglePlaceAutocomplete({
       const version = ++interactionVersionRef.current;
       onManualChange(raw); // immediate fallback — never gated on Google
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      if (!placesRef.current || raw.trim().length < MIN_CHARS) {
+      if (raw.trim().length < MIN_CHARS) {
         setSuggestions([]);
         closeDropdown();
         return;
       }
+
+      // Places may still be initializing when a fast user reaches 3+ chars.
+      // Previously that first race permanently produced "manual-only" behaviour
+      // for the mounted field. Retry the resilient loader on the debounced
+      // keystroke, then run the exact same suggestion path if this interaction is
+      // still current.
+      if (!placesRef.current) {
+        debounceRef.current = setTimeout(() => {
+          void loadGoogleMaps().then((places) => {
+            if (version !== interactionVersionRef.current || !places) return;
+            placesRef.current = places;
+            void fetchSuggestions(raw, version);
+          });
+        }, DEBOUNCE_MS);
+        return;
+      }
+
       debounceRef.current = setTimeout(() => void fetchSuggestions(raw, version), DEBOUNCE_MS);
     },
     [onManualChange, fetchSuggestions, closeDropdown],

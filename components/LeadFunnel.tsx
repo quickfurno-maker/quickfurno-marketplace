@@ -9,6 +9,9 @@ import { resolveLeadTracking } from "@/lib/analytics/leadTracking";
 import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useActiveCities";
 import { useActiveCategories, NO_ACTIVE_CATEGORIES_MESSAGE } from "@/lib/categories/useActiveCategories";
 import { isIndianLeadMobile } from "@/lib/leads/indianMobile";
+import GooglePlaceAutocomplete from "@/components/location/GooglePlaceAutocomplete";
+import { isPlaceCompatibleWithSelectedCity } from "@/lib/google-maps/normalizePlace";
+import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
 
 /**
  * Standalone enquiry funnel for /enquiry.
@@ -58,7 +61,7 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
 
   // Phase 14B/14C: cities + services come only from admin-managed active
   // cities and active categories.
-  const { cities: activeCities, loading: citiesLoading } = useActiveCities();
+  const { cities: activeCities, records: activeCityRecords, loading: citiesLoading } = useActiveCities();
   const { categories: activeCategories, loading: categoriesLoading } = useActiveCategories();
   const inferredService =
     defaultService && activeCategories.includes(defaultService)
@@ -71,6 +74,7 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
     area: "", budget: "", property_type: "", timeline: "", message: "",
   });
   const [consent, setConsent] = useState(false);
+  const [googlePlace, setGooglePlace] = useState<NormalizedGooglePlace | null>(null);
 
   // Default to the first active city once loaded; keep the user's pick if active.
   useEffect(() => {
@@ -89,6 +93,33 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
   }, [activeCategories, defaultService]);
 
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  function setCity(value: string) {
+    setGooglePlace(null);
+    setForm((current) => ({ ...current, city: value }));
+  }
+
+  function setAreaManual(value: string) {
+    setGooglePlace(null);
+    setForm((current) => ({ ...current, area: value }));
+  }
+
+  function setAreaFromGoogle(place: NormalizedGooglePlace) {
+    const cityRecord = activeCityRecords.find(
+      (record) => record.name.toLowerCase() === form.city.toLowerCase(),
+    );
+    const aliases = cityRecord?.acceptedCityLabels ?? (form.city ? [form.city] : []);
+    if (form.city && !isPlaceCompatibleWithSelectedCity(place, form.city, aliases)) {
+      setError(`Please select a location within ${form.city}.`);
+      return;
+    }
+    setError(null);
+    setGooglePlace(place);
+    setForm((current) => ({
+      ...current,
+      area: place.area ?? place.formattedAddress ?? current.area,
+    }));
+  }
 
   // QF-UI-TRACKING-01: the duplicate submit-time URL parser that used to live
   // here is gone. /enquiry now shares the one attribution authority with the
@@ -128,6 +159,17 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
       });
       const res = await submitLead({
         ...form,
+        latitude: googlePlace?.lat ?? undefined,
+        longitude: googlePlace?.lng ?? undefined,
+        google_place_id: googlePlace?.placeId ?? undefined,
+        google_city: googlePlace?.city ?? undefined,
+        formatted_address: googlePlace?.formattedAddress ?? undefined,
+        area_normalized:
+          googlePlace?.areaNormalized ?? (form.area.trim() ? form.area.trim().toLowerCase() : undefined),
+        sublocality: googlePlace?.sublocality ?? undefined,
+        neighborhood: googlePlace?.neighborhood ?? undefined,
+        location_source: googlePlace ? "google_place" : "manual",
+        location_captured_at: googlePlace ? new Date().toISOString() : undefined,
         source: "Enquiry funnel",
         share_consent: consent,
         // QF-UI-TRACKING-01: current URL first, stored tagged campaign second.
@@ -198,7 +240,7 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
         </Field>
         {activeCities.length === 1 ? null : (
           <Field label="City">
-            <select value={form.city} onChange={(e) => set("city", e.target.value)} disabled={activeCities.length === 0}>
+            <select value={form.city} onChange={(e) => setCity(e.target.value)} disabled={activeCities.length === 0}>
               {activeCities.length === 0
                 ? <option value="">{citiesLoading ? "Loading cities…" : NO_ACTIVE_CITIES_MESSAGE}</option>
                 : activeCities.map((c) => <option key={c}>{c}</option>)}
@@ -206,7 +248,16 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
           </Field>
         )}
         <Field label="Area / locality">
-          <input value={form.area} onChange={(e) => set("area", e.target.value)} placeholder="e.g. Kharadi" />
+          <GooglePlaceAutocomplete
+            value={form.area}
+            city={form.city}
+            mode="address"
+            suggestionsPortal
+            onManualChange={setAreaManual}
+            onPlaceSelected={setAreaFromGoogle}
+            placeholder={form.city ? `Search area or location in ${form.city}` : "Search area or location"}
+            autoComplete="off"
+          />
         </Field>
         {inferredService ? null : (
           <Field label="Service needed">

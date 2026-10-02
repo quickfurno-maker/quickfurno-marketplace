@@ -23,6 +23,7 @@
 //     submits the enquiry form. Mouse select + outside-click-to-close supported.
 // ============================================================================
 import {
+  type CSSProperties,
   InputHTMLAttributes,
   type KeyboardEvent as ReactKeyboardEvent,
   useCallback,
@@ -31,6 +32,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { loadGoogleMaps } from "@/lib/google-maps/loadGoogleMaps";
 import { normalizeGooglePlace } from "@/lib/google-maps/normalizePlace";
 import type {
@@ -57,6 +59,11 @@ export type GooglePlaceAutocompleteProps = NativeInputProps & {
   onPlaceSelected: (place: NormalizedGooglePlace) => void;
   /** "locality" biases to areas/sublocalities; "address" to full addresses. */
   mode?: "locality" | "address";
+  /**
+   * Render the suggestion list on document.body with viewport positioning.
+   * Use this inside hero/band surfaces whose artwork intentionally clips overflow.
+   */
+  suggestionsPortal?: boolean;
 };
 
 type Suggestion = {
@@ -100,10 +107,12 @@ export default function GooglePlaceAutocomplete({
   onManualChange,
   onPlaceSelected,
   mode = "locality",
+  suggestionsPortal = false,
   ...inputProps
 }: GooglePlaceAutocompleteProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listboxRef = useRef<HTMLUListElement>(null);
   const placesRef = useRef<PlacesLibrary | null>(null);
   const sessionTokenRef = useRef<unknown>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -128,6 +137,7 @@ export default function GooglePlaceAutocomplete({
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [portalStyle, setPortalStyle] = useState<CSSProperties>({});
 
   // Best-effort load of the Places library. Any failure leaves manual input intact.
   useEffect(() => {
@@ -346,7 +356,12 @@ export default function GooglePlaceAutocomplete({
   useEffect(() => {
     if (!open) return;
     const onDocMouseDown = (ev: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(ev.target as Node)) {
+      const target = ev.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        !listboxRef.current?.contains(target)
+      ) {
         closeDropdown();
       }
     };
@@ -354,11 +369,72 @@ export default function GooglePlaceAutocomplete({
     return () => document.removeEventListener("mousedown", onDocMouseDown);
   }, [open, closeDropdown]);
 
+  // Hero/category bands deliberately clip decorative overflow. When requested,
+  // anchor the listbox to the input in viewport space and portal it to <body>.
+  useEffect(() => {
+    if (!open || !suggestionsPortal) return;
+    const update = () => {
+      const input = inputRef.current;
+      if (!input) return;
+      const rect = input.getBoundingClientRect();
+      const viewportH = window.innerHeight;
+      const preferredMax = Math.min(240, Math.max(160, viewportH * 0.45));
+      const below = Math.max(0, viewportH - rect.bottom - 8);
+      const above = Math.max(0, rect.top - 8);
+      const openUp = below < 180 && above > below;
+      const available = Math.max(120, Math.min(preferredMax, openUp ? above : below));
+      setPortalStyle({
+        position: "fixed",
+        left: rect.left,
+        width: rect.width,
+        zIndex: 2000,
+        maxHeight: available,
+        ...(openUp
+          ? { bottom: viewportH - rect.top + 4, top: "auto" }
+          : { top: rect.bottom + 4, bottom: "auto" }),
+      });
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [open, suggestionsPortal, suggestions.length]);
+
   // Unique per-instance ARIA ids so multiple mounted autocompletes never collide.
   const uid = useId();
   const listboxId = `qf-place-list-${uid}`;
   const optionId = (i: number) => `qf-place-opt-${uid}-${i}`;
   const showList = open && suggestions.length > 0;
+  const listbox = showList ? (
+    <ul
+      ref={listboxRef}
+      className={`qf-place-suggest${suggestionsPortal ? " qf-place-suggest--portal" : ""}`}
+      role="listbox"
+      id={listboxId}
+      style={suggestionsPortal ? portalStyle : undefined}
+    >
+      {suggestions.map((s, i) => (
+        <li
+          key={s.id}
+          id={optionId(i)}
+          role="option"
+          aria-selected={i === activeIndex}
+          className={`qf-place-suggest-item${i === activeIndex ? " is-active" : ""}`}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            void selectSuggestion(s);
+          }}
+          onMouseEnter={() => setActiveIndex(i)}
+        >
+          <span className="qf-place-suggest-main">{s.primary}</span>
+          {s.secondary ? <span className="qf-place-suggest-sub">{s.secondary}</span> : null}
+        </li>
+      ))}
+    </ul>
+  ) : null;
 
   return (
     <div className="qf-place-ac" ref={containerRef}>
@@ -378,28 +454,9 @@ export default function GooglePlaceAutocomplete({
         }
         autoComplete={inputProps.autoComplete ?? "off"}
       />
-      {showList ? (
-        <ul className="qf-place-suggest" role="listbox" id={listboxId}>
-          {suggestions.map((s, i) => (
-            <li
-              key={s.id}
-              id={optionId(i)}
-              role="option"
-              aria-selected={i === activeIndex}
-              className={`qf-place-suggest-item${i === activeIndex ? " is-active" : ""}`}
-              // onMouseDown (not onClick) so selection fires before input blur.
-              onMouseDown={(e) => {
-                e.preventDefault();
-                void selectSuggestion(s);
-              }}
-              onMouseEnter={() => setActiveIndex(i)}
-            >
-              <span className="qf-place-suggest-main">{s.primary}</span>
-              {s.secondary ? <span className="qf-place-suggest-sub">{s.secondary}</span> : null}
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      {suggestionsPortal && typeof document !== "undefined"
+        ? createPortal(listbox, document.body)
+        : listbox}
     </div>
   );
 }

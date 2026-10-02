@@ -66,11 +66,6 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   const listingUnavailable = publicVendors === null;
   const vendors = publicVendors ?? [];
 
-  // Areas that a LISTED vendor actually covers. The hero's area select is
-  // built from this rather than from every Pune locality, so choosing one
-  // always leads somewhere.
-  const areas = [...new Set(vendors.flatMap((v) => v.areas ?? []))].sort();
-
   // Neutral SERVICE artwork for this trade: decorative only, never attached to
   // a vendor, so it can never read as any particular business's project.
   const artwork = categoryArtwork(category.name);
@@ -87,7 +82,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           description={category.description}
           enquiryService={enquiryService}
           vendorCount={vendors.length}
-          areas={areas}
+          city="Pune"
           heading={<h1 className="qfd-hero qfc-title">{category.name} in Pune</h1>}
           artwork={
             artwork ? (

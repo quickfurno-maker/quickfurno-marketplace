@@ -1035,8 +1035,9 @@ export function VendorRegisterForm({
             {(() => {
               const baseTouched = touched.baseArea || showErrors;
               const baseValid = baseAreaValue.length >= 2;
+              const basePrecise = Boolean(f.googlePlaceId);
               const baseInvalid = baseTouched && !baseValid;
-              const wrapperClass = `qf-rf-field${baseInvalid ? " has-error" : ""}${baseValid ? " is-valid" : ""}`;
+              const wrapperClass = `qf-rf-field${baseInvalid ? " has-error" : ""}${basePrecise ? " is-valid" : ""}`;
               return (
                 <label className={wrapperClass} ref={bindField("baseArea")}>
                   <span>Exact office / business location</span>
@@ -1052,7 +1053,7 @@ export function VendorRegisterForm({
                       disabled={!hasCitySelected}
                       autoComplete="off"
                     />
-                    {baseValid ? (
+                    {basePrecise ? (
                       <span className="qf-rf-input-icon qf-rf-input-icon--valid">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#19a55a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="20 6 9 17 4 12"></polyline>

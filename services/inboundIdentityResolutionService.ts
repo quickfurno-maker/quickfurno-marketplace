@@ -23,16 +23,21 @@
 // ADMIN/FOUNDER. There is no authoritative admin/founder phone-identity table today, so no
 // admin match is ever produced. No founder phone is hardcoded and none is read from env.
 //
-// SCHEMA LIMITATION (documented, fail-safe). `client_accounts.phone_e164` is canonical E.164
-// and UNIQUE → a provable EXACT client match. Vendor phones (`vendor_dashboard_users.phone`,
-// `vendors.phone`) are non-canonical, non-unique `text`; the vendor finder matches ONLY an
-// EXACT canonical string on a VERIFIED vendor phone, which yields a safe MISS (never a false
-// positive) when the stored value is not canonical. A canonical vendor phone/hash column is a
-// prerequisite for reliable vendor inbound identity in a later phase.
+// VENDOR WHATSAPP IDENTITY. The caller is the already-signature-verified Meta inbound boundary.
+// That provider-attested sender may match either:
+//   • a verified canonical vendor-dashboard identity; or
+//   • the CURRENT approved+active vendor business contact.
+// QuickFurno's vendor contact contract stores Indian mobile contacts as exactly ten bare digits.
+// For an inbound +91 E.164 sender ONLY, the resolver compares the corresponding ten-digit stored
+// form as an additional exact representation. This is not a generic country-code guess: the
+// inbound number already states +91 and the vendor storage contract is explicitly Indian.
+// No phone_verified flag is mutated here, no dashboard authentication is granted, and no local
+// number from any other country is ever promoted. Ambiguity still fails closed.
 // ============================================================================
 
 import { adminClient } from "../lib/supabase";
 import { normalizePhoneE164 } from "../lib/communication/phone";
+import { isValidIndianMobile } from "../lib/vendors/vendorContactContract";
 
 export const InboundIdentityConfidence = {
   EXACT: "exact",
@@ -89,6 +94,33 @@ export interface InboundIdentityDeps {
   readonly findAdminCandidates: (canonicalE164: string) => Promise<InboundPrincipalCandidate[]>;
 }
 
+/**
+ * Exact stored representations a Meta-attested inbound sender may use for vendor contact lookup.
+ *
+ * The generic phone normalizer stays strict. Only a canonical +91 inbound number is projected to
+ * QuickFurno's already-defined Indian vendor-storage shape (10 bare digits). Other countries get
+ * canonical E.164 only. The helper never accepts or upgrades a bare local inbound number.
+ */
+export function vendorStoredPhoneCandidatesForInbound(
+  canonicalE164: string
+): readonly string[] {
+  const values = [canonicalE164];
+  if (canonicalE164.startsWith("+91")) {
+    const national = canonicalE164.slice(3);
+    if (isValidIndianMobile(national)) values.push(national);
+  }
+  return Object.freeze(values);
+}
+
+function vendorContactOrFilter(values: readonly string[]): string {
+  return values
+    .flatMap((value) => [
+      `whatsapp_number.eq.${value}`,
+      `phone.eq.${value}`,
+    ])
+    .join(",");
+}
+
 /** LAZY: constructed per request, never at module import. Read-only queries only. */
 export function defaultInboundIdentityDeps(): InboundIdentityDeps {
   return {
@@ -104,19 +136,55 @@ export function defaultInboundIdentityDeps(): InboundIdentityDeps {
         principalId: String((r as { id: string }).id),
       }));
     },
-    // Conservative + fail-safe: EXACT canonical equality on a VERIFIED vendor phone. A
-    // non-canonically-stored phone simply does not match (a safe miss, never a false positive).
+    // Two independent, read-only proofs may name the same vendor:
+    // 1) a previously verified canonical dashboard phone; and
+    // 2) the provider-attested inbound sender exactly matching the approved+active business contact.
+    // The latter is conversation identity only; it does NOT set phone_verified or grant dashboard auth.
     findVendorCandidates: async (e164) => {
-      const { data, error } = await adminClient()
-        .from("vendor_dashboard_users")
-        .select("vendor_id")
-        .eq("phone", e164)
-        .eq("phone_verified", true);
-      if (error) throw error;
-      return (data ?? [])
-        .map((r) => (r as { vendor_id: string | null }).vendor_id)
-        .filter((id): id is string => typeof id === "string" && id.trim() !== "")
-        .map((id) => ({ principalType: InboundPrincipalType.VENDOR, principalId: String(id) }));
+      const db = adminClient();
+      const storedForms = vendorStoredPhoneCandidatesForInbound(e164);
+      const [verifiedMemberships, businessContacts] = await Promise.all([
+        db
+          .from("vendor_dashboard_users")
+          .select("vendor_id")
+          .eq("status", "active")
+          .eq("phone_verified", true)
+          .eq("phone_e164", e164),
+        db
+          .from("vendors")
+          .select("id")
+          .ilike("status", "approved")
+          .eq("is_active", true)
+          .or(vendorContactOrFilter(storedForms)),
+      ]);
+      if (verifiedMemberships.error) throw verifiedMemberships.error;
+      if (businessContacts.error) throw businessContacts.error;
+
+      const verifiedIds = (verifiedMemberships.data ?? [])
+        .map((row) => (row as { vendor_id?: unknown }).vendor_id)
+        .filter((id): id is string => typeof id === "string" && id.trim() !== "");
+
+      // A verified membership still has to point at a CURRENT approved+active vendor. Verification
+      // history can outlive business eligibility and must never reactivate a suspended vendor.
+      let verifiedActiveIds: string[] = [];
+      if (verifiedIds.length > 0) {
+        const active = await db
+          .from("vendors")
+          .select("id")
+          .in("id", verifiedIds)
+          .ilike("status", "approved")
+          .eq("is_active", true);
+        if (active.error) throw active.error;
+        verifiedActiveIds = (active.data ?? [])
+          .map((row) => (row as { id?: unknown }).id)
+          .filter((id): id is string => typeof id === "string" && id.trim() !== "");
+      }
+
+      return [...verifiedActiveIds, ...(businessContacts.data ?? []).map(
+        (row) => String((row as { id: string }).id)
+      )]
+        .filter((id) => id.trim() !== "")
+        .map((id) => ({ principalType: InboundPrincipalType.VENDOR, principalId: id }));
     },
     // No authoritative admin/founder phone-identity table exists. Never invent one.
     findAdminCandidates: async () => [],

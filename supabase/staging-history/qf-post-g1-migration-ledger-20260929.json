@@ -230,6 +230,18 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"
+    },
+    {
+      "version": "20261002040748",
+      "name": "vendor_v2_commercial_activation",
+      "filename": "20261002040748_vendor_v2_commercial_activation.sql",
+      "path": "supabase/migrations/20261002040748_vendor_v2_commercial_activation.sql",
+      "canonicalSha256": "99f36775b35bceb82f451c7c702c0a88efd93678990ce89c1ccd02d83b2f8a36",
+      "exactVersionPresence": {
+        "staging": true,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-02"
     }
   ],
   "supersededLegacyPins": [

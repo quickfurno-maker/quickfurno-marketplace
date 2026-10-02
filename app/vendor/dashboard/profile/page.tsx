@@ -6,6 +6,7 @@ import {
   getVendorApprovedProfileSummary,
   listVendorProfileChangeRequests,
 } from "@/services/vendorProfileChangeService";
+import { getCurrentVendorContactVerificationSummary } from "@/services/vendorVerificationSummaryService";
 import "./vendor-profile-v2.css";
 
 export const metadata = { title: "My profile - QuickFurno" };
@@ -31,9 +32,10 @@ export default async function VendorProfilePage(props: VendorProfilePageProps) {
 
   // The same two reads the pre-V2 page made, unchanged: the approved public
   // summary and this vendor's own change requests.
-  const [summaryRes, requestsRes] = await Promise.all([
+  const [summaryRes, requestsRes, verificationRes] = await Promise.all([
     getVendorApprovedProfileSummary(vendor.id),
     listVendorProfileChangeRequests(vendor.id),
+    getCurrentVendorContactVerificationSummary(),
   ]);
 
   return (
@@ -41,8 +43,9 @@ export default async function VendorProfilePage(props: VendorProfilePageProps) {
       vendor={vendor}
       summary={summaryRes.ok ? summaryRes.data : null}
       requests={requestsRes.ok ? requestsRes.data : []}
+      contactVerification={verificationRes.ok ? verificationRes.data : null}
       feedback={readProfileFeedback(searchParams?.request)}
-      loadError={!summaryRes.ok || !requestsRes.ok}
+      loadError={!summaryRes.ok || !requestsRes.ok || !verificationRes.ok}
     />
   );
 }

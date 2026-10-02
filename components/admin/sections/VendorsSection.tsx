@@ -182,12 +182,43 @@ export function VendorsPage({ data, error }: { data: VendorsDirectoryData | null
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
-      const result = (await res.json()) as { ok?: boolean; error?: string };
+      const result = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        vendor?: { business_name?: string | null };
+        loginActivation?: {
+          alreadyActive: boolean;
+          repaired: boolean;
+          profileRoleOutcome: string | null;
+          recoveryLink: string | null;
+          dashboardMappingLinked: boolean;
+          dashboardMappingCreated: boolean;
+          recoveryLinkIssued: boolean;
+        } | null;
+        loginActivationError?: { code?: string; error?: string } | null;
+      };
       if (!res.ok || !result?.ok) {
         notify(result?.error ?? "Action failed.", "error");
         return false;
       }
-      notify(successMsg, "success");
+
+      if (result.loginActivation) {
+        setLoginActivation({
+          vendorName: result.vendor?.business_name || "Vendor",
+          alreadyActive: result.loginActivation.alreadyActive,
+          repaired: result.loginActivation.repaired,
+          profileRoleOutcome: result.loginActivation.profileRoleOutcome ?? null,
+          recoveryLink: result.loginActivation.recoveryLink,
+          mappingLinked: result.loginActivation.dashboardMappingLinked,
+          mappingCreated: result.loginActivation.dashboardMappingCreated,
+          recoveryLinkIssued: result.loginActivation.recoveryLinkIssued,
+        });
+        notify("Vendor approved and login access prepared.", "success");
+      } else if (result.loginActivationError) {
+        notify(`Vendor approved. Login setup needs attention: ${result.loginActivationError.error ?? result.loginActivationError.code ?? "unknown reason"}.`, "info");
+      } else {
+        notify(successMsg, "success");
+      }
       router.refresh();
       return true;
     } catch {

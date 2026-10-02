@@ -210,7 +210,7 @@ export async function collectAdminKpiStats(db: ReturnType<typeof adminClient>) {
  * app/actions.asAdmin from requireSuperadmin(), threaded down after
  * authorization succeeded. It is never taken from request input.
  */
-async function recordAuditLog(
+export async function recordAuditLog(
   action: string,
   entityType: string,
   entityId: string | undefined,

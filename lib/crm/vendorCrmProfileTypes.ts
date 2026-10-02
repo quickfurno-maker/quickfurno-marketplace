@@ -28,6 +28,7 @@ export type VendorCrmProfileTab =
   | "tags"
   | "notes"
   | "tasks"
+  | "location"
   | "core-context";
 
 export interface VendorCoreFacts {
@@ -47,6 +48,18 @@ export interface VendorCoreFacts {
   remaining_credits: number | null;
   last_assigned_at: string | null;
   created_at: string | null;
+  office_latitude: number | null;
+  office_longitude: number | null;
+  google_place_id: string | null;
+  google_city: string | null;
+  formatted_address: string | null;
+  area_normalized: string | null;
+  sublocality: string | null;
+  neighborhood: string | null;
+  service_zone_id: string | null;
+  location_verification_status: "unverified" | "provisional" | "verified" | "outside_service_area" | null;
+  location_verification_method: "none" | "city_fallback" | "polygon" | null;
+  location_verified_at: string | null;
 }
 
 export interface VendorCrmProfileRecord {

@@ -670,7 +670,7 @@ function validateState(state) {
     extension?.evidenceProjects?.staging?.projectRef === "uckafzuochmbvtiodmcl" &&
     extension?.evidenceProjects?.production?.projectRef === "yqpgcsduqbxulrlzwzap");
   check("post-G1 extension records are unique, exact and hash-pinned",
-    extensionRecords.length === 18 &&
+    extensionRecords.length === 19 &&
     new Set(extensionRecords.map((record) => record.version)).size === extensionRecords.length &&
     extensionRecords.every((record) => {
       const local = localByVersion.get(record.version);
@@ -689,6 +689,12 @@ function validateState(state) {
         local?.sha256 === record.canonicalSha256 &&
         (
           record.evidence === "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29" ||
+          (
+            record.version === "20261002040748" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-02" &&
+            record.exactVersionPresence?.staging === true &&
+            record.exactVersionPresence?.production === false
+          ) ||
           (
             allowedSourcePin !== undefined &&
             record.evidence === allowedSourcePin &&

@@ -27,6 +27,7 @@ import * as leadClarifications from "../services/leadClarificationService";
 import * as aos from "../services/aosService";
 import * as vendorLoginActivation from "../services/vendorLoginActivationService";
 import * as vendorPrincipalProfiles from "../services/vendorPrincipalProfileService";
+import * as adminVendorLocation from "../services/adminVendorLocationService";
 import {
   queueHumanConversationReply,
   releaseHumanConversationToAi,
@@ -686,6 +687,16 @@ export const adminSaveLeadClarificationResponses = async (
 export const adminGetLeadClarificationResponses = async (leadId: string, requestId?: string) =>
   asAdmin(() => leadClarifications.getClarificationResponses(leadId, requestId));
 export const adminAllVendors      = async () => asAdmin(() => admin.getAllVendors());
+export const adminBackfillVendorLocation = async (
+  vendorId: string,
+  input: adminVendorLocation.VendorLocationBackfillInput,
+) =>
+  asAdmin(async (actor) => {
+    const result = await adminVendorLocation.backfillVendorExactLocation(vendorId, input, actor);
+    revalidatePath("/admin/vendor-crm");
+    revalidatePath(`/admin/vendor-crm/${vendorId}`);
+    return result;
+  });
 export const adminApproveVendor   = async (id: string) => asAdmin((actor) => admin.approveVendor(id, actor));
 export const adminRejectVendor    = async (id: string) => asAdmin((actor) => admin.rejectVendor(id, actor));
 export const adminSuspendVendor   = async (id: string) => asAdmin((actor) => admin.suspendVendor(id, actor));

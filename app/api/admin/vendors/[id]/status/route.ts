@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/app/actions";
 import { setVendorStatusAction, type VendorStatusAction } from "@/services/vendorAdminService";
+import { activateVendorLogin } from "@/services/vendorLoginActivationService";
 
 export const dynamic = "force-dynamic";
 
@@ -35,13 +36,35 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ ok: false, error: "Invalid action." }, { status: 400 });
   }
 
-  const result = await setVendorStatusAction((await params).id, action as VendorStatusAction, session.adminRole ?? "Superadmin", session.userId);
+  const vendorId = (await params).id;
+  const result = await setVendorStatusAction(vendorId, action as VendorStatusAction, session.adminRole ?? "Superadmin", session.userId);
   if (!result.ok) {
     const status = result.code === "VALIDATION" ? 400 : result.code === "NOT_FOUND" ? 404 : 500;
     return NextResponse.json({ ok: false, error: result.error }, { status });
   }
 
-  return NextResponse.json({ ok: true, vendor: result.data }, { status: 200 });
+  // V1 onboarding orchestration: approval immediately attempts the canonical
+  // EXISTING-vendor login activation/repair path. Approval remains the Core
+  // business decision; login provisioning is reported separately so an email
+  // collision or missing email cannot silently roll the approval back.
+  // The single-use recovery link is returned only to this superadmin response
+  // and is never stored, logged, or sent by this route.
+  let loginActivation: Awaited<ReturnType<typeof activateVendorLogin>> | null = null;
+  if (action === "approve") {
+    loginActivation = await activateVendorLogin({ vendorId });
+  }
+
+  return NextResponse.json(
+    {
+      ok: true,
+      vendor: result.data,
+      loginActivation: loginActivation?.ok ? loginActivation.data : null,
+      loginActivationError: loginActivation && !loginActivation.ok
+        ? { code: loginActivation.code, error: loginActivation.error }
+        : null,
+    },
+    { status: 200 },
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

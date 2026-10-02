@@ -43,6 +43,7 @@ export default async function VendorCrmDirectoryPage({
     city: one("city"),
     verification: one("verification"),
     enabled: one("enabled"),
+    location: one("location"),
     onboarding_stage: one("onboarding_stage"),
     relationship_status: one("relationship_status"),
     source: one("source"),

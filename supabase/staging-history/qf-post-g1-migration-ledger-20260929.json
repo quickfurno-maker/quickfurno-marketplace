@@ -310,7 +310,10 @@
       },
       "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_SCHEMA_AUDIT_2026-10-02",
       "reconciledBySourceVersion": "20261002090000",
-      "reconciliationEvidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_RECONCILIATION_2026-10-02"
+      "reconciliationEvidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_RECONCILIATION_2026-10-02",
+      "observedProductionAppliedVersion": "20261002102901",
+      "productionSemanticApplication": "PROVEN",
+      "productionEvidence": "FIRST_PARTY_SUPABASE_MCP_PRODUCTION_SCHEMA_AUDIT_2026-10-02"
     },
     {
       "version": "20261002090000",
@@ -360,6 +363,44 @@
         "legacyAccrualServiceRoleExecute": false,
         "browserConsumeExecute": false,
         "serviceConsumeExecute": true
+      },
+      "observedProductionAppliedVersion": "20261002102915",
+      "productionSemanticApplication": "PROVEN",
+      "productionEvidence": "FIRST_PARTY_SUPABASE_MCP_PRODUCTION_APPLY_ROLLBACK_CANARY_2026-10-02",
+      "productionRuntimeReleaseSha": "1dd9eb74bdd644c9633e1da5c3d0ac8393d2b382",
+      "productionCanary": {
+        "mode": "ROLLBACK_ONLY",
+        "snapshot": "applied",
+        "snapshotReplay": "already_applied",
+        "consume": "applied",
+        "consumeReplay": "already_applied",
+        "comparableVendorCount": 3,
+        "fairSharePerDelivery": 0.333333,
+        "firstDeliveryBalances": {
+          "deliveredVendor": -0.666667,
+          "missedPeer1": 0.333333,
+          "missedPeer2": 0.333333,
+          "fartherBand": 0
+        },
+        "restore": "applied",
+        "restoreReplay": "already_applied",
+        "restoredBalances": {
+          "deliveredVendor": 0,
+          "missedPeer1": 0,
+          "missedPeer2": 0,
+          "fartherBand": 0
+        },
+        "rowsAfterRollback": {
+          "opportunities": 0,
+          "candidates": 0,
+          "fairness": 0,
+          "events": 0,
+          "syntheticVendors": 0,
+          "syntheticLeads": 0,
+          "syntheticAssignments": 0
+        },
+        "browserSnapshotExecute": false,
+        "serviceSnapshotExecute": true
       }
     },
     {
@@ -378,7 +419,10 @@
         "20261002085216"
       ],
       "stagingApplyReplayCount": 2,
-      "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_INDEX_APPLY_2026-10-02"
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_INDEX_APPLY_2026-10-02",
+      "observedProductionAppliedVersion": "20261002102931",
+      "productionSemanticApplication": "PROVEN",
+      "productionEvidence": "FIRST_PARTY_SUPABASE_MCP_PRODUCTION_INDEX_AUDIT_2026-10-02"
     }
   ],
   "supersededLegacyPins": [

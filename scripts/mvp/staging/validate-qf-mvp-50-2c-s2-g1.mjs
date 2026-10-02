@@ -703,7 +703,10 @@ function validateState(state) {
             record.observedStagingAppliedVersion === "20261002080447" &&
             record.stagingSemanticApplication === "EARLIER_DRAFT_RECONCILED_BY_20261002090000" &&
             record.reconciledBySourceVersion === "20261002090000" &&
-            record.reconciliationEvidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_RECONCILIATION_2026-10-02"
+            record.reconciliationEvidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_RECONCILIATION_2026-10-02" &&
+            record.observedProductionAppliedVersion === "20261002102901" &&
+            record.productionSemanticApplication === "PROVEN" &&
+            record.productionEvidence === "FIRST_PARTY_SUPABASE_MCP_PRODUCTION_SCHEMA_AUDIT_2026-10-02"
           ) ||
           (
             record.version === "20261002090000" &&
@@ -724,7 +727,35 @@ function validateState(state) {
             record.stagingCanary?.rowsAfterRollback?.events === 0 &&
             record.stagingCanary?.legacyAccrualServiceRoleExecute === false &&
             record.stagingCanary?.browserConsumeExecute === false &&
-            record.stagingCanary?.serviceConsumeExecute === true
+            record.stagingCanary?.serviceConsumeExecute === true &&
+            record.observedProductionAppliedVersion === "20261002102915" &&
+            record.productionSemanticApplication === "PROVEN" &&
+            record.productionEvidence === "FIRST_PARTY_SUPABASE_MCP_PRODUCTION_APPLY_ROLLBACK_CANARY_2026-10-02" &&
+            record.productionRuntimeReleaseSha === "1dd9eb74bdd644c9633e1da5c3d0ac8393d2b382" &&
+            record.productionCanary?.mode === "ROLLBACK_ONLY" &&
+            record.productionCanary?.snapshot === "applied" &&
+            record.productionCanary?.snapshotReplay === "already_applied" &&
+            record.productionCanary?.consume === "applied" &&
+            record.productionCanary?.consumeReplay === "already_applied" &&
+            record.productionCanary?.comparableVendorCount === 3 &&
+            record.productionCanary?.fairSharePerDelivery === 0.333333 &&
+            record.productionCanary?.firstDeliveryBalances?.deliveredVendor === -0.666667 &&
+            record.productionCanary?.firstDeliveryBalances?.missedPeer1 === 0.333333 &&
+            record.productionCanary?.firstDeliveryBalances?.missedPeer2 === 0.333333 &&
+            record.productionCanary?.firstDeliveryBalances?.fartherBand === 0 &&
+            record.productionCanary?.restoredBalances?.deliveredVendor === 0 &&
+            record.productionCanary?.restoredBalances?.missedPeer1 === 0 &&
+            record.productionCanary?.restoredBalances?.missedPeer2 === 0 &&
+            record.productionCanary?.restoredBalances?.fartherBand === 0 &&
+            record.productionCanary?.rowsAfterRollback?.opportunities === 0 &&
+            record.productionCanary?.rowsAfterRollback?.candidates === 0 &&
+            record.productionCanary?.rowsAfterRollback?.fairness === 0 &&
+            record.productionCanary?.rowsAfterRollback?.events === 0 &&
+            record.productionCanary?.rowsAfterRollback?.syntheticVendors === 0 &&
+            record.productionCanary?.rowsAfterRollback?.syntheticLeads === 0 &&
+            record.productionCanary?.rowsAfterRollback?.syntheticAssignments === 0 &&
+            record.productionCanary?.browserSnapshotExecute === false &&
+            record.productionCanary?.serviceSnapshotExecute === true
           ) ||
           (
             record.version === "20261002091500" &&
@@ -734,7 +765,10 @@ function validateState(state) {
             record.stagingSemanticApplication === "PROVEN" &&
             Array.isArray(record.observedStagingAppliedVersions) &&
             JSON.stringify(record.observedStagingAppliedVersions) === JSON.stringify(["20261002083936","20261002085216"]) &&
-            record.stagingApplyReplayCount === 2
+            record.stagingApplyReplayCount === 2 &&
+            record.observedProductionAppliedVersion === "20261002102931" &&
+            record.productionSemanticApplication === "PROVEN" &&
+            record.productionEvidence === "FIRST_PARTY_SUPABASE_MCP_PRODUCTION_INDEX_AUDIT_2026-10-02"
           ) ||
           (
             allowedSourcePin !== undefined &&

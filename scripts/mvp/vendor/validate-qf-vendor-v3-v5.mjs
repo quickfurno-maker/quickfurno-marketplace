@@ -8,6 +8,7 @@ const files = {
   operatingMigration: read("supabase/migrations/20261002043238_vendor_v3_v5_operating_flow.sql"),
   connectionMigration: read("supabase/migrations/20261002044054_vendor_v3_connection_delivery_gate.sql"),
   indexMigration: read("supabase/migrations/20261002045022_vendor_v3_v5_fk_indexes.sql"),
+  triggerMigration: read("supabase/migrations/20261002052224_vendor_v3_db_delivery_projection.sql"),
   lifecycleService: read("services/leadAssignmentLifecycleService.ts"),
   webhookService: read("services/metaWhatsAppWebhookService.ts"),
   matching: read("services/leadMatchingEngine.ts"),
@@ -78,6 +79,18 @@ check("V3 connection UI waits for provider delivery", files.leadCard.includes("A
 check("V3 matcher consumes provider delivery fairness", files.matching.includes("last_assigned_at: asText(vendor.last_delivered_at)"));
 check("V3 matcher does not consume vendor last_assigned_at", !files.matching.includes("last_assigned_at: asText(vendor.last_assigned_at)"));
 check("V3 fairness evidence names provider delivery model", files.matching.includes('fairness_model: "provider_delivery_tiebreak_v1"'));
+check("V3 database trigger projects only canonical delivered/read lead-assignment messages",
+  files.triggerMigration.includes("new.channel = 'whatsapp'")
+  && files.triggerMigration.includes("new.template_key = 'lead_assignment_alert'")
+  && files.triggerMigration.includes("new.status in ('delivered','read')"));
+check("V3 database trigger reuses the single canonical delivery projection RPC",
+  files.triggerMigration.includes("perform public.qf_project_vendor_lead_delivery_v1(new.id)"));
+check("V3 database trigger is idempotency-friendly on unchanged delivery truth",
+  files.triggerMigration.includes("old.status is not distinct from new.status")
+  && files.triggerMigration.includes("old.delivered_at is not distinct from new.delivered_at")
+  && files.triggerMigration.includes("old.read_at is not distinct from new.read_at"));
+check("V3 database trigger is not callable by browser or service roles",
+  files.triggerMigration.includes("from public, anon, authenticated, service_role"));
 
 // V4 — human-governed recovery.
 check("V4 report recovery vocabulary is constrained", files.operatingMigration.includes("restore_credit_and_replace") && files.operatingMigration.includes("bad_lead_reports_recovery_status_check"));

@@ -136,6 +136,7 @@
     "test:mvp:70-04": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/admin/validate-qf-mvp-70-04-final-certification.mjs",
     "test:mvp:75-01": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/matching/validate-qf-mvp-75-01.mjs",
     "test:mvp:75-02": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/matching/validate-qf-mvp-75-02.mjs",
+    "test:mvp:fair-opportunity": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/matching/validate-qf-fair-opportunity.mjs",
     "test:mvp:location-straight-line": "node scripts/mvp/matching/validate-qf-location-straight-line.mjs",
     "test:mvp:public-google-location": "node scripts/mvp/location/validate-qf-public-google-location.mjs",
     "test:mvp:vendor-location-backfill": "node scripts/mvp/matching/validate-qf-vendor-location-backfill.mjs",

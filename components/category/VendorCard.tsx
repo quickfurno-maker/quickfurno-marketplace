@@ -116,7 +116,11 @@ export function VendorCard({ vendor, compareOn, onCompare, compareFull, category
                 <IconShieldTick /> Verified
               </span>
             ) : null}
-            {coverage ? (
+            {typeof vendor.distanceKm === "number" ? (
+              <span className="qfc-where">
+                <IconPin size={13} width={2.1} /> {vendor.distanceKm.toFixed(1)} km straight-line
+              </span>
+            ) : coverage ? (
               <span className="qfc-where">
                 <IconPin size={13} width={2.1} /> {coverage}
               </span>

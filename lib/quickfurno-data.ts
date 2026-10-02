@@ -72,8 +72,12 @@ export type Vendor = {
   teamSize?: string | null;
   /** How far they travel, in km. null when they never set it. */
   serviceRadiusKm?: number | null;
-  /** Projects a month they can take, e.g. "1–5 projects". */
+  /** Projects a month they can take, e.g. "1–5 projects". Display only; never a rank input. */
   monthlyCapacity?: string | null;
+  /** Straight-line client-to-vendor distance when a verified client point is available. */
+  distanceKm?: number | null;
+  /** Current automatic-assignment eligibility. Used only to keep active-credit vendors first. */
+  leadEligible?: boolean;
 };
 
 export type VendorServiceChip = {

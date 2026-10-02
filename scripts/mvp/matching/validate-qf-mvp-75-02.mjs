@@ -544,7 +544,7 @@ section('E. FALLBACK CONTRACT [pure + static]');
 section('F. SHORTLIST NEVER NARROWS THE CANDIDATE POOL [static]');
 // ===========================================================================
 {
-  const iEval = MATCHER.indexOf('const evaluation = await evaluateVendorsForLead(leadRow);');
+  const iEval = MATCHER.indexOf('const evaluation = await evaluateVendorsForLead(leadRow, { recordFairOpportunityPool: true });');
   const iGeo = MATCHER.indexOf('await fetchGeoVendorShortlist(leadRow)');
   const iPool = MATCHER.indexOf('const rankedPool = splitRankedPool(');
 
@@ -732,8 +732,10 @@ section('H. MATCHCORE PRESERVATION [pure + static]');
     && /if \(tierResult === null\) reasons\.push\("category_mismatch"\);/.test(MATCHER)
     && /evaluateVendorAutomaticLeadEligibility\(vendor, \{ nowMs \}\)/.test(MATCHER));
 
-  check('H09 the matcher still takes exactly ONE clock read per ranking run',
-    (MATCHER.match(/const nowMs = Date\.now\(\);/g) || []).length === 1);
+  check('H09 the matcher still uses exactly one clock source and injects one instant into the real run',
+    (MATCHER.match(/Date\.now\(\)/g) || []).length === 1
+    && /const nowMs = readMatchingClock\(\);/.test(MATCHER)
+    && (MATCHER.match(/,\s*nowMs,\s*\);/g) || []).length >= 2);
 
   check('H10 the comparator is still the shared MatchCore contract, unchanged by this phase',
     /eligible\.sort\(\(a, b\) => compareAutomaticMatchDecisions\(a\.__decision, b\.__decision, leadHasCoords\)\);/.test(MATCHER));
@@ -1089,8 +1091,8 @@ section('MUTATION REJECTION — TypeScript seam');
       s.replace('if (!cityMatches(vendor, lead)) reasons.push("city_mismatch");', ''),
       (s) => /if \(!cityMatches\(vendor, lead\)\) reasons\.push\("city_mismatch"\);/.test(stripTs(s))],
 
-    ['the single clock read per run duplicated', (s) =>
-      s.replace('  const nowMs = Date.now();', '  const nowMs = Date.now();\n  const nowMs2 = Date.now();'),
+    ['the single clock source duplicated', (s) =>
+      s.replace('  return Date.now();', '  return Date.now() + Date.now();'),
       (s) => (stripTs(s).match(/Date\.now\(\)/g) || []).length === 1],
 
     ['MatchCore re-ranked on the PostGIS distance instead of its own haversine', (s) =>

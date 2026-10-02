@@ -153,6 +153,9 @@ jobs:
       - name: QF-MVP-75.02 geo normalization and PostGIS shortlist
         run: npm run test:mvp:75-02
 
+      - name: Fair opportunity distribution
+        run: npm run test:mvp:fair-opportunity
+
       # Verified location + straight-line geography. Google Places/GPS may
       # capture WGS84 coordinates, but routing stays entirely inside QuickFurno:
       # no Routes key, provider switch, matrix call or traffic dependency.

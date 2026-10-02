@@ -76,9 +76,9 @@ check("V3 browser gets lifecycle state but no operation/credit evidence",
   && !files.leadsModel.includes("credit_deducted"));
 check("V3 lead UI exposes acknowledgement only after delivered", files.leadsModel.includes('canAcknowledge: row.lifecycle_status === "delivered"'));
 check("V3 connection UI waits for provider delivery", files.leadCard.includes("Available after QuickFurno confirms lead delivery."));
-check("V3 matcher consumes provider delivery fairness", files.matching.includes("last_assigned_at: asText(vendor.last_delivered_at)"));
+check("V3 matcher consumes provider delivery fairness", files.matching.includes("const lastDeliveredAt = fairness?.ledger_present") && files.matching.includes("? fairness.last_delivered_at") && files.matching.includes(": asText(vendor.last_delivered_at)") && files.matching.includes("last_assigned_at: lastDeliveredAt"));
 check("V3 matcher does not consume vendor last_assigned_at", !files.matching.includes("last_assigned_at: asText(vendor.last_assigned_at)"));
-check("V3 fairness evidence names provider delivery model", files.matching.includes('fairness_model: "provider_delivery_tiebreak_v1"'));
+check("V3 fairness evidence names provider-confirmed consumption under the fair-opportunity model", files.matching.includes("fairness_model: FAIRNESS_MODEL_VERSION") && files.matching.includes('opportunity_consumption: "provider_confirmed_delivery"'));
 check("V3 database trigger projects only canonical delivered/read lead-assignment messages",
   files.triggerMigration.includes("new.channel = 'whatsapp'")
   && files.triggerMigration.includes("new.template_key = 'lead_assignment_alert'")

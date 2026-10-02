@@ -27,6 +27,8 @@ import {
 import { buildGeoMatchEvidence } from "../lib/geo/geoShortlistContract";
 import { fetchGeoVendorShortlist } from "./geoVendorShortlistService";
 import { buildSelectionPlan } from "../lib/matchcore/selectionPlan";
+import { buildFairnessScope, clampFairnessBalance, distanceBand, FAIRNESS_MODEL_VERSION, type FairOpportunitySnapshot } from "../lib/matchcore/fairOpportunity";
+import { loadFairOpportunitySnapshots, snapshotFairOpportunityEligiblePool } from "./vendorFairOpportunityService";
 // QF-MVP-80.01 — the marketplace kill switch. The canonical settings reader and
 // the canonical reason code both live in lib/lead-assignment/runtimeSettings, so
 // this matcher, the preview engine and the Launch Control console cannot drift
@@ -111,6 +113,11 @@ export type EligibleMatchedVendor = {
   has_coordinates: boolean;
   coordinate_source: CoordinateSource;
   area_affinity: number;
+  distance_band: number;
+  fair_share_balance: number;
+  delivered_7d: number;
+  last_delivered_at: string | null;
+  fairness_scope_key: string | null;
   rank_reason: string;
   rank_position?: number;
 };
@@ -156,6 +163,8 @@ export type VendorMatchEvaluation = {
   skipped: SkippedVendorAudit[];
   skippedReasonCounts: Record<string, number>;
   eligibleCoordinates: EligibleVendorCoordinate[];
+  fairnessScopeKey?: string;
+  fairnessLedgerAvailable?: boolean;
 };
 
 const MAX_VENDOR_MATCHES = 3;
@@ -178,6 +187,10 @@ const MAX_VENDOR_SCAN = 5000;
 // Audit snapshots list per-vendor skip reasons up to this cap; reason counts
 // always cover every evaluated vendor.
 const MAX_SKIPPED_AUDIT_ENTRIES = 40;
+
+function readMatchingClock(): number {
+  return Date.now();
+}
 // Phase 3A observability tag stamped into every matching_snapshot so read-only
 // diagnostics can tell current-system runs apart from legacy/untagged ones.
 // METADATA ONLY — it never affects ranking, filtering, tiers, distance, area
@@ -258,10 +271,10 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
     //   overwrite "this lead carried no share consent" with "matching was off".
     //
     //   BEFORE `evaluateVendorsForLead`, which is the first step here that can
-    //   lead anywhere: every vendor evaluation, the 75.02 geo shortlist, the
-    //   75.03 route provider call, the 75.04 ordering, the ranked pool, the
-    //   canonical assignment authority, the per-assignment credit debit and
-    //   every dashboard / WhatsApp / client preview is downstream of it.
+    //   lead anywhere: every vendor evaluation, fair-opportunity accrual, the
+    //   read-only 75.02 straight-line geo evidence, the ranked pool, canonical
+    //   assignment authority, per-assignment credit debit and every dashboard /
+    //   WhatsApp / client preview is downstream of it. Routes API is not used.
     //   Halting here means not one of them can run.
     //
     // The mode is read ONCE per run through the canonical reader, which
@@ -275,13 +288,9 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
     // through this path — redefining that is a product contract change, not a
     // rollback control, and is deliberately out of scope here.
     //
-    // KNOWN BOUNDARY, stated rather than hidden: the canonical reader fails
-    // OPEN — an UNREADABLE settings table yields the built-in default
-    // (`preview`), not `off`. That is the pre-existing runtime contract (a lead
-    // must never be blocked by an unreadable settings table) and this slice
-    // deliberately preserves it, because inverting it would change behaviour in
-    // the not-off modes. A MISSING ROW is not a read failure: it is a successful
-    // read that resolves to the default.
+    // KNOWN BOUNDARY: the canonical reader now fails CLOSED. An unreadable or
+    // missing runtime setting resolves to the built-in `off` default, so silence
+    // can never authorize assignment/credit mutation.
     // ======================================================================
     const runtimeSettings = await loadMarketplaceRuntimeSettings();
     if (runtimeSettings.auto_assignment_mode === "off") {
@@ -343,9 +352,15 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
       });
     }
 
-    const evaluation = await evaluateVendorsForLead(leadRow);
+    const evaluation = await evaluateVendorsForLead(leadRow, { recordFairOpportunityPool: true });
     if (!evaluation.ok) return { ok: false, code: evaluation.code, error: evaluation.error };
-    const { eligible, skipped, skippedReasonCounts } = evaluation.data;
+    const {
+      eligible,
+      skipped,
+      skippedReasonCounts,
+      fairnessScopeKey,
+      fairnessLedgerAvailable,
+    } = evaluation.data;
 
     // QF-MVP-75.02 — bounded read-only PostGIS geo DISCOVERY, recorded as
     // evidence and nothing else.
@@ -388,17 +403,31 @@ export async function runAutoLeadMatchingForLead(leadId: string): Promise<Result
       google_routes_required: false,
     };
 
-    // The current fairness signal is provider-confirmed delivery exposure,
-    // projected into vendors.last_delivered_at and carried through MatchCore’s
-    // historical last_assigned_at decision field. It runs only after category,
-    // direct-line distance and area affinity. A richer exposure fairness model
-    // can replace this later once canonical delivered events exist.
     const selectionPlan = buildSelectionPlan(straightLineOrderedVendorIds);
     const fairnessEvidence = {
-      fairness_model: "provider_delivery_tiebreak_v1",
-      position_after: ["match_tier", "direct_line_distance_km", "area_affinity"],
-      delivery_exposure_active: true,
-      reason: "PROVIDER_CONFIRMED_DELIVERY_ONLY",
+      fairness_model: FAIRNESS_MODEL_VERSION,
+      scope_key: fairnessScopeKey ?? null,
+      ledger_available: fairnessLedgerAvailable ?? false,
+      active_credit_is_gate_only: true,
+      lead_credit_cost: 1,
+      opportunity_consumption: "provider_confirmed_delivery",
+      ordering: [
+        "match_tier",
+        "distance_band",
+        "fair_share_balance",
+        "delivered_7d",
+        "last_delivered_at",
+        "area_affinity",
+        "exact_distance",
+        "vendor_id",
+      ],
+      vendor_state: eligible.map((vendor) => ({
+        vendor_id: vendor.id,
+        distance_band: vendor.distance_band,
+        fair_share_balance: vendor.fair_share_balance,
+        delivered_7d: vendor.delivered_7d,
+        last_delivered_at: vendor.last_delivered_at,
+      })),
     };
 
     // Ranked candidate POOL. Recorded as selected_vendor_ids so diagnostics keep
@@ -590,7 +619,10 @@ export async function getEligibleVendorsForLead(lead: LeadForMatching): Promise<
 }
 
 /** Full eligible + skipped-with-reasons evaluation, used for audit snapshots. */
-export async function evaluateVendorsForLead(lead: LeadForMatching): Promise<Result<VendorMatchEvaluation>> {
+export async function evaluateVendorsForLead(
+  lead: LeadForMatching,
+  options: { recordFairOpportunityPool?: boolean } = {},
+): Promise<Result<VendorMatchEvaluation>> {
   try {
     // Eligibility rules read loosely-aliased columns (city/office_city, several
     // credit/package aliases), so filtering happens in JS via the shared helper.
@@ -613,7 +645,55 @@ export async function evaluateVendorsForLead(lead: LeadForMatching): Promise<Res
     }
 
     const serviceZonePolicy = await loadServiceZoneRuntimePolicy();
-    return ok(rankVendorsForLead(lead, rows, serviceZonePolicy));
+    const nowMs = readMatchingClock();
+
+    // Pass 1 determines the canonical hard-eligible pool with NEUTRAL fairness.
+    // This is the exact set allowed to accrue a missed-turn entitlement.
+    const baseEvaluation = rankVendorsForLead(
+      lead,
+      rows,
+      serviceZonePolicy,
+      new Map<string, FairOpportunitySnapshot>(),
+      nowMs,
+    );
+    if (baseEvaluation.eligible.length === 0) return ok(baseEvaluation);
+
+    const eligibleIds = baseEvaluation.eligible.map((vendor) => vendor.id);
+    const scope = buildFairnessScope(lead);
+
+    // Read-only evaluators (AOS previews, recovery inspection, admin diagnostics)
+    // may rank against CURRENT fairness but must never create an eligible-pool
+    // snapshot. Only the real automatic assignment run records that pool.
+    const fairness = options.recordFairOpportunityPool
+      ? await snapshotFairOpportunityEligiblePool(
+          lead,
+          baseEvaluation.eligible.map((vendor) => ({
+            id: vendor.id,
+            match_tier: vendor.match_tier,
+            distance_band: vendor.distance_band,
+          })),
+        )
+      : {
+          scopeKey: scope.scopeKey,
+          ...(await loadFairOpportunitySnapshots({
+            scopeKey: scope.scopeKey,
+            vendorIds: eligibleIds,
+          })),
+        };
+
+    // Pass 2 ranks the SAME rows at the SAME logical instant using canonical
+    // fairness state. Recording this lead's eligible pool does not change any
+    // balance; balances move later only on provider-confirmed delivery.
+    const ranked = rankVendorsForLead(
+      lead,
+      rows,
+      serviceZonePolicy,
+      fairness.snapshots,
+      nowMs,
+    );
+    ranked.fairnessScopeKey = fairness.scopeKey;
+    ranked.fairnessLedgerAvailable = fairness.ledgerAvailable;
+    return ok(ranked);
   } catch (e) {
     return fail(e);
   }
@@ -631,6 +711,8 @@ export function rankVendorsForLead(
   lead: LeadForMatching,
   rows: Array<Record<string, unknown>>,
   serviceZonePolicy: ServiceZoneRuntimePolicy = EMPTY_SERVICE_ZONE_POLICY,
+  fairnessByVendor: ReadonlyMap<string, FairOpportunitySnapshot> = new Map(),
+  nowMs = readMatchingClock(),
 ): VendorMatchEvaluation {
   const eligible: RankableCandidate[] = [];
   const skipped: SkippedVendorAudit[] = [];
@@ -643,12 +725,8 @@ export function rankVendorsForLead(
   // has coordinates; manual leads rank by tier + soft area affinity + fairness.
   const leadHasCoords = isValidCoordinate(lead.latitude, lead.longitude);
   const leadParentGroup = getParentCategoryGroup([lead.subcategory, lead.service_required, lead.category]);
-  // QF-MVP-75.01: ONE clock read for the whole run, injected into every
-  // eligibility evaluation. The assignment-suspension window is the only
-  // clock-sensitive gate, and since this ranking is now BINDING on the
-  // authority, every vendor in a single run must be judged against the SAME
-  // instant rather than each against its own Date.now().
-  const nowMs = Date.now();
+  // nowMs is injected by the caller so hard eligibility and the fairness rerank
+  // evaluate every vendor against the same logical instant.
 
   for (const vendor of rows) {
     const id = asText(vendor.id);
@@ -723,13 +801,21 @@ export function rankVendorsForLead(
       ? haversineKm(lead.latitude, lead.longitude, coords.lat, coords.lng)
       : null;
     const areaAffinity = computeAreaAffinity(vendor, lead);
+    const fairness = fairnessByVendor.get(id);
+    const band = distanceBand(distanceKm);
+    const lastDeliveredAt = fairness?.ledger_present
+      ? fairness.last_delivered_at
+      : asText(vendor.last_delivered_at);
+    const fairShareBalance = clampFairnessBalance(fairness?.fair_share_balance ?? 0);
+    const delivered7d = fairness?.delivered_7d ?? 0;
     eligibleCoordinates.push({ vendor_id: id, latitude: coords.lat, longitude: coords.lng });
 
     eligible.push({
       id,
       business_name: asText(vendor.business_name),
-      // Informational only (NOT used for ranking); ranking uses the comparator below.
-      score: scoreVendor(vendor, lead, "credit_wallet"),
+      // Deprecated compatibility field. Subjective/commercial scoring is not part
+      // of fair distribution; keep the field neutral for older audit consumers.
+      score: 0,
       credits: wallet.credits,
       packageStatus: normalizePackageStatus(vendor), // display/history only (deprecated for eligibility)
       visibilityType: "credit_wallet",
@@ -739,6 +825,11 @@ export function rankVendorsForLead(
       has_coordinates: hasCoordinates,
       coordinate_source: coords.source,
       area_affinity: areaAffinity,
+      distance_band: band,
+      fair_share_balance: fairShareBalance,
+      delivered_7d: delivered7d,
+      last_delivered_at: lastDeliveredAt,
+      fairness_scope_key: fairness?.scope_key ?? null,
       rank_reason: "",
       // QF-MVP-75.01: the pure MatchCore decision record this candidate is
       // ranked by. Kept alongside the public row so the comparator has exactly
@@ -753,25 +844,23 @@ export function rankVendorsForLead(
         coordinate_source: coords.source,
         distance_km: distanceKm,
         area_affinity: areaAffinity,
-        // MatchCore keeps its historical field name, but V4 fairness now
-        // consumes only provider-confirmed delivery exposure. Merely creating
-        // an assignment/debit no longer moves the fair-turn clock.
-        last_assigned_at: asText(vendor.last_delivered_at),
+        distance_band: band,
+        fair_share_balance: fairShareBalance,
+        delivered_7d: delivered7d,
+        last_delivered_at: lastDeliveredAt,
+        // Historical field retained for the v1 decision shape; it now mirrors
+        // provider-confirmed delivery rather than assignment creation.
+        last_assigned_at: lastDeliveredAt,
         rating: Number.isFinite(Number(vendor.rating)) ? Number(vendor.rating) : 0,
         rank_position: null,
       },
     });
   }
 
-  // Rank: category tier first (0 before 1), then distance-aware ordering, then
-  // soft area affinity, fairness (last_assigned_at asc, nulls first), rating, id.
-  //
-  // QF-MVP-75.01: the comparator is now the shared MatchCore contract
-  // (lib/matchcore/automaticMatchDecision). The order is unchanged; what changed
-  // is that the persistence authority is bound by it, so this is no longer an
-  // advisory ordering. The contract also hardens the fairness key: an
-  // unparseable last_assigned_at previously produced NaN, which made the
-  // comparator non-total and let the same input sort differently.
+  // Rank: category tier → broad distance band → fair-share deficit →
+  // recent-delivery cooldown → longest wait → locality/exact-distance tie-breaks.
+  // Credits are already a hard gate above and never multiply priority. Rating,
+  // package size, popularity and inferred capacity do not participate.
   eligible.sort((a, b) => compareAutomaticMatchDecisions(a.__decision, b.__decision, leadHasCoords));
 
   // Finalize audit: rank position + human reason; strip internal sort-only fields.
@@ -918,40 +1007,29 @@ function computeAreaAffinity(vendor: Record<string, unknown>, lead: LeadForMatch
  * record it is ordered by. `__decision` is stripped before the row is returned,
  * so the persisted snapshot shape is unchanged.
  *
- * QF-MVP-75.01: the comparator itself moved to
+ * The comparator lives in
  * lib/matchcore/automaticMatchDecision.compareAutomaticMatchDecisions. The
- * approved order is unchanged — category_tier ASC, has_coordinates DESC,
- * distance_km ASC, area_affinity DESC, last_assigned_at ASC (nulls first),
- * rating DESC, id ASC, with the coordinate/distance keys applying only when the
- * LEAD has coordinates — but it now has ONE definition that the authority is
- * bound by and the offline suite can exercise directly.
+ * current fair-distribution order is category tier, broad distance band,
+ * fair-share deficit, recent provider-confirmed delivery count, oldest
+ * provider-confirmed delivery, locality/exact-distance tie-breaks, then vendor
+ * id. Credits are eligibility only; rating/package/popularity/capacity do not
+ * participate.
  */
 type RankableCandidate = EligibleMatchedVendor & { __decision: AutomaticMatchDecision };
 
 function buildRankReason(vendor: EligibleMatchedVendor, leadHasCoords: boolean): string {
   const parts = [`tier${vendor.match_tier}:${vendor.match_type}`];
-  if (leadHasCoords && vendor.distance_km != null) parts.push(`${vendor.distance_km}km`);
-  else if (leadHasCoords && !vendor.has_coordinates) parts.push("no_vendor_coords");
+  if (leadHasCoords && vendor.distance_km != null) {
+    parts.push(`distance_band:${vendor.distance_band}`);
+    parts.push(`${vendor.distance_km}km`);
+  } else if (leadHasCoords && !vendor.has_coordinates) parts.push("no_vendor_coords");
   else if (!leadHasCoords) parts.push("no_lead_coords");
+  parts.push(`fair_balance:${vendor.fair_share_balance.toFixed(3)}`);
+  parts.push(`delivered_7d:${vendor.delivered_7d}`);
+  if (vendor.last_delivered_at) parts.push(`last_delivered:${vendor.last_delivered_at}`);
+  else parts.push("never_delivered");
   if (vendor.area_affinity > 0) parts.push(`area_affinity:${vendor.area_affinity}`);
   return parts.join(" | ");
-}
-
-function scoreVendor(vendor: Record<string, unknown>, lead: LeadForMatching, visibilityType?: string) {
-  const leadArea = normalize(lead.area);
-  const areas = Array.isArray(vendor.areas_covered) ? vendor.areas_covered.map(normalize) : [];
-  const rating = Number(vendor.rating ?? 0);
-  const completedProjects = Number(vendor.completed_projects ?? 0);
-  const credits = Number(vendor.remaining_credits ?? 0);
-  let score = 50;
-  if (visibilityType === "paid") score += 25;
-  if (visibilityType === "trial") score += 12;
-  if (vendor.covers_full_city === true) score += 10;
-  if (leadArea && areas.includes(leadArea)) score += 14;
-  if (Number.isFinite(rating)) score += Math.min(15, Math.max(0, rating * 3));
-  if (Number.isFinite(completedProjects)) score += Math.min(10, completedProjects / 10);
-  if (Number.isFinite(credits)) score += Math.min(8, credits);
-  return Math.round(score * 100) / 100;
 }
 
 function normalize(value: unknown) {

@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 // ============================================================================
-// QuickFurno — components/vendors/ClientSelectedVendorEnquiry.tsx
+// QuickFurno â€” components/vendors/ClientSelectedVendorEnquiry.tsx
 // Phase 26A-2E: "Send enquiry to this vendor" on a vendor profile. The vendor's
 // city / category / subcategory / parent group / service area are auto-prefilled
 // and locked (hidden context); the client only fills name, phone, area (editable,
@@ -9,13 +9,15 @@
 // THIS vendor (assign immediately if eligible; otherwise a 1-hour recharge window
 // before auto-filling other vendors). No credit logic here; no live WhatsApp.
 // ============================================================================
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { sendClientSelectedVendorEnquiry } from "@/app/actions";
 import { formatServiceLabels } from "@/components/client-enquiry/enquiryDisplay";
 import GooglePlaceAutocomplete from "@/components/location/GooglePlaceAutocomplete";
 import { useActiveCities } from "@/lib/locations/useActiveCities";
 import { isPlaceCompatibleWithSelectedCity } from "@/lib/google-maps/normalizePlace";
 import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
+import { useProjectLocation } from "@/components/location/ProjectLocationProvider";
+import { projectLocationToGooglePlace } from "@/lib/locations/projectLocation";
 
 type Props = {
   vendorId: string;
@@ -30,7 +32,7 @@ type Props = {
 
 const PHONE_RE = /^[6-9]\d{9}$/;
 
-const BUDGETS = ["Below ₹1 lakh", "₹1–3 lakh", "₹3–7 lakh", "₹7–15 lakh", "₹15 lakh+", "Not sure yet"];
+const BUDGETS = ["Below â‚¹1 lakh", "â‚¹1â€“3 lakh", "â‚¹3â€“7 lakh", "â‚¹7â€“15 lakh", "â‚¹15 lakh+", "Not sure yet"];
 const TIMELINES = ["Immediately", "Within 15 days", "Within 1 month", "Just exploring"];
 
 function cleanPhone(raw: string): string {
@@ -56,6 +58,11 @@ export function ClientSelectedVendorEnquiry({
   const [projectArea, setProjectArea] = useState(area ?? "");
   const [googlePlace, setGooglePlace] = useState<NormalizedGooglePlace | null>(null);
   const { records: activeCityRecords } = useActiveCities();
+  const {
+    location: globalProjectLocation,
+    setGoogleLocation: setGlobalProjectLocation,
+    clearLocation: clearGlobalProjectLocation,
+  } = useProjectLocation();
   const [budget, setBudget] = useState("");
   const [timeline, setTimeline] = useState("");
   const [requirement, setRequirement] = useState("");
@@ -64,9 +71,21 @@ export function ClientSelectedVendorEnquiry({
   const [error, setError] = useState("");
   const [doneMessage, setDoneMessage] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (
+      !globalProjectLocation ||
+      globalProjectLocation.city.toLowerCase() !== city.toLowerCase()
+    ) {
+      return;
+    }
+    setProjectArea(globalProjectLocation.label);
+    setGooglePlace(projectLocationToGooglePlace(globalProjectLocation));
+  }, [globalProjectLocation, city]);
+
   function handleAreaManual(value: string) {
     setProjectArea(value);
     setGooglePlace(null);
+    if (globalProjectLocation) clearGlobalProjectLocation({ refresh: false });
   }
 
   function handleAreaPlace(place: NormalizedGooglePlace) {
@@ -81,6 +100,14 @@ export function ClientSelectedVendorEnquiry({
     setError("");
     setGooglePlace(place);
     setProjectArea(place.area ?? place.formattedAddress ?? projectArea);
+    if (
+      cityRecord &&
+      place.placeId &&
+      place.lat != null &&
+      place.lng != null
+    ) {
+      setGlobalProjectLocation(place, cityRecord, { refresh: false });
+    }
   }
 
   async function submit() {
@@ -133,7 +160,7 @@ export function ClientSelectedVendorEnquiry({
   if (doneMessage) {
     return (
       <div className="qf-cs-enquiry qf-cs-enquiry--done" role="status">
-        <span className="qf-cs-enquiry-check" aria-hidden="true">✓</span>
+        <span className="qf-cs-enquiry-check" aria-hidden="true">âœ“</span>
         <p>{doneMessage}</p>
       </div>
     );
@@ -162,12 +189,12 @@ export function ClientSelectedVendorEnquiry({
         </p>
       ) : null}
 
-      {/* Auto-prefilled from the vendor profile — shown read-only, not editable. */}
+      {/* Auto-prefilled from the vendor profile â€” shown read-only, not editable. */}
       <div className="qf-cs-enquiry-locked">
-        {/* DISPLAY ONLY dedupe — the submitted serviceCategory / subcategory
+        {/* DISPLAY ONLY dedupe â€” the submitted serviceCategory / subcategory
             values are unchanged. */}
-        <span>{formatServiceLabels(serviceCategory, subcategory, " · ")}</span>
-        <span>{[city, parentCategoryGroup].filter(Boolean).join(" · ")}</span>
+        <span>{formatServiceLabels(serviceCategory, subcategory, " Â· ")}</span>
+        <span>{[city, parentCategoryGroup].filter(Boolean).join(" Â· ")}</span>
       </div>
 
       <label className="qf-cs-enquiry-field">
@@ -226,7 +253,7 @@ export function ClientSelectedVendorEnquiry({
           value={requirement}
           onChange={(e) => setRequirement(e.target.value)}
           rows={3}
-          placeholder="Tell the vendor about your project…"
+          placeholder="Tell the vendor about your projectâ€¦"
         />
       </label>
       <label className="qf-cs-enquiry-consent">
@@ -238,7 +265,7 @@ export function ClientSelectedVendorEnquiry({
         </span>
       </label>
       <button type="button" className={className} disabled={busy} onClick={submit}>
-        {busy ? "Sending…" : `Send to ${vendorName}`}
+        {busy ? "Sendingâ€¦" : `Send to ${vendorName}`}
       </button>
       <p className="qf-cs-enquiry-multi">
         You can create separate requests for other services like sofa, painting, or civil work, each with up to 3

@@ -1006,7 +1006,7 @@ export const suite = {
       },
     },
     {
-      name: 'vendor registration authority and rules are unchanged',
+      name: 'vendor registration keeps one authority and Google-only location rules',
       run: () => {
         const src = readFileSync('components/VendorRegisterForm.tsx', 'utf8');
         assertTrue(src.includes('submitVendorAccountRegistration'), 'sole submit authority');
@@ -1017,13 +1017,21 @@ export const suite = {
                            'isPlaceCompatibleWithSelectedCity', 'readTracking', 'CATEGORY_MIN_RATE']) {
           assertTrue(src.includes(dep), 'preserved: ' + dep);
         }
-        // Six steps, in order.
-        assertTrue(src.includes('const LAST_STEP = 5'), 'six steps (0..5) preserved');
+        // Device-location permission step is intentionally gone. Google business
+        // base selection now supplies the canonical office coordinates.
+        assertTrue(src.includes('const LAST_STEP = 4'), 'five steps (0..4) locked');
         for (const name of ['Business Identity', 'Service Category', 'City & Base Area',
-                            'Location', 'Business Strength', 'Review']) {
+                            'Business Strength', 'Review']) {
           assertTrue(src.includes(name), 'step preserved: ' + name);
         }
-        // Validation rules untouched.
+        assertFalse(/navigator\.geolocation|getCurrentPosition|requestLocation/.test(src),
+          'no device geolocation capture');
+        assertFalse(src.includes('Allow location for better matching'),
+          'no device-location permission step');
+        assertTrue(src.includes('office_latitude: f.baseLatitude')
+          && src.includes('office_longitude: f.baseLongitude'),
+          'Google-selected office/base coordinates remain the vendor location authority');
+        // Validation rules outside the removed device-location step are untouched.
         assertTrue(src.includes('key: "confirmPassword"'), 'confirm-password rule kept');
         assertTrue(/10-digit/.test(src), '10-digit phone rule kept');
         // No invented brand remains as a placeholder.
@@ -1756,7 +1764,7 @@ export const suite = {
         // This form renders INLINE beneath the page h1 on /vendor?mode=signup,
         // so an h3 step title skipped a level (measured jump "1->3").
         for (const title of ['Tell us about your business', 'What do you specialise in?',
-                             'Where do you serve clients?', 'Improve your client matching',
+                             'Where do you serve clients?',
                              'Tell us your business strength', 'Review your application',
                              'Vendor account created']) {
           assertTrue(src.includes('<h2>' + title + '</h2>'), title + ' is an h2');

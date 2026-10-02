@@ -12,6 +12,8 @@ import { isIndianLeadMobile } from "@/lib/leads/indianMobile";
 import GooglePlaceAutocomplete from "@/components/location/GooglePlaceAutocomplete";
 import { isPlaceCompatibleWithSelectedCity } from "@/lib/google-maps/normalizePlace";
 import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
+import { useProjectLocation } from "@/components/location/ProjectLocationProvider";
+import { projectLocationToGooglePlace } from "@/lib/locations/projectLocation";
 
 /**
  * Standalone enquiry funnel for /enquiry.
@@ -58,6 +60,11 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
   const [step, setStep] = useState<Step>("form");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const {
+    location: globalProjectLocation,
+    setGoogleLocation: setGlobalProjectLocation,
+    clearLocation: clearGlobalProjectLocation,
+  } = useProjectLocation();
 
   // Phase 14B/14C: cities + services come only from admin-managed active
   // cities and active categories.
@@ -76,11 +83,34 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
   const [consent, setConsent] = useState(false);
   const [googlePlace, setGooglePlace] = useState<NormalizedGooglePlace | null>(null);
 
-  // Default to the first active city once loaded; keep the user's pick if active.
+  // Prefer the globally selected Google project location. If none exists,
+  // fall back to the first active city for the legacy/manual path.
   useEffect(() => {
     if (!activeCities.length) return;
-    setForm((f) => (activeCities.includes(f.city) ? f : { ...f, city: activeCities[0] }));
-  }, [activeCities]);
+
+    if (
+      globalProjectLocation &&
+      activeCities.some(
+        (city) => city.toLowerCase() === globalProjectLocation.city.toLowerCase(),
+      )
+    ) {
+      setGooglePlace(projectLocationToGooglePlace(globalProjectLocation));
+      setForm((current) => ({
+        ...current,
+        city: globalProjectLocation.city,
+        area: globalProjectLocation.label,
+      }));
+      return;
+    }
+
+    if (!globalProjectLocation) {
+      setForm((current) =>
+        activeCities.includes(current.city)
+          ? current
+          : { ...current, city: activeCities[0] },
+      );
+    }
+  }, [activeCities, globalProjectLocation]);
 
   // Default to defaultService (if active) or the first active category.
   useEffect(() => {
@@ -96,11 +126,13 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
 
   function setCity(value: string) {
     setGooglePlace(null);
-    setForm((current) => ({ ...current, city: value }));
+    if (globalProjectLocation) clearGlobalProjectLocation({ refresh: false });
+    setForm((current) => ({ ...current, city: value, area: "" }));
   }
 
   function setAreaManual(value: string) {
     setGooglePlace(null);
+    if (globalProjectLocation) clearGlobalProjectLocation({ refresh: false });
     setForm((current) => ({ ...current, area: value }));
   }
 
@@ -119,6 +151,14 @@ export function LeadFunnel({ defaultService }: { defaultService?: string }) {
       ...current,
       area: place.area ?? place.formattedAddress ?? current.area,
     }));
+    if (
+      cityRecord &&
+      place.placeId &&
+      place.lat != null &&
+      place.lng != null
+    ) {
+      setGlobalProjectLocation(place, cityRecord, { refresh: false });
+    }
   }
 
   // QF-UI-TRACKING-01: the duplicate submit-time URL parser that used to live

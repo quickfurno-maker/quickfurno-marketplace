@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
@@ -11,6 +12,8 @@ import { CategoryListing } from "@/components/category/CategoryListing";
 import { IconArrow, IconCheck } from "@/components/category/icons";
 import { loadMarketplaceRuntimeSettings } from "@/lib/lead-assignment/runtimeSettings";
 import { getPublicVendorsForCategory } from "@/services/publicVendorService";
+import { PROJECT_LOCATION_COOKIE, parseProjectLocationCookie } from "@/lib/locations/projectLocation";
+import { getActiveCities } from "@/lib/locations/cityService";
 import {
   categories,
   categorySlug,
@@ -56,13 +59,35 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
   const settings = await loadMarketplaceRuntimeSettings();
   const enquiryService = enquiryServiceForCategory(category.name);
+  const cookieStore = await cookies();
+  const projectLocation = parseProjectLocationCookie(
+    cookieStore.get(PROJECT_LOCATION_COOKIE)?.value,
+  );
+  const activeCities = await getActiveCities();
+  const selectedActiveCity = projectLocation
+    ? activeCities.find(
+        (activeCity) =>
+          activeCity.name.toLowerCase() === projectLocation.city.toLowerCase(),
+      ) ?? null
+    : null;
+  const fallbackCity =
+    activeCities.find((activeCity) => activeCity.name.toLowerCase() === "pune") ??
+    activeCities[0] ??
+    null;
+  const pageCity = selectedActiveCity?.name ?? fallbackCity?.name ?? "Pune";
+  const verifiedBrowsingLocation =
+    selectedActiveCity && projectLocation ? projectLocation : null;
 
   // `null` = the vendors table could not be read. `[]` = read succeeded and no
   // vendor is publicly visible in this category. These stay distinct: a read
   // failure must never render as "no vendors", and must never fall back to the
   // static demo catalogue, which would publish fictional businesses as live
   // verified ones.
-  const publicVendors = await getPublicVendorsForCategory(category.name, settings);
+  const publicVendors = await getPublicVendorsForCategory(category.name, settings, {
+    city: pageCity,
+    latitude: verifiedBrowsingLocation?.latitude ?? null,
+    longitude: verifiedBrowsingLocation?.longitude ?? null,
+  });
   const listingUnavailable = publicVendors === null;
   const vendors = publicVendors ?? [];
 
@@ -82,8 +107,8 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           description={category.description}
           enquiryService={enquiryService}
           vendorCount={vendors.length}
-          city="Pune"
-          heading={<h1 className="qfd-hero qfc-title">{category.name} in Pune</h1>}
+          city={pageCity}
+          heading={<h1 className="qfd-hero qfc-title">{category.name} near {verifiedBrowsingLocation?.label ?? pageCity}</h1>}
           artwork={
             artwork ? (
               <div className="qfc-hero-art" aria-hidden="true">
@@ -94,7 +119,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           }
         />
 
-        <section className="qfc-body" aria-label={`${category.name} in Pune`}>
+        <section className="qfc-body" aria-label={`${category.name} in ${pageCity}`}>
           <span className="qfd-glow qfd-glow--tr" aria-hidden="true" />
           <span className="qfd-glow qfd-glow--amber qfd-glow--bl" aria-hidden="true" />
 
@@ -150,7 +175,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
               </div>
 
               <div className="qfd-card qfc-rail-card">
-                <h2 className="qfd-h3">Other trades in Pune</h2>
+                <h2 className="qfd-h3">Other trades in {pageCity}</h2>
                 <p className="qfd-lede">
                   Only need one part of the job? The same matching rules apply on every one of these.
                 </p>
@@ -175,7 +200,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           <div className="qfd-wrap">
             <p className="qfd-kicker">Ready to start?</p>
             <h2 className="qfd-h1">Get matched with verified {category.name.toLowerCase()}.</h2>
-            <p className="qfd-lede">One free enquiry, up to 3 relevant businesses in Pune.</p>
+            <p className="qfd-lede">One free enquiry, up to 3 relevant businesses in {pageCity}.</p>
             <div className="qfc-cta-actions">
               <EnquiryModalTrigger
                 className="qfd-btn qfd-btn--primary qfd-btn--lg"

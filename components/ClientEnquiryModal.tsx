@@ -35,6 +35,8 @@ import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useAc
 import GooglePlaceAutocomplete from "@/components/location/GooglePlaceAutocomplete";
 import { isPlaceCompatibleWithSelectedCity } from "@/lib/google-maps/normalizePlace";
 import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
+import { useProjectLocation } from "@/components/location/ProjectLocationProvider";
+import { projectLocationToGooglePlace } from "@/lib/locations/projectLocation";
 
 // ---------------------------------------------------------------------------
 // "Requirement First" guided multi-step enquiry flow.
@@ -127,7 +129,7 @@ type RFState = {
   lng: number | null;
   shareConsent: boolean;
   // ── Phase 2: Google area enhancement (manual fallback preserved) ──────────
-  // Optional structured location captured from Google Places or browser GPS.
+  // Optional structured project location captured from an intentional Google Places selection.
   // These map to the Phase 1 optional CreateLeadInput fields; when empty they
   // are simply omitted from the payload, so the manual flow is unchanged.
   googlePlaceId: string;
@@ -137,7 +139,7 @@ type RFState = {
   sublocality: string;
   neighborhood: string;
   locationAccuracyMeters: number | null;
-  locationSource: "" | "manual" | "browser_gps" | "google_place" | "reverse_geocode";
+  locationSource: "" | "manual" | "google_place" | "reverse_geocode";
   locationCapturedAt: string;
 };
 
@@ -432,6 +434,11 @@ export function EnquiryModalTrigger({
 }
 
 export function EnquiryModalProvider({ children }: { children: ReactNode }) {
+  const {
+    location: globalProjectLocation,
+    setGoogleLocation: setGlobalProjectLocation,
+    clearLocation: clearGlobalProjectLocation,
+  } = useProjectLocation();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<RFState>(initialState);
@@ -445,7 +452,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   const [submitting, setSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const dialogRef = useRef<HTMLDivElement | null>(null);
-  const [locStatus, setLocStatus] = useState<"" | "locating" | "captured" | "denied" | "unsupported">("");
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   // First step the client may navigate back to. 0 for the normal flow; for a
   // resolved preferred-vendor flow it is the first step the client still has to
@@ -519,7 +525,11 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     // Option A: skip category/subcategory (and city, when the vendor prefills it)
     // for a resolved preferred-vendor flow — land on the first field the client
     // still has to complete (budget when city is known, else the city/area step).
-    const preselectedPlace = options.googlePlace;
+    const preselectedPlace =
+      options.googlePlace ??
+      (!options.area && globalProjectLocation
+        ? projectLocationToGooglePlace(globalProjectLocation)
+        : undefined);
     const preselectedCity = options.city ?? preselectedPlace?.city ?? "";
     const preselectedArea =
       options.area ?? preselectedPlace?.area ?? preselectedPlace?.formattedAddress ?? "";
@@ -532,7 +542,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setSuccessMessage("");
     setSubmitting(false);
     setShowConfirm(false);
-    setLocStatus("");
     setTouched({});
     setMinStep(preferredSelection ? startStep : 0);
     setStep(startStep);
@@ -574,7 +583,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       source: options.source ?? "Requirement flow",
       intent: isPreferred ? "preferred_vendor" : "general_auto_match",
     });
-  }, []);
+  }, [globalProjectLocation]);
 
   const contextValue = useMemo(() => ({ openModal }), [openModal]);
 
@@ -585,7 +594,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
     setSuccess(false);
     setSuccessMessage("");
     setSubmitting(false);
-    setLocStatus("");
     setTouched({});
     setStep(0);
     setMinStep(0);
@@ -786,53 +794,27 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
   // dependency of any effect. Assigned on every render; read only on Escape.
   requestCloseRef.current = requestClose;
 
-  // ── Phase 2: Area / Locality — Google area enhancement (manual fallback) ────
-  // Manual typing keeps the exact old behaviour (free-text area) and never
-  // leaves stale structured metadata that disagrees with the typed text.
-  //   CASE A (browser GPS captured): keep GPS lat/lng/accuracy/source/timestamp;
-  //           only refresh the area text (and clear any Google identity fields).
-  //   CASE B (previous Google place, or no GPS): clear ALL Google-derived data,
-  //           INCLUDING the now-stale locationCapturedAt, and mark source manual.
+  // Google Places is the only precise project-location capture path. Manual
+  // typing remains a safe fallback, but it clears ALL structured location
+  // evidence so stale coordinates can never follow newly typed text.
   function onAreaManualChange(value: string) {
-    // Clear any stale "select an area within <city>" mismatch banner the moment
-    // the client starts typing a manual area (this handler is only wired to the
-    // step-2 area field, so it never touches submission errors on other steps).
     setError("");
-    setForm((current) => {
-      const keepGpsCoords =
-        current.locationSource === "browser_gps" &&
-        current.lat != null &&
-        current.lng != null &&
-        Number.isFinite(current.lat) &&
-        Number.isFinite(current.lng);
-
-      const base = {
-        ...current,
-        area: value,
-        areaNormalized: value.trim().toLowerCase(),
-        // Google place identity never survives manual editing of the area text.
-        googlePlaceId: "",
-        googleCity: "",
-        formattedAddress: "",
-        sublocality: "",
-        neighborhood: "",
-      };
-
-      if (keepGpsCoords) {
-        // CASE A — GPS coords/source/accuracy/timestamp remain valid.
-        return base;
-      }
-
-      // CASE B — drop every Google-derived signal, including the stale timestamp.
-      return {
-        ...base,
-        lat: null,
-        lng: null,
-        locationAccuracyMeters: null,
-        locationSource: "manual",
-        locationCapturedAt: "",
-      };
-    });
+    setForm((current) => ({
+      ...current,
+      area: value,
+      areaNormalized: value.trim().toLowerCase(),
+      lat: null,
+      lng: null,
+      googlePlaceId: "",
+      googleCity: "",
+      formattedAddress: "",
+      sublocality: "",
+      neighborhood: "",
+      locationAccuracyMeters: null,
+      locationSource: "manual",
+      locationCapturedAt: "",
+    }));
+    if (globalProjectLocation) clearGlobalProjectLocation({ refresh: false });
     markTouched("area");
   }
 
@@ -857,17 +839,19 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       return; // keep the form exactly as-is; manual typing remains available
     }
     setError("");
+    const matchedCityRecord = place.city
+      ? activeCityRecords.find((record) =>
+          record.acceptedCityLabels.some(
+            (label) => label.toLowerCase() === place.city!.toLowerCase(),
+          ),
+        )
+      : undefined;
+    const globalCityRecord = selectedCityRecord ?? matchedCityRecord;
+
     setForm((current) => {
       // Only accept a place city that is one of the admin-managed active cities
-      // (case-insensitive), and store it in the canonical casing from that list.
-      const matchedCity = place.city
-        ? activeCityRecords.find((record) =>
-            record.acceptedCityLabels.some(
-              (label) => label.toLowerCase() === place.city!.toLowerCase(),
-            ),
-          )?.name
-        : undefined;
-      const nextCity = matchedCity ?? current.city;
+      // and store it in the canonical casing from that source of truth.
+      const nextCity = matchedCityRecord?.name ?? current.city;
       return {
         ...current,
         area: place.area ?? current.area,
@@ -883,40 +867,23 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
         areaNormalized: place.areaNormalized ?? (place.area ? place.area.toLowerCase() : ""),
         sublocality: place.sublocality ?? "",
         neighborhood: place.neighborhood ?? "",
-        locationAccuracyMeters: null, // a precise place is not a GPS accuracy radius
+        locationAccuracyMeters: null,
         locationSource: "google_place",
         locationCapturedAt: new Date().toISOString(),
       };
     });
+    if (
+      globalCityRecord &&
+      place.placeId &&
+      place.lat != null &&
+      place.lng != null
+    ) {
+      // Keep the site-wide project-location context in sync, but do not refresh
+      // while the enquiry modal is open.
+      setGlobalProjectLocation(place, globalCityRecord, { refresh: false });
+    }
     markTouched("area");
     markTouched("city");
-  }
-
-  function useMyLocation() {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setLocStatus("unsupported");
-      return;
-    }
-    setLocStatus("locating");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        // Keep existing behaviour (store lat/lng) and additionally tag the
-        // structured source + accuracy + timestamp. No reverse geocoding here.
-        setForm((current) => ({
-          ...current,
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          locationAccuracyMeters: Number.isFinite(pos.coords.accuracy)
-            ? pos.coords.accuracy
-            : current.locationAccuracyMeters,
-          locationSource: "browser_gps",
-          locationCapturedAt: new Date().toISOString(),
-        }));
-        setLocStatus("captured");
-      },
-      () => setLocStatus("denied"),
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
   }
 
   // Open-via-event bridge (used when a trigger renders outside the provider tree).
@@ -1044,7 +1011,6 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
       form.categoryLabel ? `Category: ${form.categoryLabel}` : "",
       form.subcategory ? `Service: ${form.subcategory}` : "",
       form.message.trim() ? `Notes: ${form.message.trim()}` : "",
-      form.lat != null && form.lng != null ? `GPS: ${form.lat.toFixed(5)}, ${form.lng.toFixed(5)}` : "",
     ].filter(Boolean);
 
     const budgetText = budgetSummary();
@@ -1322,23 +1288,12 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                   placeholder="Search building, society, street or area"
                   autoComplete="off"
                 />
-                <ValidationIcon state={form.googlePlaceId || (form.locationSource === "browser_gps" && form.lat != null && form.lng != null) ? "valid" : areaUi.showError ? "invalid" : "none"} />
+                <ValidationIcon state={form.googlePlaceId ? "valid" : areaUi.showError ? "invalid" : "none"} />
               </div>
               <small className="qf-sf-example">Pick a Google suggestion for precise matching. Manual entry remains available.</small>
               {areaUi.showError ? <span className="qf-rf-field-err">{areaUi.error}</span> : null}
             </label>
 
-            <div className="qf-sf-locrow qf-sf-field--full">
-              <button type="button" className="qf-sf-loc" onClick={useMyLocation}>
-                <QFIcon name="pin" />
-                {locStatus === "locating" ? "Getting location…" : "Use my current location"}
-              </button>
-              {locStatus === "captured" ? (
-                <p className="qf-sf-note qf-sf-note--ok">Location captured — we&apos;ll use this as one matching signal for eligible vendors.</p>
-              ) : null}
-              {locStatus === "denied" ? <p className="qf-sf-note">No problem — your city and area above are enough.</p> : null}
-              {locStatus === "unsupported" ? <p className="qf-sf-note">Your browser does not support location — your city and area are enough.</p> : null}
-            </div>
           </div>
         </section>
 

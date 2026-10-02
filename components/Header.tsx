@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 import { EnquiryModalTrigger } from "@/components/ClientEnquiryModal";
 import { Wordmark } from "@/components/Wordmark";
+import { useProjectLocation } from "@/components/location/ProjectLocationProvider";
 
 // Single source of truth for the unified public-site navigation.
 // Anchor links (e.g. /#categories) resolve to homepage sections; on other
@@ -23,6 +24,7 @@ export function Header() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeHref, setActiveHref] = useState("/");
+  const { location, hydrated: locationHydrated, openPicker } = useProjectLocation();
 
   /**
    * QF-UI-V2-14: Escape did not dismiss the mobile menu. This is a disclosure
@@ -145,7 +147,22 @@ export function Header() {
         </nav>
 
         <div className="qf-header-actions">
-          <span className="qf-location-pill"><QFIcon name="pin" /> Pune</span>
+          <button
+            type="button"
+            className="qf-location-pill qf-location-pill--button"
+            onClick={openPicker}
+            aria-label={location ? `Project location: ${location.label}, ${location.city}. Change location` : "Set project location"}
+          >
+            <QFIcon name="pin" />
+            <span>
+              {locationHydrated
+                ? location
+                  ? `${location.label}, ${location.city}`
+                  : "Set project location"
+                : "Project location"}
+            </span>
+            <small>{location ? "Change" : "Choose"}</small>
+          </button>
           <EnquiryModalTrigger className="qf-header-cta" source="Global public header">
             Get up to 3 matches
           </EnquiryModalTrigger>

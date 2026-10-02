@@ -54,11 +54,11 @@ type VendorRow = Record<string, unknown>;
 export type PublicVendorDiscoveryContext = {
   /** Canonical active city for the page. Defaults to Pune during the launch. */
   city?: string;
-  /** Client Google/GPS point. Used only for straight-line relevance ordering. */
+  /** Client-selected Google project point. Used only for straight-line relevance ordering. */
   latitude?: number | null;
   longitude?: number | null;
-  /** Optional canonical zone once the global location context resolves it. */
-  serviceZoneId?: string | null;
+  // Service-zone authority is deliberately NOT accepted from browser context.
+  // The server derives it from the admin-managed active-city record.
 };
 
 /** Category → neutral image tone used by the card when a vendor has no imagery. */
@@ -217,7 +217,7 @@ export async function getPublicVendorsForCategory(
 
     const scope = buildFairnessScope({
       city: activeCity.name,
-      service_zone_id: discovery.serviceZoneId ?? null,
+      service_zone_id: activeCity.serviceZoneId,
       category,
     });
     const fairness = await loadFairOpportunitySnapshots({

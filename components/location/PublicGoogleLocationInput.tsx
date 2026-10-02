@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import GooglePlaceAutocomplete from "@/components/location/GooglePlaceAutocomplete";
 import { useActiveCities } from "@/lib/locations/useActiveCities";
 import { isPlaceCompatibleWithSelectedCity } from "@/lib/google-maps/normalizePlace";
 import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
+import { useProjectLocation } from "@/components/location/ProjectLocationProvider";
+import { projectLocationToGooglePlace } from "@/lib/locations/projectLocation";
 
 export type PublicGoogleLocationInputProps = {
   city: string;
@@ -32,27 +34,61 @@ export function PublicGoogleLocationInput({
 }: PublicGoogleLocationInputProps) {
   const [value, setValue] = useState("");
   const [place, setPlace] = useState<NormalizedGooglePlace | null>(null);
+  const [selectionError, setSelectionError] = useState("");
   const { records } = useActiveCities();
+  const { location, setGoogleLocation, clearLocation } = useProjectLocation();
 
-  const acceptedLabels = useMemo(() => {
-    const record = records.find((item) => item.name.toLowerCase() === city.toLowerCase());
-    return record?.acceptedCityLabels ?? [city];
-  }, [records, city]);
+  // Every public project-location input reflects the same verified Google place,
+  // including when the user switches to another admin-enabled city.
+  useEffect(() => {
+    if (!location) return;
+    setValue(location.label);
+    setPlace(projectLocationToGooglePlace(location));
+  }, [location]);
+
+  const selectedCityRecord = place
+    ? records.find((record) =>
+        isPlaceCompatibleWithSelectedCity(
+          place,
+          record.name,
+          record.acceptedCityLabels?.length ? record.acceptedCityLabels : [record.name],
+        ),
+      )
+    : null;
 
   function handleManualChange(raw: string) {
     setValue(raw);
     setPlace(null);
+    setSelectionError("");
+    // A manual edit is not verified Google evidence. Drop any previously saved
+    // precise project point immediately so stale coordinates cannot survive.
+    if (location) clearLocation({ refresh: true });
   }
 
   function handlePlaceSelected(next: NormalizedGooglePlace) {
-    if (city && !isPlaceCompatibleWithSelectedCity(next, city, acceptedLabels)) {
-      // Keep the typed text as manual fallback, but never attach coordinates
-      // from a clearly different city to this city-specific public surface.
+    const cityRecord = records.find((record) =>
+      isPlaceCompatibleWithSelectedCity(
+        next,
+        record.name,
+        record.acceptedCityLabels?.length ? record.acceptedCityLabels : [record.name],
+      ),
+    );
+    if (!cityRecord) {
+      // A Google result gives us enough truth to know this location is outside
+      // the current marketplace. Do not degrade that known mismatch into a
+      // manual Pune/active-city lead.
       setPlace(null);
+      setValue("");
+      setSelectionError(
+        `QuickFurno isn't serving ${next.city?.trim() || "that city"} yet — choose an active city location.`,
+      );
+      if (location) clearLocation({ refresh: true });
       return;
     }
+    setSelectionError("");
     setPlace(next);
     setValue(next.area ?? next.formattedAddress ?? value);
+    setGoogleLocation(next, cityRecord, { refresh: true });
   }
 
   return (
@@ -60,16 +96,17 @@ export function PublicGoogleLocationInput({
       id={id}
       className={className}
       value={value}
-      city={city}
+      city={location?.city ?? city}
       mode="address"
       suggestionsPortal
-      placeholder={placeholder}
+      placeholder={selectionError || placeholder}
       aria-label={ariaLabel}
+      aria-invalid={selectionError ? true : undefined}
       autoComplete="off"
       onManualChange={handleManualChange}
       onPlaceSelected={handlePlaceSelected}
       data-quote-area=""
-      data-quote-city={city}
+      data-quote-city={selectedCityRecord?.name ?? location?.city ?? city}
       data-quote-place-id={place?.placeId ?? undefined}
       data-quote-google-city={place?.city ?? undefined}
       data-quote-formatted-address={place?.formattedAddress ?? undefined}

@@ -102,9 +102,10 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       portfolio_urls: input.portfolio_urls ?? [],
       gst_number: input.gst_number ?? null,
       message: input.message ?? null,
-      location_permission_status: input.location_permission_status ?? "not_requested",
-      latitude: input.latitude ?? null,
-      longitude: input.longitude ?? null,
+      // Device/browser coordinates are deliberately not accepted for new vendor
+      // registration. The Google-selected office/base point above is the only
+      // new vendor-coordinate authority. Legacy DB columns remain untouched for
+      // historical rows until location backfill retires them.
       // service_radius_km no longer hardcoded to 20 (Phase 1). Only written when
       // explicitly provided; otherwise the DB column default applies. Matching
       // does not use this value in Phase 1.

@@ -487,7 +487,7 @@ section('E. FALLBACK CONTRACT [pure + static]');
     outcome: outcome('no_geo_vendor'),
     leadCoordinateSource: 'lead_coordinates',
     leadHasValidCoordinate: true,
-    leadLocationSource: 'browser_gps',
+    leadLocationSource: 'google_place',
     leadGooglePlaceIdPresent: true,
     cityEligibleVendorCount: 5,
   });
@@ -636,7 +636,7 @@ section('G. MATCHING EVIDENCE [pure]');
     outcome: { status: 'shortlisted', entries: normalized, error_code: null },
     leadCoordinateSource: 'lead_coordinates',
     leadHasValidCoordinate: true,
-    leadLocationSource: 'browser_gps',
+    leadLocationSource: 'google_place',
     leadGooglePlaceIdPresent: true,
     cityEligibleVendorCount: 6,
   });
@@ -659,7 +659,7 @@ section('G. MATCHING EVIDENCE [pure]');
 
   check('G11 coordinate PROVENANCE is recorded, but never the lead coordinate itself',
     evidence.lead_coordinate_source === 'lead_coordinates'
-    && evidence.lead_location_source === 'browser_gps'
+    && evidence.lead_location_source === 'google_place'
     && evidence.lead_google_place_id_present === true
     && !Object.prototype.hasOwnProperty.call(evidence, 'lead_latitude')
     && !Object.prototype.hasOwnProperty.call(evidence, 'lead_longitude')

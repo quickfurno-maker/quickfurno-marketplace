@@ -7,7 +7,7 @@
 //   • Contact&Trust 20 / Location 20 / Requirement 30 / Intent 30 (max 100).
 //   • Email is NOT a scoring signal. Duplicate is a hard gate only (no
 //     not_duplicate reward, no fraud penalty).
-//   • Structured Google/GPS evidence feeds a SEPARATE location_confidence (0/4),
+//   • Structured Google Place evidence feeds a SEPARATE location_confidence (0/4),
 //     never total_score. location_consent is not a quality signal.
 //   • Genuine client detail (+5) and explicit intent (+7) require a provably
 //     client-authored field. The current backend contract has none (message is a
@@ -81,7 +81,7 @@ export type LeadQualityScoreResult = {
   intent_score: number;
   fraud_penalty: number;
   total_score: number;
-  // SEPARATE from total_score: 0 (manual) or 4 (trusted Google/GPS). Feeds Phase 2
+  // SEPARATE from total_score: 0 (manual) or 4 (trusted Google Place). Feeds Phase 2
   // distance-ranking confidence; never moves a lead across the quality threshold.
   location_confidence: number;
   score_class: LeadScoreClass;
@@ -128,14 +128,12 @@ export function calculateLeadQuality(input: LeadQualityInput): LeadQualityScoreR
   const validLat = typeof input.latitude === "number" && Number.isFinite(input.latitude);
   const validLng = typeof input.longitude === "number" && Number.isFinite(input.longitude);
   const locationSource = String(input.location_source ?? "").trim().toLowerCase();
-  const trustedLocationSource = locationSource === "google_place" || locationSource === "browser_gps";
+  const trustedLocationSource = locationSource === "google_place";
   const structuredLocationEvidence = Boolean(
-    firstText(input.google_place_id) ||
-      (validLat && validLng) ||
-      firstText(input.formatted_address) ||
-      firstText(input.sublocality) ||
-      firstText(input.neighborhood) ||
-      trustedLocationSource,
+    trustedLocationSource &&
+      firstText(input.google_place_id) &&
+      validLat &&
+      validLng,
   );
   const locationConfidence = structuredLocationEvidence ? 4 : 0;
 
@@ -230,7 +228,7 @@ export function calculateLeadQuality(input: LeadQualityInput): LeadQualityScoreR
       intent: intentReasons,
       location_confidence: {
         score: locationConfidence,
-        structured_google_gps_evidence: structuredLocationEvidence,
+        structured_google_place_evidence: structuredLocationEvidence,
       },
       budget_fit: {
         resolved_category: budgetFit.category,

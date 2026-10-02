@@ -257,7 +257,7 @@ function MatchReasonDetailsDrawer({
                       </div>
                       <p className="mt-1 text-xs text-slate-500">
                         {detail
-                          ? `Selected: ${detail.visibilityType} package · score ${detail.score} · ${formatNumber(detail.credits)} credits`
+                          ? `Selected: fair balance ${Number(detail.fair_share_balance ?? 0).toFixed(3)} · ${formatNumber(detail.delivered_7d ?? 0)} delivered/7d · ${formatNumber(detail.credits)} active credits`
                           : "Selected by matching run"}
                       </p>
                     </div>

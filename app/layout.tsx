@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Caveat, Poppins, Playfair_Display } from "next/font/google";
 import localFont from "next/font/local";
 import { EnquiryModalProvider } from "@/components/ClientEnquiryModal";
+import { ProjectLocationProvider } from "@/components/location/ProjectLocationProvider";
 import { ScrollProgress } from "@/components/ScrollProgress";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import "./globals.css";
@@ -113,7 +114,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ScrollProgress />
         <ScrollReveal />
-        <EnquiryModalProvider>{children}</EnquiryModalProvider>
+        <ProjectLocationProvider>
+          <EnquiryModalProvider>{children}</EnquiryModalProvider>
+        </ProjectLocationProvider>
       </body>
     </html>
   );

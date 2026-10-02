@@ -51,13 +51,10 @@ const STEP_NAMES = [
   "Business Identity",
   "Service Category",
   "City & Base Area",
-  "Location",
   "Business Strength",
   "Review",
 ];
-const LAST_STEP = 5;
-
-type LocStatus = "idle" | "requesting" | "granted" | "denied" | "unavailable";
+const LAST_STEP = 4;
 
 type WizardState = {
   businessName: string;
@@ -287,15 +284,6 @@ export function VendorRegisterForm({
   // Field wrappers registered for scroll-to-first-error on a failed Continue.
   const fieldRefs = useRef<Record<string, HTMLElement | null>>({});
 
-  // Location capture
-  const [loc, setLoc] = useState<{
-    status: LocStatus;
-    latitude: number | null;
-    longitude: number | null;
-    accuracy: number | null;
-    capturedAt: string | null;
-  }>({ status: "idle", latitude: null, longitude: null, accuracy: null, capturedAt: null });
-
   const bodyRef = useRef<HTMLDivElement>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
@@ -386,32 +374,6 @@ export function VendorRegisterForm({
     setTouched((prev) => ({ ...prev, baseArea: true }));
   }
 
-  function requestLocation() {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setLoc((s) => ({ ...s, status: "unavailable" }));
-      return;
-    }
-    setLoc((s) => ({ ...s, status: "requesting" }));
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLoc({
-          status: "granted",
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-          capturedAt: new Date().toISOString(),
-        });
-      },
-      (err) => {
-        setLoc((s) => ({
-          ...s,
-          status: err.code === err.PERMISSION_DENIED ? "denied" : "unavailable",
-        }));
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-    );
-  }
-
   type FieldError = { key: string; message: string };
 
   // Required-field check per step. Returns a human-readable reason per missing
@@ -453,7 +415,7 @@ export function VendorRegisterForm({
         }
         break;
       }
-      case 4:
+      case 3:
         // Interior categories require a valid per-sqft rate at/above the minimum.
         if (usesSqftRate && !rateValid)
           e.push({ key: "rate", message: `Minimum starting rate for this category is ₹${minRate}/sqft.` });
@@ -497,7 +459,7 @@ export function VendorRegisterForm({
         next.addressLine2 = true;
         next.landmark = true;
         next.state = true;
-      } else if (step === 4) {
+      } else if (step === 3) {
         next.rate = true;
       }
       return next;
@@ -568,22 +530,13 @@ export function VendorRegisterForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finalCategory]);
 
-  // Per spec: only granted / denied / not_requested. Any error (incl. unavailable)
-  // counts as denied; idle (button never clicked) is not_requested.
-  const locationPermissionStatus =
-    loc.status === "granted"
-      ? "granted"
-      : loc.status === "denied" || loc.status === "unavailable"
-        ? "denied"
-        : "not_requested";
-
   async function onSubmit() {
     if (busy) return;
     setError("");
 
     // Re-validate every step. If an earlier step is incomplete, send the vendor
     // back to it with the exact reason rather than failing silently at submit.
-    for (const s of [0, 1, 2, 4]) {
+    for (const s of [0, 1, 2, 3]) {
       if (stepErrors(s).length > 0) {
         setStep(s);
         setShowErrors(true);
@@ -662,10 +615,6 @@ export function VendorRegisterForm({
         area_normalized: f.baseAreaNormalized || undefined,
         sublocality: f.sublocality || undefined,
         neighborhood: f.neighborhood || undefined,
-        // Legacy fallback coordinates from optional browser GPS (Step 4).
-        location_permission_status: locationPermissionStatus,
-        latitude: loc.status === "granted" ? loc.latitude : null,
-        longitude: loc.status === "granted" ? loc.longitude : null,
         // Step 5 — business strength.
         business_type: f.businessType || undefined,
         team_size: f.teamSize || undefined,
@@ -814,7 +763,7 @@ export function VendorRegisterForm({
              client enquiry MODAL keeps its h3#qf-rf-title, because there it is
              the dialog's accessible name and a dialog starts its own context. */
           <div className="qf-rf-question">
-            <span className="qf-rf-qcount">Step 1 of 6</span>
+            <span className="qf-rf-qcount">Step 1 of 5</span>
             <h2>Tell us about your business</h2>
             <p className="qf-rf-qhint">These details help us create your vendor profile and dashboard access.</p>
             <div className="qf-rf-fields">
@@ -893,7 +842,7 @@ export function VendorRegisterForm({
       case 1:
         return (
           <div className="qf-rf-question">
-            <span className="qf-rf-qcount">Step 2 of 6</span>
+            <span className="qf-rf-qcount">Step 2 of 5</span>
             <h2>What do you specialise in?</h2>
             <p className="qf-rf-qhint">Choose the same category clients use to find vendors on QuickFurno.</p>
             <div className={`qf-rf-tiles${fieldError("category") ? " has-error" : ""}`} ref={bindField("category")}>
@@ -957,7 +906,7 @@ export function VendorRegisterForm({
       case 2:
         return (
           <div className="qf-rf-question">
-            <span className="qf-rf-qcount">Step 3 of 6</span>
+            <span className="qf-rf-qcount">Step 3 of 5</span>
             <h2>Where do you serve clients?</h2>
             <p className="qf-rf-qhint">Pick your city and your business base area. You can update this later from your dashboard.</p>
 
@@ -1117,52 +1066,9 @@ export function VendorRegisterForm({
       case 3:
         return (
           <div className="qf-rf-question">
-            <span className="qf-rf-qcount">Step 4 of 6</span>
-            <h2>Improve your client matching</h2>
-            <p className="qf-rf-qhint">
-              Sharing location helps QuickFurno match you with nearby client enquiries.
-            </p>
-
-            <div className="qf-vrf-loc-card">
-              <span className="qf-vrf-loc-icon">
-                <QFIcon name="pin" />
-              </span>
-              <div className="qf-vrf-loc-text">
-                <strong>Allow location for better matching</strong>
-                <small>Used only for matching — never shown publicly as exact GPS.</small>
-              </div>
-              <button
-                type="button"
-                className="qf-rf-btn qf-rf-btn--primary qf-rf-btn--full"
-                onClick={requestLocation}
-                disabled={loc.status === "requesting"}
-              >
-                {loc.status === "requesting"
-                  ? "Requesting location…"
-                  : loc.status === "granted"
-                    ? "Location captured ✓"
-                    : "Allow location for better matching"}
-              </button>
-            </div>
-
-            {loc.status === "granted" ? (
-              <p className="qf-rf-loc-note qf-rf-loc-note--ok">
-                Location captured — accuracy ~{loc.accuracy != null ? Math.round(loc.accuracy) : "—"} m.
-                We&apos;ll match you with nearby clients.
-              </p>
-            ) : (
-              <p className="qf-rf-loc-note">
-                Prefer not to share location? You can continue — your business base area is enough.
-              </p>
-            )}
-          </div>
-        );
-      case 4:
-        return (
-          <div className="qf-rf-question">
-            <span className="qf-rf-qcount">Step 5 of 6</span>
+            <span className="qf-rf-qcount">Step 4 of 5</span>
             <h2>Tell us your business strength</h2>
-            <p className="qf-rf-qhint">This helps us understand your capacity, experience, and project fit.</p>
+            <p className="qf-rf-qhint">These details appear in your business profile. They do not change your fair lead priority.</p>
 
             <ChipGroup label="Years of experience" options={EXPERIENCE_OPTIONS} value={f.yearsExperience} onPick={(v) => set("yearsExperience", v)} />
             <ChipGroup label="Team size" options={TEAM_OPTIONS} value={f.teamSize} onPick={(v) => set("teamSize", v)} />
@@ -1224,7 +1130,7 @@ export function VendorRegisterForm({
       default:
         return (
           <div className="qf-rf-question">
-            <span className="qf-rf-qcount">Step 6 of 6</span>
+            <span className="qf-rf-qcount">Step 5 of 5</span>
             <h2>Review your application</h2>
             <p className="qf-rf-qhint">
               Please check your details before submitting. Our team will verify your profile and
@@ -1254,7 +1160,6 @@ export function VendorRegisterForm({
               ) : null}
               {String(f.stateName ?? "").trim() ? <SummaryRow label="State" value={String(f.stateName ?? "").trim()} /> : null}
               <SummaryRow label="Base area" value={baseAreaValue || "—"} />
-              <SummaryRow label="Location" value={loc.status === "granted" ? "Shared" : "Not shared"} />
               {f.yearsExperience ? <SummaryRow label="Experience" value={f.yearsExperience} /> : null}
               {f.teamSize ? <SummaryRow label="Team size" value={f.teamSize} /> : null}
               {f.monthlyCapacity ? <SummaryRow label="Capacity" value={f.monthlyCapacity} /> : null}

@@ -69,7 +69,7 @@ export interface CreateLeadInput {
   latitude?: number | null;
   longitude?: number | null;
   location_accuracy_meters?: number | null;
-  location_source?: "manual" | "browser_gps" | "google_place" | "reverse_geocode" | string;
+  location_source?: "manual" | "google_place" | "reverse_geocode" | string;
   location_captured_at?: string;
   google_place_id?: string;
   google_city?: string;
@@ -121,20 +121,14 @@ export interface VendorRegistrationInput {
   gst_number?: string;
   message?: string;
   user_id?: string;
-  // Vendor base location (optional, browser GPS) — used later for nearest-client
-  // lead matching. All optional so registration still works without GPS.
-  base_latitude?: number;
-  base_longitude?: number;
-  location_accuracy_meters?: number;
-  location_source?: string;
-  location_captured_at?: string;
+  // New vendor location is intentionally Google office/base only. Legacy
+  // device-coordinate columns remain in the database for historical rows but
+  // are not part of the registration input contract.
   service_radius_km?: number;
   base_area?: string;
   // Guided onboarding wizard fields (stored once 009_vendor_onboarding.sql /
   // 010_vendor_exact_columns.sql run; registerVendor falls back gracefully if
   // the columns are missing).
-  latitude?: number | null;
-  longitude?: number | null;
   whatsapp_number?: string;
   selected_category?: string;
   selected_subcategories?: string[];
@@ -149,7 +143,6 @@ export interface VendorRegistrationInput {
   // legacy DB column is left in place; new onboarding no longer writes it.
   office_latitude?: number | null;
   office_longitude?: number | null;
-  location_permission_status?: string;
   business_type?: string;
   years_experience?: string;
   team_size?: string;

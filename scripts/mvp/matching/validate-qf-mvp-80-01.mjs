@@ -53,6 +53,7 @@ import {
   CANONICAL_LIFETIME_ASSIGNMENT_CAP,
   MAX_CANONICAL_CANDIDATE_POOL,
 } from '../../../lib/marketplace/canonicalAssignmentContract.ts';
+import { EXPECTED_LIVE_MIGRATION_COUNT } from '../staging/live-migration-ledger.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
@@ -98,18 +99,18 @@ const REASON = 'auto_assignment_off';
  * fails loudly rather than silently.
  */
 const GATE = 'const runtimeSettings = await loadMarketplaceRuntimeSettings();';
-const FIRST_ACTING_STEP = 'const evaluation = await evaluateVendorsForLead(leadRow);';
+const FIRST_ACTING_STEP = 'const evaluation = await evaluateVendorsForLead(leadRow, { recordFairOpportunityPool: true });';
 
+const OFF_BRANCH_END = 'if (asText(leadRow.location_verification_status) === "outside_service_area") {';
 const iGate = MATCHER.indexOf(GATE);
 const iEval = MATCHER.indexOf(FIRST_ACTING_STEP);
+const iOffEnd = MATCHER.indexOf(OFF_BRANCH_END);
 
 /**
- * The off branch, as source text: from the gate up to the first step that could
- * act. Anything dangerous inside this slice is a defect, and the slice is used
- * rather than the whole function so a legitimate downstream call is never
- * mistaken for one made while the switch is off.
+ * Exact kill-switch branch slice. It ends before the separate service-zone
+ * refusal, which is safe/non-acting but legitimately writes its own run record.
  */
-const OFF_BRANCH = iGate >= 0 && iEval > iGate ? MATCHER.slice(iGate, iEval) : '';
+const OFF_BRANCH = iGate >= 0 && iOffEnd > iGate ? MATCHER.slice(iGate, iOffEnd) : '';
 
 /**
  * The evidence block names its own STANDING NEGATIVES — `credits_debited: false`
@@ -203,7 +204,6 @@ section('C. PLACEMENT — the halt precedes EVERYTHING that could act [static]')
     duplicate: 'if (leadRow.is_duplicate) {',
     evaluate: FIRST_ACTING_STEP,
     geo: 'await fetchGeoVendorShortlist(leadRow)',
-    route: 'const routeOutcome = await measureLeadRouteTimes(',
     pool: 'const rankedPool = splitRankedPool(',
     authority: 'const assignment = await assignLeadToMatchedVendors(leadId, selectedVendorIds);',
     dashboard: 'await deliverLeadToVendorDashboard(leadId, vendor.vendor_id, vendor.assignment_id);',
@@ -227,8 +227,8 @@ section('C. PLACEMENT — the halt precedes EVERYTHING that could act [static]')
   check('C05 the gate runs BEFORE the 75.02 geo shortlist read',
     iGate >= 0 && idx.geo > iGate);
 
-  check('C06 the gate runs BEFORE the 75.03 route provider seam',
-    iGate >= 0 && idx.route > iGate);
+  check('C06 the removed Routes provider cannot bypass the gate because no route seam exists',
+    !/measureLeadRouteTimes|routeOutcome|reorderByGeoFrontier/.test(MATCHER));
 
   check('C07 the gate runs BEFORE the ranked candidate pool is built',
     iGate >= 0 && idx.pool > iGate);
@@ -335,12 +335,10 @@ section('E. NOT-OFF IS UNCHANGED — preview is NOT redefined [static]');
     && /candidate_order_is_binding: true/.test(MATCHER)
     && /ranked_candidate_order: selectedVendorIds/.test(MATCHER));
 
-  check('E05 the 75.02 / 75.03 / 75.04 seams are untouched by this phase',
+  check('E05 the straight-line geo evidence seam remains and the removed Routes seam stays absent',
     (MATCHER.match(/await fetchGeoVendorShortlist\(/g) || []).length === 1
     && /geo: geoEvidence,/.test(MATCHER)
-    && /route: routeEvidence,/.test(MATCHER)
-    && /geofair: geoFairEvidence,/.test(MATCHER)
-    && /reorderByGeoFrontier\(eligible, routeOutcome\.placements\)/.test(MATCHER));
+    && !/measureLeadRouteTimes|routeOutcome|routeEvidence|reorderByGeoFrontier/.test(MATCHER));
 
   check('E06 the cap-deferred evidence is still recorded on every terminal outcome',
     /cap_deferred_vendor_ids: classifyCapDeferred\(/.test(MATCHER)
@@ -410,13 +408,10 @@ section('G. MVP INVARIANTS UNCHANGED [pure] [static]');
     && /const MAX_ASSIGNMENT_CANDIDATE_POOL = MAX_CANONICAL_CANDIDATE_POOL;/.test(MATCHER)
     && /const MAX_VENDOR_MATCHES = 3;/.test(MATCHER));
 
-  // QF-MVP-50.6 RE-PIN: 102 -> 105. This pin had gone STALE on main: QF-MVP-80.14A
-  // (103), QF-MVP-82A-R0 (104) and now the 50.6 orphan cancellation authority (105) each
-  // added a migration without re-pinning it here, so this assertion was already failing on
-  // a clean tree before this phase. The guard's point is unchanged — THIS phase added no
-  // migration of its own — so the pin moves to the truthful live count. Still exact.
-  check('G05 QF-MVP-80.01 itself added NO migration — the repo set is 119',
-    readdirSync(path.join(ROOT, 'supabase', 'migrations')).filter((f) => f.endsWith('.sql')).length === 119);
+  // Migration governance is centralized in the explicit live-ledger helper.
+  // This remains exact equality: an unpinned migration still fails the guard.
+  check(`G05 the local migration set matches the governed live ledger (${EXPECTED_LIVE_MIGRATION_COUNT})`,
+    readdirSync(path.join(ROOT, 'supabase', 'migrations')).filter((f) => f.endsWith('.sql')).length === EXPECTED_LIVE_MIGRATION_COUNT);
 
   check('G06 the three migrations this phase rehearses exist on disk, unrenamed',
     ['20260814000000_qf_mvp_40_marketing_consent_writer.sql',
@@ -456,9 +451,12 @@ section('H. SECRET + ENVIRONMENT BOUNDARY [static]');
   const ownImports = (read('scripts/mvp/matching/validate-qf-mvp-80-01.mjs')
     .match(/^import[\s\S]*?from '[^']+';$/gm) || []).map((s) => s.match(/from '([^']+)';$/)[1]);
 
-  check('H04 this harness itself is offline: it imports only node builtins and ONE pure module',
+  check('H04 this harness itself is offline: imports are node builtins, pure contract, or source-only migration ledger',
     ownImports.length > 0
-    && ownImports.every((s) => s.startsWith('node:') || s === '../../../lib/marketplace/canonicalAssignmentContract.ts'),
+    && ownImports.every((s) =>
+      s.startsWith('node:')
+      || s === '../../../lib/marketplace/canonicalAssignmentContract.ts'
+      || s === '../staging/live-migration-ledger.mjs'),
     JSON.stringify(ownImports));
 }
 
@@ -490,14 +488,16 @@ section('I. MUTANTS — every check above is proved to bite [mutant]');
 
   mutant('03 adding a SECOND, contradicting mode branch is rejected',
     MATCHER_RAW,
-    (s) => s.replace('    const evaluation = await evaluateVendorsForLead(leadRow);',
-      '    if (runtimeSettings.auto_assignment_mode === "preview") { /* noop */ }\n    const evaluation = await evaluateVendorsForLead(leadRow);'),
+    (s) => s.replace(`    ${FIRST_ACTING_STEP}`,
+      '    if (runtimeSettings.auto_assignment_mode === "preview") { /* noop */ }\n'
+      + `    ${FIRST_ACTING_STEP}`),
     (s) => (stripTs(s).match(/runtimeSettings\.auto_assignment_mode/g) || []).length === 1);
 
   mutant('04 reading the settings TWICE per run is rejected',
     MATCHER_RAW,
-    (s) => s.replace('    const evaluation = await evaluateVendorsForLead(leadRow);',
-      '    const again = await loadMarketplaceRuntimeSettings();\n    const evaluation = await evaluateVendorsForLead(leadRow);'),
+    (s) => s.replace(`    ${FIRST_ACTING_STEP}`,
+      '    const again = await loadMarketplaceRuntimeSettings();\n'
+      + `    ${FIRST_ACTING_STEP}`),
     (s) => (stripTs(s).match(/await loadMarketplaceRuntimeSettings\(\)/g) || []).length === 1);
 
   // ---- placement -----------------------------------------------------------
@@ -556,8 +556,18 @@ section('I. MUTANTS — every check above is proved to bite [mutant]');
   const offSlice = (s) => {
     const t = stripTs(s);
     const g = t.indexOf(GATE);
-    const e = t.indexOf(FIRST_ACTING_STEP);
+    const e = t.indexOf(OFF_BRANCH_END, g);
     return g >= 0 && e > g ? t.slice(g, e) : '';
+  };
+
+  const replaceInOffBranch = (s, before, after) => {
+    const g = s.indexOf(GATE);
+    const e = s.indexOf(OFF_BRANCH_END, g);
+    if (g < 0 || e <= g) return s;
+    const branch = s.slice(g, e);
+    const changed = branch.replace(before, after);
+    if (changed === branch) return s;
+    return s.slice(0, g) + changed + s.slice(e);
   };
 
   /**
@@ -578,7 +588,7 @@ section('I. MUTANTS — every check above is proved to bite [mutant]');
 
   mutant('09 SKIPPING the matching-run evidence in the off branch is rejected',
     MATCHER_RAW,
-    (s) => s.replace(`      await updateMatchingRun(runId, {
+    (s) => replaceInOffBranch(s, `      await updateMatchingRun(runId, {
         run_status: "skipped",
         eligible_vendor_count: 0,`, `      await noopRun(runId, {
         run_status: "skipped",
@@ -592,9 +602,7 @@ section('I. MUTANTS — every check above is proved to bite [mutant]');
 
   mutant('11 recording a NON-terminal run status while off is rejected',
     MATCHER_RAW,
-    // The three-line anchor is unique to the off branch; the two-line prefix is
-    // shared with the consent refusal above.
-    (s) => s.replace(`        run_status: "skipped",
+    (s) => replaceInOffBranch(s, `        run_status: "skipped",
         eligible_vendor_count: 0,`, `        run_status: "started",
         eligible_vendor_count: 0,`),
     (s) => /run_status: "skipped",/.test(offSlice(s)));

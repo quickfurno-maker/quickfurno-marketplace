@@ -290,6 +290,95 @@
         "production": false
       },
       "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-02"
+    },
+    {
+      "version": "20261002071500",
+      "name": "vendor_fair_opportunity_distribution",
+      "filename": "20261002071500_vendor_fair_opportunity_distribution.sql",
+      "path": "supabase/migrations/20261002071500_vendor_fair_opportunity_distribution.sql",
+      "canonicalSha256": "fb11dd6a6c345d9e559dc62175bccdee8dfc74bf389725560827b03c80d3d2cd",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "observedStagingAppliedVersion": "20261002080447",
+      "stagingSemanticApplication": "EARLIER_DRAFT_RECONCILED_BY_20261002090000",
+      "stagingCanary": {
+        "draftRowsAfterCanaryCleanup": 0,
+        "draftFairnessRowsAfterCanaryCleanup": 0,
+        "draftEventsAfterCanaryCleanup": 0
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_SCHEMA_AUDIT_2026-10-02",
+      "reconciledBySourceVersion": "20261002090000",
+      "reconciliationEvidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_RECONCILIATION_2026-10-02"
+    },
+    {
+      "version": "20261002090000",
+      "name": "vendor_fair_opportunity_group_reconcile",
+      "filename": "20261002090000_vendor_fair_opportunity_group_reconcile.sql",
+      "path": "supabase/migrations/20261002090000_vendor_fair_opportunity_group_reconcile.sql",
+      "canonicalSha256": "11a9fff636f2d055571a69fd101d2db2664fcbe022950bb3d2be3ac9c33b21e9",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "stagingSemanticApplication": "PROVEN",
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_APPLY_ROLLBACK_CANARY_2026-10-02",
+      "observedStagingAppliedVersions": [
+        "20261002083321",
+        "20261002083346"
+      ],
+      "stagingApplyReplayCount": 2,
+      "stagingCanary": {
+        "mode": "ROLLBACK_ONLY",
+        "snapshot": "applied",
+        "snapshotReplay": "already_applied",
+        "consume": "applied",
+        "consumeReplay": "already_applied",
+        "comparableVendorCount": 3,
+        "fairSharePerDelivery": 0.333333,
+        "firstDeliveryBalances": {
+          "deliveredVendor": -0.666667,
+          "missedPeer1": 0.333333,
+          "missedPeer2": 0.333333,
+          "fartherBand": 0
+        },
+        "restore": "applied",
+        "restoreReplay": "already_applied",
+        "restoredBalances": {
+          "deliveredVendor": 0,
+          "missedPeer1": 0,
+          "missedPeer2": 0,
+          "fartherBand": 0
+        },
+        "rowsAfterRollback": {
+          "opportunities": 0,
+          "candidates": 0,
+          "fairness": 0,
+          "events": 0
+        },
+        "legacyAccrualServiceRoleExecute": false,
+        "browserConsumeExecute": false,
+        "serviceConsumeExecute": true
+      }
+    },
+    {
+      "version": "20261002091500",
+      "name": "vendor_fair_opportunity_fk_indexes",
+      "filename": "20261002091500_vendor_fair_opportunity_fk_indexes.sql",
+      "path": "supabase/migrations/20261002091500_vendor_fair_opportunity_fk_indexes.sql",
+      "canonicalSha256": "6df7696af347570441cbba228d13270827bb2fbb194d378f2bca5d6ee3bd8aa7",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "stagingSemanticApplication": "PROVEN",
+      "observedStagingAppliedVersions": [
+        "20261002083936",
+        "20261002085216"
+      ],
+      "stagingApplyReplayCount": 2,
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_INDEX_APPLY_2026-10-02"
     }
   ],
   "supersededLegacyPins": [

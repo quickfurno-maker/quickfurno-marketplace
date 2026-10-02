@@ -670,7 +670,7 @@ function validateState(state) {
     extension?.evidenceProjects?.staging?.projectRef === "uckafzuochmbvtiodmcl" &&
     extension?.evidenceProjects?.production?.projectRef === "yqpgcsduqbxulrlzwzap");
   check("post-G1 extension records are unique, exact and hash-pinned",
-    extensionRecords.length === 23 &&
+    extensionRecords.length === 26 &&
     new Set(extensionRecords.map((record) => record.version)).size === extensionRecords.length &&
     extensionRecords.every((record) => {
       const local = localByVersion.get(record.version);
@@ -694,6 +694,47 @@ function validateState(state) {
             record.evidence === "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-02" &&
             record.exactVersionPresence?.staging === true &&
             record.exactVersionPresence?.production === false
+          ) ||
+          (
+            record.version === "20261002071500" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_SCHEMA_AUDIT_2026-10-02" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.observedStagingAppliedVersion === "20261002080447" &&
+            record.stagingSemanticApplication === "EARLIER_DRAFT_RECONCILED_BY_20261002090000" &&
+            record.reconciledBySourceVersion === "20261002090000" &&
+            record.reconciliationEvidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_RECONCILIATION_2026-10-02"
+          ) ||
+          (
+            record.version === "20261002090000" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_APPLY_ROLLBACK_CANARY_2026-10-02" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            Array.isArray(record.observedStagingAppliedVersions) &&
+            JSON.stringify(record.observedStagingAppliedVersions) === JSON.stringify(["20261002083321","20261002083346"]) &&
+            record.stagingApplyReplayCount === 2 &&
+            record.stagingCanary?.mode === "ROLLBACK_ONLY" &&
+            record.stagingCanary?.comparableVendorCount === 3 &&
+            record.stagingCanary?.fairSharePerDelivery === 0.333333 &&
+            record.stagingCanary?.firstDeliveryBalances?.deliveredVendor === -0.666667 &&
+            record.stagingCanary?.firstDeliveryBalances?.missedPeer1 === 0.333333 &&
+            record.stagingCanary?.firstDeliveryBalances?.missedPeer2 === 0.333333 &&
+            record.stagingCanary?.firstDeliveryBalances?.fartherBand === 0 &&
+            record.stagingCanary?.rowsAfterRollback?.events === 0 &&
+            record.stagingCanary?.legacyAccrualServiceRoleExecute === false &&
+            record.stagingCanary?.browserConsumeExecute === false &&
+            record.stagingCanary?.serviceConsumeExecute === true
+          ) ||
+          (
+            record.version === "20261002091500" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_INDEX_APPLY_2026-10-02" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            Array.isArray(record.observedStagingAppliedVersions) &&
+            JSON.stringify(record.observedStagingAppliedVersions) === JSON.stringify(["20261002083936","20261002085216"]) &&
+            record.stagingApplyReplayCount === 2
           ) ||
           (
             allowedSourcePin !== undefined &&

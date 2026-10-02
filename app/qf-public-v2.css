@@ -1545,3 +1545,212 @@
     font-size: 10px;
   }
 }
+
+/* ==========================================================================
+   Global Google project location
+   ========================================================================== */
+.qf-site-header .qf-location-pill--button {
+  max-width: 260px;
+  appearance: none;
+  cursor: pointer;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.qf-site-header .qf-location-pill--button > span {
+  min-width: 0;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qf-site-header .qf-location-pill--button > small {
+  color: #9a3d16;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .01em;
+}
+
+.qf-site-header .qf-location-pill--button:hover,
+.qf-site-header .qf-location-pill--button:focus-visible {
+  border-color: #d5b9a5;
+  background: #fff8f2;
+}
+
+.qf-project-location-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1900;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(24, 18, 14, .48);
+  backdrop-filter: blur(8px);
+}
+
+.qf-project-location-dialog {
+  position: relative;
+  width: min(100%, 520px);
+  padding: 30px;
+  border: 1px solid #eadfd2;
+  border-radius: 22px;
+  background: #fffdfa;
+  color: #171512;
+  box-shadow: 0 28px 80px -24px rgba(31, 24, 17, .55);
+}
+
+.qf-project-location-dialog h2 {
+  margin: 12px 0 7px;
+  font-size: clamp(1.45rem, 4vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -.025em;
+}
+
+.qf-project-location-dialog > p {
+  margin: 0;
+  color: #696057;
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+.qf-project-location-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #eadfd2;
+  border-radius: 999px;
+  background: #fff;
+  color: #544c44;
+  cursor: pointer;
+  font-size: 21px;
+  line-height: 1;
+}
+
+.qf-project-location-icon {
+  display: inline-grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 13px;
+  background: #fff1e8;
+  color: #c94a16;
+}
+
+.qf-project-location-icon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.qf-project-location-field {
+  position: relative;
+  margin-top: 20px;
+}
+
+.qf-project-location-field .qf-place-wrap,
+.qf-project-location-field input {
+  width: 100%;
+}
+
+.qf-project-location-field input {
+  min-height: 50px;
+  padding: 0 15px;
+  border: 1px solid #ddcfc2;
+  border-radius: 12px;
+  background: #fff;
+  color: #171512;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+.qf-project-location-field input:focus {
+  border-color: #c94a16;
+  box-shadow: 0 0 0 3px rgba(201, 74, 22, .10);
+}
+
+.qf-project-location-error {
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: #fff0ed;
+  color: #a4311c;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.qf-project-location-current {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 11px 12px;
+  border: 1px solid #eadfd2;
+  border-radius: 11px;
+  background: #fffaf5;
+}
+
+.qf-project-location-current > span {
+  grid-column: 1;
+  color: #7b7168;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.qf-project-location-current > strong {
+  grid-column: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.qf-project-location-current > button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  border: 0;
+  background: transparent;
+  color: #a43c14;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.qf-project-location-dialog > small {
+  display: block;
+  margin-top: 14px;
+  color: #81776e;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+@media (max-width: 879px) {
+  .qf-site-header .qf-location-pill--button {
+    max-width: 58px;
+    justify-content: center;
+  }
+
+  .qf-site-header .qf-location-pill--button > span,
+  .qf-site-header .qf-location-pill--button > small {
+    display: none;
+  }
+
+  .qf-project-location-overlay {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .qf-project-location-dialog {
+    width: 100%;
+    padding: 26px 18px 20px;
+    border-radius: 20px 20px 14px 14px;
+  }
+}

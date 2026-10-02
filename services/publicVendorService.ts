@@ -34,6 +34,12 @@ import {
 } from "@/lib/lead-assignment/runtimeSettings";
 import { getVendorPublicVisibility } from "@/lib/vendors/vendorVisibility";
 import { normalizeStatus } from "@/lib/vendors/vendorEligibility";
+import { evaluateVendorAutomaticLeadEligibility } from "@/lib/vendors/vendorAutomaticEligibility";
+import { resolveVendorCanonicalCoordinate } from "@/lib/geo/canonicalCoordinate";
+import { haversineKm, isValidCoordinate } from "@/lib/geo/distance";
+import { buildFairnessScope, clampFairnessBalance } from "@/lib/matchcore/fairOpportunity";
+import { orderPublicVendorCandidates } from "@/lib/marketplace/publicVendorFairOrdering";
+import { loadFairOpportunitySnapshots } from "@/services/vendorFairOpportunityService";
 import { type QuickFurnoCategory, type Vendor } from "@/lib/quickfurno-data";
 import { normalizeLocalities } from "@/lib/locality";
 import { getActiveCities, type ActiveCity } from "@/lib/locations/cityService";
@@ -44,6 +50,16 @@ import {
 } from "@/services/vendorReviewService";
 
 type VendorRow = Record<string, unknown>;
+
+export type PublicVendorDiscoveryContext = {
+  /** Canonical active city for the page. Defaults to Pune during the launch. */
+  city?: string;
+  /** Client-selected Google project point. Used only for straight-line relevance ordering. */
+  latitude?: number | null;
+  longitude?: number | null;
+  // Service-zone authority is deliberately NOT accepted from browser context.
+  // The server derives it from the admin-managed active-city record.
+};
 
 /** Category → neutral image tone used by the card when a vendor has no imagery. */
 const IMAGE_TONE_BY_CATEGORY: Record<QuickFurnoCategory, string> = {
@@ -150,54 +166,161 @@ const CATEGORY_RESOLUTION_PRIORITY: QuickFurnoCategory[] = [
 export async function getPublicVendorsForCategory(
   category: QuickFurnoCategory,
   settings?: MarketplaceRuntimeSettings,
+  discovery: PublicVendorDiscoveryContext = {},
 ): Promise<Vendor[] | null> {
   try {
     const runtimeSettings = settings ?? (await loadMarketplaceRuntimeSettings());
     const activeCities = await getActiveCities();
     if (activeCities.length === 0) return [];
 
+    const requestedCity = discovery.city?.trim() || "Pune";
+    const activeCity = activeCities.find(
+      (city) =>
+        normalizeText(city.name) === normalizeText(requestedCity) ||
+        normalizeText(city.slug) === normalizeText(requestedCity),
+    );
+    if (!activeCity) return [];
+
     const { data, error } = await adminClient()
       .from("vendors")
       .select("*")
-      .order("rating", { ascending: false })
       .limit(500);
 
     if (error || !Array.isArray(data)) {
-      console.warn("[public vendors] vendors table unavailable; falling back to static", {
+      console.warn("[public vendors] vendors table unavailable", {
         message: error?.message,
       });
       return null;
     }
 
-    const rows = (data as VendorRow[]).filter((row) => Boolean(normalizeCity(row, activeCities)));
+    const rows = (data as VendorRow[]).filter(
+      (row) => normalizeCity(row, activeCities) === activeCity.name,
+    );
     const candidates = rows
       .filter((row) => matchesPublicCategory(row, category))
       .flatMap((row) => {
         const visibility = getVendorPublicVisibility(row, runtimeSettings);
-        return visibility.isPubliclyVisible ? [{ row, visibilityType: visibility.visibilityType }] : [];
+        return visibility.isPubliclyVisible
+          ? [{ row, visibilityType: visibility.visibilityType }]
+          : [];
       });
-    const reviewStats = await getApprovedReviewStatsForVendors(
-      candidates.map(({ row }) => asText(row.id)).filter((id): id is string => Boolean(id)),
-    );
-    const mapped = candidates.flatMap(({ row, visibilityType }) => {
-      const id = asText(row.id);
-      const stats = id ? reviewStats.get(id) : undefined;
-      const vendor = mapToPublicVendor(row, category, visibilityType, activeCities, stats ? { ...stats, reviews: [] } : undefined);
-      return vendor ? [vendor] : [];
+
+    if (candidates.length === 0) return [];
+
+    // Public discovery may READ the same fairness state as automatic matching,
+    // but page views never create a fairness event and never mutate credits.
+    const nowMs = Date.now();
+    const assignmentEligibleIds = candidates
+      .filter(({ row }) => evaluateVendorAutomaticLeadEligibility(row, { nowMs }).eligible)
+      .map(({ row }) => asText(row.id))
+      .filter((id): id is string => Boolean(id));
+
+    const scope = buildFairnessScope({
+      city: activeCity.name,
+      service_zone_id: activeCity.serviceZoneId,
+      category,
+    });
+    const fairness = await loadFairOpportunitySnapshots({
+      scopeKey: scope.scopeKey,
+      vendorIds: assignmentEligibleIds,
     });
 
-    // Temporary safe debug aid (no phone/email/secrets/private notes).
-    console.info("[public vendors] category match", {
+    const clientHasCoordinates = isValidCoordinate(
+      discovery.latitude,
+      discovery.longitude,
+    );
+
+    const rankedInputs = candidates.flatMap(({ row }) => {
+      const id = asText(row.id);
+      if (!id) return [];
+      const eligibility = evaluateVendorAutomaticLeadEligibility(row, { nowMs });
+      const coordinate = resolveVendorCanonicalCoordinate(row);
+      const hasCoordinates = coordinate.source !== "none";
+      const distanceKm =
+        clientHasCoordinates && hasCoordinates
+          ? haversineKm(
+              discovery.latitude,
+              discovery.longitude,
+              coordinate.latitude,
+              coordinate.longitude,
+            )
+          : null;
+      const fair = eligibility.eligible ? fairness.snapshots.get(id) : undefined;
+      const lastDeliveredAt = fair?.ledger_present
+        ? fair.last_delivered_at
+        : asText(row.last_delivered_at);
+
+      return [{
+        vendor_id: id,
+        assignment_eligible: eligibility.eligible,
+        has_coordinates: hasCoordinates,
+        distance_km: distanceKm,
+        fair_share_balance: eligibility.eligible
+          ? clampFairnessBalance(fair?.fair_share_balance ?? 0)
+          : 0,
+        delivered_7d: eligibility.eligible ? fair?.delivered_7d ?? 0 : 0,
+        last_delivered_at: eligibility.eligible ? lastDeliveredAt : null,
+      }];
+    });
+
+    const orderedRank = orderPublicVendorCandidates(
+      rankedInputs,
+      clientHasCoordinates,
+    );
+    const rankById = new Map(orderedRank.map((item, index) => [
+      item.vendor_id,
+      { ...item, index },
+    ]));
+    const candidateById = new Map(
+      candidates
+        .map((candidate) => [asText(candidate.row.id), candidate] as const)
+        .filter((entry): entry is readonly [string, typeof candidates[number]] => Boolean(entry[0])),
+    );
+
+    const orderedCandidates = orderedRank.flatMap((rank) => {
+      const candidate = candidateById.get(rank.vendor_id);
+      return candidate ? [{ ...candidate, rank }] : [];
+    });
+
+    const reviewStats = await getApprovedReviewStatsForVendors(
+      orderedCandidates.map(({ rank }) => rank.vendor_id),
+    );
+    const mapped = orderedCandidates.flatMap(({ row, visibilityType, rank }) => {
+      const stats = reviewStats.get(rank.vendor_id);
+      const vendor = mapToPublicVendor(
+        row,
+        category,
+        visibilityType,
+        activeCities,
+        stats ? { ...stats, reviews: [] } : undefined,
+      );
+      return vendor
+        ? [{
+            ...vendor,
+            distanceKm: rank.distance_km,
+            leadEligible: rank.assignment_eligible,
+          }]
+        : [];
+    });
+
+    console.info("[public vendors] fair category order", {
       category,
+      city: activeCity.name,
       totalFetched: rows.length,
       visibleCount: mapped.length,
-      showFreeVendorsPublicly: runtimeSettings.show_free_vendors_publicly,
-      sampleServices: rows.slice(0, 5).map((row) => row.service_categories),
+      leadEligibleCount: assignmentEligibleIds.length,
+      clientHasCoordinates,
+      fairnessScopeKey: scope.scopeKey,
+      fairnessLedgerAvailable: fairness.ledgerAvailable,
+      // IDs only — no client PII and no private vendor contact fields.
+      orderedVendorIds: orderedRank.map((item) => item.vendor_id),
+      // Keep the lookup referenced for debug parity without exposing balances.
+      orderCount: rankById.size,
     });
 
     return mapped;
   } catch (error) {
-    console.warn("[public vendors] unexpected error; falling back to static", {
+    console.warn("[public vendors] unexpected error", {
       message: error instanceof Error ? error.message : "Unknown error",
     });
     return null;

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { submitLead } from "@/app/actions";
@@ -8,6 +8,8 @@ import { useActiveCities, NO_ACTIVE_CITIES_MESSAGE } from "@/lib/locations/useAc
 import GooglePlaceAutocomplete from "@/components/location/GooglePlaceAutocomplete";
 import { isPlaceCompatibleWithSelectedCity } from "@/lib/google-maps/normalizePlace";
 import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
+import { useProjectLocation } from "@/components/location/ProjectLocationProvider";
+import { projectLocationToGooglePlace } from "@/lib/locations/projectLocation";
 
 export function HomeEnquiryForm({ defaultService }: { defaultService?: string }) {
   const inferredService =
@@ -21,6 +23,11 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
 
   // Phase 14B: cities come only from admin-managed active cities.
   const { cities: activeCities, records: activeCityRecords, loading: citiesLoading } = useActiveCities();
+  const {
+    location: globalProjectLocation,
+    setGoogleLocation: setGlobalProjectLocation,
+    clearLocation: clearGlobalProjectLocation,
+  } = useProjectLocation();
 
   const [f, setF] = useState({
     name: "", phone: "", city: "", area: "",
@@ -32,11 +39,13 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
 
   function setCity(value: string) {
     setGooglePlace(null);
-    setF((current) => ({ ...current, city: value }));
+    if (globalProjectLocation) clearGlobalProjectLocation({ refresh: false });
+    setF((current) => ({ ...current, city: value, area: "" }));
   }
 
   function setAreaManual(value: string) {
     setGooglePlace(null);
+    if (globalProjectLocation) clearGlobalProjectLocation({ refresh: false });
     setF((current) => ({ ...current, area: value }));
   }
 
@@ -55,14 +64,42 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
       ...current,
       area: place.area ?? place.formattedAddress ?? current.area,
     }));
+    if (
+      cityRecord &&
+      place.placeId &&
+      place.lat != null &&
+      place.lng != null
+    ) {
+      setGlobalProjectLocation(place, cityRecord, { refresh: false });
+    }
   }
 
-  // Default to the first active city once the list loads; keep the user's pick
-  // if it is still active.
+  // Prefer the globally selected Google project location. If none exists,
+  // preserve the legacy first-active-city fallback.
   useEffect(() => {
     if (!activeCities.length) return;
-    setF((s) => (activeCities.includes(s.city) ? s : { ...s, city: activeCities[0] }));
-  }, [activeCities]);
+    if (
+      globalProjectLocation &&
+      activeCities.some(
+        (city) => city.toLowerCase() === globalProjectLocation.city.toLowerCase(),
+      )
+    ) {
+      setGooglePlace(projectLocationToGooglePlace(globalProjectLocation));
+      setF((current) => ({
+        ...current,
+        city: globalProjectLocation.city,
+        area: globalProjectLocation.label,
+      }));
+      return;
+    }
+    if (!globalProjectLocation) {
+      setF((current) =>
+        activeCities.includes(current.city)
+          ? current
+          : { ...current, city: activeCities[0] },
+      );
+    }
+  }, [activeCities, globalProjectLocation]);
 
   async function onSubmit() {
     if (busy) return;
@@ -131,7 +168,7 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
   if (done) {
     return (
       <div className="panel p-8 text-center">
-        <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-gold/50 bg-gold/15 text-gold">✓</div>
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-gold/50 bg-gold/15 text-gold">âœ“</div>
         <h3 className="mt-5 text-2xl text-ivory">Thank you!</h3>
         <p className="mx-auto mt-3 max-w-md font-sans text-sm text-muted">
           Your enquiry is captured. We&apos;ll complete any missing project details on WhatsApp before matching you with suitable professionals.
@@ -143,7 +180,7 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
   return (
     <div className="panel p-6 md:p-7">
       <h3 className="font-display text-xl text-ivory">Get free quotes</h3>
-      <p className="mt-1 font-sans text-sm text-muted">One requirement → up to 3 verified pros. No charge, no spam.</p>
+      <p className="mt-1 font-sans text-sm text-muted">One requirement â†’ up to 3 verified pros. No charge, no spam.</p>
 
       {error && <p className="mt-4 rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 font-sans text-sm text-red-200">{error}</p>}
 
@@ -151,7 +188,7 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
         <L label="Full name"><input className="field" value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="Your name" /></L>
         <L label="WhatsApp number"><input className="field" value={f.phone} onChange={(e) => set("phone", e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" maxLength={10} placeholder="10-digit WhatsApp number" /></L>
         {activeCities.length === 1 ? null : (
-          <L label="City"><select className="field" value={f.city} onChange={(e) => setCity(e.target.value)} disabled={activeCities.length === 0}>{activeCities.length === 0 ? <option value="" className="bg-navy-deep">{citiesLoading ? "Loading cities…" : NO_ACTIVE_CITIES_MESSAGE}</option> : activeCities.map((c) => <option key={c} className="bg-navy-deep">{c}</option>)}</select></L>
+          <L label="City"><select className="field" value={f.city} onChange={(e) => setCity(e.target.value)} disabled={activeCities.length === 0}>{activeCities.length === 0 ? <option value="" className="bg-navy-deep">{citiesLoading ? "Loading citiesâ€¦" : NO_ACTIVE_CITIES_MESSAGE}</option> : activeCities.map((c) => <option key={c} className="bg-navy-deep">{c}</option>)}</select></L>
         )}
         <L label="Area / locality">
           <GooglePlaceAutocomplete
@@ -186,7 +223,7 @@ export function HomeEnquiryForm({ defaultService }: { defaultService?: string })
       </label>
 
       <button onClick={onSubmit} disabled={busy} className="btn-gold mt-5 w-full">
-        {busy ? "Sending…" : "Get Free Quotes"}
+        {busy ? "Sendingâ€¦" : "Get Free Quotes"}
       </button>
       <p className="mt-3 font-sans text-xs text-muted/70">Your number is shared only with matched professionals. Never sold.</p>
     </div>

@@ -487,7 +487,7 @@ section('E. FALLBACK CONTRACT [pure + static]');
     outcome: outcome('no_geo_vendor'),
     leadCoordinateSource: 'lead_coordinates',
     leadHasValidCoordinate: true,
-    leadLocationSource: 'browser_gps',
+    leadLocationSource: 'google_place',
     leadGooglePlaceIdPresent: true,
     cityEligibleVendorCount: 5,
   });
@@ -544,7 +544,7 @@ section('E. FALLBACK CONTRACT [pure + static]');
 section('F. SHORTLIST NEVER NARROWS THE CANDIDATE POOL [static]');
 // ===========================================================================
 {
-  const iEval = MATCHER.indexOf('const evaluation = await evaluateVendorsForLead(leadRow);');
+  const iEval = MATCHER.indexOf('const evaluation = await evaluateVendorsForLead(leadRow, { recordFairOpportunityPool: true });');
   const iGeo = MATCHER.indexOf('await fetchGeoVendorShortlist(leadRow)');
   const iPool = MATCHER.indexOf('const rankedPool = splitRankedPool(');
 
@@ -636,7 +636,7 @@ section('G. MATCHING EVIDENCE [pure]');
     outcome: { status: 'shortlisted', entries: normalized, error_code: null },
     leadCoordinateSource: 'lead_coordinates',
     leadHasValidCoordinate: true,
-    leadLocationSource: 'browser_gps',
+    leadLocationSource: 'google_place',
     leadGooglePlaceIdPresent: true,
     cityEligibleVendorCount: 6,
   });
@@ -659,7 +659,7 @@ section('G. MATCHING EVIDENCE [pure]');
 
   check('G11 coordinate PROVENANCE is recorded, but never the lead coordinate itself',
     evidence.lead_coordinate_source === 'lead_coordinates'
-    && evidence.lead_location_source === 'browser_gps'
+    && evidence.lead_location_source === 'google_place'
     && evidence.lead_google_place_id_present === true
     && !Object.prototype.hasOwnProperty.call(evidence, 'lead_latitude')
     && !Object.prototype.hasOwnProperty.call(evidence, 'lead_longitude')
@@ -732,8 +732,10 @@ section('H. MATCHCORE PRESERVATION [pure + static]');
     && /if \(tierResult === null\) reasons\.push\("category_mismatch"\);/.test(MATCHER)
     && /evaluateVendorAutomaticLeadEligibility\(vendor, \{ nowMs \}\)/.test(MATCHER));
 
-  check('H09 the matcher still takes exactly ONE clock read per ranking run',
-    (MATCHER.match(/const nowMs = Date\.now\(\);/g) || []).length === 1);
+  check('H09 the matcher still uses exactly one clock source and injects one instant into the real run',
+    (MATCHER.match(/Date\.now\(\)/g) || []).length === 1
+    && /const nowMs = readMatchingClock\(\);/.test(MATCHER)
+    && (MATCHER.match(/,\s*nowMs,\s*\);/g) || []).length >= 2);
 
   check('H10 the comparator is still the shared MatchCore contract, unchanged by this phase',
     /eligible\.sort\(\(a, b\) => compareAutomaticMatchDecisions\(a\.__decision, b\.__decision, leadHasCoords\)\);/.test(MATCHER));
@@ -1089,8 +1091,8 @@ section('MUTATION REJECTION — TypeScript seam');
       s.replace('if (!cityMatches(vendor, lead)) reasons.push("city_mismatch");', ''),
       (s) => /if \(!cityMatches\(vendor, lead\)\) reasons\.push\("city_mismatch"\);/.test(stripTs(s))],
 
-    ['the single clock read per run duplicated', (s) =>
-      s.replace('  const nowMs = Date.now();', '  const nowMs = Date.now();\n  const nowMs2 = Date.now();'),
+    ['the single clock source duplicated', (s) =>
+      s.replace('  return Date.now();', '  return Date.now() + Date.now();'),
       (s) => (stripTs(s).match(/Date\.now\(\)/g) || []).length === 1],
 
     ['MatchCore re-ranked on the PostGIS distance instead of its own haversine', (s) =>

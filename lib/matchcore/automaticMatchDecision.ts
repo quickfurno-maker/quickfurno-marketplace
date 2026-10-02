@@ -34,12 +34,13 @@
 //   It is NOT primary/reserve. The ranked pool is a single ordered candidate
 //   list; there is no reserve role, no promotion and no lifecycle here.
 // ============================================================================
+import { clampFairnessBalance, distanceBand } from "./fairOpportunity";
 
 /**
  * Contract version for the automatic MatchCore decision record. Bump only when
  * the DECISION SHAPE changes in a way a reader must notice.
  */
-export const MATCHCORE_AUTOMATIC_CONTRACT_VERSION = 1;
+export const MATCHCORE_AUTOMATIC_CONTRACT_VERSION = 2;
 
 /**
  * Mirror of the `v` field in the authority's SHA-256 `request_fingerprint`
@@ -119,9 +120,20 @@ export interface AutomaticMatchDecision {
   distance_km: number | null;
   /** 1 = listed area, 0.5 = covers_full_city, 0 = neither. Ranking only. */
   area_affinity: number;
-  /** ISO timestamp of the vendor's last assignment debit, or null. Fairness. */
+  /**
+   * Historical compatibility field. The live matcher now populates this from
+   * provider-confirmed delivery time; assignment creation alone is not fairness.
+   */
   last_assigned_at: string | null;
-  /** Existing fallback tiebreaker only. NOT a quality model (see 75.00 audit). */
+  /** Explicit provider-confirmed delivery timestamp for fair-turn ordering. */
+  last_delivered_at?: string | null;
+  /** Broad direct-line relevance band: 0 <=3km, 1 <=7km, 2 <=12km, 3 farther. */
+  distance_band?: number;
+  /** Accrued eligible fair share minus delivered opportunities. Higher = more owed. */
+  fair_share_balance?: number;
+  /** Net provider-confirmed delivered opportunities in the last 7 days. */
+  delivered_7d?: number;
+  /** Informational legacy field only. It is NOT a ranking input. */
   rating: number;
   rank_position: number | null;
 }
@@ -189,23 +201,21 @@ export function fairnessKey(lastAssignedAt: string | null | undefined): number {
 }
 
 /**
- * The approved automatic-path comparator, unchanged in intent from the ordering
- * services/leadMatchingEngine has always produced:
+ * Canonical automatic-path order for fair lead distribution:
  *
- *   match_tier ASC                 (0 exact before 1 parent-group fallback)
- *   has_coordinates DESC   -.
- *   distance_km ASC        -'     only when the LEAD itself has coordinates
- *   area_affinity DESC
- *   last_assigned_at ASC           fairness; never-assigned first
- *   rating DESC                    existing fallback tiebreaker
- *   vendor_id ASC                  stable final tiebreak
+ *   match_tier ASC                    exact category before fallback
+ *   has_coordinates DESC              when the lead has coordinates
+ *   distance_band ASC                 geography/relevance guard
+ *   fair_share_balance DESC           most under-served eligible vendor first
+ *   delivered_7d ASC                  recent-delivery cooldown
+ *   last_delivered_at ASC             longest eligible wait / never-delivered first
+ *   area_affinity DESC                soft locality tiebreak
+ *   distance_km ASC                   exact distance only inside the same fair state
+ *   vendor_id ASC                     stable deterministic final tiebreak
  *
- * Deterministic and total: the final key is a UUID comparison over a
- * de-duplicated candidate set, so the comparator returns 0 only when both sides
- * are the same vendor. There is no random() and no clock.
- *
- * QF-MVP-75.01 does NOT change this order. It changes only whether the
- * persistence authority is bound by it.
+ * Credits do not appear here: remaining_credits is a HARD ELIGIBILITY gate.
+ * Rating, package size, popularity, revenue and inferred project capacity are
+ * deliberately absent. The final UUID key makes the order total and auditable.
  */
 export function compareAutomaticMatchDecisions(
   a: AutomaticMatchDecision,
@@ -216,18 +226,34 @@ export function compareAutomaticMatchDecisions(
 
   if (leadHasCoordinates) {
     if (a.has_coordinates !== b.has_coordinates) return a.has_coordinates ? -1 : 1;
+    const aBand = Number.isFinite(a.distance_band) ? Number(a.distance_band) : distanceBand(a.distance_km);
+    const bBand = Number.isFinite(b.distance_band) ? Number(b.distance_band) : distanceBand(b.distance_km);
+    if (aBand !== bBand) return aBand - bBand;
+  }
+
+  const aBalance = clampFairnessBalance(
+    Number.isFinite(a.fair_share_balance) ? Number(a.fair_share_balance) : 0,
+  );
+  const bBalance = clampFairnessBalance(
+    Number.isFinite(b.fair_share_balance) ? Number(b.fair_share_balance) : 0,
+  );
+  if (aBalance !== bBalance) return bBalance - aBalance;
+
+  const aRecent = Number.isFinite(a.delivered_7d) ? Number(a.delivered_7d) : 0;
+  const bRecent = Number.isFinite(b.delivered_7d) ? Number(b.delivered_7d) : 0;
+  if (aRecent !== bRecent) return aRecent - bRecent;
+
+  const at = fairnessKey(a.last_delivered_at ?? a.last_assigned_at);
+  const bt = fairnessKey(b.last_delivered_at ?? b.last_assigned_at);
+  if (at !== bt) return at < bt ? -1 : 1;
+
+  if (a.area_affinity !== b.area_affinity) return b.area_affinity - a.area_affinity;
+
+  if (leadHasCoordinates) {
     const ad = a.distance_km ?? Number.POSITIVE_INFINITY;
     const bd = b.distance_km ?? Number.POSITIVE_INFINITY;
     if (ad !== bd) return ad < bd ? -1 : 1;
   }
-
-  if (a.area_affinity !== b.area_affinity) return b.area_affinity - a.area_affinity;
-
-  const at = fairnessKey(a.last_assigned_at);
-  const bt = fairnessKey(b.last_assigned_at);
-  if (at !== bt) return at < bt ? -1 : 1;
-
-  if (a.rating !== b.rating) return b.rating - a.rating;
 
   return a.vendor_id.localeCompare(b.vendor_id);
 }

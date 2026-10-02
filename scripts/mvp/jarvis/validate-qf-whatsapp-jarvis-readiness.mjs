@@ -69,6 +69,10 @@ const webhookService = read("services/metaWhatsAppWebhookService.ts");
 const metaProviderSource = read(
   "lib/communication/providers/metaCloudWhatsAppProvider.ts",
 );
+const inboundIdentityResolver = read(
+  "services/inboundIdentityResolutionService.ts",
+);
+const vendorContactContract = read("lib/vendors/vendorContactContract.ts");
 
 let passed = 0;
 const test = async (name, fn) => {
@@ -654,6 +658,19 @@ await test("STOP START HELP are persisted controls but never Jarvis turns", () =
     false,
   );
 });
+await test("provider-attested Indian vendor contact can reach exact Anisha identity without weakening auth", () => {
+  assert.match(vendorContactContract, /INDIAN_MOBILE_RE = \/\^\[6-9\]\\d\{9\}\$\//);
+  assert.match(inboundIdentityResolver, /vendorStoredPhoneCandidatesForInbound/);
+  assert.match(inboundIdentityResolver, /isValidIndianMobile/);
+  assert.match(inboundIdentityResolver, /from\("vendors"\)/);
+  assert.match(inboundIdentityResolver, /\.ilike\("status", "approved"\)/);
+  assert.match(inboundIdentityResolver, /\.eq\("is_active", true\)/);
+  assert.match(inboundIdentityResolver, /\.eq\("phone_e164", e164\)/);
+  assert.match(inboundIdentityResolver, /\.eq\("phone_verified", true\)/);
+  assert.doesNotMatch(inboundIdentityResolver, /phone_verified\s*[:=]\s*true/);
+  assert.doesNotMatch(inboundIdentityResolver, /\.limit\(\s*1\s*\)/);
+});
+
 await test("concierge routes exact clients/vendors and explicit prospects deterministically", () => {
   const base = {
     messageType: "text",

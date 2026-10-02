@@ -21,6 +21,7 @@ if (!existsSync(tsc)) throw new Error("TypeScript compiler not found. Run npm in
 const TS_FILES = [
   "lib/errors.ts",
   "lib/communication/phone.ts",
+  "lib/vendors/vendorContactContract.ts",
   "lib/communication/providers/metaWhatsAppInbound.ts",
 ];
 
@@ -313,6 +314,26 @@ const resolve1 = async (over, phone = E164) => {
   assert(out.ok === true, `resolution succeeded (got ${safeStringify(out)})`);
   return out.identity;
 };
+
+check("ID-VENDOR-1. +91 inbound maps to exact Indian vendor stored forms only", () => {
+  const forms = M.Resolver.vendorStoredPhoneCandidatesForInbound(E164);
+  assert(
+    safeStringify(forms) === safeStringify([E164, "9812345678"]),
+    `unexpected vendor forms ${safeStringify(forms)}`
+  );
+  const us = M.Resolver.vendorStoredPhoneCandidatesForInbound("+15551234567");
+  assert(safeStringify(us) === safeStringify(["+15551234567"]), "non-India inbound must stay E.164-only");
+});
+
+check("ID-VENDOR-2. vendor default finder is provider-attested business-contact aware and remains fail-closed", () => {
+  const src = readF(RESOLVER_SRC);
+  assert(src.includes('from("vendors")'), "approved vendor business contacts are consulted");
+  assert(src.includes('.ilike("status", "approved")') && src.includes('.eq("is_active", true)'), "only approved+active vendor rows may identify");
+  assert(src.includes('from("vendor_dashboard_users")') && src.includes('.eq("phone_verified", true)') && src.includes('.eq("phone_e164", e164)'), "verified canonical membership remains a source");
+  assert(src.includes("isValidIndianMobile"), "the existing Indian vendor contact contract is reused");
+  assert(!/phone_verified\s*[:=]\s*true/.test(src), "inbound resolution must never mutate verification state");
+  assert(!/\.limit\(\s*1\s*\)/.test(src), "vendor lookup must never first-row-win");
+});
 
 check("29. one client candidate → EXACT", async () => {
   const r = await resolve1({ clients: [clientCand("client-1")] });

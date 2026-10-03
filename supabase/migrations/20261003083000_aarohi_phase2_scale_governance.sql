@@ -91,13 +91,16 @@ create index if not exists aarohi_discovery_runs_city_policy_idx
 alter table public.aarohi_outreach_jobs
   add column if not exists city_id uuid references public.cities(id) on delete restrict,
   add column if not exists eligibility_ref uuid references public.aarohi_channel_eligibility(id) on delete restrict,
-  add column if not exists capacity_snapshot_id uuid references public.aarohi_channel_capacity_snapshots(id) on delete restrict;
+  add column if not exists capacity_snapshot_id uuid references public.aarohi_channel_capacity_snapshots(id) on delete restrict,
+  add column if not exists broadcast_batch_id uuid references public.aarohi_broadcast_batches(id) on delete set null;
 create index if not exists aarohi_outreach_jobs_city_idx
   on public.aarohi_outreach_jobs(city_id,scheduled_at) where city_id is not null;
 create index if not exists aarohi_outreach_jobs_eligibility_idx
   on public.aarohi_outreach_jobs(eligibility_ref) where eligibility_ref is not null;
 create index if not exists aarohi_outreach_jobs_capacity_idx
   on public.aarohi_outreach_jobs(capacity_snapshot_id) where capacity_snapshot_id is not null;
+create index if not exists aarohi_outreach_jobs_broadcast_batch_idx
+  on public.aarohi_outreach_jobs(broadcast_batch_id) where broadcast_batch_id is not null;
 
 alter table public.aarohi_broadcast_batches
   add column if not exists city_id uuid references public.cities(id) on delete restrict,

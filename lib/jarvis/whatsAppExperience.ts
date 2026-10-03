@@ -168,6 +168,16 @@ export function buildAgentTransitionExperience(
   });
 }
 
+export function buildAarohiDedicatedNumberBoundaryExperience(): QfWhatsAppExperienceV1 {
+  return Object.freeze({
+    version: 1,
+    actor: "SYSTEM",
+    kind: "status",
+    heading: "QuickFurno Partner",
+    body: "This WhatsApp number is dedicated to new QuickFurno partner acquisition with Aarohi. Existing vendors and clients should continue on the main QuickFurno WhatsApp channel.",
+  });
+}
+
 export function buildVendorIdentityRequiredExperience(): QfWhatsAppExperienceV1 {
   return Object.freeze({
     version: 1,

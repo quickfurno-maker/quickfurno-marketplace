@@ -7,7 +7,7 @@
     "build": "next build",
     "build:staging:safe": "node scripts/mvp/build/build-staging-safe.mjs",
     "start": "next start",
-    "bench:scale:http": "node scripts/scale/http-baseline.mjs",
+    "bench:scale:http": "node scripts/scale/http-baseline.mjs",\n    "test:scale:portability": "node scripts/scale/validate-portability-contract.mjs",
     "lint": "eslint app components lib --ext .js,.jsx,.ts,.tsx",
     "typecheck": "tsc --noEmit",
     "bootstrap:local:qa": "node scripts/mvp/local/bootstrap-qf-canonical-local-qa.mjs",

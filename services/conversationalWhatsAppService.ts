@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "crypto";
 import { adminClient } from "../lib/supabase";
 import { hashPhoneE164, maskPhoneE164, normalizePhoneE164 } from "../lib/communication/phone";
 import { openConversationValue, sealConversationValue } from "../lib/communication/conversationSeal";
-import { resolveConversationalMetaConfig, outboundToRuntime } from "../lib/communication/providers/metaCloudWhatsAppConfig";
+import { resolveConversationalMetaConfig, resolveOutboundMetaConfig, outboundToRuntime } from "../lib/communication/providers/metaCloudWhatsAppConfig";
 import { MetaCloudWhatsAppProvider, META_WHATSAPP_CLOUD_PROVIDER_KEY } from "../lib/communication/providers/metaCloudWhatsAppProvider";
 import { FetchHttpTransport } from "../lib/communication/httpTransport";
 import { evaluateMetaOutboundGateForMessage } from "./communicationProviderRuntimeService";
@@ -96,6 +96,14 @@ function isJarvisConversationAccount(account: any): boolean {
     (account.account_role === "transactional" || account.account_role === "conversational");
 }
 
+function resolveConversationMetaConfig(account:any) {
+  // The main/core number uses the primary Meta credential set. The dedicated
+  // Aarohi acquisition lane reuses the existing conversational credential set.
+  return account?.account_alias === "aarohi" || account?.account_role === "conversational"
+    ? resolveConversationMetaConfig(account)
+    : resolveOutboundMetaConfig();
+}
+
 const SUBJECT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type JarvisAuthorityActor = "AAROHI" | "ANISHA" | "RIYA" | "HUMAN" | "SYSTEM";
@@ -180,7 +188,7 @@ export async function signalConversationalWhatsAppPresence(input: {
   const account = await providerAccount(String(conversation.provider_account_id));
   if (!isJarvisConversationAccount(account)) return "skipped";
 
-  const config = resolveConversationalMetaConfig();
+  const config = resolveConversationMetaConfig(account);
   if (!config.ok) return "skipped";
   if (
     account.phone_number_reference !== config.config.phoneNumberId ||
@@ -1230,7 +1238,7 @@ export async function dispatchConversationalOutbox(
     return { ok: false, reason: "provider_account_not_conversational" };
   }
 
-  const config = resolveConversationalMetaConfig();
+  const config = resolveConversationMetaConfig(account);
   if (!config.ok) {
     await failOutbox(claimed.id, "failed", "CONVERSATIONAL_PROVIDER_CONFIG_MISSING");
     return { ok: false, reason: "provider_not_configured" };

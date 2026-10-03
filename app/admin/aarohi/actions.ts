@@ -213,7 +213,9 @@ export async function recordAarohiChannelEligibilityAction(prospectId:string,for
     providerKey:val(formData,"provider_key")||null,
     evidenceKind:val(formData,"evidence_kind")||"ADMIN_REVIEW",
     evidenceRef:val(formData,"evidence_ref")||`admin:${a}`,
-    expiresAt:val(formData,"expires_at")||null,
+    expiresAt:state==="ELIGIBLE"
+      ?new Date(Date.now()+Math.max(5,Math.min(1440,Number(val(formData,"ttl_minutes")||60)))*60_000).toISOString()
+      :null,
   });
   refresh(prospectId);
 }
@@ -234,7 +236,7 @@ export async function recordAarohiCapacitySnapshotAction(formData:FormData){
     usedToday:Number(val(formData,"used_today")||0),
     reservedForMain:Number(val(formData,"reserved_for_main")||0),
     acquisitionAvailable:Number(val(formData,"acquisition_available")||0),
-    expiresAt:val(formData,"expires_at"),
+    expiresAt:new Date(Date.now()+Math.max(5,Math.min(1440,Number(val(formData,"ttl_minutes")||60)))*60_000).toISOString(),
     reasonCode:val(formData,"reason_code")||`admin:${a}`,
   });
   refresh();

@@ -9,6 +9,12 @@ import {
   createManualAarohiProspect, reviewAarohiIdentityMatch, scoreAarohiProspect, selectAarohiPackage,
   setAarohiPaused, setAarohiSuppressed, setAarohiTakeover, updateAarohiTask, updateAarohiWorkflow,
 } from "@/services/aarohiCrmService";
+import {
+  createAarohiVendorRegistrationLink,
+  linkAarohiWhatsAppContinuation,
+  observeAarohiChannelIdentity,
+  recordAarohiAssistedFirstOutreach,
+} from "@/services/aarohiOmnichannelService";
 
 async function actor(permission:AarohiPermission){
   const session=await getAdminSession();
@@ -36,3 +42,57 @@ export async function createCampaignAction(formData:FormData){const a=await acto
 export async function addCampaignMemberAction(campaignId:string,prospectId:string){const a=await actor("aarohi.manage_campaigns");await addAarohiCampaignMember(campaignId,prospectId,a);refresh(prospectId);}
 export async function selectPackageAction(prospectId:string,packageId:string){const a=await actor("aarohi.manage");await selectAarohiPackage(prospectId,packageId,a);refresh(prospectId);}
 export async function completeHandoffAction(prospectId:string,formData:FormData){const a=await actor("aarohi.manage");await sensitiveBudget(a);await completeAarohiHandoff(prospectId,val(formData,"vendor_id"),a);refresh(prospectId);}
+
+
+export async function observeChannelIdentityAction(prospectId:string,formData:FormData){
+  const a=await actor("aarohi.manage");
+  const channel=val(formData,"channel");
+  if(!["INSTAGRAM","FACEBOOK","X","WEBSITE"].includes(channel)) throw new Error("invalid_channel");
+  await observeAarohiChannelIdentity({
+    prospectId,
+    channel:channel as "INSTAGRAM"|"FACEBOOK"|"X"|"WEBSITE",
+    externalReference:val(formData,"external_reference"),
+    profileUrl:val(formData,"profile_url")||null,
+    displayName:val(formData,"display_name")||null,
+    actorId:a,
+  });
+  refresh(prospectId);
+}
+
+export async function recordAssistedOutreachAction(prospectId:string,formData:FormData){
+  const a=await actor("aarohi.manage");
+  const channel=val(formData,"channel");
+  if(channel!=="INSTAGRAM"&&channel!=="FACEBOOK") throw new Error("invalid_assisted_channel");
+  await recordAarohiAssistedFirstOutreach({
+    prospectId,
+    channel,
+    externalReference:val(formData,"external_reference")||null,
+    actorId:a,
+  });
+  refresh(prospectId);
+}
+
+export async function linkWhatsAppContinuationAction(prospectId:string,formData:FormData){
+  const a=await actor("aarohi.manage");
+  await linkAarohiWhatsAppContinuation({
+    prospectId,
+    phoneE164:val(formData,"phone_e164"),
+    actorId:a,
+  });
+  refresh(prospectId);
+}
+
+export async function createRegistrationLinkAction(
+  prospectId:string,
+  channel:"WHATSAPP"|"INSTAGRAM"|"FACEBOOK"|"X"|"WEBSITE"|"MANUAL"="MANUAL",
+):Promise<{ok:true;relativeUrl:string;expiresAt:string}|{ok:false;error:string}>{
+  try{
+    const a=await actor("aarohi.manage");
+    await sensitiveBudget(a);
+    const result=await createAarohiVendorRegistrationLink({prospectId,channel,actorId:a});
+    refresh(prospectId);
+    return {ok:true,...result};
+  }catch(error){
+    return {ok:false,error:error instanceof Error?error.message:"registration_link_failed"};
+  }
+}

@@ -179,6 +179,8 @@
     "test:mvp:whatsapp-media-bridge": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-media-bridge.mjs",
     "build:automation-worker": "esbuild worker/nativeAutomationWorker.ts --bundle --platform=node --format=esm --target=node20 --packages=external --alias:server-only=./worker/serverOnlyShim.ts --tsconfig=tsconfig.json --outfile=dist/automation-worker.mjs",
     "start:automation-worker": "node dist/automation-worker.mjs",
+    "build:aarohi-acquisition-worker": "esbuild worker/aarohiAcquisitionWorker.ts --bundle --platform=node --format=esm --target=node20 --packages=external --alias:server-only=./worker/serverOnlyShim.ts --tsconfig=tsconfig.json --outfile=dist/aarohi-acquisition-worker.mjs",
+    "start:aarohi-acquisition-worker": "node dist/aarohi-acquisition-worker.mjs",
     "build:conversation-transport": "esbuild worker/conversationTransportWorker.ts --bundle --platform=node --format=esm --target=node20 --packages=external --alias:server-only=./worker/serverOnlyShim.ts --tsconfig=tsconfig.json --outfile=dist/conversation-transport-worker.mjs",
     "start:conversation-transport": "node dist/conversation-transport-worker.mjs",
     "test:mvp:conversation-fastpath": "node scripts/mvp/jarvis/validate-qf-conversation-fastpath.mjs",

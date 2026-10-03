@@ -35,6 +35,8 @@ export interface CreateLeadInput {
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
+  /** Opaque, expiring Aarohi acquisition token. Resolved only on the server; never a prospect id. */
+  aarohi_acquisition_token?: string;
   // Optional opaque Aarohi acquisition token. Resolved server-side; never a prospect id.
   aarohi_acquisition_token?: string;
   utm_term?: string;

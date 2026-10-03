@@ -77,13 +77,16 @@ create table if not exists public.aarohi_outreach_jobs (
   initiation_mode text not null check (initiation_mode in ('ASSISTED_FIRST_CONTACT','GOVERNED_API_IF_ELIGIBLE','GOVERNED_TEMPLATE')),
   state text not null default 'QUEUED' check (state in (
     'QUEUED','NEEDS_HUMAN_REVIEW','NEEDS_CORE_AUTHORIZATION','AUTHORIZED',
-    'DISPATCH_READY','DISPATCHED','WAITING_REPLY','COMPLETED','BLOCKED','CANCELLED'
+    'DISPATCH_READY','CLAIMED','DISPATCHED','WAITING_REPLY','COMPLETED','BLOCKED','CANCELLED'
   )),
   priority smallint not null default 50 check (priority between 0 and 100),
   scheduled_at timestamptz not null default now(),
   draft_ref text,
   core_authorization_ref text,
   provider_message_ref text,
+  worker_ref text,
+  execution_token uuid,
+  claimed_at timestamptz,
   attempt_count integer not null default 0 check (attempt_count>=0),
   max_attempts integer not null default 1 check (max_attempts between 1 and 5),
   last_error_code text,
@@ -91,7 +94,8 @@ create table if not exists public.aarohi_outreach_jobs (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   completed_at timestamptz,
-  check (state not in ('AUTHORIZED','DISPATCH_READY','DISPATCHED','WAITING_REPLY','COMPLETED') or core_authorization_ref is not null)
+  check (state not in ('AUTHORIZED','DISPATCH_READY','CLAIMED','DISPATCHED','WAITING_REPLY','COMPLETED') or core_authorization_ref is not null),
+  check (state<>'CLAIMED' or (execution_token is not null and worker_ref is not null and claimed_at is not null))
 );
 create index if not exists aarohi_outreach_jobs_queue_idx
   on public.aarohi_outreach_jobs(state,scheduled_at,priority desc)
@@ -191,6 +195,72 @@ begin
 end $$;
 revoke all on function public.qf_aarohi_claim_discovery_run_v1(text) from public,anon,authenticated;
 grant execute on function public.qf_aarohi_claim_discovery_run_v1(text) to service_role;
+
+create or replace function public.qf_aarohi_claim_social_outreach_v1(p_worker_ref text)
+returns public.aarohi_outreach_jobs
+language plpgsql security definer set search_path=public as $
+declare v public.aarohi_outreach_jobs;
+begin
+  if nullif(trim(p_worker_ref),'') is null then raise exception 'worker_ref_required'; end if;
+  select * into v from public.aarohi_outreach_jobs
+    where state='DISPATCH_READY'
+      and channel in ('INSTAGRAM','FACEBOOK','X')
+      and core_authorization_ref is not null
+    order by priority desc,scheduled_at asc,id asc
+    limit 1 for update skip locked;
+  if v.id is null then return null; end if;
+  update public.aarohi_outreach_jobs
+    set state='CLAIMED',worker_ref=left(trim(p_worker_ref),128),
+        execution_token=gen_random_uuid(),claimed_at=now(),
+        attempt_count=attempt_count+1,updated_at=now()
+    where id=v.id returning * into v;
+  return v;
+end $;
+revoke all on function public.qf_aarohi_claim_social_outreach_v1(text) from public,anon,authenticated;
+grant execute on function public.qf_aarohi_claim_social_outreach_v1(text) to service_role;
+
+create or replace function public.qf_aarohi_complete_social_outreach_v1(
+  p_job_id uuid,
+  p_execution_token uuid,
+  p_outcome text,
+  p_provider_message_ref text default null,
+  p_error_code text default null
+) returns public.aarohi_outreach_jobs
+language plpgsql security definer set search_path=public as $
+declare v public.aarohi_outreach_jobs;
+begin
+  if p_outcome not in ('ACCEPTED','DEFINITIVE_FAILURE','UNCERTAIN') then
+    raise exception 'outreach_outcome_invalid';
+  end if;
+  select * into v from public.aarohi_outreach_jobs
+    where id=p_job_id for update;
+  if v.id is null then raise exception 'outreach_job_not_found'; end if;
+  if v.state<>'CLAIMED' or v.execution_token is distinct from p_execution_token then
+    raise exception 'outreach_execution_token_mismatch';
+  end if;
+  if p_outcome='ACCEPTED' then
+    if nullif(trim(coalesce(p_provider_message_ref,'')),'') is null then
+      raise exception 'outreach_provider_ref_required';
+    end if;
+    update public.aarohi_outreach_jobs
+      set state='WAITING_REPLY',
+          provider_message_ref=left(trim(p_provider_message_ref),300),
+          execution_token=null,worker_ref=null,claimed_at=null,
+          last_error_code=null,updated_at=now()
+      where id=p_job_id returning * into v;
+  else
+    update public.aarohi_outreach_jobs
+      set state='BLOCKED',
+          execution_token=null,worker_ref=null,claimed_at=null,
+          last_error_code=left(coalesce(nullif(trim(p_error_code),''),
+            case when p_outcome='UNCERTAIN' then 'PROVIDER_EXECUTION_UNCERTAIN' else 'PROVIDER_DEFINITIVE_FAILURE' end),160),
+          updated_at=now()
+      where id=p_job_id returning * into v;
+  end if;
+  return v;
+end $;
+revoke all on function public.qf_aarohi_complete_social_outreach_v1(uuid,uuid,text,text,text) from public,anon,authenticated;
+grant execute on function public.qf_aarohi_complete_social_outreach_v1(uuid,uuid,text,text,text) to service_role;
 
 create or replace function public.qf_aarohi_cancel_outreach_on_suppression_v1()
 returns trigger language plpgsql security definer set search_path=public as $$

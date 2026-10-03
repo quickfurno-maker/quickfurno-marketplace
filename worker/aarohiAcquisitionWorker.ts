@@ -17,7 +17,11 @@ loadEnvironment();
 const sleep=(ms:number)=>new Promise<void>((resolveSleep)=>setTimeout(resolveSleep,ms));
 
 async function main(){
-  const {scheduleAarohiDiscoveryRuns}=await import("@/services/aarohiPhase2AcquisitionService");
+  const {
+    scheduleAarohiDiscoveryRuns,
+    promoteReadyAarohiDiscoveryCandidates,
+    authorizePendingAarohiOutreach,
+  }=await import("@/services/aarohiPhase2AcquisitionService");
   const enabled=process.env.QF_AAROHI_PHASE2_DISCOVERY_ENABLED?.trim().toLowerCase()==="true";
   const intervalRaw=Number(process.env.QF_AAROHI_PHASE2_SCHEDULER_INTERVAL_MS??300_000);
   const interval=Number.isInteger(intervalRaw)&&intervalRaw>=60_000&&intervalRaw<=3_600_000
@@ -33,7 +37,14 @@ async function main(){
   while(!stopping){
     try{
       const result=await scheduleAarohiDiscoveryRuns();
-      console.info("[qf-aarohi-phase2] discovery schedule cycle",{queued:result.queued});
+      const promotion=await promoteReadyAarohiDiscoveryCandidates(50);
+      const authorization=await authorizePendingAarohiOutreach(100);
+      console.info("[qf-aarohi-phase2] acquisition cycle",{
+        queued:result.queued,
+        promoted:promotion.promoted,
+        review:promotion.review,
+        authorized:authorization.authorized,
+      });
     }catch(error){
       console.error("[qf-aarohi-phase2] discovery schedule cycle failed",{
         code:error instanceof Error?error.message.slice(0,160):"AAROHI_PHASE2_SCHEDULER_ERROR",

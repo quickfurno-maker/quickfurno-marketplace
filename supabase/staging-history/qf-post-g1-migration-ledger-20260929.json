@@ -469,6 +469,18 @@
         "indexesPresent": 4,
         "targetForeignKeyWarningsRemaining": 0
       }
+    },
+    {
+      "version": "20261003080000",
+      "name": "aarohi_phase2_autonomous_acquisition",
+      "filename": "20261003080000_aarohi_phase2_autonomous_acquisition.sql",
+      "path": "supabase/migrations/20261003080000_aarohi_phase2_autonomous_acquisition.sql",
+      "canonicalSha256": "ccd8be564e4ddecf55b2cfef7491d296ef9bab56ac0de4411cf7b6deaca1537d",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-03_BEFORE_DEPLOYMENT"
     }
   ],
   "supersededLegacyPins": [

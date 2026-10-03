@@ -113,6 +113,132 @@ create table if not exists public.aarohi_social_reply_signals (
 create index if not exists aarohi_social_reply_timeline_idx
   on public.aarohi_social_reply_signals(prospect_id,occurred_at desc);
 
+create table if not exists public.aarohi_communication_permissions (
+  id uuid primary key default gen_random_uuid(),
+  prospect_id uuid not null references public.aarohi_prospects(id) on delete cascade,
+  channel text not null check (channel in ('WHATSAPP','INSTAGRAM','FACEBOOK','X')),
+  purpose text not null check (purpose in ('ACQUISITION_CONTINUATION','MARKETING_BROADCAST')),
+  state text not null check (state in ('GRANTED','REVOKED')),
+  destination_hash text check (destination_hash is null or destination_hash ~ '^[0-9a-f]{64}
+  prospect_id uuid primary key references public.aarohi_prospects(id) on delete cascade,
+  version integer not null default 1 check (version>=1),
+  safe_summary text not null default '',
+  structured_facts jsonb not null default '{}'::jsonb,
+  last_channel text,
+  last_event_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+comment on table public.aarohi_memory_snapshots is
+  'Non-authoritative, content-minimized cross-channel acquisition context for Aarohi WhatsApp continuity. Core facts remain authoritative elsewhere.';
+
+create table if not exists public.aarohi_broadcast_batches (
+  id uuid primary key default gen_random_uuid(),
+  campaign_id uuid not null references public.aarohi_campaigns(id) on delete restrict,
+  channel text not null default 'WHATSAPP' check (channel='WHATSAPP'),
+  template_name text not null,
+  state text not null default 'DRAFT' check (state in ('DRAFT','READY','QUEUED','RUNNING','COMPLETED','CANCELLED','BLOCKED')),
+  scheduled_for timestamptz,
+  target_count integer not null default 0 check (target_count>=0),
+  authorized_count integer not null default 0 check (authorized_count>=0 and authorized_count<=target_count),
+  dispatched_count integer not null default 0 check (dispatched_count>=0 and dispatched_count<=authorized_count),
+  failed_count integer not null default 0 check (failed_count>=0 and failed_count<=authorized_count),
+  daily_cap integer not null default 1000 check (daily_cap between 1 and 10000),
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists aarohi_broadcast_batches_schedule_idx
+  on public.aarohi_broadcast_batches(state,scheduled_for)
+  where state in ('READY','QUEUED','RUNNING');
+
+do $$ declare t text; begin
+  foreach t in array array[
+    'aarohi_discovery_connectors','aarohi_discovery_runs','aarohi_discovery_candidates',
+    'aarohi_outreach_jobs','aarohi_social_reply_signals','aarohi_communication_permissions',
+    'aarohi_memory_snapshots','aarohi_broadcast_batches'
+  ] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('revoke all on public.%I from public,anon,authenticated', t);
+    execute format('grant select,insert,update,delete on public.%I to service_role', t);
+  end loop;
+end $$;
+
+insert into public.aarohi_discovery_connectors(
+  tenant_id,channel,provider_key,discovery_mode,outreach_mode,enabled,provider_ready,config
+) values
+('quickfurno','INSTAGRAM','meta_official','ASSISTED_IMPORT','ASSISTED_FIRST_CONTACT',false,false,'{"arbitrary_browser_cold_dm":false}'::jsonb),
+('quickfurno','FACEBOOK','meta_official','ASSISTED_IMPORT','ASSISTED_FIRST_CONTACT',false,false,'{"arbitrary_browser_cold_dm":false}'::jsonb),
+('quickfurno','X','x_official','GOVERNED_API','GOVERNED_API_IF_ELIGIBLE',false,false,'{"arbitrary_browser_cold_dm":false}'::jsonb),
+('quickfurno','GOOGLE','google_business_discovery','GOVERNED_API','NONE',false,false,'{}'::jsonb),
+('quickfurno','WEBSITE','approved_web_discovery','INBOUND_FEED','NONE',false,false,'{}'::jsonb),
+('quickfurno','JUSTDIAL','approved_directory_feed','INBOUND_FEED','NONE',false,false,'{}'::jsonb),
+('quickfurno','INDIAMART','approved_directory_feed','INBOUND_FEED','NONE',false,false,'{}'::jsonb)
+on conflict(tenant_id,channel,provider_key) do nothing;
+
+create or replace function public.qf_aarohi_claim_discovery_run_v1(p_worker_ref text)
+returns public.aarohi_discovery_runs
+language plpgsql security definer set search_path=public as $$
+declare v public.aarohi_discovery_runs;
+begin
+  if nullif(trim(p_worker_ref),'') is null then raise exception 'worker_ref_required'; end if;
+  select * into v from public.aarohi_discovery_runs
+    where state='QUEUED' order by requested_at asc,id asc limit 1 for update skip locked;
+  if v.id is null then return null; end if;
+  update public.aarohi_discovery_runs
+    set state='CLAIMED',claimed_at=now(),worker_ref=left(trim(p_worker_ref),128)
+    where id=v.id returning * into v;
+  return v;
+end $$;
+revoke all on function public.qf_aarohi_claim_discovery_run_v1(text) from public,anon,authenticated;
+grant execute on function public.qf_aarohi_claim_discovery_run_v1(text) to service_role;
+
+create or replace function public.qf_aarohi_cancel_outreach_on_suppression_v1()
+returns trigger language plpgsql security definer set search_path=public as $$
+begin
+  if new.do_not_contact=true or new.ai_paused=true or new.prospect_stage='SUPPRESSED' then
+    update public.aarohi_communication_permissions
+      set state='REVOKED',revoked_at=coalesce(revoked_at,now()),updated_at=now(),
+          evidence_kind='STOP_OR_SUPPRESSION',
+          evidence_ref=case when evidence_ref='' then 'core-suppression' else evidence_ref end
+      where prospect_id=new.id and state='GRANTED';
+    update public.aarohi_outreach_jobs
+      set state='CANCELLED',last_error_code='PROSPECT_SUPPRESSED',updated_at=now(),completed_at=now()
+      where prospect_id=new.id
+        and state not in ('COMPLETED','CANCELLED');
+    update public.aarohi_broadcast_batches b
+      set state=case when b.state='RUNNING' then 'BLOCKED' else b.state end,updated_at=now()
+      where b.id in (
+        select distinct j.campaign_id from public.aarohi_outreach_jobs j
+        where j.prospect_id=new.id and j.campaign_id is not null
+      );
+  end if;
+  return new;
+end $$;
+revoke all on function public.qf_aarohi_cancel_outreach_on_suppression_v1() from public,anon,authenticated;
+
+drop trigger if exists trg_aarohi_cancel_outreach_on_suppression on public.aarohi_prospects;
+create trigger trg_aarohi_cancel_outreach_on_suppression
+after update of do_not_contact,ai_paused,prospect_stage on public.aarohi_prospects
+for each row execute function public.qf_aarohi_cancel_outreach_on_suppression_v1();
+),
+  evidence_kind text not null check (evidence_kind in (
+    'SOCIAL_WHATSAPP_SHARE','WHATSAPP_EXPLICIT_OPT_IN','ADMIN_EVIDENCE_IMPORT','STOP_OR_SUPPRESSION'
+  )),
+  evidence_ref text not null,
+  policy_version text not null default 'aarohi-permission-v1',
+  granted_at timestamptz,
+  revoked_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(prospect_id,channel,purpose),
+  check (
+    (state='GRANTED' and granted_at is not null and revoked_at is null)
+    or (state='REVOKED' and revoked_at is not null)
+  )
+);
+create index if not exists aarohi_permissions_purpose_idx
+  on public.aarohi_communication_permissions(channel,purpose,state,updated_at desc);
+
 create table if not exists public.aarohi_memory_snapshots (
   prospect_id uuid primary key references public.aarohi_prospects(id) on delete cascade,
   version integer not null default 1 check (version>=1),

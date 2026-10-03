@@ -299,6 +299,12 @@ jobs:
       - name: WhatsApp Human Desk certification
         run: npm run test:mvp:whatsapp-human-desk
 
+      # SCALE-P01 — portability ratchet. Offline: no secrets, no network.
+      # Prevents new direct infrastructure coupling while known single-host debt
+      # remains explicitly pinned to its remediation phase.
+      - name: Infrastructure portability contract
+        run: npm run test:scale:portability
+
       - name: Typecheck
         run: npm run typecheck
 

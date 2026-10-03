@@ -15,6 +15,10 @@ import {
   observeAarohiChannelIdentity,
   recordAarohiAssistedFirstOutreach,
 } from "@/services/aarohiOmnichannelService";
+import {
+  planAarohiWhatsAppBroadcast,
+  promoteAarohiDiscoveryCandidate,
+} from "@/services/aarohiPhase2AcquisitionService";
 
 async function actor(permission:AarohiPermission){
   const session=await getAdminSession();
@@ -27,7 +31,7 @@ async function sensitiveBudget(actorId:string){
   if(r.error) throw r.error; if((r.count??0)>=30) throw new Error("aarohi_action_rate_limited");
 }
 const val=(f:FormData,k:string)=>{const v=f.get(k);return typeof v==="string"?v:"";};
-function refresh(id?:string){revalidatePath("/admin/aarohi");revalidatePath("/admin/aarohi/prospects");revalidatePath("/admin/aarohi/pipeline");revalidatePath("/admin/aarohi/inbox");revalidatePath("/admin/aarohi/tasks");if(id)revalidatePath(`/admin/aarohi/prospects/${id}`);}
+function refresh(id?:string){revalidatePath("/admin/aarohi");revalidatePath("/admin/aarohi/prospects");revalidatePath("/admin/aarohi/pipeline");revalidatePath("/admin/aarohi/inbox");revalidatePath("/admin/aarohi/tasks");revalidatePath("/admin/aarohi/discovery");revalidatePath("/admin/aarohi/outreach");revalidatePath("/admin/aarohi/campaigns");if(id)revalidatePath(`/admin/aarohi/prospects/${id}`);}
 
 export async function createProspectAction(formData:FormData){const a=await actor("aarohi.manage");const id=await createManualAarohiProspect({business_name:val(formData,"business_name"),city_id:val(formData,"city_id"),primary_category:val(formData,"primary_category"),area:val(formData,"area"),pincode:val(formData,"pincode"),primary_phone:val(formData,"primary_phone"),website:val(formData,"website"),contact_person_name:val(formData,"contact_person_name")},a);refresh(id);}
 export async function updateWorkflowAction(prospectId:string,formData:FormData){const a=await actor("aarohi.manage");await updateAarohiWorkflow(prospectId,{prospect_stage:val(formData,"prospect_stage"),conversation_stage:val(formData,"conversation_stage"),priority_band:val(formData,"priority_band"),next_action_type:val(formData,"next_action_type"),next_action_at:val(formData,"next_action_at")||null,next_action_reason:val(formData,"next_action_reason"),preferred_channel:val(formData,"preferred_channel"),current_objection:val(formData,"current_objection")},a);refresh(prospectId);}
@@ -95,4 +99,23 @@ export async function createRegistrationLinkAction(
   }catch(error){
     return {ok:false,error:error instanceof Error?error.message:"registration_link_failed"};
   }
+}
+
+export async function promoteDiscoveryCandidateAction(candidateId:string){
+  const a=await actor("aarohi.manage");
+  await sensitiveBudget(a);
+  const result=await promoteAarohiDiscoveryCandidate(candidateId,a);
+  refresh(result.prospectId);
+}
+
+export async function planWhatsAppBroadcastAction(campaignId:string,formData:FormData){
+  const a=await actor("aarohi.manage_campaigns");
+  await sensitiveBudget(a);
+  await planAarohiWhatsAppBroadcast({
+    campaignId,
+    templateName:val(formData,"template_name"),
+    actorId:a,
+    dailyCap:Number(val(formData,"daily_cap")||1000),
+  });
+  refresh();
 }

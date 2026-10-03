@@ -21,6 +21,7 @@ async function main(){
     scheduleAarohiDiscoveryRuns,
     promoteReadyAarohiDiscoveryCandidates,
     authorizePendingAarohiOutreach,
+    scheduleAarohiFollowups,
   }=await import("@/services/aarohiPhase2AcquisitionService");
   const enabled=process.env.QF_AAROHI_PHASE2_DISCOVERY_ENABLED?.trim().toLowerCase()==="true";
   const intervalRaw=Number(process.env.QF_AAROHI_PHASE2_SCHEDULER_INTERVAL_MS??300_000);
@@ -38,12 +39,16 @@ async function main(){
     try{
       const result=await scheduleAarohiDiscoveryRuns();
       const promotion=await promoteReadyAarohiDiscoveryCandidates(50);
+      const followups=await scheduleAarohiFollowups(new Date(),100);
       const authorization=await authorizePendingAarohiOutreach(100);
       console.info("[qf-aarohi-phase2] acquisition cycle",{
         queued:result.queued,
         promoted:promotion.promoted,
+        excluded:promotion.excluded,
         review:promotion.review,
+        followupsQueued:followups.queued,
         authorized:authorization.authorized,
+        authorizationBlocked:authorization.blocked,
       });
     }catch(error){
       console.error("[qf-aarohi-phase2] discovery schedule cycle failed",{

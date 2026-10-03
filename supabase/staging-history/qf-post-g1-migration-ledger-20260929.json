@@ -551,6 +551,25 @@
         "indexesPresent": 3,
         "targetForeignKeyWarningsRemaining": 0
       }
+    },
+    {
+      "version": "20261003081046",
+      "name": "aarohi_full_fk_index_closeout",
+      "filename": "20261003081046_aarohi_full_fk_index_closeout.sql",
+      "path": "supabase/migrations/20261003081046_aarohi_full_fk_index_closeout.sql",
+      "canonicalSha256": "f4249c4582498ac3ef59d0374ccfdc343facde338c5cd62535614104dc21192e",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "stagingSemanticApplication": "PROVEN",
+      "observedStagingAppliedVersion": "20261003081215",
+      "stagingApplyReplayCount": 1,
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_AAROHI_FULL_FK_INDEX_CLOSEOUT_2026-10-03",
+      "stagingAdvisorClosure": {
+        "indexesPresent": 17,
+        "targetForeignKeyWarningsRemaining": 0
+      }
     }
   ],
   "supersededLegacyPins": [

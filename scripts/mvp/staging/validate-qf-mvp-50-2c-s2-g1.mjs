@@ -670,7 +670,7 @@ function validateState(state) {
     extension?.evidenceProjects?.staging?.projectRef === "uckafzuochmbvtiodmcl" &&
     extension?.evidenceProjects?.production?.projectRef === "yqpgcsduqbxulrlzwzap");
   check("post-G1 extension records are unique, exact and hash-pinned",
-    extensionRecords.length === 32 &&
+    extensionRecords.length === 33 &&
     new Set(extensionRecords.map((record) => record.version)).size === extensionRecords.length &&
     extensionRecords.every((record) => {
       const local = localByVersion.get(record.version);
@@ -849,6 +849,17 @@ function validateState(state) {
             record.observedStagingAppliedVersion === "20261003072655" &&
             record.stagingApplyReplayCount === 1 &&
             record.stagingAdvisorClosure?.indexesPresent === 3 &&
+            record.stagingAdvisorClosure?.targetForeignKeyWarningsRemaining === 0
+          ) ||
+          (
+            record.version === "20261003081046" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_AAROHI_FULL_FK_INDEX_CLOSEOUT_2026-10-03" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            record.observedStagingAppliedVersion === "20261003081215" &&
+            record.stagingApplyReplayCount === 1 &&
+            record.stagingAdvisorClosure?.indexesPresent === 17 &&
             record.stagingAdvisorClosure?.targetForeignKeyWarningsRemaining === 0
           ) ||
           (

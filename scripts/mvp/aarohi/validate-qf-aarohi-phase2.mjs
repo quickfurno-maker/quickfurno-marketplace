@@ -22,6 +22,8 @@ const governanceMigrationPath =
   "supabase/migrations/20261003083000_aarohi_phase2_scale_governance.sql";
 const opsMigrationPath =
   "supabase/migrations/20261003090000_aarohi_phase2_ops_control_analytics.sql";
+const fullFkIndexPath =
+  "supabase/migrations/20261003081046_aarohi_full_fk_index_closeout.sql";
 const consentPath = "services/aarohiOutboundConsentEnforcer.ts";
 const whatsAppExecutionPath = "services/aarohiWhatsAppExecutionService.ts";
 const recipientResolverPath = "services/communicationRecipientResolver.ts";
@@ -42,6 +44,7 @@ for (const p of [
   migrationPath,
   governanceMigrationPath,
   opsMigrationPath,
+  fullFkIndexPath,
   policyPath,
   servicePath,
   opsServicePath,
@@ -64,6 +67,7 @@ for (const p of [
 const migration = read(migrationPath);
 const governance = read(governanceMigrationPath);
 const opsMigration = read(opsMigrationPath);
+const fullFkIndexes = read(fullFkIndexPath);
 const policy = read(policyPath);
 const service = read(servicePath);
 const route = read(routePath);
@@ -292,6 +296,38 @@ check(
   "cost evidence stores no provider credentials",
   !/(access_token|bearer_token|api_secret|private_key)\s+text/i.test(
     opsMigration,
+  ),
+);
+
+const fullFkIndexNames = [
+  "aarohi_campaign_members_added_by_idx",
+  "aarohi_campaign_members_prospect_id_idx",
+  "aarohi_campaigns_created_by_idx",
+  "aarohi_handoffs_completed_by_idx",
+  "aarohi_identity_matches_prospect_b_id_idx",
+  "aarohi_identity_matches_reviewed_by_idx",
+  "aarohi_interactions_conversation_id_idx",
+  "aarohi_opportunities_core_order_reference_idx",
+  "aarohi_opportunities_core_vendor_id_idx",
+  "aarohi_opportunities_interested_package_id_idx",
+  "aarohi_opportunities_prospect_id_idx",
+  "aarohi_prospects_human_owner_idx",
+  "aarohi_prospects_merged_into_prospect_id_idx",
+  "aarohi_tasks_assigned_to_idx",
+  "aarohi_tasks_created_by_idx",
+  "aarohi_tasks_prospect_id_idx",
+  "communication_conversations_aarohi_prospect_id_idx",
+];
+for (const indexName of fullFkIndexNames) {
+  check(
+    "full FK closeout contains " + indexName,
+    fullFkIndexes.includes(indexName),
+  );
+}
+check(
+  "full FK closeout is index-only",
+  !/\b(insert|update|delete|alter\s+table|drop\s+table|create\s+table|create\s+function)\b/i.test(
+    fullFkIndexes,
   ),
 );
 check(

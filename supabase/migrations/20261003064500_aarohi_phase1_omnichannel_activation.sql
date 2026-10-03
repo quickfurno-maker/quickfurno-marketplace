@@ -622,6 +622,7 @@ for each row execute function public.qf_aarohi_mark_conversion_complete_v1();
 create or replace function public.qf_aarohi_auto_handoff_from_vendor_v1()
 returns trigger
 language plpgsql
+security definer
 set search_path=public
 as $$
 begin
@@ -636,6 +637,7 @@ revoke all on function public.qf_aarohi_auto_handoff_from_vendor_v1()
 create or replace function public.qf_aarohi_auto_handoff_from_package_v1()
 returns trigger
 language plpgsql
+security definer
 set search_path=public
 as $$
 begin

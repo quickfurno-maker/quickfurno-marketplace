@@ -14,7 +14,9 @@ import {
 } from "@/lib/jarvis/aarohiPhase2Contract";
 import {
   claimAarohiDiscoveryRun,
+  claimAarohiSocialOutreach,
   completeAarohiDiscoveryRun,
+  completeAarohiSocialOutreach,
   ingestAarohiDiscoveryCandidate,
   recordAarohiSocialReply,
 } from "@/services/aarohiPhase2AcquisitionService";
@@ -89,6 +91,26 @@ export async function POST(request:Request):Promise<Response>{
       return reply(200,{
         protocol:QFJ_AAROHI_PHASE2_PROTOCOL,version:QFJ_AAROHI_PHASE2_VERSION,
         requestId:parsed.requestId,status:"accepted",candidateIds,
+      });
+    }
+    if(operation.kind==="CLAIM_SOCIAL_OUTREACH"){
+      const job=await claimAarohiSocialOutreach(String(operation.payload.workerRef));
+      return reply(200,{
+        protocol:QFJ_AAROHI_PHASE2_PROTOCOL,version:QFJ_AAROHI_PHASE2_VERSION,
+        requestId:parsed.requestId,status:job?"claimed":"idle",job,
+      });
+    }
+    if(operation.kind==="COMPLETE_SOCIAL_OUTREACH"){
+      const job=await completeAarohiSocialOutreach({
+        jobId:String(operation.payload.jobId),
+        executionToken:String(operation.payload.executionToken),
+        outcome:String(operation.payload.outcome) as "ACCEPTED"|"DEFINITIVE_FAILURE"|"UNCERTAIN",
+        providerMessageRef:operation.payload.providerMessageRef==null?null:String(operation.payload.providerMessageRef),
+        errorCode:operation.payload.errorCode==null?null:String(operation.payload.errorCode),
+      });
+      return reply(200,{
+        protocol:QFJ_AAROHI_PHASE2_PROTOCOL,version:QFJ_AAROHI_PHASE2_VERSION,
+        requestId:parsed.requestId,status:"recorded",job,
       });
     }
     if(operation.kind==="COMPLETE_DISCOVERY_RUN"){

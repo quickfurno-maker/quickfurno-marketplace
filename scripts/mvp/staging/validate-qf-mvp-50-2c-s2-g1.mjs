@@ -681,10 +681,6 @@ function validateState(state) {
         ["20261001154500", "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"],
         ["20261001165000", "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"],
         ["20261003070000", "SOURCE_PIN_CREATED_2026-10-03_BEFORE_DEPLOYMENT"],
-        ["20261003080000", "SOURCE_PIN_CREATED_2026-10-03_BEFORE_DEPLOYMENT"],
-        ["20261003083000", "SOURCE_PIN_CREATED_2026-10-03_BEFORE_DEPLOYMENT"],
-        ["20261003090000", "SOURCE_PIN_CREATED_2026-10-03_BEFORE_DEPLOYMENT"],
-        ["20261003091000", "SOURCE_PIN_CREATED_2026-10-03_BEFORE_DEPLOYMENT"],
       ]);
       const allowedSourcePin = sourcePinnedEvidence.get(record.version);
       return local?.version === record.version &&
@@ -801,6 +797,58 @@ function validateState(state) {
             record.observedStagingAppliedVersion === "20261003040425" &&
             record.stagingApplyReplayCount === 1 &&
             record.stagingAdvisorClosure?.indexesPresent === 4 &&
+            record.stagingAdvisorClosure?.targetForeignKeyWarningsRemaining === 0
+          ) ||
+          (
+            record.version === "20261003080000" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_APPLY_2026-10-03" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            record.observedStagingAppliedVersion === "20261003072042" &&
+            record.stagingApplyReplayCount === 1
+          ) ||
+          (
+            record.version === "20261003083000" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_APPLY_2026-10-03" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            record.observedStagingAppliedVersion === "20261003072049" &&
+            record.stagingApplyReplayCount === 1
+          ) ||
+          (
+            record.version === "20261003090000" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_FAIL_CLOSED_CANARY_2026-10-03" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            record.observedStagingAppliedVersion === "20261003072056" &&
+            record.stagingApplyReplayCount === 1 &&
+            record.stagingCanary?.mode === "ROLLBACK_ONLY" &&
+            record.stagingCanary?.runtimeMode === "PAUSED" &&
+            record.stagingCanary?.discoveryClaimBlocked === true &&
+            record.stagingCanary?.dispatchReadyBlocked === true &&
+            record.stagingCanary?.allChannelsRuntimeEnabled === false &&
+            record.stagingCanary?.connectorsEnabled === 0 &&
+            record.stagingCanary?.cityPoliciesEnabled === 0 &&
+            record.stagingCanary?.followupPoliciesEnabled === 0 &&
+            record.stagingCanary?.allPhase2TablesRls === true &&
+            record.stagingCanary?.browserRoleExecute === false &&
+            record.stagingCanary?.serviceRoleExecute === true &&
+            record.stagingCanary?.rowsAfterRollback?.prospects === 0 &&
+            record.stagingCanary?.rowsAfterRollback?.discoveryRuns === 0 &&
+            record.stagingCanary?.rowsAfterRollback?.outreachJobs === 0
+          ) ||
+          (
+            record.version === "20261003091000" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_PHASE2_INDEX_APPLY_2026-10-03" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            record.observedStagingAppliedVersion === "20261003072655" &&
+            record.stagingApplyReplayCount === 1 &&
+            record.stagingAdvisorClosure?.indexesPresent === 3 &&
             record.stagingAdvisorClosure?.targetForeignKeyWarningsRemaining === 0
           ) ||
           (

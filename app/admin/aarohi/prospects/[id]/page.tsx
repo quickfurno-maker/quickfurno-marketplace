@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { AarohiBadge,AarohiPageHead,formatWhen } from "@/components/admin/aarohi/AarohiPrimitives";
 import { AarohiRegistrationLinkTool } from "@/components/admin/aarohi/AarohiRegistrationLinkTool";
 import { getAarohiProspect,listActivePackages } from "@/services/aarohiCrmService";
-import { createTaskAction,completeHandoffAction,identityDecisionAction,linkWhatsAppContinuationAction,observeChannelIdentityAction,pauseAarohiAction,recordAssistedOutreachAction,recordAarohiMarketingPermissionAction,scoreProspectAction,selectPackageAction,suppressProspectAction,takeoverProspectAction,updateWorkflowAction } from "../../actions";
+import { createTaskAction,completeHandoffAction,identityDecisionAction,linkWhatsAppContinuationAction,observeChannelIdentityAction,pauseAarohiAction,recordAssistedOutreachAction,recordAarohiChannelEligibilityAction,recordAarohiMarketingPermissionAction,scoreProspectAction,selectPackageAction,suppressProspectAction,takeoverProspectAction,updateWorkflowAction } from "../../actions";
 export const dynamic="force-dynamic";
 function Field({label,value}:{label:string;value:React.ReactNode}){return <><dt>{label}</dt><dd>{value||"—"}</dd></>}
 export default async function Prospect360Page({params}:{params:Promise<{id:string}>}){const [data,packages]=await Promise.all([getAarohiProspect((await params).id),listActivePackages()]);if(!data)notFound();const p:any=data.prospect;const score:any=data.scores[0]??{};const handoff:any=data.handoff;const core:any=data.core;return <>
@@ -35,6 +35,16 @@ export default async function Prospect360Page({params}:{params:Promise<{id:strin
       <label>Assisted first contact<select name="channel" className="qf-aarohi-select"><option>INSTAGRAM</option><option>FACEBOOK</option></select></label>
       <label>Platform reference<input name="external_reference" className="qf-aarohi-input"/></label>
       <button className="qf-aarohi-btn" data-tone="ghost">Mark first DM sent by operator</button>
+     </form>
+     <form action={recordAarohiChannelEligibilityAction.bind(null,p.id)} className="qf-aarohi-formgrid">
+      <label>Channel eligibility<select name="channel" className="qf-aarohi-select" defaultValue="X"><option>X</option><option>INSTAGRAM</option><option>FACEBOOK</option><option>WHATSAPP</option></select></label>
+      <label>State<select name="state" className="qf-aarohi-select"><option>UNKNOWN</option><option>ELIGIBLE</option><option>INELIGIBLE</option></select></label>
+      <label>Provider key<input name="provider_key" className="qf-aarohi-input" placeholder="x_official"/></label>
+      <label>Evidence kind<input name="evidence_kind" className="qf-aarohi-input" placeholder="PROVIDER_RECIPIENT_PERMISSION"/></label>
+      <label className="wide">Evidence reference<input name="evidence_ref" required className="qf-aarohi-input" placeholder="provider/ops evidence ref"/></label>
+      <label>TTL minutes<input name="ttl_minutes" type="number" min="5" max="1440" defaultValue="60" className="qf-aarohi-input"/></label>
+      <button className="qf-aarohi-btn" data-tone="ghost">Record eligibility</button>
+      <p className="qf-aarohi-note wide">Cold X initiation requires fresh ELIGIBLE evidence. Instagram/Facebook cold starts remain human-assisted regardless of this field.</p>
      </form>
      <form action={linkWhatsAppContinuationAction.bind(null,p.id)} className="qf-aarohi-formgrid">
       <label className="wide">WhatsApp continuation (explicit international number)<input name="phone_e164" required className="qf-aarohi-input" placeholder="+91…"/></label>

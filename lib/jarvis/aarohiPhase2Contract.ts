@@ -7,6 +7,8 @@ export const QFJ_AAROHI_PHASE2_OPERATIONS = [
   "CLAIM_DISCOVERY_RUN",
   "SUBMIT_DISCOVERY_CANDIDATES",
   "COMPLETE_DISCOVERY_RUN",
+  "CLAIM_SOCIAL_OUTREACH",
+  "COMPLETE_SOCIAL_OUTREACH",
   "SUBMIT_SOCIAL_REPLY",
 ] as const;
 export type QfjAarohiPhase2OperationKind = typeof QFJ_AAROHI_PHASE2_OPERATIONS[number];
@@ -94,6 +96,19 @@ function parseOperation(value:unknown):QfjAarohiPhase2Request["operation"]|null{
       !Number.isSafeInteger(payload.promotedCount)||Number(payload.promotedCount)<0||Number(payload.promotedCount)>Number(payload.candidateCount)||
       !optionalString(payload.errorCode,160)
     ) return null;
+  }else if(kind==="CLAIM_SOCIAL_OUTREACH"){
+    if(!exactKeys(payload,["workerRef"])||!string(payload.workerRef,1,128)||!REF.test(String(payload.workerRef))) return null;
+  }else if(kind==="COMPLETE_SOCIAL_OUTREACH"){
+    const keys=Object.keys(payload);
+    if(keys.some(key=>!["jobId","executionToken","outcome","providerMessageRef","errorCode"].includes(key))||!["jobId","executionToken","outcome"].every(key=>keys.includes(key))) return null;
+    if(
+      !UUID.test(String(payload.jobId))||
+      !UUID.test(String(payload.executionToken))||
+      !["ACCEPTED","DEFINITIVE_FAILURE","UNCERTAIN"].includes(String(payload.outcome))||
+      !optionalString(payload.providerMessageRef,300)||
+      !optionalString(payload.errorCode,160)
+    ) return null;
+    if(payload.outcome==="ACCEPTED"&&!string(payload.providerMessageRef,1,300)) return null;
   }else{
     const keys=Object.keys(payload);
     if(keys.some(key=>!["prospectId","channel","threadRef","messageRef","replyKind","safeSummary","occurredAt","phoneE164"].includes(key))||!["prospectId","channel","threadRef","messageRef","replyKind","safeSummary","occurredAt"].every(key=>keys.includes(key))) return null;

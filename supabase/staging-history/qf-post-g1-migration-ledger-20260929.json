@@ -493,6 +493,18 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-10-03_BEFORE_DEPLOYMENT"
+    },
+    {
+      "version": "20261003090000",
+      "name": "aarohi_phase2_ops_control_analytics",
+      "filename": "20261003090000_aarohi_phase2_ops_control_analytics.sql",
+      "path": "supabase/migrations/20261003090000_aarohi_phase2_ops_control_analytics.sql",
+      "canonicalSha256": "a2e9eade298ee5639938d211d16e990d07628e13c4c5f042ec2b4b2a3d22c49b",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-03_BEFORE_DEPLOYMENT"
     }
   ],
   "supersededLegacyPins": [

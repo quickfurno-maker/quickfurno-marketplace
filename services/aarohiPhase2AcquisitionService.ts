@@ -562,44 +562,66 @@ export async function planAarohiWhatsAppBroadcast(args:{
   campaignId:string;templateName:string;actorId:string;dailyCap?:number;
 }){
   const db=adminClient();
+  const template=args.templateName.trim().slice(0,512);
+  if(!template) throw new Error("aarohi_broadcast_template_required");
   const cap=Math.max(1,Math.min(10000,Math.round(args.dailyCap??1000)));
   const [{data:members,error},{data:permissions,error:permissionError}]=await Promise.all([
     db.from("aarohi_campaign_members")
-      .select("prospect_id,aarohi_prospects!inner(id,whatsapp_available,do_not_contact,ai_paused,human_takeover,prospect_stage)")
+      .select("prospect_id,aarohi_prospects!inner(id,city_id,whatsapp_available,do_not_contact,ai_paused,human_takeover,prospect_stage)")
       .eq("campaign_id",args.campaignId),
     db.from("aarohi_communication_permissions")
-      .select("prospect_id").eq("channel","WHATSAPP").eq("purpose","MARKETING_BROADCAST").eq("state","GRANTED"),
+      .select("prospect_id").eq("channel","WHATSAPP")
+      .eq("purpose","MARKETING_BROADCAST").eq("state","GRANTED"),
   ]);
   if(error) throw error;
   if(permissionError) throw permissionError;
   const marketingAllowed=new Set((permissions??[]).map((row:any)=>String(row.prospect_id)));
-  const eligible=(members??[]).filter((m:any)=>{
-    const p=m.aarohi_prospects;
-    return marketingAllowed.has(String(m.prospect_id))&&p?.whatsapp_available===true&&p?.do_not_contact!==true&&p?.ai_paused!==true&&p?.human_takeover!==true&&p?.prospect_stage!=="SUPPRESSED";
-  }).slice(0,cap);
-  const batch=await db.from("aarohi_broadcast_batches").insert({
-    campaign_id:args.campaignId,template_name:args.templateName.trim().slice(0,512),
-    state:"READY",target_count:eligible.length,daily_cap:cap,created_by:args.actorId,
-  }).select("id").single();
-  if(batch.error) throw batch.error;
-  let queued=0;
-  for(const member of eligible){
-    const prospectId=String((member as any).prospect_id);
-    await queueAarohiOutreach({
-      prospectId,channel:"WHATSAPP",campaignId:args.campaignId,priority:60,
-      draftRef:`template:${args.templateName.trim().slice(0,200)}`,
-      idempotencyKey:`aarohi.broadcast.${batch.data.id}.${prospectId}`,
-    });
-    queued+=1;
+  const grouped=new Map<string,any[]>();
+  for(const member of members??[]){
+    const p=(member as any).aarohi_prospects;
+    if(
+      !marketingAllowed.has(String((member as any).prospect_id))||
+      p?.whatsapp_available!==true||p?.do_not_contact===true||p?.ai_paused===true||
+      p?.human_takeover===true||p?.prospect_stage==="SUPPRESSED"||!p?.city_id
+    ) continue;
+    const list=grouped.get(String(p.city_id))??[];
+    if(list.length<cap) list.push(member);
+    grouped.set(String(p.city_id),list);
   }
-  await db.from("aarohi_broadcast_batches").update({target_count:queued,updated_at:new Date().toISOString()}).eq("id",batch.data.id);
-  await db.from("aarohi_events").insert({
+
+  const batches:Array<{batchId:string;cityId:string;targetCount:number}>=[];
+  for(const [cityId,eligible] of grouped.entries()){
+    const batch=await db.from("aarohi_broadcast_batches").insert({
+      campaign_id:args.campaignId,city_id:cityId,template_name:template,
+      state:"READY",target_count:eligible.length,daily_cap:cap,created_by:args.actorId,
+    }).select("id").single();
+    if(batch.error) throw batch.error;
+    let queued=0;
+    for(const member of eligible){
+      const prospectId=String((member as any).prospect_id);
+      await queueAarohiOutreach({
+        prospectId,channel:"WHATSAPP",campaignId:args.campaignId,
+        broadcastBatchId:String(batch.data.id),priority:60,
+        draftRef:`template:${template.slice(0,200)}`,
+        idempotencyKey:`aarohi.broadcast.${batch.data.id}.${prospectId}`,
+      });
+      queued+=1;
+    }
+    const update=await db.from("aarohi_broadcast_batches")
+      .update({target_count:queued,updated_at:new Date().toISOString()})
+      .eq("id",batch.data.id);
+    if(update.error) throw update.error;
+    batches.push({batchId:String(batch.data.id),cityId,targetCount:queued});
+  }
+
+  const event=await db.from("aarohi_events").insert({
     event_type:"broadcast.batch_planned",actor_type:"HUMAN",actor_reference:args.actorId,
-    safe_summary:"Aarohi WhatsApp broadcast batch planned; every recipient still requires Core authorization.",
-    reference_type:"broadcast_batch",reference_id:String(batch.data.id),
-    event_data:{targetCount:queued,dailyCap:cap},
+    safe_summary:"Aarohi WhatsApp broadcast batches planned by city; every recipient still requires Core authorization.",
+    reference_type:"campaign",reference_id:args.campaignId,
+    event_data:{batchCount:batches.length,targetCount:batches.reduce((n,b)=>n+b.targetCount,0),dailyCap:cap},
   });
-  return {batchId:String(batch.data.id),targetCount:queued};
+  if(event.error) throw event.error;
+  return {batches,targetCount:batches.reduce((n,b)=>n+b.targetCount,0)};
 }
 
 export async function recordAarohiSocialReply(args:{

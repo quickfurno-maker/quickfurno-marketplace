@@ -76,6 +76,98 @@ where provider_key='meta_whatsapp_cloud'
   and account_alias='jarvis'
   and account_role='conversational';
 
+create or replace function public.qf_aarohi_complete_whatsapp_intake_v1(
+  p_intake_id uuid,
+  p_primary_category text
+) returns uuid
+language plpgsql
+security definer
+set search_path=public
+as $
+declare
+  v_intake public.aarohi_whatsapp_intakes;
+  v_existing uuid;
+  v_prospect_id uuid;
+  v_category text;
+begin
+  v_category:=left(trim(coalesce(p_primary_category,'')),120);
+  if length(v_category)<2 then raise exception 'aarohi_intake_category_required'; end if;
+
+  select * into v_intake
+    from public.aarohi_whatsapp_intakes
+    where id=p_intake_id
+    for update;
+  if v_intake.id is null then raise exception 'aarohi_intake_not_found'; end if;
+  if v_intake.state='COMPLETE' and v_intake.prospect_id is not null then
+    return v_intake.prospect_id;
+  end if;
+  if v_intake.state<>'AWAITING_CATEGORY'
+     or nullif(trim(coalesce(v_intake.business_name,'')),'') is null
+     or v_intake.city_id is null then
+    raise exception 'aarohi_intake_not_ready';
+  end if;
+
+  select ci.prospect_id into v_existing
+    from public.aarohi_channel_identities ci
+    join public.aarohi_prospects p on p.id=ci.prospect_id
+    where ci.channel='WHATSAPP'
+      and ci.external_reference=('whatsapp_hash:'||v_intake.destination_hash)
+      and p.tenant_id='quickfurno'
+      and p.merged_into_prospect_id is null
+      and p.do_not_contact=false
+      and p.prospect_stage<>'SUPPRESSED'
+    order by ci.created_at asc
+    limit 1;
+
+  if v_existing is not null then
+    update public.aarohi_whatsapp_intakes
+      set state='COMPLETE',primary_category=v_category,prospect_id=v_existing,
+          completed_at=coalesce(completed_at,now()),updated_at=now()
+      where id=v_intake.id;
+    return v_existing;
+  end if;
+
+  insert into public.aarohi_prospects(
+    tenant_id,city_id,business_name,normalized_business_name,primary_category,
+    source_confidence,data_confidence,prospect_stage,conversation_stage,
+    preferred_channel,last_activity_at
+  ) values (
+    'quickfurno',v_intake.city_id,trim(v_intake.business_name),
+    lower(regexp_replace(trim(v_intake.business_name),'[^a-zA-Z0-9]+',' ','g')),
+    v_category,80,60,'CONTACTED','FIRST_CONTACT','WHATSAPP',now()
+  ) returning id into v_prospect_id;
+
+  insert into public.aarohi_channel_identities(
+    prospect_id,channel,external_reference,display_name,verification_status
+  ) values (
+    v_prospect_id,'WHATSAPP','whatsapp_hash:'||v_intake.destination_hash,
+    trim(v_intake.business_name),'OBSERVED'
+  );
+
+  insert into public.aarohi_events(
+    prospect_id,event_type,actor_type,actor_reference,channel,safe_summary,
+    reference_type,reference_id,event_data
+  ) values (
+    v_prospect_id,'prospect.whatsapp_intake_completed','CORE','whatsapp-intake','WHATSAPP',
+    'Dedicated Aarohi WhatsApp intake created a durable acquisition prospect',
+    'whatsapp_intake',v_intake.id::text,
+    jsonb_build_object('city_id',v_intake.city_id::text,'category',v_category)
+  );
+
+  update public.aarohi_whatsapp_intakes
+    set state='COMPLETE',primary_category=v_category,prospect_id=v_prospect_id,
+        completed_at=now(),updated_at=now()
+    where id=v_intake.id;
+
+  return v_prospect_id;
+end
+$;
+
+revoke all on function public.qf_aarohi_complete_whatsapp_intake_v1(uuid,text)
+  from public,anon,authenticated;
+grant execute on function public.qf_aarohi_complete_whatsapp_intake_v1(uuid,text)
+  to service_role;
+
 create or replace function public.qf_aarohi_link_vendor_conversion_v1(
   p_prospect_id uuid,
   p_vendor_id uuid,

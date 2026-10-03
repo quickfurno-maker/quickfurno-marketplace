@@ -2126,3 +2126,145 @@
     color: #67738a;
   }
 }
+
+
+/* ==========================================================================
+   QF-UI-20261003 — mobile enquiry density audit
+   Keep the continuous lead form touch-safe without letting it read like a
+   desktop form scaled up on a phone. Lead logic and validation are untouched.
+   ========================================================================== */
+@media (max-width: 719px) {
+  .qf-rf-backdrop.qf-rf-backdrop {
+    padding: 6px 6px 0;
+  }
+
+  .qf-rf-modal.qf-rf-modal {
+    width: calc(100% - 4px);
+    max-height: calc(100dvh - 6px);
+    border-radius: 18px 18px 10px 10px;
+  }
+
+  .qf-rf-top.qf-rf-top {
+    padding: 0.46rem 0.58rem 0.5rem;
+  }
+
+  .qf-rf-top-row {
+    min-height: 40px;
+  }
+
+  .qf-rf-flow-name.qf-rf-flow-name {
+    font-size: 0.72rem;
+  }
+
+  .qf-sf-intro {
+    margin-top: 0.24rem;
+    padding: 0.52rem 0.62rem 0.56rem;
+    border-radius: 14px;
+  }
+
+  .qf-sf-intro h3 {
+    max-width: 230px;
+    font-size: clamp(1.28rem, 6vw, 1.5rem);
+    line-height: 1.02;
+  }
+
+  .qf-sf-intro p {
+    max-width: 280px;
+    margin-top: 0.24rem;
+    font-size: 0.7rem;
+    line-height: 1.34;
+  }
+
+  .qf-rf-body.qf-rf-body {
+    padding: 0.54rem;
+  }
+
+  .qf-sf.qf-sf {
+    gap: 0.62rem;
+  }
+
+  .qf-sf-card {
+    padding: 0.68rem;
+    border-radius: 1rem;
+  }
+
+  .qf-sf-card-grid {
+    gap: 0.58rem;
+    margin-top: 0.64rem;
+  }
+
+  .qf-sf-sechead {
+    gap: 0.56rem;
+  }
+
+  .qf-sf-sechead-n {
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.94rem;
+  }
+
+  .qf-sf-sechead h4 {
+    font-size: 0.96rem;
+  }
+
+  .qf-sf-sechead small {
+    font-size: 0.68rem;
+    line-height: 1.28;
+  }
+
+  .qf-sf-required {
+    padding: 0.28rem 0.48rem;
+    font-size: 0.64rem;
+  }
+
+  .qf-sf-label {
+    font-size: 0.74rem;
+  }
+
+  .qf-sf-field input,
+  .qf-sf-field select,
+  .qf-sf .qf-rf-input-wrapper input {
+    min-height: 46px;
+    border-radius: 0.72rem;
+  }
+
+  .qf-sf-field textarea {
+    min-height: 78px;
+  }
+
+  .qf-sf-phone-input,
+  .qf-sf-country {
+    min-height: 46px;
+  }
+
+  .qf-sf-phone-input input {
+    min-height: 44px;
+  }
+
+  .qf-sf-example {
+    font-size: 0.64rem;
+    line-height: 1.3;
+  }
+
+  .qf-sf-consent {
+    padding: 0.62rem 0.66rem;
+    font-size: 0.72rem;
+    line-height: 1.42;
+  }
+
+  .qf-rf-footer.qf-sf-footer {
+    padding: 0.56rem 0.62rem max(0.6rem, env(safe-area-inset-bottom));
+  }
+
+  .qf-sf-cta.qf-sf-cta {
+    min-height: 48px;
+    border-radius: 0.76rem;
+    font-size: 0.92rem;
+  }
+
+  .qf-sf-trust {
+    margin-top: 0.34rem;
+    font-size: 0.62rem;
+    line-height: 1.3;
+  }
+}

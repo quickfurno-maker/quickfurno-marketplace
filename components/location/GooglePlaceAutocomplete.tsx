@@ -377,29 +377,45 @@ export default function GooglePlaceAutocomplete({
       const input = inputRef.current;
       if (!input) return;
       const rect = input.getBoundingClientRect();
-      const viewportH = window.innerHeight;
-      const preferredMax = Math.min(240, Math.max(160, viewportH * 0.45));
+      const visualViewport = window.visualViewport;
+      const viewportH = visualViewport?.height ?? window.innerHeight;
+      const viewportW = visualViewport?.width ?? window.innerWidth;
+      const preferredMax = Math.min(240, Math.max(144, viewportH * 0.42));
       const below = Math.max(0, viewportH - rect.bottom - 8);
       const above = Math.max(0, rect.top - 8);
-      const openUp = below < 180 && above > below;
-      const available = Math.max(120, Math.min(preferredMax, openUp ? above : below));
+      const openUp = below < 168 && above > below;
+      const available = Math.max(112, Math.min(preferredMax, openUp ? above : below));
+      const horizontalInset = viewportW <= 640 ? 8 : 0;
+      const width = Math.max(
+        0,
+        Math.min(rect.width, viewportW - horizontalInset * 2),
+      );
+      const left = Math.min(
+        Math.max(rect.left, horizontalInset),
+        Math.max(horizontalInset, viewportW - width - horizontalInset),
+      );
+
       setPortalStyle({
         position: "fixed",
-        left: rect.left,
-        width: rect.width,
+        left,
+        width,
         zIndex: 2000,
         maxHeight: available,
         ...(openUp
-          ? { bottom: viewportH - rect.top + 4, top: "auto" }
+          ? { bottom: Math.max(4, viewportH - rect.top + 4), top: "auto" }
           : { top: rect.bottom + 4, bottom: "auto" }),
       });
     };
     update();
     window.addEventListener("resize", update);
     window.addEventListener("scroll", update, true);
+    window.visualViewport?.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("scroll", update);
     return () => {
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
+      window.visualViewport?.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("scroll", update);
     };
   }, [open, suggestionsPortal, suggestions.length]);
 

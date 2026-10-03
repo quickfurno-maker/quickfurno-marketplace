@@ -1754,3 +1754,96 @@
     border-radius: 20px 20px 14px 14px;
   }
 }
+
+
+/* ==========================================================================
+   QF-UI-20261003 — mobile project-location sheet
+   The location chooser must respect the visual viewport/keyboard and behave as
+   a compact bottom sheet instead of a centered desktop dialog on small screens.
+   ========================================================================== */
+@media (max-width: 879px) {
+  .qf-project-location-overlay {
+    height: 100dvh;
+    align-items: end;
+    padding: 0;
+    overscroll-behavior: contain;
+  }
+
+  .qf-project-location-dialog {
+    width: 100%;
+    max-height: min(86dvh, 680px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 18px 16px max(16px, env(safe-area-inset-bottom));
+    border-radius: 20px 20px 0 0;
+    scrollbar-gutter: stable;
+  }
+
+  .qf-project-location-close {
+    top: 8px;
+    right: 8px;
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
+  }
+
+  .qf-project-location-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+  }
+
+  .qf-project-location-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .qf-project-location-dialog h2 {
+    margin: 8px 44px 5px 0;
+    font-size: clamp(1.2rem, 5.5vw, 1.42rem);
+    line-height: 1.16;
+  }
+
+  .qf-project-location-dialog > p {
+    max-width: 34rem;
+    font-size: 12.5px;
+    line-height: 1.45;
+  }
+
+  .qf-project-location-field {
+    margin-top: 14px;
+  }
+
+  .qf-project-location-field input {
+    min-height: 46px;
+    padding: 0 12px;
+    border-radius: 11px;
+    font-size: 16px;
+  }
+
+  .qf-project-location-current {
+    margin-top: 12px;
+    padding: 10px 11px;
+  }
+
+  .qf-project-location-current > strong {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    line-height: 1.3;
+  }
+
+  .qf-project-location-dialog > small {
+    margin-top: 10px;
+    font-size: 10.75px;
+    line-height: 1.4;
+  }
+}
+
+@media (max-width: 420px) {
+  .qf-project-location-dialog {
+    max-height: 88dvh;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}

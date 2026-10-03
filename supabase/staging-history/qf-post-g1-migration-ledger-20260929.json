@@ -429,7 +429,7 @@
       "name": "aarohi_phase1_omnichannel_activation",
       "filename": "20261003064500_aarohi_phase1_omnichannel_activation.sql",
       "path": "supabase/migrations/20261003064500_aarohi_phase1_omnichannel_activation.sql",
-      "canonicalSha256": "cbdf5bf38cd5cc1af8c72e6a6c0f193d1baf66e99afee64d47ee0d92bbbd4aa7",
+      "canonicalSha256": "fb10d57da662e18c5d07957e02228a5062f53435cf4ea359b0a5241ed7f33c3e",
       "exactVersionPresence": {
         "staging": false,
         "production": false

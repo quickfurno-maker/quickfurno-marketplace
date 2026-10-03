@@ -475,7 +475,7 @@
       "name": "aarohi_phase2_autonomous_acquisition",
       "filename": "20261003080000_aarohi_phase2_autonomous_acquisition.sql",
       "path": "supabase/migrations/20261003080000_aarohi_phase2_autonomous_acquisition.sql",
-      "canonicalSha256": "ccd8be564e4ddecf55b2cfef7491d296ef9bab56ac0de4411cf7b6deaca1537d",
+      "canonicalSha256": "9816bf19562cdba37d244b0b0867fa7c3832f2a4776e55a9c15de56888362408",
       "exactVersionPresence": {
         "staging": false,
         "production": false

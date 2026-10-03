@@ -49,6 +49,7 @@ export type CommunicationRecipientType =
   | "vendor"
   | "admin"
   | "lead"
+  | "prospect"
   | "integration"
   | "system";
 

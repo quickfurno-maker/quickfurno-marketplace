@@ -12,6 +12,7 @@ const check=(name,condition)=>{
 
 const migrationPath="supabase/migrations/20261003080000_aarohi_phase2_autonomous_acquisition.sql";
 const governanceMigrationPath="supabase/migrations/20261003083000_aarohi_phase2_scale_governance.sql";
+const opsMigrationPath="supabase/migrations/20261003090000_aarohi_phase2_ops_control_analytics.sql";
 const consentPath="services/aarohiOutboundConsentEnforcer.ts";
 const whatsAppExecutionPath="services/aarohiWhatsAppExecutionService.ts";
 const recipientResolverPath="services/communicationRecipientResolver.ts";
@@ -25,11 +26,15 @@ const contextPath="services/conversationalWhatsAppService.ts";
 const discoveryPage="app/admin/aarohi/discovery/page.tsx";
 const outreachPage="app/admin/aarohi/outreach/page.tsx";
 const campaignPage="app/admin/aarohi/campaigns/page.tsx";
-for(const p of [migrationPath,governanceMigrationPath,policyPath,servicePath,routePath,workerPath,contextPath,discoveryPage,outreachPage,campaignPage,consentPath,whatsAppExecutionPath,recipientResolverPath,communicationTypesPath,envPath]){
+const settingsPage="app/admin/aarohi/settings/page.tsx";
+const analyticsPage="app/admin/aarohi/analytics/page.tsx";
+const opsServicePath="services/aarohiPhase2OpsService.ts";
+for(const p of [migrationPath,governanceMigrationPath,opsMigrationPath,policyPath,servicePath,opsServicePath,routePath,workerPath,contextPath,discoveryPage,outreachPage,campaignPage,settingsPage,analyticsPage,consentPath,whatsAppExecutionPath,recipientResolverPath,communicationTypesPath,envPath]){
   check("required Phase 2 artifact exists: "+p,exists(p));
 }
 const migration=read(migrationPath);
 const governance=read(governanceMigrationPath);
+const opsMigration=read(opsMigrationPath);
 const policy=read(policyPath);
 const service=read(servicePath);
 const route=read(routePath);
@@ -38,6 +43,9 @@ const context=read(contextPath);
 const discovery=read(discoveryPage);
 const outreach=read(outreachPage);
 const campaigns=read(campaignPage);
+const settings=read(settingsPage);
+const analytics=read(analyticsPage);
+const opsService=read(opsServicePath);
 const consent=read(consentPath);
 const whatsappExecution=read(whatsAppExecutionPath);
 const recipientResolver=read(recipientResolverPath);
@@ -89,6 +97,15 @@ check("Core authorization keeps IG/FB cold starts assisted",governance.includes(
 check("Core authorization uses global marketing frequency policy",governance.includes("communication_frequency_policies")&&governance.includes("FREQUENCY_WINDOW_EXHAUSTED"));
 check("WhatsApp claim rechecks runtime eligibility",governance.includes("qf_aarohi_claim_whatsapp_outreach_v1")&&governance.includes("cp.outreach_enabled=true"));
 check("uncertain WhatsApp outcome never requeues",governance.includes("PROVIDER_EXECUTION_UNCERTAIN")&&governance.includes("state='BLOCKED'"));
+check("ops migration creates global runtime controls",opsMigration.includes("public.aarohi_runtime_controls"));
+check("ops migration creates cost evidence table",opsMigration.includes("public.aarohi_acquisition_cost_entries"));
+check("global runtime defaults PAUSED",opsMigration.includes("mode text not null default 'PAUSED'"));
+check("global runtime PAUSED forces flags false",opsMigration.includes("mode<>'PAUSED'")&&opsMigration.includes("discovery_enabled=false"));
+check("database guard blocks automated outbound",opsMigration.includes("qf_aarohi_guard_outreach_runtime_v1")&&opsMigration.includes("aarohi_runtime_outbound_disabled"));
+check("database guard blocks disabled channel",opsMigration.includes("aarohi_runtime_channel_disabled"));
+check("database guard protects assisted first contact",opsMigration.includes("aarohi_runtime_assisted_outbound_disabled"));
+check("database guard protects discovery claims",opsMigration.includes("qf_aarohi_guard_discovery_claim_v1")&&opsMigration.includes("aarohi_runtime_discovery_disabled"));
+check("cost evidence stores no provider credentials",!/(access_token|bearer_token|api_secret|private_key)\s+text/i.test(opsMigration));
 check("communication recipient vocabulary explicitly adds prospect",
   governance.includes("'prospect'")&&communicationTypes.includes('| "prospect"'));
 check("prospect destination resolves only from Aarohi prospect record",
@@ -127,6 +144,12 @@ check("WhatsApp sharing grants continuation only",service.includes('purpose:"ACQ
 check("broadcast explicitly requires MARKETING_BROADCAST",service.includes('"MARKETING_BROADCAST"')&&service.includes("marketingAllowed"));
 check("memory snapshot is safe summary based",service.includes("safe_summary")&&service.includes("structured_facts"));
 check("Phase 2 service contains no provider fetch",!service.includes("fetch("));
+check("service discovery obeys global runtime control",service.includes("getAarohiRuntimeControl")&&service.includes("runtime.discovery_enabled"));
+check("service authorization obeys global runtime control",service.includes('runtime.mode!=="GOVERNED_AUTOMATION"')&&service.includes("runtime.outbound_enabled"));
+check("service followups obey global runtime control",service.includes("runtime.followups_enabled"));
+check("ops service writes Core-owned controls",opsService.includes('from("aarohi_runtime_controls")')&&opsService.includes("runtime.controls_changed"));
+check("ops service computes source/city/category attribution",opsService.includes("bySource")&&opsService.includes("byCity")&&opsService.includes("byCategory"));
+check("cost-per-activation is evidence-gated",opsService.includes("costPerActivatedVendorMinorInr")&&opsService.includes("activatedCount>0&&inrSpend>0"));
 
 check("Jarvis Phase 2 endpoint defaults off",route.includes("QF_JARVIS_AAROHI_PHASE2_ENABLED")&&route.includes('!=="true"'));
 check("Jarvis Phase 2 endpoint verifies signed request",route.includes("verifyQfjSignedRequestSignature"));
@@ -142,6 +165,11 @@ check("cross-channel memory is bounded",context.includes("slice(0, 1400)")&&cont
 check("Discovery UI exposes connector readiness",discovery.includes("Connector readiness"));
 check("Outreach UI states no row grants send",outreach.includes("No row on this page is itself permission to send"));
 check("Campaign UI has no blast control",campaigns.includes("There is intentionally no direct")&&campaigns.includes("Plan batch"));
+check("Settings UI exposes PAUSED and provider incident controls",settings.includes("PAUSED")&&settings.includes("provider_incident_mode"));
+check("Settings UI states controls cannot enable provider execution",settings.includes("cannot enable provider execution"));
+check("Analytics UI exposes source attribution",analytics.includes("Source attribution"));
+check("Analytics UI exposes recorded spend evidence",analytics.includes("Acquisition cost evidence"));
+check("Analytics UI refuses inferred ROI framing",analytics.includes("No opaque conversion prediction or inferred ROI"));
 
 console.log(`SUMMARY passed=${passed} failed=${failed}`);
 if(failed>0) process.exit(1);

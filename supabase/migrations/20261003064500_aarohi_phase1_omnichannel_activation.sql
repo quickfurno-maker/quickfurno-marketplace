@@ -56,19 +56,21 @@ comment on table public.aarohi_registration_intents is
 comment on table public.aarohi_vendor_conversion_links is
   'Authoritative Core correlation proving which canonical vendor originated from which Aarohi prospect. Required before final handoff.';
 
--- Repurpose the already-connected second conversational account for Aarohi.
--- Provider readiness/billing/health are intentionally not promoted here; those remain operator/provider facts.
+-- Prepare the already-connected second conversational account for Aarohi.
+-- IMPORTANT: schema apply alone MUST NOT activate acquisition traffic. Final cutover is a separate
+-- operator action after QuickFurno + qf-jarvis application deploy, provider credential verification,
+-- signed runtime bridge enablement and a controlled canary.
 update public.communication_provider_accounts
 set account_alias='aarohi',
     display_name='QuickFurno Partner — Aarohi Acquisition',
     account_role='conversational',
-    jarvis_access_mode='proposal_only',
-    is_default_for_role=true,
+    jarvis_access_mode='denied',
+    is_default_for_role=false,
     metadata=coalesce(metadata,'{}'::jsonb)
       || jsonb_build_object(
         'lane','acquisition',
         'agent','AAROHI',
-        'runtime_activation','enabled_after_application_deploy'
+        'runtime_activation','prepared_disabled'
       ),
     updated_at=now()
 where provider_key='meta_whatsapp_cloud'
@@ -87,6 +89,7 @@ as $$
 declare
   v_intake public.aarohi_whatsapp_intakes;
   v_existing uuid;
+  v_existing_count integer;
   v_prospect_id uuid;
   v_category text;
 begin
@@ -107,7 +110,14 @@ begin
     raise exception 'aarohi_intake_not_ready';
   end if;
 
-  select ci.prospect_id into v_existing
+  if not exists (
+    select 1 from public.cities c
+    where c.id=v_intake.city_id and c.is_active=true
+  ) then
+    raise exception 'aarohi_intake_city_inactive';
+  end if;
+
+  select count(distinct ci.prospect_id) into v_existing_count
     from public.aarohi_channel_identities ci
     join public.aarohi_prospects p on p.id=ci.prospect_id
     where ci.channel='WHATSAPP'
@@ -115,9 +125,24 @@ begin
       and p.tenant_id='quickfurno'
       and p.merged_into_prospect_id is null
       and p.do_not_contact=false
-      and p.prospect_stage<>'SUPPRESSED'
-    order by ci.created_at asc
-    limit 1;
+      and p.prospect_stage<>'SUPPRESSED';
+
+  if v_existing_count > 1 then
+    raise exception 'aarohi_whatsapp_identity_ambiguous';
+  end if;
+
+  if v_existing_count = 1 then
+    select ci.prospect_id into v_existing
+      from public.aarohi_channel_identities ci
+      join public.aarohi_prospects p on p.id=ci.prospect_id
+      where ci.channel='WHATSAPP'
+        and ci.external_reference=('whatsapp_hash:'||v_intake.destination_hash)
+        and p.tenant_id='quickfurno'
+        and p.merged_into_prospect_id is null
+        and p.do_not_contact=false
+        and p.prospect_stage<>'SUPPRESSED'
+      limit 1;
+  end if;
 
   if v_existing is not null then
     update public.aarohi_whatsapp_intakes
@@ -168,6 +193,59 @@ revoke all on function public.qf_aarohi_complete_whatsapp_intake_v1(uuid,text)
 grant execute on function public.qf_aarohi_complete_whatsapp_intake_v1(uuid,text)
   to service_role;
 
+create or replace function public.qf_aarohi_try_auto_handoff_v1(p_vendor_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare
+  v_link public.aarohi_vendor_conversion_links;
+  v_vendor public.vendors;
+  v_paid boolean;
+begin
+  select * into v_link
+    from public.aarohi_vendor_conversion_links
+    where vendor_id=p_vendor_id and status='LINKED'
+    for update;
+  if v_link.id is null then return false; end if;
+  if exists(select 1 from public.aarohi_handoffs where vendor_id=p_vendor_id) then return true; end if;
+
+  select * into v_vendor from public.vendors where id=p_vendor_id;
+  if v_vendor.id is null
+     or coalesce(v_vendor.status,'')<>'Approved'
+     or coalesce(v_vendor.is_active,false) is not true
+     or lower(coalesce(v_vendor.verification_status,''))<>'verified' then
+    return false;
+  end if;
+
+  select exists(
+    select 1 from public.vendor_packages vp
+      where vp.vendor_id=p_vendor_id
+        and lower(coalesce(vp.payment_status,''))='paid'
+        and lower(coalesce(vp.status,''))='active'
+    union all
+    select 1 from public.vendor_package_orders vo
+      where vo.vendor_id=p_vendor_id
+        and lower(coalesce(vo.payment_status,''))='paid'
+        and lower(coalesce(vo.activation_status,''))='activated'
+  ) into v_paid;
+  if not v_paid then return false; end if;
+
+  perform public.qf_aarohi_complete_handoff_v1(
+    v_link.prospect_id,
+    p_vendor_id,
+    null,
+    'core.auto.vendor.'||p_vendor_id::text,
+    'auto-handoff.'||v_link.prospect_id::text||'.'||p_vendor_id::text
+  );
+  return true;
+end
+$$;
+
+revoke all on function public.qf_aarohi_try_auto_handoff_v1(uuid) from public,anon,authenticated;
+grant execute on function public.qf_aarohi_try_auto_handoff_v1(uuid) to service_role;
+
 create or replace function public.qf_aarohi_link_vendor_conversion_v1(
   p_prospect_id uuid,
   p_vendor_id uuid,
@@ -213,6 +291,9 @@ begin
     if v_existing.prospect_id<>p_prospect_id or v_existing.vendor_id<>p_vendor_id then
       raise exception 'aarohi_vendor_correlation_conflict';
     end if;
+    if v_existing.status='REVOKED' then
+      raise exception 'aarohi_vendor_correlation_revoked';
+    end if;
     v_result:=v_existing;
   else
     insert into public.aarohi_vendor_conversion_links(
@@ -248,6 +329,11 @@ begin
     'vendor',p_vendor_id::text,
     jsonb_build_object('correlation_id',v_result.id::text)
   );
+
+  -- If this newly correlated vendor already satisfies every canonical activation fact,
+  -- complete acquisition now. This happens AFTER the registration projection above so
+  -- qf_aarohi_complete_handoff_v1 cannot be overwritten back to STARTED.
+  perform public.qf_aarohi_try_auto_handoff_v1(p_vendor_id);
 
   return v_result;
 end
@@ -303,58 +389,7 @@ revoke all on function public.qf_aarohi_require_conversion_link_v1() from public
 revoke all on function public.qf_aarohi_mark_conversion_complete_v1() from public,anon,authenticated;
 
 
-create or replace function public.qf_aarohi_try_auto_handoff_v1(p_vendor_id uuid)
-returns boolean
-language plpgsql
-security definer
-set search_path=public
-as $$
-declare
-  v_link public.aarohi_vendor_conversion_links;
-  v_vendor public.vendors;
-  v_paid boolean;
-begin
-  select * into v_link
-    from public.aarohi_vendor_conversion_links
-    where vendor_id=p_vendor_id and status='LINKED'
-    for update;
-  if v_link.id is null then return false; end if;
-  if exists(select 1 from public.aarohi_handoffs where vendor_id=p_vendor_id) then return true; end if;
 
-  select * into v_vendor from public.vendors where id=p_vendor_id;
-  if v_vendor.id is null
-     or coalesce(v_vendor.status,'')<>'Approved'
-     or coalesce(v_vendor.is_active,false) is not true
-     or lower(coalesce(v_vendor.verification_status,''))<>'verified' then
-    return false;
-  end if;
-
-  select exists(
-    select 1 from public.vendor_packages vp
-      where vp.vendor_id=p_vendor_id
-        and lower(coalesce(vp.payment_status,''))='paid'
-        and lower(coalesce(vp.status,''))='active'
-    union all
-    select 1 from public.vendor_package_orders vo
-      where vo.vendor_id=p_vendor_id
-        and lower(coalesce(vo.payment_status,''))='paid'
-        and lower(coalesce(vo.activation_status,''))='activated'
-  ) into v_paid;
-  if not v_paid then return false; end if;
-
-  perform public.qf_aarohi_complete_handoff_v1(
-    v_link.prospect_id,
-    p_vendor_id,
-    null,
-    'core.auto.vendor.'||p_vendor_id::text,
-    'auto-handoff.'||v_link.prospect_id::text||'.'||p_vendor_id::text
-  );
-  return true;
-end
-$$;
-
-revoke all on function public.qf_aarohi_try_auto_handoff_v1(uuid) from public,anon,authenticated;
-grant execute on function public.qf_aarohi_try_auto_handoff_v1(uuid) to service_role;
 
 create or replace function public.qf_aarohi_auto_handoff_from_vendor_v1()
 returns trigger language plpgsql set search_path=public as $$
@@ -370,12 +405,7 @@ begin
   return new;
 end $$;
 
-create or replace function public.qf_aarohi_auto_handoff_from_link_v1()
-returns trigger language plpgsql set search_path=public as $$
-begin
-  if new.status='LINKED' then perform public.qf_aarohi_try_auto_handoff_v1(new.vendor_id); end if;
-  return new;
-end $$;
+
 
 drop trigger if exists trg_aarohi_auto_handoff_vendor on public.vendors;
 create trigger trg_aarohi_auto_handoff_vendor
@@ -392,14 +422,11 @@ create trigger trg_aarohi_auto_handoff_package_order
 after insert or update of payment_status,activation_status on public.vendor_package_orders
 for each row execute function public.qf_aarohi_auto_handoff_from_package_v1();
 
-drop trigger if exists trg_aarohi_auto_handoff_link on public.aarohi_vendor_conversion_links;
-create trigger trg_aarohi_auto_handoff_link
-after insert or update of status on public.aarohi_vendor_conversion_links
-for each row execute function public.qf_aarohi_auto_handoff_from_link_v1();
+
 
 revoke all on function public.qf_aarohi_auto_handoff_from_vendor_v1() from public,anon,authenticated;
 revoke all on function public.qf_aarohi_auto_handoff_from_package_v1() from public,anon,authenticated;
-revoke all on function public.qf_aarohi_auto_handoff_from_link_v1() from public,anon,authenticated;
+
 ),
   state text not null default 'AWAITING_BUSINESS'
     check (state in ('AWAITING_BUSINESS','AWAITING_CITY','AWAITING_CATEGORY','COMPLETE','CANCELLED')),

@@ -83,7 +83,7 @@ create or replace function public.qf_aarohi_complete_whatsapp_intake_v1(
 language plpgsql
 security definer
 set search_path=public
-as $
+as $$
 declare
   v_intake public.aarohi_whatsapp_intakes;
   v_existing uuid;
@@ -161,7 +161,7 @@ begin
 
   return v_prospect_id;
 end
-$;
+$$;
 
 revoke all on function public.qf_aarohi_complete_whatsapp_intake_v1(uuid,text)
   from public,anon,authenticated;
@@ -308,7 +308,7 @@ returns boolean
 language plpgsql
 security definer
 set search_path=public
-as $
+as $$
 declare
   v_link public.aarohi_vendor_conversion_links;
   v_vendor public.vendors;
@@ -351,31 +351,31 @@ begin
   );
   return true;
 end
-$;
+$$;
 
 revoke all on function public.qf_aarohi_try_auto_handoff_v1(uuid) from public,anon,authenticated;
 grant execute on function public.qf_aarohi_try_auto_handoff_v1(uuid) to service_role;
 
 create or replace function public.qf_aarohi_auto_handoff_from_vendor_v1()
-returns trigger language plpgsql set search_path=public as $
+returns trigger language plpgsql set search_path=public as $$
 begin
   perform public.qf_aarohi_try_auto_handoff_v1(new.id);
   return new;
-end $;
+end $$;
 
 create or replace function public.qf_aarohi_auto_handoff_from_package_v1()
-returns trigger language plpgsql set search_path=public as $
+returns trigger language plpgsql set search_path=public as $$
 begin
   perform public.qf_aarohi_try_auto_handoff_v1(new.vendor_id);
   return new;
-end $;
+end $$;
 
 create or replace function public.qf_aarohi_auto_handoff_from_link_v1()
-returns trigger language plpgsql set search_path=public as $
+returns trigger language plpgsql set search_path=public as $$
 begin
   if new.status='LINKED' then perform public.qf_aarohi_try_auto_handoff_v1(new.vendor_id); end if;
   return new;
-end $;
+end $$;
 
 drop trigger if exists trg_aarohi_auto_handoff_vendor on public.vendors;
 create trigger trg_aarohi_auto_handoff_vendor

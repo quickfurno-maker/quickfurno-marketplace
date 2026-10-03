@@ -712,6 +712,7 @@ function normalizeConversationContextText(value: string): string {
 
 function buildConversationContext(
   events: readonly JarvisConversationContextEvent[],
+  crossChannelMemory?: string | null,
 ): JarvisWhatsAppConversationContext {
   const ordered = [...events]
     .filter((event) => event.text.length > 0)
@@ -738,10 +739,18 @@ function buildConversationContext(
     chars += addition;
   }
 
+  const history = selected.join("\n");
+  const memory = normalizeConversationContextText(crossChannelMemory ?? "").slice(0, 1400);
+  const memoryLine = memory ? `CONTEXT: ${memory}` : "";
+  const combined = [memoryLine, history].filter(Boolean).join("\n").slice(0, 4000);
+  if (combined.length < memoryLine.length + history.length + (memoryLine && history ? 1 : 0)) {
+    truncated = true;
+  }
+
   return Object.freeze({
     version: 1 as const,
     authority: "NON_AUTHORITATIVE_CONVERSATION_CONTEXT" as const,
-    text: selected.join("\n"),
+    text: combined,
     includedTurns: selected.length,
     truncated,
   });
@@ -759,7 +768,16 @@ export async function readJarvisWhatsAppConversationContext(input: {
     return { ok: true, value: buildConversationContext([]) };
   }
 
-  const [inboundResult, outboxResult] = await Promise.all([
+  const memoryRead =
+    material.value.assignedActor === "AAROHI" && material.value.subjectRef
+      ? adminClient()
+          .from("aarohi_memory_snapshots")
+          .select("safe_summary")
+          .eq("prospect_id", material.value.subjectRef)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null });
+
+  const [inboundResult, outboxResult, memoryResult] = await Promise.all([
     adminClient()
       .from("communication_inbound_messages")
       .select("id,received_at,message_type,content_minimized")
@@ -774,6 +792,7 @@ export async function readJarvisWhatsAppConversationContext(input: {
       .lt("expected_revision", input.expectedRevision)
       .order("created_at", { ascending: false })
       .limit(12),
+    memoryRead,
   ]);
   if (inboundResult.error || outboxResult.error) {
     return { ok: false, reason: "conversation_not_found" };
@@ -821,7 +840,11 @@ export async function readJarvisWhatsAppConversationContext(input: {
     });
   }
 
-  return { ok: true, value: buildConversationContext(events) };
+  const crossChannelMemory =
+    memoryResult.error || typeof memoryResult.data?.safe_summary !== "string"
+      ? null
+      : memoryResult.data.safe_summary;
+  return { ok: true, value: buildConversationContext(events, crossChannelMemory) };
 }
 
 type ConversationProposalSource = "JARVIS" | "SYSTEM" | "HUMAN";

@@ -7,6 +7,7 @@
 //
 // Resolution safety remains unchanged: only failed extensionless RELATIVE imports
 // may fall back to ".ts"; bare specifiers and aliases are never rewritten.
+// It NEVER maps the "@/..." path alias.
 // ============================================================================
 import fs from "node:fs/promises";
 import ts from "typescript";

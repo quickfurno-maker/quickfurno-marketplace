@@ -211,3 +211,25 @@ The current low-load web path is fast. The primary scale risks are:
 6. lack of QuickFurno container runtime parity with Jarvis
 
 These findings determine the order of Phases 01–10.
+
+## Revalidation snapshot — 2026-10-04
+
+A second authorized low-impact public benchmark used 40 requests/path, concurrency 4 and 3 warmups:
+
+| Path | p50 | p95 | p99 | Approx throughput | Errors |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `/` | 64.38 ms | 126.49 ms | 151.95 ms | 54.64 req/s | 0% |
+| `/vendors` | 55.99 ms | 83.58 ms | 100.67 ms | 66.78 req/s | 0% |
+
+This remains a low-impact baseline, not a production capacity claim.
+
+The production listener/isolation finding was independently reverified:
+- 3000 externally reachable — current production Next.js.
+- 3001 loopback-only / not externally reachable — staging webhook.
+- 3002 externally reachable — staging Next.js process.
+- 3099 externally reachable — detached old Next.js release; working directory already deleted.
+- 3101 externally reachable — detached old production release.
+- 3103 externally reachable — detached old production release.
+- UFW is inactive.
+
+The stale/exposed listeners are therefore a confirmed P0 hardening input for Phase 01/02. Phase 00 remains measurement-only and intentionally performs no production cleanup.

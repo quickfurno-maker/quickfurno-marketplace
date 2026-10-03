@@ -639,6 +639,24 @@ export async function recordAarohiSocialReply(args:{
   safeSummary:string;occurredAt:string;phoneE164?:string|null;
 }){
   const db=adminClient();
+  const messageRef=cleanRef(args.messageRef);
+  const existingSignal=await db.from("aarohi_social_reply_signals")
+    .select("id,prospect_id,reply_kind,whatsapp_hash")
+    .eq("channel",args.channel)
+    .eq("external_message_reference",messageRef)
+    .maybeSingle();
+  if(existingSignal.error) throw existingSignal.error;
+  if(existingSignal.data){
+    if(String(existingSignal.data.prospect_id)!==args.prospectId||
+       String(existingSignal.data.reply_kind)!==args.replyKind){
+      throw new Error("aarohi_social_reply_replay_conflict");
+    }
+    return {
+      signalId:String(existingSignal.data.id),
+      whatsappLinked:!!existingSignal.data.whatsapp_hash,
+      replayed:true,
+    };
+  }
   await actionableProspect(args.prospectId).catch(async(error)=>{
     if(args.replyKind!=="STOP") throw error;
   });
@@ -653,12 +671,23 @@ export async function recordAarohiSocialReply(args:{
   const insert=await db.from("aarohi_social_reply_signals").upsert({
     prospect_id:args.prospectId,channel:args.channel,
     external_thread_reference:cleanRef(args.threadRef),
-    external_message_reference:cleanRef(args.messageRef),
+    external_message_reference:messageRef,
     reply_kind:args.replyKind,whatsapp_hash:whatsappHash,
     safe_summary:args.safeSummary.trim().slice(0,500),
     occurred_at:new Date(args.occurredAt).toISOString(),
-  },{onConflict:"channel,external_message_reference"}).select("id").single();
-  if(insert.error) throw insert.error;
+  }).select("id").single();
+  if(insert.error){
+    if((insert.error as any).code==="23505"){
+      const raced=await db.from("aarohi_social_reply_signals")
+        .select("id,prospect_id,reply_kind,whatsapp_hash")
+        .eq("channel",args.channel).eq("external_message_reference",messageRef).maybeSingle();
+      if(raced.error) throw raced.error;
+      if(raced.data&&String(raced.data.prospect_id)===args.prospectId&&String(raced.data.reply_kind)===args.replyKind){
+        return {signalId:String(raced.data.id),whatsappLinked:!!raced.data.whatsapp_hash,replayed:true};
+      }
+    }
+    throw insert.error;
+  }
 
   if(args.replyKind==="STOP"){
     const stopped=await db.from("aarohi_prospects").update({
@@ -726,7 +755,7 @@ export async function recordAarohiSocialReply(args:{
   }
 
   await refreshAarohiMemorySnapshot(args.prospectId);
-  return {signalId:String(insert.data.id),whatsappLinked:!!normalizedPhone};
+  return {signalId:String(insert.data.id),whatsappLinked:!!normalizedPhone,replayed:false};
 }
 
 export async function refreshAarohiMemorySnapshot(prospectId:string){

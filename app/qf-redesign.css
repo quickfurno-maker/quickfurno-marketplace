@@ -7672,3 +7672,26 @@ body::before {
 }
 
 
+
+
+/* QF-UI-20261003 — touch-safe Google suggestions on narrow visual viewports. */
+@media (max-width: 640px) {
+  .qf-place-suggest--portal {
+    max-width: calc(100vw - 16px);
+    border-radius: 12px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .qf-place-suggest-item {
+    padding: 0.6rem 0.62rem;
+  }
+
+  .qf-place-suggest-main {
+    font-size: 0.86rem;
+  }
+
+  .qf-place-suggest-sub {
+    font-size: 0.72rem;
+  }
+}

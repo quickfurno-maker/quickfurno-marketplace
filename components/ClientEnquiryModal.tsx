@@ -1282,6 +1282,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                   value={form.area}
                   city={form.city}
                   mode="address"
+                  suggestionsPortal
                   onManualChange={onAreaManualChange}
                   onPlaceSelected={onAreaPlaceSelected}
                   onBlur={() => markTouched("area")}

@@ -21,12 +21,14 @@ import {
   serializeQfWhatsAppExperience,
   humanTextExperience,
   textExperience,
+  buildAarohiDedicatedNumberBoundaryExperience,
   type QfWhatsAppExperienceV1,
 } from "../lib/jarvis/whatsAppExperience";
 import {
   deriveQfWhatsAppInboundMaterial,
   type QfWhatsAppInboundMaterialV1,
 } from "../lib/jarvis/whatsAppInboundMaterial";
+import { processAarohiWhatsAppIntake } from "./aarohiWhatsAppIntakeService";
 
 const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const CHANNEL = "whatsapp";
@@ -298,7 +300,7 @@ export async function recordConversationalInbound(input: {
     }};
   }
 
-  const routing = resolveWhatsAppConciergeRouting({
+  let routing = resolveWhatsAppConciergeRouting({
     identityConfidence: input.identityConfidence,
     principalType: input.principalType,
     messageType: input.messageType,
@@ -309,6 +311,98 @@ export async function recordConversationalInbound(input: {
     currentHumanTakeover: existing?.human_takeover === true,
     isNewConversation: !existing,
   });
+
+  const dedicatedAarohiAccount =
+    account.account_alias === "aarohi" || account.account_role === "conversational";
+  let resolvedAarohiProspectId: string | null =
+    existing?.subject_type === "prospect" &&
+    typeof existing?.aarohi_prospect_id === "string" &&
+    SUBJECT_UUID.test(existing.aarohi_prospect_id)
+      ? existing.aarohi_prospect_id
+      : null;
+
+  if (dedicatedAarohiAccount) {
+    // This number is acquisition-only. Exact existing QuickFurno principals never get pitched here.
+    if (input.identityConfidence === "exact" && input.principalType !== null) {
+      resolvedAarohiProspectId = null;
+      routing = Object.freeze({
+        subjectType: "unknown" as const,
+        assignedActor: "SYSTEM" as const,
+        jarvisEnabled: false,
+        humanTakeover: false,
+        state: "OPEN" as const,
+        suppressJarvisTurn: true,
+        systemExperience: buildAarohiDedicatedNumberBoundaryExperience(),
+        source: "identity" as const,
+      });
+    } else if (input.suppressJarvisTurn !== true) {
+      const intake = await processAarohiWhatsAppIntake({
+        providerAccountId: input.providerAccountId,
+        destinationHash,
+        messageType: input.messageType,
+        contentMinimized: input.contentMinimized,
+      });
+      if (intake.kind === "ready") {
+        resolvedAarohiProspectId = intake.prospectId;
+        routing = Object.freeze({
+          subjectType: "prospect" as const,
+          assignedActor: "AAROHI" as const,
+          jarvisEnabled: true,
+          humanTakeover: false,
+          state: "OPEN" as const,
+          suppressJarvisTurn: false,
+          source: "existing" as const,
+        });
+      } else if (intake.kind === "completed") {
+        resolvedAarohiProspectId = intake.prospectId;
+        routing = Object.freeze({
+          subjectType: "prospect" as const,
+          assignedActor: "AAROHI" as const,
+          jarvisEnabled: true,
+          humanTakeover: false,
+          state: "OPEN" as const,
+          suppressJarvisTurn: true,
+          systemExperience: textExperience("AAROHI", intake.body),
+          source: "choice" as const,
+        });
+      } else if (intake.kind === "prompt" || intake.kind === "ambiguous") {
+        resolvedAarohiProspectId = null;
+        routing = Object.freeze({
+          subjectType: "unknown" as const,
+          assignedActor: "SYSTEM" as const,
+          jarvisEnabled: false,
+          humanTakeover: false,
+          state: "OPEN" as const,
+          suppressJarvisTurn: true,
+          systemExperience: Object.freeze({
+            version: 1 as const,
+            actor: "SYSTEM" as const,
+            kind: "text" as const,
+            body: intake.body,
+          }),
+          source: "menu" as const,
+        });
+      } else {
+        resolvedAarohiProspectId = null;
+        routing = Object.freeze({
+          subjectType: "unknown" as const,
+          assignedActor: "SYSTEM" as const,
+          jarvisEnabled: false,
+          humanTakeover: false,
+          state: "OPEN" as const,
+          suppressJarvisTurn: true,
+          systemExperience: Object.freeze({
+            version: 1 as const,
+            actor: "SYSTEM" as const,
+            kind: "text" as const,
+            body: "QuickFurno could not safely start the acquisition intake right now. Please try again shortly.",
+          }),
+          source: "menu" as const,
+        });
+      }
+    }
+  }
+
   const exactSubjectId = input.identityConfidence === "exact" &&
     input.principalType === routing.subjectType &&
     typeof input.principalId === "string" &&
@@ -321,7 +415,10 @@ export async function recordConversationalInbound(input: {
       ? existing.subject_id
       : null;
   const subjectId = exactSubjectId ?? preservedSubjectId;
+  const aarohiProspectId = routing.subjectType === "prospect" ? resolvedAarohiProspectId : null;
   const jarvisAllowedByAccount = account.jarvis_access_mode === "proposal_only";
+  const jarvisAllowedForBoundSubject =
+    routing.assignedActor !== "AAROHI" || aarohiProspectId !== null;
 
   let conversation: any;
   if (existing) {
@@ -339,9 +436,10 @@ export async function recordConversationalInbound(input: {
         destination_masked: maskPhoneE164(normalized.e164),
         subject_type: routing.subjectType,
         subject_id: subjectId,
+        aarohi_prospect_id: aarohiProspectId,
         assigned_actor: routing.assignedActor,
         state: routing.state,
-        jarvis_enabled: jarvisAllowedByAccount && routing.jarvisEnabled,
+        jarvis_enabled: jarvisAllowedByAccount && jarvisAllowedForBoundSubject && routing.jarvisEnabled,
         human_takeover: routing.humanTakeover,
         last_inbound_at: occurred.toISOString(),
         service_window_expires_at: serviceWindowExpiresAt,
@@ -374,9 +472,10 @@ export async function recordConversationalInbound(input: {
         encryption_key_id: sealed.value.keyId,
         subject_type: routing.subjectType,
         subject_id: subjectId,
+        aarohi_prospect_id: aarohiProspectId,
         assigned_actor: routing.assignedActor,
         state: routing.state,
-        jarvis_enabled: jarvisAllowedByAccount && routing.jarvisEnabled,
+        jarvis_enabled: jarvisAllowedByAccount && jarvisAllowedForBoundSubject && routing.jarvisEnabled,
         human_takeover: routing.humanTakeover,
         last_inbound_at: occurred.toISOString(),
         service_window_expires_at: serviceWindowExpiresAt,

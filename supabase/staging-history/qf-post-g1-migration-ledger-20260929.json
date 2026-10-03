@@ -475,7 +475,19 @@
       "name": "aarohi_phase2_autonomous_acquisition",
       "filename": "20261003080000_aarohi_phase2_autonomous_acquisition.sql",
       "path": "supabase/migrations/20261003080000_aarohi_phase2_autonomous_acquisition.sql",
-      "canonicalSha256": "9816bf19562cdba37d244b0b0867fa7c3832f2a4776e55a9c15de56888362408",
+      "canonicalSha256": "053d0835687c9c5282f6eddc6d4eeee0fd23ed42f2b4b34dbdd739736d802033",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-03_BEFORE_DEPLOYMENT"
+    },
+    {
+      "version": "20261003083000",
+      "name": "aarohi_phase2_scale_governance",
+      "filename": "20261003083000_aarohi_phase2_scale_governance.sql",
+      "path": "supabase/migrations/20261003083000_aarohi_phase2_scale_governance.sql",
+      "canonicalSha256": "8de819e5f708bcc99fcde86d1c2b752cd2f79018d0cb1a571825f537f2c402d4",
       "exactVersionPresence": {
         "staging": false,
         "production": false

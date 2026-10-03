@@ -48,6 +48,42 @@ async function actionableProspect(prospectId:string){
 }
 function dayKey(date:Date):string{return date.toISOString().slice(0,10);}
 
+export async function listAarohiDiscoveryCandidates(limit=100){
+  const safe=Math.max(1,Math.min(250,Math.round(limit)));
+  const {data,error}=await adminClient().from("aarohi_discovery_candidates")
+    .select("id,source_type,external_reference,profile_url,business_name,city_hint,category_hint,website,confidence,state,prospect_id,observed_at,created_at,aarohi_discovery_connectors(channel,provider_key)")
+    .order("created_at",{ascending:false}).limit(safe);
+  if(error) throw error;
+  return data??[];
+}
+
+export async function listAarohiOutreachJobs(limit=150){
+  const safe=Math.max(1,Math.min(300,Math.round(limit)));
+  const {data,error}=await adminClient().from("aarohi_outreach_jobs")
+    .select("id,prospect_id,campaign_id,channel,initiation_mode,state,priority,scheduled_at,draft_ref,core_authorization_ref,provider_message_ref,attempt_count,max_attempts,last_error_code,updated_at,aarohi_prospects(business_name,prospect_stage,do_not_contact),aarohi_campaigns(name)")
+    .order("scheduled_at",{ascending:false}).limit(safe);
+  if(error) throw error;
+  return data??[];
+}
+
+export async function listAarohiBroadcastBatches(limit=100){
+  const safe=Math.max(1,Math.min(200,Math.round(limit)));
+  const {data,error}=await adminClient().from("aarohi_broadcast_batches")
+    .select("id,campaign_id,template_name,state,scheduled_for,target_count,authorized_count,dispatched_count,failed_count,daily_cap,created_at,updated_at,aarohi_campaigns(name)")
+    .order("created_at",{ascending:false}).limit(safe);
+  if(error) throw error;
+  return data??[];
+}
+
+export async function listAarohiMemorySnapshots(limit=100){
+  const safe=Math.max(1,Math.min(200,Math.round(limit)));
+  const {data,error}=await adminClient().from("aarohi_memory_snapshots")
+    .select("prospect_id,version,safe_summary,last_channel,last_event_at,updated_at,aarohi_prospects(business_name,prospect_stage)")
+    .order("updated_at",{ascending:false}).limit(safe);
+  if(error) throw error;
+  return data??[];
+}
+
 export async function getAarohiPhase2Dashboard(){
   const db=adminClient();
   const [

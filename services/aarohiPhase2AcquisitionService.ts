@@ -112,9 +112,30 @@ export async function scheduleAarohiDiscoveryRuns(now=new Date()){
 }
 
 export async function claimAarohiDiscoveryRun(workerRef:string){
-  const {data,error}=await adminClient().rpc("qf_aarohi_claim_discovery_run_v1",{p_worker_ref:workerRef});
+  const db=adminClient();
+  const {data,error}=await db.rpc("qf_aarohi_claim_discovery_run_v1",{p_worker_ref:workerRef});
   if(error) throw error;
-  return data??null;
+  if(!data) return null;
+  const run=Array.isArray(data)?data[0]:data;
+  if(!run?.id||!run?.connector_id) return null;
+  const connector=await db.from("aarohi_discovery_connectors")
+    .select("id,channel,provider_key,enabled,provider_ready,daily_candidate_cap")
+    .eq("id",String(run.connector_id)).maybeSingle();
+  if(connector.error) throw connector.error;
+  if(!connector.data||connector.data.enabled!==true||connector.data.provider_ready!==true){
+    await db.from("aarohi_discovery_runs").update({
+      state:"CANCELLED",completed_at:new Date().toISOString(),error_code:"CONNECTOR_NOT_READY",
+    }).eq("id",String(run.id));
+    return null;
+  }
+  return Object.freeze({
+    runId:String(run.id),
+    connectorId:String(run.connector_id),
+    channel:String(connector.data.channel),
+    providerKey:String(connector.data.provider_key),
+    querySpec:typeof run.query_spec==="object"&&run.query_spec?run.query_spec:{},
+    maxCandidates:Number(connector.data.daily_candidate_cap??100),
+  });
 }
 
 export async function ingestAarohiDiscoveryCandidate(args:{

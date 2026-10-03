@@ -39,7 +39,7 @@ function safeMetadata(input:Record<string,unknown>|undefined):Record<string,unkn
 }
 async function actionableProspect(prospectId:string){
   const {data,error}=await adminClient().from("aarohi_prospects")
-    .select("id,tenant_id,prospect_stage,do_not_contact,ai_paused,human_takeover,whatsapp_available")
+    .select("id,tenant_id,city_id,prospect_stage,conversation_stage,do_not_contact,ai_paused,human_takeover,whatsapp_available,preferred_channel,last_activity_at,next_action_type,next_action_at")
     .eq("id",prospectId).eq("tenant_id","quickfurno").maybeSingle();
   if(error) throw error;
   if(!data||data.do_not_contact||data.ai_paused||data.human_takeover||data.prospect_stage==="SUPPRESSED"){
@@ -115,37 +115,57 @@ export async function getAarohiPhase2Dashboard(){
 }
 
 export async function scheduleAarohiDiscoveryRuns(now=new Date()){
-  if(!phase2AutonomousDiscoveryEnabled()) return {enabled:false,queued:0};
+  if(!phase2AutonomousDiscoveryEnabled()) return {enabled:false,queued:0,cities:0};
   const db=adminClient();
   const iso=now.toISOString();
-  const {data:connectors,error}=await db.from("aarohi_discovery_connectors")
-    .select("id,channel,provider_key,schedule_minutes,daily_candidate_cap,next_run_at,config")
-    .eq("tenant_id","quickfurno").eq("enabled",true).eq("provider_ready",true)
-    .or(`next_run_at.is.null,next_run_at.lte.${iso}`);
-  if(error) throw error;
+  const [connectorsResult,policiesResult]=await Promise.all([
+    db.from("aarohi_discovery_connectors")
+      .select("id,channel,provider_key,schedule_minutes,daily_candidate_cap,config")
+      .eq("tenant_id","quickfurno").eq("enabled",true).eq("provider_ready",true),
+    db.from("aarohi_acquisition_city_policies")
+      .select("id,city_id,daily_discovery_cap,categories,cities!inner(id,name,slug,is_active)")
+      .eq("enabled",true).eq("discovery_enabled",true).eq("cities.is_active",true),
+  ]);
+  if(connectorsResult.error) throw connectorsResult.error;
+  if(policiesResult.error) throw policiesResult.error;
   let queued=0;
-  for(const connector of connectors??[]){
-    const idempotency=`aarohi.discovery.${connector.id}.${dayKey(now)}`;
-    const inserted=await db.from("aarohi_discovery_runs").upsert({
-      connector_id:connector.id,
-      state:"QUEUED",
-      query_spec:{
-        channel:connector.channel,
-        providerKey:connector.provider_key,
-        dailyCandidateCap:connector.daily_candidate_cap,
-        ...(typeof connector.config==="object"&&connector.config?connector.config:{}),
-      },
-      idempotency_key:idempotency,
-    },{onConflict:"idempotency_key",ignoreDuplicates:true}).select("id");
-    if(inserted.error) throw inserted.error;
-    if((inserted.data??[]).length>0) queued+=1;
-    const next=new Date(now.getTime()+Number(connector.schedule_minutes)*60_000).toISOString();
-    const updated=await db.from("aarohi_discovery_connectors").update({
-      last_run_at:iso,next_run_at:next,last_status:"QUEUED",updated_at:iso,
-    }).eq("id",connector.id);
-    if(updated.error) throw updated.error;
+  for(const policy of policiesResult.data??[]){
+    const city=(policy as any).cities;
+    for(const connector of connectorsResult.data??[]){
+      const minutes=Math.max(60,Number(connector.schedule_minutes??1440));
+      const bucket=Math.floor(now.getTime()/(minutes*60_000));
+      const cap=Math.max(1,Math.min(
+        Number(connector.daily_candidate_cap??250),
+        Number(policy.daily_discovery_cap??250),
+      ));
+      const idempotency=`aarohi.discovery.${connector.id}.${policy.city_id}.${bucket}`;
+      const inserted=await db.from("aarohi_discovery_runs").upsert({
+        connector_id:connector.id,
+        city_id:policy.city_id,
+        city_policy_id:policy.id,
+        state:"QUEUED",
+        query_spec:{
+          channel:connector.channel,
+          providerKey:connector.provider_key,
+          cityId:policy.city_id,
+          cityName:city?.name??null,
+          citySlug:city?.slug??null,
+          categories:Array.isArray(policy.categories)?policy.categories:[],
+          dailyCandidateCap:cap,
+          ...(typeof connector.config==="object"&&connector.config?connector.config:{}),
+        },
+        idempotency_key:idempotency,
+      },{onConflict:"idempotency_key",ignoreDuplicates:true}).select("id");
+      if(inserted.error) throw inserted.error;
+      if((inserted.data??[]).length>0) queued+=1;
+      const next=new Date(now.getTime()+minutes*60_000).toISOString();
+      const updated=await db.from("aarohi_discovery_connectors").update({
+        last_run_at:iso,next_run_at:next,last_status:"QUEUED",updated_at:iso,
+      }).eq("id",connector.id);
+      if(updated.error) throw updated.error;
+    }
   }
-  return {enabled:true,queued};
+  return {enabled:true,queued,cities:(policiesResult.data??[]).length};
 }
 
 export async function promoteReadyAarohiDiscoveryCandidates(limit=50){
@@ -438,6 +458,7 @@ export async function promoteAarohiDiscoveryCandidate(candidateId:string,actorRe
 
 export async function queueAarohiOutreach(args:{
   prospectId:string;channel:AarohiPhase2Channel;campaignId?:string|null;
+  broadcastBatchId?:string|null;
   priority?:number;draftRef?:string|null;idempotencyKey:string;
   continuation?:boolean;
 }){
@@ -452,6 +473,8 @@ export async function queueAarohiOutreach(args:{
   const state=args.continuation===true?"NEEDS_CORE_AUTHORIZATION":initialOutreachState(args.channel);
   const {data,error}=await adminClient().from("aarohi_outreach_jobs").upsert({
     prospect_id:args.prospectId,campaign_id:args.campaignId??null,
+    broadcast_batch_id:args.broadcastBatchId??null,
+    city_id:prospect.city_id,
     channel:args.channel,initiation_mode:policy.initiation,state,
     priority:Math.max(0,Math.min(100,Math.round(args.priority??50))),
     draft_ref:args.draftRef?.trim().slice(0,300)||null,
@@ -467,49 +490,28 @@ export async function authorizePendingAarohiOutreach(limit=100){
   const safe=Math.max(1,Math.min(250,Math.round(limit)));
   const db=adminClient();
   const {data,error}=await db.from("aarohi_outreach_jobs")
-    .select("id,prospect_id,channel,draft_ref,state,aarohi_prospects!inner(do_not_contact,ai_paused,human_takeover,prospect_stage)")
-    .eq("state","NEEDS_CORE_AUTHORIZATION")
+    .select("id").eq("state","NEEDS_CORE_AUTHORIZATION")
     .order("priority",{ascending:false}).order("scheduled_at",{ascending:true}).limit(safe);
   if(error) throw error;
   let authorized=0,blocked=0;
+  const reasons:Record<string,number>={};
   for(const job of data??[]){
-    const prospect=(job as any).aarohi_prospects;
-    if(prospect?.do_not_contact===true||prospect?.ai_paused===true||prospect?.human_takeover===true||prospect?.prospect_stage==="SUPPRESSED"){
-      await db.from("aarohi_outreach_jobs").update({
-        state:"CANCELLED",last_error_code:"PROSPECT_SUPPRESSED",
-        updated_at:new Date().toISOString(),completed_at:new Date().toISOString(),
-      }).eq("id",job.id);
-      blocked+=1;continue;
+    const result=await db.rpc("qf_aarohi_authorize_outreach_v1",{p_job_id:String(job.id)});
+    if(result.error) throw result.error;
+    const payload=(result.data??{}) as any;
+    if(payload.allowed===true){
+      authorized+=1;
+    }else{
+      blocked+=1;
+      const reason=String(payload.reason??"CORE_AUTHORIZATION_BLOCKED").slice(0,160);
+      reasons[reason]=(reasons[reason]??0)+1;
+      const noted=await db.from("aarohi_outreach_jobs").update({
+        last_error_code:reason,updated_at:new Date().toISOString(),
+      }).eq("id",job.id).eq("state","NEEDS_CORE_AUTHORIZATION");
+      if(noted.error) throw noted.error;
     }
-    let allowed=false;
-    const draft=String(job.draft_ref??"");
-    const channel=String(job.channel);
-    if(["INSTAGRAM","FACEBOOK","X"].includes(channel)&&draft==="system:request-whatsapp-continuation"){
-      const social=await db.from("aarohi_social_reply_signals").select("id")
-        .eq("prospect_id",String(job.prospect_id)).eq("channel",channel)
-        .in("reply_kind",["INTERESTED","WHATSAPP_SHARED"]).order("occurred_at",{ascending:false}).limit(1);
-      if(social.error) throw social.error;
-      allowed=(social.data??[]).length===1;
-    }else if(channel==="WHATSAPP"){
-      const purpose=draft.startsWith("template:")?"MARKETING_BROADCAST":"ACQUISITION_CONTINUATION";
-      const permission=await db.from("aarohi_communication_permissions").select("id")
-        .eq("prospect_id",String(job.prospect_id)).eq("channel","WHATSAPP")
-        .eq("purpose",purpose).eq("state","GRANTED").limit(1);
-      if(permission.error) throw permission.error;
-      allowed=(permission.data??[]).length===1;
-    }
-    // Cold X initiation remains blocked until an official-provider eligibility
-    // authority is supplied during final provider activation.
-    if(!allowed){blocked+=1;continue;}
-    const authRef=`core:aarohi-outreach:${job.id}:v1`;
-    const updated=await db.from("aarohi_outreach_jobs").update({
-      state:"DISPATCH_READY",core_authorization_ref:authRef,
-      updated_at:new Date().toISOString(),last_error_code:null,
-    }).eq("id",job.id).eq("state","NEEDS_CORE_AUTHORIZATION");
-    if(updated.error) throw updated.error;
-    authorized+=1;
   }
-  return {examined:(data??[]).length,authorized,blocked};
+  return {examined:(data??[]).length,authorized,blocked,reasons};
 }
 
 export async function recordAarohiCommunicationPermission(args:{

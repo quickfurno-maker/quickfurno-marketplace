@@ -301,6 +301,105 @@ for each row execute function public.qf_aarohi_mark_conversion_complete_v1();
 
 revoke all on function public.qf_aarohi_require_conversion_link_v1() from public,anon,authenticated;
 revoke all on function public.qf_aarohi_mark_conversion_complete_v1() from public,anon,authenticated;
+
+
+create or replace function public.qf_aarohi_try_auto_handoff_v1(p_vendor_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path=public
+as $
+declare
+  v_link public.aarohi_vendor_conversion_links;
+  v_vendor public.vendors;
+  v_paid boolean;
+begin
+  select * into v_link
+    from public.aarohi_vendor_conversion_links
+    where vendor_id=p_vendor_id and status='LINKED'
+    for update;
+  if v_link.id is null then return false; end if;
+  if exists(select 1 from public.aarohi_handoffs where vendor_id=p_vendor_id) then return true; end if;
+
+  select * into v_vendor from public.vendors where id=p_vendor_id;
+  if v_vendor.id is null
+     or coalesce(v_vendor.status,'')<>'Approved'
+     or coalesce(v_vendor.is_active,false) is not true
+     or lower(coalesce(v_vendor.verification_status,''))<>'verified' then
+    return false;
+  end if;
+
+  select exists(
+    select 1 from public.vendor_packages vp
+      where vp.vendor_id=p_vendor_id
+        and lower(coalesce(vp.payment_status,''))='paid'
+        and lower(coalesce(vp.status,''))='active'
+    union all
+    select 1 from public.vendor_package_orders vo
+      where vo.vendor_id=p_vendor_id
+        and lower(coalesce(vo.payment_status,''))='paid'
+        and lower(coalesce(vo.activation_status,''))='activated'
+  ) into v_paid;
+  if not v_paid then return false; end if;
+
+  perform public.qf_aarohi_complete_handoff_v1(
+    v_link.prospect_id,
+    p_vendor_id,
+    null,
+    'core.auto.vendor.'||p_vendor_id::text,
+    'auto-handoff.'||v_link.prospect_id::text||'.'||p_vendor_id::text
+  );
+  return true;
+end
+$;
+
+revoke all on function public.qf_aarohi_try_auto_handoff_v1(uuid) from public,anon,authenticated;
+grant execute on function public.qf_aarohi_try_auto_handoff_v1(uuid) to service_role;
+
+create or replace function public.qf_aarohi_auto_handoff_from_vendor_v1()
+returns trigger language plpgsql set search_path=public as $
+begin
+  perform public.qf_aarohi_try_auto_handoff_v1(new.id);
+  return new;
+end $;
+
+create or replace function public.qf_aarohi_auto_handoff_from_package_v1()
+returns trigger language plpgsql set search_path=public as $
+begin
+  perform public.qf_aarohi_try_auto_handoff_v1(new.vendor_id);
+  return new;
+end $;
+
+create or replace function public.qf_aarohi_auto_handoff_from_link_v1()
+returns trigger language plpgsql set search_path=public as $
+begin
+  if new.status='LINKED' then perform public.qf_aarohi_try_auto_handoff_v1(new.vendor_id); end if;
+  return new;
+end $;
+
+drop trigger if exists trg_aarohi_auto_handoff_vendor on public.vendors;
+create trigger trg_aarohi_auto_handoff_vendor
+after update of status,is_active,verification_status on public.vendors
+for each row execute function public.qf_aarohi_auto_handoff_from_vendor_v1();
+
+drop trigger if exists trg_aarohi_auto_handoff_vendor_package on public.vendor_packages;
+create trigger trg_aarohi_auto_handoff_vendor_package
+after insert or update of payment_status,status on public.vendor_packages
+for each row execute function public.qf_aarohi_auto_handoff_from_package_v1();
+
+drop trigger if exists trg_aarohi_auto_handoff_package_order on public.vendor_package_orders;
+create trigger trg_aarohi_auto_handoff_package_order
+after insert or update of payment_status,activation_status on public.vendor_package_orders
+for each row execute function public.qf_aarohi_auto_handoff_from_package_v1();
+
+drop trigger if exists trg_aarohi_auto_handoff_link on public.aarohi_vendor_conversion_links;
+create trigger trg_aarohi_auto_handoff_link
+after insert or update of status on public.aarohi_vendor_conversion_links
+for each row execute function public.qf_aarohi_auto_handoff_from_link_v1();
+
+revoke all on function public.qf_aarohi_auto_handoff_from_vendor_v1() from public,anon,authenticated;
+revoke all on function public.qf_aarohi_auto_handoff_from_package_v1() from public,anon,authenticated;
+revoke all on function public.qf_aarohi_auto_handoff_from_link_v1() from public,anon,authenticated;
 ),
   state text not null default 'AWAITING_BUSINESS'
     check (state in ('AWAITING_BUSINESS','AWAITING_CITY','AWAITING_CATEGORY','COMPLETE','CANCELLED')),

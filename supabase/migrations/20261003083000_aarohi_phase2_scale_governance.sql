@@ -1,6 +1,15 @@
 -- Aarohi Phase 2 scale-governance hardening.
 -- All autonomous controls default OFF/UNKNOWN. No provider credential or send authority is created here.
 
+-- Explicitly extend the durable communication recipient vocabulary for Aarohi.
+-- The destination is still resolved server-side from public.aarohi_prospects.primary_phone.
+alter table public.communication_messages
+  drop constraint if exists communication_messages_recipient_type_check;
+alter table public.communication_messages
+  add constraint communication_messages_recipient_type_check
+  check (recipient_type in ('client','vendor','admin','lead','prospect','integration','system'));
+
+
 create table if not exists public.aarohi_acquisition_city_policies (
   id uuid primary key default gen_random_uuid(),
   city_id uuid not null unique references public.cities(id) on delete restrict,

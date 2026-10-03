@@ -23,6 +23,7 @@ async function main(){
     authorizePendingAarohiOutreach,
     scheduleAarohiFollowups,
   }=await import("@/services/aarohiPhase2AcquisitionService");
+  const {executeAarohiWhatsAppOutreachBatch}=await import("@/services/aarohiWhatsAppExecutionService");
   const enabled=process.env.QF_AAROHI_PHASE2_DISCOVERY_ENABLED?.trim().toLowerCase()==="true";
   const intervalRaw=Number(process.env.QF_AAROHI_PHASE2_SCHEDULER_INTERVAL_MS??300_000);
   const interval=Number.isInteger(intervalRaw)&&intervalRaw>=60_000&&intervalRaw<=3_600_000
@@ -41,6 +42,7 @@ async function main(){
       const promotion=await promoteReadyAarohiDiscoveryCandidates(50);
       const followups=await scheduleAarohiFollowups(new Date(),100);
       const authorization=await authorizePendingAarohiOutreach(100);
+      const whatsappExecution=await executeAarohiWhatsAppOutreachBatch(20);
       console.info("[qf-aarohi-phase2] acquisition cycle",{
         queued:result.queued,
         promoted:promotion.promoted,
@@ -49,6 +51,7 @@ async function main(){
         followupsQueued:followups.queued,
         authorized:authorization.authorized,
         authorizationBlocked:authorization.blocked,
+        whatsappExecution,
       });
     }catch(error){
       console.error("[qf-aarohi-phase2] discovery schedule cycle failed",{

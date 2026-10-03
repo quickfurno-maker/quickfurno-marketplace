@@ -839,3 +839,286 @@ export async function completeAarohiDiscoveryRun(args:{
   }).eq("id",args.runId);
   if(error) throw error;
 }
+
+
+export async function listAarohiCityPolicies(){
+  const {data,error}=await adminClient().from("aarohi_acquisition_city_policies")
+    .select("id,city_id,enabled,discovery_enabled,outreach_enabled,broadcasts_enabled,timezone,quiet_start,quiet_end,daily_discovery_cap,daily_outreach_cap,categories,autonomy_level,policy_reference,updated_at,cities(name,slug,is_active)")
+    .order("updated_at",{ascending:false});
+  if(error) throw error;
+  return data??[];
+}
+
+export async function updateAarohiCityPolicy(args:{
+  cityId:string;enabled:boolean;discoveryEnabled:boolean;outreachEnabled:boolean;
+  broadcastsEnabled:boolean;quietStart:string;quietEnd:string;
+  dailyDiscoveryCap:number;dailyOutreachCap:number;autonomyLevel:number;
+  categories:string[];actorId:string;
+}){
+  if(!UUID.test(args.cityId)) throw new Error("aarohi_city_policy_city_invalid");
+  const db=adminClient();
+  const city=await db.from("cities").select("id,is_active").eq("id",args.cityId).maybeSingle();
+  if(city.error) throw city.error;
+  if(!city.data||city.data.is_active!==true) throw new Error("aarohi_city_policy_city_inactive");
+  const row={
+    city_id:args.cityId,enabled:args.enabled,
+    discovery_enabled:args.discoveryEnabled,outreach_enabled:args.outreachEnabled,
+    broadcasts_enabled:args.broadcastsEnabled,
+    quiet_start:args.quietStart,quiet_end:args.quietEnd,
+    daily_discovery_cap:Math.max(1,Math.min(5000,Math.round(args.dailyDiscoveryCap))),
+    daily_outreach_cap:Math.max(1,Math.min(5000,Math.round(args.dailyOutreachCap))),
+    autonomy_level:Math.max(0,Math.min(4,Math.round(args.autonomyLevel))),
+    categories:[...new Set(args.categories.map(x=>x.trim()).filter(Boolean))].slice(0,100),
+    policy_reference:`admin:${args.actorId}:phase2-v1`,
+    created_by:args.actorId,updated_at:new Date().toISOString(),
+  };
+  const result=await db.from("aarohi_acquisition_city_policies").upsert(row,{onConflict:"city_id"})
+    .select("id").single();
+  if(result.error) throw result.error;
+  return String(result.data.id);
+}
+
+export async function setAarohiDiscoveryConnectorState(args:{
+  connectorId:string;enabled:boolean;providerReady:boolean;actorId:string;
+}){
+  if(!UUID.test(args.connectorId)) throw new Error("aarohi_connector_invalid");
+  if(args.enabled&&!args.providerReady) throw new Error("aarohi_connector_provider_not_ready");
+  const db=adminClient();
+  const update=await db.from("aarohi_discovery_connectors").update({
+    enabled:args.enabled,provider_ready:args.providerReady,
+    last_status:args.enabled?"ENABLED_BY_OPERATOR":"DISABLED_BY_OPERATOR",
+    updated_at:new Date().toISOString(),
+  }).eq("id",args.connectorId).select("id").maybeSingle();
+  if(update.error) throw update.error;
+  if(!update.data) throw new Error("aarohi_connector_not_found");
+  await db.from("aarohi_events").insert({
+    event_type:"discovery.connector_policy_changed",actor_type:"HUMAN",
+    actor_reference:args.actorId,safe_summary:"Aarohi discovery connector state changed by operator.",
+    reference_type:"discovery_connector",reference_id:args.connectorId,
+    event_data:{enabled:args.enabled,providerReady:args.providerReady},
+  });
+}
+
+export async function listAarohiCapacitySnapshots(limit=40){
+  const safe=Math.max(1,Math.min(100,Math.round(limit)));
+  const {data,error}=await adminClient().from("aarohi_channel_capacity_snapshots")
+    .select("id,channel,provider_key,provider_account_id,state,daily_limit,used_today,reserved_for_main,acquisition_available,reason_code,observed_at,expires_at,created_at")
+    .order("observed_at",{ascending:false}).limit(safe);
+  if(error) throw error;
+  return data??[];
+}
+
+export async function recordAarohiCapacitySnapshot(args:{
+  channel:"WHATSAPP"|"INSTAGRAM"|"FACEBOOK"|"X";providerKey:string;
+  providerAccountId?:string|null;state:"UNKNOWN"|"GREEN"|"YELLOW"|"RED";
+  dailyLimit?:number|null;usedToday:number;reservedForMain:number;
+  acquisitionAvailable:number;expiresAt:string;reasonCode?:string|null;
+}){
+  const now=new Date();
+  const expiry=new Date(args.expiresAt);
+  if(!Number.isFinite(expiry.getTime())||expiry<=now||expiry.getTime()>now.getTime()+24*60*60*1000){
+    throw new Error("aarohi_capacity_expiry_invalid");
+  }
+  const daily=args.dailyLimit==null?null:Math.max(0,Math.round(args.dailyLimit));
+  const used=Math.max(0,Math.round(args.usedToday));
+  const reserve=Math.max(0,Math.round(args.reservedForMain));
+  const available=Math.max(0,Math.round(args.acquisitionAvailable));
+  if(daily!=null&&(used>daily||available>Math.max(daily-used-reserve,0))){
+    throw new Error("aarohi_capacity_numbers_invalid");
+  }
+  const {data,error}=await adminClient().from("aarohi_channel_capacity_snapshots").insert({
+    channel:args.channel,provider_key:args.providerKey.trim().slice(0,120),
+    provider_account_id:args.providerAccountId??null,state:args.state,
+    daily_limit:daily,used_today:used,reserved_for_main:reserve,
+    acquisition_available:available,reason_code:args.reasonCode?.trim().slice(0,160)||null,
+    observed_at:now.toISOString(),expires_at:expiry.toISOString(),
+  }).select("id").single();
+  if(error) throw error;
+  return String(data.id);
+}
+
+export async function recordAarohiChannelEligibility(args:{
+  prospectId:string;channel:"INSTAGRAM"|"FACEBOOK"|"X"|"WHATSAPP";
+  state:"UNKNOWN"|"ELIGIBLE"|"INELIGIBLE";providerKey?:string|null;
+  evidenceKind:string;evidenceRef:string;observedAt?:string;expiresAt?:string|null;
+}){
+  await actionableProspect(args.prospectId).catch((error)=>{
+    if(args.state==="INELIGIBLE") return;
+    throw error;
+  });
+  const observed=new Date(args.observedAt??Date.now());
+  if(!Number.isFinite(observed.getTime())) throw new Error("aarohi_eligibility_observed_invalid");
+  let expires:string|null=null;
+  if(args.expiresAt){
+    const value=new Date(args.expiresAt);
+    if(!Number.isFinite(value.getTime())||value<=observed) throw new Error("aarohi_eligibility_expiry_invalid");
+    expires=value.toISOString();
+  }
+  const {data,error}=await adminClient().from("aarohi_channel_eligibility").upsert({
+    prospect_id:args.prospectId,channel:args.channel,state:args.state,
+    provider_key:args.providerKey?.trim().slice(0,120)||null,
+    evidence_kind:args.evidenceKind.trim().slice(0,120),
+    evidence_ref:args.evidenceRef.trim().slice(0,300),
+    observed_at:observed.toISOString(),expires_at:expires,updated_at:new Date().toISOString(),
+  },{onConflict:"prospect_id,channel"}).select("id").single();
+  if(error) throw error;
+  return String(data.id);
+}
+
+export async function listAarohiFollowupPolicies(){
+  const {data,error}=await adminClient().from("aarohi_followup_policies")
+    .select("id,channel,trigger_stage,enabled,delay_minutes,max_attempts,policy_reference,updated_at")
+    .order("channel").order("trigger_stage");
+  if(error) throw error;
+  return data??[];
+}
+
+export async function upsertAarohiFollowupPolicy(args:{
+  channel:"INSTAGRAM"|"FACEBOOK"|"X"|"WHATSAPP";triggerStage:string;
+  enabled:boolean;delayMinutes:number;maxAttempts:number;actorId:string;
+}){
+  const stage=args.triggerStage.trim().slice(0,80);
+  if(!stage) throw new Error("aarohi_followup_stage_required");
+  const {data,error}=await adminClient().from("aarohi_followup_policies").upsert({
+    channel:args.channel,trigger_stage:stage,enabled:args.enabled,
+    delay_minutes:Math.max(60,Math.min(43200,Math.round(args.delayMinutes))),
+    max_attempts:Math.max(1,Math.min(10,Math.round(args.maxAttempts))),
+    policy_reference:`admin:${args.actorId}:phase2-followup-v1`,
+    created_by:args.actorId,updated_at:new Date().toISOString(),
+  },{onConflict:"channel,trigger_stage"}).select("id").single();
+  if(error) throw error;
+  return String(data.id);
+}
+
+export async function recommendAarohiNextChannel(prospectId:string){
+  const prospect=await actionableProspect(prospectId);
+  const db=adminClient();
+  const [jobs,permissions,identities,replies,eligibility]=await Promise.all([
+    db.from("aarohi_outreach_jobs").select("channel,state").eq("prospect_id",prospectId)
+      .in("state",["NEEDS_HUMAN_REVIEW","NEEDS_CORE_AUTHORIZATION","DISPATCH_READY","CLAIMED","WAITING_REPLY"])
+      .order("updated_at",{ascending:false}).limit(1),
+    db.from("aarohi_communication_permissions").select("channel,purpose,state")
+      .eq("prospect_id",prospectId).eq("state","GRANTED"),
+    db.from("aarohi_channel_identities").select("channel").eq("prospect_id",prospectId)
+      .neq("verification_status","REJECTED"),
+    db.from("aarohi_social_reply_signals").select("channel,reply_kind,occurred_at")
+      .eq("prospect_id",prospectId).order("occurred_at",{ascending:false}).limit(5),
+    db.from("aarohi_channel_eligibility").select("channel,state,expires_at")
+      .eq("prospect_id",prospectId),
+  ]);
+  for(const r of [jobs,permissions,identities,replies,eligibility]) if(r.error) throw r.error;
+  const active=(jobs.data??[])[0] as any;
+  if(active) return {channel:String(active.channel),action:"CONTINUE_EXISTING_JOB",reason:`ACTIVE_${active.state}`};
+  const perms=new Set((permissions.data??[]).map((r:any)=>`${r.channel}:${r.purpose}`));
+  if(prospect.whatsapp_available===true&&perms.has("WHATSAPP:ACQUISITION_CONTINUATION")){
+    return {channel:"WHATSAPP",action:"CONTINUE",reason:"WHATSAPP_PERMISSION_AND_IDENTITY"};
+  }
+  const channels=new Set((identities.data??[]).map((r:any)=>String(r.channel)));
+  const replied=(replies.data??[]).find((r:any)=>["INTERESTED","WHATSAPP_SHARED","OTHER"].includes(String(r.reply_kind)));
+  if(replied&&channels.has(String((replied as any).channel))){
+    return {channel:String((replied as any).channel),action:"CONTINUE",reason:"ACTIVE_SOCIAL_REPLY"};
+  }
+  const now=Date.now();
+  const xEligible=(eligibility.data??[]).some((r:any)=>
+    r.channel==="X"&&r.state==="ELIGIBLE"&&(!r.expires_at||Date.parse(r.expires_at)>now)
+  );
+  if(xEligible&&channels.has("X")) return {channel:"X",action:"GOVERNED_INITIATION",reason:"FRESH_X_ELIGIBILITY"};
+  if(channels.has("INSTAGRAM")) return {channel:"INSTAGRAM",action:"ASSISTED_FIRST_CONTACT",reason:"INSTAGRAM_IDENTITY"};
+  if(channels.has("FACEBOOK")) return {channel:"FACEBOOK",action:"ASSISTED_FIRST_CONTACT",reason:"FACEBOOK_IDENTITY"};
+  return {channel:null,action:"HUMAN_REVIEW",reason:"NO_ELIGIBLE_CHANNEL"};
+}
+
+export async function markAarohiAssistedFirstContactJob(args:{
+  jobId:string;actorId:string;externalReference?:string|null;
+}){
+  const db=adminClient();
+  const job=await db.from("aarohi_outreach_jobs")
+    .select("id,prospect_id,channel,state").eq("id",args.jobId).maybeSingle();
+  if(job.error) throw job.error;
+  if(!job.data||job.data.state!=="NEEDS_HUMAN_REVIEW"||
+     !["INSTAGRAM","FACEBOOK"].includes(String(job.data.channel))){
+    throw new Error("aarohi_assisted_job_invalid");
+  }
+  await actionableProspect(String(job.data.prospect_id));
+  const now=new Date().toISOString();
+  const update=await db.from("aarohi_outreach_jobs").update({
+    state:"WAITING_REPLY",
+    core_authorization_ref:`human-assisted:${args.actorId}:${args.jobId}`,
+    provider_message_ref:args.externalReference?.trim().slice(0,300)||null,
+    updated_at:now,last_error_code:null,
+  }).eq("id",args.jobId).eq("state","NEEDS_HUMAN_REVIEW");
+  if(update.error) throw update.error;
+  await db.from("aarohi_prospects").update({
+    prospect_stage:"CONTACTED",conversation_stage:"FIRST_CONTACT",
+    preferred_channel:job.data.channel,last_activity_at:now,updated_at:now,
+    next_action_type:"FOLLOW_UP",next_action_reason:"Await eligible social reply before automated continuation.",
+  }).eq("id",job.data.prospect_id);
+  await db.from("aarohi_events").insert({
+    prospect_id:job.data.prospect_id,event_type:"outreach.assisted_first_contact",
+    actor_type:"HUMAN",actor_reference:args.actorId,channel:job.data.channel,
+    safe_summary:"Operator confirmed platform-assisted first acquisition contact.",
+    reference_type:"outreach_job",reference_id:args.jobId,
+    event_data:{channel:job.data.channel},
+  });
+  await refreshAarohiMemorySnapshot(String(job.data.prospect_id));
+}
+
+export async function scheduleAarohiFollowups(now=new Date(),limit=100){
+  const db=adminClient();
+  const [policies,prospects]=await Promise.all([
+    db.from("aarohi_followup_policies").select("id,channel,trigger_stage,delay_minutes,max_attempts")
+      .eq("enabled",true),
+    db.from("aarohi_prospects")
+      .select("id,city_id,prospect_stage,conversation_stage,preferred_channel,last_activity_at,next_action_type,do_not_contact,ai_paused,human_takeover")
+      .eq("tenant_id","quickfurno").eq("next_action_type","FOLLOW_UP")
+      .eq("do_not_contact",false).eq("ai_paused",false).eq("human_takeover",false)
+      .neq("prospect_stage","SUPPRESSED").order("last_activity_at",{ascending:true}).limit(Math.max(1,Math.min(250,limit))),
+  ]);
+  if(policies.error) throw policies.error;
+  if(prospects.error) throw prospects.error;
+  let queued=0,skipped=0;
+  for(const prospect of prospects.data??[]){
+    const channel=String(prospect.preferred_channel??"");
+    const policy=(policies.data??[]).find((p:any)=>
+      p.channel===channel&&(p.trigger_stage===prospect.conversation_stage||p.trigger_stage===prospect.prospect_stage||p.trigger_stage==="*")
+    ) as any;
+    if(!policy){skipped+=1;continue;}
+    const due=Date.parse(String(prospect.last_activity_at))+Number(policy.delay_minutes)*60_000;
+    if(!Number.isFinite(due)||due>now.getTime()){skipped+=1;continue;}
+    const prior=await db.from("aarohi_outreach_jobs").select("id",{count:"exact",head:true})
+      .eq("prospect_id",prospect.id).eq("channel",channel)
+      .like("draft_ref",`system:follow-up:${policy.id}%`);
+    if(prior.error) throw prior.error;
+    if((prior.count??0)>=Number(policy.max_attempts)){skipped+=1;continue;}
+    const recommendation=await recommendAarohiNextChannel(String(prospect.id));
+    if(recommendation.channel!==channel){skipped+=1;continue;}
+    await queueAarohiOutreach({
+      prospectId:String(prospect.id),channel:channel as AarohiPhase2Channel,
+      priority:65,draftRef:`system:follow-up:${policy.id}`,
+      idempotencyKey:`aarohi.followup.${policy.id}.${prospect.id}.${prior.count??0}`,
+      continuation:true,
+    });
+    queued+=1;
+  }
+  return {examined:(prospects.data??[]).length,queued,skipped};
+}
+
+export async function claimAarohiWhatsAppOutreach(workerRef:string){
+  const {data,error}=await adminClient().rpc("qf_aarohi_claim_whatsapp_outreach_v1",{p_worker_ref:workerRef});
+  if(error) throw error;
+  if(!data) return null;
+  const job=Array.isArray(data)?data[0]:data;
+  return job?.id&&job?.execution_token?job:null;
+}
+
+export async function completeAarohiWhatsAppOutreach(args:{
+  jobId:string;executionToken:string;outcome:"ACCEPTED"|"DEFINITIVE_FAILURE"|"UNCERTAIN";
+  providerMessageRef?:string|null;errorCode?:string|null;
+}){
+  const {data,error}=await adminClient().rpc("qf_aarohi_complete_whatsapp_outreach_v1",{
+    p_job_id:args.jobId,p_execution_token:args.executionToken,p_outcome:args.outcome,
+    p_provider_message_ref:args.providerMessageRef??null,p_error_code:args.errorCode??null,
+  });
+  if(error) throw error;
+  return data??null;
+}

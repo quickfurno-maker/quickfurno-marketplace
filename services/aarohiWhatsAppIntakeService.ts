@@ -1,11 +1,14 @@
 import "server-only";
 import { adminClient } from "@/lib/supabase";
+import { normalizePhoneE164 } from "@/lib/communication/phone";
+import { vendorStoredPhoneCandidatesForInbound } from "@/services/inboundIdentityResolutionService";
 
 type IntakeOutcome =
   | { readonly kind:"ready"; readonly prospectId:string }
   | { readonly kind:"prompt"; readonly body:string }
   | { readonly kind:"completed"; readonly prospectId:string; readonly body:string }
   | { readonly kind:"ambiguous"; readonly body:string }
+  | { readonly kind:"existing_vendor"; readonly body:string }
   | { readonly kind:"refused" };
 
 function normalizedText(value:Record<string,unknown>,messageType:string):string {
@@ -19,6 +22,38 @@ function normalizedText(value:Record<string,unknown>,messageType:string):string 
 
 function normalizeCity(value:string):string {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+}
+
+function vendorContactOrFilter(values:readonly string[]):string {
+  return values.flatMap((value)=>[
+    "whatsapp_number.eq."+value,
+    "phone.eq."+value,
+  ]).join(",");
+}
+
+async function anyExistingVendorForInboundPhone(senderPhoneE164:string):Promise<"yes"|"no"|"error">{
+  const normalized=normalizePhoneE164(senderPhoneE164);
+  if(!normalized.ok) return "error";
+  const db=adminClient();
+  const storedForms=vendorStoredPhoneCandidatesForInbound(normalized.e164);
+  const [businessContacts,verifiedMemberships]=await Promise.all([
+    db.from("vendors").select("id").or(vendorContactOrFilter(storedForms)),
+    db.from("vendor_dashboard_users")
+      .select("vendor_id")
+      .eq("phone_verified",true)
+      .eq("phone_e164",normalized.e164),
+  ]);
+  if(businessContacts.error||verifiedMemberships.error) return "error";
+  const ids=new Set<string>();
+  for(const row of businessContacts.data??[]){
+    const id=(row as {id?:unknown}).id;
+    if(typeof id==="string"&&id) ids.add(id);
+  }
+  for(const row of verifiedMemberships.data??[]){
+    const id=(row as {vendor_id?:unknown}).vendor_id;
+    if(typeof id==="string"&&id) ids.add(id);
+  }
+  return ids.size>0?"yes":"no";
 }
 
 export async function resolveAarohiProspectByWhatsAppHash(destinationHash:string):Promise<
@@ -61,6 +96,7 @@ async function availableCities():Promise<Array<{id:string;name:string;slug:strin
 export async function processAarohiWhatsAppIntake(args:{
   providerAccountId:string;
   destinationHash:string;
+  senderPhoneE164:string;
   messageType:string;
   contentMinimized:Record<string,unknown>;
 }):Promise<IntakeOutcome>{
@@ -68,6 +104,15 @@ export async function processAarohiWhatsAppIntake(args:{
   if(existing.kind==="exact") return {kind:"ready",prospectId:existing.prospectId};
   if(existing.kind==="ambiguous"){
     return {kind:"ambiguous",body:"We found more than one acquisition profile for this WhatsApp identity. A QuickFurno team member will review it before Aarohi continues."};
+  }
+
+  const vendorGate=await anyExistingVendorForInboundPhone(args.senderPhoneE164);
+  if(vendorGate==="error") return {kind:"refused"};
+  if(vendorGate==="yes"){
+    return {
+      kind:"existing_vendor",
+      body:"This WhatsApp identity is already connected to a QuickFurno vendor record. Please use the main QuickFurno vendor support channel instead of starting a new partner acquisition.",
+    };
   }
 
   const db=adminClient();

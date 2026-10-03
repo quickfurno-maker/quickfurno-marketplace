@@ -18,6 +18,7 @@ import {
 import {
   planAarohiWhatsAppBroadcast,
   promoteAarohiDiscoveryCandidate,
+  recordAarohiCommunicationPermission,
 } from "@/services/aarohiPhase2AcquisitionService";
 
 async function actor(permission:AarohiPermission){
@@ -118,4 +119,19 @@ export async function planWhatsAppBroadcastAction(campaignId:string,formData:For
     dailyCap:Number(val(formData,"daily_cap")||1000),
   });
   refresh();
+}
+
+export async function recordAarohiMarketingPermissionAction(prospectId:string,formData:FormData){
+  const a=await actor("aarohi.manage");
+  await sensitiveBudget(a);
+  const state=val(formData,"state")==="GRANTED"?"GRANTED":"REVOKED";
+  await recordAarohiCommunicationPermission({
+    prospectId,
+    channel:"WHATSAPP",
+    purpose:"MARKETING_BROADCAST",
+    state,
+    evidenceKind:state==="GRANTED"?"ADMIN_EVIDENCE_IMPORT":"STOP_OR_SUPPRESSION",
+    evidenceRef:val(formData,"evidence_ref"),
+  });
+  refresh(prospectId);
 }

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { adminClient } from "@/lib/supabase";
+import { openConversationValue } from "@/lib/communication/conversationSeal";
 import {
   QFJ_OPERATOR_SNAPSHOT_PROTOCOL,
   parseQfjOperatorSnapshot,
@@ -14,6 +15,28 @@ const ACTIVITY_HOURS = 24;
 function safeLabel(value: unknown, fallback = "—"): string {
   const text = typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
   return (text || fallback).slice(0, 160);
+}
+
+function destinationAad(id: string, providerAccountId: string, destinationHash: string): string {
+  return ["qf.conversation.destination.v1", id, providerAccountId, destinationHash].join("\n");
+}
+
+function fullConversationDestination(row: any): string {
+  const opened = openConversationValue(
+    {
+      ciphertext: String(row.sealed_destination_ciphertext ?? ""),
+      nonce: String(row.sealed_destination_nonce ?? ""),
+      authTag: String(row.sealed_destination_auth_tag ?? ""),
+      keyId: String(row.encryption_key_id ?? ""),
+    },
+    destinationAad(
+      String(row.id),
+      String(row.provider_account_id),
+      String(row.destination_hash),
+    ),
+  );
+  if (!opened.ok) throw new Error("JARVIS_OPERATOR_DESTINATION_UNAVAILABLE");
+  return safeLabel(opened.value);
 }
 
 function approvalRisk(action: string):
@@ -96,7 +119,7 @@ export async function readJarvisOperatorSnapshot(): Promise<QfjOperatorSnapshot>
       .select("id,action_type,entity_type,source,decision_status,requested_at")
       .order("requested_at", { ascending: false }).limit(APPROVAL_LIMIT),
     db.from("communication_conversations")
-      .select("id,destination_masked,subject_type,assigned_actor,state,human_takeover,revision,updated_at")
+      .select("id,provider_account_id,destination_hash,sealed_destination_ciphertext,sealed_destination_nonce,sealed_destination_auth_tag,encryption_key_id,subject_type,assigned_actor,state,human_takeover,revision,updated_at")
       .order("updated_at", { ascending: false }).limit(CONVERSATION_LIMIT),
     countRows("automation_action_requests", [["eq", "decision_status", "requested"]]),
     countRows("automation_action_requests", [["eq", "decision_status", "authorized"]]),
@@ -141,7 +164,7 @@ export async function readJarvisOperatorSnapshot(): Promise<QfjOperatorSnapshot>
     ],
     conversationControl: (conversations.data ?? []).map((row: any) => ({
       id: String(row.id),
-      subject: safeLabel(row.destination_masked, safeLabel(row.subject_type, "conversation")),
+      subject: fullConversationDestination(row),
       agent: safeLabel(row.assigned_actor, "UNASSIGNED"),
       humanTakeover: row.human_takeover === true || row.state === "HUMAN",
       aiPaused: row.state === "PAUSED",

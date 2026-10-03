@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
   "purpose": "POST_G1_EXPLICIT_MIGRATION_PIN_EXTENSION",
-  "observedDate": "2026-09-29",
+  "observedDate": "2026-10-03",
   "databaseMutationAuthorized": false,
   "productionDeploymentAuthorized": false,
   "evidenceProjects": {
@@ -423,6 +423,52 @@
       "observedProductionAppliedVersion": "20261002102931",
       "productionSemanticApplication": "PROVEN",
       "productionEvidence": "FIRST_PARTY_SUPABASE_MCP_PRODUCTION_INDEX_AUDIT_2026-10-02"
+    },
+    {
+      "version": "20261003064500",
+      "name": "aarohi_phase1_omnichannel_activation",
+      "filename": "20261003064500_aarohi_phase1_omnichannel_activation.sql",
+      "path": "supabase/migrations/20261003064500_aarohi_phase1_omnichannel_activation.sql",
+      "canonicalSha256": "205ee8994485d2b29fa66964708e79d26ae692edcc897b4ad0a95d727f9f3217",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "stagingSemanticApplication": "PROVEN",
+      "observedStagingAppliedVersion": "20261003034807",
+      "stagingApplyReplayCount": 1,
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_APPLY_ROLLBACK_CANARY_2026-10-03",
+      "stagingCanary": {
+        "mode": "ROLLBACK_ONLY",
+        "intakeIdempotent": true,
+        "hashedWhatsAppIdentityOnly": true,
+        "rowsAfterRollback": {
+          "intakes": 0,
+          "registrationIntents": 0,
+          "conversionLinks": 0,
+          "canaryProspects": 0,
+          "canaryEvents": 0
+        }
+      }
+    },
+    {
+      "version": "20261003070000",
+      "name": "aarohi_phase1_fk_indexes",
+      "filename": "20261003070000_aarohi_phase1_fk_indexes.sql",
+      "path": "supabase/migrations/20261003070000_aarohi_phase1_fk_indexes.sql",
+      "canonicalSha256": "2826eb9bba7df984f929bb3405c3003a87f1d3200d8e5f5650c29bb3a1c07873",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "stagingSemanticApplication": "PROVEN",
+      "observedStagingAppliedVersion": "20261003040425",
+      "stagingApplyReplayCount": 1,
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_INDEX_APPLY_2026-10-03",
+      "stagingAdvisorClosure": {
+        "indexesPresent": 4,
+        "targetForeignKeyWarningsRemaining": 0
+      }
     }
   ],
   "supersededLegacyPins": [

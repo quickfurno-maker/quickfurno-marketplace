@@ -43,7 +43,7 @@ export async function listAarohiProspects(input:Record<string,unknown>={}){
 export async function getAarohiProspect(id:string){
   const db=adminClient(); const p=await db.from("aarohi_prospects").select("*,cities(name,slug)").eq("id",id).maybeSingle(); if(p.error) throw p.error; if(!p.data)return null;
   const merged=await db.from("aarohi_prospects").select("id").eq("merged_into_prospect_id",id); if(merged.error)throw merged.error; const lineage=[id,...(merged.data??[]).map(x=>x.id)];
-  const [sources,channels,interactions,conversations,tasks,scores,matches,handoff,opportunities,events]=await Promise.all([
+  const [sources,channels,interactions,conversations,tasks,scores,matches,handoff,conversion,opportunities,events]=await Promise.all([
     db.from("aarohi_prospect_sources").select("*").in("prospect_id",lineage).order("imported_at",{ascending:false}),
     db.from("aarohi_channel_identities").select("*").in("prospect_id",lineage).order("updated_at",{ascending:false}),
     db.from("aarohi_interactions").select("*").in("prospect_id",lineage).order("occurred_at",{ascending:false}).limit(100),
@@ -52,13 +52,15 @@ export async function getAarohiProspect(id:string){
     db.from("aarohi_scores").select("*").in("prospect_id",lineage).order("calculated_at",{ascending:false}).limit(20),
     db.from("aarohi_identity_matches").select("*").or(`prospect_a_id.eq.${id},prospect_b_id.eq.${id}`).order("created_at",{ascending:false}),
     db.from("aarohi_handoffs").select("*").eq("prospect_id",id).maybeSingle(),
+    db.from("aarohi_vendor_conversion_links").select("*").eq("prospect_id",id).maybeSingle(),
     db.from("aarohi_opportunities").select("*,packages(id,name,display_price,lead_count,validity_days,is_active)").eq("prospect_id",id).order("updated_at",{ascending:false}),
     db.from("aarohi_events").select("*").in("prospect_id",lineage).order("occurred_at",{ascending:false}).limit(150),
   ]);
-  for(const r of [sources,channels,interactions,conversations,tasks,scores,matches,handoff,opportunities,events]) if(r.error) throw r.error;
+  for(const r of [sources,channels,interactions,conversations,tasks,scores,matches,handoff,conversion,opportunities,events]) if(r.error) throw r.error;
   let core:any=null;
-  if(handoff.data?.vendor_id){
-    const vendorId=handoff.data.vendor_id;
+  const correlatedVendorId=handoff.data?.vendor_id??conversion.data?.vendor_id??null;
+  if(correlatedVendorId){
+    const vendorId=correlatedVendorId;
     const [v,vp,vo,pay]=await Promise.all([
       db.from("vendors").select("id,business_name,status,verification_status,is_active,paid_status,public_visibility").eq("id",vendorId).maybeSingle(),
       db.from("vendor_packages").select("id,package_id,payment_status,status,purchase_date,expiry_date,packages(name,display_price,validity_days)").eq("vendor_id",vendorId).order("purchase_date",{ascending:false}).limit(5),
@@ -66,7 +68,7 @@ export async function getAarohiProspect(id:string){
       db.from("payments").select("id,package_id,amount,payment_status,created_at").eq("vendor_id",vendorId).order("created_at",{ascending:false}).limit(5),
     ]); core={vendor:v.data??null,vendorPackages:vp.data??[],orders:vo.data??[],payments:pay.data??[]};
   }
-  return {prospect:p.data,lineage,sources:sources.data??[],channels:channels.data??[],interactions:interactions.data??[],conversations:conversations.data??[],tasks:tasks.data??[],scores:scores.data??[],matches:matches.data??[],handoff:handoff.data??null,opportunities:opportunities.data??[],events:events.data??[],core};
+  return {prospect:p.data,lineage,sources:sources.data??[],channels:channels.data??[],interactions:interactions.data??[],conversations:conversations.data??[],tasks:tasks.data??[],scores:scores.data??[],matches:matches.data??[],handoff:handoff.data??null,conversion:conversion.data??null,opportunities:opportunities.data??[],events:events.data??[],core};
 }
 
 export async function listAarohiAttention(limit=30){

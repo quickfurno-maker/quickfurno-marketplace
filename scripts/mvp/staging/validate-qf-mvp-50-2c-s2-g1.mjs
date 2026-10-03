@@ -670,7 +670,7 @@ function validateState(state) {
     extension?.evidenceProjects?.staging?.projectRef === "uckafzuochmbvtiodmcl" &&
     extension?.evidenceProjects?.production?.projectRef === "yqpgcsduqbxulrlzwzap");
   check("post-G1 extension records are unique, exact and hash-pinned",
-    extensionRecords.length === 26 &&
+    extensionRecords.length === 28 &&
     new Set(extensionRecords.map((record) => record.version)).size === extensionRecords.length &&
     extensionRecords.every((record) => {
       const local = localByVersion.get(record.version);
@@ -680,6 +680,7 @@ function validateState(state) {
         ["20261001153000", "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"],
         ["20261001154500", "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"],
         ["20261001165000", "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"],
+        ["20261003070000", "SOURCE_PIN_CREATED_2026-10-03_BEFORE_DEPLOYMENT"],
       ]);
       const allowedSourcePin = sourcePinnedEvidence.get(record.version);
       return local?.version === record.version &&
@@ -769,6 +770,34 @@ function validateState(state) {
             record.observedProductionAppliedVersion === "20261002102931" &&
             record.productionSemanticApplication === "PROVEN" &&
             record.productionEvidence === "FIRST_PARTY_SUPABASE_MCP_PRODUCTION_INDEX_AUDIT_2026-10-02"
+          ) ||
+          (
+            record.version === "20261003064500" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_APPLY_ROLLBACK_CANARY_2026-10-03" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            record.observedStagingAppliedVersion === "20261003034807" &&
+            record.stagingApplyReplayCount === 1 &&
+            record.stagingCanary?.mode === "ROLLBACK_ONLY" &&
+            record.stagingCanary?.intakeIdempotent === true &&
+            record.stagingCanary?.hashedWhatsAppIdentityOnly === true &&
+            record.stagingCanary?.rowsAfterRollback?.intakes === 0 &&
+            record.stagingCanary?.rowsAfterRollback?.registrationIntents === 0 &&
+            record.stagingCanary?.rowsAfterRollback?.conversionLinks === 0 &&
+            record.stagingCanary?.rowsAfterRollback?.canaryProspects === 0 &&
+            record.stagingCanary?.rowsAfterRollback?.canaryEvents === 0
+          ) ||
+          (
+            record.version === "20261003070000" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_INDEX_APPLY_2026-10-03" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            record.observedStagingAppliedVersion === "20261003040425" &&
+            record.stagingApplyReplayCount === 1 &&
+            record.stagingAdvisorClosure?.indexesPresent === 4 &&
+            record.stagingAdvisorClosure?.targetForeignKeyWarningsRemaining === 0
           ) ||
           (
             allowedSourcePin !== undefined &&

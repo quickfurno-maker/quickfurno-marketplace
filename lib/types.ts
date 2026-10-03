@@ -153,6 +153,8 @@ export interface VendorRegistrationInput {
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
+  /** Opaque, expiring Aarohi acquisition token. Resolved only on the server; never a prospect id. */
+  aarohi_acquisition_token?: string;
   // ── Phase 1: Google identity / normalized-location foundation ─────────────
   // Optional, backward-compatible. Persisted once migration
   // 20260704000040_google_area_location_foundation.sql runs; registerVendor

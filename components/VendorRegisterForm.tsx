@@ -141,11 +141,16 @@ function readTracking() {
   if (typeof window === "undefined") return {};
   const params = new URLSearchParams(window.location.search);
   const pick = (key: string) => params.get(key)?.trim() || undefined;
+  const sourceUrl = new URL(window.location.href);
+  // The acquisition token is an expiring bearer secret. It travels only in the
+  // dedicated server-side field below and is never persisted inside attribution URLs.
+  sourceUrl.searchParams.delete("acq");
   return {
-    source_url: window.location.href,
+    source_url: sourceUrl.toString(),
     utm_source: pick("utm_source"),
     utm_medium: pick("utm_medium"),
     utm_campaign: pick("utm_campaign"),
+    aarohi_acquisition_token: pick("acq"),
   };
 }
 
@@ -153,6 +158,18 @@ export function VendorRegisterForm({
   initialCategory = null,
 }: { initialCategory?: QuickFurnoCategory | null } = {}) {
   const [step, setStep] = useState(0);
+  const [tracking] = useState(() => readTracking());
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !tracking.aarohi_acquisition_token) return;
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete("acq");
+    window.history.replaceState(
+      window.history.state,
+      "",
+      cleanUrl.pathname + cleanUrl.search + cleanUrl.hash,
+    );
+  }, [tracking.aarohi_acquisition_token]);
   // Seeded once via the lazy initialiser, never via an effect: an effect that
   // wrote form state would re-run on the wizard's own updates, and
   // validate-mobile-form-focus.mjs exists because exactly that pattern once
@@ -620,7 +637,7 @@ export function VendorRegisterForm({
         team_size: f.teamSize || undefined,
         monthly_capacity: f.monthlyCapacity || undefined,
         starting_price: formattedRate || undefined,
-        ...readTracking(),
+        ...tracking,
       });
 
       if (!res.ok) {

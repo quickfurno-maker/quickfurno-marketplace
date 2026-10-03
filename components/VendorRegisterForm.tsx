@@ -141,8 +141,12 @@ function readTracking() {
   if (typeof window === "undefined") return {};
   const params = new URLSearchParams(window.location.search);
   const pick = (key: string) => params.get(key)?.trim() || undefined;
+  const sourceUrl = new URL(window.location.href);
+  // The acquisition token is an expiring bearer secret. It travels only in the
+  // dedicated server-side field below and is never persisted inside attribution URLs.
+  sourceUrl.searchParams.delete("acq");
   return {
-    source_url: window.location.href,
+    source_url: sourceUrl.toString(),
     utm_source: pick("utm_source"),
     utm_medium: pick("utm_medium"),
     utm_campaign: pick("utm_campaign"),

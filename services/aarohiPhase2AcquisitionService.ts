@@ -10,6 +10,7 @@ import {
   type AarohiPhase2Channel,
 } from "@/lib/aarohi/phase2Policy";
 import { linkAarohiProspectWhatsAppHash } from "@/services/aarohiWhatsAppIntakeService";
+import { vendorStoredPhoneCandidatesForInbound } from "@/services/inboundIdentityResolutionService";
 
 const SAFE_REF=/^[A-Za-z0-9._:-]{1,300}$/;
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -153,14 +154,19 @@ export async function promoteReadyAarohiDiscoveryCandidates(limit=50){
     .select("id").eq("state","NEW").gte("confidence",80)
     .order("confidence",{ascending:false}).order("created_at",{ascending:true}).limit(safe);
   if(error) throw error;
-  let promoted=0,review=0;
+  let promoted=0,review=0,excluded=0;
   for(const row of data??[]){
     try{
       await promoteAarohiDiscoveryCandidate(String(row.id),"aarohi-phase2-auto-promotion");
       promoted+=1;
     }catch(error){
+      if(error instanceof Error&&error.message==="aarohi_candidate_existing_vendor"){
+        excluded+=1;
+        continue;
+      }
       if(error instanceof Error&&[
-        "aarohi_candidate_city_review_required","aarohi_candidate_identity_ambiguous"
+        "aarohi_candidate_city_review_required","aarohi_candidate_identity_ambiguous",
+        "aarohi_candidate_vendor_review_required",
       ].includes(error.message)){
         review+=1;
         continue;
@@ -168,7 +174,7 @@ export async function promoteReadyAarohiDiscoveryCandidates(limit=50){
       throw error;
     }
   }
-  return {examined:(data??[]).length,promoted,review};
+  return {examined:(data??[]).length,promoted,review,excluded};
 }
 
 export async function claimAarohiDiscoveryRun(workerRef:string){
@@ -247,6 +253,73 @@ async function activeCityFromHint(cityHint:string|null){
   return matches.length===1?matches[0]:null;
 }
 
+function vendorPhoneOrFilter(values:readonly string[]):string{
+  return values.flatMap((value)=>[
+    `phone.eq.${value}`,
+    `whatsapp_number.eq.${value}`,
+  ]).join(",");
+}
+
+async function canonicalVendorMatch(candidate:any,cityName:string):Promise<"EXACT"|"REVIEW"|"NONE">{
+  const db=adminClient();
+  if(candidate.phone_e164){
+    const forms=vendorStoredPhoneCandidatesForInbound(String(candidate.phone_e164));
+    const byPhone=await db.from("vendors").select("id").or(vendorPhoneOrFilter(forms)).limit(2);
+    if(byPhone.error) throw byPhone.error;
+    if((byPhone.data??[]).length>0) return "EXACT";
+  }
+  if(candidate.email){
+    const byEmail=await db.from("vendors").select("id").ilike("email",String(candidate.email)).limit(2);
+    if(byEmail.error) throw byEmail.error;
+    if((byEmail.data??[]).length>0) return "EXACT";
+  }
+  const byCity=await db.from("vendors").select("id,business_name,city")
+    .ilike("city",cityName).limit(250);
+  if(byCity.error) throw byCity.error;
+  const name=String(candidate.normalized_business_name??"");
+  const matching=(byCity.data??[]).filter((row:any)=>
+    normalizeBusiness(String(row.business_name??""))===name
+  );
+  return matching.length>0?"REVIEW":"NONE";
+}
+
+async function existingAarohiProspectForCandidate(candidate:any,cityId:string){
+  const db=adminClient();
+  const ids=new Set<string>();
+  if(["INSTAGRAM","FACEBOOK","X"].includes(String(candidate.source_type))){
+    const identity=await db.from("aarohi_channel_identities").select("prospect_id")
+      .eq("channel",String(candidate.source_type))
+      .eq("external_reference",cleanRef(String(candidate.external_reference)));
+    if(identity.error) throw identity.error;
+    for(const row of identity.data??[]) if((row as any).prospect_id) ids.add(String((row as any).prospect_id));
+  }
+  if(candidate.phone_e164){
+    const phone=await db.from("aarohi_prospects").select("id")
+      .eq("tenant_id","quickfurno").eq("primary_phone",String(candidate.phone_e164))
+      .is("merged_into_prospect_id",null).neq("prospect_stage","SUPPRESSED");
+    if(phone.error) throw phone.error;
+    for(const row of phone.data??[]) ids.add(String((row as any).id));
+  }
+  if(candidate.email){
+    const email=await db.from("aarohi_prospects").select("id")
+      .eq("tenant_id","quickfurno").ilike("email",String(candidate.email))
+      .is("merged_into_prospect_id",null).neq("prospect_stage","SUPPRESSED");
+    if(email.error) throw email.error;
+    for(const row of email.data??[]) ids.add(String((row as any).id));
+  }
+  if(ids.size>1) return {kind:"AMBIGUOUS" as const};
+  if(ids.size===1) return {kind:"EXACT" as const,prospectId:[...ids][0]!};
+
+  const named=await db.from("aarohi_prospects").select("id")
+    .eq("tenant_id","quickfurno").eq("city_id",cityId)
+    .eq("normalized_business_name",String(candidate.normalized_business_name))
+    .is("merged_into_prospect_id",null).neq("prospect_stage","SUPPRESSED");
+  if(named.error) throw named.error;
+  if((named.data??[]).length>1) return {kind:"AMBIGUOUS" as const};
+  if((named.data??[]).length===1) return {kind:"EXACT" as const,prospectId:String(named.data![0]!.id)};
+  return {kind:"NONE" as const};
+}
+
 export async function promoteAarohiDiscoveryCandidate(candidateId:string,actorRef:string){
   if(!UUID.test(candidateId)) throw new Error("aarohi_candidate_invalid");
   const db=adminClient();
@@ -263,18 +336,28 @@ export async function promoteAarohiDiscoveryCandidate(candidateId:string,actorRe
     throw new Error("aarohi_candidate_city_review_required");
   }
 
-  const {data:existing,error:existingError}=await db.from("aarohi_prospects")
-    .select("id").eq("tenant_id","quickfurno").eq("city_id",city.id)
-    .eq("normalized_business_name",candidate.normalized_business_name)
-    .is("merged_into_prospect_id",null).neq("prospect_stage","SUPPRESSED");
-  if(existingError) throw existingError;
+  const vendorMatch=await canonicalVendorMatch(candidate,String(city.name));
+  if(vendorMatch==="EXACT"){
+    await db.from("aarohi_discovery_candidates").update({
+      state:"REJECTED",updated_at:new Date().toISOString(),
+    }).eq("id",candidateId);
+    throw new Error("aarohi_candidate_existing_vendor");
+  }
+  if(vendorMatch==="REVIEW"){
+    await db.from("aarohi_discovery_candidates").update({
+      state:"REVIEW",updated_at:new Date().toISOString(),
+    }).eq("id",candidateId);
+    throw new Error("aarohi_candidate_vendor_review_required");
+  }
+
+  const existing=await existingAarohiProspectForCandidate(candidate,String(city.id));
   let prospectId:string;
-  if((existing??[]).length===1){
-    prospectId=String(existing![0]!.id);
+  if(existing.kind==="EXACT"){
+    prospectId=existing.prospectId;
     await db.from("aarohi_discovery_candidates").update({
       state:"DUPLICATE",prospect_id:prospectId,updated_at:new Date().toISOString(),
     }).eq("id",candidateId);
-  }else if((existing??[]).length>1){
+  }else if(existing.kind==="AMBIGUOUS"){
     await db.from("aarohi_discovery_candidates").update({state:"REVIEW",updated_at:new Date().toISOString()}).eq("id",candidateId);
     throw new Error("aarohi_candidate_identity_ambiguous");
   }else{

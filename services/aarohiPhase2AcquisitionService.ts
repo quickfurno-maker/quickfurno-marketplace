@@ -264,13 +264,17 @@ export async function promoteAarohiDiscoveryCandidate(candidateId:string,actorRe
 export async function queueAarohiOutreach(args:{
   prospectId:string;channel:AarohiPhase2Channel;campaignId?:string|null;
   priority?:number;draftRef?:string|null;idempotencyKey:string;
+  continuation?:boolean;
 }){
   const prospect=await actionableProspect(args.prospectId);
   if(args.channel==="WHATSAPP"&&prospect.whatsapp_available!==true){
     throw new Error("aarohi_whatsapp_not_available");
   }
   const policy=AAROHI_PHASE2_POLICY[args.channel];
-  const state=initialOutreachState(args.channel);
+  // Cold first contact and continuation are intentionally different authorities.
+  // IG/FB cold starts remain human-assisted; after an inbound reply, a continuation
+  // may enter Core authorization without pretending that the original cold-DM was automated.
+  const state=args.continuation===true?"NEEDS_CORE_AUTHORIZATION":initialOutreachState(args.channel);
   const {data,error}=await adminClient().from("aarohi_outreach_jobs").upsert({
     prospect_id:args.prospectId,campaign_id:args.campaignId??null,
     channel:args.channel,initiation_mode:policy.initiation,state,
@@ -383,6 +387,28 @@ export async function recordAarohiSocialReply(args:{
     reference_type:"social_reply",reference_id:String(insert.data.id),
     event_data:{replyKind:args.replyKind,whatsappShared:!!normalizedPhone},
   });
+
+  if(args.replyKind==="INTERESTED"){
+    await queueAarohiOutreach({
+      prospectId:args.prospectId,
+      channel:args.channel,
+      priority:75,
+      draftRef:"system:request-whatsapp-continuation",
+      idempotencyKey:`aarohi.social.request-whatsapp.${insert.data.id}`,
+      continuation:true,
+    });
+  }
+  if(args.replyKind==="WHATSAPP_SHARED"&&normalizedPhone){
+    await queueAarohiOutreach({
+      prospectId:args.prospectId,
+      channel:"WHATSAPP",
+      priority:90,
+      draftRef:"system:whatsapp-acquisition-continuation",
+      idempotencyKey:`aarohi.social.whatsapp-continuation.${insert.data.id}`,
+      continuation:true,
+    });
+  }
+
   await refreshAarohiMemorySnapshot(args.prospectId);
   return {signalId:String(insert.data.id),whatsappLinked:!!normalizedPhone};
 }

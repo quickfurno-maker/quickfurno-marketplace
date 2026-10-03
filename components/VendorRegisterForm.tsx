@@ -146,6 +146,7 @@ function readTracking() {
     utm_source: pick("utm_source"),
     utm_medium: pick("utm_medium"),
     utm_campaign: pick("utm_campaign"),
+    aarohi_acquisition_token: pick("acq"),
   };
 }
 

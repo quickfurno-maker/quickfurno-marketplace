@@ -16,9 +16,15 @@ import {
   recordAarohiAssistedFirstOutreach,
 } from "@/services/aarohiOmnichannelService";
 import {
+  markAarohiAssistedFirstContactJob,
   planAarohiWhatsAppBroadcast,
   promoteAarohiDiscoveryCandidate,
+  recordAarohiCapacitySnapshot,
+  recordAarohiChannelEligibility,
   recordAarohiCommunicationPermission,
+  setAarohiDiscoveryConnectorState,
+  updateAarohiCityPolicy,
+  upsertAarohiFollowupPolicy,
 } from "@/services/aarohiPhase2AcquisitionService";
 
 async function actor(permission:AarohiPermission){
@@ -134,4 +140,102 @@ export async function recordAarohiMarketingPermissionAction(prospectId:string,fo
     evidenceRef:val(formData,"evidence_ref"),
   });
   refresh(prospectId);
+}
+
+
+export async function updateAarohiCityPolicyAction(cityId:string,formData:FormData){
+  const a=await actor("aarohi.manage");
+  await sensitiveBudget(a);
+  await updateAarohiCityPolicy({
+    cityId,
+    enabled:formData.get("enabled")==="on",
+    discoveryEnabled:formData.get("discovery_enabled")==="on",
+    outreachEnabled:formData.get("outreach_enabled")==="on",
+    broadcastsEnabled:formData.get("broadcasts_enabled")==="on",
+    quietStart:val(formData,"quiet_start")||"21:00",
+    quietEnd:val(formData,"quiet_end")||"09:00",
+    dailyDiscoveryCap:Number(val(formData,"daily_discovery_cap")||250),
+    dailyOutreachCap:Number(val(formData,"daily_outreach_cap")||100),
+    autonomyLevel:Number(val(formData,"autonomy_level")||0),
+    categories:val(formData,"categories").split(",").map(x=>x.trim()).filter(Boolean),
+    actorId:a,
+  });
+  refresh();
+}
+
+export async function setAarohiDiscoveryConnectorStateAction(connectorId:string,formData:FormData){
+  const a=await actor("aarohi.manage");
+  await sensitiveBudget(a);
+  await setAarohiDiscoveryConnectorState({
+    connectorId,
+    enabled:formData.get("enabled")==="on",
+    providerReady:formData.get("provider_ready")==="on",
+    actorId:a,
+  });
+  refresh();
+}
+
+export async function markAarohiAssistedFirstContactJobAction(jobId:string,formData:FormData){
+  const a=await actor("aarohi.manage");
+  await sensitiveBudget(a);
+  await markAarohiAssistedFirstContactJob({
+    jobId,actorId:a,externalReference:val(formData,"external_reference")||null,
+  });
+  refresh();
+}
+
+export async function upsertAarohiFollowupPolicyAction(formData:FormData){
+  const a=await actor("aarohi.manage");
+  await sensitiveBudget(a);
+  const channel=val(formData,"channel");
+  if(!["INSTAGRAM","FACEBOOK","X","WHATSAPP"].includes(channel)) throw new Error("invalid_channel");
+  await upsertAarohiFollowupPolicy({
+    channel:channel as "INSTAGRAM"|"FACEBOOK"|"X"|"WHATSAPP",
+    triggerStage:val(formData,"trigger_stage"),
+    enabled:formData.get("enabled")==="on",
+    delayMinutes:Number(val(formData,"delay_minutes")||1440),
+    maxAttempts:Number(val(formData,"max_attempts")||1),
+    actorId:a,
+  });
+  refresh();
+}
+
+export async function recordAarohiChannelEligibilityAction(prospectId:string,formData:FormData){
+  const a=await actor("aarohi.manage");
+  await sensitiveBudget(a);
+  const channel=val(formData,"channel");
+  if(!["INSTAGRAM","FACEBOOK","X","WHATSAPP"].includes(channel)) throw new Error("invalid_channel");
+  const state=val(formData,"state");
+  if(!["UNKNOWN","ELIGIBLE","INELIGIBLE"].includes(state)) throw new Error("invalid_eligibility_state");
+  await recordAarohiChannelEligibility({
+    prospectId,channel:channel as "INSTAGRAM"|"FACEBOOK"|"X"|"WHATSAPP",
+    state:state as "UNKNOWN"|"ELIGIBLE"|"INELIGIBLE",
+    providerKey:val(formData,"provider_key")||null,
+    evidenceKind:val(formData,"evidence_kind")||"ADMIN_REVIEW",
+    evidenceRef:val(formData,"evidence_ref")||`admin:${a}`,
+    expiresAt:val(formData,"expires_at")||null,
+  });
+  refresh(prospectId);
+}
+
+export async function recordAarohiCapacitySnapshotAction(formData:FormData){
+  const a=await actor("aarohi.manage");
+  await sensitiveBudget(a);
+  const channel=val(formData,"channel");
+  const state=val(formData,"state");
+  if(!["WHATSAPP","INSTAGRAM","FACEBOOK","X"].includes(channel)) throw new Error("invalid_channel");
+  if(!["UNKNOWN","GREEN","YELLOW","RED"].includes(state)) throw new Error("invalid_capacity_state");
+  await recordAarohiCapacitySnapshot({
+    channel:channel as "WHATSAPP"|"INSTAGRAM"|"FACEBOOK"|"X",
+    providerKey:val(formData,"provider_key"),
+    providerAccountId:val(formData,"provider_account_id")||null,
+    state:state as "UNKNOWN"|"GREEN"|"YELLOW"|"RED",
+    dailyLimit:val(formData,"daily_limit")?Number(val(formData,"daily_limit")):null,
+    usedToday:Number(val(formData,"used_today")||0),
+    reservedForMain:Number(val(formData,"reserved_for_main")||0),
+    acquisitionAvailable:Number(val(formData,"acquisition_available")||0),
+    expiresAt:val(formData,"expires_at"),
+    reasonCode:val(formData,"reason_code")||`admin:${a}`,
+  });
+  refresh();
 }

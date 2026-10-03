@@ -469,6 +469,107 @@
         "indexesPresent": 4,
         "targetForeignKeyWarningsRemaining": 0
       }
+    },
+    {
+      "version": "20261003080000",
+      "name": "aarohi_phase2_autonomous_acquisition",
+      "filename": "20261003080000_aarohi_phase2_autonomous_acquisition.sql",
+      "path": "supabase/migrations/20261003080000_aarohi_phase2_autonomous_acquisition.sql",
+      "canonicalSha256": "053d0835687c9c5282f6eddc6d4eeee0fd23ed42f2b4b34dbdd739736d802033",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "stagingSemanticApplication": "PROVEN",
+      "observedStagingAppliedVersion": "20261003072042",
+      "stagingApplyReplayCount": 1,
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_APPLY_2026-10-03"
+    },
+    {
+      "version": "20261003083000",
+      "name": "aarohi_phase2_scale_governance",
+      "filename": "20261003083000_aarohi_phase2_scale_governance.sql",
+      "path": "supabase/migrations/20261003083000_aarohi_phase2_scale_governance.sql",
+      "canonicalSha256": "8de819e5f708bcc99fcde86d1c2b752cd2f79018d0cb1a571825f537f2c402d4",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "stagingSemanticApplication": "PROVEN",
+      "observedStagingAppliedVersion": "20261003072049",
+      "stagingApplyReplayCount": 1,
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_APPLY_2026-10-03"
+    },
+    {
+      "version": "20261003090000",
+      "name": "aarohi_phase2_ops_control_analytics",
+      "filename": "20261003090000_aarohi_phase2_ops_control_analytics.sql",
+      "path": "supabase/migrations/20261003090000_aarohi_phase2_ops_control_analytics.sql",
+      "canonicalSha256": "a2e9eade298ee5639938d211d16e990d07628e13c4c5f042ec2b4b2a3d22c49b",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "stagingSemanticApplication": "PROVEN",
+      "observedStagingAppliedVersion": "20261003072056",
+      "stagingApplyReplayCount": 1,
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_FAIL_CLOSED_CANARY_2026-10-03",
+      "stagingCanary": {
+        "mode": "ROLLBACK_ONLY",
+        "runtimeMode": "PAUSED",
+        "discoveryClaimBlocked": true,
+        "dispatchReadyBlocked": true,
+        "allChannelsRuntimeEnabled": false,
+        "connectorsEnabled": 0,
+        "cityPoliciesEnabled": 0,
+        "followupPoliciesEnabled": 0,
+        "allPhase2TablesRls": true,
+        "browserRoleExecute": false,
+        "serviceRoleExecute": true,
+        "rowsAfterRollback": {
+          "prospects": 0,
+          "discoveryRuns": 0,
+          "outreachJobs": 0
+        }
+      }
+    },
+    {
+      "version": "20261003091000",
+      "name": "aarohi_phase2_ops_fk_indexes",
+      "filename": "20261003091000_aarohi_phase2_ops_fk_indexes.sql",
+      "path": "supabase/migrations/20261003091000_aarohi_phase2_ops_fk_indexes.sql",
+      "canonicalSha256": "8d4b34d0c17742172d0f9c2e8ce98f8ffbd5b707263417e51e2c14c70972791a",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "stagingSemanticApplication": "PROVEN",
+      "observedStagingAppliedVersion": "20261003072655",
+      "stagingApplyReplayCount": 1,
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_PHASE2_INDEX_APPLY_2026-10-03",
+      "stagingAdvisorClosure": {
+        "indexesPresent": 3,
+        "targetForeignKeyWarningsRemaining": 0
+      }
+    },
+    {
+      "version": "20261003081046",
+      "name": "aarohi_full_fk_index_closeout",
+      "filename": "20261003081046_aarohi_full_fk_index_closeout.sql",
+      "path": "supabase/migrations/20261003081046_aarohi_full_fk_index_closeout.sql",
+      "canonicalSha256": "f4249c4582498ac3ef59d0374ccfdc343facde338c5cd62535614104dc21192e",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "stagingSemanticApplication": "PROVEN",
+      "observedStagingAppliedVersion": "20261003081215",
+      "stagingApplyReplayCount": 1,
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_AAROHI_FULL_FK_INDEX_CLOSEOUT_2026-10-03",
+      "stagingAdvisorClosure": {
+        "indexesPresent": 17,
+        "targetForeignKeyWarningsRemaining": 0
+      }
     }
   ],
   "supersededLegacyPins": [

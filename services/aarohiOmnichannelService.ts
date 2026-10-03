@@ -66,7 +66,7 @@ export async function observeAarohiChannelIdentity(args:{
   await db.from("aarohi_events").insert({
     prospect_id:args.prospectId,
     event_type:"prospect.channel_observed",
-    actor_type:"ADMIN",
+    actor_type:"HUMAN",
     actor_reference:args.actorId,
     channel:args.channel,
     safe_summary:args.channel+" acquisition identity observed for operator review.",
@@ -112,7 +112,7 @@ export async function recordAarohiAssistedFirstOutreach(args:{
   await db.from("aarohi_events").insert({
     prospect_id:args.prospectId,
     event_type:"outreach.assisted_first_contact",
-    actor_type:"ADMIN",
+    actor_type:"HUMAN",
     actor_reference:args.actorId,
     channel:args.channel,
     safe_summary:"Human-assisted first social outreach recorded; automation waits for eligible engagement.",
@@ -151,7 +151,7 @@ export async function linkAarohiWhatsAppContinuation(args:{
   await db.from("aarohi_events").insert({
     prospect_id:args.prospectId,
     event_type:"whatsapp.continuation_linked",
-    actor_type:"ADMIN",
+    actor_type:"HUMAN",
     actor_reference:args.actorId,
     channel:"WHATSAPP",
     safe_summary:"Prospect approved WhatsApp continuation; hashed channel identity linked.",
@@ -172,7 +172,7 @@ export async function createAarohiVendorRegistrationLink(args:{
   await db.from("aarohi_events").insert({
     prospect_id:args.prospectId,
     event_type:"registration.intent_created",
-    actor_type:"ADMIN",
+    actor_type:"HUMAN",
     actor_reference:args.actorId,
     channel:args.channel==="MANUAL"?null:args.channel,
     safe_summary:"Expiring Aarohi vendor-registration intent created.",

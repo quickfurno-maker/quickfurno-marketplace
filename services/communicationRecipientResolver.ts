@@ -11,6 +11,7 @@
 //   vendor → public.vendors.whatsapp_number ?? .phone
 //   admin  → public.profiles.phone  (role = 'admin')
 //   lead   → public.leads.phone                     (raw capture text)
+//   prospect → public.aarohi_prospects.primary_phone (Aarohi acquisition identity)
 //
 // Each recipient type uses the adapter matching ITS OWN storage contract, and
 // no other: vendor rows use the vendor adapter, lead rows use the lead adapter,
@@ -56,6 +57,8 @@ export class SupabaseCommunicationRecipientResolver implements CommunicationReci
           return await this.resolveAdmin(id);
         case "lead":
           return await this.resolveLead(id);
+        case "prospect":
+          return await this.resolveProspect(id);
         default:
           // Unreachable: validateRecipientReference already rejected these.
           return failRecipientResolution(RecipientResolutionError.RECIPIENT_TYPE_UNSUPPORTED);
@@ -89,6 +92,20 @@ export class SupabaseCommunicationRecipientResolver implements CommunicationReci
     if (error) return failRecipientResolution(RecipientResolutionError.RECIPIENT_LOOKUP_FAILED);
     if (!data) return failRecipientResolution(RecipientResolutionError.RECIPIENT_NOT_FOUND);
     return normalizeStoredLeadDestination((data as { phone: string | null }).phone);
+  }
+
+  /** Aarohi prospect phones are acquisition contact facts, not authenticated identities. */
+  private async resolveProspect(prospectId: string): Promise<Result<string>> {
+    const { data, error } = await adminClient()
+      .from("aarohi_prospects")
+      .select("primary_phone")
+      .eq("id", prospectId)
+      .eq("tenant_id", "quickfurno")
+      .maybeSingle();
+
+    if (error) return failRecipientResolution(RecipientResolutionError.RECIPIENT_LOOKUP_FAILED);
+    if (!data) return failRecipientResolution(RecipientResolutionError.RECIPIENT_NOT_FOUND);
+    return normalizeResolvedDestination((data as { primary_phone: string | null }).primary_phone);
   }
 
   /** Phase 5A `client_accounts.phone_e164` is already the normalized identity. */

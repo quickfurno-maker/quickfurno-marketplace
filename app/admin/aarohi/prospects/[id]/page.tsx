@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { AarohiBadge,AarohiPageHead,formatWhen } from "@/components/admin/aarohi/AarohiPrimitives";
 import { AarohiRegistrationLinkTool } from "@/components/admin/aarohi/AarohiRegistrationLinkTool";
 import { getAarohiProspect,listActivePackages } from "@/services/aarohiCrmService";
-import { createTaskAction,completeHandoffAction,identityDecisionAction,linkWhatsAppContinuationAction,observeChannelIdentityAction,pauseAarohiAction,recordAssistedOutreachAction,scoreProspectAction,selectPackageAction,suppressProspectAction,takeoverProspectAction,updateWorkflowAction } from "../../actions";
+import { createTaskAction,completeHandoffAction,identityDecisionAction,linkWhatsAppContinuationAction,observeChannelIdentityAction,pauseAarohiAction,recordAssistedOutreachAction,recordAarohiChannelEligibilityAction,recordAarohiMarketingPermissionAction,scoreProspectAction,selectPackageAction,suppressProspectAction,takeoverProspectAction,updateWorkflowAction } from "../../actions";
 export const dynamic="force-dynamic";
 function Field({label,value}:{label:string;value:React.ReactNode}){return <><dt>{label}</dt><dd>{value||"—"}</dd></>}
 export default async function Prospect360Page({params}:{params:Promise<{id:string}>}){const [data,packages]=await Promise.all([getAarohiProspect((await params).id),listActivePackages()]);if(!data)notFound();const p:any=data.prospect;const score:any=data.scores[0]??{};const handoff:any=data.handoff;const core:any=data.core;return <>
@@ -36,12 +36,30 @@ export default async function Prospect360Page({params}:{params:Promise<{id:strin
       <label>Platform reference<input name="external_reference" className="qf-aarohi-input"/></label>
       <button className="qf-aarohi-btn" data-tone="ghost">Mark first DM sent by operator</button>
      </form>
+     <form action={recordAarohiChannelEligibilityAction.bind(null,p.id)} className="qf-aarohi-formgrid">
+      <label>Channel eligibility<select name="channel" className="qf-aarohi-select" defaultValue="X"><option>X</option><option>INSTAGRAM</option><option>FACEBOOK</option><option>WHATSAPP</option></select></label>
+      <label>State<select name="state" className="qf-aarohi-select"><option>UNKNOWN</option><option>ELIGIBLE</option><option>INELIGIBLE</option></select></label>
+      <label>Provider key<input name="provider_key" className="qf-aarohi-input" placeholder="x_official"/></label>
+      <label>Evidence kind<input name="evidence_kind" className="qf-aarohi-input" placeholder="PROVIDER_RECIPIENT_PERMISSION"/></label>
+      <label className="wide">Evidence reference<input name="evidence_ref" required className="qf-aarohi-input" placeholder="provider/ops evidence ref"/></label>
+      <label>TTL minutes<input name="ttl_minutes" type="number" min="5" max="1440" defaultValue="60" className="qf-aarohi-input"/></label>
+      <button className="qf-aarohi-btn" data-tone="ghost">Record eligibility</button>
+      <p className="qf-aarohi-note wide">Cold X initiation requires fresh ELIGIBLE evidence. Instagram/Facebook cold starts remain human-assisted regardless of this field.</p>
+     </form>
      <form action={linkWhatsAppContinuationAction.bind(null,p.id)} className="qf-aarohi-formgrid">
       <label className="wide">WhatsApp continuation (explicit international number)<input name="phone_e164" required className="qf-aarohi-input" placeholder="+91…"/></label>
       <p className="qf-aarohi-note wide">Only a SHA-256 channel identity is stored in Aarohi identity memory; the raw number is not written to the channel-identity table.</p>
       <button className="qf-aarohi-btn" data-tone="primary">Link WhatsApp continuation</button>
      </form>
     </div>
+   </details>
+   <details style={{marginTop:10}}><summary className="qf-aarohi-btn" data-tone="ghost">WhatsApp marketing permission</summary>
+    <form action={recordAarohiMarketingPermissionAction.bind(null,p.id)} className="qf-aarohi-formgrid" style={{marginTop:8}}>
+      <label>Decision<select name="state" className="qf-aarohi-select"><option value="GRANTED">Explicit opt-in recorded</option><option value="REVOKED">Revoke</option></select></label>
+      <label className="wide">Evidence reference<input name="evidence_ref" required className="qf-aarohi-input" placeholder="ticket / consent record / user-confirmation reference"/></label>
+      <p className="qf-aarohi-note wide">Sharing a WhatsApp number does not grant promotional permission. Record GRANTED only when explicit marketing consent evidence exists.</p>
+      <button className="qf-aarohi-btn" data-tone="ghost">Record permission evidence</button>
+    </form>
    </details>
    <details style={{marginTop:10}}><summary className="qf-aarohi-btn" data-tone="ghost">Secure vendor registration</summary><div style={{marginTop:8}}><AarohiRegistrationLinkTool prospectId={p.id}/></div></details>
    <details style={{marginTop:10}}><summary className="qf-aarohi-btn" data-tone="ghost">Update workflow</summary><form action={updateWorkflowAction.bind(null,p.id)} className="qf-aarohi-formgrid" style={{marginTop:8}}><label>Prospect stage<select name="prospect_stage" className="qf-aarohi-select" defaultValue={p.prospect_stage}>{["DISCOVERED","ENRICHED","QUALIFIED","OUTREACH_READY","CONTACTED","ENGAGED","INTERESTED","CONVERSION","LOST"].map(x=><option key={x}>{x}</option>)}</select></label><label>Conversation<select name="conversation_stage" className="qf-aarohi-select" defaultValue={p.conversation_stage}>{["NONE","FIRST_CONTACT","REPLIED","DISCOVERY","OBJECTION","PITCH","WHATSAPP_HANDOFF","FOLLOW_UP","CLOSING"].map(x=><option key={x}>{x}</option>)}</select></label><label>Priority<select name="priority_band" className="qf-aarohi-select" defaultValue={p.priority_band}>{["A+","A","B","C","D"].map(x=><option key={x}>{x}</option>)}</select></label><label>Preferred<input name="preferred_channel" className="qf-aarohi-input" defaultValue={p.preferred_channel||""}/></label><label>Next action<input name="next_action_type" className="qf-aarohi-input" defaultValue={p.next_action_type||""}/></label><label>Due<input name="next_action_at" type="datetime-local" className="qf-aarohi-input"/></label><label className="wide">Reason<input name="next_action_reason" className="qf-aarohi-input" defaultValue={p.next_action_reason||""}/></label><label className="wide">Objection<input name="current_objection" className="qf-aarohi-input" defaultValue={p.current_objection||""}/></label><button className="qf-aarohi-btn" data-tone="primary">Save local workflow</button></form></details>

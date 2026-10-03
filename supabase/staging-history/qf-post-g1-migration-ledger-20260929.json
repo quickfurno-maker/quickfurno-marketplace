@@ -505,6 +505,18 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-10-03_BEFORE_DEPLOYMENT"
+    },
+    {
+      "version": "20261003091000",
+      "name": "aarohi_phase2_ops_fk_indexes",
+      "filename": "20261003091000_aarohi_phase2_ops_fk_indexes.sql",
+      "path": "supabase/migrations/20261003091000_aarohi_phase2_ops_fk_indexes.sql",
+      "canonicalSha256": "8d4b34d0c17742172d0f9c2e8ce98f8ffbd5b707263417e51e2c14c70972791a",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-03_BEFORE_DEPLOYMENT"
     }
   ],
   "supersededLegacyPins": [

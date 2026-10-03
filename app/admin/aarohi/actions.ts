@@ -26,6 +26,11 @@ import {
   updateAarohiCityPolicy,
   upsertAarohiFollowupPolicy,
 } from "@/services/aarohiPhase2AcquisitionService";
+import {
+  recordAarohiAcquisitionCost,
+  updateAarohiRuntimeControl,
+  type AarohiRuntimeMode,
+} from "@/services/aarohiPhase2OpsService";
 
 async function actor(permission:AarohiPermission){
   const session=await getAdminSession();
@@ -38,7 +43,7 @@ async function sensitiveBudget(actorId:string){
   if(r.error) throw r.error; if((r.count??0)>=30) throw new Error("aarohi_action_rate_limited");
 }
 const val=(f:FormData,k:string)=>{const v=f.get(k);return typeof v==="string"?v:"";};
-function refresh(id?:string){revalidatePath("/admin/aarohi");revalidatePath("/admin/aarohi/prospects");revalidatePath("/admin/aarohi/pipeline");revalidatePath("/admin/aarohi/inbox");revalidatePath("/admin/aarohi/tasks");revalidatePath("/admin/aarohi/discovery");revalidatePath("/admin/aarohi/outreach");revalidatePath("/admin/aarohi/campaigns");if(id)revalidatePath(`/admin/aarohi/prospects/${id}`);}
+function refresh(id?:string){revalidatePath("/admin/aarohi");revalidatePath("/admin/aarohi/prospects");revalidatePath("/admin/aarohi/pipeline");revalidatePath("/admin/aarohi/inbox");revalidatePath("/admin/aarohi/tasks");revalidatePath("/admin/aarohi/discovery");revalidatePath("/admin/aarohi/outreach");revalidatePath("/admin/aarohi/campaigns");revalidatePath("/admin/aarohi/analytics");revalidatePath("/admin/aarohi/settings");if(id)revalidatePath(`/admin/aarohi/prospects/${id}`);}
 
 export async function createProspectAction(formData:FormData){const a=await actor("aarohi.manage");const id=await createManualAarohiProspect({business_name:val(formData,"business_name"),city_id:val(formData,"city_id"),primary_category:val(formData,"primary_category"),area:val(formData,"area"),pincode:val(formData,"pincode"),primary_phone:val(formData,"primary_phone"),website:val(formData,"website"),contact_person_name:val(formData,"contact_person_name")},a);refresh(id);}
 export async function updateWorkflowAction(prospectId:string,formData:FormData){const a=await actor("aarohi.manage");await updateAarohiWorkflow(prospectId,{prospect_stage:val(formData,"prospect_stage"),conversation_stage:val(formData,"conversation_stage"),priority_band:val(formData,"priority_band"),next_action_type:val(formData,"next_action_type"),next_action_at:val(formData,"next_action_at")||null,next_action_reason:val(formData,"next_action_reason"),preferred_channel:val(formData,"preferred_channel"),current_objection:val(formData,"current_objection")},a);refresh(prospectId);}
@@ -238,6 +243,51 @@ export async function recordAarohiCapacitySnapshotAction(formData:FormData){
     acquisitionAvailable:Number(val(formData,"acquisition_available")||0),
     expiresAt:new Date(Date.now()+Math.max(5,Math.min(1440,Number(val(formData,"ttl_minutes")||60)))*60_000).toISOString(),
     reasonCode:val(formData,"reason_code")||`admin:${a}`,
+  });
+  refresh();
+}
+
+
+export async function updateAarohiRuntimeControlAction(formData:FormData){
+  const a=await actor("aarohi.manage");
+  await sensitiveBudget(a);
+  const mode=val(formData,"mode") as AarohiRuntimeMode;
+  if(!["PAUSED","INBOUND_ONLY","ASSISTED_ONLY","GOVERNED_AUTOMATION"].includes(mode)){
+    throw new Error("invalid_runtime_mode");
+  }
+  await updateAarohiRuntimeControl({
+    mode,
+    discoveryEnabled:formData.get("discovery_enabled")==="on",
+    outboundEnabled:formData.get("outbound_enabled")==="on",
+    broadcastsEnabled:formData.get("broadcasts_enabled")==="on",
+    followupsEnabled:formData.get("followups_enabled")==="on",
+    whatsappEnabled:formData.get("whatsapp_enabled")==="on",
+    instagramEnabled:formData.get("instagram_enabled")==="on",
+    facebookEnabled:formData.get("facebook_enabled")==="on",
+    xEnabled:formData.get("x_enabled")==="on",
+    providerIncidentMode:formData.get("provider_incident_mode")==="on",
+    reason:val(formData,"reason")||null,
+    actorId:a,
+  });
+  refresh();
+}
+
+export async function recordAarohiAcquisitionCostAction(formData:FormData){
+  const a=await actor("aarohi.manage_campaigns");
+  await sensitiveBudget(a);
+  const rupees=Number(val(formData,"amount_rupees"));
+  if(!Number.isFinite(rupees)||rupees<0) throw new Error("invalid_cost_amount");
+  await recordAarohiAcquisitionCost({
+    occurredOn:val(formData,"occurred_on"),
+    channel:val(formData,"channel")||null,
+    sourceType:val(formData,"source_type")||null,
+    cityId:val(formData,"city_id")||null,
+    campaignId:val(formData,"campaign_id")||null,
+    amountMinor:Math.round(rupees*100),
+    currency:"INR",
+    sourceReference:val(formData,"source_reference"),
+    note:val(formData,"note")||null,
+    actorId:a,
   });
   refresh();
 }

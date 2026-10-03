@@ -10,6 +10,7 @@ import {
   type AarohiPhase2Channel,
 } from "@/lib/aarohi/phase2Policy";
 import { linkAarohiProspectWhatsAppHash } from "@/services/aarohiWhatsAppIntakeService";
+import { getAarohiRuntimeControl } from "@/services/aarohiPhase2OpsService";
 import { vendorStoredPhoneCandidatesForInbound } from "@/services/inboundIdentityResolutionService";
 
 const SAFE_REF=/^[A-Za-z0-9._:-]{1,300}$/;
@@ -116,6 +117,10 @@ export async function getAarohiPhase2Dashboard(){
 
 export async function scheduleAarohiDiscoveryRuns(now=new Date()){
   if(!phase2AutonomousDiscoveryEnabled()) return {enabled:false,queued:0,cities:0};
+  const runtime=await getAarohiRuntimeControl();
+  if(!runtime.discovery_enabled||!["ASSISTED_ONLY","GOVERNED_AUTOMATION"].includes(runtime.mode)){
+    return {enabled:false,queued:0,cities:0};
+  }
   const db=adminClient();
   const iso=now.toISOString();
   const [connectorsResult,policiesResult]=await Promise.all([
@@ -169,6 +174,10 @@ export async function scheduleAarohiDiscoveryRuns(now=new Date()){
 }
 
 export async function promoteReadyAarohiDiscoveryCandidates(limit=50){
+  const runtime=await getAarohiRuntimeControl();
+  if(!runtime.discovery_enabled||!["ASSISTED_ONLY","GOVERNED_AUTOMATION"].includes(runtime.mode)){
+    return {examined:0,promoted:0,review:0,excluded:0};
+  }
   const safe=Math.max(1,Math.min(100,Math.round(limit)));
   const {data,error}=await adminClient().from("aarohi_discovery_candidates")
     .select("id").eq("state","NEW").gte("confidence",80)
@@ -487,6 +496,10 @@ export async function queueAarohiOutreach(args:{
 }
 
 export async function authorizePendingAarohiOutreach(limit=100){
+  const runtime=await getAarohiRuntimeControl();
+  if(runtime.mode!=="GOVERNED_AUTOMATION"||!runtime.outbound_enabled||runtime.provider_incident_mode){
+    return {examined:0,authorized:0,blocked:0,reasons:{RUNTIME_OUTBOUND_DISABLED:1}};
+  }
   const safe=Math.max(1,Math.min(250,Math.round(limit)));
   const db=adminClient();
   const {data,error}=await db.from("aarohi_outreach_jobs")
@@ -1078,6 +1091,13 @@ export async function markAarohiAssistedFirstContactJob(args:{
     throw new Error("aarohi_assisted_job_invalid");
   }
   await actionableProspect(String(job.data.prospect_id));
+  const runtime=await getAarohiRuntimeControl();
+  const channel=String(job.data.channel);
+  const channelEnabled=channel==="INSTAGRAM"?runtime.instagram_enabled:runtime.facebook_enabled;
+  if(!["ASSISTED_ONLY","GOVERNED_AUTOMATION"].includes(runtime.mode)||
+     !runtime.outbound_enabled||runtime.provider_incident_mode||!channelEnabled){
+    throw new Error("aarohi_runtime_assisted_outbound_disabled");
+  }
   const now=new Date().toISOString();
   const update=await db.from("aarohi_outreach_jobs").update({
     state:"WAITING_REPLY",
@@ -1102,6 +1122,11 @@ export async function markAarohiAssistedFirstContactJob(args:{
 }
 
 export async function scheduleAarohiFollowups(now=new Date(),limit=100){
+  const runtime=await getAarohiRuntimeControl();
+  if(runtime.mode!=="GOVERNED_AUTOMATION"||!runtime.outbound_enabled||
+     !runtime.followups_enabled||runtime.provider_incident_mode){
+    return {examined:0,queued:0,skipped:0};
+  }
   const db=adminClient();
   const [policies,prospects]=await Promise.all([
     db.from("aarohi_followup_policies").select("id,channel,trigger_stage,delay_minutes,max_attempts")

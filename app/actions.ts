@@ -27,6 +27,7 @@ import * as leadClarifications from "../services/leadClarificationService";
 import * as aos from "../services/aosService";
 import * as vendorLoginActivation from "../services/vendorLoginActivationService";
 import * as vendorPrincipalProfiles from "../services/vendorPrincipalProfileService";
+import * as aarohiRegistration from "../services/aarohiRegistrationIntentService";
 import * as adminVendorLocation from "../services/adminVendorLocationService";
 import * as leadAssignmentLifecycle from "../services/leadAssignmentLifecycleService";
 import * as badLeadRecovery from "../services/badLeadRecoveryService";
@@ -338,6 +339,17 @@ export async function submitVendorAccountRegistration(input: VendorRegistrationI
     }
 
     const db = adminClient();
+    const acquisitionToken = input.aarohi_acquisition_token?.trim() || null;
+    if (acquisitionToken) {
+      const acquisitionIntent = await aarohiRegistration.resolveAarohiRegistrationIntent(acquisitionToken);
+      if (!acquisitionIntent.ok) {
+        return {
+          ok: false,
+          code: "AAROHI_ACQUISITION_TOKEN_INVALID",
+          error: "This QuickFurno acquisition registration link is invalid or expired. Please ask Aarohi for a fresh registration link.",
+        };
+      }
+    }
     // The TRUSTED vendor classification travels in app_metadata, which only the
     // service-role Admin API can set — never in user_metadata, which a public
     // signup writes verbatim. public.handle_new_user() reads this key and this
@@ -390,6 +402,25 @@ export async function submitVendorAccountRegistration(input: VendorRegistrationI
       await db.auth.admin.deleteUser(auth.user.id);
       createdUserId = null;
       return vendor;
+    }
+
+    if (acquisitionToken) {
+      const correlated = await aarohiRegistration.consumeAarohiRegistrationIntent({
+        token: acquisitionToken,
+        vendorId: vendor.data.id,
+      });
+      if (!correlated.ok) {
+        // Fail closed: an Aarohi-sourced signup must never survive as an uncorrelated
+        // canonical vendor. Remove the just-created vendor before deleting the auth principal.
+        await db.from("vendors").delete().eq("id", vendor.data.id);
+        await db.auth.admin.deleteUser(auth.user.id);
+        createdUserId = null;
+        return {
+          ok: false,
+          code: "AAROHI_CORRELATION_FAILED",
+          error: "QuickFurno could not securely link this registration to your Aarohi conversation. Please request a fresh registration link and try again.",
+        };
+      }
     }
 
     return ok({ ...vendor.data, user_id: auth.user.id });

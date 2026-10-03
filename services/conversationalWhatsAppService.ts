@@ -100,7 +100,7 @@ function resolveConversationMetaConfig(account:any) {
   // The main/core number uses the primary Meta credential set. The dedicated
   // Aarohi acquisition lane reuses the existing conversational credential set.
   return account?.account_alias === "aarohi" || account?.account_role === "conversational"
-    ? resolveConversationMetaConfig(account)
+    ? resolveConversationalMetaConfig()
     : resolveOutboundMetaConfig();
 }
 

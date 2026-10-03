@@ -339,6 +339,7 @@ export async function recordConversationalInbound(input: {
       const intake = await processAarohiWhatsAppIntake({
         providerAccountId: input.providerAccountId,
         destinationHash,
+        senderPhoneE164: normalized.e164,
         messageType: input.messageType,
         contentMinimized: input.contentMinimized,
       });
@@ -365,7 +366,11 @@ export async function recordConversationalInbound(input: {
           systemExperience: textExperience("AAROHI", intake.body),
           source: "choice" as const,
         });
-      } else if (intake.kind === "prompt" || intake.kind === "ambiguous") {
+      } else if (
+        intake.kind === "prompt" ||
+        intake.kind === "ambiguous" ||
+        intake.kind === "existing_vendor"
+      ) {
         resolvedAarohiProspectId = null;
         routing = Object.freeze({
           subjectType: "unknown" as const,

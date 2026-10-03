@@ -789,6 +789,17 @@ function validateState(state) {
             record.stagingCanary?.rowsAfterRollback?.canaryEvents === 0
           ) ||
           (
+            record.version === "20261003070000" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_INDEX_APPLY_2026-10-03" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            record.observedStagingAppliedVersion === "20261003040425" &&
+            record.stagingApplyReplayCount === 1 &&
+            record.stagingAdvisorClosure?.indexesPresent === 4 &&
+            record.stagingAdvisorClosure?.targetForeignKeyWarningsRemaining === 0
+          ) ||
+          (
             allowedSourcePin !== undefined &&
             record.evidence === allowedSourcePin &&
             record.exactVersionPresence?.staging === false &&

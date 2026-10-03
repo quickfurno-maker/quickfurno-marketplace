@@ -461,7 +461,14 @@
         "staging": false,
         "production": false
       },
-      "evidence": "SOURCE_PIN_CREATED_2026-10-03_BEFORE_DEPLOYMENT"
+      "stagingSemanticApplication": "PROVEN",
+      "observedStagingAppliedVersion": "20261003040425",
+      "stagingApplyReplayCount": 1,
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_INDEX_APPLY_2026-10-03",
+      "stagingAdvisorClosure": {
+        "indexesPresent": 4,
+        "targetForeignKeyWarningsRemaining": 0
+      }
     }
   ],
   "supersededLegacyPins": [

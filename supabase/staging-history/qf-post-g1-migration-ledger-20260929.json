@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
   "purpose": "POST_G1_EXPLICIT_MIGRATION_PIN_EXTENSION",
-  "observedDate": "2026-09-29",
+  "observedDate": "2026-10-03",
   "databaseMutationAuthorized": false,
   "productionDeploymentAuthorized": false,
   "evidenceProjects": {
@@ -423,6 +423,18 @@
       "observedProductionAppliedVersion": "20261002102931",
       "productionSemanticApplication": "PROVEN",
       "productionEvidence": "FIRST_PARTY_SUPABASE_MCP_PRODUCTION_INDEX_AUDIT_2026-10-02"
+    },
+    {
+      "version": "20261003064500",
+      "name": "aarohi_phase1_omnichannel_activation",
+      "filename": "20261003064500_aarohi_phase1_omnichannel_activation.sql",
+      "path": "supabase/migrations/20261003064500_aarohi_phase1_omnichannel_activation.sql",
+      "canonicalSha256": "cbdf5bf38cd5cc1af8c72e6a6c0f193d1baf66e99afee64d47ee0d92bbbd4aa7",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-03_BEFORE_DEPLOYMENT"
     }
   ],
   "supersededLegacyPins": [

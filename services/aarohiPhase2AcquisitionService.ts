@@ -529,12 +529,21 @@ export async function recordAarohiCommunicationPermission(args:{
   const now=new Date().toISOString();
   const evidence=args.evidenceRef.trim().slice(0,300);
   if(evidence.length<3) throw new Error("aarohi_permission_evidence_required");
-  if(args.destinationHash&&!/^[0-9a-f]{64}$/.test(args.destinationHash)){
+  let destinationHash=args.destinationHash??null;
+  if(args.channel==="WHATSAPP"&&args.state==="GRANTED"&&!destinationHash){
+    const prospect=await adminClient().from("aarohi_prospects")
+      .select("primary_phone").eq("id",args.prospectId).eq("tenant_id","quickfurno").maybeSingle();
+    if(prospect.error) throw prospect.error;
+    const normalized=normalizePhoneE164(String(prospect.data?.primary_phone??""));
+    if(!normalized.ok) throw new Error("aarohi_permission_destination_missing");
+    destinationHash=hashPhoneE164(normalized.e164);
+  }
+  if(destinationHash&&!/^[0-9a-f]{64}$/.test(destinationHash)){
     throw new Error("aarohi_permission_destination_invalid");
   }
   const row={
     prospect_id:args.prospectId,channel:args.channel,purpose:args.purpose,state:args.state,
-    destination_hash:args.destinationHash??null,evidence_kind:args.evidenceKind,
+    destination_hash:destinationHash,evidence_kind:args.evidenceKind,
     evidence_ref:evidence,policy_version:"aarohi-permission-v1",
     granted_at:args.state==="GRANTED"?now:null,
     revoked_at:args.state==="REVOKED"?now:null,

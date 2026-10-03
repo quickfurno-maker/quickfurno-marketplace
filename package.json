@@ -188,6 +188,7 @@
     "test:automation-native": "node scripts/mvp/automation/validate-qf-native-automation.mjs",
     "test:client-journey:phase1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/client-journey/validate-qf-client-journey-phase1.mjs",
     "test:aarohi:crm": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/aarohi/validate-qf-aarohi-crm.mjs",
+    "test:aarohi:phase2": "node scripts/mvp/aarohi/validate-qf-aarohi-phase2.mjs",
     "test:mvp:whatsapp-essential": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-essential-features.mjs",
     "test:mvp:whatsapp-human-desk": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-human-desk.mjs",
     "test:mvp:jarvis-operator-bridge": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-jarvis-operator-bridge.mjs",

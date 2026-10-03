@@ -666,6 +666,61 @@ export async function readAarohiMemorySnapshot(prospectId:string){
   return data??null;
 }
 
+export async function claimAarohiSocialOutreach(workerRef:string){
+  const db=adminClient();
+  const {data,error}=await db.rpc("qf_aarohi_claim_social_outreach_v1",{p_worker_ref:workerRef});
+  if(error) throw error;
+  if(!data) return null;
+  const job=Array.isArray(data)?data[0]:data;
+  if(!job?.id||!job?.execution_token) return null;
+  const prospect=await db.from("aarohi_prospects")
+    .select("id,business_name,prospect_stage,do_not_contact,ai_paused,human_takeover")
+    .eq("id",String(job.prospect_id)).maybeSingle();
+  if(prospect.error) throw prospect.error;
+  if(!prospect.data||prospect.data.do_not_contact||prospect.data.ai_paused||prospect.data.human_takeover||prospect.data.prospect_stage==="SUPPRESSED"){
+    await db.rpc("qf_aarohi_complete_social_outreach_v1",{
+      p_job_id:String(job.id),p_execution_token:String(job.execution_token),
+      p_outcome:"DEFINITIVE_FAILURE",p_provider_message_ref:null,p_error_code:"PROSPECT_NOT_ACTIONABLE",
+    });
+    return null;
+  }
+  const identity=await db.from("aarohi_channel_identities")
+    .select("external_reference")
+    .eq("prospect_id",String(job.prospect_id)).eq("channel",String(job.channel))
+    .neq("verification_status","REJECTED").order("updated_at",{ascending:false}).limit(1);
+  if(identity.error) throw identity.error;
+  if((identity.data??[]).length!==1){
+    await db.rpc("qf_aarohi_complete_social_outreach_v1",{
+      p_job_id:String(job.id),p_execution_token:String(job.execution_token),
+      p_outcome:"DEFINITIVE_FAILURE",p_provider_message_ref:null,p_error_code:"SOCIAL_IDENTITY_UNAVAILABLE",
+    });
+    return null;
+  }
+  return Object.freeze({
+    jobId:String(job.id),
+    executionToken:String(job.execution_token),
+    prospectId:String(job.prospect_id),
+    channel:String(job.channel),
+    externalReference:String(identity.data![0]!.external_reference),
+    messageKind:String(job.draft_ref??""),
+    coreAuthorizationRef:String(job.core_authorization_ref),
+    attemptCount:Number(job.attempt_count??1),
+  });
+}
+
+export async function completeAarohiSocialOutreach(args:{
+  jobId:string;executionToken:string;
+  outcome:"ACCEPTED"|"DEFINITIVE_FAILURE"|"UNCERTAIN";
+  providerMessageRef?:string|null;errorCode?:string|null;
+}){
+  const {data,error}=await adminClient().rpc("qf_aarohi_complete_social_outreach_v1",{
+    p_job_id:args.jobId,p_execution_token:args.executionToken,p_outcome:args.outcome,
+    p_provider_message_ref:args.providerMessageRef??null,p_error_code:args.errorCode??null,
+  });
+  if(error) throw error;
+  return data??null;
+}
+
 export async function completeAarohiDiscoveryRun(args:{
   runId:string;state:"COMPLETED"|"PARTIAL"|"FAILED"|"CANCELLED";
   candidateCount:number;promotedCount:number;errorCode?:string|null;

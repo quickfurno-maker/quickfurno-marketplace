@@ -345,18 +345,68 @@ export async function queueAarohiOutreach(args:{
   return data;
 }
 
+export async function recordAarohiCommunicationPermission(args:{
+  prospectId:string;
+  channel:"WHATSAPP"|"INSTAGRAM"|"FACEBOOK"|"X";
+  purpose:"ACQUISITION_CONTINUATION"|"MARKETING_BROADCAST";
+  state:"GRANTED"|"REVOKED";
+  evidenceKind:"SOCIAL_WHATSAPP_SHARE"|"WHATSAPP_EXPLICIT_OPT_IN"|"ADMIN_EVIDENCE_IMPORT"|"STOP_OR_SUPPRESSION";
+  evidenceRef:string;
+  destinationHash?:string|null;
+}){
+  await actionableProspect(args.prospectId).catch((error)=>{
+    if(args.state!=="REVOKED") throw error;
+  });
+  const now=new Date().toISOString();
+  const evidence=args.evidenceRef.trim().slice(0,300);
+  if(evidence.length<3) throw new Error("aarohi_permission_evidence_required");
+  if(args.destinationHash&&!/^[0-9a-f]{64}$/.test(args.destinationHash)){
+    throw new Error("aarohi_permission_destination_invalid");
+  }
+  const row={
+    prospect_id:args.prospectId,channel:args.channel,purpose:args.purpose,state:args.state,
+    destination_hash:args.destinationHash??null,evidence_kind:args.evidenceKind,
+    evidence_ref:evidence,policy_version:"aarohi-permission-v1",
+    granted_at:args.state==="GRANTED"?now:null,
+    revoked_at:args.state==="REVOKED"?now:null,
+    updated_at:now,
+  };
+  const {data,error}=await adminClient().from("aarohi_communication_permissions")
+    .upsert(row,{onConflict:"prospect_id,channel,purpose"}).select("id,state").single();
+  if(error) throw error;
+  await adminClient().from("aarohi_events").insert({
+    prospect_id:args.prospectId,
+    event_type:args.state==="GRANTED"?"consent.permission_granted":"consent.permission_revoked",
+    actor_type:args.evidenceKind==="ADMIN_EVIDENCE_IMPORT"?"HUMAN":"SYSTEM",
+    actor_reference:"aarohi-phase2-permission",
+    channel:args.channel,
+    safe_summary:args.state==="GRANTED"
+      ?`Aarohi communication permission recorded for ${args.purpose}.`
+      :`Aarohi communication permission revoked for ${args.purpose}.`,
+    reference_type:"communication_permission",reference_id:String(data.id),
+    event_data:{purpose:args.purpose,evidenceKind:args.evidenceKind,policyVersion:"aarohi-permission-v1"},
+  });
+  return data;
+}
+
 export async function planAarohiWhatsAppBroadcast(args:{
   campaignId:string;templateName:string;actorId:string;dailyCap?:number;
 }){
   const db=adminClient();
   const cap=Math.max(1,Math.min(10000,Math.round(args.dailyCap??1000)));
-  const {data:members,error}=await db.from("aarohi_campaign_members")
-    .select("prospect_id,aarohi_prospects!inner(id,whatsapp_available,do_not_contact,ai_paused,human_takeover,prospect_stage)")
-    .eq("campaign_id",args.campaignId);
+  const [{data:members,error},{data:permissions,error:permissionError}]=await Promise.all([
+    db.from("aarohi_campaign_members")
+      .select("prospect_id,aarohi_prospects!inner(id,whatsapp_available,do_not_contact,ai_paused,human_takeover,prospect_stage)")
+      .eq("campaign_id",args.campaignId),
+    db.from("aarohi_communication_permissions")
+      .select("prospect_id").eq("channel","WHATSAPP").eq("purpose","MARKETING_BROADCAST").eq("state","GRANTED"),
+  ]);
   if(error) throw error;
+  if(permissionError) throw permissionError;
+  const marketingAllowed=new Set((permissions??[]).map((row:any)=>String(row.prospect_id)));
   const eligible=(members??[]).filter((m:any)=>{
     const p=m.aarohi_prospects;
-    return p?.whatsapp_available===true&&p?.do_not_contact!==true&&p?.ai_paused!==true&&p?.human_takeover!==true&&p?.prospect_stage!=="SUPPRESSED";
+    return marketingAllowed.has(String(m.prospect_id))&&p?.whatsapp_available===true&&p?.do_not_contact!==true&&p?.ai_paused!==true&&p?.human_takeover!==true&&p?.prospect_stage!=="SUPPRESSED";
   }).slice(0,cap);
   const batch=await db.from("aarohi_broadcast_batches").insert({
     campaign_id:args.campaignId,template_name:args.templateName.trim().slice(0,512),
@@ -432,6 +482,15 @@ export async function recordAarohiSocialReply(args:{
       patch.primary_phone=normalizedPhone;patch.phone_available=true;patch.whatsapp_available=true;
       const linked=await linkAarohiProspectWhatsAppHash({prospectId:args.prospectId,destinationHash:whatsappHash!});
       if(!linked.ok) throw new Error(linked.reason);
+      await recordAarohiCommunicationPermission({
+        prospectId:args.prospectId,
+        channel:"WHATSAPP",
+        purpose:"ACQUISITION_CONTINUATION",
+        state:"GRANTED",
+        evidenceKind:"SOCIAL_WHATSAPP_SHARE",
+        evidenceRef:`social-reply:${insert.data.id}`,
+        destinationHash:whatsappHash,
+      });
     }
     const updated=await db.from("aarohi_prospects").update(patch).eq("id",args.prospectId);
     if(updated.error) throw updated.error;

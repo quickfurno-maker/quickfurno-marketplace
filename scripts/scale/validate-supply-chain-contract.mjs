@@ -59,6 +59,17 @@ add(
   workflow.includes("cosign sign --yes") && workflow.includes("@${DIGEST}"),
 );
 add(
+  "manual publish is restricted to main",
+  workflow.includes('manual publish is allowed only from main') &&
+    workflow.includes('"${REF_NAME}" != "main"'),
+);
+add(
+  "CycloneDX SBOM is cryptographically attested",
+  workflow.includes("cosign attest --yes --type cyclonedx") &&
+    workflow.includes("cosign verify-attestation") &&
+    workflow.includes("--type cyclonedx"),
+);
+add(
   "provenance attestation is pinned",
   workflow.includes(
     "actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8",

@@ -24,10 +24,7 @@ import type {
   WhatsAppSendResult,
   WhatsAppWebhookEvent,
 } from "./whatsappProvider";
-import {
-  definitivePermanentProviderError,
-  definitiveRetryableProviderError,
-} from "./providerError";
+import { definitivePermanentProviderError, definitiveRetryableProviderError } from "./providerError";
 import {
   isForbiddenSecurityMetadataKey,
   sanitizeAuthSecurityMetadata,
@@ -59,55 +56,44 @@ export const MOCK_DESTINATIONS = {
  * The secret-bearing exception text used by THROW_LEAKY. Exported so the harness
  * can assert that not one character of it ever reaches the ledger.
  */
-const MOCK_STRIPE_SHAPED_SECRET = ["sk", "live", "9f3ac2b81de44c07a5e6"].join(
-  "_",
-);
+const MOCK_STRIPE_SHAPED_SECRET = ["sk", "live", "9f3ac2b81de44c07a5e6"].join("_");
 const MOCK_AWS_SHAPED_ACCESS_KEY = ["AK", "IA", "7QF2MOCKKEY0001"].join("");
 
-export const MOCK_LEAKY_EXCEPTION_MESSAGE = `POST /v1/messages failed. Authorization: Bearer ${MOCK_STRIPE_SHAPED_SECRET} — api_key=${MOCK_AWS_SHAPED_ACCESS_KEY}, raw_payload={"otp":"123456","to":"+919876543210"}`;
+export const MOCK_LEAKY_EXCEPTION_MESSAGE =
+  `POST /v1/messages failed. Authorization: Bearer ${MOCK_STRIPE_SHAPED_SECRET} — api_key=${MOCK_AWS_SHAPED_ACCESS_KEY}, raw_payload={"otp":"123456","to":"+919876543210"}`;
 
-const ALLOWED_WEBHOOK_STATUSES: readonly WhatsAppNormalizedEventType[] =
-  Object.freeze(["accepted", "sent", "delivered", "read", "failed"]);
+const ALLOWED_WEBHOOK_STATUSES: readonly WhatsAppNormalizedEventType[] = Object.freeze([
+  "accepted",
+  "sent",
+  "delivered",
+  "read",
+  "failed",
+]);
 
-function isNormalizedEventType(
-  value: unknown,
-): value is WhatsAppNormalizedEventType {
-  return (
-    typeof value === "string" &&
-    (ALLOWED_WEBHOOK_STATUSES as readonly string[]).includes(value)
-  );
+function isNormalizedEventType(value: unknown): value is WhatsAppNormalizedEventType {
+  return typeof value === "string" && (ALLOWED_WEBHOOK_STATUSES as readonly string[]).includes(value);
 }
 
 /** Stable, order-independent hash of an arbitrary JSON-ish value. */
 function stableHash(value: unknown): string {
-  return crypto
-    .createHash("sha256")
-    .update(stableStringify(value))
-    .digest("hex");
+  return crypto.createHash("sha256").update(stableStringify(value)).digest("hex");
 }
 
 function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== "object")
-    return JSON.stringify(value) ?? "null";
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
   const entries = Object.entries(value as Record<string, unknown>)
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(
-      ([key, nested]) => `${JSON.stringify(key)}:${stableStringify(nested)}`,
-    );
+    .map(([key, nested]) => `${JSON.stringify(key)}:${stableStringify(nested)}`);
   return `{${entries.join(",")}}`;
 }
 
 /** Reads the first present key, coercing only strings/numbers. */
-function readField(
-  payload: Record<string, unknown>,
-  ...keys: string[]
-): string | null {
+function readField(payload: Record<string, unknown>, ...keys: string[]): string | null {
   for (const key of keys) {
     const value = payload[key];
     if (typeof value === "string" && value.trim() !== "") return value;
-    if (typeof value === "number" && Number.isFinite(value))
-      return String(value);
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
   }
   return null;
 }
@@ -116,10 +102,7 @@ function readField(
  * The exact signature the mock accepts: `sha256=<hmac-sha256(secret, rawBody)>`.
  * Exported so harnesses can build a valid signature instead of a magic string.
  */
-export function computeMockWebhookSignature(
-  rawBody: string,
-  secret: string,
-): string {
+export function computeMockWebhookSignature(rawBody: string, secret: string): string {
   return `sha256=${crypto.createHmac("sha256", secret).update(rawBody).digest("hex")}`;
 }
 
@@ -169,7 +152,7 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
   async sendAuthenticationMessage(
     to: string,
     templateKey: string,
-    variables: Record<string, string>,
+    variables: Record<string, string>
   ): Promise<WhatsAppSendResult> {
     // SECURITY: the authentication lane carries the plaintext OTP to the
     // provider call and nowhere else. The mock retains variable NAMES only, so
@@ -188,15 +171,13 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
   async sendTemplateMessage(
     to: string,
     templateKey: string,
-    variables: Record<string, string>,
+    variables: Record<string, string>
   ): Promise<WhatsAppSendResult> {
     // Reuses the Phase 5A sanitization vocabulary rather than a weaker local
     // regex, so "forbidden key" means exactly one thing across the codebase.
     const sanitizedVars: Record<string, string> = {};
     for (const [key, value] of Object.entries(variables)) {
-      sanitizedVars[key] = isForbiddenSecurityMetadataKey(key)
-        ? "[REDACTED]"
-        : value;
+      sanitizedVars[key] = isForbiddenSecurityMetadataKey(key) ? "[REDACTED]" : value;
     }
 
     this.lastSentPayloads.push({
@@ -213,24 +194,18 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
   private simulateSend(
     to: string,
     templateKey: string,
-    variables: Record<string, string>,
+    variables: Record<string, string>
   ): WhatsAppSendResult {
     // --- adapters that THROW ---------------------------------------------
     // CommunicationService must normalize each of these into a safe delivery
     // failure and never strand the message in `dispatching`.
     if (to === MOCK_DESTINATIONS.THROW_TRANSIENT) {
       // A typed error the adapter has PROVEN is a definitive, safely-retryable failure.
-      throw definitiveRetryableProviderError(
-        "MOCK_TRANSIENT_TRANSPORT",
-        "Simulated adapter-proven definitive, safely-retryable failure",
-      );
+      throw definitiveRetryableProviderError("MOCK_TRANSIENT_TRANSPORT", "Simulated adapter-proven definitive, safely-retryable failure");
     }
 
     if (to === MOCK_DESTINATIONS.THROW_PERMANENT) {
-      throw definitivePermanentProviderError(
-        "MOCK_PERMANENT_REJECTION",
-        "Simulated mock provider permanent rejection",
-      );
+      throw definitivePermanentProviderError("MOCK_PERMANENT_REJECTION", "Simulated mock provider permanent rejection");
     }
 
     if (to === MOCK_DESTINATIONS.THROW_TRANSPORT) {
@@ -291,16 +266,9 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
     };
   }
 
-  verifyWebhookSignature(
-    rawBody: string,
-    signature: string,
-    secret: string,
-  ): boolean {
+  verifyWebhookSignature(rawBody: string, signature: string, secret: string): boolean {
     if (typeof rawBody !== "string" || !signature || !secret) return false;
-    return secureEquals(
-      signature,
-      computeMockWebhookSignature(rawBody, secret),
-    );
+    return secureEquals(signature, computeMockWebhookSignature(rawBody, secret));
   }
 
   deriveWebhookEventId(payload: Record<string, unknown>): string {
@@ -313,12 +281,7 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
 
   normalizeWebhook(payload: Record<string, unknown>): WhatsAppWebhookEvent[] {
     const providerMessageId = readField(payload, "message_id", "messageId");
-    const occurredAt = readField(
-      payload,
-      "timestamp",
-      "occurred_at",
-      "occurredAt",
-    );
+    const occurredAt = readField(payload, "timestamp", "occurred_at", "occurredAt");
     const status = readField(payload, "status");
 
     // Required identifiers absent, or a lifecycle state we do not understand:

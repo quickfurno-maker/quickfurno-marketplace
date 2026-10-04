@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
   "purpose": "POST_G1_EXPLICIT_MIGRATION_PIN_EXTENSION",
-  "observedDate": "2026-10-03",
+  "observedDate": "2026-10-04",
   "databaseMutationAuthorized": false,
   "productionDeploymentAuthorized": false,
   "evidenceProjects": {
@@ -570,6 +570,18 @@
         "indexesPresent": 17,
         "targetForeignKeyWarningsRemaining": 0
       }
+    },
+    {
+      "version": "20261004190000",
+      "name": "scale_phase07_durable_jobs_hardening",
+      "filename": "20261004190000_scale_phase07_durable_jobs_hardening.sql",
+      "path": "supabase/migrations/20261004190000_scale_phase07_durable_jobs_hardening.sql",
+      "canonicalSha256": "a3e0f84de2b3f107ea12e6febb7cb5419f22a06c8ad675ab362f2fe244bedc04",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-04_BEFORE_DEPLOYMENT"
     }
   ],
   "supersededLegacyPins": [

@@ -1,0 +1,16 @@
+.git
+.github
+.next
+dist
+node_modules
+coverage
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+.vscode
+.idea
+supabase/.branches
+supabase/.temp
+docs

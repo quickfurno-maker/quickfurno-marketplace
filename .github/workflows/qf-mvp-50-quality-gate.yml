@@ -320,6 +320,9 @@ jobs:
       - name: QuickFurno durable jobs / outbox / idempotency contract
         run: npm run test:scale:durable-jobs:contract
 
+      - name: QuickFurno database + matching scale contract
+        run: npm run test:scale:db-matching-contract
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -509,3 +512,59 @@ jobs:
         env:
           DATABASE_URL: postgresql://qf_phase07:qf_phase07_ci_only@127.0.0.1:5432/qf_phase07
         run: npm run test:scale:durable-jobs:postgres
+
+
+  # SCALE-P08 — database/matching scale certification.
+  # Applies the actual Phase 08 migration to digest-pinned PostgreSQL/PostGIS,
+  # proves indexed bounded discovery at 100k + 1M vendors, then executes the
+  # repository's real canonical assignment function under overlapping pools.
+  matching-scale-certification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgis/postgis@sha256:894f570c0cf0664ed5576a8fd5d5bfb8fb1b19d592885b686c3a88c8bd90c41f
+        env:
+          POSTGRES_USER: qf_phase08
+          POSTGRES_PASSWORD: qf_phase08_ci_only
+          POSTGRES_DB: qf_phase08
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qf_phase08 -d qf_phase08"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - name: Checkout exact reviewed head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out SHA
+        run: |
+          EXPECTED_SHA="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          echo "Expected SHA: $EXPECTED_SHA"
+          echo "Actual SHA:   $ACTUAL_SHA"
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Certify 100k / 1M indexed vendor discovery
+        env:
+          DATABASE_URL: postgresql://qf_phase08:qf_phase08_ci_only@127.0.0.1:5432/qf_phase08
+        run: npm run test:scale:matching-scale-postgres
+
+      - name: Certify canonical assignment contention
+        env:
+          DATABASE_URL: postgresql://qf_phase08:qf_phase08_ci_only@127.0.0.1:5432/qf_phase08
+        run: npm run test:scale:matching-concurrency-postgres

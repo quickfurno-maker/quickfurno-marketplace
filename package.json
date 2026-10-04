@@ -203,7 +203,11 @@
     "test:scale:coordination": "npm run test:scale:coordination:contract && npm run test:scale:coordination:integration",
     "test:scale:durable-jobs:contract": "node scripts/scale/validate-durable-jobs-contract.mjs",
     "test:scale:durable-jobs:postgres": "node scripts/scale/certify-durable-jobs-postgres.mjs",
-    "test:scale:durable-jobs": "npm run test:scale:durable-jobs:contract && npm run test:scale:durable-jobs:postgres"
+    "test:scale:durable-jobs": "npm run test:scale:durable-jobs:contract && npm run test:scale:durable-jobs:postgres",
+    "test:scale:db-matching-contract": "node scripts/scale/validate-db-matching-scale-contract.mjs",
+    "test:scale:matching-scale-postgres": "node scripts/scale/certify-matching-scale-postgres.mjs",
+    "test:scale:matching-concurrency-postgres": "node scripts/scale/certify-matching-concurrency-postgres.mjs",
+    "test:scale:phase08": "npm run test:scale:db-matching-contract && npm run test:scale:matching-scale-postgres && npm run test:scale:matching-concurrency-postgres"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

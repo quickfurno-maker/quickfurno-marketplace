@@ -572,6 +572,18 @@
       }
     },
     {
+      "version": "20261004190001",
+      "name": "scale_phase08_matching_prefilter",
+      "filename": "20261004190001_scale_phase08_matching_prefilter.sql",
+      "path": "supabase/migrations/20261004190001_scale_phase08_matching_prefilter.sql",
+      "canonicalSha256": "df0509ddc797b835ba09b8a36af188aaeeeaf5bddbf1f0ad308a653348d919c6",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-04_BEFORE_DEPLOYMENT"
+    },
+    {
       "version": "20261004190000",
       "name": "scale_phase07_durable_jobs_hardening",
       "filename": "20261004190000_scale_phase07_durable_jobs_hardening.sql",

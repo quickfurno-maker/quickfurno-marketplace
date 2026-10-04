@@ -2,15 +2,10 @@
 import { readFile } from "node:fs/promises";
 
 const dockerfile = await readFile(new URL("../../Dockerfile", import.meta.url), "utf8");
-const compose = await readFile(
-  new URL("../../ops/container/compose.production.yml", import.meta.url),
-  "utf8",
-);
-const entrypoint = await readFile(
-  new URL("../../ops/container/entrypoint.sh", import.meta.url),
-  "utf8",
-);
+const compose = await readFile(new URL("../../ops/container/compose.production.yml", import.meta.url), "utf8");
+const entrypoint = await readFile(new URL("../../ops/container/entrypoint.sh", import.meta.url), "utf8");
 const nextConfig = await readFile(new URL("../../next.config.mjs", import.meta.url), "utf8");
+const middleware = await readFile(new URL("../../middleware.ts", import.meta.url), "utf8");
 
 const checks = [
   ["pinned Node 20.20.2 amd64 digest", dockerfile.includes("sha256:3d0f05455dea2c82e2f76e7e2543964c30f6b7d673fc1a83286736d44fe4c41c")],
@@ -24,7 +19,9 @@ const checks = [
   ["automation role", entrypoint.includes("automation-worker)")],
   ["conversation role", entrypoint.includes("conversation-transport)")],
   ["unknown role fails closed", entrypoint.includes("REFUSED unknown runtime role")],
-  ["web localhost-only publish", compose.includes('"127.0.0.1:\${QF_WEB_HOST_PORT:-3000}:3000"')],
+  ["missing config fails closed", entrypoint.includes("REFUSED missing required env")],
+  ["health probes bypass auth middleware", middleware.includes("livez$|readyz$")],
+  ["web localhost-only publish", compose.includes('"127.0.0.1:${QF_WEB_HOST_PORT:-3000}:3000"')],
   ["read-only containers", (compose.match(/read_only: true/g) ?? []).length >= 3],
   ["capabilities dropped", (compose.match(/cap_drop:/g) ?? []).length >= 3],
   ["no-new-privileges", (compose.match(/no-new-privileges:true/g) ?? []).length >= 3],
@@ -34,10 +31,10 @@ const checks = [
 
 const failed = checks.filter(([, ok]) => !ok);
 for (const [name, ok] of checks) {
-  console.log(`\${ok ? "PASS" : "FAIL"} \${name}`);
+  console.log(`${ok ? "PASS" : "FAIL"} ${name}`);
 }
 if (failed.length) {
-  console.error(`container contract failed: \${failed.length} check(s)`);
+  console.error(`container contract failed: ${failed.length} check(s)`);
   process.exit(1);
 }
-console.log(`QuickFurno container contract PASS (\${checks.length}/\${checks.length})`);
+console.log(`QuickFurno container contract PASS (${checks.length}/${checks.length})`);

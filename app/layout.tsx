@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { Caveat, Poppins, Playfair_Display } from "next/font/google";
 import localFont from "next/font/local";
 import { EnquiryModalProvider } from "@/components/ClientEnquiryModal";
 import { ProjectLocationProvider } from "@/components/location/ProjectLocationProvider";
@@ -42,44 +41,16 @@ import "./qf-primitives.css";
 import "./qv-tokens.css";
 import "./footer-v2.css";
 
-// Type system: Poppins (geometric sans) for the logo, headlines, body and UI;
-// Playfair Display italic only for the gold accent words.
-// NOTE: Poppins is exposed under the legacy `--font-manrope` variable name so
-// every existing `var(--font-manrope)` reference resolves to it with no churn.
-const poppins = Poppins({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-manrope",
-  display: "swap",
-});
-
-// Plus Jakarta Sans — body/UI face of the Pune launch homepage (headings and
-// the logo stay Poppins). Self-hosted variable font (OFL-1.1, see
-// app/fonts/PLUS-JAKARTA-SANS-LICENSE.txt) so the build never depends on a
-// Google Fonts fetch.
-const jakarta = localFont({
+// SCALE-P02: one self-hosted variable face owns the primary sans contract.
+// The previous Poppins / Playfair Display / Caveat next/font/google imports
+// made clean container builds depend on Google font resolution. The CSS keeps
+// the legacy semantic variable names, so this reliability fix does not require
+// a broad component/style rewrite.
+const primarySans = localFont({
   src: "./fonts/plus-jakarta-sans-latin-wght-normal.woff2",
   weight: "200 800",
   style: "normal",
-  variable: "--font-jakarta",
-  display: "swap",
-});
-
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
-  style: ["normal", "italic"],
-  variable: "--font-playfair",
-  display: "swap",
-});
-
-// Caveat — the handwritten accent lines on the rebuilt homepage sections
-// ("Still have a question?", "Be part of Pune's trusted home services
-// community.", "A better Pune, together."). Nothing else uses it.
-const caveat = Caveat({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  variable: "--font-caveat",
+  variable: "--font-manrope",
   display: "swap",
 });
 
@@ -110,7 +81,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${poppins.variable} ${playfair.variable} ${jakarta.variable} ${caveat.variable}`}>
+    <html lang="en" className={primarySans.variable}>
       <body>
         <ScrollProgress />
         <ScrollReveal />

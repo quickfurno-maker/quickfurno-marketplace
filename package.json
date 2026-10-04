@@ -7,6 +7,8 @@
     "build": "next build",
     "build:staging:safe": "node scripts/mvp/build/build-staging-safe.mjs",
     "start": "next start",
+    "bench:scale:http": "node scripts/scale/http-baseline.mjs",
+    "test:scale:portability": "node scripts/scale/validate-portability-contract.mjs",
     "lint": "eslint app components lib --ext .js,.jsx,.ts,.tsx",
     "typecheck": "tsc --noEmit",
     "bootstrap:local:qa": "node scripts/mvp/local/bootstrap-qf-canonical-local-qa.mjs",
@@ -192,7 +194,13 @@
     "test:mvp:whatsapp-essential": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-essential-features.mjs",
     "test:mvp:whatsapp-human-desk": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-human-desk.mjs",
     "test:mvp:jarvis-operator-bridge": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-jarvis-operator-bridge.mjs",
-    "test:client-journey:phase2-riya": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/client-journey/validate-qf-riya-phase2-sync.mjs"
+    "test:client-journey:phase2-riya": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/client-journey/validate-qf-riya-phase2-sync.mjs",
+    "test:scale:container": "node scripts/scale/validate-container-contract.mjs",
+    "test:scale:artifact": "node scripts/scale/validate-artifact-contract.mjs",
+    "test:scale:stateless": "node scripts/scale/validate-stateless-runtime.mjs",
+    "test:scale:coordination:contract": "node scripts/scale/validate-coordination-contract.mjs",
+    "test:scale:coordination:integration": "node --experimental-transform-types scripts/scale/certify-coordination.mjs",
+    "test:scale:coordination": "npm run test:scale:coordination:contract && npm run test:scale:coordination:integration"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
@@ -201,6 +209,7 @@
     "next": "16.3.6",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "redis": "6.3.0",
     "sharp": "^0.35.4",
     "standardwebhooks": "^1.0.0",
     "ws": "^8.21.3",

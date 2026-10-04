@@ -1,7 +1,13 @@
 :root {
+  /* SCALE-P02: deterministic font roles. The primary face is the tracked
+     self-hosted Plus Jakarta Sans variable font. Accent roles use local/system
+     stacks so production image builds never require Google Fonts. */
+  --font-jakarta: var(--font-manrope);
+  --font-playfair: Georgia, "Times New Roman", serif;
+  --font-caveat: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
   --font-sans: var(--font-manrope), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-display: var(--font-playfair), "Cormorant Garamond", Georgia, "Times New Roman", serif;
-  --font-serif: var(--font-playfair), "Cormorant Garamond", Georgia, serif;
+  --font-display: var(--font-playfair);
+  --font-serif: var(--font-playfair);
 
   --color-ivory: #F7F1E8;
   --color-ivory-strong: #FFFFFF;

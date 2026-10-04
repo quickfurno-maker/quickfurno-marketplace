@@ -991,7 +991,7 @@ check("80 the runtime loader is EXECUTED by its own smoke, and it is wired in", 
     "it traps any network attempt");
   assert(/"test:mvp:80-17a-r1-loader"/.test(PACKAGE_RAW), "npm script exists");
   assert(/test:mvp:80-17a-r1-loader/.test(WORKFLOW_RAW), "CI runs it");
-  assert(/node-version: '20'/.test(WORKFLOW_RAW), "and it runs on Node 20, the production runtime");
+  assert(/node-version:\s*['"]20['"]/.test(WORKFLOW_RAW), "and it runs on Node 20, the production runtime");
 });
 
 // ---- A1-A10. attestation FILE safety ---------------------------------------

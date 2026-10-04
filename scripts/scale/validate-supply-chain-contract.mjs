@@ -60,7 +60,7 @@ add(
 );
 add(
   "manual publish is restricted to main",
-  workflow.includes('manual publish is allowed only from main') &&
+  workflow.includes("manual publish is allowed only from main") &&
     workflow.includes('"${REF_NAME}" != "main"'),
 );
 add(

@@ -944,10 +944,14 @@ check(
 
 const workflowDir = join(root, ".github", "workflows");
 const workflowFiles = readdirSync(workflowDir).filter((f) => /\.ya?ml$/.test(f));
-const workflows = workflowFiles.map((f) => readFileSync(join(workflowDir, f), "utf8"));
-const gate = workflows.join("\n");
+const qualityWorkflowName = "qf-mvp-50-quality-gate.yml";
+const supplyChainWorkflowName = "oci-supply-chain.yml";
+check("the canonical application CI workflow still exists", workflowFiles.includes(qualityWorkflowName));
+check("the isolated OCI supply-chain workflow is explicit", workflowFiles.includes(supplyChainWorkflowName));
 
-check("the repository has exactly one CI workflow", workflowFiles.length === 1);
+const gate = readFileSync(join(workflowDir, qualityWorkflowName), "utf8");
+const supplyChain = readFileSync(join(workflowDir, supplyChainWorkflowName), "utf8");
+
 check(
   "the CI gate runs all four Phase 70 validators",
   PHASE_70_SCRIPTS.every((s) => gate.includes(`npm run ${s}`)),
@@ -957,8 +961,8 @@ check(
   /github\.event\.pull_request\.head\.sha/.test(gate) && /test "\$ACTUAL_SHA" = "\$EXPECTED_SHA"/.test(gate),
 );
 check("the CI gate runs on pull requests to main", /pull_request:[\s\S]{0,120}branches:[\s\S]{0,40}- main/.test(gate));
-check("the CI gate declares no secret", !/secrets\./.test(gate) && !/\$\{\{\s*secrets/.test(gate));
-// Judge the gate by what it EXECUTES. Step names and comments legitimately say
+check("the application CI gate declares no secret", !/secrets\./.test(gate) && !/\$\{\{\s*secrets/.test(gate));
+// Judge the application gate by what it EXECUTES. Step names and comments legitimately say
 // "no Supabase" and "staging history governance"; only `run:` lines act.
 const gateCommands = [...gate.matchAll(/^\s*run:\s*(?:\|)?\s*(.*)$/gm)].map((m) => m[1]);
 check(
@@ -975,6 +979,21 @@ check(
 );
 check("the CI gate pins Node 24, which the .ts resolve hook requires", /node-version: '24'/.test(gate));
 check("the CI gate grants read-only repository permissions", /permissions:\s*\n\s*contents: read/.test(gate));
+
+const supplyChainCommands = [...supplyChain.matchAll(/^\s*run:\s*(?:\|)?\s*(.*)$/gm)].map((m) => m[1]);
+check(
+  "the OCI workflow is registry-only and has no production-host deployment authority",
+  /name:\s*OCI Supply Chain/.test(supplyChain) &&
+    /packages:\s*write/.test(supplyChain) &&
+    supplyChainCommands.every(
+      (c) => !/\bssh\b|\bscp\b|\brsync\b|kubectl|helm\s+upgrade|docker\s+compose\s+up|pm2|systemctl|vercel\s+deploy|supabase\s+db/i.test(c),
+    ),
+);
+check(
+  "the OCI workflow cannot manually publish from a non-main branch",
+  supplyChain.includes("manual publish is allowed only from main") &&
+    supplyChain.includes('"${REF_NAME}" != "main"'),
+);
 
 // Repository convention for a phase closeout is docs/QF-MVP-<n>-CLOSEOUT.md —
 // the precedent is docs/QF-MVP-50-CLOSEOUT.md.

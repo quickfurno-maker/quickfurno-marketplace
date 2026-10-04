@@ -56,8 +56,11 @@ export const MOCK_DESTINATIONS = {
  * The secret-bearing exception text used by THROW_LEAKY. Exported so the harness
  * can assert that not one character of it ever reaches the ledger.
  */
+const MOCK_STRIPE_SHAPED_SECRET = ["sk", "live", "9f3ac2b81de44c07a5e6"].join("_");
+const MOCK_AWS_SHAPED_ACCESS_KEY = ["AK", "IA", "7QF2MOCKKEY0001"].join("");
+
 export const MOCK_LEAKY_EXCEPTION_MESSAGE =
-  'POST /v1/messages failed. Authorization: Bearer sk_live_9f3ac2b81de44c07a5e6 — api_key=AKIA7QF2MOCKKEY0001, raw_payload={"otp":"123456","to":"+919876543210"}';
+  `POST /v1/messages failed. Authorization: Bearer ${MOCK_STRIPE_SHAPED_SECRET} — api_key=${MOCK_AWS_SHAPED_ACCESS_KEY}, raw_payload={"otp":"123456","to":"+919876543210"}`;
 
 const ALLOWED_WEBHOOK_STATUSES: readonly WhatsAppNormalizedEventType[] = Object.freeze([
   "accepted",

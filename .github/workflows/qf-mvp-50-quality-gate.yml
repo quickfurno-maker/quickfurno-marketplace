@@ -314,6 +314,9 @@ jobs:
       - name: QuickFurno stateless runtime + object storage contract
         run: npm run test:scale:stateless
 
+      - name: QuickFurno Redis/Valkey coordination contract
+        run: npm run test:scale:coordination:contract
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -408,3 +411,48 @@ jobs:
 
       - name: Run exact-head container certification
         run: node scripts/scale/certify-container-image.mjs
+  # SCALE-P06 — shared ephemeral coordination certification.
+  # Uses a digest-pinned Valkey service and proves two web + two worker
+  # replicas share rate limits/cache invalidation/locks while Redis outage
+  # remains a safe coordination failure rather than business-state loss.
+  coordination-certification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      valkey:
+        image: valkey/valkey@sha256:081c2f5cb575efc901aa80ff9cdbd1ec6a301682fd35e1ebb4b0990a4a4a8507
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - name: Checkout exact reviewed head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out SHA
+        run: |
+          EXPECTED_SHA="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          echo "Expected SHA: $EXPECTED_SHA"
+          echo "Actual SHA:   $ACTUAL_SHA"
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Certify shared Valkey coordination
+        env:
+          QF_COORDINATION_REDIS_URL: redis://127.0.0.1:6379
+        run: npm run test:scale:coordination

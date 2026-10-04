@@ -373,3 +373,32 @@ jobs:
           ! grep -q 'next/headers' <<< "$OUTPUT"
           ! grep -q 'server-only' <<< "$OUTPUT"
           ! grep -q 'without native WebSocket support' <<< "$OUTPUT"
+
+  # SCALE-P02 — exact-head immutable image certification.
+  # Docker-specific configuration stays inside the offline repository script so
+  # this locked quality workflow remains free of secrets/providers/staging calls.
+  container-certification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact reviewed head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out SHA
+        run: |
+          EXPECTED_SHA="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          echo "Expected SHA: $EXPECTED_SHA"
+          echo "Actual SHA:   $ACTUAL_SHA"
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Run exact-head container certification
+        run: node scripts/scale/certify-container-image.mjs

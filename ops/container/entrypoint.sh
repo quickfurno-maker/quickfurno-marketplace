@@ -1,6 +1,17 @@
 #!/bin/sh
 set -eu
 
+role="${QF_RUNTIME_ROLE:-web}"
+
+case "$role" in
+  web|automation-worker|conversation-transport|aarohi-acquisition)
+    ;;
+  *)
+    echo "quickfurno-container REFUSED unknown runtime role: $role" >&2
+    exit 64
+    ;;
+esac
+
 if [ -z "${NEXT_PUBLIC_SUPABASE_URL:-}" ]; then
   echo "quickfurno-container REFUSED missing mandatory config: NEXT_PUBLIC_SUPABASE_URL" >&2
   exit 78
@@ -13,8 +24,6 @@ if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
   echo "quickfurno-container REFUSED missing mandatory config: SUPABASE_SERVICE_ROLE_KEY" >&2
   exit 78
 fi
-
-role="${QF_RUNTIME_ROLE:-web}"
 
 case "$role" in
   web)
@@ -30,9 +39,5 @@ case "$role" in
     ;;
   aarohi-acquisition)
     exec node dist/aarohi-acquisition-worker.mjs
-    ;;
-  *)
-    echo "quickfurno-container REFUSED unknown runtime role: $role" >&2
-    exit 64
     ;;
 esac

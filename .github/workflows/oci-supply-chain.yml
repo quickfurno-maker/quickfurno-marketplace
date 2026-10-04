@@ -116,7 +116,7 @@ jobs:
           exit-code: "1"
           ignore-unfixed: true
           severity: CRITICAL,HIGH
-          trivy-version: v0.75.0
+          version: v0.75.0
 
       - name: Generate CycloneDX SBOM
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -125,7 +125,7 @@ jobs:
           format: cyclonedx
           output: qf-sbom.cdx.json
           exit-code: "0"
-          trivy-version: v0.75.0
+          version: v0.75.0
 
       - name: Record build metadata
         shell: bash

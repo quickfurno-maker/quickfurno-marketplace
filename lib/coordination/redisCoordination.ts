@@ -9,6 +9,7 @@ import type {
   LockAcquire,
   LockRelease,
   RateLimitDecision,
+  WakeupWait,
 } from "./coordination";
 
 const DEFAULT_PREFIX = "qf:v1";
@@ -66,6 +67,8 @@ export type RedisCoordinationOptions = {
 export class RedisCoordination implements CoordinationPort {
   readonly #client;
   readonly #prefix;
+  #subscriber: ReturnType<typeof createClient> | null = null;
+  #waitActive = false;
 
   constructor(options: RedisCoordinationOptions) {
     const url = options.url.trim();
@@ -355,7 +358,87 @@ export class RedisCoordination implements CoordinationPort {
     }
   }
 
+  async waitForWakeup(input: {
+    namespace: string;
+    topics: readonly string[];
+    timeoutMs: number;
+  }): Promise<WakeupWait> {
+    if (this.#waitActive) return { status: "unavailable" };
+    const timeoutMs = positiveInteger(input.timeoutMs, "timeoutMs", 60_000);
+    const topics = [...new Set(input.topics.map((topic) => machineToken(topic, "topic")))];
+    if (topics.length < 1 || topics.length > 32) {
+      throw new Error("topics must contain between 1 and 32 machine tokens");
+    }
+    const channels = topics.map(
+      (topic) => `${this.#base(input.namespace)}:wake:${topic}`,
+    );
+
+    this.#waitActive = true;
+    let subscriber = this.#subscriber;
+    try {
+      if (subscriber === null) {
+        subscriber = this.#client.duplicate({
+          socket: {
+            connectTimeout: 750,
+            reconnectStrategy: false,
+          },
+        });
+        subscriber.on("error", () => undefined);
+        this.#subscriber = subscriber;
+      }
+      const activeSubscriber = subscriber;
+      if (activeSubscriber === null) return { status: "unavailable" };
+      if (!activeSubscriber.isReady) {
+        try {
+          if (!activeSubscriber.isOpen) await activeSubscriber.connect();
+        } catch {
+          return { status: "unavailable" };
+        }
+      }
+
+      return await new Promise<WakeupWait>(async (resolve) => {
+        let settled = false;
+        const finish = async (value: WakeupWait): Promise<void> => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          try {
+            await activeSubscriber.unsubscribe(channels);
+          } catch {
+            // Wake-up is advisory. A cleanup failure cannot affect durable DB work.
+          }
+          resolve(value);
+        };
+        const timer = setTimeout(() => {
+          void finish({ status: "timeout" });
+        }, timeoutMs);
+        try {
+          await activeSubscriber.subscribe(channels, (payload, channel) => {
+            const suffix = channel.slice(channel.lastIndexOf(":") + 1);
+            void finish({
+              status: "wakeup",
+              topic: suffix,
+              payload,
+            });
+          });
+        } catch {
+          await finish({ status: "unavailable" });
+        }
+      });
+    } finally {
+      this.#waitActive = false;
+    }
+  }
+
   async disconnect(): Promise<void> {
+    if (this.#subscriber?.isOpen) {
+      try {
+        await this.#subscriber.quit();
+      } catch {
+        this.#subscriber.destroy();
+      }
+    }
+    this.#subscriber = null;
     if (!this.#client.isOpen) return;
     try {
       await this.#client.quit();

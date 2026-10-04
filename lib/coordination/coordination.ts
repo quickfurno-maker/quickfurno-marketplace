@@ -21,6 +21,11 @@ export type LockRelease =
   | { status: "not-owner" }
   | { status: "unavailable" };
 
+export type WakeupWait =
+  | { status: "wakeup"; topic: string; payload: string }
+  | { status: "timeout" }
+  | { status: "unavailable" };
+
 export interface CoordinationPort {
   ping(): Promise<CoordinationStatus>;
   rateLimit(input: {
@@ -62,6 +67,11 @@ export interface CoordinationPort {
     topic: string;
     payload: Readonly<Record<string, unknown>>;
   }): Promise<CoordinationWrite>;
+  waitForWakeup(input: {
+    namespace: string;
+    topics: readonly string[];
+    timeoutMs: number;
+  }): Promise<WakeupWait>;
   disconnect(): Promise<void>;
 }
 

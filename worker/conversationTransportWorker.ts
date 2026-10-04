@@ -32,15 +32,15 @@ function boundedInt(raw: string | undefined, fallback: number, min: number, max:
 
 const idlePollMs = boundedInt(
   process.env.QF_CONVERSATION_TRANSPORT_IDLE_POLL_MS,
-  100,
-  50,
+  1000,
+  250,
   5000,
 );
 const busyPollMs = boundedInt(
   process.env.QF_CONVERSATION_TRANSPORT_BUSY_POLL_MS,
+  25,
   10,
-  5,
-  1000,
+  500,
 );
 const maxDrain = boundedInt(
   process.env.QF_CONVERSATION_TRANSPORT_MAX_DRAIN,
@@ -48,35 +48,84 @@ const maxDrain = boundedInt(
   1,
   200,
 );
+const heartbeatMs = boundedInt(
+  process.env.QF_CONVERSATION_TRANSPORT_HEARTBEAT_MS,
+  15000,
+  5000,
+  60000,
+);
 
 const sleep = (ms: number) =>
   new Promise<void>((resolveSleep) => setTimeout(resolveSleep, ms));
 
+function jitter(ms: number): number {
+  const spread = Math.max(25, Math.floor(ms * 0.2));
+  return Math.max(10, ms - spread + Math.floor(Math.random() * (spread * 2 + 1)));
+}
+
 async function main() {
   const jarvis = await import("@/services/jarvisWhatsAppGatewayService");
   const conversational = await import("@/services/conversationalWhatsAppService");
+  const wakeups = await import("@/lib/coordination/durableWorkWakeup");
+  const scale = await import("@/services/scaleWorkerRuntimeService");
+
+  const role = "conversation-transport";
+  const workerId = scale.scaleWorkerId(
+    role,
+    process.env.QF_CONVERSATION_TRANSPORT_WORKER_ID,
+  );
+  const startedAt = new Date().toISOString();
   let stopping = false;
+  let drainStartedAt: string | null = null;
+  let lastHeartbeatAt = 0;
+
+  const heartbeat = async (
+    state: "starting" | "running" | "idle" | "degraded" | "draining" | "stopped",
+    acceptingWork: boolean,
+    inFlight: number,
+    force = false,
+    lastSafeCode?: string,
+  ) => {
+    const now = Date.now();
+    if (!force && now - lastHeartbeatAt < heartbeatMs) return;
+    await scale.writeScaleWorkerHeartbeat({
+      role,
+      workerId,
+      state,
+      acceptingWork,
+      inFlight,
+      startedAt,
+      drainStartedAt,
+      lastSafeCode,
+    });
+    lastHeartbeatAt = now;
+  };
 
   const stop = () => {
     stopping = true;
+    drainStartedAt ??= new Date().toISOString();
   };
   process.once("SIGTERM", stop);
   process.once("SIGINT", stop);
 
   console.info("[qf-conversation-transport] worker starting", {
+    workerId,
     idlePollMs,
     busyPollMs,
     maxDrain,
   });
+  await heartbeat("starting", true, 0, true).catch(() => undefined);
 
   while (!stopping) {
     let didWork = false;
     let processed = 0;
-    const startedAt = Date.now();
+    const started = Date.now();
 
     try {
+      await heartbeat("running", true, 0).catch(() => undefined);
       for (let i = 0; i < maxDrain && !stopping; i += 1) {
         let cycleWorked = false;
+        await heartbeat("running", true, 1).catch(() => undefined);
 
         const reply = await conversational.dispatchNextConversationalOutbox();
         if (reply.processed) {
@@ -84,6 +133,8 @@ async function main() {
           didWork = true;
           processed += 1;
         }
+
+        if (stopping) break;
 
         const turn = await jarvis.dispatchNextJarvisWhatsAppTurn();
         if (turn.processed) {
@@ -98,23 +149,39 @@ async function main() {
       if (didWork) {
         console.info("[qf-conversation-transport] cycle", {
           processed,
-          elapsedMs: Date.now() - startedAt,
+          elapsedMs: Date.now() - started,
         });
+        await heartbeat("running", true, 0).catch(() => undefined);
+        if (!stopping) await sleep(jitter(busyPollMs));
+        continue;
       }
 
-      await sleep(didWork ? busyPollMs : idlePollMs);
-    } catch (error) {
-      console.error("[qf-conversation-transport] cycle failed", {
-        code:
-          error instanceof Error
-            ? error.message.slice(0, 160)
-            : "CONVERSATION_TRANSPORT_UNKNOWN_ERROR",
+      await heartbeat("idle", true, 0).catch(() => undefined);
+      const wake = await wakeups.waitForDurableWorkWakeup({
+        topics: ["conversation-outbox", "jarvis-turn-outbox"],
+        timeoutMs: idlePollMs,
       });
-      await sleep(500);
+      if (wake.status === "unavailable" && !stopping) {
+        await sleep(jitter(idlePollMs));
+      }
+    } catch (error) {
+      const code =
+        error instanceof Error
+          ? error.message.slice(0, 160)
+          : "CONVERSATION_TRANSPORT_UNKNOWN_ERROR";
+      console.error("[qf-conversation-transport] cycle failed", { code });
+      await heartbeat("degraded", true, 0, true, code).catch(() => undefined);
+      if (!stopping) await sleep(jitter(Math.max(idlePollMs, 1000)));
     }
   }
 
-  console.info("[qf-conversation-transport] worker stopped");
+  drainStartedAt ??= new Date().toISOString();
+  await heartbeat("draining", false, 0, true, "GRACEFUL_DRAIN").catch(() => undefined);
+  await wakeups.closeDurableWorkCoordination().catch(() => undefined);
+  await heartbeat("stopped", false, 0, true, "GRACEFUL_DRAIN_COMPLETE").catch(
+    () => undefined,
+  );
+  console.info("[qf-conversation-transport] worker stopped", { workerId });
 }
 
 main().catch((error) => {

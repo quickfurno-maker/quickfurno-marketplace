@@ -91,6 +91,34 @@ services:
         max-file: "5"
     networks: [qf-private]
 
+  aarohi-acquisition:
+    profiles: ["aarohi"]
+    image: quickfurno:${QF_IMAGE_TAG:?QF_IMAGE_TAG must be an immutable git SHA}
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      QF_RUNTIME_ROLE: aarohi-acquisition
+      QF_RELEASE_SHA: ${QF_IMAGE_TAG}
+    env_file:
+      - ${QF_ENV_FILE:?QF_ENV_FILE must point to an external production env file}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    pids_limit: 192
+    mem_limit: 512m
+    cpus: 0.50
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks: [qf-private]
+
 networks:
   qf-private:
     driver: bridge

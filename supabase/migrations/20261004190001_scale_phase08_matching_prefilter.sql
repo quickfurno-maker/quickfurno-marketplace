@@ -1,5 +1,5 @@
 -- ============================================================================
--- SCALE-P08 — Database & Matching Scale Hardening
+-- SCALE-P08 â€” Database & Matching Scale Hardening
 --
 -- Purpose:
 --   Replace the application-side UUID ordered 5,000-vendor scan with a bounded,
@@ -216,58 +216,57 @@ as $$
       )
     group by d.vendor_id
   ),
-  base as (
+  candidate_ids as materialized (
+    -- Fast path: when both sides carry a resolved zone, keep the zone equality
+    -- as an indexable equality instead of hiding it inside an OR expression.
+    -- This is the dominant production path and lets PostgreSQL combine the
+    -- partial service-zone B-tree with the matching-terms GIN index.
     select
-      v as vendor_row,
-      case
-        when v.matching_terms && t.tier0 then 0
-        else 1
-      end::smallint as match_tier,
-      public.qf_match_haversine_km_v1(
-        l.latitude,
-        l.longitude,
-        case
-          when v.office_latitude is not null and v.office_longitude is not null
-               and v.office_latitude between -90 and 90
-               and v.office_longitude between -180 and 180
-               and not (v.office_latitude = 0 and v.office_longitude = 0)
-            then v.office_latitude::double precision
-          when v.latitude is not null and v.longitude is not null
-               and v.latitude between -90 and 90
-               and v.longitude between -180 and 180
-               and not (v.latitude = 0 and v.longitude = 0)
-            then v.latitude::double precision
-          else null
-        end,
-        case
-          when v.office_latitude is not null and v.office_longitude is not null
-               and v.office_latitude between -90 and 90
-               and v.office_longitude between -180 and 180
-               and not (v.office_latitude = 0 and v.office_longitude = 0)
-            then v.office_longitude::double precision
-          when v.latitude is not null and v.longitude is not null
-               and v.latitude between -90 and 90
-               and v.longitude between -180 and 180
-               and not (v.latitude = 0 and v.longitude = 0)
-            then v.longitude::double precision
-          else null
-        end
-      ) as distance_km,
-      case
-        when nullif(l.area_key, '') is not null
-          and exists (
-            select 1
-            from unnest(coalesce(v.areas_covered, '{}'::text[])) a(area_name)
-            where lower(btrim(a.area_name)) = l.area_key
-          ) then 1.0
-        when v.covers_full_city is true then 0.5
-        else 0.0
-      end as area_affinity,
-      greatest(-3.0, least(3.0, coalesce(f.fair_share_balance, 0)::double precision))
-        as fair_share_balance,
-      coalesce(recent.delivered_7d, 0)::integer as delivered_7d,
-      case when f.vendor_id is not null then f.last_delivered_at else v.last_delivered_at end
-        as last_delivered_at
+      v.id,
+      v.matching_terms,
+      v.office_latitude,
+      v.office_longitude,
+      v.latitude,
+      v.longitude,
+      v.areas_covered,
+      v.covers_full_city,
+      v.last_delivered_at
+    from lead_ctx l
+    cross join terms t
+    join public.vendors v
+      on l.service_zone_id is not null
+     and v.service_zone_id = l.service_zone_id
+     and lower(btrim(coalesce(v.status, ''))) in ('approved','active')
+     and v.is_active is distinct from false
+     and v.accepting_leads is distinct from false
+     and coalesce(v.remaining_credits, 0) >= 1
+     and not (
+       v.assignment_suspended_at is not null
+       and (
+         v.assignment_suspended_until is null
+         or v.assignment_suspended_until > now()
+       )
+     )
+     and coalesce(v.location_verification_status, '') <> 'outside_service_area'
+     and v.matching_terms && (t.tier0 || t.tier1)
+    where l.lead_zone_active is distinct from false
+      and l.lead_zone_matching_enabled is distinct from false
+
+    union all
+
+    -- Compatibility path for unresolved/null-zone records. This branch is
+    -- disjoint from the resolved-zone branch, preserving the original strict
+    -- zone/city fallback rules without forcing the hot branch through an OR.
+    select
+      v.id,
+      v.matching_terms,
+      v.office_latitude,
+      v.office_longitude,
+      v.latitude,
+      v.longitude,
+      v.areas_covered,
+      v.covers_full_city,
+      v.last_delivered_at
     from lead_ctx l
     cross join terms t
     join public.vendors v
@@ -283,38 +282,81 @@ as $$
        )
      )
      and coalesce(v.location_verification_status, '') <> 'outside_service_area'
-     and (
-       v.matching_terms && t.tier0
-       or v.matching_terms && t.tier1
-     )
+     and v.matching_terms && (t.tier0 || t.tier1)
     left join public.marketplace_service_zones vz on vz.id = v.service_zone_id
-    left join public.vendor_opportunity_fairness f
-      on f.vendor_id = v.id and f.scope_key = p_scope_key
-    left join recent_deliveries recent on recent.vendor_id = v.id
-    where
-      (l.service_zone_id is null or l.lead_zone_active is distinct from false)
+    where (l.service_zone_id is null or v.service_zone_id is null)
+      and (l.service_zone_id is null or l.lead_zone_active is distinct from false)
       and (l.service_zone_id is null or l.lead_zone_matching_enabled is distinct from false)
       and (v.service_zone_id is null or vz.id is null or (
         vz.is_active is true and vz.matching_enabled is true
       ))
-      and (
-        (
-          l.service_zone_id is not null
-          and v.service_zone_id is not null
-          and l.service_zone_id = v.service_zone_id
-        )
-        or (
-          (l.service_zone_id is null or v.service_zone_id is null)
-          and not (
-            (l.service_zone_id is not null and l.lead_zone_strict)
-            or (v.service_zone_id is not null and coalesce(vz.requires_resolved_location, false))
-          )
-          and (
-            l.city_key = ''
-            or v.matching_city_key = l.city_key
-          )
-        )
+      and not (
+        (l.service_zone_id is not null and l.lead_zone_strict)
+        or (v.service_zone_id is not null and coalesce(vz.requires_resolved_location, false))
       )
+      and (
+        l.city_key = ''
+        or v.matching_city_key = l.city_key
+      )
+  ),
+  base as (
+    select
+      c.id as vendor_id,
+      case
+        when c.matching_terms && t.tier0 then 0
+        else 1
+      end::smallint as match_tier,
+      public.qf_match_haversine_km_v1(
+        l.latitude,
+        l.longitude,
+        case
+          when c.office_latitude is not null and c.office_longitude is not null
+               and c.office_latitude between -90 and 90
+               and c.office_longitude between -180 and 180
+               and not (c.office_latitude = 0 and c.office_longitude = 0)
+            then c.office_latitude::double precision
+          when c.latitude is not null and c.longitude is not null
+               and c.latitude between -90 and 90
+               and c.longitude between -180 and 180
+               and not (c.latitude = 0 and c.longitude = 0)
+            then c.latitude::double precision
+          else null
+        end,
+        case
+          when c.office_latitude is not null and c.office_longitude is not null
+               and c.office_latitude between -90 and 90
+               and c.office_longitude between -180 and 180
+               and not (c.office_latitude = 0 and c.office_longitude = 0)
+            then c.office_longitude::double precision
+          when c.latitude is not null and c.longitude is not null
+               and c.latitude between -90 and 90
+               and c.longitude between -180 and 180
+               and not (c.latitude = 0 and c.longitude = 0)
+            then c.longitude::double precision
+          else null
+        end
+      ) as distance_km,
+      case
+        when nullif(l.area_key, '') is not null
+          and exists (
+            select 1
+            from unnest(coalesce(c.areas_covered, '{}'::text[])) a(area_name)
+            where lower(btrim(a.area_name)) = l.area_key
+          ) then 1.0
+        when c.covers_full_city is true then 0.5
+        else 0.0
+      end as area_affinity,
+      greatest(-3.0, least(3.0, coalesce(f.fair_share_balance, 0)::double precision))
+        as fair_share_balance,
+      coalesce(recent.delivered_7d, 0)::integer as delivered_7d,
+      case when f.vendor_id is not null then f.last_delivered_at else c.last_delivered_at end
+        as last_delivered_at
+    from lead_ctx l
+    cross join terms t
+    join candidate_ids c on true
+    left join public.vendor_opportunity_fairness f
+      on f.vendor_id = c.id and f.scope_key = p_scope_key
+    left join recent_deliveries recent on recent.vendor_id = c.id
   ),
   ranked as (
     select
@@ -328,9 +370,38 @@ as $$
       end as distance_band,
       case when b.distance_km is null then 0 else 1 end as has_coordinates
     from base b
+  ),
+  top_candidates as materialized (
+    -- Keep the expensive sort narrow. Carrying the complete vendors composite
+    -- through a tens-of-thousands-row sort made performance depend heavily on
+    -- row width and runner memory. Rank only IDs/scalars, limit to the bounded
+    -- window, and fetch/JSON-encode full vendor rows afterwards.
+    select
+      r.vendor_id,
+      r.match_tier,
+      r.has_coordinates,
+      r.distance_band,
+      r.fair_share_balance,
+      r.delivered_7d,
+      r.last_delivered_at,
+      r.area_affinity,
+      r.distance_km
+    from ranked r
+    order by
+      r.match_tier asc,
+      case when (select geo_point is not null from lead_ctx) then r.has_coordinates else 1 end desc,
+      case when (select geo_point is not null from lead_ctx) then r.distance_band else 0 end asc,
+      r.fair_share_balance desc,
+      r.delivered_7d asc,
+      r.last_delivered_at asc nulls first,
+      r.area_affinity desc,
+      case when (select geo_point is not null from lead_ctx) then r.distance_km else 0 end asc nulls last,
+      r.vendor_id asc
+    limit least(greatest(coalesce(p_limit, 512), 20), 2048)
   )
-  select to_jsonb(r.vendor_row) as vendor
-  from ranked r
+  select to_jsonb(v) as vendor
+  from top_candidates r
+  join public.vendors v on v.id = r.vendor_id
   order by
     r.match_tier asc,
     case when (select geo_point is not null from lead_ctx) then r.has_coordinates else 1 end desc,
@@ -340,8 +411,7 @@ as $$
     r.last_delivered_at asc nulls first,
     r.area_affinity desc,
     case when (select geo_point is not null from lead_ctx) then r.distance_km else 0 end asc nulls last,
-    (r.vendor_row).id asc
-  limit least(greatest(coalesce(p_limit, 512), 20), 2048);
+    r.vendor_id asc;
 $$;
 
 comment on function public.qf_match_vendor_prefilter_v1(uuid,text,text[],text[],integer) is

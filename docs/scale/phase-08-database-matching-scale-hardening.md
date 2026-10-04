@@ -58,9 +58,9 @@ Synthetic topology models 20 service zones/cities.
 ### 100k vendors
 
 - rows: **100,001**
-- warm runs: **267.8 / 237.6 / 259.3 ms**
-- worst warm latency: **267.8 ms**
-- index probe: **4.7 ms**
+- warm runs: **240.3 / 201.1 / 194.0 ms**
+- worst warm latency: **240.3 ms**
+- index probe: **5.3 ms**
 - returned window: 512
 - high-ID vendor beyond the historical first-5k scan: found
 - SLO: **< 1.5 s — PASS**
@@ -68,9 +68,9 @@ Synthetic topology models 20 service zones/cities.
 ### 1M vendors
 
 - rows: **1,000,001**
-- warm runs: **2,429.3 / 2,179.3 / 2,335.8 ms**
-- worst warm latency: **2,429.3 ms**
-- index probe: **135.1 ms**
+- warm runs: **1,675.6 / 1,873.6 / 1,912.2 ms**
+- worst warm latency: **1,912.2 ms**
+- index probe: **113.6 ms**
 - returned window: 512
 - high-ID vendor beyond the historical first-5k scan: found
 - SLO: **< 3.5 s — PASS**

@@ -576,7 +576,7 @@
       "name": "scale_phase08_matching_prefilter",
       "filename": "20261004190001_scale_phase08_matching_prefilter.sql",
       "path": "supabase/migrations/20261004190001_scale_phase08_matching_prefilter.sql",
-      "canonicalSha256": "df0509ddc797b835ba09b8a36af188aaeeeaf5bddbf1f0ad308a653348d919c6",
+      "canonicalSha256": "5ab95933887e8127ccdbd86127dff313a6a7efef8d5253c1275e2cc2ad7b9d84",
       "exactVersionPresence": {
         "staging": false,
         "production": false

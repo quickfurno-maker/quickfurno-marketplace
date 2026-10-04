@@ -207,7 +207,10 @@
     "test:scale:db-matching-contract": "node scripts/scale/validate-db-matching-scale-contract.mjs",
     "test:scale:matching-scale-postgres": "node scripts/scale/certify-matching-scale-postgres.mjs",
     "test:scale:matching-concurrency-postgres": "node scripts/scale/certify-matching-concurrency-postgres.mjs",
-    "test:scale:phase08": "npm run test:scale:db-matching-contract && npm run test:scale:matching-scale-postgres && npm run test:scale:matching-concurrency-postgres"
+    "test:scale:phase08": "npm run test:scale:db-matching-contract && npm run test:scale:matching-scale-postgres && npm run test:scale:matching-concurrency-postgres",
+    "test:scale:db-lifecycle-contract": "node scripts/scale/validate-db-lifecycle-contract.mjs",
+    "test:scale:data-lifecycle-postgres": "node scripts/scale/certify-data-lifecycle-postgres.mjs",
+    "test:scale:phase09": "npm run test:scale:db-lifecycle-contract && npm run test:scale:data-lifecycle-postgres"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

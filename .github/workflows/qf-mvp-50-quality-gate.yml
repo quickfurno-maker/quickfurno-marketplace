@@ -323,6 +323,9 @@ jobs:
       - name: QuickFurno database + matching scale contract
         run: npm run test:scale:db-matching-contract
 
+      - name: QuickFurno database lifecycle contract
+        run: npm run test:scale:db-lifecycle-contract
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -568,3 +571,51 @@ jobs:
         env:
           DATABASE_URL: postgresql://qf_phase08:qf_phase08_ci_only@127.0.0.1:5432/qf_phase08
         run: npm run test:scale:matching-concurrency-postgres
+
+  # SCALE-P09 — bounded operational retention certification.
+  # The job owns a disposable database, applies the exact lifecycle migration,
+  # proves concurrent prune batches do not overlap, refuses near-live cutoffs,
+  # and proves protected audit/business evidence cannot enter auto-delete.
+  data-lifecycle-certification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+        env:
+          POSTGRES_USER: qf_phase09
+          POSTGRES_PASSWORD: qf_phase09_ci_only
+          POSTGRES_DB: qf_phase09
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qf_phase09 -d qf_phase09"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - name: Checkout exact reviewed head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out SHA
+        run: |
+          EXPECTED_SHA="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Certify lifecycle retention and protected evidence
+        env:
+          DATABASE_URL: postgresql://qf_phase09:qf_phase09_ci_only@127.0.0.1:5432/qf_phase09
+        run: npm run test:scale:data-lifecycle-postgres

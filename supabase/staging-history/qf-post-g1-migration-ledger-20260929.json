@@ -572,6 +572,18 @@
       }
     },
     {
+      "version": "20261004190002",
+      "name": "scale_phase09_data_lifecycle",
+      "filename": "20261004190002_scale_phase09_data_lifecycle.sql",
+      "path": "supabase/migrations/20261004190002_scale_phase09_data_lifecycle.sql",
+      "canonicalSha256": "1c3880d334877b4bce174a23fc1398f35cd3ea16fa3132ceb404f40552b9cd7e",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-04_BEFORE_DEPLOYMENT"
+    },
+    {
       "version": "20261004190001",
       "name": "scale_phase08_matching_prefilter",
       "filename": "20261004190001_scale_phase08_matching_prefilter.sql",

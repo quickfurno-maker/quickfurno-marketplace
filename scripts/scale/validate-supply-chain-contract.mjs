@@ -15,6 +15,12 @@ const add = (name, ok) => checks.push([name, Boolean(ok)]);
 
 add("GHCR is the OCI registry", workflow.includes("ghcr.io/"));
 add(
+  "Buildx action is pinned",
+  workflow.includes(
+    "docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435",
+  ),
+);
+add(
   "PR build job has read-only contents permission",
   workflow.includes("build-certify:") &&
     workflow.includes("permissions:\n      contents: read"),

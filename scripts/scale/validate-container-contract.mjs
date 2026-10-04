@@ -12,6 +12,7 @@ const entrypoint = await readFile(
 );
 const nextConfig = await readFile(new URL("../../next.config.mjs", import.meta.url), "utf8");
 const middleware = await readFile(new URL("../../middleware.ts", import.meta.url), "utf8");
+const rootLayout = await readFile(new URL("../../app/layout.tsx", import.meta.url), "utf8");
 
 const checks = [
   [
@@ -27,6 +28,8 @@ const checks = [
   ["exact revision label", dockerfile.includes("org.opencontainers.image.revision")],
   ["single entrypoint", dockerfile.includes('ENTRYPOINT ["/usr/local/bin/qf-entrypoint"]')],
   ["standalone Next output", nextConfig.includes('output: "standalone"')],
+  ["Google font loader absent", !rootLayout.includes("next/font/google")],
+  ["self-hosted primary font", rootLayout.includes("next/font/local") && rootLayout.includes("plus-jakarta-sans-latin-wght-normal.woff2")],
   ["web role", entrypoint.includes("web)") && entrypoint.includes("exec node server.js")],
   ["automation role", entrypoint.includes("automation-worker)")],
   ["conversation role", entrypoint.includes("conversation-transport)")],

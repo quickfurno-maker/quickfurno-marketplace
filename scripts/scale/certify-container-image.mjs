@@ -68,7 +68,8 @@ writeFileSync(envFile, "", { mode: 0o600 });
 
 const composeEnv = {
   ...process.env,
-  QF_IMAGE_TAG: sha,
+  QF_IMAGE_REF: "example.invalid/quickfurno@sha256:" + "0".repeat(64),
+  QF_RELEASE_SHA: sha,
   QF_ENV_FILE: envFile,
 };
 
@@ -77,7 +78,13 @@ try {
 
   exec(
     "docker",
-    ["compose", "-f", "ops/container/compose.production.yml", "config", "--quiet"],
+    [
+      "compose",
+      "-f",
+      "ops/container/compose.production.yml",
+      "config",
+      "--quiet",
+    ],
     { env: composeEnv },
   );
   exec(
@@ -133,7 +140,10 @@ try {
     ["image", "inspect", image, "--format", "{{json .Config.Entrypoint}}"],
     { capture: true },
   ).trim();
-  assert(entrypoint === '["/usr/local/bin/qf-entrypoint"]', "image entrypoint is deterministic");
+  assert(
+    entrypoint === '["/usr/local/bin/qf-entrypoint"]',
+    "image entrypoint is deterministic",
+  );
 
   exec("docker", [
     "run",
@@ -179,9 +189,14 @@ try {
   }
   assert(live?.status === "alive", "hardened web container liveness");
   assert(ready?.status === "ready", "hardened web container readiness");
-  assert(live?.revision === sha && ready?.revision === sha, "health diagnostics expose exact revision");
+  assert(
+    live?.revision === sha && ready?.revision === sha,
+    "health diagnostics expose exact revision",
+  );
 
-  const uid = exec("docker", ["exec", containerName, "id", "-u"], { capture: true }).trim();
+  const uid = exec("docker", ["exec", containerName, "id", "-u"], {
+    capture: true,
+  }).trim();
   assert(uid === "10001", "running container remains non-root");
 
   const readOnly = exec(
@@ -203,7 +218,10 @@ try {
     ["inspect", containerName, "--format", "{{json .HostConfig.SecurityOpt}}"],
     { capture: true },
   ).trim();
-  assert(securityOpt.includes("no-new-privileges"), "running container enforces no-new-privileges");
+  assert(
+    securityOpt.includes("no-new-privileges"),
+    "running container enforces no-new-privileges",
+  );
 
   exec("docker", [
     "run",
@@ -232,16 +250,32 @@ try {
     "dist/conversation-transport-worker.mjs",
     "dist/aarohi-acquisition-worker.mjs",
   ]) {
-    exec("docker", ["run", "--rm", "--entrypoint", "node", image, "--check", worker]);
+    exec("docker", [
+      "run",
+      "--rm",
+      "--entrypoint",
+      "node",
+      image,
+      "--check",
+      worker,
+    ]);
   }
   process.stdout.write("PASS all worker artifacts parse on runtime Node\n");
 
-  const missing = execResult("docker", ["run", "--rm", "-e", "QF_RUNTIME_ROLE=web", image]);
+  const missing = execResult("docker", [
+    "run",
+    "--rm",
+    "-e",
+    "QF_RUNTIME_ROLE=web",
+    image,
+  ]);
   process.stdout.write(missing.stdout);
   process.stderr.write(missing.stderr);
   assert(missing.status === 78, "missing mandatory config fails closed");
   assert(
-    (missing.stdout + missing.stderr).includes("REFUSED missing mandatory config"),
+    (missing.stdout + missing.stderr).includes(
+      "REFUSED missing mandatory config",
+    ),
     "missing-config refusal is observable",
   );
 
@@ -260,7 +294,9 @@ try {
     "unknown-role refusal is observable",
   );
 
-  process.stdout.write(`QuickFurno exact-head container certification PASS sha=${sha}\n`);
+  process.stdout.write(
+    `QuickFurno exact-head container certification PASS sha=${sha}\n`,
+  );
 } finally {
   spawnSync("docker", ["rm", "-f", containerName], {
     cwd: process.cwd(),

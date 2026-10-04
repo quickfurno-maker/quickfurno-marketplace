@@ -80,16 +80,20 @@ jobs:
             | grep -Fx "$SOURCE_SHA"
           docker image inspect "quickfurno-candidate:$SOURCE_SHA" --format '{{.Id}}' > image-id.txt
 
-      - name: Scan exact image for fixable HIGH/CRITICAL vulnerabilities
+      - name: Produce fixable HIGH/CRITICAL vulnerability report
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
           image-ref: quickfurno-candidate:${{ steps.source.outputs.sha }}
           scan-type: image
+          scanners: vuln
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          exit-code: "1"
-          format: table
-          output: trivy-vulnerabilities.txt
+          exit-code: "0"
+          format: json
+          output: trivy-vulnerabilities.json
+
+      - name: Enforce vulnerability policy with explicit findings
+        run: node scripts/scale/enforce-trivy-report.mjs trivy-vulnerabilities.json
 
       - name: Generate SPDX JSON SBOM from exact image
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
@@ -117,7 +121,7 @@ jobs:
           path: |
             quickfurno-image.tar.gz
             quickfurno-sbom.spdx.json
-            trivy-vulnerabilities.txt
+            trivy-vulnerabilities.json
             image-id.txt
             candidate.sha256
           if-no-files-found: error

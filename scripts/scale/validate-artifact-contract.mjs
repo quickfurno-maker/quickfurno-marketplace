@@ -37,8 +37,12 @@ add(
   "release publication is guarded to main push or explicit manual proof",
   workflow.includes("workflow_dispatch:") &&
     workflow.includes("publish:") &&
-    workflow.includes("github.event_name == 'push' && github.ref == 'refs/heads/main'") &&
-    workflow.includes("github.event_name == 'workflow_dispatch' && inputs.publish == true"),
+    workflow.includes(
+      "github.event_name == 'push' && github.ref == 'refs/heads/main'",
+    ) &&
+    workflow.includes(
+      "github.event_name == 'workflow_dispatch' && inputs.publish == true",
+    ),
 );
 add(
   "workflow never publishes mutable latest image tag",

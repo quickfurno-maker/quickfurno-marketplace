@@ -11,12 +11,12 @@ on:
     branches:
       # Durable QF-MVP-50 feature-branch glob. The previous single-branch filter
       # went stale the moment that branch merged, silently disabling push runs.
-      - 'mvp/qf-mvp-50-*'
+      - "mvp/qf-mvp-50-*"
       # QF-MVP-75 matching/geography branches change the money path, and this
       # gate already runs their validators. Without this glob a 75.x branch got
       # push coverage only once a pull request existed.
-      - 'mvp/qf-mvp-75-*'
-      - 'feat/aarohi-*'
+      - "mvp/qf-mvp-75-*"
+      - "feat/aarohi-*"
 
 permissions:
   contents: read
@@ -55,7 +55,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: "24"
           cache: npm
 
       - name: Report Node version
@@ -351,7 +351,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
           cache: npm
 
       - name: Report Node version
@@ -401,7 +401,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: "24"
 
       - name: Run exact-head container certification
         run: node scripts/scale/certify-container-image.mjs

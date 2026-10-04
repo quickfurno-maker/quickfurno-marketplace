@@ -944,10 +944,25 @@ check(
 
 const workflowDir = join(root, ".github", "workflows");
 const workflowFiles = readdirSync(workflowDir).filter((f) => /\.ya?ml$/.test(f));
-const workflows = workflowFiles.map((f) => readFileSync(join(workflowDir, f), "utf8"));
-const gate = workflows.join("\n");
+const workflowEntries = workflowFiles.map((file) => ({
+  file,
+  text: readFileSync(join(workflowDir, file), "utf8"),
+}));
+const phase70Workflows = workflowEntries.filter(({ text }) =>
+  PHASE_70_SCRIPTS.every((s) => text.includes(`npm run ${s}`)),
+);
+const gate = phase70Workflows[0]?.text ?? "";
 
-check("the repository has exactly one CI workflow", workflowFiles.length === 1);
+check(
+  "exactly one CI workflow owns all four Phase 70 validators",
+  phase70Workflows.length === 1,
+);
+check(
+  "no other workflow executes a Phase 70 validator",
+  workflowEntries
+    .filter(({ file }) => file !== phase70Workflows[0]?.file)
+    .every(({ text }) => PHASE_70_SCRIPTS.every((s) => !text.includes(`npm run ${s}`))),
+);
 check(
   "the CI gate runs all four Phase 70 validators",
   PHASE_70_SCRIPTS.every((s) => gate.includes(`npm run ${s}`)),
@@ -973,7 +988,10 @@ check(
   "the CI gate does not run an operator-credential build",
   !/build:staging:safe/.test(gate) && /npm run build\b/.test(gate),
 );
-check("the CI gate pins Node 24, which the .ts resolve hook requires", /node-version: '24'/.test(gate));
+check(
+  "the CI gate pins Node 24, which the .ts resolve hook requires",
+  /node-version:\s*['"]24['"]/.test(gate),
+);
 check("the CI gate grants read-only repository permissions", /permissions:\s*\n\s*contents: read/.test(gate));
 
 // Repository convention for a phase closeout is docs/QF-MVP-<n>-CLOSEOUT.md —

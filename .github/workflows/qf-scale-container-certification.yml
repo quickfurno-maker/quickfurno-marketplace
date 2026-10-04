@@ -1,0 +1,130 @@
+name: QF Scale Container Certification
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - 'feat/scale-*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  container-certification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact reviewed head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Resolve exact SHA
+        id: revision
+        shell: bash
+        run: |
+          EXPECTED_SHA="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA"
+          echo "sha=$ACTUAL_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Static container contract
+        run: node scripts/scale/validate-container-contract.mjs
+
+      - name: Validate production Compose model
+        shell: bash
+        run: |
+          touch /tmp/qf-container-cert.env
+          QF_IMAGE_TAG="${{ steps.revision.outputs.sha }}" \
+          QF_ENV_FILE=/tmp/qf-container-cert.env \
+          docker compose -f ops/container/compose.production.yml config --quiet
+          QF_IMAGE_TAG="${{ steps.revision.outputs.sha }}" \
+          QF_ENV_FILE=/tmp/qf-container-cert.env \
+          docker compose --profile aarohi -f ops/container/compose.production.yml config --quiet
+
+      - name: Build exact-head container
+        shell: bash
+        run: |
+          docker build \
+            --build-arg "GIT_SHA=${{ steps.revision.outputs.sha }}" \
+            --build-arg "NEXT_PUBLIC_SUPABASE_URL=https://example.invalid" \
+            --build-arg "NEXT_PUBLIC_SUPABASE_ANON_KEY=container-certification-public-placeholder" \
+            --tag "quickfurno:${{ steps.revision.outputs.sha }}" \
+            .
+
+      - name: Verify immutable image metadata
+        shell: bash
+        run: |
+          IMAGE="quickfurno:${{ steps.revision.outputs.sha }}"
+          test "$(docker image inspect "$IMAGE" --format '{{.Config.User}}')" = "10001:10001"
+          test "$(docker image inspect "$IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "${{ steps.revision.outputs.sha }}"
+          test "$(docker image inspect "$IMAGE" --format '{{json .Config.Entrypoint}}')" = '["/usr/local/bin/qf-entrypoint"]'
+
+      - name: Hardened web runtime smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="quickfurno:${{ steps.revision.outputs.sha }}"
+          docker run -d --name qf-container-cert \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 256 \
+            --memory 1g \
+            --cpus 1.0 \
+            -p 127.0.0.1:39000:3000 \
+            -e QF_RUNTIME_ROLE=web \
+            -e NEXT_PUBLIC_SUPABASE_URL=https://example.invalid \
+            -e NEXT_PUBLIC_SUPABASE_ANON_KEY=container-certification-public-placeholder \
+            -e SUPABASE_SERVICE_ROLE_KEY=container-certification-not-a-secret \
+            "$IMAGE"
+          trap 'docker logs qf-container-cert || true; docker rm -f qf-container-cert >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:39000/livez >/tmp/qf-livez.json &&
+               curl --fail --silent http://127.0.0.1:39000/readyz >/tmp/qf-readyz.json; then
+              break
+            fi
+            sleep 1
+          done
+          grep -q '"status":"alive"' /tmp/qf-livez.json
+          grep -q '"status":"ready"' /tmp/qf-readyz.json
+          grep -q "${{ steps.revision.outputs.sha }}" /tmp/qf-livez.json
+          test "$(docker exec qf-container-cert id -u)" = "10001"
+          test "$(docker inspect qf-container-cert --format '{{.HostConfig.ReadonlyRootfs}}')" = "true"
+
+      - name: Final image contains no dotenv files or package manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="quickfurno:${{ steps.revision.outputs.sha }}"
+          test -z "$(docker run --rm --entrypoint sh "$IMAGE" -c "find /app -type f \( -name '.env' -o -name '.env.*' \) -print -quit")"
+          docker run --rm --entrypoint sh "$IMAGE" -c '! command -v npm >/dev/null 2>&1'
+
+      - name: Worker artifact and fail-closed role smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="quickfurno:${{ steps.revision.outputs.sha }}"
+          docker run --rm --entrypoint node "$IMAGE" --check dist/automation-worker.mjs
+          docker run --rm --entrypoint node "$IMAGE" --check dist/conversation-transport-worker.mjs
+          docker run --rm --entrypoint node "$IMAGE" --check dist/aarohi-acquisition-worker.mjs
+          set +e
+          docker run --rm -e QF_RUNTIME_ROLE=web "$IMAGE" >/tmp/qf-missing-config.out 2>&1
+          MISSING_CODE=$?
+          docker run --rm -e QF_RUNTIME_ROLE=unknown "$IMAGE" >/tmp/qf-unknown-role.out 2>&1
+          ROLE_CODE=$?
+          set -e
+          cat /tmp/qf-missing-config.out
+          cat /tmp/qf-unknown-role.out
+          test "$MISSING_CODE" -eq 78
+          test "$ROLE_CODE" -eq 64
+          grep -q "REFUSED missing mandatory config" /tmp/qf-missing-config.out
+          grep -q "REFUSED unknown runtime role" /tmp/qf-unknown-role.out

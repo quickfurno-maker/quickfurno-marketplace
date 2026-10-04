@@ -44,6 +44,12 @@ ENV NODE_ENV=production \
     QF_RELEASE_SHA=${GIT_SHA} \
     QF_RUNTIME_ROLE=web
 
+# The Node patch tag can outlive security updates in Debian bookworm. Refresh only
+# the final runtime OS before the immutable release artifact is signed/published.
+RUN apt-get update \
+ && apt-get upgrade -y \
+ && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --gid 10001 quickfurno \
  && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin quickfurno
 

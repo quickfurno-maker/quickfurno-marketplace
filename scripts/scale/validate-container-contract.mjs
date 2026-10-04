@@ -28,7 +28,7 @@ const checks = [
   ["exact revision label", dockerfile.includes("org.opencontainers.image.revision")],
   ["single entrypoint", dockerfile.includes('ENTRYPOINT ["/usr/local/bin/qf-entrypoint"]')],
   ["standalone Next output", nextConfig.includes('output: "standalone"')],
-  ["Google font loader absent", !rootLayout.includes("next/font/google")],
+  ["Google font loader absent", !/from\\s+["\']next\\/font\\/google["\']/.test(rootLayout)],
   ["self-hosted primary font", rootLayout.includes("next/font/local") && rootLayout.includes("plus-jakarta-sans-latin-wght-normal.woff2")],
   ["web role", entrypoint.includes("web)") && entrypoint.includes("exec node server.js")],
   ["automation role", entrypoint.includes("automation-worker)")],

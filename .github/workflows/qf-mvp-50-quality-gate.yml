@@ -11,12 +11,13 @@ on:
     branches:
       # Durable QF-MVP-50 feature-branch glob. The previous single-branch filter
       # went stale the moment that branch merged, silently disabling push runs.
-      - 'mvp/qf-mvp-50-*'
+      - "mvp/qf-mvp-50-*"
       # QF-MVP-75 matching/geography branches change the money path, and this
       # gate already runs their validators. Without this glob a 75.x branch got
       # push coverage only once a pull request existed.
-      - 'mvp/qf-mvp-75-*'
-      - 'feat/aarohi-*'
+      - "mvp/qf-mvp-75-*"
+      - "feat/aarohi-*"
+      - "feat/scale-*"
 
 permissions:
   contents: read
@@ -34,7 +35,7 @@ jobs:
       # a synthetic merge commit that is not the reviewed head. Pin the event head
       # SHA explicitly so the gate proves the exact code under review.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           # The QF-MVP-40.10 containment guards prove a claim over a pinned historical commit
@@ -53,9 +54,9 @@ jobs:
       # The MVP validators import .ts modules through a resolve-only hook and rely
       # on Node's native type stripping, which Node 20 does not provide.
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '24'
+          node-version: "24"
           cache: npm
 
       - name: Report Node version
@@ -308,6 +309,9 @@ jobs:
       - name: QuickFurno container contract
         run: npm run test:scale:container
 
+      - name: Supply-chain reproducibility contract
+        run: npm run test:scale:supply-chain
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -332,7 +336,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
@@ -346,9 +350,9 @@ jobs:
           test "$ACTUAL_SHA" = "$EXPECTED_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: "20"
           cache: npm
 
       - name: Report Node version
@@ -382,7 +386,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout exact reviewed head
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
@@ -396,9 +400,9 @@ jobs:
           test "$ACTUAL_SHA" = "$EXPECTED_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '24'
+          node-version: "24"
 
       - name: Run exact-head container certification
         run: node scripts/scale/certify-container-image.mjs

@@ -37,13 +37,19 @@ const securityHeaders = [
   // whatever third party a visitor clicks through to.
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   // Nothing in this product uses these. Off by default is the honest setting.
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), payment=(), usb=(), interest-cohort=()" },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), payment=(), usb=(), interest-cohort=()",
+  },
 ];
 
 const nextConfig = {
   // SCALE-P02: emit a self-contained production server so the same immutable
   // image can run on a VPS, managed container platform, or Kubernetes later.
   output: "standalone",
+  // SCALE-P04: every replica built from one source SHA reports the same Next build ID.
+  generateBuildId: async () =>
+    process.env.QF_RELEASE_SHA || process.env.GITHUB_SHA || "development",
   reactStrictMode: true,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
@@ -52,7 +58,13 @@ const nextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
       ...(supabaseHostname
-        ? [{ protocol: "https", hostname: supabaseHostname, pathname: "/storage/v1/object/public/**" }]
+        ? [
+            {
+              protocol: "https",
+              hostname: supabaseHostname,
+              pathname: "/storage/v1/object/public/**",
+            },
+          ]
         : []),
     ],
   },

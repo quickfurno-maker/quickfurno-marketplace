@@ -308,6 +308,9 @@ jobs:
       - name: QuickFurno container contract
         run: npm run test:scale:container
 
+      - name: QuickFurno immutable artifact contract
+        run: npm run test:scale:artifact
+
       - name: Typecheck
         run: npm run typecheck
 

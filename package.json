@@ -195,7 +195,8 @@
     "test:mvp:whatsapp-human-desk": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-human-desk.mjs",
     "test:mvp:jarvis-operator-bridge": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-jarvis-operator-bridge.mjs",
     "test:client-journey:phase2-riya": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/client-journey/validate-qf-riya-phase2-sync.mjs",
-    "test:scale:container": "node scripts/scale/validate-container-contract.mjs"
+    "test:scale:container": "node scripts/scale/validate-container-contract.mjs",
+    "test:scale:artifact": "node scripts/scale/validate-artifact-contract.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

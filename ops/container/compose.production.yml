@@ -2,13 +2,13 @@ name: quickfurno
 
 services:
   web:
-    image: quickfurno:${QF_IMAGE_TAG:?QF_IMAGE_TAG must be an immutable git SHA}
+    image: ${QF_IMAGE_REF:?QF_IMAGE_REF must be an immutable OCI digest reference}
     restart: unless-stopped
     init: true
     environment:
       NODE_ENV: production
       QF_RUNTIME_ROLE: web
-      QF_RELEASE_SHA: ${QF_IMAGE_TAG}
+      QF_RELEASE_SHA: ${QF_RELEASE_SHA:?QF_RELEASE_SHA must be the exact source git SHA}
     env_file:
       - ${QF_ENV_FILE:?QF_ENV_FILE must point to an external production env file}
     ports:
@@ -25,7 +25,13 @@ services:
     cpus: 1.0
     stop_grace_period: 30s
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz',{cache:'no-store'}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/readyz',{cache:'no-store'}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 20s
       timeout: 5s
       start_period: 20s
@@ -38,13 +44,13 @@ services:
     networks: [qf-private]
 
   automation-worker:
-    image: quickfurno:${QF_IMAGE_TAG:?QF_IMAGE_TAG must be an immutable git SHA}
+    image: ${QF_IMAGE_REF:?QF_IMAGE_REF must be an immutable OCI digest reference}
     restart: unless-stopped
     init: true
     environment:
       NODE_ENV: production
       QF_RUNTIME_ROLE: automation-worker
-      QF_RELEASE_SHA: ${QF_IMAGE_TAG}
+      QF_RELEASE_SHA: ${QF_RELEASE_SHA:?QF_RELEASE_SHA must be the exact source git SHA}
     env_file:
       - ${QF_ENV_FILE:?QF_ENV_FILE must point to an external production env file}
     read_only: true
@@ -65,13 +71,13 @@ services:
     networks: [qf-private]
 
   conversation-transport:
-    image: quickfurno:${QF_IMAGE_TAG:?QF_IMAGE_TAG must be an immutable git SHA}
+    image: ${QF_IMAGE_REF:?QF_IMAGE_REF must be an immutable OCI digest reference}
     restart: unless-stopped
     init: true
     environment:
       NODE_ENV: production
       QF_RUNTIME_ROLE: conversation-transport
-      QF_RELEASE_SHA: ${QF_IMAGE_TAG}
+      QF_RELEASE_SHA: ${QF_RELEASE_SHA:?QF_RELEASE_SHA must be the exact source git SHA}
     env_file:
       - ${QF_ENV_FILE:?QF_ENV_FILE must point to an external production env file}
     read_only: true
@@ -93,13 +99,13 @@ services:
 
   aarohi-acquisition:
     profiles: ["aarohi"]
-    image: quickfurno:${QF_IMAGE_TAG:?QF_IMAGE_TAG must be an immutable git SHA}
+    image: ${QF_IMAGE_REF:?QF_IMAGE_REF must be an immutable OCI digest reference}
     restart: unless-stopped
     init: true
     environment:
       NODE_ENV: production
       QF_RUNTIME_ROLE: aarohi-acquisition
-      QF_RELEASE_SHA: ${QF_IMAGE_TAG}
+      QF_RELEASE_SHA: ${QF_RELEASE_SHA:?QF_RELEASE_SHA must be the exact source git SHA}
     env_file:
       - ${QF_ENV_FILE:?QF_ENV_FILE must point to an external production env file}
     read_only: true

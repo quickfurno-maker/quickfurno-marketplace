@@ -37,6 +37,7 @@ const sleep = (ms: number) =>
 
 async function main() {
   const runtime = await import("@/services/nativeAutomationRuntimeService");
+  const scale = await import("@/services/scaleWorkerRuntimeService");
   const engine = await import("@/services/nativeAutomationEngineService");
   const studio = await import("@/services/automationStudioService");
   const jarvisWhatsApp =
@@ -50,7 +51,9 @@ async function main() {
   const cfg = runtime.getNativeAutomationRuntimeConfig();
   const startedAt = new Date().toISOString();
   let stopping = false;
+  let drainStartedAt: string | null = null;
   let lastHeartbeatWrite = 0;
+  let lastReplicaHeartbeatWrite = 0;
   let nextRecoveryAt = 0;
   let nextMaintenanceAt = 0;
   let nextSystemLanesAt = 0;
@@ -97,6 +100,26 @@ async function main() {
     await runtime.writeNativeAutomationRuntimeSnapshot(snapshot);
     lastHeartbeatWrite = now;
   };
+  const writeReplicaHeartbeat = async (
+    state: "starting" | "running" | "idle" | "degraded" | "draining" | "stopped",
+    acceptingWork: boolean,
+    force = false,
+    lastSafeCode?: string,
+  ) => {
+    const now = Date.now();
+    if (!force && now - lastReplicaHeartbeatWrite < cfg.heartbeatMs) return;
+    await scale.writeScaleWorkerHeartbeat({
+      role: "native-automation",
+      workerId: cfg.workerId,
+      state,
+      acceptingWork,
+      inFlight: 0,
+      startedAt,
+      drainStartedAt,
+      lastSafeCode,
+    });
+    lastReplicaHeartbeatWrite = now;
+  };
   const markResult = (
     lane: keyof typeof snapshot.laneLastRunAt,
     result: NativeAutomationCycleResult,
@@ -118,6 +141,7 @@ async function main() {
 
   const stop = () => {
     stopping = true;
+    drainStartedAt ??= new Date().toISOString();
   };
   process.once("SIGTERM", stop);
   process.once("SIGINT", stop);
@@ -131,6 +155,9 @@ async function main() {
 
   if (cfg.mode === "active") snapshot.state = "running";
   await writeHeartbeat(true);
+  await writeReplicaHeartbeat("starting", cfg.mode === "active", true).catch(
+    () => undefined,
+  );
 
   const familyLanes = [
     ["client_journey", "client_whatsapp"],
@@ -140,6 +167,10 @@ async function main() {
   while (!stopping) {
     try {
       snapshot.cycles += 1;
+      await writeReplicaHeartbeat(
+        cfg.mode === "active" ? "running" : "idle",
+        cfg.mode === "active",
+      ).catch(() => undefined);
       if (cfg.mode !== "active") {
         snapshot.state = cfg.mode === "shadow" ? "shadow" : "paused";
         await writeHeartbeat();
@@ -298,15 +329,31 @@ async function main() {
         code: snapshot.lastSafeCode,
       });
       await writeHeartbeat(true).catch(() => undefined);
+      await writeReplicaHeartbeat(
+        "degraded",
+        true,
+        true,
+        snapshot.lastSafeCode ?? undefined,
+      ).catch(() => undefined);
       await sleep(Math.max(cfg.idlePollMs, 5000));
     }
   }
 
+  drainStartedAt ??= new Date().toISOString();
+  await writeReplicaHeartbeat("draining", false, true, "GRACEFUL_DRAIN").catch(
+    () => undefined,
+  );
   snapshot.state = "stopping";
   snapshot.heartbeatAt = new Date().toISOString();
   await runtime
     .writeNativeAutomationRuntimeSnapshot(snapshot)
     .catch(() => undefined);
+  await writeReplicaHeartbeat(
+    "stopped",
+    false,
+    true,
+    "GRACEFUL_DRAIN_COMPLETE",
+  ).catch(() => undefined);
   console.info("[qf-native-automation] worker stopped", {
     workerId: cfg.workerId,
   });

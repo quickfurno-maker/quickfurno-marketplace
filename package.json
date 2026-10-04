@@ -200,7 +200,10 @@
     "test:scale:stateless": "node scripts/scale/validate-stateless-runtime.mjs",
     "test:scale:coordination:contract": "node scripts/scale/validate-coordination-contract.mjs",
     "test:scale:coordination:integration": "node --experimental-transform-types scripts/scale/certify-coordination.mjs",
-    "test:scale:coordination": "npm run test:scale:coordination:contract && npm run test:scale:coordination:integration"
+    "test:scale:coordination": "npm run test:scale:coordination:contract && npm run test:scale:coordination:integration",
+    "test:scale:durable-jobs:contract": "node scripts/scale/validate-durable-jobs-contract.mjs",
+    "test:scale:durable-jobs:postgres": "node scripts/scale/certify-durable-jobs-postgres.mjs",
+    "test:scale:durable-jobs": "npm run test:scale:durable-jobs:contract && npm run test:scale:durable-jobs:postgres"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
@@ -224,6 +227,7 @@
     "esbuild": "^0.25.12",
     "eslint": "^9.0.0",
     "eslint-config-next": "16.3.6",
+    "pg": "8.22.0",
     "postcss": "8.5.23",
     "tailwindcss": "^3.4.13",
     "typescript": "^5.6.2"

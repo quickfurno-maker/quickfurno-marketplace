@@ -150,6 +150,38 @@ assert.deepEqual(JSON.parse(await wakeup), {
 await subscriber.unsubscribe();
 await subscriber.quit();
 
+// SCALE-P07: production workers consume the same advisory signal through the
+// provider-neutral port. Missing signals remain harmless because timeout returns
+// to the durable PostgreSQL poll path.
+const portWait = worker2.waitForWakeup({
+  namespace,
+  topics: ["jobs"],
+  timeoutMs: 2_000,
+});
+await new Promise((resolve) => setTimeout(resolve, 50));
+await worker1.publishWakeup({
+  namespace,
+  topic: "jobs",
+  payload: { kind: "phase07-port-wakeup", opaqueId: "job-456" },
+});
+const observedPortWakeup = await portWait;
+assert.equal(observedPortWakeup.status, "wakeup");
+if (observedPortWakeup.status === "wakeup") {
+  assert.equal(observedPortWakeup.topic, "jobs");
+  assert.deepEqual(JSON.parse(observedPortWakeup.payload), {
+    kind: "phase07-port-wakeup",
+    opaqueId: "job-456",
+  });
+}
+assert.deepEqual(
+  await worker2.waitForWakeup({
+    namespace,
+    topics: ["jobs"],
+    timeoutMs: 50,
+  }),
+  { status: "timeout" },
+);
+
 const inspector = createClient({ url });
 inspector.on("error", () => undefined);
 await inspector.connect();
@@ -200,6 +232,14 @@ assert.deepEqual(
     namespace,
     topic: "jobs",
     payload: { opaqueId: "missed-wakeup" },
+  }),
+  { status: "unavailable" },
+);
+assert.deepEqual(
+  await outage.waitForWakeup({
+    namespace,
+    topics: ["jobs"],
+    timeoutMs: 100,
   }),
   { status: "unavailable" },
 );

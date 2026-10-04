@@ -29,6 +29,7 @@ import {
   type QfWhatsAppInboundMaterialV1,
 } from "../lib/jarvis/whatsAppInboundMaterial";
 import { processAarohiWhatsAppIntake } from "./aarohiWhatsAppIntakeService";
+import { publishDurableWorkWakeup } from "../lib/coordination/durableWorkWakeup";
 
 const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const CHANNEL = "whatsapp";
@@ -543,14 +544,18 @@ export async function recordConversationalInbound(input: {
     process.env.QF_JARVIS_WHATSAPP_ENABLED?.trim().toLowerCase() === "true" &&
     ["AAROHI", "ANISHA", "RIYA"].includes(actor)
   ) {
-    await adminClient().from("communication_jarvis_turn_outbox").upsert({
-      conversation_id: conversation.id,
-      inbound_message_id: input.inboundMessageId,
-      conversation_revision: Number(conversation.revision),
-      assigned_actor: actor,
-      status: "pending",
-      attempt_count: 0,
-    }, { onConflict: "inbound_message_id", ignoreDuplicates: true });
+    const { error: turnOutboxError } = await adminClient()
+      .from("communication_jarvis_turn_outbox")
+      .upsert({
+        conversation_id: conversation.id,
+        inbound_message_id: input.inboundMessageId,
+        conversation_revision: Number(conversation.revision),
+        assigned_actor: actor,
+        status: "pending",
+        attempt_count: 0,
+      }, { onConflict: "inbound_message_id", ignoreDuplicates: true });
+    if (turnOutboxError) throw turnOutboxError;
+    void publishDurableWorkWakeup("jarvis-turn-outbox", input.inboundMessageId);
   }
 
   return { ok: true, value: {
@@ -965,10 +970,13 @@ async function queueConversationExperience(input: {
       Number(existing.expected_revision) === input.expectedRevision &&
       existing.body_digest === digest
     ) {
+      void publishDurableWorkWakeup("conversation-outbox", String(existing.id));
       return { ok: true, value: { outboxId: existing.id } };
     }
     return { ok: false, reason: "conversation_not_sendable" };
   }
+
+  void publishDurableWorkWakeup("conversation-outbox", String(data.id));
 
   await adminClient().from("communication_conversation_events").insert({
     conversation_id: input.conversationId,

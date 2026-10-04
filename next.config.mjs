@@ -41,6 +41,9 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  // SCALE-P02: emit a self-contained production server so the same immutable
+  // image can run on a VPS, managed container platform, or Kubernetes later.
+  output: "standalone",
   reactStrictMode: true,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

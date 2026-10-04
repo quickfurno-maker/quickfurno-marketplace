@@ -1,38 +1,34 @@
 #!/bin/sh
 set -eu
 
-role="${QF_RUNTIME_ROLE:-web}"
+if [ -z "${NEXT_PUBLIC_SUPABASE_URL:-}" ]; then
+  echo "quickfurno-container REFUSED missing mandatory config: NEXT_PUBLIC_SUPABASE_URL" >&2
+  exit 78
+fi
+if [ -z "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
+  echo "quickfurno-container REFUSED missing mandatory config: NEXT_PUBLIC_SUPABASE_ANON_KEY" >&2
+  exit 78
+fi
+if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+  echo "quickfurno-container REFUSED missing mandatory config: SUPABASE_SERVICE_ROLE_KEY" >&2
+  exit 78
+fi
 
-require_env() {
-  name="$1"
-  eval "value=\${$name:-}"
-  if [ -z "$value" ]; then
-    echo "quickfurno-container REFUSED missing required env: $name" >&2
-    exit 78
-  fi
-}
+role="${QF_RUNTIME_ROLE:-web}"
 
 case "$role" in
   web)
-    require_env NEXT_PUBLIC_SUPABASE_URL
-    require_env NEXT_PUBLIC_SUPABASE_ANON_KEY
     export HOSTNAME="${HOSTNAME:-0.0.0.0}"
     export PORT="${PORT:-3000}"
     exec node server.js
     ;;
   automation-worker)
-    require_env NEXT_PUBLIC_SUPABASE_URL
-    require_env SUPABASE_SERVICE_ROLE_KEY
     exec node dist/automation-worker.mjs
     ;;
   conversation-transport)
-    require_env NEXT_PUBLIC_SUPABASE_URL
-    require_env SUPABASE_SERVICE_ROLE_KEY
     exec node dist/conversation-transport-worker.mjs
     ;;
   aarohi-acquisition)
-    require_env NEXT_PUBLIC_SUPABASE_URL
-    require_env SUPABASE_SERVICE_ROLE_KEY
     exec node dist/aarohi-acquisition-worker.mjs
     ;;
   *)

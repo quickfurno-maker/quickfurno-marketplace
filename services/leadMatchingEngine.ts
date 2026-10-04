@@ -26,6 +26,7 @@ import {
 } from "../lib/geo/canonicalCoordinate";
 import { buildGeoMatchEvidence } from "../lib/geo/geoShortlistContract";
 import { fetchGeoVendorShortlist } from "./geoVendorShortlistService";
+import { fetchVendorMatchPrefilterRows } from "./vendorMatchingPrefilterService";
 import { buildSelectionPlan } from "../lib/matchcore/selectionPlan";
 import { buildFairnessScope, clampFairnessBalance, distanceBand, FAIRNESS_MODEL_VERSION, type FairOpportunitySnapshot } from "../lib/matchcore/fairOpportunity";
 import { loadFairOpportunitySnapshots, snapshotFairOpportunityEligiblePool } from "./vendorFairOpportunityService";
@@ -182,8 +183,9 @@ const MAX_VENDOR_MATCHES = 3;
 // The pool bound is imported rather than re-declared, so the matcher and the
 // transport seam cannot drift apart on the value.
 const MAX_ASSIGNMENT_CANDIDATE_POOL = MAX_CANONICAL_CANDIDATE_POOL;
-const VENDOR_PAGE_SIZE = 500;
-const MAX_VENDOR_SCAN = 5000;
+// SCALE-P08: vendor discovery is database-prefiltered and bounded. The former
+// UUID-ordered 5,000-row application scan now exists only inside the migration
+// compatibility fallback in vendorMatchingPrefilterService.
 // Audit snapshots list per-vendor skip reasons up to this cap; reason counts
 // always cover every evaluated vendor.
 const MAX_SKIPPED_AUDIT_ENTRIES = 40;
@@ -624,24 +626,17 @@ export async function evaluateVendorsForLead(
   options: { recordFairOpportunityPool?: boolean } = {},
 ): Promise<Result<VendorMatchEvaluation>> {
   try {
-    // Eligibility rules read loosely-aliased columns (city/office_city, several
-    // credit/package aliases), so filtering happens in JS via the shared helper.
-    // Page through the full table instead of capping at one arbitrary batch.
-    const rows: Array<Record<string, unknown>> = [];
-    for (let from = 0; from < MAX_VENDOR_SCAN; from += VENDOR_PAGE_SIZE) {
-      const { data, error } = await adminClient()
-        .from("vendors")
-        .select("*")
-        .order("id", { ascending: true })
-        .range(from, from + VENDOR_PAGE_SIZE - 1);
-      if (error) throw error;
-
-      const page = (data ?? []) as Array<Record<string, unknown>>;
-      rows.push(...page);
-      if (page.length < VENDOR_PAGE_SIZE) break;
-      if (rows.length >= MAX_VENDOR_SCAN) {
-        console.warn("[lead matching] vendor scan hit safety cap", { scanned: rows.length, cap: MAX_VENDOR_SCAN });
-      }
+    // SCALE-P08: indexed PostgreSQL/PostGIS discovery removes the historical
+    // UUID-ordered 5,000-row scan, which became both incomplete and expensive at
+    // large vendor counts. The returned window is still re-evaluated below by
+    // the canonical TypeScript gates, then rechecked transactionally by Core.
+    const prefilter = await fetchVendorMatchPrefilterRows(lead);
+    const rows = prefilter.rows;
+    if (prefilter.source === "legacy_fallback") {
+      console.warn("[lead matching] Phase 08 database prefilter degraded", {
+        reason: prefilter.degradedReason,
+        rows: rows.length,
+      });
     }
 
     const serviceZonePolicy = await loadServiceZoneRuntimePolicy();

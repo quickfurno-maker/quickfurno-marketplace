@@ -322,6 +322,65 @@ export function vendorMatchesParentGroup(vendor: VendorLike, group: string): boo
   return false;
 }
 
+/**
+ * SCALE-P08 — database prefilter vocabulary derived from the SAME canonical
+ * category taxonomy used by the final TypeScript matcher.
+ *
+ * Tier 0 contains exact/subcategory labels plus every synonym-group label that
+ * can make isLeadVendorCategoryCompatible() true. Tier 1 contains every label
+ * whose parent group can make vendorMatchesParentGroup() true. PostgreSQL uses
+ * these terms only to build a bounded candidate window; this module remains the
+ * final category decision authority before assignment.
+ */
+export function buildVendorMatchPrefilterTerms(lead: LeadLike): {
+  tier0Terms: string[];
+  tier1Terms: string[];
+  parentGroup: string;
+} {
+  const leadTerms = collectTerms(lead?.category, lead?.service_required, lead?.subcategory);
+  const tier0 = new Set<string>(leadTerms);
+
+  for (const term of leadTerms) {
+    for (const canonicalGroup of getCanonicalCategoryGroups(term)) {
+      for (const label of CANONICAL_CATEGORY_GROUPS[canonicalGroup] ?? []) {
+        const normalized = normalizeCategory(label);
+        if (normalized) tier0.add(normalized);
+      }
+    }
+  }
+
+  const parentGroup = getParentCategoryGroup(leadTerms);
+  const tier1 = new Set<string>();
+
+  const knownParent = (KNOWN_PARENT_CATEGORY_GROUPS as readonly string[]).includes(parentGroup);
+  if (knownParent) {
+    for (const label of PARENT_GROUP_DEFINITIONS[parentGroup as KnownParentCategoryGroup] ?? []) {
+      const normalized = normalizeCategory(label);
+      if (normalized) tier1.add(normalized);
+    }
+  } else {
+    for (const term of leadTerms) tier1.add(term);
+  }
+
+  // Canonical synonym labels that resolve into the same parent group also belong
+  // to the fallback vocabulary. This keeps labels such as "premium interior
+  // design" aligned even when the parent seed list uses a shorter spelling.
+  for (const labels of Object.values(CANONICAL_CATEGORY_GROUPS)) {
+    for (const label of labels) {
+      const normalized = normalizeCategory(label);
+      if (normalized && getParentCategoryGroup(normalized) === parentGroup) {
+        tier1.add(normalized);
+      }
+    }
+  }
+
+  return {
+    tier0Terms: [...tier0].sort(),
+    tier1Terms: [...tier1].sort(),
+    parentGroup,
+  };
+}
+
 export const CATEGORY_MATCHING_SMOKE_CASES = [
   ["Modular Kitchen", "Modular Factory"],
   ["Carpentry", "Carpenters"],

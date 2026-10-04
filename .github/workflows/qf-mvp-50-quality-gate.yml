@@ -547,6 +547,7 @@ jobs:
             -e QF_RUNTIME_ROLE=web \
             -e NEXT_PUBLIC_SUPABASE_URL=https://example.invalid \
             -e NEXT_PUBLIC_SUPABASE_ANON_KEY=container-certification-public-placeholder \
+            -e SUPABASE_SERVICE_ROLE_KEY=container-certification-not-a-secret \
             "$IMAGE"
           trap 'docker logs qf-container-cert || true; docker rm -f qf-container-cert >/dev/null 2>&1 || true' EXIT
           for attempt in $(seq 1 30); do
@@ -562,6 +563,14 @@ jobs:
           test "$(docker exec qf-container-cert id -u)" = "10001"
           test "$(docker inspect qf-container-cert --format '{{.HostConfig.ReadonlyRootfs}}')" = "true"
 
+      - name: Final image contains no dotenv files or package manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="quickfurno:${{ steps.revision.outputs.sha }}"
+          test -z "$(docker run --rm --entrypoint sh "$IMAGE" -c "find /app -type f \( -name '.env' -o -name '.env.*' \) -print -quit")"
+          docker run --rm --entrypoint sh "$IMAGE" -c '! command -v npm >/dev/null 2>&1'
+
       - name: Worker artifact and fail-closed role smoke
         shell: bash
         run: |
@@ -571,9 +580,14 @@ jobs:
           docker run --rm --entrypoint node "$IMAGE" --check dist/conversation-transport-worker.mjs
           docker run --rm --entrypoint node "$IMAGE" --check dist/aarohi-acquisition-worker.mjs
           set +e
+          docker run --rm -e QF_RUNTIME_ROLE=web "$IMAGE" >/tmp/qf-missing-config.out 2>&1
+          MISSING_CODE=$?
           docker run --rm -e QF_RUNTIME_ROLE=unknown "$IMAGE" >/tmp/qf-unknown-role.out 2>&1
-          CODE=$?
+          ROLE_CODE=$?
           set -e
+          cat /tmp/qf-missing-config.out
           cat /tmp/qf-unknown-role.out
-          test "$CODE" -eq 64
+          test "$MISSING_CODE" -eq 78
+          test "$ROLE_CODE" -eq 64
+          grep -q "REFUSED missing mandatory config" /tmp/qf-missing-config.out
           grep -q "REFUSED unknown runtime role" /tmp/qf-unknown-role.out

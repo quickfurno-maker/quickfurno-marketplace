@@ -27,6 +27,9 @@ ENV NODE_ENV=production \
 WORKDIR /app
 COPY --from=build-deps /app/node_modules ./node_modules
 COPY . .
+RUN test -n "$NEXT_PUBLIC_SUPABASE_URL" \
+ && test -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+ || (echo "QuickFurno image build REFUSED: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required build inputs." >&2; exit 64)
 RUN npm run build:automation-worker \
  && npm run build:conversation-transport \
  && npm run build:aarohi-acquisition-worker \

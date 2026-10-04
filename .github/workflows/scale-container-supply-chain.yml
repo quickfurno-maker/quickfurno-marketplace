@@ -5,6 +5,13 @@ on:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish/sign this exact source SHA to GHCR without deployment"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -47,7 +54,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$EVENT_NAME" == "push" && "$REF_NAME" == "refs/heads/main" ]]; then
+          if [[ ("$EVENT_NAME" == "push" && "$REF_NAME" == "refs/heads/main") || ("$EVENT_NAME" == "workflow_dispatch" && "${{ inputs.publish }}" == "true") ]]; then
             if [[ -z "$PROD_URL" || -z "$PROD_ANON" ]]; then
               echo "PUBLIC_BUILD_CONFIG_MISSING" >&2
               exit 64
@@ -129,7 +136,7 @@ jobs:
 
   publish:
     name: Publish and sign exact QuickFurno digest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.publish == true)
     needs: certify
     runs-on: ubuntu-latest
     timeout-minutes: 30

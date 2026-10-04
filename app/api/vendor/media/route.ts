@@ -37,12 +37,14 @@
 // ============================================================================
 import { NextResponse } from "next/server";
 import sharp from "sharp";
-import { adminClient, serverClient } from "@/lib/supabase";
+import { serverClient } from "@/lib/supabase";
+import { createSupabaseObjectStorage } from "@/lib/storage/supabaseObjectStorage";
 
 export const runtime = "nodejs";        // sharp is native; it cannot run on edge
 export const dynamic = "force-dynamic";
 
 const BUCKET = "vendor-media";
+const mediaStorage = createSupabaseObjectStorage({ bucket: BUCKET });
 const MAX_BYTES = 8 * 1024 * 1024;      // 8 MiB in
 const MAX_EDGE = 1600;                  // longest side after resize
 // A ceiling on STORED objects per vendor, not on published photos. The profile
@@ -83,10 +85,25 @@ export async function POST(request: Request) {
   const vendorId = await callerVendorId();
   if (!vendorId) return bad("UNAUTHORIZED", "Sign in as a vendor to add photos.", 401);
 
-  const db = adminClient();
-  const { data: stored } = await db.storage.from(BUCKET).list(vendorId, { limit: MAX_OBJECTS_PER_VENDOR + 1 });
-  if ((stored?.length ?? 0) >= MAX_OBJECTS_PER_VENDOR) {
-    return bad("LIMIT_REACHED", "You have reached the upload limit. Remove some photos and try again.");
+  let stored: readonly string[];
+  try {
+    stored = await mediaStorage.list(vendorId, {
+      limit: MAX_OBJECTS_PER_VENDOR + 1,
+    });
+  } catch {
+    // Failing open here would turn a storage/provider outage into a quota
+    // bypass. Capacity enforcement is part of the upload authorization.
+    return bad(
+      "STORAGE_UNAVAILABLE",
+      "Photo storage is temporarily unavailable. Please try again.",
+      503,
+    );
+  }
+  if (stored.length >= MAX_OBJECTS_PER_VENDOR) {
+    return bad(
+      "LIMIT_REACHED",
+      "You have reached the upload limit. Remove some photos and try again.",
+    );
   }
 
   let form: FormData;
@@ -125,18 +142,25 @@ export async function POST(request: Request) {
   }
 
   const key = `${vendorId}/${crypto.randomUUID()}.webp`;
-  const { error: uploadError } = await db.storage
-    .from(BUCKET)
-    .upload(key, output, { contentType: "image/webp", cacheControl: "31536000", upsert: false });
-  if (uploadError) {
-    return bad("UPLOAD_FAILED", "The photo could not be saved. Please try again.", 502);
+  try {
+    await mediaStorage.put(key, output, {
+      contentType: "image/webp",
+      cacheControl: "31536000",
+      upsert: false,
+    });
+  } catch {
+    return bad(
+      "UPLOAD_FAILED",
+      "The photo could not be saved. Please try again.",
+      502,
+    );
   }
 
-  const { data: pub } = db.storage.from(BUCKET).getPublicUrl(key);
+  const publicUrl = mediaStorage.publicUrl(key);
 
   // Just a safe hosted URL. Nothing is published until the vendor submits the
   // profile form and an admin approves it, same as a pasted link.
-  return NextResponse.json({ ok: true, url: pub.publicUrl, width, height, bytes: output.length });
+  return NextResponse.json({ ok: true, url: publicUrl, width, height, bytes: output.length });
 }
 
 /** Discard an upload the vendor decided against, so it is not left orphaned. */
@@ -153,18 +177,22 @@ export async function DELETE(request: Request) {
   const url = (body.url ?? "").trim();
   if (!url) return bad("NO_URL", "Which photo should be removed?");
 
-  // The key is derived from the url and MUST start with this vendor's own id.
-  // That single check is what stops a crafted url reaching another vendor's
-  // folder — ownership is proved by the path, not by anything the caller says.
-  const marker = `/${BUCKET}/`;
-  const at = url.indexOf(marker);
-  const key = at === -1 ? "" : url.slice(at + marker.length).split("?")[0];
+  // Provider-specific URL parsing belongs to the storage adapter. This route
+  // still owns authorization: only this vendor's key prefix may be deleted.
+  const key = mediaStorage.keyFromPublicUrl(url);
   if (!key || !key.startsWith(`${vendorId}/`) || key.includes("..")) {
     return bad("NOT_YOURS", "That photo does not belong to your account.", 404);
   }
 
-  const { error } = await adminClient().storage.from(BUCKET).remove([key]);
-  if (error) return bad("DELETE_FAILED", "That photo could not be removed. Please try again.", 502);
+  try {
+    await mediaStorage.remove([key]);
+  } catch {
+    return bad(
+      "DELETE_FAILED",
+      "That photo could not be removed. Please try again.",
+      502,
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }

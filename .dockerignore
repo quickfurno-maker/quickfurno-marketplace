@@ -13,4 +13,6 @@ coverage
 .idea
 supabase/.branches
 supabase/.temp
-docs
+docs/**
+!docs/provider-manifests/
+!docs/provider-manifests/**

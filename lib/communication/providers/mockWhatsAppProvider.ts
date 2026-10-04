@@ -141,3 +141,179 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
 
   clearLastSentPayloads(): void {
     this.lastSentPayloads = [];
+  }
+
+  /** Resets the deterministic id counter. Tests call this for a clean slate. */
+  reset(): void {
+    this.sendSequence = 0;
+    this.lastSentPayloads = [];
+  }
+
+  async sendAuthenticationMessage(
+    to: string,
+    templateKey: string,
+    variables: Record<string, string>
+  ): Promise<WhatsAppSendResult> {
+    // SECURITY: the authentication lane carries the plaintext OTP to the
+    // provider call and nowhere else. The mock retains variable NAMES only, so
+    // a test double can never become an OTP sink.
+    this.lastSentPayloads.push({
+      lane: "authentication",
+      to,
+      templateKey,
+      variableKeys: Object.keys(variables),
+      variables: {},
+    });
+
+    return this.simulateSend(to, templateKey, variables);
+  }
+
+  async sendTemplateMessage(
+    to: string,
+    templateKey: string,
+    variables: Record<string, string>
+  ): Promise<WhatsAppSendResult> {
+    // Reuses the Phase 5A sanitization vocabulary rather than a weaker local
+    // regex, so "forbidden key" means exactly one thing across the codebase.
+    const sanitizedVars: Record<string, string> = {};
+    for (const [key, value] of Object.entries(variables)) {
+      sanitizedVars[key] = isForbiddenSecurityMetadataKey(key) ? "[REDACTED]" : value;
+    }
+
+    this.lastSentPayloads.push({
+      lane: "business",
+      to,
+      templateKey,
+      variableKeys: Object.keys(variables),
+      variables: sanitizedVars,
+    });
+
+    return this.simulateSend(to, templateKey, variables);
+  }
+
+  private simulateSend(
+    to: string,
+    templateKey: string,
+    variables: Record<string, string>
+  ): WhatsAppSendResult {
+    // --- adapters that THROW ---------------------------------------------
+    // CommunicationService must normalize each of these into a safe delivery
+    // failure and never strand the message in `dispatching`.
+    if (to === MOCK_DESTINATIONS.THROW_TRANSIENT) {
+      // A typed error the adapter has PROVEN is a definitive, safely-retryable failure.
+      throw definitiveRetryableProviderError("MOCK_TRANSIENT_TRANSPORT", "Simulated adapter-proven definitive, safely-retryable failure");
+    }
+
+    if (to === MOCK_DESTINATIONS.THROW_PERMANENT) {
+      throw definitivePermanentProviderError("MOCK_PERMANENT_REJECTION", "Simulated mock provider permanent rejection");
+    }
+
+    if (to === MOCK_DESTINATIONS.THROW_TRANSPORT) {
+      const transport = new Error("socket hang up") as Error & { code: string };
+      transport.code = "ECONNRESET";
+      throw transport;
+    }
+
+    if (to === MOCK_DESTINATIONS.THROW_LEAKY) {
+      // An unclassified adapter bug whose message is full of things that must
+      // never be persisted. The service must withhold this text entirely.
+      throw new Error(MOCK_LEAKY_EXCEPTION_MESSAGE);
+    }
+
+    // --- adapters that RETURN a failure result ----------------------------
+    if (to === MOCK_DESTINATIONS.RETRYABLE_FAILURE) {
+      return {
+        accepted: false,
+        provider: this.providerKey,
+        providerMessageId: null,
+        normalizedStatus: "failed",
+        errorCode: "RATE_LIMIT_EXCEEDED",
+        errorMessage: "Simulated mock provider rate limit exceeded",
+        // A rate-limit is a DEFINITE (provably-not-delivered) rejection that is safe
+        // to retry — definitive_failure keeps the existing retry lane behavior.
+        retryable: true,
+        outcomeCertainty: "definitive_failure",
+      };
+    }
+
+    if (to === MOCK_DESTINATIONS.PERMANENT_FAILURE) {
+      return {
+        accepted: false,
+        provider: this.providerKey,
+        providerMessageId: null,
+        normalizedStatus: "failed",
+        errorCode: "INVALID_DESTINATION_NUMBER",
+        errorMessage: "Simulated mock provider invalid recipient destination",
+        retryable: false,
+        outcomeCertainty: "definitive_failure",
+      };
+    }
+
+    // Deterministic id: monotonic counter + stable hash of the send input.
+    this.sendSequence += 1;
+    const sequence = String(this.sendSequence).padStart(6, "0");
+    const inputDigest = stableHash({ to, templateKey, variables }).slice(0, 12);
+
+    return {
+      accepted: true,
+      provider: this.providerKey,
+      providerMessageId: `mock-msg-${sequence}-${inputDigest}`,
+      normalizedStatus: "accepted",
+      errorCode: null,
+      errorMessage: null,
+      retryable: false,
+      outcomeCertainty: "accepted",
+    };
+  }
+
+  verifyWebhookSignature(rawBody: string, signature: string, secret: string): boolean {
+    if (typeof rawBody !== "string" || !signature || !secret) return false;
+    return secureEquals(signature, computeMockWebhookSignature(rawBody, secret));
+  }
+
+  deriveWebhookEventId(payload: Record<string, unknown>): string {
+    const explicit = readField(payload, "event_id", "eventId");
+    if (explicit) return explicit;
+    // Deterministic fallback — never random. Identical payloads collapse onto
+    // the same receipt, which is exactly the de-duplication behaviour we want.
+    return `mock-evt-${stableHash(payload).slice(0, 24)}`;
+  }
+
+  normalizeWebhook(payload: Record<string, unknown>): WhatsAppWebhookEvent[] {
+    const providerMessageId = readField(payload, "message_id", "messageId");
+    const occurredAt = readField(payload, "timestamp", "occurred_at", "occurredAt");
+    const status = readField(payload, "status");
+
+    // Required identifiers absent, or a lifecycle state we do not understand:
+    // drop the event. It must never be coerced onto "delivered".
+    if (!providerMessageId || !occurredAt) return [];
+    if (!isNormalizedEventType(status)) return [];
+
+    const rawMeta = (payload.metadata as Record<string, unknown>) || {};
+    const sanitizedMetadata = sanitizeAuthSecurityMetadata(rawMeta);
+
+    return [
+      {
+        providerEventId: this.deriveWebhookEventId(payload),
+        providerMessageId,
+        normalizedEventType: status,
+        occurredAt,
+        sanitizedMetadata,
+      },
+    ];
+  }
+
+  async healthCheck(): Promise<WhatsAppProviderHealth> {
+    return {
+      provider: this.providerKey,
+      configured: true,
+      reachable: true,
+      status: "healthy",
+      // A health probe is inherently a point-in-time observation; this is the
+      // one clock read the mock keeps.
+      checkedAt: new Date().toISOString(),
+      latencyMs: 12,
+      detailsSanitized: { info: "Mock provider online", mode: "test-dev-only" },
+    };
+  }
+}

@@ -311,6 +311,9 @@ jobs:
       - name: QuickFurno immutable artifact contract
         run: npm run test:scale:artifact
 
+      - name: QuickFurno stateless runtime + object storage contract
+        run: npm run test:scale:stateless
+
       - name: Typecheck
         run: npm run typecheck
 

@@ -5,36 +5,24 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../..",
-);
-const MANIFEST_PATH =
-  "supabase/staging-history/qf-mvp-staging-history-manifest.json";
-const EXTENSION_PATH =
-  "supabase/staging-history/qf-post-g1-migration-ledger-20260929.json";
-const BASELINE_PATH =
-  "supabase/staging-baseline/20260722000100_qf_mvp_staging_baseline_269c9265.sql";
-const TARGET_PATH =
-  "supabase/migrations/20260803000000_qf_mvp_50_2c_lead_communication_recipient.sql";
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const MANIFEST_PATH = "supabase/staging-history/qf-mvp-staging-history-manifest.json";
+const EXTENSION_PATH = "supabase/staging-history/qf-post-g1-migration-ledger-20260929.json";
+const BASELINE_PATH = "supabase/staging-baseline/20260722000100_qf_mvp_staging_baseline_269c9265.sql";
+const TARGET_PATH = "supabase/migrations/20260803000000_qf_mvp_50_2c_lead_communication_recipient.sql";
 const S1_PATH = "docs/QF-MVP-50-2C-S1-STAGING-PREFLIGHT-EVIDENCE.md";
 const GOVERNANCE_PATH = "docs/QF-MVP-50-2C-S2-STAGING-HISTORY-GOVERNANCE.md";
 const README_PATH = "supabase/staging-baseline/README.md";
-const APPLICATION_REPORT_PATH =
-  "docs/QF-MVP-20-STAGING-BASELINE-APPLICATION-RESULTS.md";
+const APPLICATION_REPORT_PATH = "docs/QF-MVP-20-STAGING-BASELINE-APPLICATION-RESULTS.md";
 const WORKFLOW_PATH = ".github/workflows/qf-mvp-50-quality-gate.yml";
 
 const BASELINE_VERSION = "20260722000100";
-const BASELINE_SHA =
-  "101ac82c7840eec8802155fec4d4a18cba445447b7d773aaf168417f737aa33c";
-const HISTORICAL_SHA =
-  "920a4aa0143b7c91231a3c83d01452e49b8b9a829c322f15c7df4fe9f07ecc81";
+const BASELINE_SHA = "101ac82c7840eec8802155fec4d4a18cba445447b7d773aaf168417f737aa33c";
+const HISTORICAL_SHA = "920a4aa0143b7c91231a3c83d01452e49b8b9a829c322f15c7df4fe9f07ecc81";
 // QF-MVP-50.2D-R1 — the 50.2C target is now the frozen APPLIED anchor.
 const TARGET_VERSION = "20260803000000";
-const TARGET_SHA =
-  "77d2bb1162e0522b061f36df787d94c2dad4f0ceeff3e4a07c8946cd4e1d56ca";
-const APPLIED_EVIDENCE_MARKER =
-  "QF_MVP_50_2C_S2_D2_R1_STAGING_MIGRATION_APPLIED_AND_VERIFIED";
+const TARGET_SHA = "77d2bb1162e0522b061f36df787d94c2dad4f0ceeff3e4a07c8946cd4e1d56ca";
+const APPLIED_EVIDENCE_MARKER = "QF_MVP_50_2C_S2_D2_R1_STAGING_MIGRATION_APPLIED_AND_VERIFIED";
 
 // QF-MVP-50.2-R2-APPLIED-TRUTH — RE-PIN, NEVER LOOSEN.
 //
@@ -127,8 +115,7 @@ const POST_ANCHOR_APPLIED = [
     version: "20260808500000",
     name: "qf_mvp_50_3_automation_policy_config_foundation_bridge",
     sha: "05e114910c8ba06e9d697b81ca645dfc13a03ed29751090901666975dc6fcbca",
-    marker:
-      "QF_MVP_50_3_50_4_POLICY_CONFIG_BRIDGE_STAGING_APPLIED_AND_VERIFIED",
+    marker: "QF_MVP_50_3_50_4_POLICY_CONFIG_BRIDGE_STAGING_APPLIED_AND_VERIFIED",
     remoteHistory: 26,
     phase: "QF-MVP-50.3-50.4-POLICY-CONFIG-BRIDGE",
   },
@@ -154,8 +141,7 @@ const POST_ANCHOR_APPLIED = [
     version: "20260811000000",
     name: "qf_mvp_50_3_50_4_family_aware_claim_routing",
     sha: "fc7efae9c2349854b9856d3b3b3956933bcfe79ed15c1eeb7caf65bc61f8f89d",
-    marker:
-      "QF_MVP_50_3_50_4_FAMILY_CLAIM_STAGING_FORENSIC_RECONCILIATION_APPLIED",
+    marker: "QF_MVP_50_3_50_4_FAMILY_CLAIM_STAGING_FORENSIC_RECONCILIATION_APPLIED",
     evidenceType: "IMPORTED_FOUNDER_ACKNOWLEDGED_EXISTING_STAGING_STATE",
     remoteHistory: 29,
     phase: "QF-MVP-50.3/50.4-FAMILY-AWARE-CLAIM",
@@ -363,8 +349,7 @@ const POST_ANCHOR_PENDING = [
   path: `supabase/migrations/${m.version}_${m.name}.sql`,
 }));
 
-const RECONCILED_EVIDENCE_TYPE =
-  "DIRECT_READ_ONLY_REMOTE_HISTORY_CERTIFICATION";
+const RECONCILED_EVIDENCE_TYPE = "DIRECT_READ_ONLY_REMOTE_HISTORY_CERTIFICATION";
 const RECONCILED_REMOTE_STATUS = "PRESENT_IN_STAGING_AND_PRODUCTION_HISTORY";
 // The certified interval, exactly as both remote histories return it.
 const RECONCILED_HISTORY = [
@@ -483,8 +468,7 @@ const POST_ANCHOR_ALL = [
   ...POST_ANCHOR_STAGING_APPLIED,
 ].sort((a, b) => (a.version < b.version ? -1 : a.version > b.version ? 1 : 0));
 const POST_ANCHOR_ORDER = POST_ANCHOR_ALL.map((m) => m.version);
-const APPLIED_EVIDENCE_TYPE =
-  "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD";
+const APPLIED_EVIDENCE_TYPE = "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD";
 // QF-MVP-40 MARKETING-CONSENT RE-PIN: 98 -> 99, adding ONLY the SOURCE-PENDING
 // canonical marketing-consent writer RPC (20260814000000). No existing migration was
 // changed, renamed, deleted or reordered. Still exact equality.
@@ -517,57 +501,43 @@ const MIGRATION_COUNT = 119;
 // RECONCILED_HISTORY are pinned — a historical observation stays observed.
 // The LIVE tree size is asserted separately, against MIGRATION_COUNT.
 const RECONCILIATION_MIGRATION_COUNT = 102;
-const RECONCILIATION_DOC_PATH =
-  "docs/QF-MVP-80-05-MIGRATION-HISTORY-RECONCILIATION.md";
+const RECONCILIATION_DOC_PATH = "docs/QF-MVP-80-05-MIGRATION-HISTORY-RECONCILIATION.md";
 
 const APPROVED_COMMON = [
-  "20260723000100",
-  "20260723000200",
-  "20260723000300",
-  "20260723000400",
-  "20260723000500",
-  "20260723000600",
-  "20260723000700",
-  "20260723000800",
-  "20260723000900",
-  "20260723001000",
-  "20260723001100",
-  "20260723001200",
-  "20260723001300",
-  "20260723001400",
-  "20260728001500",
-  "20260728001600",
-  "20260801110000",
-  "20260801152049",
+  "20260723000100", "20260723000200", "20260723000300", "20260723000400",
+  "20260723000500", "20260723000600", "20260723000700", "20260723000800",
+  "20260723000900", "20260723001000", "20260723001100", "20260723001200",
+  "20260723001300", "20260723001400", "20260728001500", "20260728001600",
+  "20260801110000", "20260801152049",
 ];
 
 const L3_RESOLVED = {
-  20260723001200: {
+  "20260723001200": {
     byteProvenance: "UNAVAILABLE",
     remoteStatementCount: 1,
     digest: "21a8f22417ca9e895590ce2411544f3667660cdc74eefa3f46032c7eb9f07b00",
   },
-  20260723001300: {
+  "20260723001300": {
     byteProvenance: "UNAVAILABLE",
     remoteStatementCount: 1,
     digest: "0ac1ee093c4fbeb9bbb1e8b19551f614c3dba2970c168f3e58edc5753f18d405",
   },
-  20260728001500: {
+  "20260728001500": {
     byteProvenance: "REPRESENTATION_EQUIVALENT",
     remoteStatementCount: 1,
     digest: "459a9698a31318759bf6ff605050224136e5dddf4c216646a46823b01177be52",
   },
-  20260728001600: {
+  "20260728001600": {
     byteProvenance: "EXACT",
     remoteStatementCount: 1,
     digest: "4823948c3389f094a88ddbf177db5dae3e90b0812447266ee42885ed4b25688f",
   },
-  20260801110000: {
+  "20260801110000": {
     byteProvenance: "UNAVAILABLE",
     remoteStatementCount: 79,
     digest: "c37232cbc2a041fd58bd7d8cefc4ff3a0e27ce3c415d0d03c33e0b2fe60856e4",
   },
-  20260801152049: {
+  "20260801152049": {
     byteProvenance: "UNAVAILABLE",
     remoteStatementCount: 1,
     digest: "d5a6a68f267af3ca55822a347211292224ad73a21551720bc128786a56349b72",
@@ -582,10 +552,8 @@ function canonicalMigrationSourceBytes(buffer) {
     .replace(/\r/g, "\n");
   return Buffer.from(canonicalText, "utf8");
 }
-const canonicalMigrationSourceSha256 = (buffer) =>
-  sha256(canonicalMigrationSourceBytes(buffer));
-const read = (relativePath) =>
-  readFileSync(path.join(ROOT, relativePath), "utf8");
+const canonicalMigrationSourceSha256 = (buffer) => sha256(canonicalMigrationSourceBytes(buffer));
+const read = (relativePath) => readFileSync(path.join(ROOT, relativePath), "utf8");
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 
@@ -594,10 +562,7 @@ function walk(relativeDirectory) {
   if (!existsSync(absoluteDirectory)) return [];
   const found = [];
   for (const entry of readdirSync(absoluteDirectory, { withFileTypes: true })) {
-    const relativePath = path.posix.join(
-      relativeDirectory.replaceAll("\\", "/"),
-      entry.name,
-    );
+    const relativePath = path.posix.join(relativeDirectory.replaceAll("\\", "/"), entry.name);
     if (entry.isDirectory()) found.push(...walk(relativePath));
     if (entry.isFile()) found.push(relativePath);
   }
@@ -607,17 +572,13 @@ function walk(relativeDirectory) {
 function loadState() {
   const manifestText = read(MANIFEST_PATH);
   const extensionText = read(EXTENSION_PATH);
-  const migrationFiles = readdirSync(path.join(ROOT, "supabase/migrations"), {
-    withFileTypes: true,
-  })
+  const migrationFiles = readdirSync(path.join(ROOT, "supabase/migrations"), { withFileTypes: true })
     .filter((entry) => entry.isFile())
     .map((entry) => entry.name)
     .sort();
   const migrations = migrationFiles.map((filename) => {
     const match = /^(\d{14})_(.+)\.sql$/.exec(filename);
-    const bytes = readFileSync(
-      path.join(ROOT, "supabase/migrations", filename),
-    );
+    const bytes = readFileSync(path.join(ROOT, "supabase/migrations", filename));
     return {
       filename,
       version: match?.[1] ?? null,
@@ -631,10 +592,7 @@ function loadState() {
   const stagingHistorySqlSha256 = Object.fromEntries(
     stagingHistoryFiles
       .filter((file) => file.toLowerCase().endsWith(".sql"))
-      .map((file) => [
-        path.posix.basename(file),
-        sha256(readFileSync(path.join(ROOT, file))),
-      ]),
+      .map((file) => [path.posix.basename(file), sha256(readFileSync(path.join(ROOT, file)))]),
   );
 
   return {
@@ -645,27 +603,18 @@ function loadState() {
     baselineSha: sha256(readFileSync(path.join(ROOT, BASELINE_PATH))),
     targetExists: existsSync(path.join(ROOT, TARGET_PATH)),
     targetSha: sha256(readFileSync(path.join(ROOT, TARGET_PATH))),
-    targetCanonicalSha: canonicalMigrationSourceSha256(
-      readFileSync(path.join(ROOT, TARGET_PATH)),
-    ),
+    targetCanonicalSha: canonicalMigrationSourceSha256(readFileSync(path.join(ROOT, TARGET_PATH))),
     // One on-disk record per pinned post-anchor migration, keyed by version, so
     // every SHA assertion below stays an exact per-migration identity check.
-    postAnchorOnDisk: Object.fromEntries(
-      POST_ANCHOR_ALL.map((m) => {
-        const full = path.join(ROOT, m.path);
-        const present = existsSync(full);
-        return [
-          m.version,
-          {
-            exists: present,
-            sha: present ? sha256(readFileSync(full)) : null,
-            canonicalSha: present
-              ? canonicalMigrationSourceSha256(readFileSync(full))
-              : null,
-          },
-        ];
-      }),
-    ),
+    postAnchorOnDisk: Object.fromEntries(POST_ANCHOR_ALL.map((m) => {
+      const full = path.join(ROOT, m.path);
+      const present = existsSync(full);
+      return [m.version, {
+        exists: present,
+        sha: present ? sha256(readFileSync(full)) : null,
+        canonicalSha: present ? canonicalMigrationSourceSha256(readFileSync(full)) : null,
+      }];
+    })),
     s1Exists: existsSync(path.join(ROOT, S1_PATH)),
     s1: read(S1_PATH),
     governance: read(GOVERNANCE_PATH),
@@ -676,661 +625,345 @@ function loadState() {
     stagingHistoryFiles,
     stagingHistorySqlSha256,
     reconciliationDoc: read(RECONCILIATION_DOC_PATH),
-    governanceFiles: [
-      MANIFEST_PATH,
-      EXTENSION_PATH,
-      S1_PATH,
-      GOVERNANCE_PATH,
-      README_PATH,
-      APPLICATION_REPORT_PATH,
-      RECONCILIATION_DOC_PATH,
-    ].map((file) => ({ file, text: read(file) })),
+    governanceFiles: [MANIFEST_PATH, EXTENSION_PATH, S1_PATH, GOVERNANCE_PATH, README_PATH, APPLICATION_REPORT_PATH, RECONCILIATION_DOC_PATH]
+      .map((file) => ({ file, text: read(file) })),
   };
 }
 
 function validateState(state) {
   const results = [];
-  const check = (name, passed, detail = "") =>
-    results.push({ name, passed: Boolean(passed), detail });
+  const check = (name, passed, detail = "") => results.push({ name, passed: Boolean(passed), detail });
   const manifest = state.manifest;
   const extension = state.extension;
-  const extensionRecords = Array.isArray(extension?.records)
-    ? extension.records
-    : [];
-  const supersededLegacyPins = Array.isArray(extension?.supersededLegacyPins)
-    ? extension.supersededLegacyPins
-    : [];
-  const supersededVersions = new Set(
-    supersededLegacyPins.map((record) => record.legacyVersion),
-  );
-  const validMigrations = state.migrations.filter(
-    (record) => !record.malformed,
-  );
+  const extensionRecords = Array.isArray(extension?.records) ? extension.records : [];
+  const supersededLegacyPins = Array.isArray(extension?.supersededLegacyPins) ? extension.supersededLegacyPins : [];
+  const supersededVersions = new Set(supersededLegacyPins.map((record) => record.legacyVersion));
+  const validMigrations = state.migrations.filter((record) => !record.malformed);
   const versions = validMigrations.map((record) => record.version);
-  const duplicates = [
-    ...new Set(
-      versions.filter((version, index) => versions.indexOf(version) !== index),
-    ),
-  ];
-  const preBaseline = validMigrations.filter(
-    (record) => record.version < BASELINE_VERSION,
-  );
-  const postByVersion = new Map(
-    manifest.postBaselineApplied.map((record) => [record.version, record]),
-  );
-  const localByVersion = new Map(
-    validMigrations.map((record) => [record.version, record]),
-  );
-  const extensionByVersion = new Map(
-    extensionRecords.map((record) => [record.version, record]),
-  );
-  const expectedPreRecords = preBaseline.map(
-    ({ version, filename, sha256: hash }) => ({
-      version,
-      filename,
-      sha256: hash,
-    }),
-  );
+  const duplicates = [...new Set(versions.filter((version, index) => versions.indexOf(version) !== index))];
+  const preBaseline = validMigrations.filter((record) => record.version < BASELINE_VERSION);
+  const postByVersion = new Map(manifest.postBaselineApplied.map((record) => [record.version, record]));
+  const localByVersion = new Map(validMigrations.map((record) => [record.version, record]));
+  const extensionByVersion = new Map(extensionRecords.map((record) => [record.version, record]));
+  const expectedPreRecords = preBaseline.map(({ version, filename, sha256: hash }) => ({ version, filename, sha256: hash }));
   const newestVersion = [...versions].sort().at(-1);
   const currentPostAnchorOrder = [
     ...POST_ANCHOR_ORDER.filter((version) => !supersededVersions.has(version)),
     ...extensionRecords.map((record) => record.version),
   ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-  const expectedLiveMigrationCount =
-    MIGRATION_COUNT - supersededLegacyPins.length + extensionRecords.length;
-  const expectedCurrentPostAnchorCount =
-    POST_ANCHOR_ORDER.length -
-    supersededLegacyPins.length +
-    extensionRecords.length;
+  const expectedLiveMigrationCount = MIGRATION_COUNT - supersededLegacyPins.length + extensionRecords.length;
+  const expectedCurrentPostAnchorCount = POST_ANCHOR_ORDER.length - supersededLegacyPins.length + extensionRecords.length;
 
-  check(
-    "manifest parses with manifestVersion=1",
-    manifest.manifestVersion === 1,
-  );
-  check(
-    "manifest scope is source-only G1",
-    manifest.scope?.phase === "QF-MVP-50.2C-S2-G1" &&
-      manifest.scope?.databaseMutationAuthorized === false,
-  );
-  check(
-    "post-G1 extension ledger is explicit and non-authorizing",
+  check("manifest parses with manifestVersion=1", manifest.manifestVersion === 1);
+  check("manifest scope is source-only G1", manifest.scope?.phase === "QF-MVP-50.2C-S2-G1" && manifest.scope?.databaseMutationAuthorized === false);
+  check("post-G1 extension ledger is explicit and non-authorizing",
     extension?.manifestVersion === 1 &&
-      extension?.purpose === "POST_G1_EXPLICIT_MIGRATION_PIN_EXTENSION" &&
-      extension?.databaseMutationAuthorized === false &&
-      extension?.productionDeploymentAuthorized === false &&
-      extension?.safety?.exactPinsRequired === true &&
-      extension?.safety?.unlistedMigrationForbidden === true &&
-      extension?.safety?.hashDriftForbidden === true &&
-      extension?.safety?.genericFutureMigrationAllowanceForbidden === true &&
-      extension?.safety?.legacyManifestRewritten === false,
-  );
-  check(
-    "post-G1 extension project identities are exact",
-    extension?.evidenceProjects?.staging?.projectRef ===
-      "uckafzuochmbvtiodmcl" &&
-      extension?.evidenceProjects?.production?.projectRef ===
-        "yqpgcsduqbxulrlzwzap",
-  );
-  check(
-    "post-G1 extension records are unique, exact and hash-pinned",
+    extension?.purpose === "POST_G1_EXPLICIT_MIGRATION_PIN_EXTENSION" &&
+    extension?.databaseMutationAuthorized === false &&
+    extension?.productionDeploymentAuthorized === false &&
+    extension?.safety?.exactPinsRequired === true &&
+    extension?.safety?.unlistedMigrationForbidden === true &&
+    extension?.safety?.hashDriftForbidden === true &&
+    extension?.safety?.genericFutureMigrationAllowanceForbidden === true &&
+    extension?.safety?.legacyManifestRewritten === false);
+  check("post-G1 extension project identities are exact",
+    extension?.evidenceProjects?.staging?.projectRef === "uckafzuochmbvtiodmcl" &&
+    extension?.evidenceProjects?.production?.projectRef === "yqpgcsduqbxulrlzwzap");
+  check("post-G1 extension records are unique, exact and hash-pinned",
     extensionRecords.length === 33 &&
-      new Set(extensionRecords.map((record) => record.version)).size ===
-        extensionRecords.length &&
-      extensionRecords.every((record) => {
-        const local = localByVersion.get(record.version);
-        const sourcePinnedEvidence = new Map([
-          ["20260929154156", "SOURCE_PIN_CREATED_2026-09-29_BEFORE_DEPLOYMENT"],
-          ["20261001144025", "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"],
-          ["20261001153000", "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"],
-          ["20261001154500", "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"],
-          ["20261001165000", "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"],
-          ["20261003070000", "SOURCE_PIN_CREATED_2026-10-03_BEFORE_DEPLOYMENT"],
-        ]);
-        const allowedSourcePin = sourcePinnedEvidence.get(record.version);
-        return (
-          local?.version === record.version &&
-          local?.name === record.name &&
-          local?.filename === record.filename &&
-          record.path === `supabase/migrations/${record.filename}` &&
-          local?.sha256 === record.canonicalSha256 &&
-          (record.evidence ===
-            "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29" ||
-            ([
-              "20261002040748",
-              "20261002043238",
-              "20261002044054",
-              "20261002045022",
-              "20261002052224",
-            ].includes(record.version) &&
-              record.evidence ===
-                "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-02" &&
-              record.exactVersionPresence?.staging === true &&
-              record.exactVersionPresence?.production === false) ||
-            (record.version === "20261002071500" &&
-              record.evidence ===
-                "FIRST_PARTY_SUPABASE_MCP_STAGING_SCHEMA_AUDIT_2026-10-02" &&
-              record.exactVersionPresence?.staging === false &&
-              record.exactVersionPresence?.production === false &&
-              record.observedStagingAppliedVersion === "20261002080447" &&
-              record.stagingSemanticApplication ===
-                "EARLIER_DRAFT_RECONCILED_BY_20261002090000" &&
-              record.reconciledBySourceVersion === "20261002090000" &&
-              record.reconciliationEvidence ===
-                "FIRST_PARTY_SUPABASE_MCP_STAGING_RECONCILIATION_2026-10-02" &&
-              record.observedProductionAppliedVersion === "20261002102901" &&
-              record.productionSemanticApplication === "PROVEN" &&
-              record.productionEvidence ===
-                "FIRST_PARTY_SUPABASE_MCP_PRODUCTION_SCHEMA_AUDIT_2026-10-02") ||
-            (record.version === "20261002090000" &&
-              record.evidence ===
-                "FIRST_PARTY_SUPABASE_MCP_STAGING_APPLY_ROLLBACK_CANARY_2026-10-02" &&
-              record.exactVersionPresence?.staging === false &&
-              record.exactVersionPresence?.production === false &&
-              record.stagingSemanticApplication === "PROVEN" &&
-              Array.isArray(record.observedStagingAppliedVersions) &&
-              JSON.stringify(record.observedStagingAppliedVersions) ===
-                JSON.stringify(["20261002083321", "20261002083346"]) &&
-              record.stagingApplyReplayCount === 2 &&
-              record.stagingCanary?.mode === "ROLLBACK_ONLY" &&
-              record.stagingCanary?.comparableVendorCount === 3 &&
-              record.stagingCanary?.fairSharePerDelivery === 0.333333 &&
-              record.stagingCanary?.firstDeliveryBalances?.deliveredVendor ===
-                -0.666667 &&
-              record.stagingCanary?.firstDeliveryBalances?.missedPeer1 ===
-                0.333333 &&
-              record.stagingCanary?.firstDeliveryBalances?.missedPeer2 ===
-                0.333333 &&
-              record.stagingCanary?.firstDeliveryBalances?.fartherBand === 0 &&
-              record.stagingCanary?.rowsAfterRollback?.events === 0 &&
-              record.stagingCanary?.legacyAccrualServiceRoleExecute === false &&
-              record.stagingCanary?.browserConsumeExecute === false &&
-              record.stagingCanary?.serviceConsumeExecute === true &&
-              record.observedProductionAppliedVersion === "20261002102915" &&
-              record.productionSemanticApplication === "PROVEN" &&
-              record.productionEvidence ===
-                "FIRST_PARTY_SUPABASE_MCP_PRODUCTION_APPLY_ROLLBACK_CANARY_2026-10-02" &&
-              record.productionRuntimeReleaseSha ===
-                "1dd9eb74bdd644c9633e1da5c3d0ac8393d2b382" &&
-              record.productionCanary?.mode === "ROLLBACK_ONLY" &&
-              record.productionCanary?.snapshot === "applied" &&
-              record.productionCanary?.snapshotReplay === "already_applied" &&
-              record.productionCanary?.consume === "applied" &&
-              record.productionCanary?.consumeReplay === "already_applied" &&
-              record.productionCanary?.comparableVendorCount === 3 &&
-              record.productionCanary?.fairSharePerDelivery === 0.333333 &&
-              record.productionCanary?.firstDeliveryBalances
-                ?.deliveredVendor === -0.666667 &&
-              record.productionCanary?.firstDeliveryBalances?.missedPeer1 ===
-                0.333333 &&
-              record.productionCanary?.firstDeliveryBalances?.missedPeer2 ===
-                0.333333 &&
-              record.productionCanary?.firstDeliveryBalances?.fartherBand ===
-                0 &&
-              record.productionCanary?.restoredBalances?.deliveredVendor ===
-                0 &&
-              record.productionCanary?.restoredBalances?.missedPeer1 === 0 &&
-              record.productionCanary?.restoredBalances?.missedPeer2 === 0 &&
-              record.productionCanary?.restoredBalances?.fartherBand === 0 &&
-              record.productionCanary?.rowsAfterRollback?.opportunities === 0 &&
-              record.productionCanary?.rowsAfterRollback?.candidates === 0 &&
-              record.productionCanary?.rowsAfterRollback?.fairness === 0 &&
-              record.productionCanary?.rowsAfterRollback?.events === 0 &&
-              record.productionCanary?.rowsAfterRollback?.syntheticVendors ===
-                0 &&
-              record.productionCanary?.rowsAfterRollback?.syntheticLeads ===
-                0 &&
-              record.productionCanary?.rowsAfterRollback
-                ?.syntheticAssignments === 0 &&
-              record.productionCanary?.browserSnapshotExecute === false &&
-              record.productionCanary?.serviceSnapshotExecute === true) ||
-            (record.version === "20261002091500" &&
-              record.evidence ===
-                "FIRST_PARTY_SUPABASE_MCP_STAGING_INDEX_APPLY_2026-10-02" &&
-              record.exactVersionPresence?.staging === false &&
-              record.exactVersionPresence?.production === false &&
-              record.stagingSemanticApplication === "PROVEN" &&
-              Array.isArray(record.observedStagingAppliedVersions) &&
-              JSON.stringify(record.observedStagingAppliedVersions) ===
-                JSON.stringify(["20261002083936", "20261002085216"]) &&
-              record.stagingApplyReplayCount === 2 &&
-              record.observedProductionAppliedVersion === "20261002102931" &&
-              record.productionSemanticApplication === "PROVEN" &&
-              record.productionEvidence ===
-                "FIRST_PARTY_SUPABASE_MCP_PRODUCTION_INDEX_AUDIT_2026-10-02") ||
-            (record.version === "20261003064500" &&
-              record.evidence ===
-                "FIRST_PARTY_SUPABASE_MCP_STAGING_APPLY_ROLLBACK_CANARY_2026-10-03" &&
-              record.exactVersionPresence?.staging === false &&
-              record.exactVersionPresence?.production === false &&
-              record.stagingSemanticApplication === "PROVEN" &&
-              record.observedStagingAppliedVersion === "20261003034807" &&
-              record.stagingApplyReplayCount === 1 &&
-              record.stagingCanary?.mode === "ROLLBACK_ONLY" &&
-              record.stagingCanary?.intakeIdempotent === true &&
-              record.stagingCanary?.hashedWhatsAppIdentityOnly === true &&
-              record.stagingCanary?.rowsAfterRollback?.intakes === 0 &&
-              record.stagingCanary?.rowsAfterRollback?.registrationIntents ===
-                0 &&
-              record.stagingCanary?.rowsAfterRollback?.conversionLinks === 0 &&
-              record.stagingCanary?.rowsAfterRollback?.canaryProspects === 0 &&
-              record.stagingCanary?.rowsAfterRollback?.canaryEvents === 0) ||
-            (record.version === "20261003070000" &&
-              record.evidence ===
-                "FIRST_PARTY_SUPABASE_MCP_STAGING_INDEX_APPLY_2026-10-03" &&
-              record.exactVersionPresence?.staging === false &&
-              record.exactVersionPresence?.production === false &&
-              record.stagingSemanticApplication === "PROVEN" &&
-              record.observedStagingAppliedVersion === "20261003040425" &&
-              record.stagingApplyReplayCount === 1 &&
-              record.stagingAdvisorClosure?.indexesPresent === 4 &&
-              record.stagingAdvisorClosure
-                ?.targetForeignKeyWarningsRemaining === 0) ||
-            (record.version === "20261003080000" &&
-              record.evidence ===
-                "FIRST_PARTY_SUPABASE_MCP_STAGING_APPLY_2026-10-03" &&
-              record.exactVersionPresence?.staging === false &&
-              record.exactVersionPresence?.production === false &&
-              record.stagingSemanticApplication === "PROVEN" &&
-              record.observedStagingAppliedVersion === "20261003072042" &&
-              record.stagingApplyReplayCount === 1) ||
-            (record.version === "20261003083000" &&
-              record.evidence ===
-                "FIRST_PARTY_SUPABASE_MCP_STAGING_APPLY_2026-10-03" &&
-              record.exactVersionPresence?.staging === false &&
-              record.exactVersionPresence?.production === false &&
-              record.stagingSemanticApplication === "PROVEN" &&
-              record.observedStagingAppliedVersion === "20261003072049" &&
-              record.stagingApplyReplayCount === 1) ||
-            (record.version === "20261003090000" &&
-              record.evidence ===
-                "FIRST_PARTY_SUPABASE_MCP_STAGING_FAIL_CLOSED_CANARY_2026-10-03" &&
-              record.exactVersionPresence?.staging === false &&
-              record.exactVersionPresence?.production === false &&
-              record.stagingSemanticApplication === "PROVEN" &&
-              record.observedStagingAppliedVersion === "20261003072056" &&
-              record.stagingApplyReplayCount === 1 &&
-              record.stagingCanary?.mode === "ROLLBACK_ONLY" &&
-              record.stagingCanary?.runtimeMode === "PAUSED" &&
-              record.stagingCanary?.discoveryClaimBlocked === true &&
-              record.stagingCanary?.dispatchReadyBlocked === true &&
-              record.stagingCanary?.allChannelsRuntimeEnabled === false &&
-              record.stagingCanary?.connectorsEnabled === 0 &&
-              record.stagingCanary?.cityPoliciesEnabled === 0 &&
-              record.stagingCanary?.followupPoliciesEnabled === 0 &&
-              record.stagingCanary?.allPhase2TablesRls === true &&
-              record.stagingCanary?.browserRoleExecute === false &&
-              record.stagingCanary?.serviceRoleExecute === true &&
-              record.stagingCanary?.rowsAfterRollback?.prospects === 0 &&
-              record.stagingCanary?.rowsAfterRollback?.discoveryRuns === 0 &&
-              record.stagingCanary?.rowsAfterRollback?.outreachJobs === 0) ||
-            (record.version === "20261003091000" &&
-              record.evidence ===
-                "FIRST_PARTY_SUPABASE_MCP_STAGING_PHASE2_INDEX_APPLY_2026-10-03" &&
-              record.exactVersionPresence?.staging === false &&
-              record.exactVersionPresence?.production === false &&
-              record.stagingSemanticApplication === "PROVEN" &&
-              record.observedStagingAppliedVersion === "20261003072655" &&
-              record.stagingApplyReplayCount === 1 &&
-              record.stagingAdvisorClosure?.indexesPresent === 3 &&
-              record.stagingAdvisorClosure
-                ?.targetForeignKeyWarningsRemaining === 0) ||
-            (record.version === "20261003081046" &&
-              record.evidence ===
-                "FIRST_PARTY_SUPABASE_MCP_STAGING_AAROHI_FULL_FK_INDEX_CLOSEOUT_2026-10-03" &&
-              record.exactVersionPresence?.staging === false &&
-              record.exactVersionPresence?.production === false &&
-              record.stagingSemanticApplication === "PROVEN" &&
-              record.observedStagingAppliedVersion === "20261003081215" &&
-              record.stagingApplyReplayCount === 1 &&
-              record.stagingAdvisorClosure?.indexesPresent === 17 &&
-              record.stagingAdvisorClosure
-                ?.targetForeignKeyWarningsRemaining === 0) ||
-            (allowedSourcePin !== undefined &&
-              record.evidence === allowedSourcePin &&
-              record.exactVersionPresence?.staging === false &&
-              record.exactVersionPresence?.production === false)) &&
-          typeof record.exactVersionPresence?.staging === "boolean" &&
-          typeof record.exactVersionPresence?.production === "boolean"
-        );
-      }),
-  );
-  check(
-    "legacy service-availability identity is explicitly superseded",
+    new Set(extensionRecords.map((record) => record.version)).size === extensionRecords.length &&
+    extensionRecords.every((record) => {
+      const local = localByVersion.get(record.version);
+      const sourcePinnedEvidence = new Map([
+        ["20260929154156", "SOURCE_PIN_CREATED_2026-09-29_BEFORE_DEPLOYMENT"],
+        ["20261001144025", "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"],
+        ["20261001153000", "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"],
+        ["20261001154500", "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"],
+        ["20261001165000", "SOURCE_PIN_CREATED_2026-10-01_BEFORE_DEPLOYMENT"],
+        ["20261003070000", "SOURCE_PIN_CREATED_2026-10-03_BEFORE_DEPLOYMENT"],
+      ]);
+      const allowedSourcePin = sourcePinnedEvidence.get(record.version);
+      return local?.version === record.version &&
+        local?.name === record.name &&
+        local?.filename === record.filename &&
+        record.path === `supabase/migrations/${record.filename}` &&
+        local?.sha256 === record.canonicalSha256 &&
+        (
+          record.evidence === "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-09-29" ||
+          (
+            ["20261002040748","20261002043238","20261002044054","20261002045022","20261002052224"].includes(record.version) &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-02" &&
+            record.exactVersionPresence?.staging === true &&
+            record.exactVersionPresence?.production === false
+          ) ||
+          (
+            record.version === "20261002071500" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_SCHEMA_AUDIT_2026-10-02" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.observedStagingAppliedVersion === "20261002080447" &&
+            record.stagingSemanticApplication === "EARLIER_DRAFT_RECONCILED_BY_20261002090000" &&
+            record.reconciledBySourceVersion === "20261002090000" &&
+            record.reconciliationEvidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_RECONCILIATION_2026-10-02" &&
+            record.observedProductionAppliedVersion === "20261002102901" &&
+            record.productionSemanticApplication === "PROVEN" &&
+            record.productionEvidence === "FIRST_PARTY_SUPABASE_MCP_PRODUCTION_SCHEMA_AUDIT_2026-10-02"
+          ) ||
+          (
+            record.version === "20261002090000" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_APPLY_ROLLBACK_CANARY_2026-10-02" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            Array.isArray(record.observedStagingAppliedVersions) &&
+            JSON.stringify(record.observedStagingAppliedVersions) === JSON.stringify(["20261002083321","20261002083346"]) &&
+            record.stagingApplyReplayCount === 2 &&
+            record.stagingCanary?.mode === "ROLLBACK_ONLY" &&
+            record.stagingCanary?.comparableVendorCount === 3 &&
+            record.stagingCanary?.fairSharePerDelivery === 0.333333 &&
+            record.stagingCanary?.firstDeliveryBalances?.deliveredVendor === -0.666667 &&
+            record.stagingCanary?.firstDeliveryBalances?.missedPeer1 === 0.333333 &&
+            record.stagingCanary?.firstDeliveryBalances?.missedPeer2 === 0.333333 &&
+            record.stagingCanary?.firstDeliveryBalances?.fartherBand === 0 &&
+            record.stagingCanary?.rowsAfterRollback?.events === 0 &&
+            record.stagingCanary?.legacyAccrualServiceRoleExecute === false &&
+            record.stagingCanary?.browserConsumeExecute === false &&
+            record.stagingCanary?.serviceConsumeExecute === true &&
+            record.observedProductionAppliedVersion === "20261002102915" &&
+            record.productionSemanticApplication === "PROVEN" &&
+            record.productionEvidence === "FIRST_PARTY_SUPABASE_MCP_PRODUCTION_APPLY_ROLLBACK_CANARY_2026-10-02" &&
+            record.productionRuntimeReleaseSha === "1dd9eb74bdd644c9633e1da5c3d0ac8393d2b382" &&
+            record.productionCanary?.mode === "ROLLBACK_ONLY" &&
+            record.productionCanary?.snapshot === "applied" &&
+            record.productionCanary?.snapshotReplay === "already_applied" &&
+            record.productionCanary?.consume === "applied" &&
+            record.productionCanary?.consumeReplay === "already_applied" &&
+            record.productionCanary?.comparableVendorCount === 3 &&
+            record.productionCanary?.fairSharePerDelivery === 0.333333 &&
+            record.productionCanary?.firstDeliveryBalances?.deliveredVendor === -0.666667 &&
+            record.productionCanary?.firstDeliveryBalances?.missedPeer1 === 0.333333 &&
+            record.productionCanary?.firstDeliveryBalances?.missedPeer2 === 0.333333 &&
+            record.productionCanary?.firstDeliveryBalances?.fartherBand === 0 &&
+            record.productionCanary?.restoredBalances?.deliveredVendor === 0 &&
+            record.productionCanary?.restoredBalances?.missedPeer1 === 0 &&
+            record.productionCanary?.restoredBalances?.missedPeer2 === 0 &&
+            record.productionCanary?.restoredBalances?.fartherBand === 0 &&
+            record.productionCanary?.rowsAfterRollback?.opportunities === 0 &&
+            record.productionCanary?.rowsAfterRollback?.candidates === 0 &&
+            record.productionCanary?.rowsAfterRollback?.fairness === 0 &&
+            record.productionCanary?.rowsAfterRollback?.events === 0 &&
+            record.productionCanary?.rowsAfterRollback?.syntheticVendors === 0 &&
+            record.productionCanary?.rowsAfterRollback?.syntheticLeads === 0 &&
+            record.productionCanary?.rowsAfterRollback?.syntheticAssignments === 0 &&
+            record.productionCanary?.browserSnapshotExecute === false &&
+            record.productionCanary?.serviceSnapshotExecute === true
+          ) ||
+          (
+            record.version === "20261002091500" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_INDEX_APPLY_2026-10-02" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            Array.isArray(record.observedStagingAppliedVersions) &&
+            JSON.stringify(record.observedStagingAppliedVersions) === JSON.stringify(["20261002083936","20261002085216"]) &&
+            record.stagingApplyReplayCount === 2 &&
+            record.observedProductionAppliedVersion === "20261002102931" &&
+            record.productionSemanticApplication === "PROVEN" &&
+            record.productionEvidence === "FIRST_PARTY_SUPABASE_MCP_PRODUCTION_INDEX_AUDIT_2026-10-02"
+          ) ||
+          (
+            record.version === "20261003064500" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_APPLY_ROLLBACK_CANARY_2026-10-03" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            record.observedStagingAppliedVersion === "20261003034807" &&
+            record.stagingApplyReplayCount === 1 &&
+            record.stagingCanary?.mode === "ROLLBACK_ONLY" &&
+            record.stagingCanary?.intakeIdempotent === true &&
+            record.stagingCanary?.hashedWhatsAppIdentityOnly === true &&
+            record.stagingCanary?.rowsAfterRollback?.intakes === 0 &&
+            record.stagingCanary?.rowsAfterRollback?.registrationIntents === 0 &&
+            record.stagingCanary?.rowsAfterRollback?.conversionLinks === 0 &&
+            record.stagingCanary?.rowsAfterRollback?.canaryProspects === 0 &&
+            record.stagingCanary?.rowsAfterRollback?.canaryEvents === 0
+          ) ||
+          (
+            record.version === "20261003070000" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_INDEX_APPLY_2026-10-03" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            record.observedStagingAppliedVersion === "20261003040425" &&
+            record.stagingApplyReplayCount === 1 &&
+            record.stagingAdvisorClosure?.indexesPresent === 4 &&
+            record.stagingAdvisorClosure?.targetForeignKeyWarningsRemaining === 0
+          ) ||
+          (
+            record.version === "20261003080000" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_APPLY_2026-10-03" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            record.observedStagingAppliedVersion === "20261003072042" &&
+            record.stagingApplyReplayCount === 1
+          ) ||
+          (
+            record.version === "20261003083000" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_APPLY_2026-10-03" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            record.observedStagingAppliedVersion === "20261003072049" &&
+            record.stagingApplyReplayCount === 1
+          ) ||
+          (
+            record.version === "20261003090000" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_FAIL_CLOSED_CANARY_2026-10-03" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            record.observedStagingAppliedVersion === "20261003072056" &&
+            record.stagingApplyReplayCount === 1 &&
+            record.stagingCanary?.mode === "ROLLBACK_ONLY" &&
+            record.stagingCanary?.runtimeMode === "PAUSED" &&
+            record.stagingCanary?.discoveryClaimBlocked === true &&
+            record.stagingCanary?.dispatchReadyBlocked === true &&
+            record.stagingCanary?.allChannelsRuntimeEnabled === false &&
+            record.stagingCanary?.connectorsEnabled === 0 &&
+            record.stagingCanary?.cityPoliciesEnabled === 0 &&
+            record.stagingCanary?.followupPoliciesEnabled === 0 &&
+            record.stagingCanary?.allPhase2TablesRls === true &&
+            record.stagingCanary?.browserRoleExecute === false &&
+            record.stagingCanary?.serviceRoleExecute === true &&
+            record.stagingCanary?.rowsAfterRollback?.prospects === 0 &&
+            record.stagingCanary?.rowsAfterRollback?.discoveryRuns === 0 &&
+            record.stagingCanary?.rowsAfterRollback?.outreachJobs === 0
+          ) ||
+          (
+            record.version === "20261003091000" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_PHASE2_INDEX_APPLY_2026-10-03" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            record.observedStagingAppliedVersion === "20261003072655" &&
+            record.stagingApplyReplayCount === 1 &&
+            record.stagingAdvisorClosure?.indexesPresent === 3 &&
+            record.stagingAdvisorClosure?.targetForeignKeyWarningsRemaining === 0
+          ) ||
+          (
+            record.version === "20261003081046" &&
+            record.evidence === "FIRST_PARTY_SUPABASE_MCP_STAGING_AAROHI_FULL_FK_INDEX_CLOSEOUT_2026-10-03" &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false &&
+            record.stagingSemanticApplication === "PROVEN" &&
+            record.observedStagingAppliedVersion === "20261003081215" &&
+            record.stagingApplyReplayCount === 1 &&
+            record.stagingAdvisorClosure?.indexesPresent === 17 &&
+            record.stagingAdvisorClosure?.targetForeignKeyWarningsRemaining === 0
+          ) ||
+          (
+            allowedSourcePin !== undefined &&
+            record.evidence === allowedSourcePin &&
+            record.exactVersionPresence?.staging === false &&
+            record.exactVersionPresence?.production === false
+          )
+        ) &&
+        typeof record.exactVersionPresence?.staging === "boolean" &&
+        typeof record.exactVersionPresence?.production === "boolean";
+    }));
+  check("legacy service-availability identity is explicitly superseded",
     supersededLegacyPins.length === 1 &&
-      supersededLegacyPins[0]?.legacyVersion === "20260915120000" &&
-      supersededLegacyPins[0]?.legacyName ===
-        "qf_jarvis_service_availability" &&
-      supersededLegacyPins[0]?.replacementVersion === "20260926035801" &&
-      supersededLegacyPins[0]?.replacementName ===
-        "qf_jarvis_service_availability_deploy" &&
-      supersededLegacyPins[0]?.replacementExactVersionPresence?.staging ===
-        true &&
-      supersededLegacyPins[0]?.replacementExactVersionPresence?.production ===
-        true &&
-      supersededLegacyPins[0]?.classification ===
-        "SUPERSEDED_SOURCE_IDENTITY_DEPLOYED_UNDER_REPLACEMENT_VERSION",
-  );
-  check(
-    "migration source hash policy exists",
-    typeof manifest.migrationSourceHashPolicy === "object" &&
-      manifest.migrationSourceHashPolicy !== null,
-  );
-  check(
-    "migration source hash algorithm is sha256",
-    manifest.migrationSourceHashPolicy?.algorithm === "sha256",
-  );
-  check(
-    "migration source canonicalization is UTF8_LINE_ENDINGS_TO_LF",
-    manifest.migrationSourceHashPolicy?.canonicalization ===
-      "UTF8_LINE_ENDINGS_TO_LF",
-  );
-  check(
-    "migration source hash scope is exact",
-    manifest.migrationSourceHashPolicy?.scope === "supabase/migrations/*.sql",
-  );
-  check(
-    "migration source hash policy preserves BOM",
-    manifest.migrationSourceHashPolicy?.preserveBom === true,
-  );
-  check(
-    "migration source hash policy preserves final-newline state",
-    manifest.migrationSourceHashPolicy?.preserveFinalNewlineState === true,
-  );
-  check(
-    "migration source hash policy preserves all non-line-ending bytes",
-    manifest.migrationSourceHashPolicy?.preserveAllNonLineEndingBytes === true,
-  );
+    supersededLegacyPins[0]?.legacyVersion === "20260915120000" &&
+    supersededLegacyPins[0]?.legacyName === "qf_jarvis_service_availability" &&
+    supersededLegacyPins[0]?.replacementVersion === "20260926035801" &&
+    supersededLegacyPins[0]?.replacementName === "qf_jarvis_service_availability_deploy" &&
+    supersededLegacyPins[0]?.replacementExactVersionPresence?.staging === true &&
+    supersededLegacyPins[0]?.replacementExactVersionPresence?.production === true &&
+    supersededLegacyPins[0]?.classification === "SUPERSEDED_SOURCE_IDENTITY_DEPLOYED_UNDER_REPLACEMENT_VERSION");
+  check("migration source hash policy exists", typeof manifest.migrationSourceHashPolicy === "object" && manifest.migrationSourceHashPolicy !== null);
+  check("migration source hash algorithm is sha256", manifest.migrationSourceHashPolicy?.algorithm === "sha256");
+  check("migration source canonicalization is UTF8_LINE_ENDINGS_TO_LF", manifest.migrationSourceHashPolicy?.canonicalization === "UTF8_LINE_ENDINGS_TO_LF");
+  check("migration source hash scope is exact", manifest.migrationSourceHashPolicy?.scope === "supabase/migrations/*.sql");
+  check("migration source hash policy preserves BOM", manifest.migrationSourceHashPolicy?.preserveBom === true);
+  check("migration source hash policy preserves final-newline state", manifest.migrationSourceHashPolicy?.preserveFinalNewlineState === true);
+  check("migration source hash policy preserves all non-line-ending bytes", manifest.migrationSourceHashPolicy?.preserveAllNonLineEndingBytes === true);
   const lfFixture = Buffer.from("SELECT 1;\n-- x\n", "utf8");
   const crlfFixture = Buffer.from("SELECT 1;\r\n-- x\r\n", "utf8");
   const loneCrFixture = Buffer.from("SELECT 1;\r-- x\r", "utf8");
-  check(
-    "canonical migration hash equates LF and CRLF",
-    canonicalMigrationSourceSha256(lfFixture) ===
-      canonicalMigrationSourceSha256(crlfFixture),
-  );
-  check(
-    "canonical migration hash equates LF and lone CR",
-    canonicalMigrationSourceSha256(lfFixture) ===
-      canonicalMigrationSourceSha256(loneCrFixture),
-  );
-  check(
-    "canonical migration hash preserves non-line-ending changes",
-    canonicalMigrationSourceSha256(Buffer.from("SELECT 1", "utf8")) !==
-      canonicalMigrationSourceSha256(Buffer.from("SELECT 2", "utf8")),
-  );
-  check(
-    "canonical migration hash preserves final-newline presence",
-    canonicalMigrationSourceSha256(Buffer.from("SELECT 1\n", "utf8")) !==
-      canonicalMigrationSourceSha256(Buffer.from("SELECT 1", "utf8")),
-  );
-  check(
-    "canonical migration hash preserves UTF-8 BOM",
-    canonicalMigrationSourceSha256(Buffer.from("\ufeffSELECT 1\n", "utf8")) !==
-      canonicalMigrationSourceSha256(Buffer.from("SELECT 1\n", "utf8")),
-  );
-  check(
-    "staging environment identity is exact",
-    manifest.environment?.name === "QuickFurno Staging" &&
-      manifest.environment?.projectRef === "uckafzuochmbvtiodmcl",
-  );
-  check(
-    "forbidden project refs are exact",
-    same(manifest.environment?.forbiddenProjectRefs, {
-      production: "yqpgcsduqbxulrlzwzap",
-      jarvis: "coilipywdvxklewquqvv",
-      onedecore: "lpurlfmpvriyvpkujvyl",
-    }),
-  );
-  check(
-    "baseline source path exists",
-    state.baselineExists && manifest.baseline?.sourcePath === BASELINE_PATH,
-  );
-  check(
-    "baseline tracked SHA is exact",
-    state.baselineSha === BASELINE_SHA &&
-      manifest.baseline?.trackedSourceSha256 === BASELINE_SHA,
-  );
-  check(
-    "baseline source-schema SHA is preserved",
-    manifest.baseline?.sourceSchemaSha256 ===
-      "269c9265d32a9f85488d76bfcf9dd528bd9b6b915bafb09ebb024a6bde182a2f",
-  );
-  check(
-    "baseline Git blob and revision count are exact",
-    manifest.baseline?.gitBlobSha ===
-      "65e56c0419a986cc14a5abcfb184dd4a82625630" &&
-      manifest.baseline?.contentRevisionCount === 1,
-  );
-  check(
-    "historical checksum and correction status are exact",
-    manifest.baseline?.historicalDocumentedSha256 === HISTORICAL_SHA &&
-      manifest.baseline?.historicalDocumentedShaStatus ===
-        "DOCUMENTATION_ERROR_UNREPRODUCIBLE",
-  );
-  check(
-    "baseline remote statement identity is exact",
-    manifest.baseline?.remoteStatementCount === 821 &&
-      manifest.baseline?.remoteOrderedStatementDigestSha256 ===
-        "231e163068b0608aa53f09d97ded9c85f6b69d37d07ccd15de07d2c8c2aab581",
-  );
-  check(
-    "baseline remains undiscoverable by migration chain",
-    manifest.baseline?.migrationChainDiscoverable === false &&
-      manifest.baseline?.normalDbPushMustNeverDiscoverBaseline === true &&
-      !manifest.baseline?.sourcePath.startsWith("supabase/migrations/"),
-  );
-  check(
-    "external apply-workspace bytes are recorded unavailable",
-    manifest.baseline?.externalApplyWorkspaceBytesRetained === false,
-  );
-  check(
-    "baseline version is absent under migrations",
-    !state.migrations.some((record) => record.version === BASELINE_VERSION),
-  );
-  check(
-    `direct migration count matches legacy pins plus explicit post-G1 extension (${expectedLiveMigrationCount})`,
+  check("canonical migration hash equates LF and CRLF", canonicalMigrationSourceSha256(lfFixture) === canonicalMigrationSourceSha256(crlfFixture));
+  check("canonical migration hash equates LF and lone CR", canonicalMigrationSourceSha256(lfFixture) === canonicalMigrationSourceSha256(loneCrFixture));
+  check("canonical migration hash preserves non-line-ending changes", canonicalMigrationSourceSha256(Buffer.from("SELECT 1", "utf8")) !== canonicalMigrationSourceSha256(Buffer.from("SELECT 2", "utf8")));
+  check("canonical migration hash preserves final-newline presence", canonicalMigrationSourceSha256(Buffer.from("SELECT 1\n", "utf8")) !== canonicalMigrationSourceSha256(Buffer.from("SELECT 1", "utf8")));
+  check("canonical migration hash preserves UTF-8 BOM", canonicalMigrationSourceSha256(Buffer.from("\ufeffSELECT 1\n", "utf8")) !== canonicalMigrationSourceSha256(Buffer.from("SELECT 1\n", "utf8")));
+  check("staging environment identity is exact", manifest.environment?.name === "QuickFurno Staging" && manifest.environment?.projectRef === "uckafzuochmbvtiodmcl");
+  check("forbidden project refs are exact", same(manifest.environment?.forbiddenProjectRefs, {
+    production: "yqpgcsduqbxulrlzwzap", jarvis: "coilipywdvxklewquqvv", onedecore: "lpurlfmpvriyvpkujvyl",
+  }));
+  check("baseline source path exists", state.baselineExists && manifest.baseline?.sourcePath === BASELINE_PATH);
+  check("baseline tracked SHA is exact", state.baselineSha === BASELINE_SHA && manifest.baseline?.trackedSourceSha256 === BASELINE_SHA);
+  check("baseline source-schema SHA is preserved", manifest.baseline?.sourceSchemaSha256 === "269c9265d32a9f85488d76bfcf9dd528bd9b6b915bafb09ebb024a6bde182a2f");
+  check("baseline Git blob and revision count are exact", manifest.baseline?.gitBlobSha === "65e56c0419a986cc14a5abcfb184dd4a82625630" && manifest.baseline?.contentRevisionCount === 1);
+  check("historical checksum and correction status are exact", manifest.baseline?.historicalDocumentedSha256 === HISTORICAL_SHA && manifest.baseline?.historicalDocumentedShaStatus === "DOCUMENTATION_ERROR_UNREPRODUCIBLE");
+  check("baseline remote statement identity is exact", manifest.baseline?.remoteStatementCount === 821 && manifest.baseline?.remoteOrderedStatementDigestSha256 === "231e163068b0608aa53f09d97ded9c85f6b69d37d07ccd15de07d2c8c2aab581");
+  check("baseline remains undiscoverable by migration chain", manifest.baseline?.migrationChainDiscoverable === false && manifest.baseline?.normalDbPushMustNeverDiscoverBaseline === true && !manifest.baseline?.sourcePath.startsWith("supabase/migrations/"));
+  check("external apply-workspace bytes are recorded unavailable", manifest.baseline?.externalApplyWorkspaceBytesRetained === false);
+  check("baseline version is absent under migrations", !state.migrations.some((record) => record.version === BASELINE_VERSION));
+  check(`direct migration count matches legacy pins plus explicit post-G1 extension (${expectedLiveMigrationCount})`,
     state.migrations.length === expectedLiveMigrationCount,
-    `actual=${state.migrations.length}`,
-  );
-  check(
-    "migration filenames are all well formed",
-    state.migrations.every((record) => !record.malformed),
-  );
-  check(
-    "migration timestamps have no duplicates",
-    duplicates.length === 0,
-    duplicates.join(","),
-  );
-  check(
-    "pre-baseline source count is 68",
-    preBaseline.length === 68,
-    `actual=${preBaseline.length}`,
-  );
-  check(
-    "pre-baseline manifest count is 68",
-    manifest.preBaselineChain?.count === 68 &&
-      manifest.preBaselineChain?.records?.length === 68,
-  );
-  check(
-    "pre-baseline manifest records exactly match source",
-    same(manifest.preBaselineChain?.records, expectedPreRecords),
-  );
-  check(
-    "pre-baseline classification is exact",
-    manifest.preBaselineChain?.classification ===
-      "PRE_BASELINE_CHAIN_INTENTIONALLY_SUPERSEDED_FOR_STAGING" &&
-      manifest.preBaselineChain?.semanticRole ===
-        "HISTORICAL_SOURCE_CHAIN_NOT_REMOTE_LEDGER_ENTRIES",
-  );
-  check(
-    "pre-baseline replay/repair/history insertion all fail closed",
-    manifest.preBaselineChain?.mustReplayOnStaging === false &&
-      manifest.preBaselineChain?.mustRepairAsApplied === false &&
-      manifest.preBaselineChain?.mustInsertIntoRemoteHistory === false,
-  );
-  check(
-    "post-baseline set is exactly the approved 18",
-    same(
-      manifest.postBaselineApplied.map((record) => record.version),
-      APPROVED_COMMON,
-    ),
-  );
-  check(
-    "all 18 post-baseline source files and hashes match",
-    APPROVED_COMMON.every((version) => {
-      const local = localByVersion.get(version);
-      const recorded = postByVersion.get(version);
-      return (
-        local &&
-        recorded &&
-        recorded.filename === local.filename &&
-        recorded.name === local.name &&
-        recorded.localSha256 === local.sha256
-      );
-    }),
-  );
-  check(
-    "all 18 ledger/semantic classifications are proven",
-    manifest.postBaselineApplied.every(
-      (record) =>
-        record.ledgerApplication === "PROVEN" &&
-        record.semanticApplication === "PROVEN",
-    ),
-  );
-  check(
-    "all 18 deployment blockers are false",
-    manifest.postBaselineApplied.every(
-      (record) => record.deploymentBlocker === false,
-    ),
-  );
-  check(
-    "six L3 remote counts/digests/byte classifications are exact",
-    Object.entries(L3_RESOLVED).every(([version, expected]) => {
-      const record = postByVersion.get(version);
-      return (
-        record?.byteProvenance === expected.byteProvenance &&
-        record?.remoteStatementCount === expected.remoteStatementCount &&
-        record?.remoteOrderedStatementDigestSha256 === expected.digest
-      );
-    }),
-  );
-  check(
-    "other 12 rows do not invent remote statement metadata",
-    manifest.postBaselineApplied
-      .filter((record) => !L3_RESOLVED[record.version])
-      .every(
-        (record) =>
-          !("remoteStatementCount" in record) &&
-          !("remoteOrderedStatementDigestSha256" in record) &&
-          !("byteProvenance" in record),
-      ),
-  );
-  check(
-    "anchor manifest identity is exact",
-    manifest.appliedAnchor?.version === TARGET_VERSION &&
-      manifest.appliedAnchor?.name ===
-        "qf_mvp_50_2c_lead_communication_recipient" &&
-      manifest.appliedAnchor?.path === TARGET_PATH,
-  );
-  check(
-    "anchor source exists and raw/canonical SHA are exact",
-    state.targetExists &&
-      state.targetSha === TARGET_SHA &&
-      state.targetCanonicalSha === TARGET_SHA &&
-      manifest.appliedAnchor?.sha256 === TARGET_SHA,
-  );
-  check(
-    "anchor operational status is APPLIED with imported D2-R1 evidence",
-    manifest.appliedAnchor?.operationalStatus === "APPLIED" &&
-      manifest.appliedAnchor?.appliedEvidenceMarker ===
-        APPLIED_EVIDENCE_MARKER &&
-      manifest.appliedAnchor?.appliedEvidenceType ===
-        "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD" &&
-      manifest.appliedAnchor?.remoteHistoryCountAfterApply === 20 &&
-      manifest.appliedAnchor?.appliedExactlyOnce === true,
-  );
-  check(
-    "anchor L3 observation is preserved as historical, not rewritten",
-    manifest.appliedAnchor?.remoteVersionStatusAtL3 === "ABSENT",
-  );
-  check(
-    "anchor documentation points to imported S1 evidence",
-    manifest.appliedAnchor?.documentationStatus ===
-      "SOURCE_CONTROLLED_PREFLIGHT_IMPORTED_BY_G1" &&
-      manifest.appliedAnchor?.preflightEvidencePath === S1_PATH,
-  );
-  check(
-    "anchor is present exactly once under migrations",
-    validMigrations.filter((record) => record.version === TARGET_VERSION)
-      .length === 1,
-  );
-  check(
-    "superseded pendingTarget block is gone",
-    manifest.pendingTarget === undefined,
-  );
+    `actual=${state.migrations.length}`);
+  check("migration filenames are all well formed", state.migrations.every((record) => !record.malformed));
+  check("migration timestamps have no duplicates", duplicates.length === 0, duplicates.join(","));
+  check("pre-baseline source count is 68", preBaseline.length === 68, `actual=${preBaseline.length}`);
+  check("pre-baseline manifest count is 68", manifest.preBaselineChain?.count === 68 && manifest.preBaselineChain?.records?.length === 68);
+  check("pre-baseline manifest records exactly match source", same(manifest.preBaselineChain?.records, expectedPreRecords));
+  check("pre-baseline classification is exact", manifest.preBaselineChain?.classification === "PRE_BASELINE_CHAIN_INTENTIONALLY_SUPERSEDED_FOR_STAGING" && manifest.preBaselineChain?.semanticRole === "HISTORICAL_SOURCE_CHAIN_NOT_REMOTE_LEDGER_ENTRIES");
+  check("pre-baseline replay/repair/history insertion all fail closed", manifest.preBaselineChain?.mustReplayOnStaging === false && manifest.preBaselineChain?.mustRepairAsApplied === false && manifest.preBaselineChain?.mustInsertIntoRemoteHistory === false);
+  check("post-baseline set is exactly the approved 18", same(manifest.postBaselineApplied.map((record) => record.version), APPROVED_COMMON));
+  check("all 18 post-baseline source files and hashes match", APPROVED_COMMON.every((version) => {
+    const local = localByVersion.get(version);
+    const recorded = postByVersion.get(version);
+    return local && recorded && recorded.filename === local.filename && recorded.name === local.name && recorded.localSha256 === local.sha256;
+  }));
+  check("all 18 ledger/semantic classifications are proven", manifest.postBaselineApplied.every((record) => record.ledgerApplication === "PROVEN" && record.semanticApplication === "PROVEN"));
+  check("all 18 deployment blockers are false", manifest.postBaselineApplied.every((record) => record.deploymentBlocker === false));
+  check("six L3 remote counts/digests/byte classifications are exact", Object.entries(L3_RESOLVED).every(([version, expected]) => {
+    const record = postByVersion.get(version);
+    return record?.byteProvenance === expected.byteProvenance
+      && record?.remoteStatementCount === expected.remoteStatementCount
+      && record?.remoteOrderedStatementDigestSha256 === expected.digest;
+  }));
+  check("other 12 rows do not invent remote statement metadata", manifest.postBaselineApplied
+    .filter((record) => !L3_RESOLVED[record.version])
+    .every((record) => !("remoteStatementCount" in record) && !("remoteOrderedStatementDigestSha256" in record) && !("byteProvenance" in record)));
+  check("anchor manifest identity is exact", manifest.appliedAnchor?.version === TARGET_VERSION && manifest.appliedAnchor?.name === "qf_mvp_50_2c_lead_communication_recipient" && manifest.appliedAnchor?.path === TARGET_PATH);
+  check("anchor source exists and raw/canonical SHA are exact", state.targetExists && state.targetSha === TARGET_SHA && state.targetCanonicalSha === TARGET_SHA && manifest.appliedAnchor?.sha256 === TARGET_SHA);
+  check("anchor operational status is APPLIED with imported D2-R1 evidence", manifest.appliedAnchor?.operationalStatus === "APPLIED" && manifest.appliedAnchor?.appliedEvidenceMarker === APPLIED_EVIDENCE_MARKER && manifest.appliedAnchor?.appliedEvidenceType === "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD" && manifest.appliedAnchor?.remoteHistoryCountAfterApply === 20 && manifest.appliedAnchor?.appliedExactlyOnce === true);
+  check("anchor L3 observation is preserved as historical, not rewritten", manifest.appliedAnchor?.remoteVersionStatusAtL3 === "ABSENT");
+  check("anchor documentation points to imported S1 evidence", manifest.appliedAnchor?.documentationStatus === "SOURCE_CONTROLLED_PREFLIGHT_IMPORTED_BY_G1" && manifest.appliedAnchor?.preflightEvidencePath === S1_PATH);
+  check("anchor is present exactly once under migrations", validMigrations.filter((record) => record.version === TARGET_VERSION).length === 1);
+  check("superseded pendingTarget block is gone", manifest.pendingTarget === undefined);
 
   // Exact post-anchor pin: ten APPLIED (remote history 21-30), five RECONCILED
   // (QF-MVP-80.05: already applied to BOTH staging and production, proved read-only),
   // plus the explicitly pinned pending and staging-applied sets.
-  const postAnchorLocal = validMigrations.filter(
-    (record) => record.version > TARGET_VERSION,
-  );
-  const appliedPins = Array.isArray(manifest.appliedPostAnchorMigrations)
-    ? manifest.appliedPostAnchorMigrations
-    : null;
-  const reconciledPins = Array.isArray(manifest.reconciledPostAnchorMigrations)
-    ? manifest.reconciledPostAnchorMigrations
-    : null;
-  const pendingPins = Array.isArray(manifest.pendingPostAnchorMigrations)
-    ? manifest.pendingPostAnchorMigrations
-    : null;
-  const stagingAppliedPins = Array.isArray(
-    manifest.stagingAppliedPostAnchorMigrations,
-  )
-    ? manifest.stagingAppliedPostAnchorMigrations
-    : null;
+  const postAnchorLocal = validMigrations.filter((record) => record.version > TARGET_VERSION);
+  const appliedPins = Array.isArray(manifest.appliedPostAnchorMigrations) ? manifest.appliedPostAnchorMigrations : null;
+  const reconciledPins = Array.isArray(manifest.reconciledPostAnchorMigrations) ? manifest.reconciledPostAnchorMigrations : null;
+  const pendingPins = Array.isArray(manifest.pendingPostAnchorMigrations) ? manifest.pendingPostAnchorMigrations : null;
+  const stagingAppliedPins = Array.isArray(manifest.stagingAppliedPostAnchorMigrations) ? manifest.stagingAppliedPostAnchorMigrations : null;
   const appliedTruth = [...(appliedPins ?? []), ...(reconciledPins ?? [])];
 
-  check(
-    `exactly ${expectedCurrentPostAnchorCount} local migrations are newer than the anchor after explicit supersession/extension`,
+  check(`exactly ${expectedCurrentPostAnchorCount} local migrations are newer than the anchor after explicit supersession/extension`,
     postAnchorLocal.length === expectedCurrentPostAnchorCount,
-    `actual=${postAnchorLocal.length}`,
-  );
-  check(
-    "the post-anchor migrations appear in exact legacy-plus-extension pinned order",
-    same(
-      postAnchorLocal.map((record) => record.version),
-      currentPostAnchorOrder,
-    ),
-  );
-  check(
-    "anchor preserves its historical post-anchor count",
-    manifest.appliedAnchor?.postAnchorMigrationCount === 32,
-  );
-  check(
-    "manifest declares exactly ten APPLIED post-anchor migrations",
-    appliedPins !== null && appliedPins.length === 10,
-    `actual=${appliedPins?.length}`,
-  );
-  check(
-    "the applied records appear in exact pinned order",
-    same(
-      appliedPins?.map((record) => record.version),
-      POST_ANCHOR_APPLIED.map((m) => m.version),
-    ),
-  );
-  check(
-    "manifest declares exactly five RECONCILED post-anchor migrations",
-    reconciledPins !== null && reconciledPins.length === 5,
-    `actual=${reconciledPins?.length}`,
-  );
-  check(
-    "the reconciled records appear in exact pinned order",
-    same(
-      reconciledPins?.map((r) => r.version),
-      POST_ANCHOR_RECONCILED.map((m) => m.version),
-    ),
-  );
+    `actual=${postAnchorLocal.length}`);
+  check("the post-anchor migrations appear in exact legacy-plus-extension pinned order",
+    same(postAnchorLocal.map((record) => record.version), currentPostAnchorOrder));
+  check("anchor preserves its historical post-anchor count", manifest.appliedAnchor?.postAnchorMigrationCount === 32);
+  check("manifest declares exactly ten APPLIED post-anchor migrations", appliedPins !== null && appliedPins.length === 10, `actual=${appliedPins?.length}`);
+  check("the applied records appear in exact pinned order", same(appliedPins?.map((record) => record.version), POST_ANCHOR_APPLIED.map((m) => m.version)));
+  check("manifest declares exactly five RECONCILED post-anchor migrations", reconciledPins !== null && reconciledPins.length === 5, `actual=${reconciledPins?.length}`);
+  check("the reconciled records appear in exact pinned order", same(reconciledPins?.map((r) => r.version), POST_ANCHOR_RECONCILED.map((m) => m.version)));
   // QF-MVP-82A-R0-S1: R0 left the PENDING set when it was applied to staging, so
   // PENDING was exactly the 80.14A production activation authority again.
   // QF-MVP-50.6 RE-PIN: 1 -> 2. The orphan cancellation authority (20260905000000)
@@ -1338,381 +971,228 @@ function validateState(state) {
   // version/name/path/SHA, and neither may also be claimed applied anywhere.
   // QF-MVP-40.14 RE-PIN: 4 -> 5. The Meta transactional mapping seed + activation
   // authority (20260912000000) is source-only and joins PENDING.
-  check(
-    "the explicit PENDING post-anchor set holds exactly the nine pinned entries",
-    pendingPins !== null &&
-      pendingPins.length === POST_ANCHOR_PENDING.length &&
-      pendingPins.length === 9,
-    `actual=${pendingPins?.length}`,
-  );
-  check(
-    "the explicit STAGING-APPLIED post-anchor set holds exactly the eight pinned entries",
-    stagingAppliedPins !== null &&
-      stagingAppliedPins.length === POST_ANCHOR_STAGING_APPLIED.length &&
-      stagingAppliedPins.length === 8,
-    `actual=${stagingAppliedPins?.length}`,
-  );
-  check(
-    "the staging-applied record claims staging and explicitly refuses production",
+  check("the explicit PENDING post-anchor set holds exactly the nine pinned entries",
+    pendingPins !== null && pendingPins.length === POST_ANCHOR_PENDING.length && pendingPins.length === 9,
+    `actual=${pendingPins?.length}`);
+  check("the explicit STAGING-APPLIED post-anchor set holds exactly the eight pinned entries",
+    stagingAppliedPins !== null && stagingAppliedPins.length === POST_ANCHOR_STAGING_APPLIED.length &&
+    stagingAppliedPins.length === 8,
+    `actual=${stagingAppliedPins?.length}`);
+  check("the staging-applied record claims staging and explicitly refuses production",
     stagingAppliedPins?.[0]?.operationalStatus === "APPLIED_TO_STAGING" &&
-      stagingAppliedPins?.[0]?.appliedToStaging === true &&
-      stagingAppliedPins?.[0]?.appliedExactlyOnceToStaging === true &&
-      stagingAppliedPins?.[0]?.independentRemoteRelistVerified === true &&
-      stagingAppliedPins?.[0]?.appliedToProduction === false &&
-      stagingAppliedPins?.[0]?.productionVersionStatus ===
-        "NOT_APPLIED_NOT_PROVEN" &&
-      stagingAppliedPins?.[0]?.requiresSeparateProductionDeploymentGate ===
-        true,
-  );
-  check(
-    "the staging-applied record fabricates NO remote-history count",
+    stagingAppliedPins?.[0]?.appliedToStaging === true &&
+    stagingAppliedPins?.[0]?.appliedExactlyOnceToStaging === true &&
+    stagingAppliedPins?.[0]?.independentRemoteRelistVerified === true &&
+    stagingAppliedPins?.[0]?.appliedToProduction === false &&
+    stagingAppliedPins?.[0]?.productionVersionStatus === "NOT_APPLIED_NOT_PROVEN" &&
+    stagingAppliedPins?.[0]?.requiresSeparateProductionDeploymentGate === true);
+  check("the staging-applied record fabricates NO remote-history count",
     stagingAppliedPins?.[0]?.remoteHistoryCountObservedAtApply === false &&
-      stagingAppliedPins?.[0]?.remoteHistoryCountAfterApply === null,
-  );
-  const aarohiStagingPin = stagingAppliedPins?.find(
-    (record) => record.version === "20260917000000",
-  );
-  check(
-    "Aarohi staging application evidence is exact",
+    stagingAppliedPins?.[0]?.remoteHistoryCountAfterApply === null);
+  const aarohiStagingPin = stagingAppliedPins?.find((record) => record.version === "20260917000000");
+  check("Aarohi staging application evidence is exact",
     aarohiStagingPin?.operationalStatus === "APPLIED_TO_STAGING" &&
-      aarohiStagingPin?.appliedToStaging === true &&
-      aarohiStagingPin?.appliedExactlyOnceToStaging === true &&
-      aarohiStagingPin?.stagingRemoteVersionStatus ===
-        "PRESENT_IN_STAGING_HISTORY" &&
-      aarohiStagingPin?.independentRemoteRelistVerified === true &&
-      aarohiStagingPin?.appliedEvidenceMarker ===
-        "QF_AAROHI_ACQUISITION_CRM_S1_STAGING_MIGRATION_APPLIED_AND_VERIFIED" &&
-      aarohiStagingPin?.appliedEvidenceType ===
-        "FIRST_PARTY_EXACT_ONE_DRY_RUN_VERIFIED_ISOLATED_WORKSPACE_STAGING_EXECUTION" &&
-      aarohiStagingPin?.evidencePath ===
-        "docs/QF-AAROHI-ACQUISITION-CRM-STAGING-CERTIFICATION.md",
-  );
-  check(
-    "Aarohi foundation production application is independently recorded",
+    aarohiStagingPin?.appliedToStaging === true &&
+    aarohiStagingPin?.appliedExactlyOnceToStaging === true &&
+    aarohiStagingPin?.stagingRemoteVersionStatus === "PRESENT_IN_STAGING_HISTORY" &&
+    aarohiStagingPin?.independentRemoteRelistVerified === true &&
+    aarohiStagingPin?.appliedEvidenceMarker === "QF_AAROHI_ACQUISITION_CRM_S1_STAGING_MIGRATION_APPLIED_AND_VERIFIED" &&
+    aarohiStagingPin?.appliedEvidenceType === "FIRST_PARTY_EXACT_ONE_DRY_RUN_VERIFIED_ISOLATED_WORKSPACE_STAGING_EXECUTION" &&
+    aarohiStagingPin?.evidencePath === "docs/QF-AAROHI-ACQUISITION-CRM-STAGING-CERTIFICATION.md");
+  check("Aarohi foundation production application is independently recorded",
     aarohiStagingPin?.appliedToProduction === true &&
-      aarohiStagingPin?.productionVersionStatus ===
-        "PRESENT_IN_PRODUCTION_HISTORY" &&
-      aarohiStagingPin?.productionHistoryVersionPresent === true &&
-      aarohiStagingPin?.productionAarohiSchemaPresent === true &&
-      aarohiStagingPin?.productionAppliedExactlyOnce === true &&
-      aarohiStagingPin?.requiresSeparateProductionDeploymentGate === false,
-  );
-  check(
-    "Aarohi staging certification fabricates NO remote-history count",
+    aarohiStagingPin?.productionVersionStatus === "PRESENT_IN_PRODUCTION_HISTORY" &&
+    aarohiStagingPin?.productionHistoryVersionPresent === true &&
+    aarohiStagingPin?.productionAarohiSchemaPresent === true &&
+    aarohiStagingPin?.productionAppliedExactlyOnce === true &&
+    aarohiStagingPin?.requiresSeparateProductionDeploymentGate === false);
+  check("Aarohi staging certification fabricates NO remote-history count",
     aarohiStagingPin?.remoteHistoryCountObservedAtApply === false &&
-      aarohiStagingPin?.remoteHistoryCountAfterApply === null,
-  );
-  const aarohiAnishaPin = stagingAppliedPins?.find(
-    (record) => record.version === "20260918093000",
-  );
-  check(
-    "Aarohi to Anisha bridge staging evidence is exact",
+    aarohiStagingPin?.remoteHistoryCountAfterApply === null);
+  const aarohiAnishaPin = stagingAppliedPins?.find((record) => record.version === "20260918093000");
+  check("Aarohi to Anisha bridge staging evidence is exact",
     aarohiAnishaPin?.operationalStatus === "APPLIED_TO_STAGING" &&
-      aarohiAnishaPin?.appliedToStaging === true &&
-      aarohiAnishaPin?.appliedExactlyOnceToStaging === true &&
-      aarohiAnishaPin?.stagingRemoteVersionStatus ===
-        "PRESENT_IN_STAGING_HISTORY" &&
-      aarohiAnishaPin?.independentRemoteRelistVerified === true &&
-      aarohiAnishaPin?.appliedEvidenceMarker ===
-        "QF_AAROHI_ANISHA_HANDOFF_STAGING_MIGRATION_APPLIED_AND_VERIFIED" &&
-      aarohiAnishaPin?.appliedEvidenceType ===
-        "FIRST_PARTY_EXACT_ONE_DRY_RUN_VERIFIED_ISOLATED_WORKSPACE_STAGING_EXECUTION",
-  );
-  check(
-    "Aarohi to Anisha bridge production application is independently recorded",
+    aarohiAnishaPin?.appliedToStaging === true &&
+    aarohiAnishaPin?.appliedExactlyOnceToStaging === true &&
+    aarohiAnishaPin?.stagingRemoteVersionStatus === "PRESENT_IN_STAGING_HISTORY" &&
+    aarohiAnishaPin?.independentRemoteRelistVerified === true &&
+    aarohiAnishaPin?.appliedEvidenceMarker === "QF_AAROHI_ANISHA_HANDOFF_STAGING_MIGRATION_APPLIED_AND_VERIFIED" &&
+    aarohiAnishaPin?.appliedEvidenceType === "FIRST_PARTY_EXACT_ONE_DRY_RUN_VERIFIED_ISOLATED_WORKSPACE_STAGING_EXECUTION");
+  check("Aarohi to Anisha bridge production application is independently recorded",
     aarohiAnishaPin?.appliedToProduction === true &&
-      aarohiAnishaPin?.productionVersionStatus ===
-        "PRESENT_IN_PRODUCTION_HISTORY" &&
-      aarohiAnishaPin?.productionHistoryVersionPresent === true &&
-      aarohiAnishaPin?.productionAppliedExactlyOnce === true &&
-      aarohiAnishaPin?.productionIndependentRemoteRelistVerified === true &&
-      aarohiAnishaPin?.productionBridgeColumnsVerified === 6 &&
-      aarohiAnishaPin?.productionHandoffRpcVerified === true &&
-      aarohiAnishaPin?.requiresSeparateProductionDeploymentGate === false,
-  );
-  check(
-    "Aarohi to Anisha bridge fabricates NO remote-history count",
+    aarohiAnishaPin?.productionVersionStatus === "PRESENT_IN_PRODUCTION_HISTORY" &&
+    aarohiAnishaPin?.productionHistoryVersionPresent === true &&
+    aarohiAnishaPin?.productionAppliedExactlyOnce === true &&
+    aarohiAnishaPin?.productionIndependentRemoteRelistVerified === true &&
+    aarohiAnishaPin?.productionBridgeColumnsVerified === 6 &&
+    aarohiAnishaPin?.productionHandoffRpcVerified === true &&
+    aarohiAnishaPin?.requiresSeparateProductionDeploymentGate === false);
+  check("Aarohi to Anisha bridge fabricates NO remote-history count",
     aarohiAnishaPin?.remoteHistoryCountObservedAtApply === false &&
-      aarohiAnishaPin?.remoteHistoryCountAfterApply === null,
-  );
-  const whatsappJarvisPin = stagingAppliedPins?.find(
-    (record) => record.version === "20260918120000",
-  );
-  const whatsappJarvisLocal = postAnchorLocal.find(
-    (record) => record.version === "20260918120000",
-  );
+    aarohiAnishaPin?.remoteHistoryCountAfterApply === null);
+  const whatsappJarvisPin = stagingAppliedPins?.find((record) => record.version === "20260918120000");
+  const whatsappJarvisLocal = postAnchorLocal.find((record) => record.version === "20260918120000");
   const whatsappJarvisDisk = state.postAnchorOnDisk?.["20260918120000"];
-  check(
-    "WhatsApp/Jarvis foundation identity and source hash are exact",
+  check("WhatsApp/Jarvis foundation identity and source hash are exact",
     whatsappJarvisPin?.name === "whatsapp_conversational_jarvis_foundation" &&
-      whatsappJarvisPin?.path ===
-        "supabase/migrations/20260918120000_whatsapp_conversational_jarvis_foundation.sql" &&
-      whatsappJarvisPin?.phase ===
-        "QF-WHATSAPP-JARVIS-CONVERSATIONAL-FOUNDATION" &&
-      whatsappJarvisLocal?.name ===
-        "whatsapp_conversational_jarvis_foundation" &&
-      whatsappJarvisDisk?.exists === true &&
-      whatsappJarvisDisk?.sha ===
-        "4d33c0f1fc490b6ca3ba254aea6d5e4ee816bb31292ff3651aaf8f99d075f9f7" &&
-      whatsappJarvisDisk?.canonicalSha ===
-        "4d33c0f1fc490b6ca3ba254aea6d5e4ee816bb31292ff3651aaf8f99d075f9f7" &&
-      whatsappJarvisPin?.sha256 === whatsappJarvisLocal?.sha256,
-  );
-  check(
-    "WhatsApp/Jarvis foundation staging application evidence is exact",
+    whatsappJarvisPin?.path === "supabase/migrations/20260918120000_whatsapp_conversational_jarvis_foundation.sql" &&
+    whatsappJarvisPin?.phase === "QF-WHATSAPP-JARVIS-CONVERSATIONAL-FOUNDATION" &&
+    whatsappJarvisLocal?.name === "whatsapp_conversational_jarvis_foundation" &&
+    whatsappJarvisDisk?.exists === true &&
+    whatsappJarvisDisk?.sha === "4d33c0f1fc490b6ca3ba254aea6d5e4ee816bb31292ff3651aaf8f99d075f9f7" &&
+    whatsappJarvisDisk?.canonicalSha === "4d33c0f1fc490b6ca3ba254aea6d5e4ee816bb31292ff3651aaf8f99d075f9f7" &&
+    whatsappJarvisPin?.sha256 === whatsappJarvisLocal?.sha256);
+  check("WhatsApp/Jarvis foundation staging application evidence is exact",
     whatsappJarvisPin?.operationalStatus === "APPLIED_TO_STAGING" &&
-      whatsappJarvisPin?.appliedToStaging === true &&
-      whatsappJarvisPin?.appliedExactlyOnceToStaging === true &&
-      whatsappJarvisPin?.stagingRemoteVersionStatus ===
-        "PRESENT_IN_STAGING_HISTORY" &&
-      whatsappJarvisPin?.independentRemoteRelistVerified === true &&
-      whatsappJarvisPin?.remoteHistoryCountAfterApply === 43,
-  );
-  check(
-    "WhatsApp/Jarvis foundation production application is independently recorded",
+    whatsappJarvisPin?.appliedToStaging === true &&
+    whatsappJarvisPin?.appliedExactlyOnceToStaging === true &&
+    whatsappJarvisPin?.stagingRemoteVersionStatus === "PRESENT_IN_STAGING_HISTORY" &&
+    whatsappJarvisPin?.independentRemoteRelistVerified === true &&
+    whatsappJarvisPin?.remoteHistoryCountAfterApply === 43);
+  check("WhatsApp/Jarvis foundation production application is independently recorded",
     whatsappJarvisPin?.appliedToProduction === true &&
-      whatsappJarvisPin?.productionVersionStatus ===
-        "PRESENT_IN_PRODUCTION_HISTORY" &&
-      whatsappJarvisPin?.productionHistoryVersionPresent === true &&
-      whatsappJarvisPin?.productionAppliedExactlyOnce === true &&
-      whatsappJarvisPin?.productionIndependentRemoteRelistVerified === true &&
-      whatsappJarvisPin?.productionRemoteHistoryCountAfterApply === 51 &&
-      whatsappJarvisPin?.requiresSeparateProductionDeploymentGate === false,
-  );
-  check(
-    "WhatsApp/Jarvis foundation deployment evidence and disabled seed are exact",
-    whatsappJarvisPin?.appliedEvidenceMarker ===
-      "QF_WHATSAPP_JARVIS_CONVERSATIONAL_FOUNDATION_DATABASE_APPLIED_AND_VERIFIED" &&
-      whatsappJarvisPin?.appliedEvidenceType ===
-        "SUPABASE_MCP_APPLY_VERIFIED_AND_CANONICAL_HISTORY_ALIGNED" &&
-      whatsappJarvisPin?.productionConversationalProviderAccountSeededDisabled ===
-        true &&
-      whatsappJarvisPin?.evidencePath ===
-        "docs/QF-WHATSAPP-JARVIS-CONVERSATIONAL-FOUNDATION-CERTIFICATION.md",
-  );
-  const callbackReplayPin = stagingAppliedPins?.find(
-    (record) => record.version === "20260918180500",
-  );
-  const callbackReplayLocal = postAnchorLocal.find(
-    (record) => record.version === "20260918180500",
-  );
+    whatsappJarvisPin?.productionVersionStatus === "PRESENT_IN_PRODUCTION_HISTORY" &&
+    whatsappJarvisPin?.productionHistoryVersionPresent === true &&
+    whatsappJarvisPin?.productionAppliedExactlyOnce === true &&
+    whatsappJarvisPin?.productionIndependentRemoteRelistVerified === true &&
+    whatsappJarvisPin?.productionRemoteHistoryCountAfterApply === 51 &&
+    whatsappJarvisPin?.requiresSeparateProductionDeploymentGate === false);
+  check("WhatsApp/Jarvis foundation deployment evidence and disabled seed are exact",
+    whatsappJarvisPin?.appliedEvidenceMarker === "QF_WHATSAPP_JARVIS_CONVERSATIONAL_FOUNDATION_DATABASE_APPLIED_AND_VERIFIED" &&
+    whatsappJarvisPin?.appliedEvidenceType === "SUPABASE_MCP_APPLY_VERIFIED_AND_CANONICAL_HISTORY_ALIGNED" &&
+    whatsappJarvisPin?.productionConversationalProviderAccountSeededDisabled === true &&
+    whatsappJarvisPin?.evidencePath === "docs/QF-WHATSAPP-JARVIS-CONVERSATIONAL-FOUNDATION-CERTIFICATION.md");
+  const callbackReplayPin = stagingAppliedPins?.find((record) => record.version === "20260918180500");
+  const callbackReplayLocal = postAnchorLocal.find((record) => record.version === "20260918180500");
   const callbackReplayDisk = state.postAnchorOnDisk?.["20260918180500"];
-  check(
-    "WhatsApp/Jarvis callback replay deployment evidence is exact",
+  check("WhatsApp/Jarvis callback replay deployment evidence is exact",
     callbackReplayPin?.name === "jarvis_whatsapp_callback_replay_receipts" &&
-      callbackReplayPin?.phase === "QF-WHATSAPP-JARVIS-CALLBACK-REPLAY" &&
-      callbackReplayPin?.sha256 ===
-        "0052d194680be37bc0680200e64a37fd414190cd781c2e802a5bd23d65c8b2a9" &&
-      callbackReplayLocal?.name ===
-        "jarvis_whatsapp_callback_replay_receipts" &&
-      callbackReplayDisk?.exists === true &&
-      callbackReplayDisk?.canonicalSha === callbackReplayPin?.sha256 &&
-      callbackReplayPin?.operationalStatus === "APPLIED_TO_STAGING" &&
-      callbackReplayPin?.appliedToStaging === true &&
-      callbackReplayPin?.appliedExactlyOnceToStaging === true &&
-      callbackReplayPin?.stagingRemoteVersionStatus ===
-        "PRESENT_IN_STAGING_HISTORY" &&
-      callbackReplayPin?.stagingRemoteHistoryCountAfterApply === 44 &&
-      callbackReplayPin?.appliedToProduction === true &&
-      callbackReplayPin?.productionVersionStatus ===
-        "PRESENT_IN_PRODUCTION_HISTORY" &&
-      callbackReplayPin?.productionRemoteHistoryCountAfterApply === 52 &&
-      callbackReplayPin?.requiresSeparateStagingDeploymentGate === false &&
-      callbackReplayPin?.requiresSeparateProductionDeploymentGate === false &&
-      callbackReplayPin?.runtimeActivationChanged === false,
-  );
-  const reviewPin = stagingAppliedPins?.find(
-    (record) => record.version === "20260919010000",
-  );
-  const reviewLocal = postAnchorLocal.find(
-    (record) => record.version === "20260919010000",
-  );
+    callbackReplayPin?.phase === "QF-WHATSAPP-JARVIS-CALLBACK-REPLAY" &&
+    callbackReplayPin?.sha256 === "0052d194680be37bc0680200e64a37fd414190cd781c2e802a5bd23d65c8b2a9" &&
+    callbackReplayLocal?.name === "jarvis_whatsapp_callback_replay_receipts" &&
+    callbackReplayDisk?.exists === true &&
+    callbackReplayDisk?.canonicalSha === callbackReplayPin?.sha256 &&
+    callbackReplayPin?.operationalStatus === "APPLIED_TO_STAGING" &&
+    callbackReplayPin?.appliedToStaging === true &&
+    callbackReplayPin?.appliedExactlyOnceToStaging === true &&
+    callbackReplayPin?.stagingRemoteVersionStatus === "PRESENT_IN_STAGING_HISTORY" &&
+    callbackReplayPin?.stagingRemoteHistoryCountAfterApply === 44 &&
+    callbackReplayPin?.appliedToProduction === true &&
+    callbackReplayPin?.productionVersionStatus === "PRESENT_IN_PRODUCTION_HISTORY" &&
+    callbackReplayPin?.productionRemoteHistoryCountAfterApply === 52 &&
+    callbackReplayPin?.requiresSeparateStagingDeploymentGate === false &&
+    callbackReplayPin?.requiresSeparateProductionDeploymentGate === false &&
+    callbackReplayPin?.runtimeActivationChanged === false);
+  const reviewPin = stagingAppliedPins?.find((record) => record.version === "20260919010000");
+  const reviewLocal = postAnchorLocal.find((record) => record.version === "20260919010000");
   const reviewDisk = state.postAnchorOnDisk?.["20260919010000"];
-  check(
-    "vendor review system deployment evidence is exact",
+  check("vendor review system deployment evidence is exact",
     reviewPin?.name === "vendor_review_system" &&
-      reviewPin?.phase === "QF-VENDOR-REVIEWS" &&
-      reviewPin?.sha256 ===
-        "30f85cf0cee2b0b1b3cbd825194af586fd44950f0a56e009750f1308161edb65" &&
-      reviewLocal?.name === "vendor_review_system" &&
-      reviewDisk?.exists === true &&
-      reviewDisk?.canonicalSha === reviewPin?.sha256 &&
-      reviewPin?.operationalStatus === "APPLIED_TO_STAGING" &&
-      reviewPin?.appliedToStaging === true &&
-      reviewPin?.appliedExactlyOnceToStaging === true &&
-      reviewPin?.stagingRemoteVersionStatus === "PRESENT_IN_STAGING_HISTORY" &&
-      reviewPin?.stagingRemoteHistoryCountAfterApply === 45 &&
-      reviewPin?.appliedToProduction === true &&
-      reviewPin?.productionVersionStatus === "PRESENT_IN_PRODUCTION_HISTORY" &&
-      reviewPin?.productionRemoteHistoryCountBeforeApply === 52 &&
-      reviewPin?.productionRemoteHistoryCountAfterApply === 53 &&
-      reviewPin?.requiresSeparateStagingDeploymentGate === false &&
-      reviewPin?.requiresSeparateProductionDeploymentGate === false &&
-      reviewPin?.postApplyRlsEnabled === true &&
-      reviewPin?.postApplyAnonSelect === false &&
-      reviewPin?.postApplyAnonInsert === false &&
-      reviewPin?.postApplyAuthenticatedSelect === false &&
-      reviewPin?.postApplyAuthenticatedInsert === false &&
-      same(reviewPin?.postApplyServiceRolePrivileges, [
-        "SELECT",
-        "INSERT",
-        "UPDATE",
-      ]) &&
-      reviewPin?.reviewRowsAtProductionApply === 0 &&
-      reviewPin?.evidencePath === "docs/QF-VENDOR-REVIEWS-CERTIFICATION.md",
-  );
-  const falseCeilingPin = stagingAppliedPins?.find(
-    (record) => record.version === "20260922120000",
-  );
-  const falseCeilingLocal = postAnchorLocal.find(
-    (record) => record.version === "20260922120000",
-  );
+    reviewPin?.phase === "QF-VENDOR-REVIEWS" &&
+    reviewPin?.sha256 === "30f85cf0cee2b0b1b3cbd825194af586fd44950f0a56e009750f1308161edb65" &&
+    reviewLocal?.name === "vendor_review_system" &&
+    reviewDisk?.exists === true &&
+    reviewDisk?.canonicalSha === reviewPin?.sha256 &&
+    reviewPin?.operationalStatus === "APPLIED_TO_STAGING" &&
+    reviewPin?.appliedToStaging === true &&
+    reviewPin?.appliedExactlyOnceToStaging === true &&
+    reviewPin?.stagingRemoteVersionStatus === "PRESENT_IN_STAGING_HISTORY" &&
+    reviewPin?.stagingRemoteHistoryCountAfterApply === 45 &&
+    reviewPin?.appliedToProduction === true &&
+    reviewPin?.productionVersionStatus === "PRESENT_IN_PRODUCTION_HISTORY" &&
+    reviewPin?.productionRemoteHistoryCountBeforeApply === 52 &&
+    reviewPin?.productionRemoteHistoryCountAfterApply === 53 &&
+    reviewPin?.requiresSeparateStagingDeploymentGate === false &&
+    reviewPin?.requiresSeparateProductionDeploymentGate === false &&
+    reviewPin?.postApplyRlsEnabled === true &&
+    reviewPin?.postApplyAnonSelect === false &&
+    reviewPin?.postApplyAnonInsert === false &&
+    reviewPin?.postApplyAuthenticatedSelect === false &&
+    reviewPin?.postApplyAuthenticatedInsert === false &&
+    same(reviewPin?.postApplyServiceRolePrivileges, ["SELECT", "INSERT", "UPDATE"]) &&
+    reviewPin?.reviewRowsAtProductionApply === 0 &&
+    reviewPin?.evidencePath === "docs/QF-VENDOR-REVIEWS-CERTIFICATION.md");
+  const falseCeilingPin = stagingAppliedPins?.find((record) => record.version === "20260922120000");
+  const falseCeilingLocal = postAnchorLocal.find((record) => record.version === "20260922120000");
   const falseCeilingDisk = state.postAnchorOnDisk?.["20260922120000"];
-  check(
-    "False Ceiling staging deployment evidence is exact",
+  check("False Ceiling staging deployment evidence is exact",
     falseCeilingPin?.name === "false_ceiling_category" &&
-      falseCeilingPin?.phase === "QF-PUNE-LAUNCH-FALSE-CEILING" &&
-      falseCeilingPin?.sha256 ===
-        "775794173a6f463e03a38af9f822dd61756765be3860370837d63026c268e540" &&
-      falseCeilingLocal?.name === "false_ceiling_category" &&
-      falseCeilingDisk?.exists === true &&
-      falseCeilingDisk?.canonicalSha === falseCeilingPin?.sha256 &&
-      falseCeilingPin?.operationalStatus === "APPLIED_TO_STAGING" &&
-      falseCeilingPin?.appliedToStaging === true &&
-      falseCeilingPin?.appliedExactlyOnceToStaging === true &&
-      falseCeilingPin?.stagingRemoteVersionStatus ===
-        "PRESENT_IN_STAGING_HISTORY" &&
-      falseCeilingPin?.stagingRemoteHistoryCountAfterApply === 48 &&
-      falseCeilingPin?.independentRemoteRelistVerified === true &&
-      falseCeilingPin?.appliedToProduction === false &&
-      falseCeilingPin?.productionVersionStatus ===
-        "ABSENT_IN_PRODUCTION_HISTORY" &&
-      falseCeilingPin?.requiresSeparateStagingDeploymentGate === false &&
-      falseCeilingPin?.requiresSeparateProductionDeploymentGate === true &&
-      falseCeilingPin?.postApplyFalseCeilingActiveRows === 1 &&
-      falseCeilingPin?.postApplyPopParentGroup === "False Ceiling" &&
-      falseCeilingPin?.postApplyCeilingToPopCompatible === true &&
-      falseCeilingPin?.postApplyCeilingToInteriorCompatible === false &&
-      falseCeilingPin?.postApplyAnonExecute === false &&
-      falseCeilingPin?.postApplyAuthenticatedExecute === false &&
-      falseCeilingPin?.postApplyServiceRoleExecute === true &&
-      falseCeilingPin?.appliedEvidenceMarker ===
-        "QF_PUNE_LAUNCH_FALSE_CEILING_STAGING_MIGRATION_APPLIED_AND_VERIFIED" &&
-      falseCeilingPin?.evidencePath ===
-        "docs/QF-PUNE-LAUNCH-FALSE-CEILING-STAGING-CERTIFICATION.md",
-  );
-  check(
-    "the pending records appear in exact pinned order",
-    same(
-      pendingPins?.map((record) => record.version),
-      POST_ANCHOR_PENDING.map((m) => m.version),
-    ),
-  );
+    falseCeilingPin?.phase === "QF-PUNE-LAUNCH-FALSE-CEILING" &&
+    falseCeilingPin?.sha256 === "775794173a6f463e03a38af9f822dd61756765be3860370837d63026c268e540" &&
+    falseCeilingLocal?.name === "false_ceiling_category" &&
+    falseCeilingDisk?.exists === true &&
+    falseCeilingDisk?.canonicalSha === falseCeilingPin?.sha256 &&
+    falseCeilingPin?.operationalStatus === "APPLIED_TO_STAGING" &&
+    falseCeilingPin?.appliedToStaging === true &&
+    falseCeilingPin?.appliedExactlyOnceToStaging === true &&
+    falseCeilingPin?.stagingRemoteVersionStatus === "PRESENT_IN_STAGING_HISTORY" &&
+    falseCeilingPin?.stagingRemoteHistoryCountAfterApply === 48 &&
+    falseCeilingPin?.independentRemoteRelistVerified === true &&
+    falseCeilingPin?.appliedToProduction === false &&
+    falseCeilingPin?.productionVersionStatus === "ABSENT_IN_PRODUCTION_HISTORY" &&
+    falseCeilingPin?.requiresSeparateStagingDeploymentGate === false &&
+    falseCeilingPin?.requiresSeparateProductionDeploymentGate === true &&
+    falseCeilingPin?.postApplyFalseCeilingActiveRows === 1 &&
+    falseCeilingPin?.postApplyPopParentGroup === "False Ceiling" &&
+    falseCeilingPin?.postApplyCeilingToPopCompatible === true &&
+    falseCeilingPin?.postApplyCeilingToInteriorCompatible === false &&
+    falseCeilingPin?.postApplyAnonExecute === false &&
+    falseCeilingPin?.postApplyAuthenticatedExecute === false &&
+    falseCeilingPin?.postApplyServiceRoleExecute === true &&
+    falseCeilingPin?.appliedEvidenceMarker === "QF_PUNE_LAUNCH_FALSE_CEILING_STAGING_MIGRATION_APPLIED_AND_VERIFIED" &&
+    falseCeilingPin?.evidencePath === "docs/QF-PUNE-LAUNCH-FALSE-CEILING-STAGING-CERTIFICATION.md");
+  check("the pending records appear in exact pinned order",
+    same(pendingPins?.map((record) => record.version), POST_ANCHOR_PENDING.map((m) => m.version)));
   // The four sets are compared as a SORTED union, not as concatenated blocks. Since
   // QF-MVP-50.6 a pending migration legitimately sorts after a staging-applied one,
   // so block order no longer equals version order — but the property being asserted
   // was always "every post-anchor migration is accounted for exactly once", and that
   // is what a sorted comparison states.
-  check(
-    "legacy manifest plus explicit extension account for every post-anchor migration, with no overlap",
+  check("legacy manifest plus explicit extension account for every post-anchor migration, with no overlap",
     appliedTruth.length === 15 &&
-      same(
-        [
-          ...appliedTruth.map((r) => r.version),
-          ...(pendingPins ?? [])
-            .map((r) => r.version)
-            .filter((version) => !supersededVersions.has(version)),
-          ...(stagingAppliedPins ?? []).map((r) => r.version),
-          ...extensionRecords.map((r) => r.version),
-        ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
-        currentPostAnchorOrder,
-      ) &&
-      !(pendingPins ?? []).some(
-        (p) =>
-          !supersededVersions.has(p.version) &&
-          appliedTruth.some((a) => a.version === p.version),
-      ) &&
-      !(stagingAppliedPins ?? []).some((s) =>
-        appliedTruth.some((a) => a.version === s.version),
-      ) &&
-      !(stagingAppliedPins ?? []).some((s) =>
-        (pendingPins ?? []).some((p) => p.version === s.version),
-      ) &&
-      extensionRecords.every(
-        (e) =>
-          !appliedTruth.some((a) => a.version === e.version) &&
-          !(pendingPins ?? []).some((p) => p.version === e.version) &&
-          !(stagingAppliedPins ?? []).some((s) => s.version === e.version),
-      ),
-  );
+    same([
+      ...appliedTruth.map((r) => r.version),
+      ...(pendingPins ?? []).map((r) => r.version).filter((version) => !supersededVersions.has(version)),
+      ...(stagingAppliedPins ?? []).map((r) => r.version),
+      ...extensionRecords.map((r) => r.version),
+    ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)), currentPostAnchorOrder) &&
+    !(pendingPins ?? []).some((p) => !supersededVersions.has(p.version) && appliedTruth.some((a) => a.version === p.version)) &&
+    !(stagingAppliedPins ?? []).some((s) => appliedTruth.some((a) => a.version === s.version)) &&
+    !(stagingAppliedPins ?? []).some((s) => (pendingPins ?? []).some((p) => p.version === s.version)) &&
+    extensionRecords.every((e) =>
+      !appliedTruth.some((a) => a.version === e.version) &&
+      !(pendingPins ?? []).some((p) => p.version === e.version) &&
+      !(stagingAppliedPins ?? []).some((s) => s.version === e.version)));
 
   for (const expected of POST_ANCHOR_RECONCILED) {
     const label = `${expected.phase} ${expected.version}`;
-    const local = postAnchorLocal.find(
-      (record) => record.version === expected.version,
-    );
-    const pin = reconciledPins?.find(
-      (record) => record.version === expected.version,
-    );
+    const local = postAnchorLocal.find((record) => record.version === expected.version);
+    const pin = reconciledPins?.find((record) => record.version === expected.version);
     const disk = state.postAnchorOnDisk?.[expected.version];
-    check(
-      `${label}: local migration is exactly the pinned version/name/file`,
-      local?.version === expected.version &&
-        local?.name === expected.name &&
-        local?.filename === expected.filename,
-    );
-    check(
-      `${label}: manifest entry matches the pinned identity`,
-      pin?.version === expected.version &&
-        pin?.name === expected.name &&
-        pin?.path === expected.path &&
-        pin?.phase === expected.phase,
-    );
-    check(
-      `${label}: source exists and raw/canonical SHA are exact`,
-      disk?.exists === true &&
-        disk?.sha === expected.sha &&
-        disk?.canonicalSha === expected.sha,
-    );
-    check(
-      `${label}: manifest SHA equals the on-disk SHA`,
-      pin?.sha256 === expected.sha && pin?.sha256 === local?.sha256,
-    );
-    check(
-      `${label}: is APPLIED and can never be re-marked pending`,
-      pin?.operationalStatus === "APPLIED" &&
-        !pendingPins?.some((r) => r.version === expected.version),
-    );
-    check(
-      `${label}: is recorded applied to BOTH staging and production`,
-      pin?.appliedToStaging === true &&
-        pin?.appliedToProduction === true &&
-        pin?.remoteVersionStatus === RECONCILED_REMOTE_STATUS,
-    );
-    check(
-      `${label}: carries its own distinct read-only certification evidence`,
-      pin?.appliedEvidenceMarker === expected.marker &&
-        pin?.appliedEvidenceType === RECONCILED_EVIDENCE_TYPE &&
-        pin?.evidencePath === RECONCILIATION_DOC_PATH,
-    );
-    check(
-      `${label}: names the read-only provenance of each environment`,
-      pin?.stagingHistoryEvidence ===
-        "OWNER_CERTIFIED_READ_ONLY_SCHEMA_MIGRATIONS_QUERY" &&
-        pin?.productionHistoryEvidence ===
-          "FIRST_PARTY_READ_ONLY_SCHEMA_MIGRATIONS_QUERY",
-    );
-    check(
-      `${label}: fabricates NO remote-history count nobody observed`,
-      !("remoteHistoryCountAfterApply" in (pin ?? {})) &&
-        pin?.remoteHistoryCountObservedAtApply === false,
-    );
-    check(
-      `${label}: applied exactly once, not by this source phase, and needs no further gate`,
-      pin?.appliedExactlyOnce === true &&
-        pin?.appliedByThisPhase === false &&
-        pin?.requiresSeparateStagingDeploymentGate === false,
-    );
+    check(`${label}: local migration is exactly the pinned version/name/file`,
+      local?.version === expected.version && local?.name === expected.name && local?.filename === expected.filename);
+    check(`${label}: manifest entry matches the pinned identity`,
+      pin?.version === expected.version && pin?.name === expected.name && pin?.path === expected.path && pin?.phase === expected.phase);
+    check(`${label}: source exists and raw/canonical SHA are exact`,
+      disk?.exists === true && disk?.sha === expected.sha && disk?.canonicalSha === expected.sha);
+    check(`${label}: manifest SHA equals the on-disk SHA`,
+      pin?.sha256 === expected.sha && pin?.sha256 === local?.sha256);
+    check(`${label}: is APPLIED and can never be re-marked pending`,
+      pin?.operationalStatus === "APPLIED" && !pendingPins?.some((r) => r.version === expected.version));
+    check(`${label}: is recorded applied to BOTH staging and production`,
+      pin?.appliedToStaging === true && pin?.appliedToProduction === true &&
+      pin?.remoteVersionStatus === RECONCILED_REMOTE_STATUS);
+    check(`${label}: carries its own distinct read-only certification evidence`,
+      pin?.appliedEvidenceMarker === expected.marker && pin?.appliedEvidenceType === RECONCILED_EVIDENCE_TYPE &&
+      pin?.evidencePath === RECONCILIATION_DOC_PATH);
+    check(`${label}: names the read-only provenance of each environment`,
+      pin?.stagingHistoryEvidence === "OWNER_CERTIFIED_READ_ONLY_SCHEMA_MIGRATIONS_QUERY" &&
+      pin?.productionHistoryEvidence === "FIRST_PARTY_READ_ONLY_SCHEMA_MIGRATIONS_QUERY");
+    check(`${label}: fabricates NO remote-history count nobody observed`,
+      !("remoteHistoryCountAfterApply" in (pin ?? {})) && pin?.remoteHistoryCountObservedAtApply === false);
+    check(`${label}: applied exactly once, not by this source phase, and needs no further gate`,
+      pin?.appliedExactlyOnce === true && pin?.appliedByThisPhase === false &&
+      pin?.requiresSeparateStagingDeploymentGate === false);
   }
 
   // QF-MVP-80.14A — per-migration assertions for the PENDING set. A pending entry
@@ -1723,415 +1203,166 @@ function validateState(state) {
   // prevent.
   for (const expected of POST_ANCHOR_PENDING) {
     const label = `${expected.phase} ${expected.version}`;
-    const local = postAnchorLocal.find(
-      (record) => record.version === expected.version,
-    );
-    const pin = pendingPins?.find(
-      (record) => record.version === expected.version,
-    );
+    const local = postAnchorLocal.find((record) => record.version === expected.version);
+    const pin = pendingPins?.find((record) => record.version === expected.version);
     const disk = state.postAnchorOnDisk?.[expected.version];
-    const supersession = supersededLegacyPins.find(
-      (record) => record.legacyVersion === expected.version,
-    );
-    const replacementLocal = supersession
-      ? localByVersion.get(supersession.replacementVersion)
-      : undefined;
-    const replacementExtension = supersession
-      ? extensionByVersion.get(supersession.replacementVersion)
-      : undefined;
+    const supersession = supersededLegacyPins.find((record) => record.legacyVersion === expected.version);
+    const replacementLocal = supersession ? localByVersion.get(supersession.replacementVersion) : undefined;
+    const replacementExtension = supersession ? extensionByVersion.get(supersession.replacementVersion) : undefined;
     const exactLegacyOrSupersededIdentity = local
-      ? local.version === expected.version &&
-        local.name === expected.name &&
-        local.filename === expected.filename
+      ? local.version === expected.version && local.name === expected.name && local.filename === expected.filename
       : supersession?.legacyName === expected.name &&
         supersession?.legacyPath === expected.path &&
         replacementLocal?.version === supersession.replacementVersion &&
         replacementLocal?.name === supersession.replacementName &&
-        replacementExtension?.canonicalSha256 ===
-          supersession.replacementCanonicalSha256;
+        replacementExtension?.canonicalSha256 === supersession.replacementCanonicalSha256;
 
-    check(
-      `${label}: local migration is exactly pinned or explicitly superseded by a pinned replacement`,
-      exactLegacyOrSupersededIdentity,
-    );
-    check(
-      `${label}: manifest entry matches the pinned identity`,
-      pin?.version === expected.version &&
-        pin?.name === expected.name &&
-        pin?.path === expected.path &&
-        pin?.phase === expected.phase,
-    );
-    check(
-      `${label}: source hash is exact or supersession preserves the legacy hash and pins replacement hash`,
-      (disk?.exists === true &&
-        disk?.sha === expected.sha &&
-        disk?.canonicalSha === expected.sha) ||
-        (supersession !== undefined &&
-          disk?.exists === false &&
-          supersession.legacyCanonicalSha256 === expected.sha &&
-          replacementLocal?.sha256 ===
-            supersession.replacementCanonicalSha256 &&
-          replacementExtension?.canonicalSha256 ===
-            supersession.replacementCanonicalSha256),
-    );
-    check(
-      `${label}: manifest SHA equals the active source identity or preserved legacy pin`,
+    check(`${label}: local migration is exactly pinned or explicitly superseded by a pinned replacement`,
+      exactLegacyOrSupersededIdentity);
+    check(`${label}: manifest entry matches the pinned identity`,
+      pin?.version === expected.version && pin?.name === expected.name && pin?.path === expected.path && pin?.phase === expected.phase);
+    check(`${label}: source hash is exact or supersession preserves the legacy hash and pins replacement hash`,
+      (disk?.exists === true && disk?.sha === expected.sha && disk?.canonicalSha === expected.sha) ||
+      (supersession !== undefined &&
+        disk?.exists === false &&
+        supersession.legacyCanonicalSha256 === expected.sha &&
+        replacementLocal?.sha256 === supersession.replacementCanonicalSha256 &&
+        replacementExtension?.canonicalSha256 === supersession.replacementCanonicalSha256));
+    check(`${label}: manifest SHA equals the active source identity or preserved legacy pin`,
       pin?.sha256 === expected.sha &&
-        (pin?.sha256 === local?.sha256 ||
-          supersession?.legacyCanonicalSha256 === expected.sha),
-    );
-    check(
-      `${label}: is PENDING and is never also claimed applied`,
+      (pin?.sha256 === local?.sha256 || supersession?.legacyCanonicalSha256 === expected.sha));
+    check(`${label}: is PENDING and is never also claimed applied`,
       pin?.operationalStatus === "PENDING" &&
-        !appliedTruth.some((record) => record.version === expected.version),
-    );
-    const expectedRemoteStatus =
-      expected.remoteVersionStatus ?? "NOT_PROVEN_OFFLINE";
-    check(
-      `${label}: claims NO application evidence and NO remote history`,
-      pin?.appliedToStaging === false &&
-        pin?.appliedToProduction === false &&
-        pin?.remoteVersionStatus === expectedRemoteStatus &&
-        !("remoteHistoryCountAfterApply" in (pin ?? {})) &&
-        !("appliedEvidenceMarker" in (pin ?? {})),
-    );
-    check(
-      `${label}: any direct read-only absence evidence is pinned exactly`,
+      !appliedTruth.some((record) => record.version === expected.version));
+    const expectedRemoteStatus = expected.remoteVersionStatus ?? "NOT_PROVEN_OFFLINE";
+    check(`${label}: claims NO application evidence and NO remote history`,
+      pin?.appliedToStaging === false && pin?.appliedToProduction === false &&
+      pin?.remoteVersionStatus === expectedRemoteStatus &&
+      !("remoteHistoryCountAfterApply" in (pin ?? {})) &&
+      !("appliedEvidenceMarker" in (pin ?? {})));
+    check(`${label}: any direct read-only absence evidence is pinned exactly`,
       expected.remoteHistoryReadEvidence === undefined
         ? !("remoteHistoryReadEvidence" in (pin ?? {}))
-        : pin?.remoteHistoryReadEvidence === expected.remoteHistoryReadEvidence,
-    );
-    check(
-      `${label}: still requires its own separate deployment gate`,
-      pin?.requiresSeparateStagingDeploymentGate === true &&
-        pin?.appliedByThisPhase === false,
-    );
+        : pin?.remoteHistoryReadEvidence === expected.remoteHistoryReadEvidence);
+    check(`${label}: still requires its own separate deployment gate`,
+      pin?.requiresSeparateStagingDeploymentGate === true && pin?.appliedByThisPhase === false);
   }
 
   // Per-migration exact identity, hash, evidence and remote-history assertions.
   for (const expected of POST_ANCHOR_APPLIED) {
     const label = `${expected.phase} ${expected.version}`;
-    const local = postAnchorLocal.find(
-      (record) => record.version === expected.version,
-    );
-    const pin = appliedPins?.find(
-      (record) => record.version === expected.version,
-    );
+    const local = postAnchorLocal.find((record) => record.version === expected.version);
+    const pin = appliedPins?.find((record) => record.version === expected.version);
     const disk = state.postAnchorOnDisk?.[expected.version];
 
-    check(
-      `${label}: local migration is exactly the pinned version/name/file`,
-      local?.version === expected.version &&
-        local?.name === expected.name &&
-        local?.filename === expected.filename,
-    );
-    check(
-      `${label}: manifest entry matches the pinned identity`,
-      pin?.version === expected.version &&
-        pin?.name === expected.name &&
-        pin?.path === expected.path &&
-        pin?.phase === expected.phase,
-    );
-    check(
-      `${label}: source exists and raw/canonical SHA are exact`,
-      disk?.exists === true &&
-        disk?.sha === expected.sha &&
-        disk?.canonicalSha === expected.sha,
-    );
-    check(
-      `${label}: manifest SHA equals the on-disk SHA`,
-      pin?.sha256 === expected.sha && pin?.sha256 === local?.sha256,
-    );
-    check(
-      `${label}: recorded APPLIED with its own truthful imported evidence marker`,
-      pin?.operationalStatus === "APPLIED" &&
-        pin?.appliedEvidenceMarker === expected.marker &&
-        pin?.appliedEvidenceType ===
-          (expected.evidenceType ?? APPLIED_EVIDENCE_TYPE),
-    );
-    check(
-      `${label}: remote history after apply is exactly ${expected.remoteHistory}`,
-      pin?.remoteHistoryCountAfterApply === expected.remoteHistory,
-    );
-    check(
-      `${label}: applied exactly once, with its pinned applied-by-this-phase truth`,
-      pin?.appliedExactlyOnce === true &&
-        pin?.appliedByThisPhase === (expected.appliedByThisPhase ?? false),
-    );
-    check(
-      `${label}: absent from the pending list`,
-      !pendingPins?.some((record) => record.version === expected.version),
-    );
-    check(
-      `${label}: claims no un-proven offline remote status`,
-      !("remoteVersionStatus" in (pin ?? {})),
-    );
+    check(`${label}: local migration is exactly the pinned version/name/file`,
+      local?.version === expected.version && local?.name === expected.name && local?.filename === expected.filename);
+    check(`${label}: manifest entry matches the pinned identity`,
+      pin?.version === expected.version && pin?.name === expected.name && pin?.path === expected.path && pin?.phase === expected.phase);
+    check(`${label}: source exists and raw/canonical SHA are exact`,
+      disk?.exists === true && disk?.sha === expected.sha && disk?.canonicalSha === expected.sha);
+    check(`${label}: manifest SHA equals the on-disk SHA`,
+      pin?.sha256 === expected.sha && pin?.sha256 === local?.sha256);
+    check(`${label}: recorded APPLIED with its own truthful imported evidence marker`,
+      pin?.operationalStatus === "APPLIED" && pin?.appliedEvidenceMarker === expected.marker &&
+      pin?.appliedEvidenceType === (expected.evidenceType ?? APPLIED_EVIDENCE_TYPE));
+    check(`${label}: remote history after apply is exactly ${expected.remoteHistory}`,
+      pin?.remoteHistoryCountAfterApply === expected.remoteHistory);
+    check(`${label}: applied exactly once, with its pinned applied-by-this-phase truth`,
+      pin?.appliedExactlyOnce === true && pin?.appliedByThisPhase === (expected.appliedByThisPhase ?? false));
+    check(`${label}: absent from the pending list`,
+      !pendingPins?.some((record) => record.version === expected.version));
+    check(`${label}: claims no un-proven offline remote status`,
+      !("remoteVersionStatus" in (pin ?? {})));
   }
 
-  check(
-    "the ten applied markers are all distinct",
+  check("the ten applied markers are all distinct",
     new Set(POST_ANCHOR_APPLIED.map((m) => m.marker)).size === 10 &&
-      new Set((appliedPins ?? []).map((record) => record.appliedEvidenceMarker))
-        .size === 10,
-  );
-  check(
-    "all fifteen evidence markers across applied and reconciled are distinct",
-    new Set(appliedTruth.map((record) => record.appliedEvidenceMarker)).size ===
-      15,
-  );
-  check(
-    "the reconciled five never borrow an applied-ten marker or evidence type",
-    (reconciledPins ?? []).every(
-      (record) =>
-        !POST_ANCHOR_APPLIED.some(
-          (m) => m.marker === record.appliedEvidenceMarker,
-        ) && record.appliedEvidenceType !== APPLIED_EVIDENCE_TYPE,
-    ),
-  );
-  check(
-    "every pinned applied-history version maps to a real migration source file",
+    new Set((appliedPins ?? []).map((record) => record.appliedEvidenceMarker)).size === 10);
+  check("all fifteen evidence markers across applied and reconciled are distinct",
+    new Set(appliedTruth.map((record) => record.appliedEvidenceMarker)).size === 15);
+  check("the reconciled five never borrow an applied-ten marker or evidence type",
+    (reconciledPins ?? []).every((record) =>
+      !POST_ANCHOR_APPLIED.some((m) => m.marker === record.appliedEvidenceMarker) &&
+      record.appliedEvidenceType !== APPLIED_EVIDENCE_TYPE));
+  check("every pinned applied-history version maps to a real migration source file",
     appliedTruth.every((record) => {
       const local = localByVersion.get(record.version);
-      return (
-        local !== undefined &&
-        record.path === `supabase/migrations/${local.filename}` &&
-        record.name === local.name &&
-        record.sha256 === local.sha256
-      );
-    }),
-  );
-  check(
-    "the reconciled interval is pinned exactly as both remote histories return it",
-    same(
-      manifest.historyReconciliation?.certifiedHistory?.map((r) => [
-        r.version,
-        r.name,
-      ]),
-      RECONCILED_HISTORY,
-    ),
-  );
-  check(
-    "the reconciliation is documentary only: no migration added, removed, renamed or edited",
+      return local !== undefined && record.path === `supabase/migrations/${local.filename}` &&
+        record.name === local.name && record.sha256 === local.sha256;
+    }));
+  check("the reconciled interval is pinned exactly as both remote histories return it",
+    same(manifest.historyReconciliation?.certifiedHistory?.map((r) => [r.version, r.name]), RECONCILED_HISTORY));
+  check("the reconciliation is documentary only: no migration added, removed, renamed or edited",
     manifest.historyReconciliation?.migrationFilesChanged === 0 &&
-      manifest.historyReconciliation?.migrationsAdded === 0 &&
-      manifest.historyReconciliation?.migrationsRemoved === 0 &&
-      manifest.historyReconciliation?.migrationsRenamed === 0 &&
-      manifest.historyReconciliation?.migrationCount ===
-        RECONCILIATION_MIGRATION_COUNT &&
-      manifest.historyReconciliation?.databaseMutationAuthorized === false,
-  );
+    manifest.historyReconciliation?.migrationsAdded === 0 &&
+    manifest.historyReconciliation?.migrationsRemoved === 0 &&
+    manifest.historyReconciliation?.migrationsRenamed === 0 &&
+    manifest.historyReconciliation?.migrationCount === RECONCILIATION_MIGRATION_COUNT &&
+    manifest.historyReconciliation?.databaseMutationAuthorized === false);
   // ...and the live tree is exactly the pinned tree, one migration larger, with the
   // difference accounted for as an explicitly pinned PENDING entry and nothing else.
-  check(
-    "every migration added since that reconciliation is explicitly pinned by legacy truth or the post-G1 extension",
+  check("every migration added since that reconciliation is explicitly pinned by legacy truth or the post-G1 extension",
     expectedLiveMigrationCount - RECONCILIATION_MIGRATION_COUNT ===
-      POST_ANCHOR_PENDING.length -
-        supersededLegacyPins.length +
-        POST_ANCHOR_STAGING_APPLIED.length +
-        extensionRecords.length &&
-      state.migrations.length === expectedLiveMigrationCount,
-  );
-  check(
-    "the reconciliation authorizes no production apply and names both project refs correctly",
+      (POST_ANCHOR_PENDING.length - supersededLegacyPins.length) + POST_ANCHOR_STAGING_APPLIED.length + extensionRecords.length &&
+    state.migrations.length === expectedLiveMigrationCount);
+  check("the reconciliation authorizes no production apply and names both project refs correctly",
     manifest.historyReconciliation?.productionApplyAuthorized === false &&
-      manifest.historyReconciliation?.staging?.projectRef ===
-        "uckafzuochmbvtiodmcl" &&
-      manifest.historyReconciliation?.production?.projectRef ===
-        "yqpgcsduqbxulrlzwzap",
-  );
-  check(
-    "the reconciliation states plainly which environment was read first-party and which is owner-certified",
-    manifest.historyReconciliation?.production
-      ?.directReadPerformedByThisPhase === true &&
-      manifest.historyReconciliation?.staging
-        ?.directReadPerformedByThisPhase === false &&
-      typeof manifest.historyReconciliation?.staging?.directReadBlockedBy ===
-        "string" &&
-      (
-        manifest.historyReconciliation?.staging
-          ?.corroboratingReadOnlyObjectProbes ?? []
-      ).length === 3,
-  );
-  check(
-    "20260817000000 (the audit_logs forward repair) is represented as APPLIED, never pending",
-    reconciledPins?.some(
-      (r) =>
-        r.version === "20260817000000" && r.operationalStatus === "APPLIED",
-    ) === true && !pendingPins?.some((r) => r.version === "20260817000000"),
-  );
-  check(
-    "the reconciliation document exists and states the reconciled truth",
+    manifest.historyReconciliation?.staging?.projectRef === "uckafzuochmbvtiodmcl" &&
+    manifest.historyReconciliation?.production?.projectRef === "yqpgcsduqbxulrlzwzap");
+  check("the reconciliation states plainly which environment was read first-party and which is owner-certified",
+    manifest.historyReconciliation?.production?.directReadPerformedByThisPhase === true &&
+    manifest.historyReconciliation?.staging?.directReadPerformedByThisPhase === false &&
+    typeof manifest.historyReconciliation?.staging?.directReadBlockedBy === "string" &&
+    (manifest.historyReconciliation?.staging?.corroboratingReadOnlyObjectProbes ?? []).length === 3);
+  check("20260817000000 (the audit_logs forward repair) is represented as APPLIED, never pending",
+    reconciledPins?.some((r) => r.version === "20260817000000" && r.operationalStatus === "APPLIED") === true &&
+    !pendingPins?.some((r) => r.version === "20260817000000"));
+  check("the reconciliation document exists and states the reconciled truth",
     state.reconciliationDoc.includes("QF-MVP-80.05") &&
-      RECONCILED_HISTORY.every(([version]) =>
-        state.reconciliationDoc.includes(version),
-      ) &&
-      state.reconciliationDoc.includes("ZERO migrations applied"),
-  );
-  check(
-    "the ten remote-history counts are exactly 21 through 30 in ascending order",
-    same(
-      (appliedPins ?? []).map((record) => record.remoteHistoryCountAfterApply),
-      [21, 22, 23, 24, 25, 26, 27, 28, 29, 30],
-    ),
-  );
-  check(
-    "exactly one post-anchor migration is applied by the phase that pinned it",
-    (appliedPins ?? []).filter((record) => record.appliedByThisPhase === true)
-      .length === 1 &&
-      (appliedPins ?? []).find((record) => record.appliedByThisPhase === true)
-        ?.version === "20260812000000",
-  );
-  check(
-    "G1 still claims no database access of its own",
-    manifest.evidence?.g1PerformsDatabaseAccess === false,
-  );
-  check(
-    "newest local migration is the newest explicitly pinned legacy-plus-extension migration",
-    newestVersion === currentPostAnchorOrder[currentPostAnchorOrder.length - 1],
-  );
-  check(
-    "no generic future-migration allowance is granted",
-    manifest.safety?.genericFutureMigrationAllowanceForbidden === true &&
-      manifest.safety?.postAnchorMigrationsMustBeExplicitlyPinned === true &&
-      manifest.safety?.postAnchorMigrationsRequireOwnStagingGate === true,
-  );
+    RECONCILED_HISTORY.every(([version]) => state.reconciliationDoc.includes(version)) &&
+    state.reconciliationDoc.includes("ZERO migrations applied"));
+  check("the ten remote-history counts are exactly 21 through 30 in ascending order",
+    same((appliedPins ?? []).map((record) => record.remoteHistoryCountAfterApply), [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]));
+  check("exactly one post-anchor migration is applied by the phase that pinned it",
+    (appliedPins ?? []).filter((record) => record.appliedByThisPhase === true).length === 1 &&
+    (appliedPins ?? []).find((record) => record.appliedByThisPhase === true)?.version === "20260812000000");
+  check("G1 still claims no database access of its own", manifest.evidence?.g1PerformsDatabaseAccess === false);
+  check("newest local migration is the newest explicitly pinned legacy-plus-extension migration",
+    newestVersion === currentPostAnchorOrder[currentPostAnchorOrder.length - 1]);
+  check("no generic future-migration allowance is granted", manifest.safety?.genericFutureMigrationAllowanceForbidden === true && manifest.safety?.postAnchorMigrationsMustBeExplicitlyPinned === true && manifest.safety?.postAnchorMigrationsRequireOwnStagingGate === true);
   check("S1 evidence file exists", state.s1Exists);
-  check(
-    "S1 provenance and historical main are exact",
-    state.s1.includes("IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD") &&
-      state.s1.includes("Not generated by G1") &&
-      state.s1.includes("e511166119703c6044a73d4629a031a6685a3415"),
-  );
-  check(
-    "S1 project and target identity are exact",
-    state.s1.includes("QuickFurno Staging") &&
-      state.s1.includes("uckafzuochmbvtiodmcl") &&
-      state.s1.includes(TARGET_SHA),
-  );
-  check(
-    "S1 ledger count and prerequisites are exact",
-    state.s1.includes("Remote ledger count: `19`") &&
-      state.s1.includes("`20260801110000`: present") &&
-      state.s1.includes("`20260801152049`: present") &&
-      state.s1.includes("Target `20260803000000`: `0` rows / absent"),
-  );
-  check(
-    "S1 relation and column identity are exact",
-    state.s1.includes("Relation OID: `17826`") &&
-      state.s1.includes("attribute number: `5`") &&
-      state.s1.includes("Base type: `text`") &&
-      state.s1.includes("Nullability: `NOT NULL`") &&
-      state.s1.includes("Default: none"),
-  );
-  check(
-    "S1 constraint identity is exact",
-    state.s1.includes("exactly `1`") &&
-      state.s1.includes("communication_messages_recipient_type_check") &&
-      state.s1.includes("Constraint key: `{5}`") &&
-      state.s1.includes("Constraint validated: `true`"),
-  );
-  const vocabularyBlock =
-    state.s1.match(
-      /The accepted old vocabulary was exactly:\s*([\s\S]*?)\n`lead` was absent\./,
-    )?.[1] ?? "";
-  const observedVocabulary = [
-    ...vocabularyBlock.matchAll(/^- `([^`]+)`$/gm),
-  ].map((match) => match[1]);
-  check(
-    "S1 old vocabulary is exactly five values with lead absent",
-    same(observedVocabulary, [
-      "client",
-      "vendor",
-      "admin",
-      "integration",
-      "system",
-    ]),
-  );
-  check(
-    "S1 row/RLS/policy/trigger invariants are exact",
-    state.s1.includes("row count: `0`") &&
-      state.s1.includes("RLS: enabled") &&
-      state.s1.includes("Policies: `0`") &&
-      state.s1.includes("User triggers: `0`"),
-  );
-  check(
-    "S1 blockers and simulation result are exact",
-    state.s1.includes("Enum/domain rejection: none") &&
-      state.s1.includes("Dependent view/rule blocker: none") &&
-      state.s1.includes("Inbound foreign keys: `3`") &&
-      state.s1.includes("blockers: none") &&
-      state.s1.includes("Migration simulation: PASS"),
-  );
-  check(
-    "S1 carries explicit fresh-preflight warning",
-    state.s1.includes("not a substitute for fresh last-moment preflight") &&
-      state.s1.includes("exact deployment set contains only `20260803000000`"),
-  );
-  check(
-    "governance forbids replay and mass repair",
-    state.governance.includes("**No replay:**") &&
-      state.governance.includes("**No mass repair:**"),
-  );
-  check(
-    "governance forbids baseline revert and copy",
-    state.governance.includes("**No baseline revert or copy:**"),
-  );
-  check(
-    "governance forbids include-all",
-    state.governance.includes(
-      "`--include-all` is forbidden for this lineage",
-    ) &&
-      !/include-all.{0,30}(?:permitted|allowed|authorized)/i.test(
-        state.governance,
-      ),
-  );
-  check(
-    "governance forbids normal full-repository db push",
-    state.governance.includes(
-      "ordinary full-repository `db push` is not an authorized target-deployment mechanism",
-    ),
-  );
-  check(
-    "README checksum correction is present",
-    state.readme.includes("G1 checksum provenance correction") &&
-      state.readme.includes(BASELINE_SHA) &&
-      state.readme.includes("DOCUMENTATION_ERROR_UNREPRODUCIBLE"),
-  );
-  check(
-    "application-report checksum correction is present",
-    state.applicationReport.includes(
-      "Checksum provenance correction — QF-MVP-50.2C-S2-G1",
-    ) &&
-      state.applicationReport.includes(BASELINE_SHA) &&
-      state.applicationReport.includes("40/40"),
-  );
+  check("S1 provenance and historical main are exact", state.s1.includes("IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD") && state.s1.includes("Not generated by G1") && state.s1.includes("e511166119703c6044a73d4629a031a6685a3415"));
+  check("S1 project and target identity are exact", state.s1.includes("QuickFurno Staging") && state.s1.includes("uckafzuochmbvtiodmcl") && state.s1.includes(TARGET_SHA));
+  check("S1 ledger count and prerequisites are exact", state.s1.includes("Remote ledger count: `19`") && state.s1.includes("`20260801110000`: present") && state.s1.includes("`20260801152049`: present") && state.s1.includes("Target `20260803000000`: `0` rows / absent"));
+  check("S1 relation and column identity are exact", state.s1.includes("Relation OID: `17826`") && state.s1.includes("attribute number: `5`") && state.s1.includes("Base type: `text`") && state.s1.includes("Nullability: `NOT NULL`") && state.s1.includes("Default: none"));
+  check("S1 constraint identity is exact", state.s1.includes("exactly `1`") && state.s1.includes("communication_messages_recipient_type_check") && state.s1.includes("Constraint key: `{5}`") && state.s1.includes("Constraint validated: `true`"));
+  const vocabularyBlock = state.s1.match(/The accepted old vocabulary was exactly:\s*([\s\S]*?)\n`lead` was absent\./)?.[1] ?? "";
+  const observedVocabulary = [...vocabularyBlock.matchAll(/^- `([^`]+)`$/gm)].map((match) => match[1]);
+  check("S1 old vocabulary is exactly five values with lead absent", same(observedVocabulary, ["client", "vendor", "admin", "integration", "system"]));
+  check("S1 row/RLS/policy/trigger invariants are exact", state.s1.includes("row count: `0`") && state.s1.includes("RLS: enabled") && state.s1.includes("Policies: `0`") && state.s1.includes("User triggers: `0`"));
+  check("S1 blockers and simulation result are exact", state.s1.includes("Enum/domain rejection: none") && state.s1.includes("Dependent view/rule blocker: none") && state.s1.includes("Inbound foreign keys: `3`") && state.s1.includes("blockers: none") && state.s1.includes("Migration simulation: PASS"));
+  check("S1 carries explicit fresh-preflight warning", state.s1.includes("not a substitute for fresh last-moment preflight") && state.s1.includes("exact deployment set contains only `20260803000000`"));
+  check("governance forbids replay and mass repair", state.governance.includes("**No replay:**") && state.governance.includes("**No mass repair:**"));
+  check("governance forbids baseline revert and copy", state.governance.includes("**No baseline revert or copy:**"));
+  check("governance forbids include-all", state.governance.includes("`--include-all` is forbidden for this lineage") && !/include-all.{0,30}(?:permitted|allowed|authorized)/i.test(state.governance));
+  check("governance forbids normal full-repository db push", state.governance.includes("ordinary full-repository `db push` is not an authorized target-deployment mechanism"));
+  check("README checksum correction is present", state.readme.includes("G1 checksum provenance correction") && state.readme.includes(BASELINE_SHA) && state.readme.includes("DOCUMENTATION_ERROR_UNREPRODUCIBLE"));
+  check("application-report checksum correction is present", state.applicationReport.includes("Checksum provenance correction — QF-MVP-50.2C-S2-G1") && state.applicationReport.includes(BASELINE_SHA) && state.applicationReport.includes("40/40"));
   const correctionText = `${state.readme}\n${state.applicationReport}`;
-  check(
-    "corrections do not positively bind external bytes to 101ac",
-    !/external[^.\n]{0,160}(?:byte-identical|hash(?:es|ed)? to)[^.\n]{0,100}101ac/i.test(
-      correctionText,
-    ),
-  );
-  const allowedStagingHistorySqlFiles = Array.isArray(
-    extension?.allowedStagingHistorySqlFiles,
-  )
+  check("corrections do not positively bind external bytes to 101ac", !/external[^.\n]{0,160}(?:byte-identical|hash(?:es|ed)? to)[^.\n]{0,100}101ac/i.test(correctionText));
+  const allowedStagingHistorySqlFiles = Array.isArray(extension?.allowedStagingHistorySqlFiles)
     ? extension.allowedStagingHistorySqlFiles
     : [];
-  const observedStagingHistorySqlFiles = Object.entries(
-    state.stagingHistorySqlSha256,
-  )
+  const observedStagingHistorySqlFiles = Object.entries(state.stagingHistorySqlSha256)
     .map(([filename, sha256]) => ({ filename, sha256 }))
     .sort((a, b) => a.filename.localeCompare(b.filename));
-  check(
-    "staging-history SQL helpers are an exact hash-pinned allowlist",
+  check("staging-history SQL helpers are an exact hash-pinned allowlist",
     allowedStagingHistorySqlFiles.length === 3 &&
-      same(
-        observedStagingHistorySqlFiles,
-        [...allowedStagingHistorySqlFiles].sort((a, b) =>
-          a.filename.localeCompare(b.filename),
-        ),
-      ),
-  );
+    same(
+      observedStagingHistorySqlFiles,
+      [...allowedStagingHistorySqlFiles].sort((a, b) => a.filename.localeCompare(b.filename)),
+    ));
   const credentialPatterns = [
     /sbp_[A-Za-z0-9_-]{8,}/,
     /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
@@ -2139,1259 +1370,293 @@ function validateState(state) {
     /SUPABASE_DB_PASSWORD\s*[:=]\s*["']?\S{8,}/i,
     /postgres(?:ql)?:\/\//i,
   ];
-  check(
-    "governance artifacts contain no credential-like values",
-    state.governanceFiles.every(({ text }) =>
-      credentialPatterns.every((pattern) => !pattern.test(text)),
-    ),
-  );
-  check(
-    "manifest and documents authorize no production deployment",
-    manifest.scope?.productionImplication === false &&
-      !state.governanceFiles.some(({ text }) =>
-        /production deployment (?:is )?(?:authorized|approved)/i.test(text),
-      ),
-  );
-  check(
-    "anchor SQL remains unchanged by exact hash",
-    state.targetSha === TARGET_SHA,
-  );
-  check(
-    "package script is exact",
-    state.packageJson.scripts?.["test:mvp:50-2c-s2-g1"] ===
-      "node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs",
-  );
-  const expectedCiBlock =
-    /- name: QF-MVP-50\.1B validator\s+run: npm run test:mvp:50-1b\s+- name: QF-MVP-50\.2C-S2-G1 staging history governance\s+run: npm run test:mvp:50-2c-s2-g1\s+# Native Automation Engine replaces the retired n8n execution runtime\.\s+# It keeps the hardened Core\/Postgres action, queue, retry, consent and\s+# communication authorities while removing HTTP polling\/orchestration\.\s+- name: QuickFurno Native Automation Engine guard\s+run: npm run test:automation-native/;
-  check(
-    "CI G1 history guard remains between durable persistence and the native runtime guard",
-    expectedCiBlock.test(state.workflow),
-  );
-  check(
-    "CI exact-head checkout remains",
-    state.workflow.includes(
-      "ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}",
-    ) &&
-      state.workflow.includes("fetch-depth: 0") &&
-      state.workflow.includes("Verify exact checked-out SHA"),
-  );
-  check(
-    "CI Node 24 and install remain",
-    (state.workflow.includes("node-version: '24'") ||
-      state.workflow.includes('node-version: "24"')) &&
-      state.workflow.includes("run: npm ci"),
-  );
-  const existingGates = [
-    "QF-MVP-40.4 template catalogue",
-    "QF-MVP-40.10A Meta template contract",
-    "QF-MVP-40.10B Wave 1 readiness",
-    "QF-MVP-40.11 inactive mapping readiness",
-    "QF-MVP-40.12-R1 business template bindings",
-    "QF-MVP-50.1A validator",
-    "QF-MVP-50.1B validator",
-    "QF-MVP-50.2C-S2-G1 staging history governance",
-    "QuickFurno Native Automation Engine guard",
-    "Automation Studio control-plane guard",
-    "Typecheck",
-    "Build",
-  ];
-  const retiredExternalRuntimeGates = [
-    "QF-MVP-50.1C validator",
-    "QF-MVP-50.2A validator",
-    "QF-MVP-50.2B validator",
-    "QF-MVP-50.2C validator",
-    "QF-MVP-50.2D validator",
-  ];
-  check(
-    "CI preserves durable/history gates and replaces retired external-runtime gates with native guards",
-    existingGates.every((gate) => state.workflow.includes(`- name: ${gate}`)) &&
-      retiredExternalRuntimeGates.every(
-        (gate) => !state.workflow.includes(`- name: ${gate}`),
-      ),
-  );
-  check(
-    "CI adds no secrets, Supabase command, database command, or deployment",
-    !state.workflow.includes("${{ secrets.") &&
-      !/^\s*(?:run:\s*)?(?:npx\s+)?supabase\s+/im.test(state.workflow) &&
-      !/\bdb push\b/i.test(state.workflow) &&
-      !/^\s*run:.*\bdeploy\b/im.test(state.workflow),
-  );
-  check(
-    "manifest safety rules are all fail closed",
-    manifest.safety?.baselineMustRemainOutsideMigrations === true &&
-      manifest.safety?.preBaselineReplayForbidden === true &&
-      manifest.safety?.preBaselineMassRepairAsAppliedForbidden === true &&
-      manifest.safety?.baselineRemoteRowRevertForbidden === true &&
-      manifest.safety?.includeAllForbiddenForThisLineage === true &&
-      manifest.safety?.ordinaryFullRepositoryDbPushAuthorizedForTarget ===
-        false &&
-      manifest.safety?.targetRequiresFreshPreflight === true &&
-      manifest.safety?.targetRequiresExactOneTargetDryRun === true &&
-      manifest.safety?.targetRequiresIsolatedVersionPreservingDesign === true &&
-      manifest.safety?.targetRequiresIndependentPostApplyVerification === true,
-  );
-  check(
-    "manifest evidence records accepted L3 and imported S1",
-    manifest.evidence?.acceptedL3Decision === "L3_DESIGN_A" &&
-      manifest.evidence?.importedS1EvidenceType ===
-        "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD" &&
-      manifest.evidence?.importedS1EvidencePath === S1_PATH &&
-      manifest.evidence?.g1PerformsDatabaseAccess === false,
-  );
+  check("governance artifacts contain no credential-like values", state.governanceFiles.every(({ text }) => credentialPatterns.every((pattern) => !pattern.test(text))));
+  check("manifest and documents authorize no production deployment", manifest.scope?.productionImplication === false && !state.governanceFiles.some(({ text }) => /production deployment (?:is )?(?:authorized|approved)/i.test(text)));
+  check("anchor SQL remains unchanged by exact hash", state.targetSha === TARGET_SHA);
+  check("package script is exact", state.packageJson.scripts?.["test:mvp:50-2c-s2-g1"] === "node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
+  const expectedCiBlock = /- name: QF-MVP-50\.1B validator\s+run: npm run test:mvp:50-1b\s+- name: QF-MVP-50\.2C-S2-G1 staging history governance\s+run: npm run test:mvp:50-2c-s2-g1\s+# Native Automation Engine replaces the retired n8n execution runtime\.\s+# It keeps the hardened Core\/Postgres action, queue, retry, consent and\s+# communication authorities while removing HTTP polling\/orchestration\.\s+- name: QuickFurno Native Automation Engine guard\s+run: npm run test:automation-native/;
+  check("CI G1 history guard remains between durable persistence and the native runtime guard", expectedCiBlock.test(state.workflow));
+  check("CI exact-head checkout remains", state.workflow.includes("ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}") && state.workflow.includes("fetch-depth: 0") && state.workflow.includes("Verify exact checked-out SHA"));
+  check("CI Node 24 and install remain", (state.workflow.includes("node-version: '24'") || state.workflow.includes('node-version: "24"')) && state.workflow.includes("run: npm ci"));
+  const existingGates = ["QF-MVP-40.4 template catalogue", "QF-MVP-40.10A Meta template contract", "QF-MVP-40.10B Wave 1 readiness", "QF-MVP-40.11 inactive mapping readiness", "QF-MVP-40.12-R1 business template bindings", "QF-MVP-50.1A validator", "QF-MVP-50.1B validator", "QF-MVP-50.2C-S2-G1 staging history governance", "QuickFurno Native Automation Engine guard", "Automation Studio control-plane guard", "Typecheck", "Build"];
+  const retiredExternalRuntimeGates = ["QF-MVP-50.1C validator", "QF-MVP-50.2A validator", "QF-MVP-50.2B validator", "QF-MVP-50.2C validator", "QF-MVP-50.2D validator"];
+  check("CI preserves durable/history gates and replaces retired external-runtime gates with native guards", existingGates.every((gate) => state.workflow.includes(`- name: ${gate}`)) && retiredExternalRuntimeGates.every((gate) => !state.workflow.includes(`- name: ${gate}`)));
+  check("CI adds no secrets, Supabase command, database command, or deployment", !state.workflow.includes("${{ secrets.") && !/^\s*(?:run:\s*)?(?:npx\s+)?supabase\s+/mi.test(state.workflow) && !/\bdb push\b/i.test(state.workflow) && !/^\s*run:.*\bdeploy\b/mi.test(state.workflow));
+  check("manifest safety rules are all fail closed", manifest.safety?.baselineMustRemainOutsideMigrations === true && manifest.safety?.preBaselineReplayForbidden === true && manifest.safety?.preBaselineMassRepairAsAppliedForbidden === true && manifest.safety?.baselineRemoteRowRevertForbidden === true && manifest.safety?.includeAllForbiddenForThisLineage === true && manifest.safety?.ordinaryFullRepositoryDbPushAuthorizedForTarget === false && manifest.safety?.targetRequiresFreshPreflight === true && manifest.safety?.targetRequiresExactOneTargetDryRun === true && manifest.safety?.targetRequiresIsolatedVersionPreservingDesign === true && manifest.safety?.targetRequiresIndependentPostApplyVerification === true);
+  check("manifest evidence records accepted L3 and imported S1", manifest.evidence?.acceptedL3Decision === "L3_DESIGN_A" && manifest.evidence?.importedS1EvidenceType === "IMPORTED_OWNER_REVIEWED_EXTERNAL_EXECUTION_RECORD" && manifest.evidence?.importedS1EvidencePath === S1_PATH && manifest.evidence?.g1PerformsDatabaseAccess === false);
 
   return { results, failures: results.filter((result) => !result.passed) };
 }
 
 function runMutants(pristineState) {
   const cases = [
-    [
-      "baseline SHA changed",
-      (state) => {
-        state.baselineSha = "0".repeat(64);
-      },
-    ],
-    [
-      "920a status restored as valid",
-      (state) => {
-        state.manifest.baseline.historicalDocumentedShaStatus = "VALID";
-      },
-    ],
-    [
-      "one pre-baseline version omitted",
-      (state) => {
-        state.manifest.preBaselineChain.records.pop();
-      },
-    ],
-    [
-      "one pre-baseline SHA changed",
-      (state) => {
-        state.manifest.preBaselineChain.records[0].sha256 = "f".repeat(64);
-      },
-    ],
-    [
-      "anchor inserted into postBaselineApplied",
-      (state) => {
-        state.manifest.postBaselineApplied.push({ version: TARGET_VERSION });
-      },
-    ],
-    [
-      "anchor SHA changed",
-      (state) => {
-        state.manifest.appliedAnchor.sha256 = "a".repeat(64);
-      },
-    ],
-    [
-      "anchor demoted back to PENDING without evidence",
-      (state) => {
-        state.manifest.appliedAnchor.operationalStatus = "PENDING";
-      },
-    ],
-    [
-      "anchor applied-evidence marker forged",
-      (state) => {
-        state.manifest.appliedAnchor.appliedEvidenceMarker =
-          "QF_MVP_FAKE_MARKER";
-      },
-    ],
-    [
-      "newer fake migration added",
-      (state) => {
-        state.migrations.push({
-          filename: "20260901000000_fake.sql",
-          version: "20260901000000",
-          name: "fake",
-          sha256: "b".repeat(64),
-          malformed: false,
-        });
-      },
-    ],
+    ["baseline SHA changed", (state) => { state.baselineSha = "0".repeat(64); }],
+    ["920a status restored as valid", (state) => { state.manifest.baseline.historicalDocumentedShaStatus = "VALID"; }],
+    ["one pre-baseline version omitted", (state) => { state.manifest.preBaselineChain.records.pop(); }],
+    ["one pre-baseline SHA changed", (state) => { state.manifest.preBaselineChain.records[0].sha256 = "f".repeat(64); }],
+    ["anchor inserted into postBaselineApplied", (state) => { state.manifest.postBaselineApplied.push({ version: TARGET_VERSION }); }],
+    ["anchor SHA changed", (state) => { state.manifest.appliedAnchor.sha256 = "a".repeat(64); }],
+    ["anchor demoted back to PENDING without evidence", (state) => { state.manifest.appliedAnchor.operationalStatus = "PENDING"; }],
+    ["anchor applied-evidence marker forged", (state) => { state.manifest.appliedAnchor.appliedEvidenceMarker = "QF_MVP_FAKE_MARKER"; }],
+    ["newer fake migration added", (state) => { state.migrations.push({ filename: "20260901000000_fake.sql", version: "20260901000000", name: "fake", sha256: "b".repeat(64), malformed: false }); }],
     // --- QF-MVP-50.2E-S2-G1 post-anchor pin strength: BOTH APPLIED ------------
-    [
-      "50.2E left PENDING",
-      (state) => {
-        const [e] = state.manifest.appliedPostAnchorMigrations.splice(1, 1);
-        state.manifest.pendingPostAnchorMigrations.push({
-          ...e,
-          operationalStatus: "PENDING",
-          remoteVersionStatus: "NOT_PROVEN_OFFLINE",
-        });
-      },
-    ],
-    [
-      "50.2E applied but marker missing",
-      (state) => {
-        delete state.manifest.appliedPostAnchorMigrations[1]
-          .appliedEvidenceMarker;
-      },
-    ],
-    [
-      "50.2E marker forged",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[1].appliedEvidenceMarker =
-          "QF_MVP_FAKE_50_2E_MARKER";
-      },
-    ],
-    [
-      "50.2E marker copied from 50.2D",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[1].appliedEvidenceMarker =
-          POST_ANCHOR_APPLIED[0].marker;
-      },
-    ],
-    [
-      "50.2E remote history 21 instead of 22",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[1].remoteHistoryCountAfterApply = 21;
-      },
-    ],
-    [
-      "50.2E remote history 23",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[1].remoteHistoryCountAfterApply = 23;
-      },
-    ],
-    [
-      "50.2E manifest SHA drift",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[1].sha256 = "e".repeat(64);
-      },
-    ],
-    [
-      "50.2E on-disk SHA drift",
-      (state) => {
-        state.postAnchorOnDisk["20260805000000"].sha = "d".repeat(64);
-        state.postAnchorOnDisk["20260805000000"].canonicalSha = "d".repeat(64);
-      },
-    ],
-    [
-      "50.2E appliedExactlyOnce false",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[1].appliedExactlyOnce = false;
-      },
-    ],
-    [
-      "50.2E evidence type changed",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[1].appliedEvidenceType =
-          "SELF_ASSERTED";
-      },
-    ],
-    [
-      "50.2E claimed applied by this source phase",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[1].appliedByThisPhase = true;
-      },
-    ],
-    [
-      "50.2E fabricated offline remote status field",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[1].remoteVersionStatus =
-          "PRESENT";
-      },
-    ],
-    [
-      "50.2E migration renamed",
-      (state) => {
-        const record = state.migrations.find(
-          (m) => m.version === "20260805000000",
-        );
-        record.name = "qf_mvp_50_2e_renamed";
-        record.filename = "20260805000000_qf_mvp_50_2e_renamed.sql";
-      },
-    ],
-    [
-      "50.2E migration missing from disk",
-      (state) => {
-        state.migrations = state.migrations.filter(
-          (m) => m.version !== "20260805000000",
-        );
-        state.postAnchorOnDisk["20260805000000"].exists = false;
-      },
-    ],
+    ["50.2E left PENDING", (state) => {
+      const [e] = state.manifest.appliedPostAnchorMigrations.splice(1, 1);
+      state.manifest.pendingPostAnchorMigrations.push({ ...e, operationalStatus: "PENDING", remoteVersionStatus: "NOT_PROVEN_OFFLINE" });
+    }],
+    ["50.2E applied but marker missing", (state) => { delete state.manifest.appliedPostAnchorMigrations[1].appliedEvidenceMarker; }],
+    ["50.2E marker forged", (state) => { state.manifest.appliedPostAnchorMigrations[1].appliedEvidenceMarker = "QF_MVP_FAKE_50_2E_MARKER"; }],
+    ["50.2E marker copied from 50.2D", (state) => { state.manifest.appliedPostAnchorMigrations[1].appliedEvidenceMarker = POST_ANCHOR_APPLIED[0].marker; }],
+    ["50.2E remote history 21 instead of 22", (state) => { state.manifest.appliedPostAnchorMigrations[1].remoteHistoryCountAfterApply = 21; }],
+    ["50.2E remote history 23", (state) => { state.manifest.appliedPostAnchorMigrations[1].remoteHistoryCountAfterApply = 23; }],
+    ["50.2E manifest SHA drift", (state) => { state.manifest.appliedPostAnchorMigrations[1].sha256 = "e".repeat(64); }],
+    ["50.2E on-disk SHA drift", (state) => { state.postAnchorOnDisk["20260805000000"].sha = "d".repeat(64); state.postAnchorOnDisk["20260805000000"].canonicalSha = "d".repeat(64); }],
+    ["50.2E appliedExactlyOnce false", (state) => { state.manifest.appliedPostAnchorMigrations[1].appliedExactlyOnce = false; }],
+    ["50.2E evidence type changed", (state) => { state.manifest.appliedPostAnchorMigrations[1].appliedEvidenceType = "SELF_ASSERTED"; }],
+    ["50.2E claimed applied by this source phase", (state) => { state.manifest.appliedPostAnchorMigrations[1].appliedByThisPhase = true; }],
+    ["50.2E fabricated offline remote status field", (state) => { state.manifest.appliedPostAnchorMigrations[1].remoteVersionStatus = "PRESENT"; }],
+    ["50.2E migration renamed", (state) => {
+      const record = state.migrations.find((m) => m.version === "20260805000000");
+      record.name = "qf_mvp_50_2e_renamed";
+      record.filename = "20260805000000_qf_mvp_50_2e_renamed.sql";
+    }],
+    ["50.2E migration missing from disk", (state) => {
+      state.migrations = state.migrations.filter((m) => m.version !== "20260805000000");
+      state.postAnchorOnDisk["20260805000000"].exists = false;
+    }],
     // QF-MVP-50.5 RE-PIN: the fake versions moved to 20260813000000 because
     // 20260812000000 is now a REAL pinned pending migration.
     // QF-MVP-40.13B RE-PIN: the fake version moved to 20260814000000 because
     // 20260813000000 is now a REAL pinned pending migration.
-    [
-      "an unpinned new pending entry silently added",
-      (state) => {
-        state.manifest.pendingPostAnchorMigrations.push({
-          version: "20260818000000",
-          name: "sixteenth",
-          path: "supabase/migrations/20260818000000_sixteenth.sql",
-          sha256: "f".repeat(64),
-          phase: "QF-MVP-50.6",
-          operationalStatus: "PENDING",
-          remoteVersionStatus: "NOT_PROVEN_OFFLINE",
-          requiresSeparateStagingDeploymentGate: true,
-          appliedByThisPhase: false,
-        });
-      },
-    ],
-    [
-      "the pending list key deleted entirely instead of pinned",
-      (state) => {
-        delete state.manifest.pendingPostAnchorMigrations;
-      },
-    ],
+    ["an unpinned new pending entry silently added", (state) => { state.manifest.pendingPostAnchorMigrations.push({ version: "20260818000000", name: "sixteenth", path: "supabase/migrations/20260818000000_sixteenth.sql", sha256: "f".repeat(64), phase: "QF-MVP-50.6", operationalStatus: "PENDING", remoteVersionStatus: "NOT_PROVEN_OFFLINE", requiresSeparateStagingDeploymentGate: true, appliedByThisPhase: false }); }],
+    ["the pending list key deleted entirely instead of pinned", (state) => { delete state.manifest.pendingPostAnchorMigrations; }],
 
     // --- QF-MVP-80.14A: the ONE pinned pending activation authority ------------
     // This migration creates the only function that can turn production sending
     // on, so every way of quietly promoting it past its own gate is a mutant.
-    [
-      "the pending activation authority is emptied away",
-      (state) => {
-        state.manifest.pendingPostAnchorMigrations = [];
-      },
-    ],
-    [
-      "the pending activation authority is claimed APPLIED",
-      (state) => {
-        state.manifest.pendingPostAnchorMigrations[0].operationalStatus =
-          "APPLIED";
-      },
-    ],
-    [
-      "the pending activation authority is also listed as applied",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations.push(
-          clone(state.manifest.pendingPostAnchorMigrations[0]),
-        );
-      },
-    ],
-    [
-      "the pending activation authority claims it was applied to production",
-      (state) => {
-        state.manifest.pendingPostAnchorMigrations[0].appliedToProduction = true;
-      },
-    ],
-    [
-      "the pending activation authority's SHA drifts from disk",
-      (state) => {
-        state.manifest.pendingPostAnchorMigrations[0].sha256 = "a".repeat(64);
-      },
-    ],
-    [
-      "the pending activation authority waives its own deployment gate",
-      (state) => {
-        state.manifest.pendingPostAnchorMigrations[0].requiresSeparateStagingDeploymentGate = false;
-      },
-    ],
-    [
-      "the pending activation authority fabricates a remote history count",
-      (state) => {
-        state.manifest.pendingPostAnchorMigrations[0].remoteHistoryCountAfterApply = 31;
-      },
-    ],
+    ["the pending activation authority is emptied away", (state) => { state.manifest.pendingPostAnchorMigrations = []; }],
+    ["the pending activation authority is claimed APPLIED", (state) => {
+      state.manifest.pendingPostAnchorMigrations[0].operationalStatus = "APPLIED";
+    }],
+    ["the pending activation authority is also listed as applied", (state) => {
+      state.manifest.appliedPostAnchorMigrations.push(clone(state.manifest.pendingPostAnchorMigrations[0]));
+    }],
+    ["the pending activation authority claims it was applied to production", (state) => {
+      state.manifest.pendingPostAnchorMigrations[0].appliedToProduction = true;
+    }],
+    ["the pending activation authority's SHA drifts from disk", (state) => {
+      state.manifest.pendingPostAnchorMigrations[0].sha256 = "a".repeat(64);
+    }],
+    ["the pending activation authority waives its own deployment gate", (state) => {
+      state.manifest.pendingPostAnchorMigrations[0].requiresSeparateStagingDeploymentGate = false;
+    }],
+    ["the pending activation authority fabricates a remote history count", (state) => {
+      state.manifest.pendingPostAnchorMigrations[0].remoteHistoryCountAfterApply = 31;
+    }],
 
     // --- QF-MVP-80.05: the five RECONCILED already-applied authorities ---------
     // Index 0 is 20260813000000 (the canary activation authority); index 4 is
     // 20260817000000 (the audit_logs forward repair). The whole point of this slice is
     // that none of them may be described as pending or unproven ever again.
-    [
-      "the whole reconciled set re-marked SOURCE-PENDING",
-      (state) => {
-        state.manifest.pendingPostAnchorMigrations =
-          state.manifest.reconciledPostAnchorMigrations.map((r) => ({
-            ...r,
-            operationalStatus: "PENDING",
-            remoteVersionStatus: "NOT_PROVEN_OFFLINE",
-            requiresSeparateStagingDeploymentGate: true,
-          }));
-        state.manifest.reconciledPostAnchorMigrations = [];
-      },
-    ],
-    [
-      "20260813-20260816 re-marked SOURCE-PENDING in place",
-      (state) => {
-        for (const record of state.manifest.reconciledPostAnchorMigrations.slice(
-          0,
-          4,
-        )) {
-          record.operationalStatus = "PENDING";
-          record.remoteVersionStatus = "NOT_PROVEN_OFFLINE";
-        }
-      },
-    ],
-    [
-      "one reconciled entry moved back into the pending list",
-      (state) => {
-        const [p] = state.manifest.reconciledPostAnchorMigrations.splice(0, 1);
-        state.manifest.pendingPostAnchorMigrations.push({
-          ...p,
-          operationalStatus: "PENDING",
-          remoteVersionStatus: "NOT_PROVEN_OFFLINE",
-          requiresSeparateStagingDeploymentGate: true,
-        });
-      },
-    ],
-    [
-      "reconciled list emptied",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations = [];
-      },
-    ],
-    [
-      "reconciled list key deleted entirely",
-      (state) => {
-        delete state.manifest.reconciledPostAnchorMigrations;
-      },
-    ],
-    [
-      "40.13B demoted to PENDING in place",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations[0].operationalStatus =
-          "PENDING";
-      },
-    ],
-    [
-      "40.13B claims staging only, not production",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations[0].appliedToProduction = false;
-      },
-    ],
-    [
-      "40.13B claims production only, not staging",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations[0].appliedToStaging = false;
-      },
-    ],
-    [
-      "40.13B reverts to the stale unproven remote status",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations[0].remoteVersionStatus =
-          "NOT_PROVEN_OFFLINE";
-      },
-    ],
-    [
-      "40.13B fabricates a remote-history count nobody observed",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations[0].remoteHistoryCountAfterApply = 31;
-      },
-    ],
-    [
-      "40.13B claims a count was observed at apply",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations[0].remoteHistoryCountObservedAtApply = true;
-      },
-    ],
-    [
-      "40.13B evidence marker forged",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations[0].appliedEvidenceMarker =
-          "QF_MVP_40_13B_FAKE_MARKER";
-      },
-    ],
-    [
-      "40.13B borrows an owner-reviewed evidence type it does not have",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations[0].appliedEvidenceType =
-          APPLIED_EVIDENCE_TYPE;
-      },
-    ],
-    [
-      "40.13B borrows the 50.2D applied marker",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations[0].appliedEvidenceMarker =
-          POST_ANCHOR_APPLIED[0].marker;
-      },
-    ],
-    [
-      "40.13B claimed applied by this source phase",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations[0].appliedByThisPhase = true;
-      },
-    ],
-    [
-      "40.13B re-asserts a separate staging gate it no longer needs",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations[0].requiresSeparateStagingDeploymentGate = true;
-      },
-    ],
-    [
-      "40.13B staging provenance downgraded to nothing",
-      (state) => {
-        delete state.manifest.reconciledPostAnchorMigrations[0]
-          .stagingHistoryEvidence;
-      },
-    ],
-    [
-      "40.13B production provenance downgraded to nothing",
-      (state) => {
-        delete state.manifest.reconciledPostAnchorMigrations[0]
-          .productionHistoryEvidence;
-      },
-    ],
-    [
-      "40.13B manifest SHA drift",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations[0].sha256 = "4".repeat(
-          64,
-        );
-      },
-    ],
-    [
-      "80.03 audit repair demoted to PENDING in place",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations[4].operationalStatus =
-          "PENDING";
-      },
-    ],
-    [
-      "80.03 audit repair removed from the reconciled set",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations.splice(4, 1);
-      },
-    ],
-    [
-      "80.03 audit repair SHA drift",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations[4].sha256 = "3".repeat(
-          64,
-        );
-      },
-    ],
-    [
-      "75.01 reconciled entry claims a path that is not its migration",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations[2].path =
-          "supabase/migrations/20260815000000_something_else.sql";
-      },
-    ],
-    [
-      "the reconciled set duplicated into the applied ten",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations.push(
-          clone(state.manifest.reconciledPostAnchorMigrations[0]),
-        );
-      },
-    ],
-    [
-      "reconciled order reversed",
-      (state) => {
-        state.manifest.reconciledPostAnchorMigrations.reverse();
-      },
-    ],
-    [
-      "the certified interval loses a version",
-      (state) => {
-        state.manifest.historyReconciliation.certifiedHistory.pop();
-      },
-    ],
-    [
-      "the certified interval renames a migration",
-      (state) => {
-        state.manifest.historyReconciliation.certifiedHistory[3].name =
-          "qf_mvp_75_01_renamed";
-      },
-    ],
-    [
-      "the reconciliation claims it changed migration files",
-      (state) => {
-        state.manifest.historyReconciliation.migrationFilesChanged = 1;
-      },
-    ],
-    [
-      "the reconciliation claims it added a migration",
-      (state) => {
-        state.manifest.historyReconciliation.migrationsAdded = 1;
-      },
-    ],
-    [
-      "the reconciliation authorizes database mutation",
-      (state) => {
-        state.manifest.historyReconciliation.databaseMutationAuthorized = true;
-      },
-    ],
-    [
-      "the reconciliation authorizes a production apply",
-      (state) => {
-        state.manifest.historyReconciliation.productionApplyAuthorized = true;
-      },
-    ],
-    [
-      "the reconciliation overstates staging as first-party read",
-      (state) => {
-        state.manifest.historyReconciliation.staging.directReadPerformedByThisPhase = true;
-      },
-    ],
-    [
-      "the reconciliation drops the staging corroboration probes",
-      (state) => {
-        state.manifest.historyReconciliation.staging.corroboratingReadOnlyObjectProbes =
-          [];
-      },
-    ],
-    [
-      "the reconciliation block deleted entirely",
-      (state) => {
-        delete state.manifest.historyReconciliation;
-      },
-    ],
-    [
-      "the reconciliation document claims migrations were applied",
-      (state) => {
-        state.reconciliationDoc = state.reconciliationDoc.replace(
-          /ZERO migrations applied/g,
-          "migrations applied",
-        );
-      },
-    ],
-    [
-      "40.13B on-disk SHA drift",
-      (state) => {
-        state.postAnchorOnDisk["20260813000000"].sha = "4".repeat(64);
-        state.postAnchorOnDisk["20260813000000"].canonicalSha = "4".repeat(64);
-      },
-    ],
-    [
-      "40.13B migration renamed",
-      (state) => {
-        const record = state.migrations.find(
-          (m) => m.version === "20260813000000",
-        );
-        record.name = "qf_mvp_40_13b_renamed_authority";
-        record.filename = "20260813000000_qf_mvp_40_13b_renamed_authority.sql";
-      },
-    ],
-    [
-      "40.13B migration missing from disk",
-      (state) => {
-        state.migrations = state.migrations.filter(
-          (m) => m.version !== "20260813000000",
-        );
-        state.postAnchorOnDisk["20260813000000"].exists = false;
-      },
-    ],
-    [
-      "an eleventh applied post-anchor migration",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations.push(
-          clone(state.manifest.appliedPostAnchorMigrations[2]),
-        );
-      },
-    ],
-    [
-      "a twelfth post-anchor migration on disk",
-      (state) => {
-        state.migrations.push({
-          filename: "20260818000000_sixteenth.sql",
-          version: "20260818000000",
-          name: "sixteenth",
-          sha256: "c".repeat(64),
-          malformed: false,
-        });
-      },
-    ],
+    ["the whole reconciled set re-marked SOURCE-PENDING", (state) => {
+      state.manifest.pendingPostAnchorMigrations = state.manifest.reconciledPostAnchorMigrations.map((r) => ({
+        ...r, operationalStatus: "PENDING", remoteVersionStatus: "NOT_PROVEN_OFFLINE",
+        requiresSeparateStagingDeploymentGate: true,
+      }));
+      state.manifest.reconciledPostAnchorMigrations = [];
+    }],
+    ["20260813-20260816 re-marked SOURCE-PENDING in place", (state) => {
+      for (const record of state.manifest.reconciledPostAnchorMigrations.slice(0, 4)) {
+        record.operationalStatus = "PENDING";
+        record.remoteVersionStatus = "NOT_PROVEN_OFFLINE";
+      }
+    }],
+    ["one reconciled entry moved back into the pending list", (state) => {
+      const [p] = state.manifest.reconciledPostAnchorMigrations.splice(0, 1);
+      state.manifest.pendingPostAnchorMigrations.push({
+        ...p, operationalStatus: "PENDING", remoteVersionStatus: "NOT_PROVEN_OFFLINE",
+        requiresSeparateStagingDeploymentGate: true,
+      });
+    }],
+    ["reconciled list emptied", (state) => { state.manifest.reconciledPostAnchorMigrations = []; }],
+    ["reconciled list key deleted entirely", (state) => { delete state.manifest.reconciledPostAnchorMigrations; }],
+    ["40.13B demoted to PENDING in place", (state) => { state.manifest.reconciledPostAnchorMigrations[0].operationalStatus = "PENDING"; }],
+    ["40.13B claims staging only, not production", (state) => { state.manifest.reconciledPostAnchorMigrations[0].appliedToProduction = false; }],
+    ["40.13B claims production only, not staging", (state) => { state.manifest.reconciledPostAnchorMigrations[0].appliedToStaging = false; }],
+    ["40.13B reverts to the stale unproven remote status", (state) => { state.manifest.reconciledPostAnchorMigrations[0].remoteVersionStatus = "NOT_PROVEN_OFFLINE"; }],
+    ["40.13B fabricates a remote-history count nobody observed", (state) => { state.manifest.reconciledPostAnchorMigrations[0].remoteHistoryCountAfterApply = 31; }],
+    ["40.13B claims a count was observed at apply", (state) => { state.manifest.reconciledPostAnchorMigrations[0].remoteHistoryCountObservedAtApply = true; }],
+    ["40.13B evidence marker forged", (state) => { state.manifest.reconciledPostAnchorMigrations[0].appliedEvidenceMarker = "QF_MVP_40_13B_FAKE_MARKER"; }],
+    ["40.13B borrows an owner-reviewed evidence type it does not have", (state) => { state.manifest.reconciledPostAnchorMigrations[0].appliedEvidenceType = APPLIED_EVIDENCE_TYPE; }],
+    ["40.13B borrows the 50.2D applied marker", (state) => { state.manifest.reconciledPostAnchorMigrations[0].appliedEvidenceMarker = POST_ANCHOR_APPLIED[0].marker; }],
+    ["40.13B claimed applied by this source phase", (state) => { state.manifest.reconciledPostAnchorMigrations[0].appliedByThisPhase = true; }],
+    ["40.13B re-asserts a separate staging gate it no longer needs", (state) => { state.manifest.reconciledPostAnchorMigrations[0].requiresSeparateStagingDeploymentGate = true; }],
+    ["40.13B staging provenance downgraded to nothing", (state) => { delete state.manifest.reconciledPostAnchorMigrations[0].stagingHistoryEvidence; }],
+    ["40.13B production provenance downgraded to nothing", (state) => { delete state.manifest.reconciledPostAnchorMigrations[0].productionHistoryEvidence; }],
+    ["40.13B manifest SHA drift", (state) => { state.manifest.reconciledPostAnchorMigrations[0].sha256 = "4".repeat(64); }],
+    ["80.03 audit repair demoted to PENDING in place", (state) => { state.manifest.reconciledPostAnchorMigrations[4].operationalStatus = "PENDING"; }],
+    ["80.03 audit repair removed from the reconciled set", (state) => { state.manifest.reconciledPostAnchorMigrations.splice(4, 1); }],
+    ["80.03 audit repair SHA drift", (state) => { state.manifest.reconciledPostAnchorMigrations[4].sha256 = "3".repeat(64); }],
+    ["75.01 reconciled entry claims a path that is not its migration", (state) => { state.manifest.reconciledPostAnchorMigrations[2].path = "supabase/migrations/20260815000000_something_else.sql"; }],
+    ["the reconciled set duplicated into the applied ten", (state) => { state.manifest.appliedPostAnchorMigrations.push(clone(state.manifest.reconciledPostAnchorMigrations[0])); }],
+    ["reconciled order reversed", (state) => { state.manifest.reconciledPostAnchorMigrations.reverse(); }],
+    ["the certified interval loses a version", (state) => { state.manifest.historyReconciliation.certifiedHistory.pop(); }],
+    ["the certified interval renames a migration", (state) => { state.manifest.historyReconciliation.certifiedHistory[3].name = "qf_mvp_75_01_renamed"; }],
+    ["the reconciliation claims it changed migration files", (state) => { state.manifest.historyReconciliation.migrationFilesChanged = 1; }],
+    ["the reconciliation claims it added a migration", (state) => { state.manifest.historyReconciliation.migrationsAdded = 1; }],
+    ["the reconciliation authorizes database mutation", (state) => { state.manifest.historyReconciliation.databaseMutationAuthorized = true; }],
+    ["the reconciliation authorizes a production apply", (state) => { state.manifest.historyReconciliation.productionApplyAuthorized = true; }],
+    ["the reconciliation overstates staging as first-party read", (state) => { state.manifest.historyReconciliation.staging.directReadPerformedByThisPhase = true; }],
+    ["the reconciliation drops the staging corroboration probes", (state) => { state.manifest.historyReconciliation.staging.corroboratingReadOnlyObjectProbes = []; }],
+    ["the reconciliation block deleted entirely", (state) => { delete state.manifest.historyReconciliation; }],
+    ["the reconciliation document claims migrations were applied", (state) => { state.reconciliationDoc = state.reconciliationDoc.replace(/ZERO migrations applied/g, "migrations applied"); }],
+    ["40.13B on-disk SHA drift", (state) => { state.postAnchorOnDisk["20260813000000"].sha = "4".repeat(64); state.postAnchorOnDisk["20260813000000"].canonicalSha = "4".repeat(64); }],
+    ["40.13B migration renamed", (state) => {
+      const record = state.migrations.find((m) => m.version === "20260813000000");
+      record.name = "qf_mvp_40_13b_renamed_authority";
+      record.filename = "20260813000000_qf_mvp_40_13b_renamed_authority.sql";
+    }],
+    ["40.13B migration missing from disk", (state) => {
+      state.migrations = state.migrations.filter((m) => m.version !== "20260813000000");
+      state.postAnchorOnDisk["20260813000000"].exists = false;
+    }],
+    ["an eleventh applied post-anchor migration", (state) => { state.manifest.appliedPostAnchorMigrations.push(clone(state.manifest.appliedPostAnchorMigrations[2])); }],
+    ["a twelfth post-anchor migration on disk", (state) => { state.migrations.push({ filename: "20260818000000_sixteenth.sql", version: "20260818000000", name: "sixteenth", sha256: "c".repeat(64), malformed: false }); }],
 
     // --- QF-MVP-50.5-RECOVERY: the newly APPLIED post-anchor record ------------
     // Index 9 is 20260812000000, the tenth and newest applied post-anchor entry.
-    [
-      "50.5 applied entry removed",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations.splice(9, 1);
-      },
-    ],
-    [
-      "50.5 demoted back to PENDING in place",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[9].operationalStatus =
-          "PENDING";
-      },
-    ],
-    [
-      "50.5 moved back into the pending list",
-      (state) => {
-        const [a] = state.manifest.appliedPostAnchorMigrations.splice(9, 1);
-        state.manifest.pendingPostAnchorMigrations.push({
-          version: a.version,
-          name: a.name,
-          path: a.path,
-          sha256: a.sha256,
-          phase: a.phase,
-          operationalStatus: "PENDING",
-          remoteVersionStatus: "NOT_PROVEN_OFFLINE",
-          requiresSeparateStagingDeploymentGate: true,
-          appliedByThisPhase: false,
-        });
-      },
-    ],
-    [
-      "50.5 applied-evidence marker missing",
-      (state) => {
-        delete state.manifest.appliedPostAnchorMigrations[9]
-          .appliedEvidenceMarker;
-      },
-    ],
-    [
-      "50.5 applied-evidence marker forged",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[9].appliedEvidenceMarker =
-          "QF_MVP_50_5_FAKE_MARKER";
-      },
-    ],
-    [
-      "50.5 marker copied from the family-claim migration",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[9].appliedEvidenceMarker =
-          POST_ANCHOR_APPLIED[8].marker;
-      },
-    ],
-    [
-      "50.5 evidence downgraded to an imported record it is not",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[9].appliedEvidenceType =
-          APPLIED_EVIDENCE_TYPE;
-      },
-    ],
-    [
-      "50.5 remote history 29 instead of 30",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[9].remoteHistoryCountAfterApply = 29;
-      },
-    ],
-    [
-      "50.5 remote history 31 instead of 30",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[9].remoteHistoryCountAfterApply = 31;
-      },
-    ],
-    [
-      "50.5 appliedExactlyOnce false",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[9].appliedExactlyOnce = false;
-      },
-    ],
-    [
-      "50.5 disowns the phase that actually applied it",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[9].appliedByThisPhase = false;
-      },
-    ],
-    [
-      "50.5 fabricates an offline remote status field",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[9].remoteVersionStatus =
-          "PRESENT";
-      },
-    ],
-    [
-      "50.5 manifest SHA drift",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[9].sha256 = "5".repeat(64);
-      },
-    ],
-    [
-      "50.5 on-disk SHA drift",
-      (state) => {
-        state.postAnchorOnDisk["20260812000000"].sha = "5".repeat(64);
-        state.postAnchorOnDisk["20260812000000"].canonicalSha = "5".repeat(64);
-      },
-    ],
-    [
-      "50.5 migration renamed",
-      (state) => {
-        const record = state.migrations.find(
-          (m) => m.version === "20260812000000",
-        );
-        record.name = "qf_mvp_50_5_renamed_recovery";
-        record.filename = "20260812000000_qf_mvp_50_5_renamed_recovery.sql";
-      },
-    ],
-    [
-      "50.5 migration missing from disk",
-      (state) => {
-        state.migrations = state.migrations.filter(
-          (m) => m.version !== "20260812000000",
-        );
-        state.postAnchorOnDisk["20260812000000"].exists = false;
-      },
-    ],
-    [
-      "50.5 also listed as pending",
-      (state) => {
-        state.manifest.pendingPostAnchorMigrations.push(
-          clone(state.manifest.appliedPostAnchorMigrations[9]),
-        );
-      },
-    ],
+    ["50.5 applied entry removed", (state) => { state.manifest.appliedPostAnchorMigrations.splice(9, 1); }],
+    ["50.5 demoted back to PENDING in place", (state) => { state.manifest.appliedPostAnchorMigrations[9].operationalStatus = "PENDING"; }],
+    ["50.5 moved back into the pending list", (state) => {
+      const [a] = state.manifest.appliedPostAnchorMigrations.splice(9, 1);
+      state.manifest.pendingPostAnchorMigrations.push({
+        version: a.version, name: a.name, path: a.path, sha256: a.sha256, phase: a.phase,
+        operationalStatus: "PENDING", remoteVersionStatus: "NOT_PROVEN_OFFLINE",
+        requiresSeparateStagingDeploymentGate: true, appliedByThisPhase: false,
+      });
+    }],
+    ["50.5 applied-evidence marker missing", (state) => { delete state.manifest.appliedPostAnchorMigrations[9].appliedEvidenceMarker; }],
+    ["50.5 applied-evidence marker forged", (state) => { state.manifest.appliedPostAnchorMigrations[9].appliedEvidenceMarker = "QF_MVP_50_5_FAKE_MARKER"; }],
+    ["50.5 marker copied from the family-claim migration", (state) => { state.manifest.appliedPostAnchorMigrations[9].appliedEvidenceMarker = POST_ANCHOR_APPLIED[8].marker; }],
+    ["50.5 evidence downgraded to an imported record it is not", (state) => { state.manifest.appliedPostAnchorMigrations[9].appliedEvidenceType = APPLIED_EVIDENCE_TYPE; }],
+    ["50.5 remote history 29 instead of 30", (state) => { state.manifest.appliedPostAnchorMigrations[9].remoteHistoryCountAfterApply = 29; }],
+    ["50.5 remote history 31 instead of 30", (state) => { state.manifest.appliedPostAnchorMigrations[9].remoteHistoryCountAfterApply = 31; }],
+    ["50.5 appliedExactlyOnce false", (state) => { state.manifest.appliedPostAnchorMigrations[9].appliedExactlyOnce = false; }],
+    ["50.5 disowns the phase that actually applied it", (state) => { state.manifest.appliedPostAnchorMigrations[9].appliedByThisPhase = false; }],
+    ["50.5 fabricates an offline remote status field", (state) => { state.manifest.appliedPostAnchorMigrations[9].remoteVersionStatus = "PRESENT"; }],
+    ["50.5 manifest SHA drift", (state) => { state.manifest.appliedPostAnchorMigrations[9].sha256 = "5".repeat(64); }],
+    ["50.5 on-disk SHA drift", (state) => { state.postAnchorOnDisk["20260812000000"].sha = "5".repeat(64); state.postAnchorOnDisk["20260812000000"].canonicalSha = "5".repeat(64); }],
+    ["50.5 migration renamed", (state) => {
+      const record = state.migrations.find((m) => m.version === "20260812000000");
+      record.name = "qf_mvp_50_5_renamed_recovery";
+      record.filename = "20260812000000_qf_mvp_50_5_renamed_recovery.sql";
+    }],
+    ["50.5 migration missing from disk", (state) => {
+      state.migrations = state.migrations.filter((m) => m.version !== "20260812000000");
+      state.postAnchorOnDisk["20260812000000"].exists = false;
+    }],
+    ["50.5 also listed as pending", (state) => { state.manifest.pendingPostAnchorMigrations.push(clone(state.manifest.appliedPostAnchorMigrations[9])); }],
 
     // --- QF-MVP-50.2-R2-APPLIED-TRUTH: the newly imported APPLIED record ------
-    [
-      "R2 producer left PENDING",
-      (state) => {
-        const [r2] = state.manifest.appliedPostAnchorMigrations.splice(2, 1);
-        state.manifest.pendingPostAnchorMigrations.push({
-          version: r2.version,
-          name: r2.name,
-          path: r2.path,
-          sha256: r2.sha256,
-          phase: r2.phase,
-          operationalStatus: "PENDING",
-          remoteVersionStatus: "NOT_PROVEN_OFFLINE",
-          requiresSeparateStagingDeploymentGate: true,
-          appliedByThisPhase: false,
-        });
-      },
-    ],
-    [
-      "R2 producer demoted to PENDING in place",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[2].operationalStatus =
-          "PENDING";
-      },
-    ],
-    [
-      "R2 remote history 22 instead of 23",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[2].remoteHistoryCountAfterApply = 22;
-      },
-    ],
-    [
-      "R2 remote history 24 instead of 23",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[2].remoteHistoryCountAfterApply = 24;
-      },
-    ],
-    [
-      "R2 remote history missing",
-      (state) => {
-        delete state.manifest.appliedPostAnchorMigrations[2]
-          .remoteHistoryCountAfterApply;
-      },
-    ],
-    [
-      "R2 marker missing",
-      (state) => {
-        delete state.manifest.appliedPostAnchorMigrations[2]
-          .appliedEvidenceMarker;
-      },
-    ],
-    [
-      "R2 marker forged",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[2].appliedEvidenceMarker =
-          "QF_MVP_FAKE_R2_MARKER";
-      },
-    ],
-    [
-      "R2 marker copied from 50.2E",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[2].appliedEvidenceMarker =
-          POST_ANCHOR_APPLIED[1].marker;
-      },
-    ],
-    [
-      "R2 evidence type self-asserted",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[2].appliedEvidenceType =
-          "SELF_ASSERTED";
-      },
-    ],
-    [
-      "R2 claimed applied by this source phase",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[2].appliedByThisPhase = true;
-      },
-    ],
-    [
-      "R2 appliedExactlyOnce false",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[2].appliedExactlyOnce = false;
-      },
-    ],
-    [
-      "R2 manifest SHA drift",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[2].sha256 = "9".repeat(64);
-      },
-    ],
-    [
-      "R2 on-disk SHA drift",
-      (state) => {
-        state.postAnchorOnDisk["20260806000000"].sha = "9".repeat(64);
-        state.postAnchorOnDisk["20260806000000"].canonicalSha = "9".repeat(64);
-      },
-    ],
-    [
-      "R2 fabricated offline remote status field",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[2].remoteVersionStatus =
-          "PRESENT";
-      },
-    ],
-    [
-      "R2 migration renamed",
-      (state) => {
-        const record = state.migrations.find(
-          (m) => m.version === "20260806000000",
-        );
-        record.name = "qf_mvp_50_2_renamed_producer";
-        record.filename = "20260806000000_qf_mvp_50_2_renamed_producer.sql";
-      },
-    ],
-    [
-      "R2 migration missing from disk",
-      (state) => {
-        state.migrations = state.migrations.filter(
-          (m) => m.version !== "20260806000000",
-        );
-        state.postAnchorOnDisk["20260806000000"].exists = false;
-      },
-    ],
-    [
-      "R2 also listed as pending",
-      (state) => {
-        state.manifest.pendingPostAnchorMigrations.push(
-          clone(state.manifest.appliedPostAnchorMigrations[2]),
-        );
-      },
-    ],
+    ["R2 producer left PENDING", (state) => {
+      const [r2] = state.manifest.appliedPostAnchorMigrations.splice(2, 1);
+      state.manifest.pendingPostAnchorMigrations.push({
+        version: r2.version, name: r2.name, path: r2.path, sha256: r2.sha256, phase: r2.phase,
+        operationalStatus: "PENDING", remoteVersionStatus: "NOT_PROVEN_OFFLINE",
+        requiresSeparateStagingDeploymentGate: true, appliedByThisPhase: false,
+      });
+    }],
+    ["R2 producer demoted to PENDING in place", (state) => { state.manifest.appliedPostAnchorMigrations[2].operationalStatus = "PENDING"; }],
+    ["R2 remote history 22 instead of 23", (state) => { state.manifest.appliedPostAnchorMigrations[2].remoteHistoryCountAfterApply = 22; }],
+    ["R2 remote history 24 instead of 23", (state) => { state.manifest.appliedPostAnchorMigrations[2].remoteHistoryCountAfterApply = 24; }],
+    ["R2 remote history missing", (state) => { delete state.manifest.appliedPostAnchorMigrations[2].remoteHistoryCountAfterApply; }],
+    ["R2 marker missing", (state) => { delete state.manifest.appliedPostAnchorMigrations[2].appliedEvidenceMarker; }],
+    ["R2 marker forged", (state) => { state.manifest.appliedPostAnchorMigrations[2].appliedEvidenceMarker = "QF_MVP_FAKE_R2_MARKER"; }],
+    ["R2 marker copied from 50.2E", (state) => { state.manifest.appliedPostAnchorMigrations[2].appliedEvidenceMarker = POST_ANCHOR_APPLIED[1].marker; }],
+    ["R2 evidence type self-asserted", (state) => { state.manifest.appliedPostAnchorMigrations[2].appliedEvidenceType = "SELF_ASSERTED"; }],
+    ["R2 claimed applied by this source phase", (state) => { state.manifest.appliedPostAnchorMigrations[2].appliedByThisPhase = true; }],
+    ["R2 appliedExactlyOnce false", (state) => { state.manifest.appliedPostAnchorMigrations[2].appliedExactlyOnce = false; }],
+    ["R2 manifest SHA drift", (state) => { state.manifest.appliedPostAnchorMigrations[2].sha256 = "9".repeat(64); }],
+    ["R2 on-disk SHA drift", (state) => { state.postAnchorOnDisk["20260806000000"].sha = "9".repeat(64); state.postAnchorOnDisk["20260806000000"].canonicalSha = "9".repeat(64); }],
+    ["R2 fabricated offline remote status field", (state) => { state.manifest.appliedPostAnchorMigrations[2].remoteVersionStatus = "PRESENT"; }],
+    ["R2 migration renamed", (state) => {
+      const record = state.migrations.find((m) => m.version === "20260806000000");
+      record.name = "qf_mvp_50_2_renamed_producer";
+      record.filename = "20260806000000_qf_mvp_50_2_renamed_producer.sql";
+    }],
+    ["R2 migration missing from disk", (state) => {
+      state.migrations = state.migrations.filter((m) => m.version !== "20260806000000");
+      state.postAnchorOnDisk["20260806000000"].exists = false;
+    }],
+    ["R2 also listed as pending", (state) => { state.manifest.pendingPostAnchorMigrations.push(clone(state.manifest.appliedPostAnchorMigrations[2])); }],
 
     // --- QF-MVP-50.2-EXECUTE-V1-REPAIR: the 070 applied record ---------------
-    [
-      "070 execute repair left PENDING",
-      (state) => {
-        const [e] = state.manifest.appliedPostAnchorMigrations.splice(3, 1);
-        state.manifest.pendingPostAnchorMigrations.push({
-          ...e,
-          operationalStatus: "PENDING",
-          remoteVersionStatus: "NOT_PROVEN_OFFLINE",
-        });
-      },
-    ],
-    [
-      "070 demoted to PENDING in place",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[3].operationalStatus =
-          "PENDING";
-      },
-    ],
-    [
-      "070 remote history 23 instead of 24",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[3].remoteHistoryCountAfterApply = 23;
-      },
-    ],
-    [
-      "070 remote history 25 instead of 24",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[3].remoteHistoryCountAfterApply = 25;
-      },
-    ],
-    [
-      "070 marker missing",
-      (state) => {
-        delete state.manifest.appliedPostAnchorMigrations[3]
-          .appliedEvidenceMarker;
-      },
-    ],
-    [
-      "070 marker forged",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[3].appliedEvidenceMarker =
-          "QF_MVP_FAKE_070_MARKER";
-      },
-    ],
-    [
-      "070 evidence type self-asserted",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[3].appliedEvidenceType =
-          "SELF_ASSERTED";
-      },
-    ],
-    [
-      "070 claimed applied by this source phase",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[3].appliedByThisPhase = true;
-      },
-    ],
-    [
-      "070 appliedExactlyOnce false",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[3].appliedExactlyOnce = false;
-      },
-    ],
-    [
-      "070 manifest SHA drift",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[3].sha256 = "7".repeat(64);
-      },
-    ],
-    [
-      "070 on-disk SHA drift",
-      (state) => {
-        state.postAnchorOnDisk["20260807000000"].sha = "7".repeat(64);
-        state.postAnchorOnDisk["20260807000000"].canonicalSha = "7".repeat(64);
-      },
-    ],
-    [
-      "070 fabricated offline remote status field",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[3].remoteVersionStatus =
-          "PRESENT";
-      },
-    ],
-    [
-      "070 migration missing from disk",
-      (state) => {
-        state.migrations = state.migrations.filter(
-          (m) => m.version !== "20260807000000",
-        );
-        state.postAnchorOnDisk["20260807000000"].exists = false;
-      },
-    ],
+    ["070 execute repair left PENDING", (state) => {
+      const [e] = state.manifest.appliedPostAnchorMigrations.splice(3, 1);
+      state.manifest.pendingPostAnchorMigrations.push({ ...e, operationalStatus: "PENDING", remoteVersionStatus: "NOT_PROVEN_OFFLINE" });
+    }],
+    ["070 demoted to PENDING in place", (state) => { state.manifest.appliedPostAnchorMigrations[3].operationalStatus = "PENDING"; }],
+    ["070 remote history 23 instead of 24", (state) => { state.manifest.appliedPostAnchorMigrations[3].remoteHistoryCountAfterApply = 23; }],
+    ["070 remote history 25 instead of 24", (state) => { state.manifest.appliedPostAnchorMigrations[3].remoteHistoryCountAfterApply = 25; }],
+    ["070 marker missing", (state) => { delete state.manifest.appliedPostAnchorMigrations[3].appliedEvidenceMarker; }],
+    ["070 marker forged", (state) => { state.manifest.appliedPostAnchorMigrations[3].appliedEvidenceMarker = "QF_MVP_FAKE_070_MARKER"; }],
+    ["070 evidence type self-asserted", (state) => { state.manifest.appliedPostAnchorMigrations[3].appliedEvidenceType = "SELF_ASSERTED"; }],
+    ["070 claimed applied by this source phase", (state) => { state.manifest.appliedPostAnchorMigrations[3].appliedByThisPhase = true; }],
+    ["070 appliedExactlyOnce false", (state) => { state.manifest.appliedPostAnchorMigrations[3].appliedExactlyOnce = false; }],
+    ["070 manifest SHA drift", (state) => { state.manifest.appliedPostAnchorMigrations[3].sha256 = "7".repeat(64); }],
+    ["070 on-disk SHA drift", (state) => { state.postAnchorOnDisk["20260807000000"].sha = "7".repeat(64); state.postAnchorOnDisk["20260807000000"].canonicalSha = "7".repeat(64); }],
+    ["070 fabricated offline remote status field", (state) => { state.manifest.appliedPostAnchorMigrations[3].remoteVersionStatus = "PRESENT"; }],
+    ["070 migration missing from disk", (state) => {
+      state.migrations = state.migrations.filter((m) => m.version !== "20260807000000");
+      state.postAnchorOnDisk["20260807000000"].exists = false;
+    }],
 
     // --- QF-MVP-50.2-FRESH-CLAIM-WEDGE-REPAIR: the 080 applied record --------
-    [
-      "080 wedge repair left PENDING",
-      (state) => {
-        const [e] = state.manifest.appliedPostAnchorMigrations.splice(4, 1);
-        state.manifest.pendingPostAnchorMigrations.push({
-          ...e,
-          operationalStatus: "PENDING",
-          remoteVersionStatus: "NOT_PROVEN_OFFLINE",
-        });
-      },
-    ],
-    [
-      "080 demoted to PENDING in place",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[4].operationalStatus =
-          "PENDING";
-      },
-    ],
-    [
-      "080 remote history 24 instead of 25",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[4].remoteHistoryCountAfterApply = 24;
-      },
-    ],
-    [
-      "080 remote history 26 instead of 25",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[4].remoteHistoryCountAfterApply = 26;
-      },
-    ],
-    [
-      "080 marker missing",
-      (state) => {
-        delete state.manifest.appliedPostAnchorMigrations[4]
-          .appliedEvidenceMarker;
-      },
-    ],
-    [
-      "080 marker forged",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[4].appliedEvidenceMarker =
-          "QF_MVP_FAKE_080_MARKER";
-      },
-    ],
-    [
-      "080 evidence type self-asserted",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[4].appliedEvidenceType =
-          "SELF_ASSERTED";
-      },
-    ],
-    [
-      "080 claimed applied by this source phase",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[4].appliedByThisPhase = true;
-      },
-    ],
-    [
-      "080 appliedExactlyOnce false",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[4].appliedExactlyOnce = false;
-      },
-    ],
-    [
-      "080 manifest SHA drift",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[4].sha256 = "8".repeat(64);
-      },
-    ],
-    [
-      "080 on-disk SHA drift",
-      (state) => {
-        state.postAnchorOnDisk["20260808000000"].sha = "8".repeat(64);
-        state.postAnchorOnDisk["20260808000000"].canonicalSha = "8".repeat(64);
-      },
-    ],
-    [
-      "080 fabricated offline remote status field",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[4].remoteVersionStatus =
-          "PRESENT";
-      },
-    ],
-    [
-      "080 migration missing from disk",
-      (state) => {
-        state.migrations = state.migrations.filter(
-          (m) => m.version !== "20260808000000",
-        );
-        state.postAnchorOnDisk["20260808000000"].exists = false;
-      },
-    ],
-    [
-      "50.2D demoted back to PENDING",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[0].operationalStatus =
-          "PENDING";
-      },
-    ],
-    [
-      "50.2D marker forged",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[0].appliedEvidenceMarker =
-          "QF_MVP_FAKE_APPLIED_MARKER";
-      },
-    ],
-    [
-      "50.2D remote history changed from 21",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[0].remoteHistoryCountAfterApply = 20;
-      },
-    ],
-    [
-      "50.2D manifest SHA changed",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations[0].sha256 = "a".repeat(64);
-      },
-    ],
-    [
-      "50.2D on-disk SHA drift",
-      (state) => {
-        state.postAnchorOnDisk["20260804000000"].sha = "b".repeat(64);
-        state.postAnchorOnDisk["20260804000000"].canonicalSha = "b".repeat(64);
-      },
-    ],
-    [
-      "50.2D missing from disk",
-      (state) => {
-        state.migrations = state.migrations.filter(
-          (m) => m.version !== "20260804000000",
-        );
-        state.postAnchorOnDisk["20260804000000"].exists = false;
-      },
-    ],
-    [
-      "applied post-anchor list emptied",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations = [];
-      },
-    ],
-    [
-      "an applied post-anchor also listed as pending",
-      (state) => {
-        state.manifest.pendingPostAnchorMigrations.push(
-          clone(state.manifest.appliedPostAnchorMigrations[1]),
-        );
-      },
-    ],
-    [
-      "post-anchor order swapped",
-      (state) => {
-        state.manifest.appliedPostAnchorMigrations.reverse();
-      },
-    ],
-    [
-      "post-anchor count understated",
-      (state) => {
-        state.manifest.appliedAnchor.postAnchorMigrationCount = 1;
-      },
-    ],
-    [
-      "generic future-migration allowance granted",
-      (state) => {
-        state.manifest.safety.genericFutureMigrationAllowanceForbidden = false;
-      },
-    ],
-    [
-      "CI native automation guard removed",
-      (state) => {
-        state.workflow = state.workflow.replace(
-          /\n\s+- name: QuickFurno Native Automation Engine guard\s+run: npm run test:automation-native\s*/m,
-          "\n",
-        );
-      },
-    ],
-    [
-      "baseline copied into migrations",
-      (state) => {
-        state.migrations.push({
-          filename: `${BASELINE_VERSION}_qf_mvp_staging_baseline_269c9265.sql`,
-          version: BASELINE_VERSION,
-          name: "qf_mvp_staging_baseline_269c9265",
-          sha256: BASELINE_SHA,
-          malformed: false,
-        });
-      },
-    ],
-    [
-      "one resolved remote digest changed",
-      (state) => {
-        state.manifest.postBaselineApplied.find(
-          (record) => record.version === "20260728001600",
-        ).remoteOrderedStatementDigestSha256 = "c".repeat(64);
-      },
-    ],
-    [
-      "deployment blocker semantics corrupted",
-      (state) => {
-        state.manifest.postBaselineApplied[0].deploymentBlocker = true;
-      },
-    ],
-    [
-      "S1 evidence path removed",
-      (state) => {
-        state.manifest.appliedAnchor.preflightEvidencePath = "";
-      },
-    ],
-    [
-      "S1 old vocabulary includes lead",
-      (state) => {
-        state.s1 = state.s1.replace(
-          "\n`lead` was absent.",
-          "\n- `lead`\n\n`lead` was absent.",
-        );
-      },
-    ],
-    [
-      "governance permits include-all",
-      (state) => {
-        state.governance = state.governance.replace(
-          "`--include-all` is forbidden for this lineage",
-          "`--include-all` is permitted for this lineage",
-        );
-      },
-    ],
-    [
-      "CI G1 step removed",
-      (state) => {
-        state.workflow = state.workflow.replace(
-          /\n\s+- name: QF-MVP-50\.2C-S2-G1 staging history governance\s+run: npm run test:mvp:50-2c-s2-g1\s*/m,
-          "\n",
-        );
-      },
-    ],
-    [
-      "migration hash policy canonicalization changed to raw bytes",
-      (state) => {
-        state.manifest.migrationSourceHashPolicy.canonicalization = "RAW_BYTES";
-      },
-    ],
-    [
-      "one canonical pre-baseline SHA changed to raw CRLF hash",
-      (state) => {
-        state.manifest.preBaselineChain.records.find(
-          (record) => record.version === "20260620000003",
-        ).sha256 =
-          "e8c7f0f7eec2fd2108189fc462deeb70025c88f2ef2ae760dcc83b77451d5fb9";
-      },
-    ],
+    ["080 wedge repair left PENDING", (state) => {
+      const [e] = state.manifest.appliedPostAnchorMigrations.splice(4, 1);
+      state.manifest.pendingPostAnchorMigrations.push({ ...e, operationalStatus: "PENDING", remoteVersionStatus: "NOT_PROVEN_OFFLINE" });
+    }],
+    ["080 demoted to PENDING in place", (state) => { state.manifest.appliedPostAnchorMigrations[4].operationalStatus = "PENDING"; }],
+    ["080 remote history 24 instead of 25", (state) => { state.manifest.appliedPostAnchorMigrations[4].remoteHistoryCountAfterApply = 24; }],
+    ["080 remote history 26 instead of 25", (state) => { state.manifest.appliedPostAnchorMigrations[4].remoteHistoryCountAfterApply = 26; }],
+    ["080 marker missing", (state) => { delete state.manifest.appliedPostAnchorMigrations[4].appliedEvidenceMarker; }],
+    ["080 marker forged", (state) => { state.manifest.appliedPostAnchorMigrations[4].appliedEvidenceMarker = "QF_MVP_FAKE_080_MARKER"; }],
+    ["080 evidence type self-asserted", (state) => { state.manifest.appliedPostAnchorMigrations[4].appliedEvidenceType = "SELF_ASSERTED"; }],
+    ["080 claimed applied by this source phase", (state) => { state.manifest.appliedPostAnchorMigrations[4].appliedByThisPhase = true; }],
+    ["080 appliedExactlyOnce false", (state) => { state.manifest.appliedPostAnchorMigrations[4].appliedExactlyOnce = false; }],
+    ["080 manifest SHA drift", (state) => { state.manifest.appliedPostAnchorMigrations[4].sha256 = "8".repeat(64); }],
+    ["080 on-disk SHA drift", (state) => { state.postAnchorOnDisk["20260808000000"].sha = "8".repeat(64); state.postAnchorOnDisk["20260808000000"].canonicalSha = "8".repeat(64); }],
+    ["080 fabricated offline remote status field", (state) => { state.manifest.appliedPostAnchorMigrations[4].remoteVersionStatus = "PRESENT"; }],
+    ["080 migration missing from disk", (state) => {
+      state.migrations = state.migrations.filter((m) => m.version !== "20260808000000");
+      state.postAnchorOnDisk["20260808000000"].exists = false;
+    }],
+    ["50.2D demoted back to PENDING", (state) => { state.manifest.appliedPostAnchorMigrations[0].operationalStatus = "PENDING"; }],
+    ["50.2D marker forged", (state) => { state.manifest.appliedPostAnchorMigrations[0].appliedEvidenceMarker = "QF_MVP_FAKE_APPLIED_MARKER"; }],
+    ["50.2D remote history changed from 21", (state) => { state.manifest.appliedPostAnchorMigrations[0].remoteHistoryCountAfterApply = 20; }],
+    ["50.2D manifest SHA changed", (state) => { state.manifest.appliedPostAnchorMigrations[0].sha256 = "a".repeat(64); }],
+    ["50.2D on-disk SHA drift", (state) => { state.postAnchorOnDisk["20260804000000"].sha = "b".repeat(64); state.postAnchorOnDisk["20260804000000"].canonicalSha = "b".repeat(64); }],
+    ["50.2D missing from disk", (state) => {
+      state.migrations = state.migrations.filter((m) => m.version !== "20260804000000");
+      state.postAnchorOnDisk["20260804000000"].exists = false;
+    }],
+    ["applied post-anchor list emptied", (state) => { state.manifest.appliedPostAnchorMigrations = []; }],
+    ["an applied post-anchor also listed as pending", (state) => { state.manifest.pendingPostAnchorMigrations.push(clone(state.manifest.appliedPostAnchorMigrations[1])); }],
+    ["post-anchor order swapped", (state) => { state.manifest.appliedPostAnchorMigrations.reverse(); }],
+    ["post-anchor count understated", (state) => { state.manifest.appliedAnchor.postAnchorMigrationCount = 1; }],
+    ["generic future-migration allowance granted", (state) => { state.manifest.safety.genericFutureMigrationAllowanceForbidden = false; }],
+    ["CI native automation guard removed", (state) => { state.workflow = state.workflow.replace(/\n\s+- name: QuickFurno Native Automation Engine guard\s+run: npm run test:automation-native\s*/m, "\n"); }],
+    ["baseline copied into migrations", (state) => { state.migrations.push({ filename: `${BASELINE_VERSION}_qf_mvp_staging_baseline_269c9265.sql`, version: BASELINE_VERSION, name: "qf_mvp_staging_baseline_269c9265", sha256: BASELINE_SHA, malformed: false }); }],
+    ["one resolved remote digest changed", (state) => { state.manifest.postBaselineApplied.find((record) => record.version === "20260728001600").remoteOrderedStatementDigestSha256 = "c".repeat(64); }],
+    ["deployment blocker semantics corrupted", (state) => { state.manifest.postBaselineApplied[0].deploymentBlocker = true; }],
+    ["S1 evidence path removed", (state) => { state.manifest.appliedAnchor.preflightEvidencePath = ""; }],
+    ["S1 old vocabulary includes lead", (state) => { state.s1 = state.s1.replace("\n`lead` was absent.", "\n- `lead`\n\n`lead` was absent."); }],
+    ["governance permits include-all", (state) => { state.governance = state.governance.replace("`--include-all` is forbidden for this lineage", "`--include-all` is permitted for this lineage"); }],
+    ["CI G1 step removed", (state) => { state.workflow = state.workflow.replace(/\n\s+- name: QF-MVP-50\.2C-S2-G1 staging history governance\s+run: npm run test:mvp:50-2c-s2-g1\s*/m, "\n"); }],
+    ["migration hash policy canonicalization changed to raw bytes", (state) => { state.manifest.migrationSourceHashPolicy.canonicalization = "RAW_BYTES"; }],
+    ["one canonical pre-baseline SHA changed to raw CRLF hash", (state) => {
+      state.manifest.preBaselineChain.records.find((record) => record.version === "20260620000003").sha256 = "e8c7f0f7eec2fd2108189fc462deeb70025c88f2ef2ae760dcc83b77451d5fb9";
+    }],
   ];
 
   return cases.map(([name, mutate]) => {
@@ -3408,19 +1673,13 @@ const mutants = runMutants(state);
 
 for (const [index, result] of validation.results.entries()) {
   const detail = result.detail ? ` (${result.detail})` : "";
-  console.log(
-    `${result.passed ? "PASS" : "FAIL"} ${String(index + 1).padStart(2, "0")} ${result.name}${detail}`,
-  );
+  console.log(`${result.passed ? "PASS" : "FAIL"} ${String(index + 1).padStart(2, "0")} ${result.name}${detail}`);
 }
 for (const [index, mutant] of mutants.entries()) {
-  console.log(
-    `${mutant.rejected ? "PASS" : "FAIL"} M${String(index + 1).padStart(2, "0")} reject mutant: ${mutant.name}`,
-  );
+  console.log(`${mutant.rejected ? "PASS" : "FAIL"} M${String(index + 1).padStart(2, "0")} reject mutant: ${mutant.name}`);
 }
 
 const mutantFailures = mutants.filter((mutant) => !mutant.rejected);
-console.log(
-  `SUMMARY assertions=${validation.results.length} passed=${validation.results.length - validation.failures.length} failed=${validation.failures.length} mutants=${mutants.length} mutants_rejected=${mutants.length - mutantFailures.length}`,
-);
+console.log(`SUMMARY assertions=${validation.results.length} passed=${validation.results.length - validation.failures.length} failed=${validation.failures.length} mutants=${mutants.length} mutants_rejected=${mutants.length - mutantFailures.length}`);
 
 if (validation.failures.length || mutantFailures.length) process.exit(1);

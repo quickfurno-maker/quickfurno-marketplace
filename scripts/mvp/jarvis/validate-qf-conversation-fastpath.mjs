@@ -30,10 +30,14 @@ check("worker drains both Jarvis turns and WhatsApp reply outbox", () => {
   assert.match(worker, /maxDrain/);
 });
 
-check("idle fallback is sub-second and bounded", () => {
+check("idle transport is event-driven with bounded database fallback", () => {
+  assert.match(worker, /waitForDurableWorkWakeup/);
+  assert.match(worker, /topics:\s*\["conversation-outbox",\s*"jarvis-turn-outbox"\]/);
   assert.match(worker, /QF_CONVERSATION_TRANSPORT_IDLE_POLL_MS/);
-  assert.match(worker, /100,\s*50,\s*5000/);
+  assert.match(worker, /1000,\s*250,\s*5000/);
   assert.match(worker, /QF_CONVERSATION_TRANSPORT_BUSY_POLL_MS/);
+  assert.match(worker, /25,\s*10,\s*500/);
+  assert.match(worker, /wake\.status === "unavailable"/);
 });
 
 check("PM2 keeps exactly one dedicated autorestarting worker", () => {
@@ -41,7 +45,8 @@ check("PM2 keeps exactly one dedicated autorestarting worker", () => {
   assert.match(pm2, /instances:\s*1/);
   assert.match(pm2, /autorestart:\s*true/);
   assert.match(pm2, /QF_ENV_FILE:\s*".env.local"/);
-  assert.match(pm2, /QF_CONVERSATION_TRANSPORT_IDLE_POLL_MS:\s*"100"/);
+  assert.match(pm2, /QF_CONVERSATION_TRANSPORT_IDLE_POLL_MS:\s*"1000"/);
+  assert.match(pm2, /QF_CONVERSATION_TRANSPORT_BUSY_POLL_MS:\s*"25"/);
 });
 
 check("worker preserves Core authority rather than sending Meta directly", () => {

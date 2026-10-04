@@ -68,7 +68,8 @@ writeFileSync(envFile, "", { mode: 0o600 });
 
 const composeEnv = {
   ...process.env,
-  QF_IMAGE_TAG: sha,
+  QF_IMAGE_REF: `ghcr.io/quickfurno-maker/quickfurno-marketplace@sha256:${"0".repeat(64)}`,
+  QF_RELEASE_SHA: sha,
   QF_ENV_FILE: envFile,
 };
 

@@ -215,7 +215,10 @@
     "test:scale:phase10": "npm run test:scale:edge-origin-contract",
     "test:scale:phase11:contract": "node scripts/scale/validate-phase11-contract.mjs",
     "test:scale:phase11:resilience": "node --experimental-transform-types scripts/scale/certify-phase11-resilience.mjs",
-    "test:scale:phase11": "npm run test:scale:phase11:contract && npm run test:scale:phase11:resilience"
+    "test:scale:phase11": "npm run test:scale:phase11:contract && npm run test:scale:phase11:resilience",
+    "test:scale:phase12:contract": "node scripts/scale/validate-phase12-horizontal-workers.mjs",
+    "test:scale:phase12:messages": "node scripts/scale/certify-phase12-horizontal-messages-postgres.mjs",
+    "test:scale:phase12": "npm run test:scale:phase12:contract && npm run test:scale:matching-concurrency-postgres && npm run test:scale:durable-jobs:postgres && npm run test:scale:phase12:messages"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

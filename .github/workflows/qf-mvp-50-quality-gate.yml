@@ -469,7 +469,6 @@ jobs:
           QF_COORDINATION_REDIS_URL: redis://127.0.0.1:6379
         run: npm run test:scale:coordination
 
-
   # SCALE-P07 — durable scheduler/idempotency PostgreSQL certification.
   # Replays one schedule occurrence concurrently, proves one owner/effect,
   # expires a simulated crashed lease and proves a single fenced recovery.
@@ -518,7 +517,6 @@ jobs:
         env:
           DATABASE_URL: postgresql://qf_phase07:qf_phase07_ci_only@127.0.0.1:5432/qf_phase07
         run: npm run test:scale:durable-jobs:postgres
-
 
   # SCALE-P08 — database/matching scale certification.
   # Applies the actual Phase 08 migration to digest-pinned PostgreSQL/PostGIS,
@@ -622,3 +620,59 @@ jobs:
         env:
           DATABASE_URL: postgresql://qf_phase09:qf_phase09_ci_only@127.0.0.1:5432/qf_phase09
         run: npm run test:scale:data-lifecycle-postgres
+
+  # SCALE-P12 — horizontal worker and agent scaling certification.
+  # Depends on the existing durable-job and matching contention proofs, then
+  # certifies 32 concurrent messaging claimers with per-conversation ordering.
+  phase12-horizontal-workers-certification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - durable-jobs-certification
+      - matching-scale-certification
+    services:
+      postgres:
+        image: postgres@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+        env:
+          POSTGRES_USER: qf_phase12
+          POSTGRES_PASSWORD: qf_phase12_ci_only
+          POSTGRES_DB: qf_phase12
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qf_phase12 -d qf_phase12"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - name: Checkout exact reviewed head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out SHA
+        run: |
+          EXPECTED_SHA="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Phase 12 horizontal worker contract
+        run: npm run test:scale:phase12:contract
+
+      - name: Revalidate dedicated conversation fast path
+        run: node scripts/mvp/jarvis/validate-qf-conversation-fastpath.mjs
+
+      - name: Certify 32-replica message ordering
+        env:
+          DATABASE_URL: postgresql://qf_phase12:qf_phase12_ci_only@127.0.0.1:5432/qf_phase12
+        run: npm run test:scale:phase12:messages

@@ -1309,6 +1309,7 @@ async function failOutbox(id: string, status: "failed" | "cancelled" | "supersed
 
 export async function dispatchConversationalOutbox(
   outboxId: string,
+  alreadyClaimed = false,
 ): Promise<ConversationalResult<{ status: string; providerMessageId: string | null }>> {
   const { data: pending, error } = await adminClient()
     .from("communication_conversation_outbox")
@@ -1316,18 +1317,26 @@ export async function dispatchConversationalOutbox(
     .eq("id", outboxId)
     .maybeSingle();
   if (error || !pending) return { ok: false, reason: "outbox_not_found" };
-  if (pending.status !== "pending") return { ok: false, reason: "outbox_not_dispatchable" };
-
-  const { data: claimedRows, error: claimError } = await adminClient()
-    .from("communication_conversation_outbox")
-    .update({ status: "claimed", claimed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq("id", outboxId)
-    .eq("status", "pending")
-    .select("*");
-  if (claimError || !Array.isArray(claimedRows) || claimedRows.length !== 1) {
-    return { ok: false, reason: "claim_conflict" };
+  if (
+    (!alreadyClaimed && pending.status !== "pending") ||
+    (alreadyClaimed && pending.status !== "claimed")
+  ) {
+    return { ok: false, reason: "outbox_not_dispatchable" };
   }
-  const claimed: any = claimedRows[0];
+
+  let claimed: any = pending;
+  if (!alreadyClaimed) {
+    const { data: claimedRows, error: claimError } = await adminClient()
+      .from("communication_conversation_outbox")
+      .update({ status: "claimed", claimed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", outboxId)
+      .eq("status", "pending")
+      .select("*");
+    if (claimError || !Array.isArray(claimedRows) || claimedRows.length !== 1) {
+      return { ok: false, reason: "claim_conflict" };
+    }
+    claimed = claimedRows[0];
+  }
 
   const { data: conversation } = await adminClient()
     .from("communication_conversations")
@@ -1506,14 +1515,11 @@ export async function dispatchConversationalOutbox(
 }
 
 export async function dispatchNextConversationalOutbox(): Promise<{ processed: boolean; status: string }> {
-  const { data } = await adminClient()
-    .from("communication_conversation_outbox")
-    .select("id")
-    .eq("status", "pending")
-    .order("created_at", { ascending: true })
-    .limit(1);
-  const id = Array.isArray(data) && data.length ? data[0]?.id : null;
+  const { data, error } = await adminClient().rpc("qf_claim_conversation_outbox_v1");
+  if (error) throw error;
+  const claimed = Array.isArray(data) && data.length ? data[0] : null;
+  const id = claimed?.id;
   if (!id) return { processed: false, status: "idle" };
-  const result = await dispatchConversationalOutbox(String(id));
+  const result = await dispatchConversationalOutbox(String(id), true);
   return { processed: true, status: result.ok ? result.value.status : result.reason };
 }

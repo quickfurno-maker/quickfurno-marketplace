@@ -35,20 +35,44 @@ const ENGINE_VERSION = "native-v1";
 const sleep = (ms: number) =>
   new Promise<void>((resolveSleep) => setTimeout(resolveSleep, ms));
 
+const AUTOMATION_LANES = ["client", "vendor", "campaigns", "system", "background"] as const;
+type AutomationLane = (typeof AUTOMATION_LANES)[number];
+
+function parseAutomationLanes(raw = process.env.QF_NATIVE_AUTOMATION_LANES): readonly AutomationLane[] {
+  if (!raw?.trim()) return AUTOMATION_LANES;
+  const lanes = raw
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  if (
+    lanes.length < 1 ||
+    new Set(lanes).size !== lanes.length ||
+    lanes.some((lane) => !AUTOMATION_LANES.includes(lane as AutomationLane))
+  ) {
+    throw new Error("NATIVE_AUTOMATION_LANES_INVALID");
+  }
+  return Object.freeze(lanes as AutomationLane[]);
+}
+
+const automationLanes = parseAutomationLanes();
+const automationLaneSet = new Set<AutomationLane>(automationLanes);
+
 async function main() {
   const runtime = await import("@/services/nativeAutomationRuntimeService");
   const scale = await import("@/services/scaleWorkerRuntimeService");
   const engine = await import("@/services/nativeAutomationEngineService");
   const studio = await import("@/services/automationStudioService");
-  const jarvisWhatsApp =
-    await import("@/services/jarvisWhatsAppGatewayService");
-  const conversationalWhatsApp =
-    await import("@/services/conversationalWhatsAppService");
   const leadEnrichmentMaintenance =
     await import("@/services/leadEnrichmentMaintenanceService");
   const vendorIntelligence =
     await import("@/services/vendorIntelligenceService");
   const cfg = runtime.getNativeAutomationRuntimeConfig();
+  const scaleRole =
+    automationLanes.length === AUTOMATION_LANES.length
+      ? "native-automation"
+      : automationLanes.length === 1
+        ? `native-automation-${automationLanes[0]}`
+        : "native-automation-mixed";
   const startedAt = new Date().toISOString();
   let stopping = false;
   let drainStartedAt: string | null = null;
@@ -57,7 +81,6 @@ async function main() {
   let nextRecoveryAt = 0;
   let nextMaintenanceAt = 0;
   let nextSystemLanesAt = 0;
-  let nextConversationTransportAt = 0;
   let nextDelayedFillAt = 0;
   const snapshot: NativeAutomationRuntimeSnapshot = {
     schemaVersion: 1 as const,
@@ -109,7 +132,7 @@ async function main() {
     const now = Date.now();
     if (!force && now - lastReplicaHeartbeatWrite < cfg.heartbeatMs) return;
     await scale.writeScaleWorkerHeartbeat({
-      role: "native-automation",
+      role: scaleRole,
       workerId: cfg.workerId,
       state,
       acceptingWork,
@@ -151,6 +174,8 @@ async function main() {
     version: ENGINE_VERSION,
     mode: cfg.mode,
     workerId: cfg.workerId,
+    role: scaleRole,
+    lanes: automationLanes,
   });
 
   if (cfg.mode === "active") snapshot.state = "running";
@@ -160,9 +185,9 @@ async function main() {
   );
 
   const familyLanes = [
-    ["client_journey", "client_whatsapp"],
-    ["vendor_journey", "vendor_whatsapp"],
-    ["campaigns", "campaign_execution"],
+    ["client_journey", "client_whatsapp", "client"],
+    ["vendor_journey", "vendor_whatsapp", "vendor"],
+    ["campaigns", "campaign_execution", "campaigns"],
   ] as const;
   while (!stopping) {
     try {
@@ -179,43 +204,6 @@ async function main() {
       }
 
       let didWork = false;
-      const transportNow = Date.now();
-      if (transportNow >= nextConversationTransportAt) {
-        try {
-          const jarvisTurn =
-            await jarvisWhatsApp.dispatchNextJarvisWhatsAppTurn();
-          didWork ||= jarvisTurn.processed;
-        } catch (error) {
-          snapshot.state = "degraded";
-          snapshot.lastErrorAt = new Date().toISOString();
-          snapshot.lastSafeCode =
-            error instanceof Error
-              ? error.message.slice(0, 160)
-              : "JARVIS_TURN_TRANSPORT_UNKNOWN_ERROR";
-          console.error("[qf-native-automation] Jarvis turn transport failed", {
-            code: snapshot.lastSafeCode,
-          });
-        }
-        try {
-          const conversationalReply =
-            await conversationalWhatsApp.dispatchNextConversationalOutbox();
-          didWork ||= conversationalReply.processed;
-        } catch (error) {
-          snapshot.state = "degraded";
-          snapshot.lastErrorAt = new Date().toISOString();
-          snapshot.lastSafeCode =
-            error instanceof Error
-              ? error.message.slice(0, 160)
-              : "JARVIS_REPLY_TRANSPORT_UNKNOWN_ERROR";
-          console.error(
-            "[qf-native-automation] Jarvis reply transport failed",
-            {
-              code: snapshot.lastSafeCode,
-            },
-          );
-        }
-        nextConversationTransportAt = transportNow + cfg.systemLaneIntervalMs;
-      }
 
       const globalEnabled = await studio.isAutomationStudioGlobalEnabled();
       if (!globalEnabled) {
@@ -224,7 +212,8 @@ async function main() {
         await sleep(didWork ? 50 : cfg.idlePollMs);
         continue;
       }
-      for (const [lane, family] of familyLanes) {
+      for (const [lane, family, scaleLane] of familyLanes) {
+        if (!automationLaneSet.has(scaleLane)) continue;
         if (!(await studio.isAutomationStudioWorkflowEnabled(lane))) continue;
         for (let i = 0; i < cfg.maxDrainPerFamily && !stopping; i += 1) {
           const result = await engine.runNativeFamilyClaimCycle({
@@ -240,6 +229,7 @@ async function main() {
 
       const now = Date.now();
       if (
+        automationLaneSet.has("background") &&
         now >= nextRecoveryAt &&
         (await studio.isAutomationStudioWorkflowEnabled("recovery"))
       ) {
@@ -249,7 +239,7 @@ async function main() {
         nextRecoveryAt = now + cfg.recoveryIntervalMs;
       }
 
-      if (now >= nextSystemLanesAt) {
+      if (automationLaneSet.has("system") && now >= nextSystemLanesAt) {
         const dispatched = await engine.runNativeLeadAssignmentDispatchCycle(
           cfg.leadDispatchBatch,
         );
@@ -266,7 +256,7 @@ async function main() {
         nextSystemLanesAt = now + cfg.systemLaneIntervalMs;
       }
 
-      if (now >= nextDelayedFillAt) {
+      if (automationLaneSet.has("system") && now >= nextDelayedFillAt) {
         const delayedFill = await engine.runNativeDelayedFillCycle(
           cfg.delayedFillBatch,
         );
@@ -275,7 +265,7 @@ async function main() {
         nextDelayedFillAt = now + cfg.delayedFillIntervalMs;
       }
 
-      if (now >= nextMaintenanceAt) {
+      if (automationLaneSet.has("background") && now >= nextMaintenanceAt) {
         if (await studio.isAutomationStudioWorkflowEnabled("recovery")) {
           const reconciled = await engine.runNativeReconcileCycle(cfg.workerId);
           markResult("reconcile", reconciled);

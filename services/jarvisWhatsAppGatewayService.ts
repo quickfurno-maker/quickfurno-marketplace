@@ -3,6 +3,7 @@ import { adminClient } from "../lib/supabase";
 import { deriveJarvisNormalizedText } from "../lib/communication/providers/metaWhatsAppInbound";
 import { signalConversationalWhatsAppPresence } from "./conversationalWhatsAppService";
 import { resolveJarvisSigningPrivateKey } from "../lib/jarvis/signingPrivateKeySource";
+import { postJarvisScale } from "./jarvisScaleTransport";
 import {
   QFJ_WHATSAPP_TURN_KEY_ID_HEADER,
   QFJ_WHATSAPP_TURN_PATH,
@@ -91,30 +92,29 @@ export async function sendJarvisWhatsAppTurn(
   } catch {
     return { ok: false, reason: "config_missing" };
   }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 5_000);
-  try {
-    const response = await fetch(new URL(QFJ_WHATSAPP_TURN_PATH, cfg.baseUrl), {
-      method: "POST",
-      redirect: "error",
-      signal: controller.signal,
-      headers: {
-        "content-type": "application/json",
-        [QFJ_WHATSAPP_TURN_KEY_ID_HEADER]: cfg.keyId,
-        [QFJ_WHATSAPP_TURN_SIGNATURE_HEADER]: signature,
-      },
-      body,
-    });
-    if (response.status === 202 || response.status === 200)
-      return { ok: true, status: "accepted" };
-    if (response.status >= 400 && response.status < 500)
-      return { ok: false, reason: "refused" };
-    return { ok: false, reason: "unavailable" };
-  } catch {
-    return { ok: false, reason: "unavailable" };
-  } finally {
-    clearTimeout(timer);
-  }
+  const result = await postJarvisScale({
+    url: new URL(QFJ_WHATSAPP_TURN_PATH, cfg.baseUrl).toString(),
+    path: QFJ_WHATSAPP_TURN_PATH,
+    body,
+    keyId: cfg.keyId,
+    privateKeyPem: cfg.privateKeyPem,
+    actor: turn.assignedActor,
+    requestId: turn.requestId,
+    idempotencyKey: turn.inboundMessageId,
+    expectedRevision: turn.conversationRevision,
+    headers: {
+      "content-type": "application/json",
+      [QFJ_WHATSAPP_TURN_KEY_ID_HEADER]: cfg.keyId,
+      [QFJ_WHATSAPP_TURN_SIGNATURE_HEADER]: signature,
+    },
+  });
+  if (!result.ok) return { ok: false, reason: "unavailable" };
+  const response = result.response;
+  if (response.status === 202 || response.status === 200)
+    return { ok: true, status: "accepted" };
+  if (response.status >= 400 && response.status < 500)
+    return { ok: false, reason: "refused" };
+  return { ok: false, reason: "unavailable" };
 }
 
 export async function dispatchNextJarvisWhatsAppTurn(): Promise<{

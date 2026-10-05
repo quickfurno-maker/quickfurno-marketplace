@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { parseQfjVerificationKeys } from "@/lib/jarvis/coreDecisionAuth";
-import { parseQfjOperatorSnapshotRequest } from "@/lib/jarvis/operatorSnapshotContract";
+import { parseQfjOperatorSnapshotRequest, QFJ_OPERATOR_SNAPSHOT_PATH } from "@/lib/jarvis/operatorSnapshotContract";
+import { qfjScaleHeadersForResult, qfjScaleHttpStatus, verifyQfjScaleWebRequest } from "@/lib/jarvis/scaleRequestGuard";
 import { QFJ_KEY_ID_HEADER, QFJ_SIGNATURE_HEADER } from "@/lib/jarvis/signedRequestAuth";
 import { verifyQfjOperatorSnapshotSignature } from "@/lib/jarvis/operatorSnapshotAuth";
 import { readJarvisOperatorSnapshot } from "@/services/jarvisOperatorSnapshotService";
@@ -9,10 +10,18 @@ import { readJarvisOperatorSnapshot } from "@/services/jarvisOperatorSnapshotSer
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const reply = (status: number, body: unknown) =>
+const reply = (
+  status: number,
+  body: unknown,
+  extraHeaders: Readonly<Record<string, string>> = {},
+) =>
   NextResponse.json(body, {
     status,
-    headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" },
+    headers: {
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+      ...extraHeaders,
+    },
   });
 
 export async function POST(request: Request): Promise<Response> {
@@ -31,6 +40,21 @@ export async function POST(request: Request): Promise<Response> {
   const keys = parseQfjVerificationKeys(process.env.QF_JARVIS_OS_READ_VERIFICATION_KEYS_JSON);
   if (!keys) return reply(503, { error: "service_unavailable" });
 
+  const scaleContract = verifyQfjScaleWebRequest({
+    request,
+    rawBody: raw,
+    path: QFJ_OPERATOR_SNAPSHOT_PATH,
+    verificationKeys: keys,
+    nowMs: Date.now(),
+    allowLegacy: true,
+  });
+  if (!scaleContract.ok) {
+    return reply(
+      qfjScaleHttpStatus(scaleContract.errorClass),
+      { error: "scale_contract_rejected", errorClass: scaleContract.errorClass },
+    );
+  }
+
   const verified = verifyQfjOperatorSnapshotSignature({
     rawBody: raw,
     request: parsed,
@@ -41,6 +65,12 @@ export async function POST(request: Request): Promise<Response> {
   });
   if (!verified) return reply(401, { error: "authentication_failed" });
 
-  try { return reply(200, await readJarvisOperatorSnapshot()); }
+  try {
+    return reply(
+      200,
+      await readJarvisOperatorSnapshot(),
+      qfjScaleHeadersForResult(scaleContract),
+    );
+  }
   catch { return reply(503, { error: "service_unavailable" }); }
 }

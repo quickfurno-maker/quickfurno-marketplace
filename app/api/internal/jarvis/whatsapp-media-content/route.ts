@@ -67,8 +67,7 @@ export async function POST(request: Request): Promise<Response> {
     issuedAt: parsed.issuedAt,
     keyId: request.headers.get(QFJ_KEY_ID_HEADER),
     signature: request.headers.get(QFJ_SIGNATURE_HEADER),
-    keys,
-    now: new Date().toISOString(),
+    keys, requestHeaders: request.headers, now: new Date().toISOString(),
   });
   if (!authenticated) return json(401, { error: "authentication_failed" });
 

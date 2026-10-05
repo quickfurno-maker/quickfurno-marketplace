@@ -212,7 +212,10 @@
     "test:scale:data-lifecycle-postgres": "node scripts/scale/certify-data-lifecycle-postgres.mjs",
     "test:scale:phase09": "npm run test:scale:db-lifecycle-contract && npm run test:scale:data-lifecycle-postgres",
     "test:scale:edge-origin-contract": "node scripts/scale/validate-edge-origin-contract.mjs",
-    "test:scale:phase10": "npm run test:scale:edge-origin-contract"
+    "test:scale:phase10": "npm run test:scale:edge-origin-contract",
+    "test:scale:phase11:contract": "node scripts/scale/validate-phase11-contract.mjs",
+    "test:scale:phase11:resilience": "node --experimental-transform-types scripts/scale/certify-phase11-resilience.mjs",
+    "test:scale:phase11": "npm run test:scale:phase11:contract && npm run test:scale:phase11:resilience"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

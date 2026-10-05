@@ -17,7 +17,7 @@ export async function POST(request:Request):Promise<Response> {
   const policy=resolveQfJarvisRuntimePolicy(); if(policy.mode === "off" || !policy.serviceAvailabilityEnabled) return reply(503,{error:"service_unavailable"});
   const expectedTenant=process.env.QF_JARVIS_TENANT_ID?.trim(); if(!expectedTenant || parsed.tenantId !== expectedTenant) return reply(403,{error:"scope_refused"});
   const keys=parseQfjVerificationKeys(process.env.QF_JARVIS_CORE_VERIFICATION_KEYS_JSON); if(!keys) return reply(503,{error:"service_unavailable"});
-  const verified=verifyQfjSignedRequestSignature({ rawBody:raw, domain:QFJ_SERVICE_AVAILABILITY_SIGNING_DOMAIN, path:QFJ_SERVICE_AVAILABILITY_PATH, requestId:parsed.requestId, issuedAt:parsed.issuedAt, keyId:request.headers.get(QFJ_KEY_ID_HEADER), signature:request.headers.get(QFJ_SIGNATURE_HEADER), keys, now:new Date().toISOString() });
+  const verified=verifyQfjSignedRequestSignature({ rawBody:raw, domain:QFJ_SERVICE_AVAILABILITY_SIGNING_DOMAIN, path:QFJ_SERVICE_AVAILABILITY_PATH, requestId:parsed.requestId, issuedAt:parsed.issuedAt, keyId:request.headers.get(QFJ_KEY_ID_HEADER), signature:request.headers.get(QFJ_SIGNATURE_HEADER), keys, requestHeaders: request.headers, now:new Date().toISOString() });
   if(!verified) return reply(401,{error:"authentication_failed"});
   try { const snapshot=await readJarvisServiceAvailabilitySnapshot(); return reply(200,{protocol:QFJ_SERVICE_AVAILABILITY_PROTOCOL,version:1,requestId:parsed.requestId,snapshot}); }
   catch { return reply(503,{error:"service_unavailable"}); }

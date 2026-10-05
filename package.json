@@ -218,7 +218,9 @@
     "test:scale:phase11": "npm run test:scale:phase11:contract && npm run test:scale:phase11:resilience",
     "test:scale:phase12:contract": "node scripts/scale/validate-phase12-horizontal-workers.mjs",
     "test:scale:phase12:messages": "node scripts/scale/certify-phase12-horizontal-messages-postgres.mjs",
-    "test:scale:phase12": "npm run test:scale:phase12:contract && npm run test:scale:matching-concurrency-postgres && npm run test:scale:durable-jobs:postgres && npm run test:scale:phase12:messages"
+    "test:scale:phase12": "npm run test:scale:phase12:contract && npm run test:scale:matching-concurrency-postgres && npm run test:scale:durable-jobs:postgres && npm run test:scale:phase12:messages",
+    "test:scale:phase13:contract": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/scale/validate-phase13-config-contract.mjs",
+    "test:scale:phase13": "npm run test:scale:phase13:contract && node scripts/mvp/jarvis/validate-qf-conversation-fastpath.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

@@ -1,20 +1,11 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
-import { config as loadDotEnv } from "dotenv";
 import WebSocket from "ws";
+import {
+  assertQfRuntimeIdentity,
+  loadQfRuntimeEnvironment,
+} from "@/lib/runtime/deploymentConfig";
 
-function loadEnvironment() {
-  const explicit = process.env.QF_ENV_FILE?.trim();
-  const candidates = [explicit, ".env.local", ".env.production", ".env"].filter(Boolean) as string[];
-  for (const candidate of candidates) {
-    const path = resolve(process.cwd(), candidate);
-    if (!existsSync(path)) continue;
-    loadDotEnv({ path, override: false });
-    if (explicit) break;
-  }
-}
-
-loadEnvironment();
+loadQfRuntimeEnvironment();
+assertQfRuntimeIdentity("quickfurno.conversation-transport");
 
 if (typeof globalThis.WebSocket === "undefined") {
   Object.defineProperty(globalThis, "WebSocket", {

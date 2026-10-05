@@ -7,6 +7,7 @@
   type QfjPrivateRiyaQualificationIngressRequestV2, type QfjPrivateRiyaQualificationIngressResponseV2,
 } from "../lib/jarvis/privateRiyaIngressContract";
 import { type QfJarvisRuntimePolicy } from "../lib/jarvis/runtimePolicy";
+import { requirePortableServiceBaseUrl } from "../lib/runtime/serviceDiscovery";
 import {
   postJarvisScale,
   type QfjScaleHttpPost,
@@ -20,9 +21,10 @@ export type JarvisRiyaGatewayResult = { readonly ok: true; readonly response: Qf
 export type JarvisRiyaQualificationGatewayResult = { readonly ok: true; readonly response: QfjPrivateRiyaQualificationIngressResponseV2 } | { readonly ok: false; readonly reason: "disabled" | "unavailable" | "invalid_response" };
 
 function endpoint(baseUrl: string): string {
-  const url = new URL(baseUrl); const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "::1";
-  if ((url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) || url.username || url.password || url.search || url.hash || url.pathname !== "/") throw new Error("INVALID_JARVIS_BASE_URL");
-  return new URL(QFJ_RIYA_INGRESS_PATH, url).toString();
+  const portableBaseUrl = requirePortableServiceBaseUrl(baseUrl, {
+    allowLoopbackHttp: true,
+  });
+  return new URL(QFJ_RIYA_INGRESS_PATH, portableBaseUrl).toString();
 }
 
 async function postRiyaRequest(args: {

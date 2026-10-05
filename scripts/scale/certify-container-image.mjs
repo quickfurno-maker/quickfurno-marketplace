@@ -159,6 +159,12 @@ try {
     "-e",
     "QF_RUNTIME_ROLE=web",
     "-e",
+    "QF_RUNTIME_ENV=production",
+    "-e",
+    "QF_CONFIG_SCHEMA_VERSION=1",
+    "-e",
+    "QF_SERVICE_ID=quickfurno.web",
+    "-e",
     "NEXT_PUBLIC_SUPABASE_URL=https://example.invalid",
     "-e",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY=container-certification-public-placeholder",
@@ -237,7 +243,19 @@ try {
   }
   process.stdout.write("PASS all worker artifacts parse on runtime Node\n");
 
-  const missing = execResult("docker", ["run", "--rm", "-e", "QF_RUNTIME_ROLE=web", image]);
+  const missing = execResult("docker", [
+    "run",
+    "--rm",
+    "-e",
+    "QF_RUNTIME_ROLE=web",
+    "-e",
+    "QF_RUNTIME_ENV=production",
+    "-e",
+    "QF_CONFIG_SCHEMA_VERSION=1",
+    "-e",
+    "QF_SERVICE_ID=quickfurno.web",
+    image,
+  ]);
   process.stdout.write(missing.stdout);
   process.stderr.write(missing.stderr);
   assert(missing.status === 78, "missing mandatory config fails closed");

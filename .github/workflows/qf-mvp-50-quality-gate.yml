@@ -385,7 +385,7 @@ jobs:
         run: |
           npm run build:automation-worker
           set +e
-          OUTPUT=$(QF_NATIVE_AUTOMATION_MODE=shadow QF_NATIVE_AUTOMATION_WORKER_ID='!' node dist/automation-worker.mjs 2>&1)
+          OUTPUT=$(QF_RUNTIME_ENV=local QF_CONFIG_SCHEMA_VERSION=1 QF_SERVICE_ID=quickfurno.automation-worker QF_NATIVE_AUTOMATION_MODE=shadow QF_NATIVE_AUTOMATION_WORKER_ID='!' node dist/automation-worker.mjs 2>&1)
           CODE=$?
           set -e
           printf '%s\n' "$OUTPUT"
@@ -676,3 +676,30 @@ jobs:
         env:
           DATABASE_URL: postgresql://qf_phase12:qf_phase12_ci_only@127.0.0.1:5432/qf_phase12
         run: npm run test:scale:phase12:messages
+
+  # SCALE-P13 - portable secrets, versioned config and DNS service discovery.
+  phase13-secrets-config-certification:
+    name: Phase 13 secrets config certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout reviewed tree
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Certify portable secrets config and service discovery
+        run: npm run test:scale:phase13
+
+      - name: Revalidate portability contract
+        run: npm run test:scale:portability
+
+      - name: Typecheck
+        run: npm run typecheck

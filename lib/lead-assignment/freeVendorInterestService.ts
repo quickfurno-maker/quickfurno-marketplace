@@ -6,6 +6,7 @@ import { adminClient } from "@/lib/supabase";
 import { evaluateVendorLeadAssignmentEligibility } from "@/lib/vendors/vendorEligibility";
 import { getVendorPublicVisibility } from "@/lib/vendors/vendorVisibility";
 import { loadMarketplaceRuntimeSettings } from "@/lib/lead-assignment/runtimeSettings";
+import { allowPublicMutation } from "@/lib/security/publicMutationRateLimit";
 
 export const FREE_VENDOR_INTEREST_CLIENT_MESSAGE =
   "Request received. QuickFurno has registered your interest. Our team will help you connect with a suitable eligible vendor shortly.";
@@ -53,6 +54,15 @@ export async function captureFreeVendorInterest(
     const digits = normalizeClientPhone(input.clientPhone);
     if (!vendorId || digits.length < 10) {
       return { ok: false, code: "VALIDATION", error: "Please enter a valid phone number." };
+    }
+
+    if (!(await allowPublicMutation({
+      scope: "free-vendor-interest",
+      identity: digits,
+      limit: 10,
+      windowMs: 60 * 60 * 1000,
+    }))) {
+      return { ok: false, code: "RATE_LIMITED", error: "Too many requests. Please try again later." };
     }
 
     const settings = await loadMarketplaceRuntimeSettings();

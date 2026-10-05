@@ -4,6 +4,7 @@ import { generateKeyPairSync, sign, verify } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { isIP } from "node:net";
 
+const discoveryRuntime = await import(new URL("../../lib/runtime/serviceDiscovery.ts", import.meta.url));
 const read = (path) => readFileSync(path, "utf8");
 const failures = [];
 function check(label, fn) {
@@ -110,6 +111,30 @@ check("Jarvis service discovery is DNS-oriented and rejects literal non-loopback
   const valid = new URL("https://jarvis-a.internal/");
   assert.equal(isIP(valid.hostname), 0);
   assert.equal(isIP(new URL("https://203.0.113.10/").hostname), 4);
+  assert.equal(
+    discoveryRuntime.resolvePortableServiceBaseUrl("https://jarvis-a.internal/", {
+      allowLoopbackHttp: true,
+    }),
+    "https://jarvis-a.internal/",
+  );
+  assert.equal(
+    discoveryRuntime.resolvePortableServiceBaseUrl("https://jarvis-b.internal/", {
+      allowLoopbackHttp: true,
+    }),
+    "https://jarvis-b.internal/",
+  );
+  assert.equal(
+    discoveryRuntime.resolvePortableServiceBaseUrl("https://203.0.113.10/", {
+      allowLoopbackHttp: true,
+    }),
+    null,
+  );
+  assert.equal(
+    discoveryRuntime.resolvePortableServiceBaseUrl("http://[::1]:3100/", {
+      allowLoopbackHttp: true,
+    }),
+    "http://[::1]:3100/",
+  );
 });
 
 check("service relocation requires config only, not a source-host constant", () => {

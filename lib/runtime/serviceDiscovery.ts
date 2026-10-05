@@ -1,6 +1,6 @@
 import { isIP } from "node:net";
 
-const LOOPBACK = new Set(["127.0.0.1", "localhost", "::1"]);
+const LOOPBACK = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 
 export interface PortableServiceUrlOptions {
   readonly allowLoopbackHttp?: boolean;

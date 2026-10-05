@@ -16,7 +16,9 @@ resource "cloudflare_ruleset" "managed_waf" {
     description = "Execute Cloudflare managed WAF for QuickFurno public hosts"
     expression  = "(${local.public_host_expression})"
     action      = "execute"
-    action_parameters = { id = "efb7b8c949ac4650a09736fc376e9aee" }
+    action_parameters = {
+      id = "efb7b8c949ac4650a09736fc376e9aee"
+    }
   }]
 }
 
@@ -44,39 +46,64 @@ resource "cloudflare_ruleset" "rate_limits" {
   phase       = "http_ratelimit"
   rules = [
     {
-      ref = "vendor_auth_per_ip"
+      ref         = "vendor_auth_per_ip"
       description = "Vendor auth/reset/OTP abuse ceiling"
-      expression = "(${local.public_host_expression}) and starts_with(http.request.uri.path, \"/api/vendor/auth/\")"
-      action = "block"
-      ratelimit = { characteristics = ["cf.colo.id", "ip.src"], period = 60, requests_per_period = 20, mitigation_timeout = 300 }
+      expression  = "(${local.public_host_expression}) and starts_with(http.request.uri.path, \"/api/vendor/auth/\")"
+      action      = "block"
+      ratelimit = {
+        characteristics     = ["cf.colo.id", "ip.src"]
+        period              = 60
+        requests_per_period = 20
+        mitigation_timeout  = 300
+      }
     },
     {
-      ref = "admin_api_per_ip"
+      ref         = "admin_api_per_ip"
       description = "Admin API abuse ceiling; application authorization still required"
-      expression = "(${local.public_host_expression}) and starts_with(http.request.uri.path, \"/api/admin/\")"
-      action = "block"
-      ratelimit = { characteristics = ["cf.colo.id", "ip.src"], period = 60, requests_per_period = 120, mitigation_timeout = 60 }
+      expression  = "(${local.public_host_expression}) and starts_with(http.request.uri.path, \"/api/admin/\")"
+      action      = "block"
+      ratelimit = {
+        characteristics     = ["cf.colo.id", "ip.src"]
+        period              = 60
+        requests_per_period = 120
+        mitigation_timeout  = 60
+      }
     },
     {
-      ref = "webhooks_per_ip"
+      ref         = "webhooks_per_ip"
       description = "Webhook flood ceiling; origin signatures and idempotency remain mandatory"
-      expression = "(${local.public_host_expression}) and starts_with(http.request.uri.path, \"/api/webhooks/\")"
-      action = "block"
-      ratelimit = { characteristics = ["cf.colo.id", "ip.src"], period = 60, requests_per_period = 300, mitigation_timeout = 60 }
+      expression  = "(${local.public_host_expression}) and starts_with(http.request.uri.path, \"/api/webhooks/\")"
+      action      = "block"
+      ratelimit = {
+        characteristics     = ["cf.colo.id", "ip.src"]
+        period              = 60
+        requests_per_period = 300
+        mitigation_timeout  = 60
+      }
     },
     {
-      ref = "internal_api_per_ip"
+      ref         = "internal_api_per_ip"
       description = "Internal API flood ceiling; signed origin contract remains mandatory"
-      expression = "(${local.public_host_expression}) and starts_with(http.request.uri.path, \"/api/internal/\")"
-      action = "block"
-      ratelimit = { characteristics = ["cf.colo.id", "ip.src"], period = 60, requests_per_period = 300, mitigation_timeout = 60 }
+      expression  = "(${local.public_host_expression}) and starts_with(http.request.uri.path, \"/api/internal/\")"
+      action      = "block"
+      ratelimit = {
+        characteristics     = ["cf.colo.id", "ip.src"]
+        period              = 60
+        requests_per_period = 300
+        mitigation_timeout  = 60
+      }
     },
     {
-      ref = "csp_report_per_ip"
+      ref         = "csp_report_per_ip"
       description = "Bound CSP telemetry ingress; collector also enforces a 16 KiB body cap"
-      expression = "(${local.public_host_expression}) and http.request.uri.path eq \"/api/security/csp-report\""
-      action = "block"
-      ratelimit = { characteristics = ["cf.colo.id", "ip.src"], period = 60, requests_per_period = 60, mitigation_timeout = 60 }
+      expression  = "(${local.public_host_expression}) and http.request.uri.path eq \"/api/security/csp-report\""
+      action      = "block"
+      ratelimit = {
+        characteristics     = ["cf.colo.id", "ip.src"]
+        period              = 60
+        requests_per_period = 60
+        mitigation_timeout  = 60
+      }
     }
   ]
 }
@@ -90,18 +117,26 @@ resource "cloudflare_ruleset" "cache_rules" {
   phase       = "http_request_cache_settings"
   rules = [
     {
-      ref = "cache_next_static"
+      ref         = "cache_next_static"
       description = "Cache immutable Next static assets"
-      expression = "(${local.public_host_expression}) and starts_with(http.request.uri.path, \"/_next/static/\")"
-      action = "set_cache_settings"
-      action_parameters = { cache = true, edge_ttl = { mode = "override_origin", default = 31536000 } }
+      expression  = "(${local.public_host_expression}) and starts_with(http.request.uri.path, \"/_next/static/\")"
+      action      = "set_cache_settings"
+      action_parameters = {
+        cache = true
+        edge_ttl = {
+          mode    = "override_origin"
+          default = 31536000
+        }
+      }
     },
     {
-      ref = "bypass_dynamic_business_paths"
+      ref         = "bypass_dynamic_business_paths"
       description = "Never edge-cache APIs, admin, vendor dashboard or POST/server-action traffic"
-      expression = "(${local.public_host_expression}) and (starts_with(http.request.uri.path, \"/api/\") or starts_with(http.request.uri.path, \"/admin\") or starts_with(http.request.uri.path, \"/vendor/dashboard\") or http.request.method eq \"POST\")"
-      action = "set_cache_settings"
-      action_parameters = { cache = false }
+      expression  = "(${local.public_host_expression}) and (starts_with(http.request.uri.path, \"/api/\") or starts_with(http.request.uri.path, \"/admin\") or starts_with(http.request.uri.path, \"/vendor/dashboard\") or http.request.method eq \"POST\")"
+      action      = "set_cache_settings"
+      action_parameters = {
+        cache = false
+      }
     }
   ]
 }

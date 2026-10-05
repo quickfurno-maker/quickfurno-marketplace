@@ -1,0 +1,31 @@
+# Phase 10 example fragment for the canonical public HTTPS server.
+# This is provider-portable mTLS. The CA can issue a Cloudflare custom AOP client
+# certificate today and another CDN/load-balancer client certificate later.
+#
+# Stage this only AFTER normal TLS is healthy. Do not put the client CA private key
+# on the origin.
+
+ssl_client_certificate /etc/nginx/quickfurno/origin-client-ca.pem;
+ssl_verify_client on;
+ssl_verify_depth 2;
+
+# Portable origin safety: bound request bodies and request lifetime even when the
+# CDN/WAF is replaced or an approved emergency gateway is used. The 10 MiB ceiling
+# accommodates the application's authenticated 8 MiB vendor-media upload; individual
+# webhooks/auth routes keep their tighter application/edge limits.
+client_max_body_size 10m;
+client_body_timeout 15s;
+client_header_timeout 15s;
+send_timeout 60s;
+
+# The application remains loopback-only. These deadlines stop slow/upstream-stalled
+# requests from occupying origin capacity indefinitely.
+location / {
+    proxy_connect_timeout 5s;
+    proxy_send_timeout 60s;
+    proxy_read_timeout 60s;
+    proxy_pass http://127.0.0.1:3000;
+}
+
+# HSTS belongs in the HTTPS server only and is enabled after the TLS recovery drill:
+# add_header Strict-Transport-Security "max-age=31536000" always;

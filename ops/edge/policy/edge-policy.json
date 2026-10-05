@@ -1,0 +1,139 @@
+{
+  "version": "phase10-v1",
+  "owner": "QuickFurno Platform",
+  "posture": {
+    "cloudflareIsReplaceable": true,
+    "originBusinessControlsRequired": true,
+    "durableAuthority": "PostgreSQL",
+    "ephemeralCoordination": "Redis/Valkey",
+    "hstsActivation": "after-tls-proof",
+    "cspActivation": "report-only-before-enforce"
+  },
+  "hosts": {
+    "quickfurno.in": {
+      "mode": "cloudflare-proxied-public",
+      "cspOwner": "edge-report-only",
+      "hstsOwner": "origin-gateway-after-tls"
+    },
+    "www.quickfurno.in": {
+      "mode": "cloudflare-proxied-public",
+      "cspOwner": "edge-report-only",
+      "hstsOwner": "origin-gateway-after-tls"
+    },
+    "jarvis.quickfurno.in": {
+      "mode": "cloudflare-proxied-public",
+      "cspOwner": "application-nonce",
+      "hstsOwner": "origin-gateway-after-tls"
+    },
+    "gateway.jarvis.quickfurno.in": {
+      "mode": "approved-direct-machine-ingress",
+      "cloudflareProxy": false,
+      "requirements": [
+        "source-ip-allowlist",
+        "cryptographic-request-signing",
+        "rate-limit",
+        "body-limit",
+        "private-container-network"
+      ]
+    }
+  },
+  "routeClasses": [
+    {
+      "id": "vendor-auth",
+      "paths": [
+        "/api/vendor/auth/*"
+      ],
+      "edge": "rate-limit",
+      "origin": [
+        "database-identity-rate-limit",
+        "authorization"
+      ]
+    },
+    {
+      "id": "admin-api",
+      "paths": [
+        "/api/admin/*"
+      ],
+      "edge": "rate-limit",
+      "origin": [
+        "authentication",
+        "authorization"
+      ]
+    },
+    {
+      "id": "payments",
+      "paths": [
+        "/api/vendor/package-payment/*",
+        "/api/webhooks/razorpay/*"
+      ],
+      "edge": "rate-limit",
+      "origin": [
+        "signature-or-session-validation",
+        "idempotency"
+      ]
+    },
+    {
+      "id": "whatsapp-webhook",
+      "paths": [
+        "/api/webhooks/whatsapp/*"
+      ],
+      "edge": "rate-limit",
+      "origin": [
+        "signature-validation",
+        "idempotency"
+      ]
+    },
+    {
+      "id": "jarvis-internal",
+      "paths": [
+        "/api/internal/jarvis/*",
+        "/api/internal/process-*"
+      ],
+      "edge": "rate-limit",
+      "origin": [
+        "internal-signing",
+        "idempotency"
+      ]
+    },
+    {
+      "id": "public-server-actions",
+      "paths": [
+        "Next.js Server Actions"
+      ],
+      "edge": "generic-post-abuse-control",
+      "origin": [
+        "redis-identity-rate-limit",
+        "validation",
+        "duplicate-detection"
+      ]
+    }
+  ],
+  "cache": {
+    "eligible": [
+      "/_next/static/*",
+      "/favicon.ico",
+      "static image/font assets"
+    ],
+    "bypass": [
+      "/api/*",
+      "/admin*",
+      "/vendor/dashboard*",
+      "authenticated responses",
+      "webhooks",
+      "server actions"
+    ]
+  },
+  "origin": {
+    "publicAppPorts": [
+      "3000"
+    ],
+    "requiredPublicListeners": [
+      "80",
+      "443"
+    ],
+    "applicationBinding": "127.0.0.1 or private container network only",
+    "firewall": "deny public application ports; allow 80/443 only through approved gateway",
+    "mtls": "portable client-certificate gate; Cloudflare AOP is one compatible client",
+    "emergencyBypass": "temporary approved gateway path only; never bypass application authentication/authorization/rate limits/idempotency"
+  }
+}

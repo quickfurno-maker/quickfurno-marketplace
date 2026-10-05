@@ -38,6 +38,7 @@ import {
 import type { CreateLeadInput, PublicVendorCard, AssignResult } from "../lib/types";
 import { resolveActiveCity } from "../lib/locations/cityService";
 import { isOutsideServiceArea, verifyLocationForServiceArea } from "./locationVerificationService";
+import { allowPublicMutation } from "../lib/security/publicMutationRateLimit";
 
 function firstText(...values: Array<string | undefined>): string {
   return values.map((value) => value?.trim()).find(Boolean) ?? "";
@@ -88,6 +89,15 @@ export async function createLead(
     const contact = normalizeLeadContactForStorage(phone);
     if (!contact.ok) throw appError("VALIDATION");
     const storedPhone = contact.storage;
+
+    if (!(await allowPublicMutation({
+      scope: "lead-capture",
+      identity: storedPhone,
+      limit: 12,
+      windowMs: 60 * 60 * 1000,
+    }))) {
+      throw appError("RATE_LIMITED");
+    }
 
     const db = adminClient();
 

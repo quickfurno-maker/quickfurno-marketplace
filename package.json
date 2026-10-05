@@ -210,13 +210,15 @@
     "test:scale:phase08": "npm run test:scale:db-matching-contract && npm run test:scale:matching-scale-postgres && npm run test:scale:matching-concurrency-postgres",
     "test:scale:db-lifecycle-contract": "node scripts/scale/validate-db-lifecycle-contract.mjs",
     "test:scale:data-lifecycle-postgres": "node scripts/scale/certify-data-lifecycle-postgres.mjs",
-    "test:scale:phase09": "npm run test:scale:db-lifecycle-contract && npm run test:scale:data-lifecycle-postgres"
+    "test:scale:phase09": "npm run test:scale:db-lifecycle-contract && npm run test:scale:data-lifecycle-postgres",
+    "test:scale:edge-origin-contract": "node scripts/scale/validate-edge-origin-contract.mjs",
+    "test:scale:phase10": "npm run test:scale:edge-origin-contract"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
     "dotenv": "^16.6.1",
-    "next": "16.3.6",
+    "next": "16.3.8",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "redis": "6.3.0",
@@ -233,7 +235,7 @@
     "autoprefixer": "^10.4.20",
     "esbuild": "^0.25.12",
     "eslint": "^9.0.0",
-    "eslint-config-next": "16.3.6",
+    "eslint-config-next": "16.3.8",
     "pg": "8.22.0",
     "postcss": "8.5.23",
     "tailwindcss": "^3.4.13",

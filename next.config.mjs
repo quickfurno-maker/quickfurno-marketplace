@@ -27,7 +27,25 @@ const supabaseHostname = (() => {
 // Strict-Transport-Security is also absent on purpose: it belongs at the
 // edge/host (Vercel sets it), and setting it from the app can pin a header
 // onto a plain-http origin during local work.
+const cspReportOnly = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data: https:",
+  "style-src 'self' 'unsafe-inline' https:",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:",
+  "connect-src 'self' https: wss:",
+  "worker-src 'self' blob:",
+  "form-action 'self'",
+  "report-uri /api/security/csp-report",
+].join("; ");
+
 const securityHeaders = [
+  ...(process.env.NODE_ENV === "production"
+    ? [{ key: "Content-Security-Policy-Report-Only", value: cspReportOnly }]
+    : []),
   // Stops a browser second-guessing a declared Content-Type. Matters most for
   // the vendor media bucket: an uploaded file must never be sniffed as html.
   { key: "X-Content-Type-Options", value: "nosniff" },

@@ -18,6 +18,8 @@ const originCert = read("ops/edge/origin/certify-origin.sh");
 const firewall = read("ops/edge/origin/ufw-phase10.sh");
 const mtls = read("ops/edge/origin/nginx-mtls.conf.example");
 const runbook = read("ops/edge/README.md");
+const nextConfig = read("next.config.mjs");
+const cspRoute = read("app/api/security/csp-report/route.ts");
 
 function check(name, fn) {
   try {
@@ -69,6 +71,15 @@ check("Cloudflare rules cover WAF, endpoint limits and safe caching", () => {
   assert.match(tf, /cache_next_static/);
   assert.match(tf, /http\.request\.method eq \\"POST\\"/);
   assert.match(tf, /cache\s*=\s*false/);
+});
+
+check("CSP is telemetry-only before enforcement", () => {
+  assert.match(nextConfig, /Content-Security-Policy-Report-Only/);
+  assert.match(nextConfig, /report-uri \/api\/security\/csp-report/);
+  assert.doesNotMatch(nextConfig, /key:\s*"Content-Security-Policy"\s*,/);
+  assert.match(cspRoute, /MAX_REPORT_BYTES\s*=\s*16 \* 1024/);
+  assert.match(cspRoute, /status:\s*413/);
+  assert.match(tf, /csp_report_per_ip/);
 });
 
 check("application ports remain private", () => {

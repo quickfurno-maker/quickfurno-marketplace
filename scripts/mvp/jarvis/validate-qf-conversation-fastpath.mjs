@@ -32,7 +32,11 @@ check("worker drains both Jarvis turns and WhatsApp reply outbox", () => {
 
 check("idle transport is event-driven with bounded database fallback", () => {
   assert.match(worker, /waitForDurableWorkWakeup/);
-  assert.match(worker, /topics:\s*\["conversation-outbox",\s*"jarvis-turn-outbox"\]/);
+  assert.match(worker, /TRANSPORT_LANES = \["provider-outbound", "jarvis-ingress"\]/);
+  assert.match(worker, /QF_CONVERSATION_TRANSPORT_LANES/);
+  assert.match(worker, /"conversation-outbox"/);
+  assert.match(worker, /"jarvis-turn-outbox"/);
+  assert.match(worker, /topics: wakeTopics/);
   assert.match(worker, /QF_CONVERSATION_TRANSPORT_IDLE_POLL_MS/);
   assert.match(worker, /1000,\s*250,\s*5000/);
   assert.match(worker, /QF_CONVERSATION_TRANSPORT_BUSY_POLL_MS/);

@@ -54,6 +54,7 @@ const callbackReplayMigration = read(
 const conversationService = read("services/conversationalWhatsAppService.ts");
 const gatewayService = read("services/jarvisWhatsAppGatewayService.ts");
 const automationWorker = read("worker/nativeAutomationWorker.ts");
+const conversationTransportWorker = read("worker/conversationTransportWorker.ts");
 const replyRoute = read("app/api/internal/jarvis/whatsapp-reply/route.ts");
 const materialRoute = read(
   "app/api/internal/jarvis/whatsapp-turn-material/route.ts",
@@ -466,23 +467,12 @@ await test("Jarvis turn timestamps are canonicalized before strict gateway valid
   assert.doesNotMatch(gatewayService, /receivedAt: inbound\.received_at/);
 });
 await test("Jarvis transport is independent of Automation Studio runtime availability", () => {
-  const turnTransportAt = automationWorker.indexOf(
-    "dispatchNextJarvisWhatsAppTurn()",
-  );
-  const replyTransportAt = automationWorker.indexOf(
-    "dispatchNextConversationalOutbox()",
-  );
-  const studioGateAt = automationWorker.indexOf(
-    "isAutomationStudioGlobalEnabled()",
-  );
-  assert.ok(
-    turnTransportAt >= 0 &&
-      replyTransportAt >= 0 &&
-      studioGateAt > turnTransportAt &&
-      studioGateAt > replyTransportAt,
-  );
-  assert.match(automationWorker, /JARVIS_TURN_TRANSPORT_UNKNOWN_ERROR/);
-  assert.match(automationWorker, /JARVIS_REPLY_TRANSPORT_UNKNOWN_ERROR/);
+  assert.doesNotMatch(automationWorker, /dispatchNextJarvisWhatsAppTurn/);
+  assert.doesNotMatch(automationWorker, /dispatchNextConversationalOutbox/);
+  assert.match(conversationTransportWorker, /dispatchNextJarvisWhatsAppTurn/);
+  assert.match(conversationTransportWorker, /dispatchNextConversationalOutbox/);
+  assert.match(conversationTransportWorker, /QF_CONVERSATION_TRANSPORT_LANES/);
+  assert.match(conversationTransportWorker, /waitForDurableWorkWakeup/);
 });
 await test("Jarvis signing key source accepts exactly one bounded source and fails closed", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qf-jarvis-signing-"));

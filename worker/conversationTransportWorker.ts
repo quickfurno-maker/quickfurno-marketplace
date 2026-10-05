@@ -30,6 +30,33 @@ function boundedInt(raw: string | undefined, fallback: number, min: number, max:
   return Math.max(min, Math.min(max, Math.floor(parsed)));
 }
 
+const TRANSPORT_LANES = ["provider-outbound", "jarvis-ingress"] as const;
+type TransportLane = (typeof TRANSPORT_LANES)[number];
+
+function parseTransportLanes(raw = process.env.QF_CONVERSATION_TRANSPORT_LANES): readonly TransportLane[] {
+  if (!raw?.trim()) return TRANSPORT_LANES;
+  const lanes = raw
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  if (
+    lanes.length < 1 ||
+    new Set(lanes).size !== lanes.length ||
+    lanes.some((lane) => !TRANSPORT_LANES.includes(lane as TransportLane))
+  ) {
+    throw new Error("CONVERSATION_TRANSPORT_LANES_INVALID");
+  }
+  return Object.freeze(lanes as TransportLane[]);
+}
+
+const transportLanes = parseTransportLanes();
+const providerOutboundEnabled = transportLanes.includes("provider-outbound");
+const jarvisIngressEnabled = transportLanes.includes("jarvis-ingress");
+const wakeTopics = Object.freeze([
+  ...(providerOutboundEnabled ? ["conversation-outbox" as const] : []),
+  ...(jarvisIngressEnabled ? ["jarvis-turn-outbox" as const] : []),
+]);
+
 const idlePollMs = boundedInt(
   process.env.QF_CONVERSATION_TRANSPORT_IDLE_POLL_MS,
   1000,
@@ -69,7 +96,12 @@ async function main() {
   const wakeups = await import("@/lib/coordination/durableWorkWakeup");
   const scale = await import("@/services/scaleWorkerRuntimeService");
 
-  const role = "conversation-transport";
+  const role =
+    transportLanes.length === 2
+      ? "conversation-transport"
+      : providerOutboundEnabled
+        ? "conversation-provider-outbound"
+        : "conversation-jarvis-ingress";
   const workerId = scale.scaleWorkerId(
     role,
     process.env.QF_CONVERSATION_TRANSPORT_WORKER_ID,
@@ -110,6 +142,8 @@ async function main() {
 
   console.info("[qf-conversation-transport] worker starting", {
     workerId,
+    role,
+    lanes: transportLanes,
     idlePollMs,
     busyPollMs,
     maxDrain,
@@ -127,20 +161,24 @@ async function main() {
         let cycleWorked = false;
         await heartbeat("running", true, 1).catch(() => undefined);
 
-        const reply = await conversational.dispatchNextConversationalOutbox();
-        if (reply.processed) {
-          cycleWorked = true;
-          didWork = true;
-          processed += 1;
+        if (providerOutboundEnabled) {
+          const reply = await conversational.dispatchNextConversationalOutbox();
+          if (reply.processed) {
+            cycleWorked = true;
+            didWork = true;
+            processed += 1;
+          }
         }
 
         if (stopping) break;
 
-        const turn = await jarvis.dispatchNextJarvisWhatsAppTurn();
-        if (turn.processed) {
-          cycleWorked = true;
-          didWork = true;
-          processed += 1;
+        if (jarvisIngressEnabled) {
+          const turn = await jarvis.dispatchNextJarvisWhatsAppTurn();
+          if (turn.processed) {
+            cycleWorked = true;
+            didWork = true;
+            processed += 1;
+          }
         }
 
         if (!cycleWorked) break;
@@ -158,7 +196,7 @@ async function main() {
 
       await heartbeat("idle", true, 0).catch(() => undefined);
       const wake = await wakeups.waitForDurableWorkWakeup({
-        topics: ["conversation-outbox", "jarvis-turn-outbox"],
+        topics: wakeTopics,
         timeoutMs: idlePollMs,
       });
       if (wake.status === "unavailable" && !stopping) {

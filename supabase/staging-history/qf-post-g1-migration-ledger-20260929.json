@@ -572,6 +572,18 @@
       }
     },
     {
+      "version": "20261005160000",
+      "name": "scale_phase12_horizontal_worker_claims",
+      "filename": "20261005160000_scale_phase12_horizontal_worker_claims.sql",
+      "path": "supabase/migrations/20261005160000_scale_phase12_horizontal_worker_claims.sql",
+      "canonicalSha256": "100e8c0ed07130def955ea6b29b2779607557647fe95f69b788b5303243456f7",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-05_BEFORE_DEPLOYMENT"
+    },
+    {
       "version": "20261004190002",
       "name": "scale_phase09_data_lifecycle",
       "filename": "20261004190002_scale_phase09_data_lifecycle.sql",

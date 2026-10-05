@@ -127,31 +127,17 @@ export async function dispatchNextJarvisWhatsAppTurn(): Promise<{
     return { processed: false, status: "disabled" };
   }
   const now = new Date().toISOString();
-  let query = adminClient()
-    .from("communication_jarvis_turn_outbox")
-    .select("id")
-    .in("status", ["pending", "retry_scheduled"])
-    .or(`next_retry_at.is.null,next_retry_at.lte.${now}`);
-  if (!genericOn && qualificationOn)
-    query = query.eq("turn_purpose", "lead_qualification");
-  if (genericOn && !qualificationOn)
-    query = query.eq("turn_purpose", "conversation");
-  const { data: rows } = await query
-    .order("created_at", { ascending: true })
-    .limit(1);
-  const id = Array.isArray(rows) && rows.length ? rows[0]?.id : null;
-  if (!id) return { processed: false, status: "idle" };
-
-  const { data: claimedRows } = await adminClient()
-    .from("communication_jarvis_turn_outbox")
-    .update({ status: "claimed", claimed_at: now, updated_at: now })
-    .eq("id", id)
-    .in("status", ["pending", "retry_scheduled"])
-    .select("*");
-  if (!Array.isArray(claimedRows) || claimedRows.length !== 1) {
-    return { processed: true, status: "claim_conflict" };
-  }
-  const claimed: any = claimedRows[0];
+  const { data: claimedRows, error: claimError } = await adminClient().rpc(
+    "qf_claim_jarvis_turn_outbox_v1",
+    {
+      p_allow_conversation: genericOn,
+      p_allow_qualification: qualificationOn,
+    },
+  );
+  if (claimError) throw claimError;
+  const claimed: any =
+    Array.isArray(claimedRows) && claimedRows.length ? claimedRows[0] : null;
+  if (!claimed) return { processed: false, status: "idle" };
 
   const [{ data: conversation }, { data: inbound }] = await Promise.all([
     adminClient()

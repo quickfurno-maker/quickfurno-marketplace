@@ -23,9 +23,12 @@ implementation of that contract.
 3. Review `terraform plan` with all activation switches still false.
 4. Confirm the zone plan. Free zones use Cloudflare's automatically deployed Free Managed Ruleset; paid zones may enable the Terraform-managed Cloudflare Managed Ruleset after reconciliation.
 5. Enable custom firewall + the plan-compatible rate-limit profile, review/apply, and smoke test. Explicit cache rules are independently gated; on Free, default CDN behavior plus immutable Next.js asset headers remain the baseline until cache-rule prerequisites are intentionally granted.
-6. Put the origin behind Full (strict) TLS and a custom zone/per-hostname AOP client
-   certificate (or an equivalent portable mTLS client certificate).
-7. Activate the reviewed origin-gateway mTLS configuration.
+6. Put the origin behind Full (strict) TLS. For the initial portable baseline, enable
+   Cloudflare Global AOP only after the origin trusts Cloudflare's published AOP client
+   certificate. A custom zone/per-hostname AOP certificate is a stricter optional upgrade
+   because it is exclusive to this account, but its private key must never enter Terraform state.
+7. Activate the reviewed origin-gateway mTLS configuration and prove direct-origin
+   requests without a client certificate fail.
 8. Activate host firewall rules only after SSH access and rollback access are proven.
 9. Run `origin/certify-origin.sh` from the origin and an external host.
 10. Roll CSP out as Report-Only and collect violations before any enforcement.

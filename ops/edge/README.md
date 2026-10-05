@@ -20,9 +20,9 @@ implementation of that contract.
 1. Inventory the current Cloudflare zone and export/import every existing entry-point
    ruleset for the phases managed here. Never apply a fresh zone ruleset blindly.
 2. Run the repository Phase 10 contract.
-3. Review `terraform plan` with both activation switches still false.
-4. Enable managed WAF, review/apply, and confirm no application regression.
-5. Enable endpoint rate/cache/custom rules, review/apply, and smoke test.
+3. Review `terraform plan` with all activation switches still false.
+4. Confirm the zone plan. Free zones use Cloudflare's automatically deployed Free Managed Ruleset; paid zones may enable the Terraform-managed Cloudflare Managed Ruleset after reconciliation.
+5. Enable custom firewall + the plan-compatible rate-limit profile, review/apply, and smoke test. Explicit cache rules are independently gated; on Free, default CDN behavior plus immutable Next.js asset headers remain the baseline until cache-rule prerequisites are intentionally granted.
 6. Put the origin behind Full (strict) TLS and a custom zone/per-hostname AOP client
    certificate (or an equivalent portable mTLS client certificate).
 7. Activate the reviewed origin-gateway mTLS configuration.

@@ -12,6 +12,7 @@ import { evaluateAssignedLeadContactAccess } from "../lib/vendors/assignedLeadCo
 import { isValidIndianMobile } from "../lib/vendors/vendorContactContract";
 import { resolveActiveCity } from "../lib/locations/cityService";
 import { isOutsideServiceArea, verifyLocationForServiceArea } from "./locationVerificationService";
+import { allowPublicMutation } from "../lib/security/publicMutationRateLimit";
 import type {
   VendorRegistrationInput, VendorDashboardStats,
 } from "../lib/types";
@@ -66,6 +67,15 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
           error: "Some required details are missing. Please go back and complete the highlighted fields.",
         };
       }
+    }
+
+    if (!(await allowPublicMutation({
+      scope: "vendor-registration",
+      identity: cleanedPhone,
+      limit: 5,
+      windowMs: 24 * 60 * 60 * 1000,
+    }))) {
+      return { ok: false, code: "RATE_LIMITED", error: "Too many registration attempts. Please try again later." };
     }
 
     const locationVerification = await verifyLocationForServiceArea({

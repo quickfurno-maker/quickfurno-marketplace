@@ -53,7 +53,7 @@ check("Cloudflare Terraform is pinned and staged fail-closed", () => {
   assert.match(versions, /version\s*=\s*"~> 5\.25"/);
   assert.match(variables, /enable_managed_waf[\s\S]*default\s*=\s*false/);
   assert.match(variables, /enable_edge_rules[\s\S]*default\s*=\s*false/);
-  assert.match(runbook, /import\/reconcile/i);
+  assert.match(runbook, /export\/import[\s\S]*reconcil|imported[\s\S]*reconcil/i);
 });
 
 check("Cloudflare rules cover WAF, endpoint limits and safe caching", () => {

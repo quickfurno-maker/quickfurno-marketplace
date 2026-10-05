@@ -102,6 +102,9 @@ check("origin has shared Redis identity limits with a bounded local fallback", (
 check("origin gateway and firewall prevent direct application exposure", () => {
   assert.match(mtls, /ssl_verify_client on/);
   assert.match(mtls, /proxy_pass http:\/\/127\.0\.0\.1:3000/);
+  assert.match(mtls, /client_max_body_size\s+10m/);
+  assert.match(mtls, /proxy_connect_timeout\s+5s/);
+  assert.match(mtls, /proxy_read_timeout\s+60s/);
   assert.match(firewall, /ufw default deny incoming/);
   assert.match(firewall, /ufw allow 443\/tcp/);
   assert.match(originCert, /unexpected public TCP listener/);

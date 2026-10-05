@@ -1,0 +1,5 @@
+# Prefer TF_VAR_cloudflare_api_token for the secret.
+cloudflare_zone_id = "replace-with-zone-id"
+# Import/reconcile existing phase entry-point rulesets and review plan first.
+enable_managed_waf = false
+enable_edge_rules  = false

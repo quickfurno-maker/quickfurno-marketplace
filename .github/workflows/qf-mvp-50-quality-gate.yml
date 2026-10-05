@@ -326,6 +326,9 @@ jobs:
       - name: QuickFurno database lifecycle contract
         run: npm run test:scale:db-lifecycle-contract
 
+      - name: QuickFurno edge + portable origin contract
+        run: npm run test:scale:edge-origin-contract
+
       - name: Typecheck
         run: npm run typecheck
 

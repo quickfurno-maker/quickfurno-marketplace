@@ -54,6 +54,7 @@ check("high-risk endpoint classes have edge plus origin controls", () => {
 check("Cloudflare Terraform is pinned, plan-aware and staged fail-closed", () => {
   assert.match(versions, /version\s*=\s*"5\.26\.0"/);
   assert.match(variables, /cloudflare_plan[\s\S]*default\s*=\s*"free"/);
+  assert.match(variables, /enable_strict_ssl[\s\S]*default\s*=\s*false/);
   assert.match(variables, /enable_managed_waf[\s\S]*default\s*=\s*false/);
   assert.match(variables, /enable_edge_rules[\s\S]*default\s*=\s*false/);
   assert.match(variables, /enable_cache_rules[\s\S]*default\s*=\s*false/);
@@ -62,6 +63,9 @@ check("Cloudflare Terraform is pinned, plan-aware and staged fail-closed", () =>
 });
 
 check("Cloudflare rules are plan-aware and preserve paid upgrade headroom", () => {
+  assert.match(tf, /cloudflare_zone_setting" "ssl_strict"/);
+  assert.match(tf, /setting_id\s*=\s*"ssl"/);
+  assert.match(tf, /value\s*=\s*"strict"/);
   assert.match(tf, /Free zones receive the Cloudflare Free Managed Ruleset automatically/i);
   assert.match(tf, /enable_managed_waf && lower\(var\.cloudflare_plan\) != "free"/);
   assert.match(tf, /phase\s*=\s*"http_request_firewall_managed"/);

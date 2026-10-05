@@ -70,8 +70,7 @@ resource "cloudflare_ruleset" "rate_limits" {
       expression = "(${local.public_host_expression}) and starts_with(http.request.uri.path, \"/api/internal/\")"
       action = "block"
       ratelimit = { characteristics = ["cf.colo.id", "ip.src"], period = 60, requests_per_period = 300, mitigation_timeout = 60 }
-    }
-,
+    },
     {
       ref = "csp_report_per_ip"
       description = "Bound CSP telemetry ingress; collector also enforces a 16 KiB body cap"

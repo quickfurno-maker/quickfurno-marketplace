@@ -17,7 +17,7 @@ export async function POST(request: Request): Promise<Response> {
   const parsed = parseQfjActionRequest(parsedJson); if (!parsed) return reply(400, { error: "invalid_request" });
   const keys = parseQfjVerificationKeys(process.env.QF_JARVIS_CORE_VERIFICATION_KEYS_JSON); if (!keys) return reply(503, { error: "service_unavailable" });
   const ok = verifyQfjSignedRequestSignature({ rawBody: raw, domain: QFJ_ACTION_REQUEST_SIGNING_DOMAIN, path: QFJ_ACTION_REQUEST_PATH, requestId: parsed.requestId, issuedAt: parsed.issuedAt,
-    keyId: request.headers.get(QFJ_KEY_ID_HEADER), signature: request.headers.get(QFJ_SIGNATURE_HEADER), keys, now: new Date().toISOString() });
+    keyId: request.headers.get(QFJ_KEY_ID_HEADER), signature: request.headers.get(QFJ_SIGNATURE_HEADER), keys, requestHeaders: request.headers, now: new Date().toISOString() });
   if (!ok) return reply(401, { error: "authentication_failed" });
   const result = await submitJarvisRecommendation({ request: parsed, policy: resolveQfJarvisRuntimePolicy() });
   if (!result.ok) return reply(result.reason === "agent_paused" ? 403 : 503, { protocol: "qfj.action.request", version: 1, requestId: parsed.requestId, status: result.reason });

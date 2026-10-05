@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { parseQfjVerificationKeys } from "@/lib/jarvis/coreDecisionAuth";
 import { QFJ_KEY_ID_HEADER,QFJ_SIGNATURE_HEADER,verifyQfjSignedRequestSignature } from "@/lib/jarvis/signedRequestAuth";
 import { QFJ_AAROHI_PROJECTION_PATH,QFJ_AAROHI_PROJECTION_PROTOCOL,QFJ_AAROHI_PROJECTION_SIGNING_DOMAIN,parseQfjAarohiProjectionRequest } from "@/lib/jarvis/aarohiProjectionContract";
@@ -12,7 +12,7 @@ export async function POST(request:Request):Promise<Response>{
  let json:unknown;try{json=JSON.parse(Buffer.from(raw).toString("utf8"));}catch{return reply(400,{error:"invalid_request"});}
  const parsed=parseQfjAarohiProjectionRequest(json);if(!parsed)return reply(400,{error:"invalid_request"});
  const keys=parseQfjVerificationKeys(process.env.QF_JARVIS_CORE_VERIFICATION_KEYS_JSON);if(!keys)return reply(503,{error:"service_unavailable"});
- const ok=verifyQfjSignedRequestSignature({rawBody:raw,domain:QFJ_AAROHI_PROJECTION_SIGNING_DOMAIN,path:QFJ_AAROHI_PROJECTION_PATH,requestId:parsed.requestId,issuedAt:parsed.issuedAt,keyId:request.headers.get(QFJ_KEY_ID_HEADER),signature:request.headers.get(QFJ_SIGNATURE_HEADER),keys,now:new Date().toISOString()});
+ const ok=verifyQfjSignedRequestSignature({rawBody:raw,domain:QFJ_AAROHI_PROJECTION_SIGNING_DOMAIN,path:QFJ_AAROHI_PROJECTION_PATH,requestId:parsed.requestId,issuedAt:parsed.issuedAt,keyId:request.headers.get(QFJ_KEY_ID_HEADER),signature:request.headers.get(QFJ_SIGNATURE_HEADER),keys, requestHeaders: request.headers, now:new Date().toISOString()});
  if(!ok)return reply(401,{error:"authentication_failed"});
  const result=await applyJarvisAarohiProjection(parsed);
  return reply(200,{protocol:QFJ_AAROHI_PROJECTION_PROTOCOL,version:1,requestId:parsed.requestId,results:result.results});

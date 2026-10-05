@@ -1,0 +1,84 @@
+{
+  "protocol": "qfj.scale.http",
+  "version": 1,
+  "compatibilityId": "qfj-scale-http-v1-20261005",
+  "senderVersion": 1,
+  "acceptedVersions": [0, 1],
+  "legacyRemovalNotBefore": "2027-01-05T00:00:00Z",
+  "requestHeaders": {
+    "version": "x-qfj-scale-version",
+    "requestId": "x-qfj-request-id",
+    "idempotencyKey": "x-qfj-idempotency-key",
+    "correlationId": "x-qfj-correlation-id",
+    "traceId": "x-qfj-trace-id",
+    "actor": "x-qfj-actor",
+    "expectedRevision": "x-qfj-expected-revision",
+    "deadlineAt": "x-qfj-deadline-at",
+    "signature": "x-qfj-scale-signature",
+    "keyId": "x-qfj-key-id"
+  },
+  "responseHeaders": {
+    "version": "x-qfj-scale-version",
+    "correlationId": "x-qfj-correlation-id",
+    "traceId": "x-qfj-trace-id",
+    "errorClass": "x-qfj-error-class",
+    "retryable": "x-qfj-retryable"
+  },
+  "actors": [
+    "quickfurno-core",
+    "qf-jarvis",
+    "qf-jarvis-os",
+    "RIYA",
+    "ANISHA",
+    "AAROHI",
+    "JARVIS",
+    "SYSTEM",
+    "HUMAN"
+  ],
+  "errors": {
+    "QFJ_NONE": false,
+    "QFJ_CONTRACT_INVALID": false,
+    "QFJ_AUTHENTICATION_FAILED": false,
+    "QFJ_DEADLINE_EXCEEDED": true,
+    "QFJ_BACKPRESSURE": true,
+    "QFJ_CIRCUIT_OPEN": true,
+    "QFJ_UPSTREAM_TIMEOUT": true,
+    "QFJ_UPSTREAM_UNAVAILABLE": true,
+    "QFJ_REMOTE_REFUSED": false,
+    "QFJ_CONFLICT": false,
+    "QFJ_INVALID_RESPONSE": false,
+    "QFJ_INTERNAL_ERROR": false
+  },
+  "resilience": {
+    "defaultTimeoutMs": 2500,
+    "maxTimeoutMs": 5000,
+    "maxConcurrentPerProcess": 8,
+    "maxQueued": 0,
+    "maxSocketsPerOrigin": 8,
+    "maxFreeSocketsPerOrigin": 2,
+    "breakerFailureThreshold": 5,
+    "breakerOpenMs": 15000,
+    "halfOpenMaxProbes": 1,
+    "inlineRetries": 0
+  },
+  "signing": {
+    "domain": "qfj.scale.http.sig.v1",
+    "algorithm": "Ed25519",
+    "bodyDigest": "SHA-256 base64url",
+    "canonicalFields": [
+      "domain",
+      "version",
+      "method",
+      "path",
+      "requestId",
+      "idempotencyKey",
+      "correlationId",
+      "traceId",
+      "actor",
+      "expectedRevision-or--",
+      "deadlineAt",
+      "keyId",
+      "bodyDigest"
+    ]
+  }
+}

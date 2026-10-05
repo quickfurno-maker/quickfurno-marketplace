@@ -5,16 +5,26 @@ import { verifyQfjOperatorCommandSignature } from "@/lib/jarvis/operatorCommandA
 import {
   parseQfjOperatorCommand,
   QFJ_OPERATOR_COMMAND_OPERATOR_ID_HEADER,
+  QFJ_OPERATOR_COMMAND_PATH,
 } from "@/lib/jarvis/operatorCommandContract";
+import { qfjScaleHeadersForResult, qfjScaleHttpStatus, verifyQfjScaleWebRequest } from "@/lib/jarvis/scaleRequestGuard";
 import { QFJ_KEY_ID_HEADER,QFJ_SIGNATURE_HEADER } from "@/lib/jarvis/signedRequestAuth";
 import { executeJarvisOperatorCommand } from "@/services/jarvisOperatorCommandService";
 
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 
-const reply=(status:number,body:unknown)=>NextResponse.json(body,{
+const reply=(
+  status:number,
+  body:unknown,
+  extraHeaders:Readonly<Record<string,string>>={},
+)=>NextResponse.json(body,{
   status,
-  headers:{"cache-control":"no-store","x-content-type-options":"nosniff"},
+  headers:{
+    "cache-control":"no-store",
+    "x-content-type-options":"nosniff",
+    ...extraHeaders,
+  },
 });
 
 export async function POST(request:Request):Promise<Response>{
@@ -35,6 +45,20 @@ export async function POST(request:Request):Promise<Response>{
 
   const keys=parseQfjVerificationKeys(process.env.QF_JARVIS_OS_COMMAND_VERIFICATION_KEYS_JSON);
   if(!keys)return reply(503,{error:"service_unavailable"});
+  const scaleContract=verifyQfjScaleWebRequest({
+    request,
+    rawBody:raw,
+    path:QFJ_OPERATOR_COMMAND_PATH,
+    verificationKeys:keys,
+    nowMs:Date.now(),
+    allowLegacy:true,
+  });
+  if(!scaleContract.ok){
+    return reply(
+      qfjScaleHttpStatus(scaleContract.errorClass),
+      {error:"scale_contract_rejected",errorClass:scaleContract.errorClass},
+    );
+  }
   const operatorId=request.headers.get(QFJ_OPERATOR_COMMAND_OPERATOR_ID_HEADER);
   const verified=verifyQfjOperatorCommandSignature({
     rawBody:raw,
@@ -57,7 +81,7 @@ export async function POST(request:Request):Promise<Response>{
       :result.status==="SUBMITTED_TO_AUTHORITY"?202
         :result.status==="CONFLICT"?409
           :result.status==="REFUSED"?403:503;
-    return reply(status,result);
+    return reply(status,result,qfjScaleHeadersForResult(scaleContract));
   }catch{
     return reply(503,{error:"service_unavailable"});
   }

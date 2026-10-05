@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { QFJ_SCALE_HEADERS, verifyQfjScaleRequest } from "./scaleContract";
 import {
   QFJ_CORE_DECISION_AUDIENCE,
   QFJ_CORE_DECISION_CALLER,
@@ -36,6 +37,7 @@ export function verifyQfjSignedRequestSignature(args: {
   readonly signature: string | null;
   readonly keys: readonly QfjVerificationKey[];
   readonly now: string;
+  readonly requestHeaders?: Headers;
 }): boolean {
   if (!args.keyId || !KEY_ID.test(args.keyId) || !args.signature || !SIGNATURE.test(args.signature)) return false;
   const current = Date.parse(args.now);
@@ -56,6 +58,22 @@ export function verifyQfjSignedRequestSignature(args: {
       keyId: args.keyId,
       bodyDigest: rawQfjBodyDigest(args.rawBody),
     });
-    return crypto.verify(null, Buffer.from(input, "utf8"), key, signatureBytes);
+    const legacyVerified = crypto.verify(null, Buffer.from(input, "utf8"), key, signatureBytes);
+    if (!legacyVerified) return false;
+    if (args.requestHeaders === undefined) return true;
+    const scaleHeaders: Record<string, string> = {};
+    for (const name of Object.values(QFJ_SCALE_HEADERS)) {
+      const value = args.requestHeaders.get(name);
+      if (value !== null) scaleHeaders[name] = value;
+    }
+    return verifyQfjScaleRequest({
+      headers: scaleHeaders,
+      method: "POST",
+      path: args.path,
+      rawBody: args.rawBody,
+      verificationKeys: args.keys,
+      nowMs: current,
+      allowLegacy: true,
+    }).ok;
   } catch { return false; }
 }

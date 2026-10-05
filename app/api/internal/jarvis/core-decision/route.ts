@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from "next/server";
 import { parseSerializedQfjCoreDecisionCommand, canonicalQfjJson } from "@/lib/jarvis/coreDecisionContract";
-import { QFJ_KEY_ID_HEADER, QFJ_SIGNATURE_HEADER, parseQfjVerificationKeys, verifyQfjCoreDecisionSignature } from "@/lib/jarvis/coreDecisionAuth";
+import { QFJ_CORE_DECISION_PATH, QFJ_KEY_ID_HEADER, QFJ_SIGNATURE_HEADER, parseQfjVerificationKeys, verifyQfjCoreDecisionSignature } from "@/lib/jarvis/coreDecisionAuth";
+import { qfjScaleHeadersForResult, qfjScaleHttpStatus, verifyQfjScaleWebRequest } from "@/lib/jarvis/scaleRequestGuard";
 import { resolveQfJarvisRuntimePolicy } from "@/lib/jarvis/runtimePolicy";
 import { decideJarvisCoreCommand } from "@/services/jarvisCoreDecisionService";
 
@@ -19,10 +20,31 @@ export async function POST(request: Request): Promise<Response> {
 
   const keys = parseQfjVerificationKeys(process.env.QF_JARVIS_CORE_VERIFICATION_KEYS_JSON);
   if (!keys) return error(503, "service_unavailable");
+  const scaleContract = verifyQfjScaleWebRequest({
+    request,
+    rawBody: raw,
+    path: QFJ_CORE_DECISION_PATH,
+    verificationKeys: keys,
+    nowMs: Date.now(),
+    allowLegacy: true,
+  });
+  if (!scaleContract.ok) {
+    return NextResponse.json(
+      { error: "scale_contract_rejected", errorClass: scaleContract.errorClass },
+      { status: qfjScaleHttpStatus(scaleContract.errorClass) },
+    );
+  }
   const authenticated = verifyQfjCoreDecisionSignature({ rawBody: raw, command: parsed.command,
     keyId: request.headers.get(QFJ_KEY_ID_HEADER), signature: request.headers.get(QFJ_SIGNATURE_HEADER), keys, now: new Date().toISOString() });
   if (!authenticated) return error(401, "authentication_failed");
 
   const response = await decideJarvisCoreCommand({ command: parsed.command, policy: resolveQfJarvisRuntimePolicy(), decidedAt: new Date().toISOString() });
-  return new Response(canonicalQfjJson(response), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+  return new Response(canonicalQfjJson(response), {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      ...qfjScaleHeadersForResult(scaleContract),
+    },
+  });
 }

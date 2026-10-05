@@ -51,23 +51,31 @@ check("high-risk endpoint classes have edge plus origin controls", () => {
   }
 });
 
-check("Cloudflare Terraform is pinned and staged fail-closed", () => {
+check("Cloudflare Terraform is pinned, plan-aware and staged fail-closed", () => {
   assert.match(versions, /version\s*=\s*"5\.26\.0"/);
+  assert.match(variables, /cloudflare_plan[\s\S]*default\s*=\s*"free"/);
   assert.match(variables, /enable_managed_waf[\s\S]*default\s*=\s*false/);
   assert.match(variables, /enable_edge_rules[\s\S]*default\s*=\s*false/);
+  assert.match(variables, /enable_cache_rules[\s\S]*default\s*=\s*false/);
+  assert.match(runbook, /Free Managed Ruleset/i);
   assert.match(runbook, /export\/import[\s\S]*reconcil|imported[\s\S]*reconcil/i);
 });
 
-check("Cloudflare rules cover WAF, endpoint limits and safe caching", () => {
+check("Cloudflare rules are plan-aware and preserve paid upgrade headroom", () => {
+  assert.match(tf, /Free zones receive the Cloudflare Free Managed Ruleset automatically/i);
+  assert.match(tf, /enable_managed_waf && lower\(var\.cloudflare_plan\) != "free"/);
   assert.match(tf, /phase\s*=\s*"http_request_firewall_managed"/);
   assert.match(tf, /efb7b8c949ac4650a09736fc376e9aee/);
   assert.match(tf, /phase\s*=\s*"http_request_firewall_custom"/);
   assert.match(tf, /phase\s*=\s*"http_ratelimit"/);
-  assert.match(tf, /vendor_auth_per_ip/);
+  assert.match(tf, /free_vendor_auth_per_ip/);
+  assert.match(tf, /period\s*=\s*10/);
+  assert.match(tf, /rate_limit_rules\s*=\s*lower\(var\.cloudflare_plan\) == "free"/);
   assert.match(tf, /admin_api_per_ip/);
   assert.match(tf, /webhooks_per_ip/);
   assert.match(tf, /internal_api_per_ip/);
   assert.match(tf, /phase\s*=\s*"http_request_cache_settings"/);
+  assert.match(tf, /enable_cache_rules/);
   assert.match(tf, /cache_next_static/);
   assert.match(tf, /http\.request\.method eq \\"POST\\"/);
   assert.match(tf, /cache\s*=\s*false/);

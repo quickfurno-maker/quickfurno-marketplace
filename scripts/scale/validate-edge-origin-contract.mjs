@@ -92,6 +92,8 @@ check("origin has shared Redis identity limits with a bounded local fallback", (
   assert.match(limiter, /createRedisCoordinationFromEnv/);
   assert.match(limiter, /shared\.rateLimit/);
   assert.match(limiter, /localFallback/);
+  assert.match(limiter, /MAX_LOCAL_BUCKETS\s*=\s*4096/);
+  assert.match(limiter, /pruneLocalBuckets/);
   assert.match(lead, /scope:\s*"lead-capture"/);
   assert.match(vendor, /scope:\s*"vendor-registration"/);
   assert.match(interest, /scope:\s*"free-vendor-interest"/);

@@ -17,3 +17,11 @@ pnpm-debug.log*
 # Never commit private key material
 *.pem
 *.key
+
+# Terraform local working/state artifacts
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log

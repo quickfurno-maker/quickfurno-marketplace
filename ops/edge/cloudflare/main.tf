@@ -85,6 +85,13 @@ locals {
   rate_limit_rules = lower(var.cloudflare_plan) == "free" ? local.free_rate_limit_rules : local.paid_rate_limit_rules
 }
 
+resource "cloudflare_zone_setting" "ssl_strict" {
+  count      = var.enable_strict_ssl ? 1 : 0
+  zone_id    = var.cloudflare_zone_id
+  setting_id = "ssl"
+  value      = "strict"
+}
+
 # Free zones receive the Cloudflare Free Managed Ruleset automatically. This
 # resource intentionally manages only the paid Cloudflare Managed Ruleset.
 # A zone has one entry-point ruleset per phase, so existing rules must be

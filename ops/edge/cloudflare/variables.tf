@@ -26,6 +26,12 @@ variable "public_hosts" {
   default     = ["quickfurno.in", "www.quickfurno.in", "jarvis.quickfurno.in"]
 }
 
+variable "enable_strict_ssl" {
+  description = "Manage the zone SSL mode as Full (strict) after both origins prove valid certificates."
+  type        = bool
+  default     = false
+}
+
 variable "enable_managed_waf" {
   description = "Deploy the paid Cloudflare Managed Ruleset. Ignored on Free, where Cloudflare auto-deploys the Free Managed Ruleset."
   type        = bool

@@ -385,7 +385,7 @@ jobs:
         run: |
           npm run build:automation-worker
           set +e
-          OUTPUT=$(QF_NATIVE_AUTOMATION_MODE=shadow QF_NATIVE_AUTOMATION_WORKER_ID='!' node dist/automation-worker.mjs 2>&1)
+          OUTPUT=$(QF_RUNTIME_ENV=local QF_CONFIG_SCHEMA_VERSION=1 QF_SERVICE_ID=quickfurno.automation-worker QF_NATIVE_AUTOMATION_MODE=shadow QF_NATIVE_AUTOMATION_WORKER_ID='!' node dist/automation-worker.mjs 2>&1)
           CODE=$?
           set -e
           printf '%s\n' "$OUTPUT"

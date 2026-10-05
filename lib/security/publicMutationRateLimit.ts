@@ -4,7 +4,24 @@ import { createRedisCoordinationFromEnv } from "@/lib/coordination/redisCoordina
 type LocalBucket = { count: number; expiresAt: number };
 
 const localBuckets = new Map<string, LocalBucket>();
+const MAX_LOCAL_BUCKETS = 4096;
+let localOperations = 0;
 let shared = createRedisCoordinationFromEnv();
+
+function pruneLocalBuckets(now: number): void {
+  localOperations += 1;
+  if (localOperations % 128 !== 0 && localBuckets.size < MAX_LOCAL_BUCKETS) return;
+
+  for (const [key, bucket] of localBuckets) {
+    if (bucket.expiresAt <= now) localBuckets.delete(key);
+  }
+
+  while (localBuckets.size >= MAX_LOCAL_BUCKETS) {
+    const oldest = localBuckets.keys().next().value as string | undefined;
+    if (!oldest) break;
+    localBuckets.delete(oldest);
+  }
+}
 
 function identityDigest(scope: string, identity: string): string {
   return createHash("sha256")
@@ -17,6 +34,7 @@ function identityDigest(scope: string, identity: string): string {
 
 function localFallback(subject: string, limit: number, windowMs: number): boolean {
   const now = Date.now();
+  pruneLocalBuckets(now);
   const current = localBuckets.get(subject);
   if (!current || current.expiresAt <= now) {
     localBuckets.set(subject, { count: 1, expiresAt: now + windowMs });

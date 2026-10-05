@@ -96,7 +96,7 @@ check("origin gateway and firewall prevent direct application exposure", () => {
 });
 
 check("emergency bypass cannot bypass business security", () => {
-  assert.match(runbook, /never a direct application\\s+port/i);
+  assert.match(runbook, /never a direct application\s+port/i);
   assert.match(runbook, /authentication\/authorization/);
   assert.match(runbook, /idempotency/);
 });

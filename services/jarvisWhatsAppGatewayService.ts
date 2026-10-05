@@ -3,6 +3,7 @@ import { adminClient } from "../lib/supabase";
 import { deriveJarvisNormalizedText } from "../lib/communication/providers/metaWhatsAppInbound";
 import { signalConversationalWhatsAppPresence } from "./conversationalWhatsAppService";
 import { resolveJarvisSigningPrivateKey } from "../lib/jarvis/signingPrivateKeySource";
+import { resolvePortableServiceBaseUrl } from "../lib/runtime/serviceDiscovery";
 import { postJarvisScale } from "./jarvisScaleTransport";
 import {
   QFJ_WHATSAPP_TURN_KEY_ID_HEADER,
@@ -44,26 +45,13 @@ function canonicalInstant(value: unknown): string | null {
 }
 
 function gatewayConfig(env: NodeJS.ProcessEnv = process.env) {
-  const baseUrl = env.QF_JARVIS_BASE_URL?.trim();
+  const baseUrl = resolvePortableServiceBaseUrl(env.QF_JARVIS_BASE_URL, {
+    allowLoopbackHttp: true,
+  });
   const keyId = env.QF_JARVIS_SIGNING_KEY_ID?.trim();
   const privateKeyPem = resolveJarvisSigningPrivateKey(env);
   if (!baseUrl || !keyId || !privateKeyPem) return null;
-  try {
-    const url = new URL(baseUrl);
-    const loopback = ["127.0.0.1", "localhost", "::1"].includes(url.hostname);
-    if (
-      (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) ||
-      url.username ||
-      url.password ||
-      url.search ||
-      url.hash ||
-      url.pathname !== "/"
-    )
-      return null;
-    return { baseUrl: url.toString(), keyId, privateKeyPem };
-  } catch {
-    return null;
-  }
+  return { baseUrl, keyId, privateKeyPem };
 }
 
 export async function sendJarvisWhatsAppTurn(

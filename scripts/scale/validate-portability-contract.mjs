@@ -114,7 +114,7 @@ const productionDir = join(ROOT, "ops", "production");
 const productionFiles = (await readdir(productionDir))
   .filter((name) => name.endsWith(".cjs"))
   .sort();
-const knownLocalEnvDebt = new Set(["quickfurno-conversation-transport.config.cjs"]);
+const knownLocalEnvDebt = new Set();
 for (const name of productionFiles) {
   const source = await readFile(join(productionDir, name), "utf8");
   if (source.includes(".env.local") && !knownLocalEnvDebt.has(name)) {

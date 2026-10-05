@@ -1,3 +1,10 @@
+const { isAbsolute } = require("node:path");
+
+const envFile = process.env.QF_ENV_FILE?.trim();
+if (!envFile || !isAbsolute(envFile)) {
+  throw new Error("QF_ENV_FILE must be an absolute external production env file");
+}
+
 module.exports = {
   apps: [{
     name: "quickfurno-automation-worker",
@@ -12,7 +19,10 @@ module.exports = {
     restart_delay: 3000,
     env: {
       NODE_ENV: "production",
-      QF_ENV_FILE: ".env.production",
+      QF_RUNTIME_ENV: "production",
+      QF_CONFIG_SCHEMA_VERSION: "1",
+      QF_SERVICE_ID: "quickfurno.automation-worker",
+      QF_ENV_FILE: envFile,
     },
   }],
 };

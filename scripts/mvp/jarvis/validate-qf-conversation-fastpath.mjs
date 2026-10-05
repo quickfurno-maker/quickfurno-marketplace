@@ -48,7 +48,12 @@ check("PM2 keeps exactly one dedicated autorestarting worker", () => {
   assert.match(pm2, /quickfurno-conversation-transport/);
   assert.match(pm2, /instances:\s*1/);
   assert.match(pm2, /autorestart:\s*true/);
-  assert.match(pm2, /QF_ENV_FILE:\s*".env.local"/);
+  assert.match(pm2, /isAbsolute\(envFile\)/);
+  assert.match(pm2, /QF_ENV_FILE:\s*envFile/);
+  assert.match(pm2, /QF_RUNTIME_ENV:\s*"production"/);
+  assert.match(pm2, /QF_CONFIG_SCHEMA_VERSION:\s*"1"/);
+  assert.match(pm2, /QF_SERVICE_ID:\s*"quickfurno\.conversation-transport"/);
+  assert.doesNotMatch(pm2, /QF_ENV_FILE:\s*"\.env(?:\.local|\.production)?"/);
   assert.match(pm2, /QF_CONVERSATION_TRANSPORT_IDLE_POLL_MS:\s*"1000"/);
   assert.match(pm2, /QF_CONVERSATION_TRANSPORT_BUSY_POLL_MS:\s*"25"/);
 });

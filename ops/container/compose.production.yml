@@ -7,6 +7,9 @@ services:
     init: true
     environment:
       NODE_ENV: production
+      QF_RUNTIME_ENV: production
+      QF_CONFIG_SCHEMA_VERSION: "1"
+      QF_SERVICE_ID: quickfurno.web
       QF_RUNTIME_ROLE: web
       QF_RELEASE_SHA: ${QF_RELEASE_SHA:?QF_RELEASE_SHA must be the exact source git SHA}
     env_file:
@@ -49,6 +52,9 @@ services:
     init: true
     environment:
       NODE_ENV: production
+      QF_RUNTIME_ENV: production
+      QF_CONFIG_SCHEMA_VERSION: "1"
+      QF_SERVICE_ID: quickfurno.automation-worker
       QF_RUNTIME_ROLE: automation-worker
       QF_RELEASE_SHA: ${QF_RELEASE_SHA:?QF_RELEASE_SHA must be the exact source git SHA}
     env_file:
@@ -76,6 +82,9 @@ services:
     init: true
     environment:
       NODE_ENV: production
+      QF_RUNTIME_ENV: production
+      QF_CONFIG_SCHEMA_VERSION: "1"
+      QF_SERVICE_ID: quickfurno.conversation-transport
       QF_RUNTIME_ROLE: conversation-transport
       QF_RELEASE_SHA: ${QF_RELEASE_SHA:?QF_RELEASE_SHA must be the exact source git SHA}
     env_file:
@@ -104,6 +113,9 @@ services:
     init: true
     environment:
       NODE_ENV: production
+      QF_RUNTIME_ENV: production
+      QF_CONFIG_SCHEMA_VERSION: "1"
+      QF_SERVICE_ID: quickfurno.aarohi-acquisition
       QF_RUNTIME_ROLE: aarohi-acquisition
       QF_RELEASE_SHA: ${QF_RELEASE_SHA:?QF_RELEASE_SHA must be the exact source git SHA}
     env_file:

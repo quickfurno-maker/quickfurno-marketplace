@@ -3,9 +3,15 @@ import {
   assertQfRuntimeIdentity,
   loadQfRuntimeEnvironment,
 } from "@/lib/runtime/deploymentConfig";
+import {
+  addMetric,
+  recordMetric,
+  startQfObservability,
+} from "@/lib/observability/runtime";
 
 loadQfRuntimeEnvironment();
-assertQfRuntimeIdentity("quickfurno.conversation-transport");
+const runtimeIdentity = assertQfRuntimeIdentity("quickfurno.conversation-transport");
+const observability = startQfObservability(runtimeIdentity);
 
 if (typeof globalThis.WebSocket === "undefined") {
   Object.defineProperty(globalThis, "WebSocket", {
@@ -153,6 +159,11 @@ async function main() {
         await heartbeat("running", true, 1).catch(() => undefined);
 
         if (providerOutboundEnabled) {
+          addMetric("qf.polling.queries", 1, {
+            worker_role: "conversation-transport",
+            lane: "provider-outbound",
+            result: "attempt",
+          });
           const reply = await conversational.dispatchNextConversationalOutbox();
           if (reply.processed) {
             cycleWorked = true;
@@ -164,6 +175,11 @@ async function main() {
         if (stopping) break;
 
         if (jarvisIngressEnabled) {
+          addMetric("qf.polling.queries", 1, {
+            worker_role: "conversation-transport",
+            lane: "jarvis-ingress",
+            result: "attempt",
+          });
           const turn = await jarvis.dispatchNextJarvisWhatsAppTurn();
           if (turn.processed) {
             cycleWorked = true;
@@ -176,9 +192,18 @@ async function main() {
       }
 
       if (didWork) {
+        const elapsedMs = Date.now() - started;
+        addMetric("qf.worker.jobs", processed, {
+          worker_role: "conversation-transport",
+          result: "processed",
+        });
+        recordMetric("qf.worker.duration", elapsedMs, {
+          worker_role: "conversation-transport",
+          result: "processed",
+        });
         console.info("[qf-conversation-transport] cycle", {
           processed,
-          elapsedMs: Date.now() - started,
+          elapsedMs,
         });
         await heartbeat("running", true, 0).catch(() => undefined);
         if (!stopping) await sleep(jitter(busyPollMs));
@@ -190,6 +215,10 @@ async function main() {
         topics: wakeTopics,
         timeoutMs: idlePollMs,
       });
+      addMetric("qf.wakeup.signals", 1, {
+        worker_role: "conversation-transport",
+        result: wake.status,
+      });
       if (wake.status === "unavailable" && !stopping) {
         await sleep(jitter(idlePollMs));
       }
@@ -199,6 +228,10 @@ async function main() {
           ? error.message.slice(0, 160)
           : "CONVERSATION_TRANSPORT_UNKNOWN_ERROR";
       console.error("[qf-conversation-transport] cycle failed", { code });
+      addMetric("qf.worker.jobs", 1, {
+        worker_role: "conversation-transport",
+        result: "error",
+      });
       await heartbeat("degraded", true, 0, true, code).catch(() => undefined);
       if (!stopping) await sleep(jitter(Math.max(idlePollMs, 1000)));
     }
@@ -213,12 +246,14 @@ async function main() {
   console.info("[qf-conversation-transport] worker stopped", { workerId });
 }
 
-main().catch((error) => {
-  console.error("[qf-conversation-transport] fatal startup failure", {
-    code:
-      error instanceof Error
-        ? error.message.slice(0, 160)
-        : "CONVERSATION_TRANSPORT_FATAL",
-  });
-  process.exitCode = 1;
-});
+main()
+  .catch((error) => {
+    console.error("[qf-conversation-transport] fatal startup failure", {
+      code:
+        error instanceof Error
+          ? error.message.slice(0, 160)
+          : "CONVERSATION_TRANSPORT_FATAL",
+    });
+    process.exitCode = 1;
+  })
+  .finally(() => observability.shutdown().catch(() => undefined));

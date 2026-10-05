@@ -6,6 +6,11 @@ import { resolveJarvisSigningPrivateKey } from "../lib/jarvis/signingPrivateKeyS
 import { resolvePortableServiceBaseUrl } from "../lib/runtime/serviceDiscovery";
 import { postJarvisScale } from "./jarvisScaleTransport";
 import {
+  extractRemoteContext,
+  SpanKind,
+  withSpan,
+} from "../lib/observability/runtime";
+import {
   QFJ_WHATSAPP_TURN_KEY_ID_HEADER,
   QFJ_WHATSAPP_TURN_PATH,
   QFJ_WHATSAPP_TURN_SIGNATURE_HEADER,
@@ -207,21 +212,31 @@ export async function dispatchNextJarvisWhatsAppTurn(): Promise<{
     return { processed: true, status: "failed" };
   }
 
-  const result = await sendJarvisWhatsAppTurn({
-    requestId: randomUUID(),
-    issuedAt: new Date().toISOString(),
-    conversationId: conversation.id,
-    conversationRevision: Number(conversation.revision),
-    inboundMessageId: inbound.id,
-    receivedAt,
-    assignedActor: claimed.assigned_actor,
-    subjectType: conversation.subject_type,
-    turnPurpose: qualificationTurn ? "lead_qualification" : "conversation",
-    ...(qualificationTurn
-      ? { qualificationRequestId: String(claimed.qualification_request_id) }
-      : {}),
-    ...(text ? { normalizedText: text } : {}),
+  const parent = extractRemoteContext({
+    ...(typeof claimed.traceparent === "string" ? { traceparent: claimed.traceparent } : {}),
+    ...(typeof claimed.tracestate === "string" ? { tracestate: claimed.tracestate } : {}),
   });
+  const result = await withSpan(
+    "quickfurno.jarvis-turn-outbox",
+    SpanKind.CONSUMER,
+    { stage: "quickfurno.job", operation: "jarvis_turn_dispatch" },
+    () => sendJarvisWhatsAppTurn({
+      requestId: randomUUID(),
+      issuedAt: new Date().toISOString(),
+      conversationId: conversation.id,
+      conversationRevision: Number(conversation.revision),
+      inboundMessageId: inbound.id,
+      receivedAt,
+      assignedActor: claimed.assigned_actor,
+      subjectType: conversation.subject_type,
+      turnPurpose: qualificationTurn ? "lead_qualification" : "conversation",
+      ...(qualificationTurn
+        ? { qualificationRequestId: String(claimed.qualification_request_id) }
+        : {}),
+      ...(text ? { normalizedText: text } : {}),
+    }),
+    parent,
+  );
 
   if (result.ok) {
     const completedAt = new Date().toISOString();

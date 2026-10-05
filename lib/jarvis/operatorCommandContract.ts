@@ -11,6 +11,7 @@ export const QFJ_OPERATOR_COMMAND_FRESHNESS_MS = 60_000;
 const instant=z.string().datetime({offset:false});
 const uuid=z.string().uuid();
 const ref=z.string().min(1).max(128).regex(/^[A-Za-z0-9._:-]+$/);
+const hex64=z.string().regex(/^[0-9a-f]{64}$/);
 const base={
   protocol:z.literal(QFJ_OPERATOR_COMMAND_PROTOCOL),
   commandId:uuid,
@@ -24,6 +25,11 @@ const approval=z.object({
   action:z.literal("APPROVAL_DECIDE"),
   payload:z.object({approvalId:uuid,decision:z.enum(["APPROVE","REJECT"])}).strict(),
 }).strict();
+const agniApproval=z.object({
+  ...base,
+  action:z.literal("AGNI_APPROVAL_DECIDE"),
+  payload:z.object({proposalId:uuid,actionFingerprint:hex64,decision:z.enum(["APPROVE","REJECT"])}).strict(),
+}).strict();
 const conversation=<T extends "CONVERSATION_TAKEOVER"|"CONVERSATION_RESUME_AI"|"CONVERSATION_PAUSE_AI">(action:T)=>z.object({
   ...base,
   action:z.literal(action),
@@ -32,6 +38,7 @@ const conversation=<T extends "CONVERSATION_TAKEOVER"|"CONVERSATION_RESUME_AI"|"
 
 export const qfjOperatorCommandSchema=z.discriminatedUnion("action",[
   approval,
+  agniApproval,
   conversation("CONVERSATION_TAKEOVER"),
   conversation("CONVERSATION_RESUME_AI"),
   conversation("CONVERSATION_PAUSE_AI"),

@@ -13,6 +13,7 @@ import {
   authorizeAutomationActionRequest,
   rejectAutomationActionRequest,
 } from "@/services/automationPersistenceService";
+import { decideAgniProposal } from "@/services/agniGovernanceService";
 import { releaseHumanConversationToAi } from "@/services/conversationalWhatsAppService";
 
 const OPERATOR_ID=/^[A-Za-z0-9._:-]{1,64}$/;
@@ -111,6 +112,32 @@ async function decideApproval(
     return result(command.commandId,"APPLIED_BY_AUTHORITY","CORE_DECISION_APPLIED");
   }catch{
     return result(command.commandId,"UNAVAILABLE","CORE_DECISION_FAILED");
+  }
+}
+
+async function decideAgniApproval(
+  command:Extract<QfjOperatorCommand,{action:"AGNI_APPROVAL_DECIDE"}>,
+  actorId:string,
+):Promise<QfjOperatorCommandResult>{
+  try{
+    const decision=await decideAgniProposal({
+      proposalId:command.payload.proposalId,
+      actionFingerprint:command.payload.actionFingerprint,
+      decision:command.payload.decision,
+      decisionId:command.commandId,
+      operatorRef:actorId,
+    });
+    if(decision.ok){
+      return result(command.commandId,"APPLIED_BY_AUTHORITY",
+        decision.status==="AUTHORIZED"?"AGNI_CORE_APPROVAL_APPLIED":"AGNI_CORE_REJECTION_APPLIED");
+    }
+    if(decision.code==="NOT_FOUND")return result(command.commandId,"REFUSED","AGNI_PROPOSAL_NOT_FOUND");
+    if(decision.code==="ALREADY_DECIDED")return result(command.commandId,"CONFLICT","AGNI_PROPOSAL_ALREADY_DECIDED");
+    if(decision.code==="EXPIRED")return result(command.commandId,"CONFLICT","AGNI_PROPOSAL_EXPIRED");
+    if(decision.code==="FINGERPRINT_MISMATCH")return result(command.commandId,"CONFLICT","AGNI_FINGERPRINT_MISMATCH");
+    return result(command.commandId,"UNAVAILABLE","AGNI_CORE_DECISION_FAILED");
+  }catch{
+    return result(command.commandId,"UNAVAILABLE","AGNI_CORE_DECISION_FAILED");
   }
 }
 
@@ -252,6 +279,7 @@ export async function executeJarvisOperatorCommand(args:{
 
   let outcome:QfjOperatorCommandResult;
   if(args.command.action==="APPROVAL_DECIDE")outcome=await decideApproval(args.command,actorId);
+  else if(args.command.action==="AGNI_APPROVAL_DECIDE")outcome=await decideAgniApproval(args.command,actorId);
   else if(args.command.action==="CONVERSATION_TAKEOVER")outcome=await takeOverConversation(args.command,actorId);
   else if(args.command.action==="CONVERSATION_PAUSE_AI")outcome=await pauseConversation(args.command,actorId);
   else outcome=await resumeConversation(args.command,actorId);

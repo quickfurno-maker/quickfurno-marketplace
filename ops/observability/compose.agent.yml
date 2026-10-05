@@ -1,0 +1,48 @@
+services:
+  web:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-agent:4318
+      OTEL_SDK_DISABLED: "false"
+
+  automation-worker:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-agent:4318
+      OTEL_SDK_DISABLED: "false"
+
+  conversation-transport:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-agent:4318
+      OTEL_SDK_DISABLED: "false"
+
+  aarohi-acquisition:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-agent:4318
+      OTEL_SDK_DISABLED: "false"
+
+  otel-agent:
+    image: otel/opentelemetry-collector-contrib:0.136.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    environment:
+      AGNI_OTLP_GATEWAY_ENDPOINT: ${AGNI_OTLP_GATEWAY_ENDPOINT:?AGNI_OTLP_GATEWAY_ENDPOINT required}
+    volumes:
+      - ../observability/otel-agent.yaml:/etc/otelcol/config.yaml:ro
+      - ${QF_OTEL_SECRET_DIR:?QF_OTEL_SECRET_DIR required}:/run/secrets:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "0.30"
+          memory: 384m
+          pids: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks: [qf-private]

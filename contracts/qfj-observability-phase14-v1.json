@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 1,
+  "phase": 14,
+  "system": "AGNI",
+  "standard": "OpenTelemetry",
+  "supervision": {
+    "placement": "INDEPENDENT_ABOVE_QUICKFURNO_AND_JARVIS",
+    "monitors": ["QUICKFURNO", "JARVIS", "AGNI"],
+    "communicationPrimary": "JARVIS",
+    "emergencyChannelIndependent": true
+  },
+  "propagation": {
+    "format": "W3C Trace Context",
+    "headers": ["traceparent", "tracestate"],
+    "signedTraceBindingHeader": "x-qfj-trace-id",
+    "rejectTraceIdMismatch": true,
+    "persistAcrossDurableAsyncBoundaries": true
+  },
+  "collectorTopology": {
+    "applicationProtocol": "OTLP_ONLY",
+    "perHostAgent": true,
+    "centralGateway": true,
+    "telemetryFailureBlocksCustomerTraffic": false
+  },
+  "backend": "OTEL_COLLECTOR_PROMETHEUS_TEMPO_LOKI_GRAFANA",
+  "resourceAttributes": [
+    "service.name",
+    "service.version",
+    "service.instance.id",
+    "deployment.environment.name",
+    "qf.image.sha",
+    "qf.migration.head",
+    "qf.config.schema.version"
+  ],
+  "metricLabels": {
+    "allowed": [
+      "service",
+      "route",
+      "method",
+      "status_class",
+      "worker_role",
+      "lane",
+      "operation",
+      "result",
+      "provider",
+      "model_tier",
+      "event",
+      "stage"
+    ],
+    "forbiddenPatterns": [
+      "phone",
+      "email",
+      "name",
+      "address",
+      "prompt",
+      "message",
+      "lead_id",
+      "leadId",
+      "conversation_id",
+      "conversationId",
+      "inbound_message_id",
+      "inboundMessageId",
+      "request_id",
+      "requestId",
+      "correlation_id",
+      "correlationId",
+      "trace_id",
+      "traceId",
+      "subject",
+      "authorization",
+      "cookie",
+      "secret",
+      "password",
+      "api_key",
+      "token"
+    ]
+  },
+  "metrics": [
+    "qf.http.server.requests",
+    "qf.http.server.duration",
+    "qf.db.queries",
+    "qf.db.query.duration",
+    "qf.db.pool.wait.duration",
+    "qf.db.pool.saturation",
+    "qf.polling.queries",
+    "qf.wakeup.signals",
+    "qf.job.queue.depth",
+    "qf.job.queue.oldest.age",
+    "qf.worker.jobs",
+    "qf.worker.duration",
+    "qf.worker.retries",
+    "qf.worker.dlq",
+    "qf.matching.duration",
+    "qf.matching.candidates",
+    "qf.business.funnel",
+    "qf.provider.delivery.duration",
+    "qfj.model.duration",
+    "qfj.model.errors",
+    "qfj.model.cost",
+    "qfj.provider.concurrency",
+    "qfj.provider.saturation",
+    "qf.redis.cache",
+    "qf.redis.events",
+    "qf.runtime.settings.cache",
+    "qf.outbox.oldest.age",
+    "qf.scheduled.refusals"
+  ],
+  "dashboards": [
+    "traffic-latency-errors",
+    "database-pools-locks",
+    "queues-workers-outbox",
+    "matching-business-funnel",
+    "whatsapp-provider-delivery",
+    "jarvis-model-cost",
+    "redis-runtime-cache",
+    "host-runtime-capacity"
+  ],
+  "requiredSyntheticStages": [
+    "cloudflare.edge",
+    "quickfurno.http",
+    "quickfurno.job",
+    "quickfurno.db",
+    "quickfurno.jarvis.client",
+    "jarvis.gateway",
+    "jarvis.provider",
+    "quickfurno.callback"
+  ],
+  "alertsRequire": [
+    "runbook",
+    "userImpact",
+    "service.name",
+    "qf.image.sha",
+    "qf.migration.head",
+    "qf.config.schema.version"
+  ],
+  "aiSre": {
+    "continuousRawTelemetryStreamingToModel": false,
+    "invocation": [
+      "ALERT_OR_SLO_VIOLATION",
+      "MEANINGFUL_ANOMALY",
+      "DEPLOYMENT_REGRESSION",
+      "MANUAL_INVESTIGATION",
+      "SCHEDULED_REPORT"
+    ],
+    "input": "SANITIZED_BOUNDED_INCIDENT_CONTEXT",
+    "toolsExposedToOpenAI": false,
+    "defaultAuthority": "READ_ONLY_RECOMMEND",
+    "budgetGovernor": [
+      "INCIDENT",
+      "HOUR",
+      "DAY",
+      "MONTH",
+      "INPUT_TOKENS",
+      "OUTPUT_TOKENS",
+      "TOOL_CALLS",
+      "DEPTH",
+      "STRONG_MODEL_ESCALATIONS"
+    ]
+  },
+  "governance": {
+    "deterministicPolicyBeforeProposal": true,
+    "jevRequiredRisk": ["HIGH", "CRITICAL"],
+    "humanApprovalAuthority": "QUICKFURNO_CORE",
+    "capability": {
+      "signed": true,
+      "exactActionFingerprint": true,
+      "timeLimited": true,
+      "maxMinutes": 10,
+      "revisionBound": true,
+      "singleUse": true
+    }
+  },
+  "execution": {
+    "actionBrokerIndependent": true,
+    "hostAgentAllowlisted": true,
+    "arbitraryShell": false,
+    "arbitrarySql": false,
+    "rootSsh": false,
+    "cloudAdmin": false,
+    "currentlyExecutable": ["RUN_SYNTHETIC_TEST", "RESTART_SERVICE"],
+    "certifiedDormantDrivers": ["TEMPORARY_RATE_LIMIT"],
+    "dormantDriverActivationRequires": [
+      "EXPLICIT_CONFIG",
+      "ALLOWLISTED_TARGET",
+      "BOUNDED_DURATION",
+      "DURABLE_AUTO_ROLLBACK"
+    ],
+    "unsupportedActionsFailClosed": true,
+    "verifyAfterChange": true
+  },
+  "security": {
+    "continuousDeterministicDetection": true,
+    "missingTelemetryState": "UNKNOWN",
+    "attackContainmentRequiresBoundedTypedAction": true,
+    "highRiskForwardFixRequiresHumanApproval": true
+  },
+  "telemetryAuthority": "POWERLESS"
+}

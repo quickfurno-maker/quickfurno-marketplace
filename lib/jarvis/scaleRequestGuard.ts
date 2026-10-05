@@ -6,6 +6,7 @@ import {
   type QfjScaleVerificationKey,
   type QfjScaleVerificationResult,
 } from "./scaleContract";
+import { addMetric } from "../observability/runtime";
 
 function headerRecord(headers: Headers): Record<string, string> {
   const result: Record<string, string> = {};
@@ -24,7 +25,7 @@ export function verifyQfjScaleWebRequest(args: {
   readonly nowMs?: number;
   readonly allowLegacy?: boolean;
 }): QfjScaleVerificationResult {
-  return verifyQfjScaleRequest({
+  const result = verifyQfjScaleRequest({
     headers: headerRecord(args.request.headers),
     method: args.request.method,
     path: args.path,
@@ -33,6 +34,26 @@ export function verifyQfjScaleWebRequest(args: {
     ...(args.nowMs === undefined ? {} : { nowMs: args.nowMs }),
     allowLegacy: args.allowLegacy ?? true,
   });
+  if (!result.ok && (
+    result.errorClass === "QFJ_AUTHENTICATION_FAILED" ||
+    result.errorClass === "QFJ_CONTRACT_INVALID"
+  )) {
+    try {
+      addMetric("qf.security.auth.failures", 1, {
+        operation: "qfj_scale",
+        result: result.errorClass === "QFJ_AUTHENTICATION_FAILED" ? "authentication" : "contract",
+      });
+      if (result.errorClass === "QFJ_AUTHENTICATION_FAILED") {
+        addMetric("qf.security.signature.failures", 1, {
+          operation: "qfj_scale",
+          result: "invalid",
+        });
+      }
+    } catch {
+      // Security telemetry is powerless; request verification remains authoritative.
+    }
+  }
+  return result;
 }
 
 export function qfjScaleHeadersForResult(

@@ -1,0 +1,52 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+  batch:
+    timeout: 2s
+    send_batch_size: 512
+
+exporters:
+  otlp/agni:
+    endpoint: ${env:AGNI_OTLP_GATEWAY_ENDPOINT}
+    tls:
+      ca_file: /run/secrets/agni-otel-ca.pem
+      cert_file: /run/secrets/agni-otel-client.pem
+      key_file: /run/secrets/agni-otel-client-key.pem
+      insecure: false
+    sending_queue:
+      enabled: true
+      num_consumers: 4
+      queue_size: 2048
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 15s
+      max_elapsed_time: 0s
+
+service:
+  telemetry:
+    logs:
+      level: warn
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/agni]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/agni]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/agni]

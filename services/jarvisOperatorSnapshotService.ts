@@ -122,22 +122,47 @@ export async function readJarvisOperatorSnapshot(): Promise<QfjOperatorSnapshot>
   if (approvals.error) throw approvals.error;
   if (conversations.error) throw conversations.error;
 
+  const [agniApprovals,agniRequested,agniAuthorized,agniRejected]=await Promise.all([
+    db.from("agni_action_proposals")
+      .select("id,action_type,target_system,target_service,risk,decision_status,action_fingerprint,created_at")
+      .order("created_at",{ascending:false}).limit(50),
+    countRows("agni_action_proposals",[["eq","decision_status","requested"]]),
+    countRows("agni_action_proposals",[["eq","decision_status","authorized"]]),
+    countRows("agni_action_proposals",[["eq","decision_status","rejected"]]),
+  ]);
+  if(agniApprovals.error)throw agniApprovals.error;
+
+  const automationApprovalItems=(approvals.data??[]).map((row:any)=>({
+    id:String(row.id),
+    kind:"AUTOMATION" as const,
+    requestedAction:safeLabel(row.action_type),
+    risk:approvalRisk(String(row.action_type??"")),
+    requestedAuthority:"QuickFurno Core",
+    sourceAgent:safeLabel(row.source,"system"),
+    subject:safeLabel(row.entity_type,"entity"),
+    state:row.decision_status==="requested"?"awaiting-operator" as const:"answered" as const,
+  }));
+  const agniApprovalItems=(agniApprovals.data??[]).map((row:any)=>({
+    id:String(row.id),
+    kind:"AGNI" as const,
+    actionFingerprint:String(row.action_fingerprint),
+    requestedAction:safeLabel("AGNI · "+String(row.action_type??"action")),
+    risk:(row.risk==="HIGH"||row.risk==="CRITICAL"?"high-risk":"low-risk-reversible") as
+      "high-risk"|"low-risk-reversible",
+    requestedAuthority:"QuickFurno Core / AGNI",
+    sourceAgent:"AGNI",
+    subject:safeLabel(String(row.target_system??"system")+" · "+String(row.target_service??"service")),
+    state:row.decision_status==="requested"?"awaiting-operator" as const:"answered" as const,
+  }));
+
   const snapshot = {
     protocol: QFJ_OPERATOR_SNAPSHOT_PROTOCOL,
     emittedAt: now.toISOString(),
-    approvalQueue: (approvals.data ?? []).map((row: any) => ({
-      id: String(row.id),
-      requestedAction: safeLabel(row.action_type),
-      risk: approvalRisk(String(row.action_type ?? "")),
-      requestedAuthority: "QuickFurno Core",
-      sourceAgent: safeLabel(row.source, "system"),
-      subject: safeLabel(row.entity_type, "entity"),
-      state: row.decision_status === "requested" ? "awaiting-operator" as const : "answered" as const,
-    })),
+    approvalQueue: [...agniApprovalItems,...automationApprovalItems].slice(0,APPROVAL_LIMIT),
     approvalBreakdown: [
-      { id: "requested", label: "Awaiting decision", value: requested },
-      { id: "authorized", label: "Authorized", value: authorized },
-      { id: "rejected", label: "Rejected", value: rejected },
+      { id: "requested", label: "Awaiting decision", value: requested+agniRequested },
+      { id: "authorized", label: "Authorized", value: authorized+agniAuthorized },
+      { id: "rejected", label: "Rejected", value: rejected+agniRejected },
     ],
     conversationControl: (conversations.data ?? []).map((row: any) => ({
       id: String(row.id),

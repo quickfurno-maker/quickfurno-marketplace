@@ -30,6 +30,12 @@ import {
 } from "../lib/jarvis/whatsAppInboundMaterial";
 import { processAarohiWhatsAppIntake } from "./aarohiWhatsAppIntakeService";
 import { publishDurableWorkWakeup } from "../lib/coordination/durableWorkWakeup";
+import {
+  captureCurrentTraceContext,
+  extractRemoteContext,
+  SpanKind,
+  withSpan,
+} from "../lib/observability/runtime";
 
 const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const CHANNEL = "whatsapp";
@@ -544,6 +550,7 @@ export async function recordConversationalInbound(input: {
     process.env.QF_JARVIS_WHATSAPP_ENABLED?.trim().toLowerCase() === "true" &&
     ["AAROHI", "ANISHA", "RIYA"].includes(actor)
   ) {
+    const traceContext = captureCurrentTraceContext();
     const { error: turnOutboxError } = await adminClient()
       .from("communication_jarvis_turn_outbox")
       .upsert({
@@ -553,6 +560,8 @@ export async function recordConversationalInbound(input: {
         assigned_actor: actor,
         status: "pending",
         attempt_count: 0,
+        ...(traceContext.traceparent === undefined ? {} : { traceparent: traceContext.traceparent }),
+        ...(traceContext.tracestate === undefined ? {} : { tracestate: traceContext.tracestate }),
       }, { onConflict: "inbound_message_id", ignoreDuplicates: true });
     if (turnOutboxError) throw turnOutboxError;
     void publishDurableWorkWakeup("jarvis-turn-outbox", input.inboundMessageId);
@@ -931,6 +940,7 @@ async function queueConversationExperience(input: {
 
   const id = randomUUID();
   const digest = bodyDigest(serialized);
+  const traceContext = captureCurrentTraceContext();
   const sealed = sealConversationValue(serialized, conversationOutboxBodyAad(id, input.conversationId, input.expectedRevision, digest));
   if (!sealed.ok) return { ok: false, reason: "seal_unavailable" };
 
@@ -951,6 +961,8 @@ async function queueConversationExperience(input: {
       idempotency_key: input.idempotencyKey,
       status: "pending",
       attempt_count: 0,
+      ...(traceContext.traceparent === undefined ? {} : { traceparent: traceContext.traceparent }),
+      ...(traceContext.tracestate === undefined ? {} : { tracestate: traceContext.tracestate }),
     })
     .select("id")
     .single();
@@ -1459,22 +1471,32 @@ export async function dispatchConversationalOutbox(
   const provider = new MetaCloudWhatsAppProvider(outboundToRuntime(config.config), new FetchHttpTransport());
   const interactiveBody = [experience.body, ...(experience.items ?? []).map((item) => "• " + item)].join("\n");
   const canSendInteractive = Boolean(experience.actions?.length) && interactiveBody.length <= 1024;
-  const send = canSendInteractive
-    ? await provider.sendInteractiveMessage(
-        destination.value,
-        {
-          ...(experience.heading ? { heading: experience.heading } : {}),
-          body: interactiveBody,
-          actions: experience.actions ?? [],
-          menuButtonText: experience.actions && experience.actions.length > 3 ? "View options" : undefined,
-        },
-        { replyToProviderMessageId: conversation.last_inbound_provider_message_id },
-      )
-    : await provider.sendTextMessage(
-        destination.value,
-        renderQfWhatsAppExperienceFallback(experience),
-        { replyToProviderMessageId: conversation.last_inbound_provider_message_id },
-      );
+  const providerParent = extractRemoteContext({
+    ...(typeof claimed.traceparent === "string" ? { traceparent: claimed.traceparent } : {}),
+    ...(typeof claimed.tracestate === "string" ? { tracestate: claimed.tracestate } : {}),
+  });
+  const send = await withSpan(
+    "quickfurno.whatsapp.provider",
+    SpanKind.PRODUCER,
+    { stage: "quickfurno.callback", operation: "whatsapp_delivery" },
+    async () => canSendInteractive
+      ? provider.sendInteractiveMessage(
+          destination.value,
+          {
+            ...(experience.heading ? { heading: experience.heading } : {}),
+            body: interactiveBody,
+            actions: experience.actions ?? [],
+            menuButtonText: experience.actions && experience.actions.length > 3 ? "View options" : undefined,
+          },
+          { replyToProviderMessageId: conversation.last_inbound_provider_message_id },
+        )
+      : provider.sendTextMessage(
+          destination.value,
+          renderQfWhatsAppExperienceFallback(experience),
+          { replyToProviderMessageId: conversation.last_inbound_provider_message_id },
+        ),
+    providerParent,
+  );
   const certainty = effectiveProviderOutcomeCertainty(send);
   if (certainty === "unknown_outcome") {
     await failOutbox(claimed.id, "outcome_unknown", send.errorCode ?? "META_OUTCOME_UNKNOWN");

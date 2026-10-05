@@ -17,6 +17,7 @@ on:
       # push coverage only once a pull request existed.
       - "mvp/qf-mvp-75-*"
       - "feat/aarohi-*"
+      - "feat/scale-*"
 
 permissions:
   contents: read
@@ -700,6 +701,49 @@ jobs:
 
       - name: Revalidate portability contract
         run: npm run test:scale:portability
+
+      - name: Typecheck
+        run: npm run typecheck
+
+
+  # SCALE-P14 — AGNI supervisory observability/SRE contract.
+  phase14-observability-sre-certification:
+    name: Phase 14 observability SRE certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact reviewed head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Certify Phase 14 observability and AGNI governance
+        run: npm run test:scale:phase14
+
+      - name: Render Phase 14 telemetry overlay
+        shell: bash
+        run: |
+          printf 'PHASE14_CI_ONLY=1\n' > .phase14-ci.env
+          QF_IMAGE_REF='quickfurno@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' \
+          QF_RELEASE_SHA='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' \
+          QF_ENV_FILE="$PWD/.phase14-ci.env" \
+          AGNI_OTLP_GATEWAY_ENDPOINT='agni.internal:4317' \
+          QF_OTEL_SECRET_DIR='/tmp/qf-otel-secrets' \
+          docker compose \
+            -f ops/container/compose.production.yml \
+            -f ops/observability/compose.agent.yml \
+            config --quiet
+          rm -f .phase14-ci.env
 
       - name: Typecheck
         run: npm run typecheck

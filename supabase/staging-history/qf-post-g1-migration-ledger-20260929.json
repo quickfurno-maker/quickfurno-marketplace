@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
   "purpose": "POST_G1_EXPLICIT_MIGRATION_PIN_EXTENSION",
-  "observedDate": "2026-10-04",
+  "observedDate": "2026-10-05",
   "databaseMutationAuthorized": false,
   "productionDeploymentAuthorized": false,
   "evidenceProjects": {
@@ -577,6 +577,30 @@
       "filename": "20261005160000_scale_phase12_horizontal_worker_claims.sql",
       "path": "supabase/migrations/20261005160000_scale_phase12_horizontal_worker_claims.sql",
       "canonicalSha256": "100e8c0ed07130def955ea6b29b2779607557647fe95f69b788b5303243456f7",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-05_BEFORE_DEPLOYMENT"
+    },
+    {
+      "version": "20261005200000",
+      "name": "scale_phase14_agni_governance",
+      "filename": "20261005200000_scale_phase14_agni_governance.sql",
+      "path": "supabase/migrations/20261005200000_scale_phase14_agni_governance.sql",
+      "canonicalSha256": "e22b181743666f71ee9790501d60e48a088d6c44166ddf21a70b7de6a748c03e",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-05_BEFORE_DEPLOYMENT"
+    },
+    {
+      "version": "20261005203000",
+      "name": "scale_phase14_trace_context",
+      "filename": "20261005203000_scale_phase14_trace_context.sql",
+      "path": "supabase/migrations/20261005203000_scale_phase14_trace_context.sql",
+      "canonicalSha256": "fecb944111eb07b29b7a2efcf19e5b4ae0eae08713e3636822eddf40da6b5259",
       "exactVersionPresence": {
         "staging": false,
         "production": false

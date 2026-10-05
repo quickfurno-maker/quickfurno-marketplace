@@ -2,9 +2,15 @@ import {
   assertQfRuntimeIdentity,
   loadQfRuntimeEnvironment,
 } from "@/lib/runtime/deploymentConfig";
+import {
+  addMetric,
+  recordMetric,
+  startQfObservability,
+} from "@/lib/observability/runtime";
 
 loadQfRuntimeEnvironment();
-assertQfRuntimeIdentity("quickfurno.aarohi-acquisition");
+const runtimeIdentity=assertQfRuntimeIdentity("quickfurno.aarohi-acquisition");
+const observability=startQfObservability(runtimeIdentity);
 
 const sleep=(ms:number)=>new Promise<void>((resolveSleep)=>setTimeout(resolveSleep,ms));
 
@@ -101,12 +107,17 @@ async function main(){
         leaseSeconds,
       });
       if(claim.status!=="acquired"){
+        addMetric("qf.scheduled.refusals",1,{
+          worker_role:"aarohi-acquisition",
+          result:claim.status,
+        });
         await heartbeat("idle",true).catch(()=>undefined);
         if(!stopping) await sleep(interval);
         continue;
       }
 
       await heartbeat("running",true,true).catch(()=>undefined);
+      const cycleStarted=performance.now();
       const result=await scheduleAarohiDiscoveryRuns(now);
       const promotion=await promoteReadyAarohiDiscoveryCandidates(50);
       const followups=await scheduleAarohiFollowups(now,100);
@@ -125,6 +136,14 @@ async function main(){
         throw new Error("AAROHI_SCHEDULER_COMPLETION_OWNERSHIP_LOST");
       }
 
+      addMetric("qf.worker.jobs",1,{
+        worker_role:"aarohi-acquisition",
+        result:"completed",
+      });
+      recordMetric("qf.worker.duration",performance.now()-cycleStarted,{
+        worker_role:"aarohi-acquisition",
+        result:"completed",
+      });
       console.info("[qf-aarohi-phase2] acquisition cycle",{
         occurrenceKey,
         fence:claim.fence,
@@ -153,9 +172,11 @@ async function main(){
   await heartbeat("draining",false,true,"GRACEFUL_DRAIN").catch(()=>undefined);
   await heartbeat("stopped",false,true,"GRACEFUL_DRAIN_COMPLETE").catch(()=>undefined);
 }
-main().catch((error)=>{
-  console.error("[qf-aarohi-phase2] fatal",{
-    code:error instanceof Error?error.message.slice(0,160):"AAROHI_PHASE2_FATAL",
-  });
-  process.exitCode=1;
-});
+main()
+  .catch((error)=>{
+    console.error("[qf-aarohi-phase2] fatal",{
+      code:error instanceof Error?error.message.slice(0,160):"AAROHI_PHASE2_FATAL",
+    });
+    process.exitCode=1;
+  })
+  .finally(()=>observability.shutdown().catch(()=>undefined));

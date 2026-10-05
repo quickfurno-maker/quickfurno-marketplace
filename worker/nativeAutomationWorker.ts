@@ -4,10 +4,15 @@ import {
   loadQfRuntimeEnvironment,
 } from "@/lib/runtime/deploymentConfig";
 import type { NativeAutomationCycleResult } from "@/services/nativeAutomationEngineService";
+import {
+  addMetric,
+  startQfObservability,
+} from "@/lib/observability/runtime";
 import type { NativeAutomationRuntimeSnapshot } from "@/services/nativeAutomationRuntimeService";
 
 loadQfRuntimeEnvironment();
-assertQfRuntimeIdentity("quickfurno.automation-worker");
+const runtimeIdentity = assertQfRuntimeIdentity("quickfurno.automation-worker");
+const observability = startQfObservability(runtimeIdentity);
 
 // Supabase Realtime 2.108+ requires an explicit WebSocket implementation on Node <22.
 // The worker does not use Realtime directly, but SupabaseClient initializes its Realtime
@@ -140,7 +145,14 @@ async function main() {
     snapshot.laneLastRunAt[lane] = now;
     snapshot.lastSafeCode = result.safeCode;
     if (result.jobId) snapshot.lastClaimAt = now;
-    if (result.jobId && result.state !== "idle") snapshot.jobsProcessed += 1;
+    if (result.jobId && result.state !== "idle") {
+      snapshot.jobsProcessed += 1;
+      addMetric("qf.worker.jobs", 1, {
+        worker_role: "automation-worker",
+        lane,
+        result: result.state,
+      });
+    }
     if (result.state === "completed" || result.state === "finalized") {
       snapshot.lastSuccessAt = now;
       if (snapshot.state === "degraded") snapshot.state = "running";
@@ -338,12 +350,14 @@ async function main() {
   });
 }
 
-main().catch((error) => {
-  console.error("[qf-native-automation] fatal startup failure", {
-    code:
-      error instanceof Error
-        ? error.message.slice(0, 160)
-        : "NATIVE_WORKER_FATAL",
-  });
-  process.exitCode = 1;
-});
+main()
+  .catch((error) => {
+    console.error("[qf-native-automation] fatal startup failure", {
+      code:
+        error instanceof Error
+          ? error.message.slice(0, 160)
+          : "NATIVE_WORKER_FATAL",
+    });
+    process.exitCode = 1;
+  })
+  .finally(() => observability.shutdown().catch(() => undefined));

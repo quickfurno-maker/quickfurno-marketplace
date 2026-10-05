@@ -44,6 +44,7 @@ import { routePreferredVendorLead } from "./preferredVendorLeadService";
 import { queueSystemConversationExperience } from "./conversationalWhatsAppService";
 import { runAosV2LeadIntelligence } from "./aosV2IntelligenceService";
 import type { AosV2CoreMatchEvidence } from "@/lib/aos/v2/contracts";
+import { captureCurrentTraceContext } from "@/lib/observability/runtime";
 
 const ACTIVE_REQUEST_STATUSES = [
   "preview_prepared",
@@ -550,6 +551,7 @@ async function enqueueRiyaQualificationTurn(input: {
     return false;
   }
 
+  const traceContext = captureCurrentTraceContext();
   const row = {
     conversation_id: input.context.conversationId,
     inbound_message_id: input.inboundMessageId,
@@ -559,6 +561,8 @@ async function enqueueRiyaQualificationTurn(input: {
     qualification_request_id: input.context.request.id,
     status: "pending",
     attempt_count: 0,
+    ...(traceContext.traceparent === undefined ? {} : { traceparent: traceContext.traceparent }),
+    ...(traceContext.tracestate === undefined ? {} : { tracestate: traceContext.tracestate }),
   };
   const { error } = await adminClient()
     .from("communication_jarvis_turn_outbox")

@@ -21,6 +21,8 @@ export const qfjOperatorSnapshotRequestSchema = z.object({
 
 const approvalSchema = z.object({
   id: z.string().uuid(),
+  kind: z.enum(["AUTOMATION","AGNI"]).optional(),
+  actionFingerprint: z.string().regex(/^[0-9a-f]{64}$/).optional(),
   requestedAction: label,
   risk: z.enum(["informational","low-risk-reversible","client-or-vendor-facing","money-related","high-risk"]),
   requestedAuthority: label,

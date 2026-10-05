@@ -14,6 +14,13 @@ import {
   QfjIsolationFailure,
   QfjIsolationGate,
 } from "../lib/jarvis/scaleIsolation";
+import {
+  activeTraceId,
+  injectCurrentTraceHeaders,
+  recordMetric,
+  SpanKind,
+  withSpan,
+} from "../lib/observability/runtime";
 
 export interface QfjScaleHttpResponse {
   readonly status: number;
@@ -145,67 +152,100 @@ export function createJarvisScaleTransport(gate = defaultGate) {
     readonly headers?: Readonly<Record<string, string>>;
     readonly httpPost?: QfjScaleHttpPost;
   }): Promise<QfjScaleTransportResult> {
-    const timeoutMs = args.timeoutMs ?? QFJ_SCALE_DEFAULTS.timeoutMs;
-    const metadata = createQfjScaleMetadata({
-      requestId: args.requestId,
-      idempotencyKey: args.idempotencyKey,
-      actor: args.actor,
-      timeoutMs,
-      ...(args.expectedRevision === undefined
-        ? {}
-        : { expectedRevision: args.expectedRevision }),
-      ...(args.correlationId === undefined
-        ? {}
-        : { correlationId: args.correlationId }),
-      ...(args.traceId === undefined ? {} : { traceId: args.traceId }),
-    });
-    const raw = Buffer.from(args.body, "utf8");
-    const scaleHeaders = signQfjScaleHeaders({
-      method: "POST",
-      path: args.path,
-      metadata,
-      keyId: args.keyId,
-      privateKeyPem: args.privateKeyPem,
-      rawBody: raw,
-    });
-    const post = args.httpPost ?? boundedNodePost;
+    const startedAt = performance.now();
+    return withSpan(
+      "quickfurno.jarvis.client",
+      SpanKind.CLIENT,
+      {
+        "server.address": (() => {
+          try {
+            return new URL(args.url).hostname;
+          } catch {
+            return "invalid";
+          }
+        })(),
+        "http.request.method": "POST",
+        "qfj.route": args.path,
+      },
+      async () => {
+        const timeoutMs = args.timeoutMs ?? QFJ_SCALE_DEFAULTS.timeoutMs;
+        const activeId = activeTraceId();
+        const selectedTraceId = args.traceId ?? activeId ?? undefined;
+        const metadata = createQfjScaleMetadata({
+          requestId: args.requestId,
+          idempotencyKey: args.idempotencyKey,
+          actor: args.actor,
+          timeoutMs,
+          ...(args.expectedRevision === undefined
+            ? {}
+            : { expectedRevision: args.expectedRevision }),
+          ...(args.correlationId === undefined
+            ? {}
+            : { correlationId: args.correlationId }),
+          ...(selectedTraceId === undefined ? {} : { traceId: selectedTraceId }),
+        });
+        const raw = Buffer.from(args.body, "utf8");
+        const scaleHeaders = signQfjScaleHeaders({
+          method: "POST",
+          path: args.path,
+          metadata,
+          keyId: args.keyId,
+          privateKeyPem: args.privateKeyPem,
+          rawBody: raw,
+        });
+        const post = args.httpPost ?? boundedNodePost;
+        const baseHeaders = Object.freeze({
+          ...(args.headers ?? {}),
+          ...scaleHeaders,
+        });
+        const headers =
+          activeId !== null && activeId === metadata.traceId
+            ? injectCurrentTraceHeaders(baseHeaders)
+            : baseHeaders;
 
-    try {
-      const response = await gate.run({
-        deadlineAt: metadata.deadlineAt,
-        task: async (signal) => {
-          const value = await post(args.url, {
-            method: "POST",
-            redirect: "error",
-            signal,
-            headers: Object.freeze({
-              ...(args.headers ?? {}),
-              ...scaleHeaders,
-            }),
-            body: args.body,
+        try {
+          const response = await gate.run({
+            deadlineAt: metadata.deadlineAt,
+            task: async (signal) => {
+              const value = await post(args.url, {
+                method: "POST",
+                redirect: "error",
+                signal,
+                headers,
+                body: args.body,
+              });
+              if (value.status === 429) {
+                throw new QfjIsolationFailure("QFJ_BACKPRESSURE", true);
+              }
+              if (value.status >= 500) {
+                throw new QfjIsolationFailure("QFJ_UPSTREAM_UNAVAILABLE", true);
+              }
+              return value;
+            },
           });
-          if (value.status === 429) {
-            throw new QfjIsolationFailure("QFJ_BACKPRESSURE", true);
-          }
-          if (value.status >= 500) {
-            throw new QfjIsolationFailure("QFJ_UPSTREAM_UNAVAILABLE", true);
-          }
-          return value;
-        },
-      });
-      return { ok: true, response, metadata };
-    } catch (error) {
-      const failure =
-        error instanceof QfjIsolationFailure
-          ? error
-          : new QfjIsolationFailure("QFJ_UPSTREAM_UNAVAILABLE", true);
-      return {
-        ok: false,
-        errorClass: failure.errorClass,
-        retryable: qfjScaleRetryable(failure.errorClass),
-        metadata,
-      };
-    }
+          recordMetric("qf.provider.delivery.duration", performance.now() - startedAt, {
+            provider: "jarvis",
+            result: response.status < 400 ? "success" : "refused",
+          });
+          return { ok: true, response, metadata };
+        } catch (error) {
+          const failure =
+            error instanceof QfjIsolationFailure
+              ? error
+              : new QfjIsolationFailure("QFJ_UPSTREAM_UNAVAILABLE", true);
+          recordMetric("qf.provider.delivery.duration", performance.now() - startedAt, {
+            provider: "jarvis",
+            result: failure.errorClass,
+          });
+          return {
+            ok: false,
+            errorClass: failure.errorClass,
+            retryable: qfjScaleRetryable(failure.errorClass),
+            metadata,
+          };
+        }
+      },
+    );
   };
 }
 

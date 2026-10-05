@@ -220,9 +220,20 @@
     "test:scale:phase12:messages": "node scripts/scale/certify-phase12-horizontal-messages-postgres.mjs",
     "test:scale:phase12": "npm run test:scale:phase12:contract && npm run test:scale:matching-concurrency-postgres && npm run test:scale:durable-jobs:postgres && npm run test:scale:phase12:messages",
     "test:scale:phase13:contract": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/scale/validate-phase13-config-contract.mjs",
-    "test:scale:phase13": "npm run test:scale:phase13:contract && node scripts/mvp/jarvis/validate-qf-conversation-fastpath.mjs"
+    "test:scale:phase13": "npm run test:scale:phase13:contract && node scripts/mvp/jarvis/validate-qf-conversation-fastpath.mjs",
+    "test:scale:phase14": "node --experimental-transform-types scripts/scale/validate-phase14-observability-sre.mjs"
   },
   "dependencies": {
+    "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/api-logs": "0.222.0",
+    "@opentelemetry/exporter-logs-otlp-http": "0.222.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "0.222.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.222.0",
+    "@opentelemetry/resources": "2.11.0",
+    "@opentelemetry/sdk-logs": "0.222.0",
+    "@opentelemetry/sdk-metrics": "2.11.0",
+    "@opentelemetry/sdk-node": "0.222.0",
+    "@opentelemetry/semantic-conventions": "1.43.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
     "dotenv": "^16.6.1",
@@ -236,6 +247,8 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@opentelemetry/sdk-trace-base": "2.11.0",
+    "@opentelemetry/sdk-trace-node": "2.11.0",
     "@types/node": "^20.16.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",

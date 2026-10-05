@@ -5,6 +5,7 @@ cloudflare_plan    = "free"
 # Free zones automatically receive the Cloudflare Free Managed Ruleset.
 # Reconcile/import any existing entry-point rulesets before enabling writes.
 enable_strict_ssl  = false
+enable_global_aop  = false
 enable_managed_waf = false
 enable_edge_rules  = false
 enable_cache_rules = false

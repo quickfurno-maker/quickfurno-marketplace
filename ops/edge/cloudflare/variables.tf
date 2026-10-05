@@ -32,6 +32,12 @@ variable "enable_strict_ssl" {
   default     = false
 }
 
+variable "enable_global_aop" {
+  description = "Enable Cloudflare Global Authenticated Origin Pulls after the origin trusts Cloudflare's AOP client certificate."
+  type        = bool
+  default     = false
+}
+
 variable "enable_managed_waf" {
   description = "Deploy the paid Cloudflare Managed Ruleset. Ignored on Free, where Cloudflare auto-deploys the Free Managed Ruleset."
   type        = bool

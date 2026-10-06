@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "contract": "qfj.phase23.compatibility.v1",
+  "recordedAt": "2026-10-06T13:05:00Z",
+  "phase22Baselines": {
+    "quickfurno": "025409bc8fca15adf172a3dfba9545cb5a8ae6d0",
+    "jarvis": "615db33b3905443207699bda820ffee7d462dd50",
+    "agni": "2526629a135f4fc6babb72ae61d46888ebd2ad1c"
+  },
+  "apiPolicy": {
+    "currentMajor": 1,
+    "versionIdentity": "major wire contract version",
+    "externalNativePathPolicy": "new native/external APIs MUST use /api/v{major} or an explicitly registered equivalent",
+    "existingServerCoupledWebRoutes": "not retroactively renamed in Phase23",
+    "additiveOptionalFieldsAllowed": true,
+    "additiveResponseHeadersAllowed": true,
+    "additiveEnumValuesAllowed": false,
+    "removeOrRenameFieldRequiresNewMajor": true,
+    "changeFieldMeaningRequiresNewMajor": true,
+    "changeErrorMeaningRequiresNewMajor": true,
+    "changeIdempotencySemanticsRequiresNewMajor": true,
+    "unknownMajorFailsClosed": true
+  },
+  "qfjBoundary": {
+    "protocol": "qfj.scale.http",
+    "currentVersion": 1,
+    "acceptedVersions": [
+      0,
+      1
+    ],
+    "legacyVersionRepresentation": "missing x-qfj-scale-version header",
+    "legacyRemovalNotBefore": "2027-01-05T00:00:00Z",
+    "requestVersionHeader": "x-qfj-scale-version",
+    "compatibilityResponseHeaders": {
+      "currentVersion": "x-qfj-current-version",
+      "minimumSupportedVersion": "x-qfj-min-supported-version",
+      "deprecation": "deprecation",
+      "sunset": "sunset"
+    },
+    "signingDomain": "qfj.scale.http.sig.v1",
+    "signatureCovers": [
+      "protocol-version",
+      "method",
+      "path",
+      "request-id",
+      "idempotency-key",
+      "correlation-id",
+      "trace-id",
+      "actor",
+      "expected-revision",
+      "deadline",
+      "key-id",
+      "body-digest"
+    ],
+    "unsupportedFutureVersionFailsClosed": true
+  },
+  "deprecationPolicy": {
+    "minimumNoticeDays": 90,
+    "minimumZeroUsageDaysBeforeRemoval": 30,
+    "telemetryMetric": "qf.compatibility.requests",
+    "telemetryRequiredBeforeRemoval": true,
+    "zeroUsageEvidenceRequired": true,
+    "signedContractChangeRequiredBeforeRemoval": true,
+    "removalRequiresExplicitPhaseOrReleaseApproval": true,
+    "legacyV0": {
+      "deprecated": true,
+      "sunsetAt": "2027-01-05T00:00:00Z",
+      "removalNotBefore": "2027-01-05T00:00:00Z"
+    }
+  },
+  "eventPolicy": {
+    "identity": "eventType + eventVersion",
+    "explicitPositiveIntegerVersionRequired": true,
+    "unknownTypeFailsClosed": true,
+    "unknownVersionFailsClosed": true,
+    "permissiveFallbackForbidden": true,
+    "automaticUpgradeForbidden": true,
+    "additiveOptionalPayloadChangeMayStaySameVersion": true,
+    "requiredFieldAdditionRequiresNewVersion": true,
+    "fieldRemovalRequiresNewVersion": true,
+    "meaningChangeRequiresNewVersion": true,
+    "enumExpansionRequiresCompatibilityReview": true,
+    "previousLiveVersionRetainedUntilTelemetryAndDeprecationExit": true,
+    "eventIdIsIdempotencyIdentity": true
+  },
+  "idempotencyPolicy": {
+    "effectBearingEndpointsRequireKey": true,
+    "keySemanticsPartOfApiMajor": true,
+    "signedQfjRequestsCoverIdempotencyKey": true,
+    "sameVersionSameKeySameCanonicalEffect": "replay-or-existing-result",
+    "sameVersionSameKeyDifferentCanonicalEffect": "conflict",
+    "keyReuseAcrossMajorVersions": "separate-version-scope",
+    "silentSemanticChangeForbidden": true
+  },
+  "clientPolicy": {
+    "web": {
+      "mode": "server-coupled",
+      "minimumVersionEnforcement": false
+    },
+    "nativePolicyActivated": false,
+    "futureNativeRequirements": {
+      "platformHeader": "x-qf-client-platform",
+      "clientVersionHeader": "x-qf-client-version",
+      "clientBuildHeader": "x-qf-client-build",
+      "apiMajorHeader": "x-qf-api-major",
+      "minimumSupportedVersionPublishedBeforeEnforcement": true,
+      "hardBlockOnlyAfterTelemetryAndNotice": true,
+      "upgradeRequiredResponseCode": 426
+    }
+  },
+  "databasePolicy": {
+    "strategy": "expand-backfill-coexist-contract",
+    "nAndNMinus1MustCoexist": true,
+    "expandChangesMustBeBackwardCompatible": true,
+    "newColumnsNullableOrDefaultCompatibleDuringOverlap": true,
+    "dualReadOrDualWriteWhenMeaningMoves": true,
+    "boundedBackfillRequired": true,
+    "destructiveContractStepRequiresNMinus1Retired": true,
+    "destructiveContractStepRequiresTelemetryProof": true,
+    "rollbackDuringOverlapRequired": true
+  },
+  "consumerDrivenContracts": {
+    "frozenWireFixture": "qfj-phase23-consumer-fixture-v1.json",
+    "quickfurnoProducerValidatedAgainstJarvisExpectations": true,
+    "jarvisProducerValidatedAgainstQuickfurnoExpectations": true,
+    "additiveResponseFieldToleranceRequired": true,
+    "signedCanonicalInputVectorRequired": true
+  },
+  "observability": {
+    "compatibilityMetric": "qf.compatibility.requests",
+    "requiredLabels": [
+      "boundary",
+      "received_version",
+      "mode",
+      "result"
+    ],
+    "modes": [
+      "legacy",
+      "current",
+      "unsupported"
+    ],
+    "removalDecisionsMustReferenceTelemetry": true
+  },
+  "authority": {
+    "quickfurno": "business authority and public API owner",
+    "jarvis": "consumer/producer only within signed governed contracts",
+    "agni": "observer/recommender only; no compatibility override authority"
+  },
+  "certification": {
+    "legacyV0AndCurrentV1CoexistenceRequired": true,
+    "unsupportedV2RejectionRequired": true,
+    "legacyDeprecationHeadersRequired": true,
+    "currentCompatibilityHeadersRequired": true,
+    "signedInputFixtureParityRequired": true,
+    "eventRegistryStrictnessRequired": true,
+    "nAndNMinus1DatabaseRehearsalRequired": true,
+    "existingPhase22GateRequired": true,
+    "existingPhase21GateRequired": true,
+    "existingPhase20GateRequired": true
+  },
+  "productionBoundary": {
+    "productionApiVersionCutoverPerformed": false,
+    "legacyV0Removed": false,
+    "productionEventSchemaChanged": false,
+    "productionDatabaseMigrationPerformed": false,
+    "productionClientMinimumVersionEnforced": false,
+    "productionTrafficCutoverPerformed": false,
+    "agniAuthorityExpanded": false
+  },
+  "exit": {
+    "rollingReleaseCompatibilityPackReady": true,
+    "nextPhase": "Phase 24 - Shadow Migration, Dual-Run & CDC"
+  }
+}

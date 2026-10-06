@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "fixture": "qfj.phase23.consumer.v1",
+  "bodyUtf8": "{\"requestId\":\"phase23-fixture\",\"status\":\"accepted\"}",
+  "bodyDigestBase64Url": "mBAw13aHG0zWrKZVXBjhovRmfJWrnKyg4PPYf19X7OI",
+  "v1": {
+    "method": "POST",
+    "path": "/phase23/consumer-contract",
+    "requestId": "phase23-request-0001",
+    "idempotencyKey": "phase23-idem-0001",
+    "correlationId": "phase23-request-0001",
+    "traceId": "11111111111111111111111111111111",
+    "actor": "quickfurno-core",
+    "expectedRevision": null,
+    "deadlineAt": "2027-01-01T00:00:00.000Z",
+    "keyId": "phase23-test",
+    "expectedSigningInput": "qfj.scale.http.sig.v1\n1\nPOST\n/phase23/consumer-contract\nphase23-request-0001\nphase23-idem-0001\nphase23-request-0001\n11111111111111111111111111111111\nquickfurno-core\n-\n2027-01-01T00:00:00.000Z\nphase23-test\nmBAw13aHG0zWrKZVXBjhovRmfJWrnKyg4PPYf19X7OI"
+  },
+  "legacyV0": {
+    "versionHeaderPresent": false,
+    "acceptedDuringWindow": true,
+    "deprecated": true
+  },
+  "additiveResponseCompatibility": {
+    "nMinus1KnownFields": [
+      "status",
+      "requestId"
+    ],
+    "nResponse": {
+      "status": "accepted",
+      "requestId": "phase23-fixture",
+      "serverRevision": 23,
+      "compatibility": {
+        "currentVersion": 1
+      }
+    },
+    "nMinus1ExpectedProjection": {
+      "status": "accepted",
+      "requestId": "phase23-fixture"
+    }
+  }
+}

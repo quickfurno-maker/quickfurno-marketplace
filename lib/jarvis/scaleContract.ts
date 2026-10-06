@@ -25,6 +25,33 @@ export const QFJ_SCALE_RESPONSE_HEADERS = Object.freeze({
   retryable: "x-qfj-retryable",
 } as const);
 
+export const QFJ_COMPATIBILITY_HEADERS = Object.freeze({
+  currentVersion: "x-qfj-current-version",
+  minimumSupportedVersion: "x-qfj-min-supported-version",
+  deprecation: "deprecation",
+  sunset: "sunset",
+} as const);
+
+export const QFJ_COMPATIBILITY_CURRENT_VERSION = "1" as const;
+export const QFJ_COMPATIBILITY_MINIMUM_VERSION = "0" as const;
+export const QFJ_COMPATIBILITY_LEGACY_SUNSET_HTTP = "Mon, 05 Jan 2027 00:00:00 GMT" as const;
+export type QfjCompatibilityMode = "legacy" | "current";
+
+export function qfjCompatibilityResponseHeaders(
+  mode: QfjCompatibilityMode,
+): Readonly<Record<string, string>> {
+  return Object.freeze({
+    [QFJ_COMPATIBILITY_HEADERS.currentVersion]: QFJ_COMPATIBILITY_CURRENT_VERSION,
+    [QFJ_COMPATIBILITY_HEADERS.minimumSupportedVersion]: QFJ_COMPATIBILITY_MINIMUM_VERSION,
+    ...(mode === "legacy"
+      ? {
+          [QFJ_COMPATIBILITY_HEADERS.deprecation]: "true",
+          [QFJ_COMPATIBILITY_HEADERS.sunset]: QFJ_COMPATIBILITY_LEGACY_SUNSET_HTTP,
+        }
+      : {}),
+  });
+}
+
 export const QFJ_SCALE_ACTORS = [
   "quickfurno-core",
   "qf-jarvis",

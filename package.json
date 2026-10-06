@@ -246,7 +246,10 @@
     "test:scale:phase22:manifest": "node scripts/scale/generate-phase22-auth-callsite-manifest.mjs --check",
     "test:scale:phase22:contract": "node scripts/scale/validate-phase22-identity-auth.mjs",
     "test:scale:phase22:postgres": "node --experimental-transform-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/scale/certify-phase22-identity-auth-postgres.mjs",
-    "test:scale:phase22": "npm run test:scale:phase22:manifest && npm run test:scale:phase22:contract && npm run test:scale:phase22:postgres"
+    "test:scale:phase22": "npm run test:scale:phase22:manifest && npm run test:scale:phase22:contract && npm run test:scale:phase22:postgres",
+    "test:scale:phase23:contract": "node --experimental-transform-types scripts/scale/validate-phase23-compatibility.mjs",
+    "test:scale:phase23:postgres": "node scripts/scale/certify-phase23-n-nminus1-postgres.mjs",
+    "test:scale:phase23": "npm run test:scale:phase23:contract && npm run test:scale:phase23:postgres"
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.0",

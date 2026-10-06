@@ -1,5 +1,6 @@
 import {
   QFJ_SCALE_HEADERS,
+  qfjCompatibilityResponseHeaders,
   qfjScaleResponseHeaders,
   verifyQfjScaleRequest,
   type QfjScaleErrorClass,
@@ -34,10 +35,27 @@ export function verifyQfjScaleWebRequest(args: {
     ...(args.nowMs === undefined ? {} : { nowMs: args.nowMs }),
     allowLegacy: args.allowLegacy ?? true,
   });
-  if (!result.ok && (
-    result.errorClass === "QFJ_AUTHENTICATION_FAILED" ||
-    result.errorClass === "QFJ_CONTRACT_INVALID"
-  )) {
+  const receivedVersion = args.request.headers.get(QFJ_SCALE_HEADERS.version) ?? "0";
+  const compatibilityMode = result.ok
+    ? (result.mode === "legacy" ? "legacy" : "current")
+    : "unsupported";
+  const compatibilityResult = "errorClass" in result ? result.errorClass : "accepted";
+  try {
+    addMetric("qf.compatibility.requests", 1, {
+      boundary: "qfj.scale.http",
+      received_version: receivedVersion,
+      mode: compatibilityMode,
+      result: compatibilityResult,
+    });
+  } catch {
+    // Compatibility telemetry is powerless; request verification remains authoritative.
+  }
+
+  if (
+    "errorClass" in result &&
+    (result.errorClass === "QFJ_AUTHENTICATION_FAILED" ||
+      result.errorClass === "QFJ_CONTRACT_INVALID")
+  ) {
     try {
       addMetric("qf.security.auth.failures", 1, {
         operation: "qfj_scale",
@@ -60,9 +78,13 @@ export function qfjScaleHeadersForResult(
   result: QfjScaleVerificationResult,
   errorClass: QfjScaleErrorClass = "QFJ_NONE",
 ): Readonly<Record<string, string>> {
-  return result.ok && result.mode === "v1"
-    ? qfjScaleResponseHeaders(result.metadata, errorClass)
-    : {};
+  if (!result.ok) return {};
+  const compatibility = qfjCompatibilityResponseHeaders(
+    result.mode === "legacy" ? "legacy" : "current",
+  );
+  return result.mode === "v1"
+    ? { ...compatibility, ...qfjScaleResponseHeaders(result.metadata, errorClass) }
+    : compatibility;
 }
 
 export function qfjScaleHttpStatus(errorClass: QfjScaleErrorClass): number {

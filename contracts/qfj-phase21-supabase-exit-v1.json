@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "contract": "qfj.phase21.supabase-exit.v1",
+  "recordedAt": "2026-10-06T10:30:00Z",
+  "phase20Baselines": {
+    "quickfurno": "997cef1bfddd6bfb9505c4ac42e2cc1e055bc880",
+    "jarvis": "473dac5fb0ec8ac0d428c2f050f80b8495c1eede",
+    "agni": "bf2d6751fd605bc0be758e1a8f5f666f16ecc4af"
+  },
+  "authority": {
+    "businessTruth": "QuickFurno Core + PostgreSQL",
+    "jarvis": "reasoning_orchestration_owns_only_its_event_and_operational_state",
+    "agni": "READ_ONLY_RECOMMEND_by_default_no_new_phase21_authority"
+  },
+  "quickfurnoSource": {
+    "provider": "Supabase",
+    "projectRef": "yqpgcsduqbxulrlzwzap",
+    "postgresMajor": 17,
+    "publicTables": 139,
+    "publicViews": 1,
+    "publicPolicies": 75,
+    "publicFunctions": 181,
+    "authUsers": 9,
+    "storageBuckets": 1,
+    "storageObjects": 0,
+    "edgeFunctions": 0,
+    "realtimeTables": [
+      "public.communication_inbound_messages",
+      "public.communication_messages"
+    ],
+    "migrationHead": "20261003093648",
+    "vaultPublicRuntimeReferences": 0
+  },
+  "jarvisSource": {
+    "provider": "Supabase_PostgreSQL_only",
+    "projectRef": "coilipywdvxklewquqvv",
+    "schema": "qf_jarvis",
+    "tables": 2,
+    "eventRowsAtCertification": 0,
+    "migrationRows": 1,
+    "migrationFile": "0001_event_log.sql",
+    "migrationSha256": "dbca835c394dc67f015176af8ae0582faa78e0c1299593ac8970c5abf4389d6a",
+    "authUsers": 0,
+    "storageObjects": 0,
+    "realtimeTables": [],
+    "vaultPublicRuntimeReferences": 0
+  },
+  "databaseExportContract": {
+    "sourceTool": "supabase_db_dump",
+    "splitArtifacts": ["roles.sql", "schema.sql", "data.sql"],
+    "schemaAndDataSeparate": true,
+    "dataUsesCopy": true,
+    "rawPgDumpOfManagedSupabaseForbidden": true,
+    "dumpFilesContainProductionData": true,
+    "dumpFilesForbiddenFromGit": true,
+    "target": "PostgreSQL_17_plus_PostGIS_where_required",
+    "verifyCatalogFingerprints": true,
+    "verifyRowCountsAndReferentialIntegrity": true
+  },
+  "providerSurfaceDisposition": {
+    "postgresql": "PORTABLE_AUTHORITY",
+    "postgrestDataApi": "REPLACE_WITH_PROVIDER_NEUTRAL_PERSISTENCE_API_BOUNDARY",
+    "auth": "PHASE22_INTERNAL_PRINCIPAL_PLUS_PROVIDER_ADAPTER",
+    "sessions": "INVALIDATE_AND_REAUTHENTICATE_ON_PROVIDER_CUTOVER",
+    "storage": "EXPORT_SEPARATELY_WITH_SHA256_MANIFEST_TO_OBJECT_STORAGE_ADAPTER",
+    "realtime": "DURABLE_POSTGRES_STATE_PLUS_PROVIDER_NEUTRAL_EVENT_GATEWAY",
+    "edgeFunctions": "NONE_LIVE",
+    "supabaseVault": "REMOVE_OR_REPLACE_PROVIDER_SPECIFIC_EXTENSION_NO_PUBLIC_RUNTIME_REFS",
+    "projectConfig": "CAPTURE_AS_NON_SECRET_CONFIGURATION_MANIFEST",
+    "rlsGrantsPolicies": "PRESERVE_AND_CERTIFY"
+  },
+  "currentSupabaseCompatibility": {
+    "postgres17TargetRequired": true,
+    "explicitDataApiGrantsRequiredForFutureTableExposure": true,
+    "extensionVersionPinningAssumptionForbidden": true
+  },
+  "certification": {
+    "disposablePostgres17Required": true,
+    "quickfurnoPortableCompatibilityHarnessRequired": true,
+    "quickfurnoCriticalDomainSmoke": [
+      "matching",
+      "credits",
+      "assignments",
+      "consent",
+      "payments",
+      "worker_claims"
+    ],
+    "jarvisMigrationRebuildRequired": true,
+    "jarvisAppendOnlyLedgerRequired": true,
+    "deterministicManifestAndCallsiteInventoryRequired": true,
+    "previousPhase20GateRequired": true,
+    "noProductionMutation": true
+  },
+  "exit": {
+    "productionCutoverPerformed": false,
+    "productionDatabaseMigrated": false,
+    "productionDataCommitted": false,
+    "awsRequired": false,
+    "productionKubernetesRequired": false,
+    "agniAuthorityExpanded": false,
+    "providerExitPackReady": true,
+    "nextPhase": "Phase 22 - Provider-Neutral Identity & Auth Adapter"
+  }
+}

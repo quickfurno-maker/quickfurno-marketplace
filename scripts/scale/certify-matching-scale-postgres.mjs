@@ -266,6 +266,32 @@ async function runPrefilter() {
   return { rows: result.rows, ms: performance.now() - start };
 }
 
+async function explainPrefilter() {
+  const result = await pool.query(
+    `explain (analyze,buffers,format json)
+     select vendor
+       from public.qf_match_vendor_prefilter_v1($1,$2,$3::text[],$4::text[],$5)`,
+    [LEAD_ID, SCOPE, TIER0, TIER1, 512],
+  );
+  const root = result.rows[0]["QUERY PLAN"][0];
+  const nodes = [];
+  const walk = (node, depth = 0) => {
+    nodes.push({
+      depth,
+      nodeType: node["Node Type"],
+      relation: node["Relation Name"] ?? null,
+      index: node["Index Name"] ?? null,
+      actualTotalTime: node["Actual Total Time"] ?? null,
+      actualRows: node["Actual Rows"] ?? null,
+      actualLoops: node["Actual Loops"] ?? null,
+      rowsRemovedByFilter: node["Rows Removed by Filter"] ?? null,
+    });
+    for (const child of node.Plans ?? []) walk(child, depth + 1);
+  };
+  walk(root.Plan);
+  return { executionTime: root["Execution Time"], planningTime: root["Planning Time"], nodes };
+}
+
 async function explainIndexProbe() {
   const result = await pool.query(
     `explain (analyze,buffers,format json)
@@ -303,6 +329,11 @@ async function certify(size, maxMs) {
   const ids = lastRows.map((row) => row.vendor?.id).filter(Boolean);
   assert.ok(ids.includes(WINNER_ID), `high-ID vendor missing at ${size} vendors`);
   assert.ok(lastRows.length > 0 && lastRows.length <= 512);
+  if (worstMs >= maxMs) {
+    const diagnostic = await explainPrefilter();
+    console.error("PHASE18_MATCHING_SLO_DIAGNOSTIC");
+    console.error(JSON.stringify(diagnostic, null, 2));
+  }
   assert.ok(worstMs < maxMs, `${size} prefilter worst ${worstMs.toFixed(1)}ms >= ${maxMs}ms SLO`);
 
   const plan = await explainIndexProbe();

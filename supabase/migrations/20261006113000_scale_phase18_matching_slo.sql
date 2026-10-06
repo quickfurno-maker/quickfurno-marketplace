@@ -1,4 +1,4 @@
-﻿-- ============================================================================
+-- ============================================================================
 -- SCALE-P18 — Matching latency SLO hardening
 --
 -- The resolved strict-zone hot path keeps the Phase 08 ranking semantics, while

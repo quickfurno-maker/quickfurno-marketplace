@@ -863,3 +863,38 @@ jobs:
           docker logs qf-phase16-host-a-web || true
           docker logs qf-phase16-host-b-web || true
           cat /tmp/qf-phase16-haproxy.log 2>/dev/null || true
+
+
+  # SCALE-P17 - backup, PITR and disaster-recovery certification.
+  phase17-backup-pitr-dr-certification:
+    name: Phase 17 backup PITR DR certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact reviewed head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate DR policy and object restore
+        run: npm run test:scale:phase17
+
+      - name: Certify PostgreSQL physical PITR and logical restore
+        env:
+          PHASE17_POSTGRES_IMAGE: postgres:16.4-bookworm
+        run: npm run test:scale:phase17:postgres
+
+      - name: Collect DR container evidence
+        if: always()
+        shell: bash
+        run: docker ps -a --filter "name=qf-p17-" || true

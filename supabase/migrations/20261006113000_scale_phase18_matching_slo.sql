@@ -1,9 +1,9 @@
 -- ============================================================================
 -- SCALE-P18 — Matching latency SLO hardening
 --
--- Inline the exact spherical distance calculation inside the ranked SQL query
--- so the 100k/1M hot path avoids one SQL-function invocation per candidate.
--- Assignment, fairness, credit, category and final Core authority are unchanged.
+-- The strict resolved-zone path eliminates the compatibility vendor scan before it can touch
+-- the large vendor relation, then uses native PostGIS spherical distance for candidate ranking.
+-- Assignment, fairness, credit, category, distance bands and final Core authority are unchanged.
 -- ============================================================================
 
 begin;
@@ -77,6 +77,7 @@ as $$
       v.office_longitude,
       v.latitude,
       v.longitude,
+      v.geo_point,
       v.areas_covered,
       v.covers_full_city,
       v.last_delivered_at
@@ -113,6 +114,7 @@ as $$
       v.office_longitude,
       v.latitude,
       v.longitude,
+      v.geo_point,
       v.areas_covered,
       v.covers_full_city,
       v.last_delivered_at
@@ -133,7 +135,8 @@ as $$
      and coalesce(v.location_verification_status, '') <> 'outside_service_area'
      and v.matching_terms && (t.tier0 || t.tier1)
     left join public.marketplace_service_zones vz on vz.id = v.service_zone_id
-    where (l.service_zone_id is null or v.service_zone_id is null)
+    where (l.service_zone_id is null or l.lead_zone_strict is false)
+      and (l.service_zone_id is null or v.service_zone_id is null)
       and (l.service_zone_id is null or l.lead_zone_active is distinct from false)
       and (l.service_zone_id is null or l.lead_zone_matching_enabled is distinct from false)
       and (v.service_zone_id is null or vz.id is null or (
@@ -162,16 +165,13 @@ as $$
           or (l.latitude = 0 and l.longitude = 0)
           or coords.vendor_latitude is null
           or coords.vendor_longitude is null
+          or l.geo_point is null
+          or c.geo_point is null
         then null
-        else round((
-          6371.0 * 2.0 * asin(
-            sqrt(least(1.0, greatest(0.0,
-              power(sin(radians(coords.vendor_latitude - l.latitude) / 2.0), 2)
-              + cos(radians(l.latitude)) * cos(radians(coords.vendor_latitude))
-                * power(sin(radians(coords.vendor_longitude - l.longitude) / 2.0), 2)
-            )))
-          )
-        )::numeric, 3)::double precision
+        else round(
+          extensions.ST_Distance(l.geo_point, c.geo_point, false)
+          * 0.9999986232298033
+        ) / 1000.0
       end as distance_km,
       case
         when nullif(l.area_key, '') is not null
@@ -282,6 +282,6 @@ $$;
 
 
 comment on function public.qf_match_vendor_prefilter_v1(uuid,text,text[],text[],integer) is
-  'SCALE-P18 bounded indexed discovery with inlined spherical distance calculation; transactional assignment and Core re-evaluation remain unchanged.';
+  'SCALE-P18 bounded indexed discovery with strict-zone fallback elimination and native PostGIS spherical distance; transactional assignment and Core re-evaluation remain unchanged.';
 
 commit;

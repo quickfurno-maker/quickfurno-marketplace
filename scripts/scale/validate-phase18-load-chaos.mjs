@@ -27,7 +27,7 @@ add("audit scenarios are complete", c.auditScenarios.idleWorkersAtLeast>=10 && O
 add("soak minimum and memory bound are locked", c.soak.minimumAutomatedSeconds>=60 && c.soak.heapGrowthBytesMax<=67108864 && c.soak.queueMustDrain);
 add("real 100k/1M PostGIS certifier retained", p8scale.includes("100_000") && p8scale.includes("1_000_000") && p8scale.toLowerCase().includes("postgis"));
 add("Phase00 matching SLO is a hard D1/D2 gate", p8scale.includes("certify(100_001, 750)") && p8scale.includes("certify(1_000_001, 1_500)"));
-add("Phase18 matching hot path optimization is applied", p8scale.includes("PHASE18_MIGRATION") && matchingSloMigration.includes("cross join lateral") && matchingSloMigration.includes("asin(") && !matchingSloMigration.includes("public.qf_match_haversine_km_v1("));
+add("Phase18 matching hot path optimization is applied", p8scale.includes("PHASE18_MIGRATION") && matchingSloMigration.includes("l.lead_zone_strict is false") && matchingSloMigration.includes("extensions.ST_Distance(l.geo_point, c.geo_point, false)") && matchingSloMigration.includes("0.9999986232298033") && !matchingSloMigration.includes("public.qf_match_haversine_km_v1("));
 add("canonical concurrency certifier retained", p8conc.includes("sameLeadConcurrentOperations") && p8conc.includes("totalCreditDebits"));
 add("Jarvis resilience certifier retained", p11.toLowerCase().includes("timeout") || p11.toLowerCase().includes("circuit"));
 add("horizontal durable message certifier retained", p12.toLowerCase().includes("postgres"));

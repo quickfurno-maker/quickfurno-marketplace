@@ -648,7 +648,7 @@
       "name": "scale_phase18_matching_slo",
       "filename": "20261006113000_scale_phase18_matching_slo.sql",
       "path": "supabase/migrations/20261006113000_scale_phase18_matching_slo.sql",
-      "canonicalSha256": "8104896537e78bc20050736d759786a2c4a569365c14783dce861fd1746b5ee7",
+      "canonicalSha256": "da746487c926633d7cc51c53ff959b595f3ea209c597a9e82cb9d0f341192248",
       "exactVersionPresence": {
         "staging": false,
         "production": false

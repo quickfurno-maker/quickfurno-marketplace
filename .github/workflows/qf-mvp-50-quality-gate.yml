@@ -833,23 +833,7 @@ jobs:
       - name: Start two host-affined QuickFurno replicas
         shell: bash
         run: |
-          docker run -d --name qf-phase16-host-a-web \
-            --label qf.phase16.host=a \
-            -p 127.0.0.1:3211:3000 \
-            -e QF_RELEASE_SHA="${GITHUB_SHA}" \
-            "qf-phase16:${GITHUB_SHA}"
-          docker run -d --name qf-phase16-host-b-web \
-            --label qf.phase16.host=b \
-            -p 127.0.0.1:3212:3000 \
-            -e QF_RELEASE_SHA="${GITHUB_SHA}" \
-            "qf-phase16:${GITHUB_SHA}"
-          for port in 3211 3212; do
-            for i in $(seq 1 60); do
-              if curl -fsS "http://127.0.0.1:${port}/readyz" >/dev/null; then break; fi
-              sleep 1
-            done
-            curl -fsS "http://127.0.0.1:${port}/readyz" >/dev/null
-          done
+          bash ops/phase16/start-certification-replicas.sh "${GITHUB_SHA}"
           haproxy -D -p /tmp/qf-phase16-haproxy.pid -f ops/phase16/haproxy-certification.cfg
           for i in $(seq 1 20); do
             if curl -fsS http://127.0.0.1:8088/readyz >/dev/null; then break; fi

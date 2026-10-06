@@ -5,10 +5,11 @@ import { readFile } from "node:fs/promises";
 const root = new URL("../../", import.meta.url);
 const read = (p) => readFile(new URL(p, root), "utf8");
 
-const [topologyText, compose, haproxy, tofu, cloudInit, docs] = await Promise.all([
+const [topologyText, compose, haproxy, replicaStarter, tofu, cloudInit, docs] = await Promise.all([
   read("contracts/qfj-phase16-topology-v1.json"),
   read("ops/container/compose.production.yml"),
   read("ops/phase16/haproxy-certification.cfg"),
+  read("ops/phase16/start-certification-replicas.sh"),
   read("ops/phase16/tofu/main.tf"),
   read("ops/phase16/tofu/cloud-init.tftpl"),
   read("docs/operations/phase16-multihost-ha.md"),
@@ -67,6 +68,12 @@ add("HAProxy certification config health-checks /readyz",
   haproxy.includes("qf_host_a") &&
   haproxy.includes("qf_host_b") &&
   haproxy.includes("option redispatch"));
+add("certification replicas satisfy the fail-closed production entrypoint",
+  replicaStarter.includes("QF_RUNTIME_ENV=production") &&
+  replicaStarter.includes("QF_CONFIG_SCHEMA_VERSION=1") &&
+  replicaStarter.includes("QF_SERVICE_ID=quickfurno.web") &&
+  replicaStarter.includes("HOSTNAME=0.0.0.0") &&
+  replicaStarter.includes("phase16-runtime.invalid"));
 add("OpenTofu host inventory enforces two hosts",
   tofu.includes("length(var.quickfurno_hosts) >= 2"));
 add("OpenTofu rejects loopback shared Redis",

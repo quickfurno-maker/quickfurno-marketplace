@@ -1,0 +1,63 @@
+{
+  "contract": "qfj.topology.phase16.v1",
+  "lockedAt": "2026-10-06",
+  "currentPhysicalPlacement": {
+    "quickfurno": {
+      "placement": "DEDICATED_VPS",
+      "reason": "business-critical authority and marketplace failure-domain isolation"
+    },
+    "jarvisAgni": {
+      "placement": "SHARED_LARGER_VPS",
+      "reason": "cost-efficient initial operations with strict logical isolation"
+    }
+  },
+  "logicalIsolation": {
+    "separateContainers": true,
+    "separateNetworks": true,
+    "separateResourceLimits": true,
+    "separateCredentialsAndSecrets": true,
+    "separateReleaseManifests": true,
+    "agniUnrestrictedDockerSocketForbidden": true
+  },
+  "authority": {
+    "businessTruth": "POSTGRESQL_SUPABASE",
+    "redisValkey": "COORDINATION_ONLY",
+    "hostLocalBusinessStateForbidden": true,
+    "agniProductionAuthority": "READ_ONLY_RECOMMEND"
+  },
+  "quickfurnoHaTarget": {
+    "minimumHosts": 2,
+    "externalRedundantLoadBalancer": true,
+    "healthRemovalEndpoint": "/readyz",
+    "livenessEndpoint": "/livez",
+    "sessionAffinityRequired": false,
+    "criticalReplicaAntiAffinityByHost": true,
+    "sharedRedisValkeyRequired": true,
+    "loopbackRedisForbiddenInMultiHost": true,
+    "sharedObjectStorageRequired": true,
+    "externalSecretsRequired": true,
+    "rollingHostReplacement": true
+  },
+  "workerSafety": {
+    "crossHostWorkersAllowed": true,
+    "durableClaims": "POSTGRESQL_LEASE_FENCE",
+    "expiredClaimsReclaimable": true,
+    "staleOwnerEffectsRejected": true,
+    "redisWakeupsAuthoritative": false
+  },
+  "jarvis": {
+    "singleLargerVpsNow": true,
+    "multiHostReady": true,
+    "quickfurnoFailureDomainSeparated": true
+  },
+  "agni": {
+    "coLocatedWithJarvisNow": true,
+    "portableToDedicatedHost": true,
+    "mustNotBeCorrectnessDependencyForQuickfurno": true
+  },
+  "phase16Safety": {
+    "productionTrafficCutover": false,
+    "newProductionAuthority": false,
+    "productionDatabaseMigration": false
+  }
+}

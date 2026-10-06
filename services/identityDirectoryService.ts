@@ -54,7 +54,7 @@ export function supabaseRequestAuthAdapter(): AuthenticationProviderAdapter {
 
 export function databaseIdentityDirectoryRepository(): IdentityDirectoryRepository {
   return Object.freeze({
-    async findProviderIdentity(providerKey, providerSubject) {
+    async findProviderIdentity(providerKey: string, providerSubject: string) {
       const { data, error } = await adminClient()
         .from("identity_provider_identities")
         .select("principal_id, provider_key, provider_subject, status")
@@ -70,7 +70,7 @@ export function databaseIdentityDirectoryRepository(): IdentityDirectoryReposito
         status: String(data.status) as ProviderIdentityRecord["status"],
       };
     },
-    async findPrincipal(principalId) {
+    async findPrincipal(principalId: string) {
       const { data, error } = await adminClient()
         .from("identity_principals")
         .select("id, principal_kind, status, identity_revision")
@@ -87,7 +87,7 @@ export function databaseIdentityDirectoryRepository(): IdentityDirectoryReposito
         identityRevision: Number(data.identity_revision),
       };
     },
-    async listBusinessBindings(principalId, bindingType) {
+    async listBusinessBindings(principalId: string, bindingType?: BusinessBindingTypeValue) {
       let query = adminClient()
         .from("identity_business_bindings")
         .select("principal_id, binding_type, business_id, status")

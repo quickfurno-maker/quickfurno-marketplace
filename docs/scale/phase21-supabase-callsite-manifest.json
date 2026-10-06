@@ -1,0 +1,2135 @@
+{
+  "schemaVersion": 1,
+  "generator": "scripts/scale/generate-phase21-supabase-callsite-manifest.mjs",
+  "classification": {
+    "rpc": "PORTABLE_SQL_OR_PERSISTENCE_ADAPTER",
+    "tableAccess": "PERSISTENCE_BOUNDARY",
+    "auth": "PHASE22_PROVIDER_ADAPTER",
+    "storage": "OBJECT_STORAGE_ADAPTER",
+    "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
+  },
+  "totals": {
+    "files": 137,
+    "rpcNames": 85,
+    "tableNames": 116,
+    "storageBuckets": 0,
+    "authFiles": 12,
+    "realtimeFiles": 0
+  },
+  "rpcNames": [
+    "apply_communication_consent_command",
+    "assign_package_to_vendor",
+    "check_duplicate_lead",
+    "get_public_eligible_vendors",
+    "get_setting_int",
+    "qf_aarohi_authorize_outreach_v1",
+    "qf_aarohi_claim_discovery_run_v1",
+    "qf_aarohi_claim_social_outreach_v1",
+    "qf_aarohi_claim_whatsapp_outreach_v1",
+    "qf_aarohi_complete_handoff_v1",
+    "qf_aarohi_complete_social_outreach_v1",
+    "qf_aarohi_complete_whatsapp_intake_v1",
+    "qf_aarohi_complete_whatsapp_outreach_v1",
+    "qf_aarohi_confirm_identity_match_v1",
+    "qf_aarohi_link_vendor_conversion_v1",
+    "qf_aarohi_set_human_takeover_v1",
+    "qf_aarohi_suppress_prospect_v1",
+    "qf_acknowledge_vendor_lead_v1",
+    "qf_acquire_domain_event",
+    "qf_activate_vendor_package_order_v2",
+    "qf_admin_clear_city_boundary_v1",
+    "qf_admin_create_city_market_v1",
+    "qf_admin_service_zone_summaries_v1",
+    "qf_admin_set_city_active_v1",
+    "qf_admin_set_city_boundary_v1",
+    "qf_admin_set_city_matching_v1",
+    "qf_admin_set_city_strict_location_v1",
+    "qf_admin_update_city_market_v1",
+    "qf_admin_upsert_package_v1",
+    "qf_apply_bad_lead_recovery_v1",
+    "qf_apply_marketing_consent_v1",
+    "qf_apply_vendor_credit_delta",
+    "qf_apply_workflow_step",
+    "qf_approve_vendor_campaign_v1",
+    "qf_begin_idempotent_operation",
+    "qf_bind_vendor_package_razorpay_order_v2",
+    "qf_cancel_orphan_automation_job_v1",
+    "qf_cancel_stale_automation_job_v1",
+    "qf_claim_automation_job_for_family_v1",
+    "qf_claim_automation_job_transport_for_family_v1",
+    "qf_claim_automation_job_transport_v1",
+    "qf_claim_automation_job_v1",
+    "qf_claim_consent_ack_intents",
+    "qf_claim_conversation_outbox_v1",
+    "qf_claim_due_outbox_event",
+    "qf_claim_due_workflow_task",
+    "qf_claim_jarvis_turn_outbox_v1",
+    "qf_claim_scale_scheduler_occurrence_v1",
+    "qf_claim_vendor_package_razorpay_order_v2",
+    "qf_complete_automation_attempt_transport_v1",
+    "qf_complete_automation_attempt_v1",
+    "qf_complete_scale_scheduler_occurrence_v1",
+    "qf_create_automation_action_request_v1",
+    "qf_create_automation_job_v1",
+    "qf_dead_letter_domain_event",
+    "qf_decide_automation_action_request_v1",
+    "qf_expire_consent_ack_intents",
+    "qf_finalize_replacement_request_v1",
+    "qf_handoff_vendor_campaign_intents_v1",
+    "qf_mark_vendor_package_payment_failed_v2",
+    "qf_prepare_vendor_campaign_v1",
+    "qf_project_vendor_lead_delivery_v1",
+    "qf_read_vendor_fair_opportunity_v1",
+    "qf_recommend_bad_lead_recovery_v1",
+    "qf_reconcile_automation_attempt_transport_v1",
+    "qf_record_automation_execution_transport_v1",
+    "qf_record_vendor_client_response_v1",
+    "qf_recover_automation_job_transport_v1",
+    "qf_recover_automation_job_v1",
+    "qf_recover_stale_dispatching_consent_ack_intents",
+    "qf_release_vendor_package_razorpay_order_claim_v2",
+    "qf_reserve_consent_ack_provider_attempt",
+    "qf_resolve_service_zone_v1",
+    "qf_scale_queue_health_v1",
+    "qf_scale_worker_heartbeat_v1",
+    "qf_schedule_domain_event_retry",
+    "qf_select_stale_automation_attempt_v1",
+    "qf_snapshot_vendor_fair_opportunity_v1",
+    "qf_terminalize_consent_ack_intent",
+    "update_vendor_visibility",
+    "vendor_auth_claim_reset_grant",
+    "vendor_auth_consume_reset_challenge_and_issue_grant",
+    "vendor_auth_consume_whatsapp_challenge",
+    "vendor_auth_issue_challenge",
+    "vendor_auth_register_failed_attempt"
+  ],
+  "tableNames": [
+    "aarohi_acquisition_city_policies",
+    "aarohi_acquisition_cost_entries",
+    "aarohi_broadcast_batches",
+    "aarohi_campaign_members",
+    "aarohi_campaigns",
+    "aarohi_channel_capacity_snapshots",
+    "aarohi_channel_eligibility",
+    "aarohi_channel_identities",
+    "aarohi_communication_permissions",
+    "aarohi_conversations",
+    "aarohi_discovery_candidates",
+    "aarohi_discovery_connectors",
+    "aarohi_discovery_runs",
+    "aarohi_events",
+    "aarohi_followup_policies",
+    "aarohi_handoffs",
+    "aarohi_identity_matches",
+    "aarohi_interactions",
+    "aarohi_memory_snapshots",
+    "aarohi_opportunities",
+    "aarohi_outreach_jobs",
+    "aarohi_prospect_sources",
+    "aarohi_prospects",
+    "aarohi_registration_intents",
+    "aarohi_runtime_controls",
+    "aarohi_scores",
+    "aarohi_social_reply_signals",
+    "aarohi_tasks",
+    "aarohi_vendor_conversion_links",
+    "aarohi_whatsapp_intakes",
+    "agni_action_proposals",
+    "aos_agent_logs",
+    "aos_agent_memory",
+    "aos_audit_logs",
+    "aos_recommendations",
+    "aos_runs",
+    "aos_runtime_settings",
+    "app_settings",
+    "audit_logs",
+    "auth_security_events",
+    "automation_action_requests",
+    "automation_execution_attempts",
+    "automation_jobs",
+    "automation_policy_active_configs",
+    "automation_policy_configs",
+    "automation_transport_requests",
+    "bad_lead_report_comments",
+    "bad_lead_reports",
+    "cities",
+    "client_accounts",
+    "client_notification_logs",
+    "client_requirement_groups",
+    "communication_automation_catalog",
+    "communication_consent_ack_intents",
+    "communication_consent_command_receipts",
+    "communication_conversation_events",
+    "communication_conversation_outbox",
+    "communication_conversations",
+    "communication_delivery_events",
+    "communication_frequency_policies",
+    "communication_inbound_messages",
+    "communication_intents",
+    "communication_jarvis_callback_receipts",
+    "communication_jarvis_turn_outbox",
+    "communication_messages",
+    "communication_preferences",
+    "communication_provider_accounts",
+    "communication_provider_canary_destinations",
+    "communication_provider_runtime_policies",
+    "communication_provider_template_mappings",
+    "communication_suppressions",
+    "communication_templates",
+    "communication_webhook_receipts",
+    "domain_events",
+    "free_vendor_profile_interests",
+    "idempotency_records",
+    "jarvis_os_operator_command_receipts",
+    "jarvis_service_availability_pairs",
+    "jarvis_service_availability_taxonomy",
+    "lead_assignment_approvals",
+    "lead_assignment_queue",
+    "lead_assignments",
+    "lead_auto_assignment_logs",
+    "lead_clarification_requests",
+    "lead_clarification_responses",
+    "lead_connection_assurance",
+    "lead_delivery_logs",
+    "lead_matching_runs",
+    "lead_scores",
+    "leads",
+    "marketplace_runtime_settings",
+    "marketplace_service_zones",
+    "outbox_events",
+    "package_city_scopes",
+    "package_service_category_scopes",
+    "packages",
+    "payments",
+    "profiles",
+    "service_categories",
+    "vendor_campaigns",
+    "vendor_credit_logs",
+    "vendor_crm_profiles",
+    "vendor_dashboard_users",
+    "vendor_notifications",
+    "vendor_package_orders",
+    "vendor_packages",
+    "vendor_profile_change_requests",
+    "vendor_reviews",
+    "vendor_segments",
+    "vendor_support_messages",
+    "vendor_support_threads",
+    "vendors",
+    "workflow_failures",
+    "workflow_instances",
+    "workflow_tasks",
+    "workflow_transition_history"
+  ],
+  "storageBuckets": [],
+  "files": [
+    {
+      "file": "app/actions.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "leads",
+        "profiles",
+        "vendor_reviews",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "app/admin/aarohi/actions.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aarohi_events"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vendor/media/route.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "app/vendor/set-password/page.tsx",
+      "directImports": [],
+      "rpc": [],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "lib/aos/policy/runtime/policyConfigStoreAdapter.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "automation_policy_active_configs",
+        "automation_policy_configs"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/aos/runtime/assignmentLedgerService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "lead_assignment_approvals",
+        "vendor_credit_logs"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/aos/runtime/leadAssignmentApprovalService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "lead_assignment_approvals",
+        "lead_assignments",
+        "leads",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/aos/v2/runtime.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aos_runtime_settings"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/aos/workflow/domainEventService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_acquire_domain_event",
+        "qf_dead_letter_domain_event",
+        "qf_schedule_domain_event_retry"
+      ],
+      "tables": [
+        "domain_events"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/aos/workflow/failureService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "workflow_failures"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/aos/workflow/idempotencyService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_begin_idempotent_operation"
+      ],
+      "tables": [
+        "idempotency_records"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/aos/workflow/outboxService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_claim_due_outbox_event"
+      ],
+      "tables": [
+        "outbox_events"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/aos/workflow/workflowRepository.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "workflow_instances"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/aos/workflow/workflowTaskService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_claim_due_workflow_task"
+      ],
+      "tables": [
+        "workflow_tasks"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/aos/workflow/workflowTransitionService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_apply_workflow_step"
+      ],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/aos/workflows/leadLifecycle/adapters/leadMatchingRecommendationAdapter.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "leads"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/aos/workflows/leadLifecycle/adapters/leadQualityServiceAdapter.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "lead_scores",
+        "leads"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionAdapters.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "leads",
+        "workflow_transition_history"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/aos/workflows/leadLifecycle/distribution/leadDistributionAssignmentAdapter.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "lead_assignments"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/aos/workflows/leadLifecycle/events/leadLifecycleEventPublisher.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "domain_events"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/categories/categoryService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "service_categories"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/crm/crmAuth.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "profiles"
+      ],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "lib/identity/sessionInvalidation.ts",
+      "directImports": [
+        "@supabase/supabase-js"
+      ],
+      "rpc": [],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "lib/jarvis/scaleRequestGuard.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "lib/lead-assignment/autoAssignmentEngine.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "lead_auto_assignment_logs",
+        "leads",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/lead-assignment/freeVendorInterestService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "free_vendor_profile_interests",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/lead-assignment/leadQueueService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "lead_assignment_queue"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/lead-assignment/runtimeSettings.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "marketplace_runtime_settings"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/locations/cityService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "cities",
+        "marketplace_service_zones"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/supabase.ts",
+      "directImports": [
+        "@supabase/ssr",
+        "@supabase/supabase-js"
+      ],
+      "rpc": [],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/supabaseBrowser.ts",
+      "directImports": [
+        "@supabase/ssr"
+      ],
+      "rpc": [],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/aarohiCrmService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_aarohi_complete_handoff_v1",
+        "qf_aarohi_confirm_identity_match_v1",
+        "qf_aarohi_set_human_takeover_v1",
+        "qf_aarohi_suppress_prospect_v1"
+      ],
+      "tables": [
+        "aarohi_campaign_members",
+        "aarohi_campaigns",
+        "aarohi_channel_identities",
+        "aarohi_conversations",
+        "aarohi_events",
+        "aarohi_handoffs",
+        "aarohi_identity_matches",
+        "aarohi_interactions",
+        "aarohi_opportunities",
+        "aarohi_prospect_sources",
+        "aarohi_prospects",
+        "aarohi_scores",
+        "aarohi_tasks",
+        "aarohi_vendor_conversion_links",
+        "cities",
+        "packages",
+        "payments",
+        "vendor_package_orders",
+        "vendor_packages",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/aarohiOmnichannelService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aarohi_channel_identities",
+        "aarohi_events",
+        "aarohi_interactions",
+        "aarohi_prospects"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/aarohiOutboundConsentEnforcer.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aarohi_communication_permissions",
+        "aarohi_prospects"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/aarohiPhase2AcquisitionService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_aarohi_authorize_outreach_v1",
+        "qf_aarohi_claim_discovery_run_v1",
+        "qf_aarohi_claim_social_outreach_v1",
+        "qf_aarohi_claim_whatsapp_outreach_v1",
+        "qf_aarohi_complete_social_outreach_v1",
+        "qf_aarohi_complete_whatsapp_outreach_v1"
+      ],
+      "tables": [
+        "aarohi_acquisition_city_policies",
+        "aarohi_broadcast_batches",
+        "aarohi_campaign_members",
+        "aarohi_channel_capacity_snapshots",
+        "aarohi_channel_eligibility",
+        "aarohi_channel_identities",
+        "aarohi_communication_permissions",
+        "aarohi_discovery_candidates",
+        "aarohi_discovery_connectors",
+        "aarohi_discovery_runs",
+        "aarohi_events",
+        "aarohi_followup_policies",
+        "aarohi_memory_snapshots",
+        "aarohi_outreach_jobs",
+        "aarohi_prospect_sources",
+        "aarohi_prospects",
+        "aarohi_social_reply_signals",
+        "cities",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/aarohiPhase2OpsService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aarohi_acquisition_cost_entries",
+        "aarohi_events",
+        "aarohi_handoffs",
+        "aarohi_outreach_jobs",
+        "aarohi_prospect_sources",
+        "aarohi_prospects",
+        "aarohi_runtime_controls",
+        "aarohi_social_reply_signals",
+        "cities"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/aarohiRegistrationIntentService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_aarohi_link_vendor_conversion_v1"
+      ],
+      "tables": [
+        "aarohi_prospects",
+        "aarohi_registration_intents"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/aarohiWhatsAppExecutionService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aarohi_prospects",
+        "communication_messages"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/aarohiWhatsAppIntakeService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_aarohi_complete_whatsapp_intake_v1"
+      ],
+      "tables": [
+        "aarohi_channel_identities",
+        "aarohi_events",
+        "aarohi_prospects",
+        "aarohi_whatsapp_intakes",
+        "cities",
+        "vendor_dashboard_users",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/adminAuditService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "bad_lead_report_comments",
+        "bad_lead_reports",
+        "client_notification_logs",
+        "lead_assignments",
+        "lead_delivery_logs",
+        "lead_matching_runs",
+        "leads",
+        "vendor_package_orders"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/adminDirectoryService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "bad_lead_report_comments",
+        "bad_lead_reports",
+        "cities",
+        "client_notification_logs",
+        "lead_assignments",
+        "lead_clarification_requests",
+        "lead_delivery_logs",
+        "leads",
+        "marketplace_runtime_settings",
+        "packages",
+        "payments",
+        "service_categories",
+        "vendor_profile_change_requests",
+        "vendor_support_messages",
+        "vendor_support_threads",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/adminLaunchControlService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_provider_runtime_policies",
+        "marketplace_runtime_settings"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/adminSectionService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_admin_service_zone_summaries_v1"
+      ],
+      "tables": [
+        "app_settings",
+        "audit_logs",
+        "cities",
+        "client_notification_logs",
+        "free_vendor_profile_interests",
+        "lead_assignment_queue",
+        "lead_assignments",
+        "lead_auto_assignment_logs",
+        "lead_delivery_logs",
+        "lead_matching_runs",
+        "leads",
+        "marketplace_runtime_settings",
+        "package_city_scopes",
+        "package_service_category_scopes",
+        "packages",
+        "payments",
+        "profiles",
+        "service_categories",
+        "vendor_package_orders",
+        "vendor_packages",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/adminService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_admin_clear_city_boundary_v1",
+        "qf_admin_create_city_market_v1",
+        "qf_admin_set_city_active_v1",
+        "qf_admin_set_city_boundary_v1",
+        "qf_admin_set_city_matching_v1",
+        "qf_admin_set_city_strict_location_v1",
+        "qf_admin_update_city_market_v1",
+        "qf_admin_upsert_package_v1",
+        "update_vendor_visibility"
+      ],
+      "tables": [
+        "app_settings",
+        "audit_logs",
+        "bad_lead_report_comments",
+        "bad_lead_reports",
+        "cities",
+        "client_notification_logs",
+        "free_vendor_profile_interests",
+        "lead_assignment_queue",
+        "lead_assignments",
+        "lead_auto_assignment_logs",
+        "lead_clarification_requests",
+        "lead_delivery_logs",
+        "lead_matching_runs",
+        "leads",
+        "marketplace_runtime_settings",
+        "packages",
+        "payments",
+        "profiles",
+        "service_categories",
+        "vendor_notifications",
+        "vendor_package_orders",
+        "vendor_packages",
+        "vendor_profile_change_requests",
+        "vendor_support_messages",
+        "vendor_support_threads",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/adminVendorLocationService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/adminWhatsAppService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "automation_jobs",
+        "communication_delivery_events",
+        "communication_inbound_messages",
+        "communication_messages",
+        "communication_preferences",
+        "communication_provider_accounts",
+        "communication_provider_canary_destinations",
+        "communication_provider_runtime_policies",
+        "communication_provider_template_mappings",
+        "communication_suppressions",
+        "communication_templates",
+        "communication_webhook_receipts"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/agniGovernanceService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "agni_action_proposals"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/aosService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aos_agent_logs"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/aosV2AdminService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aos_recommendations",
+        "aos_runs"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/aosV2IntelligenceService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aos_agent_memory",
+        "aos_audit_logs",
+        "aos_recommendations",
+        "aos_runs"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/aosV2ProposalService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aos_audit_logs",
+        "aos_recommendations"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/authSecurityEventService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "auth_security_events"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/automationCampaignExecutionService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_messages"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/automationClientExecutionService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "automation_action_requests",
+        "communication_messages",
+        "lead_assignments",
+        "lead_clarification_requests",
+        "lead_clarification_responses",
+        "lead_connection_assurance",
+        "leads",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/automationPersistenceService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_claim_automation_job_v1",
+        "qf_complete_automation_attempt_v1",
+        "qf_create_automation_action_request_v1",
+        "qf_create_automation_job_v1",
+        "qf_decide_automation_action_request_v1"
+      ],
+      "tables": [
+        "automation_action_requests",
+        "automation_execution_attempts",
+        "automation_jobs"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/automationRecoveryService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_reconcile_automation_attempt_transport_v1",
+        "qf_recover_automation_job_transport_v1",
+        "qf_select_stale_automation_attempt_v1"
+      ],
+      "tables": [
+        "communication_messages"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/automationStudioService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "automation_action_requests",
+        "automation_jobs",
+        "marketplace_runtime_settings"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/automationTransportService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_claim_automation_job_transport_for_family_v1",
+        "qf_claim_automation_job_transport_v1",
+        "qf_complete_automation_attempt_transport_v1",
+        "qf_record_automation_execution_transport_v1"
+      ],
+      "tables": [
+        "automation_transport_requests",
+        "communication_messages"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/automationVendorExecutionService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "automation_policy_active_configs",
+        "communication_messages",
+        "lead_assignments",
+        "vendor_crm_profiles",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/badLeadRecoveryService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_apply_bad_lead_recovery_v1",
+        "qf_finalize_replacement_request_v1",
+        "qf_recommend_bad_lead_recovery_v1"
+      ],
+      "tables": [
+        "bad_lead_reports",
+        "leads"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/campaignCommunicationResultService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_intents",
+        "communication_messages"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/campaignHandoffService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_handoff_vendor_campaign_intents_v1"
+      ],
+      "tables": [
+        "communication_frequency_policies",
+        "communication_intents",
+        "vendor_campaigns"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/categoryAdminService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "service_categories"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/categoryRuntimeService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "service_categories"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/clientAccessService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "services/clientOtpAuthService.ts",
+      "directImports": [
+        "@supabase/supabase-js"
+      ],
+      "rpc": [],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "services/clientRequirementGroupService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "client_requirement_groups",
+        "lead_assignments",
+        "leads",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/communicationAdminService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_automation_catalog",
+        "communication_messages",
+        "communication_templates",
+        "communication_webhook_receipts"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/communicationConsentDecisionService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_preferences",
+        "communication_suppressions"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/communicationConsentWriterService.ts",
+      "directImports": [],
+      "rpc": [
+        "apply_communication_consent_command"
+      ],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/communicationFrequencyPolicyService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_frequency_policies"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/communicationMarketingConsentWriterService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_apply_marketing_consent_v1"
+      ],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/communicationProviderHealthService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_provider_accounts"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/communicationProviderRuntimeService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_provider_accounts",
+        "communication_provider_canary_destinations",
+        "communication_provider_runtime_policies"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/communicationRecipientResolver.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aarohi_prospects",
+        "client_accounts",
+        "leads",
+        "profiles",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/communicationService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_delivery_events",
+        "communication_messages",
+        "communication_templates",
+        "communication_webhook_receipts"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/consentAckWorkerService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_claim_consent_ack_intents",
+        "qf_expire_consent_ack_intents",
+        "qf_recover_stale_dispatching_consent_ack_intents",
+        "qf_reserve_consent_ack_provider_attempt",
+        "qf_terminalize_consent_ack_intent"
+      ],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/consentCommandResponseService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_consent_ack_intents",
+        "communication_consent_command_receipts"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/conversationalWhatsAppService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_claim_conversation_outbox_v1"
+      ],
+      "tables": [
+        "aarohi_memory_snapshots",
+        "aarohi_prospects",
+        "client_accounts",
+        "communication_conversation_events",
+        "communication_conversation_outbox",
+        "communication_conversations",
+        "communication_inbound_messages",
+        "communication_jarvis_callback_receipts",
+        "communication_jarvis_turn_outbox",
+        "communication_provider_accounts",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/delayedLeadFillService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "lead_assignment_queue",
+        "lead_assignments",
+        "leads",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/inboundIdentityResolutionService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "client_accounts",
+        "vendor_dashboard_users",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/inboundWhatsAppMessageService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_inbound_messages",
+        "communication_webhook_receipts"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/jarvisAarohiProjectionService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aarohi_channel_identities",
+        "aarohi_conversations",
+        "aarohi_events",
+        "aarohi_identity_matches",
+        "aarohi_prospect_sources",
+        "aarohi_prospects",
+        "aarohi_scores",
+        "aarohi_tasks",
+        "cities"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/jarvisAarohiRuntimeContextService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aarohi_prospects",
+        "aarohi_vendor_conversion_links",
+        "communication_conversations",
+        "communication_inbound_messages",
+        "communication_provider_accounts",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/jarvisContextService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "bad_lead_reports",
+        "lead_assignments",
+        "leads",
+        "vendor_notifications",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/jarvisOperatorCommandService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "automation_action_requests",
+        "communication_conversation_events",
+        "communication_conversations",
+        "jarvis_os_operator_command_receipts"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/jarvisOperatorSnapshotService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "agni_action_proposals",
+        "automation_action_requests",
+        "communication_conversations"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/jarvisRecommendationService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aos_recommendations",
+        "aos_runs"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/jarvisServiceAvailabilityService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "cities",
+        "jarvis_service_availability_pairs",
+        "jarvis_service_availability_taxonomy",
+        "service_categories"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/jarvisWhatsAppGatewayService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_claim_jarvis_turn_outbox_v1"
+      ],
+      "tables": [
+        "communication_conversation_events",
+        "communication_conversations",
+        "communication_inbound_messages",
+        "communication_jarvis_turn_outbox"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/leadAssignmentDispatchService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "automation_policy_active_configs",
+        "communication_intents",
+        "lead_assignments",
+        "leads"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/leadAssignmentLifecycleService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_acknowledge_vendor_lead_v1",
+        "qf_project_vendor_lead_delivery_v1"
+      ],
+      "tables": [
+        "communication_messages"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/leadAssignmentResultService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_intents",
+        "communication_messages"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/leadClarificationService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "lead_clarification_requests",
+        "lead_clarification_responses",
+        "leads"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/leadDeliveryService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "client_notification_logs",
+        "lead_delivery_logs",
+        "leads",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/leadEnrichmentInboundService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_conversation_outbox",
+        "communication_conversations",
+        "communication_inbound_messages",
+        "communication_jarvis_turn_outbox",
+        "lead_clarification_requests",
+        "lead_clarification_responses",
+        "leads"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/leadEnrichmentMaintenanceService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_messages",
+        "lead_clarification_requests",
+        "leads"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/leadMatchingEngine.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "lead_matching_runs",
+        "leads",
+        "marketplace_service_zones"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/leadProcessingDiagnosticsService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "client_notification_logs",
+        "lead_assignments",
+        "lead_delivery_logs",
+        "lead_matching_runs",
+        "lead_scores",
+        "leads"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/leadProcessingRecoveryService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "lead_assignments",
+        "lead_scores",
+        "leads"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/leadQualificationService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "leads"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/leadQualityRecoveryService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "lead_scores",
+        "leads"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/leadQualityService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "cities",
+        "lead_scores",
+        "leads"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/leadService.ts",
+      "directImports": [],
+      "rpc": [
+        "check_duplicate_lead",
+        "get_public_eligible_vendors"
+      ],
+      "tables": [
+        "leads"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/locationVerificationService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_resolve_service_zone_v1"
+      ],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/manualLeadAssignmentService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "lead_assignments",
+        "lead_matching_runs",
+        "leads",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/metaWhatsAppWebhookService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_webhook_receipts"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/nativeAutomationAuthorityService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_cancel_orphan_automation_job_v1",
+        "qf_cancel_stale_automation_job_v1",
+        "qf_claim_automation_job_for_family_v1",
+        "qf_recover_automation_job_v1",
+        "qf_select_stale_automation_attempt_v1"
+      ],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/nativeAutomationRuntimeService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "marketplace_runtime_settings"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/packageService.ts",
+      "directImports": [],
+      "rpc": [
+        "assign_package_to_vendor"
+      ],
+      "tables": [
+        "packages",
+        "payments"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/preferredVendorLeadService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "lead_assignments",
+        "leads",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/providerTemplateMappingService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_provider_template_mappings"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/publicVendorService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/scaleWorkerRuntimeService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_claim_scale_scheduler_occurrence_v1",
+        "qf_complete_scale_scheduler_occurrence_v1",
+        "qf_scale_queue_health_v1",
+        "qf_scale_worker_heartbeat_v1"
+      ],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorAccessService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "profiles",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorAdminService.ts",
+      "directImports": [],
+      "rpc": [
+        "update_vendor_visibility"
+      ],
+      "tables": [
+        "audit_logs",
+        "vendor_credit_logs",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorAuthChallengeService.ts",
+      "directImports": [],
+      "rpc": [
+        "vendor_auth_claim_reset_grant",
+        "vendor_auth_consume_reset_challenge_and_issue_grant",
+        "vendor_auth_consume_whatsapp_challenge",
+        "vendor_auth_issue_challenge",
+        "vendor_auth_register_failed_attempt"
+      ],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorAuthService.ts",
+      "directImports": [
+        "@supabase/supabase-js"
+      ],
+      "rpc": [],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorCampaignService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_approve_vendor_campaign_v1",
+        "qf_prepare_vendor_campaign_v1"
+      ],
+      "tables": [
+        "communication_preferences",
+        "communication_suppressions",
+        "communication_templates",
+        "vendor_segments",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorCreditWalletService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_apply_vendor_credit_delta"
+      ],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorCrmProfileReadService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "profiles"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorCrmService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorFairOpportunityService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_read_vendor_fair_opportunity_v1",
+        "qf_snapshot_vendor_fair_opportunity_v1"
+      ],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorIntelligenceService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "lead_assignments",
+        "vendor_notifications",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorLoginActivationService.ts",
+      "directImports": [
+        "@supabase/supabase-js"
+      ],
+      "rpc": [],
+      "tables": [
+        "profiles",
+        "vendor_dashboard_users",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorMatchingPrefilterService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorNotificationService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "vendor_notifications"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorPackageOrderService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "cities",
+        "package_city_scopes",
+        "package_service_category_scopes",
+        "packages",
+        "service_categories",
+        "vendor_package_orders",
+        "vendor_packages",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorPackagePaymentService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_activate_vendor_package_order_v2",
+        "qf_bind_vendor_package_razorpay_order_v2",
+        "qf_claim_vendor_package_razorpay_order_v2",
+        "qf_mark_vendor_package_payment_failed_v2",
+        "qf_release_vendor_package_razorpay_order_claim_v2"
+      ],
+      "tables": [
+        "packages",
+        "vendor_package_orders"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorPasswordResetService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorProfileChangeService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "vendor_profile_change_requests",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorReviewService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "audit_logs",
+        "lead_assignments",
+        "leads",
+        "vendor_reviews",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorSegmentService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorService.ts",
+      "directImports": [],
+      "rpc": [
+        "get_setting_int",
+        "qf_record_vendor_client_response_v1",
+        "update_vendor_visibility"
+      ],
+      "tables": [
+        "bad_lead_reports",
+        "lead_assignments",
+        "lead_connection_assurance",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorSupportService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "vendor_support_messages",
+        "vendor_support_threads"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorVerificationSummaryService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_automation_catalog",
+        "vendor_dashboard_users",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/whatsAppHumanDeskService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_conversation_outbox",
+        "communication_conversations",
+        "communication_inbound_messages"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    }
+  ]
+}

@@ -25,3 +25,6 @@ pnpm-debug.log*
 *.tfplan
 crash.log
 crash.*.log
+
+# Phase 21 production export artifacts contain private database data.
+phase21-private-export/

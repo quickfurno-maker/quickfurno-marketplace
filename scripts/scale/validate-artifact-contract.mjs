@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 
 const read = (path) =>
@@ -41,7 +41,7 @@ add(
       "github.event_name == 'push' && github.ref == 'refs/heads/main'",
     ) &&
     workflow.includes(
-      "github.event_name == 'workflow_dispatch' && inputs.publish == true",
+      "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish == true",
     ),
 );
 add(

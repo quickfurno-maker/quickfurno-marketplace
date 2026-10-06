@@ -3,10 +3,10 @@ name: Phase 20 Final Scale Launch Certification
 on:
   pull_request:
     paths:
-      - 'contracts/qfj-phase20-final-launch-v1.json'
+      - 'contracts/qfj-phase20-launch-cert-v1.json'
       - 'docs/scale/phase-20-final-launch-certification.md'
-      - 'docs/scale/phase-21-supabase-exit-inventory-design.md'
-      - 'docs/scale/phase-22-identity-provider-portability-decision.md'
+      - 'docs/scale/phase21-supabase-exit-inventory.md'
+      - 'docs/decisions/ADR-0200-identity-auth-provider-portability.md'
       - 'worker/conversationTransportWorker.ts'
       - 'services/nativeAutomationRuntimeService.ts'
       - 'supabase/migrations/20260911000000_qf_launch_security_closeout.sql'
@@ -17,10 +17,10 @@ on:
   push:
     branches: [main]
     paths:
-      - 'contracts/qfj-phase20-final-launch-v1.json'
+      - 'contracts/qfj-phase20-launch-cert-v1.json'
       - 'docs/scale/phase-20-final-launch-certification.md'
-      - 'docs/scale/phase-21-supabase-exit-inventory-design.md'
-      - 'docs/scale/phase-22-identity-provider-portability-decision.md'
+      - 'docs/scale/phase21-supabase-exit-inventory.md'
+      - 'docs/decisions/ADR-0200-identity-auth-provider-portability.md'
       - 'worker/conversationTransportWorker.ts'
       - 'services/nativeAutomationRuntimeService.ts'
       - 'supabase/migrations/20260911000000_qf_launch_security_closeout.sql'

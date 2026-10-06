@@ -2,7 +2,7 @@
 import { readFile } from "node:fs/promises";
 const root = new URL("../../", import.meta.url);
 const read = (p) => readFile(new URL(p, root), "utf8");
-const [contractText, docs, phase00, p8scale, p8conc, p11, p12, p16, soak] = await Promise.all([
+const [contractText, docs, phase00, p8scale, p8conc, p11, p12, p16, soak, matchingSloMigration] = await Promise.all([
   read("contracts/qfj-phase18-load-chaos-v1.json"),
   read("docs/operations/phase18-load-soak-chaos.md"),
   read("docs/scale/phase-00-baseline-2026-10-04.md"),
@@ -11,7 +11,8 @@ const [contractText, docs, phase00, p8scale, p8conc, p11, p12, p16, soak] = awai
   read("scripts/scale/certify-phase11-resilience.mjs"),
   read("scripts/scale/certify-phase12-horizontal-messages-postgres.mjs"),
   read("scripts/scale/certify-phase16-host-loss.mjs"),
-  read("scripts/scale/certify-phase18-soak.mjs")
+  read("scripts/scale/certify-phase18-soak.mjs"),
+  read("supabase/migrations/20261006113000_scale_phase18_matching_slo.sql")
 ]);
 const c = JSON.parse(contractText);
 const checks=[]; const add=(n,v)=>checks.push([n,Boolean(v)]);
@@ -25,6 +26,8 @@ add("failure matrix is complete", Object.values(c.failureInjection).every(Boolea
 add("audit scenarios are complete", c.auditScenarios.idleWorkersAtLeast>=10 && Object.entries(c.auditScenarios).filter(([k])=>k!=="idleWorkersAtLeast").every(([,v])=>v===true));
 add("soak minimum and memory bound are locked", c.soak.minimumAutomatedSeconds>=60 && c.soak.heapGrowthBytesMax<=67108864 && c.soak.queueMustDrain);
 add("real 100k/1M PostGIS certifier retained", p8scale.includes("100_000") && p8scale.includes("1_000_000") && p8scale.toLowerCase().includes("postgis"));
+add("Phase00 matching SLO is a hard D1/D2 gate", p8scale.includes("certify(100_001, 750)") && p8scale.includes("certify(1_000_001, 1_500)"));
+add("Phase18 matching hot path optimization is applied", p8scale.includes("PHASE18_MIGRATION") && matchingSloMigration.includes("asin(") && matchingSloMigration.includes("* 1000.0 + 0.5"));
 add("canonical concurrency certifier retained", p8conc.includes("sameLeadConcurrentOperations") && p8conc.includes("totalCreditDebits"));
 add("Jarvis resilience certifier retained", p11.toLowerCase().includes("timeout") || p11.toLowerCase().includes("circuit"));
 add("horizontal durable message certifier retained", p12.toLowerCase().includes("postgres"));

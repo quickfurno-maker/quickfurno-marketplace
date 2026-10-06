@@ -14,6 +14,10 @@ const MIGRATION = new URL(
   "../../supabase/migrations/20261004190001_scale_phase08_matching_prefilter.sql",
   import.meta.url,
 );
+const PHASE18_MIGRATION = new URL(
+  "../../supabase/migrations/20261006113000_scale_phase18_matching_slo.sql",
+  import.meta.url,
+);
 
 const LEAD_ID = "11111111-1111-4111-8111-111111111111";
 const ZONE_ID = "22222222-2222-4222-8222-222222222222";
@@ -156,6 +160,8 @@ async function setup() {
 
   const migration = await readFile(MIGRATION, "utf8");
   await pool.query(migration);
+  const phase18Migration = await readFile(PHASE18_MIGRATION, "utf8");
+  await pool.query(phase18Migration);
 
   await pool.query(
     `insert into public.marketplace_service_zones(id,is_active,matching_enabled,requires_resolved_location)
@@ -320,11 +326,11 @@ try {
   await setup();
   await seedRange(1, 100_000);
   await ensureHighIdWinner();
-  const at100k = await certify(100_001, 1_500);
+  const at100k = await certify(100_001, 750);
 
   await seedRange(100_001, 1_000_000);
   await ensureHighIdWinner();
-  const at1m = await certify(1_000_001, 3_500);
+  const at1m = await certify(1_000_001, 1_500);
 
   console.log("QuickFurno Phase 08 matching scale certification PASS");
   console.log(JSON.stringify({ at100k, at1m }, null, 2));

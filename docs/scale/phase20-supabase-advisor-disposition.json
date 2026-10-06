@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "projectRef": "yqpgcsduqbxulrlzwzap",
+  "projectName": "QuickFurno",
+  "observedAt": "2026-10-06T08:57:09Z",
+  "security": [
+    {
+      "lint": "security_definer_view",
+      "level": "ERROR",
+      "count": 1,
+      "objects": ["public.vendor_public_v"],
+      "disposition": "ACCEPTED_BY_DESIGN",
+      "launchBlocking": false,
+      "rationale": "Owner-rights is deliberate so anon can read only the structural public projection while holding zero base-table SELECT. The view has a fixed 21-column allowlist, an internal Approved+active+public_visibility+credit row predicate, and all write privileges are revoked and asserted by migration."
+    },
+    {
+      "lint": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "count": 2,
+      "objects": ["public.is_admin()", "public.owns_vendor(uuid)"],
+      "disposition": "ACCEPTED_REQUIRED_RLS_HELPERS",
+      "launchBlocking": false,
+      "rationale": "These helpers are referenced by authenticated RLS policies. PUBLIC and anon EXECUTE are revoked; authenticated/service_role EXECUTE is intentional. Each returns only a current-user authorization boolean and does not expose row data or mutate business state."
+    },
+    {
+      "lint": "auth_leaked_password_protection",
+      "level": "WARN",
+      "count": 1,
+      "objects": ["Supabase Auth"],
+      "disposition": "ACCEPTED_WITH_SECURITY_FOLLOWUP",
+      "launchBlocking": false,
+      "rationale": "The project is on Pro and the control should be enabled before broad password-auth growth. It does not affect scale architecture or authority correctness. Phase 26 owns the production Auth hardening bundle so password-strength, leaked-password, reauthentication and MFA controls are changed and regression-tested together rather than piecemeal."
+    },
+    {
+      "lint": "rls_enabled_no_policy",
+      "level": "INFO",
+      "count": 99,
+      "disposition": "ACCEPTED_SERVER_ONLY_DENY_BY_DEFAULT",
+      "launchBlocking": false,
+      "rationale": "These tables are RLS-on with no browser policy, which denies anon/authenticated Data API access while service-role/server authorities remain explicit."
+    }
+  ],
+  "performance": [
+    {
+      "lint": "unindexed_foreign_keys",
+      "level": "INFO",
+      "count": 73,
+      "disposition": "TRACK_MEASURED",
+      "rationale": "Do not add indexes blindly. Phase 8 already certified bounded matching plans; add FK indexes when representative query/delete/update plans justify them."
+    },
+    {
+      "lint": "unused_index",
+      "level": "INFO",
+      "count": 187,
+      "disposition": "KEEP_UNTIL_REPRESENTATIVE_TRAFFIC",
+      "rationale": "Current usage statistics are not sufficient evidence to remove future-path or low-frequency safety indexes."
+    },
+    {
+      "lint": "multiple_permissive_policies",
+      "level": "WARN",
+      "count": 34,
+      "disposition": "ACCEPTED_FOR_LAUNCH_OPTIMIZE_LATER",
+      "rationale": "Policies are functionally correct; this is a performance lint. Phase 20 preserves authorization semantics and records it for measured RLS optimization."
+    },
+    {
+      "lint": "auth_db_connections_absolute",
+      "level": "INFO",
+      "count": 1,
+      "disposition": "TRACK_WITH_COMPUTE_SCALING",
+      "rationale": "Current Auth max 10 connection allocation is adequate at present; switch to percentage allocation when compute is resized."
+    }
+  ],
+  "jarvisProject": {
+    "projectRef": "coilipywdvxklewquqvv",
+    "security": [{"lint":"rls_enabled_no_policy","level":"INFO","count":2,"disposition":"ACCEPTED_NON_EXPOSED_SCHEMA"}],
+    "performance": [
+      {"lint":"unused_index","level":"INFO","count":4,"disposition":"KEEP_UNTIL_TRAFFIC"},
+      {"lint":"auth_db_connections_absolute","level":"INFO","count":1,"disposition":"TRACK_WITH_COMPUTE_SCALING"}
+    ]
+  }
+}

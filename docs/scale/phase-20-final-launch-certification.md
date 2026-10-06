@@ -53,7 +53,7 @@ Phase 20 revalidates the existing hardened container contract:
 
 The live advisor snapshot is recorded in `phase20-supabase-advisor-disposition.json`.
 
-No advisor ERROR/WARN is left unreviewed. The owner-rights `vendor_public_v` view remains an explicit accepted exception because the public projection is structurally allowlisted and base-table access stays revoked. `is_admin()` and `owns_vendor(uuid)` remain authenticated-only RLS helpers. Leaked-password protection is a documented Phase 26 production-security follow-up rather than a scale-architecture blocker.
+No advisor ERROR/WARN is left unreviewed. The owner-rights `vendor_public_v` view remains an explicit accepted exception because the public projection is structurally allowlisted and base-table access stays revoked. `is_admin()` and `owns_vendor(uuid)` remain authenticated-only RLS helpers. At Phase 20 closeout, the live security advisor no longer reports the leaked-password-protection warning; broader password-strength, reauthentication and MFA hardening remains governed by the later Auth-security phase.
 
 ## Expand / contract rehearsal
 

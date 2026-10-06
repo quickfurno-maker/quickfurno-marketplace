@@ -245,7 +245,7 @@
     "gen:scale:phase22:manifest": "node scripts/scale/generate-phase22-auth-callsite-manifest.mjs",
     "test:scale:phase22:manifest": "node scripts/scale/generate-phase22-auth-callsite-manifest.mjs --check",
     "test:scale:phase22:contract": "node scripts/scale/validate-phase22-identity-auth.mjs",
-    "test:scale:phase22:postgres": "node --experimental-transform-types scripts/scale/certify-phase22-identity-auth-postgres.mjs",
+    "test:scale:phase22:postgres": "node --experimental-transform-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/scale/certify-phase22-identity-auth-postgres.mjs",
     "test:scale:phase22": "npm run test:scale:phase22:manifest && npm run test:scale:phase22:contract && npm run test:scale:phase22:postgres"
   },
   "dependencies": {

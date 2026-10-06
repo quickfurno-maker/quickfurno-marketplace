@@ -54,4 +54,53 @@ export {
   containsForbiddenSecurityKey,
   sanitizeAuthSecurityMetadata,
 } from "./authSecurityEvent";
-export type { AuthSecurityEventTypeValue, AuthSecurityEvent } from "./authSecurityEvent";
+export type {
+  AuthSecurityEventTypeValue,
+  AuthSecurityEvent,
+} from "./authSecurityEvent";
+
+export {
+  IdentityProviderKind,
+  IdentityAssuranceLevel,
+  isProviderKey,
+  isProviderSubject,
+  isProviderAuthentication,
+  IDENTITY_PROVIDER_CUTOVER_POLICY,
+} from "./providerIdentity";
+export type {
+  IdentityProviderKindValue,
+  IdentityAssuranceLevelValue,
+  ProviderAuthentication,
+  AuthenticationProviderAdapter,
+} from "./providerIdentity";
+
+export {
+  InternalPrincipalKind,
+  InternalPrincipalStatus,
+  ProviderIdentityStatus,
+  BusinessBindingType,
+  StablePrincipalDenialReason,
+  resolveMappedPrincipal,
+} from "./identityDirectory";
+export type {
+  InternalPrincipalKindValue,
+  InternalPrincipalStatusValue,
+  ProviderIdentityStatusValue,
+  BusinessBindingTypeValue,
+  InternalPrincipalRecord,
+  ProviderIdentityRecord,
+  BusinessBindingRecord,
+  IdentityDirectoryRepository,
+  MappedPrincipalContext,
+  StablePrincipalDenialReasonValue,
+  StablePrincipalResolution,
+} from "./identityDirectory";
+
+export { StableBusinessAccessDenialReason } from "./providerNeutralAccess";
+export type {
+  StableVendorAccessContext,
+  StableClientAccessContext,
+  StableAdminAccessContext,
+  StableBusinessAccessDenialReasonValue,
+  StableBusinessAccessResolution,
+} from "./providerNeutralAccess";

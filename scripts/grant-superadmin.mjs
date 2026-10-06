@@ -43,15 +43,20 @@ if (missing.length) {
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { persistSession: false, autoRefreshToken: false } }
+  { auth: { persistSession: false, autoRefreshToken: false } },
 );
 
 async function findUserByEmail(target) {
   // listUsers is paginated; walk pages until we find the email.
   for (let page = 1; page <= 50; page++) {
-    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 200 });
+    const { data, error } = await supabase.auth.admin.listUsers({
+      page,
+      perPage: 200,
+    });
     if (error) throw error;
-    const found = data.users.find((u) => (u.email || "").toLowerCase() === target);
+    const found = data.users.find(
+      (u) => (u.email || "").toLowerCase() === target,
+    );
     if (found) return found;
     if (data.users.length < 200) break; // last page
   }
@@ -67,7 +72,7 @@ if (!user) {
       `\nNo Supabase Auth user found for "${email}".\n` +
         `Either create the user once in the Supabase dashboard (Authentication → Users),\n` +
         `or re-run this script with a one-time password via env:\n` +
-        `  $env:SEED_ADMIN_PASSWORD="your-strong-password"; node scripts/grant-superadmin.mjs ${email}\n`
+        `  $env:SEED_ADMIN_PASSWORD="your-strong-password"; node scripts/grant-superadmin.mjs ${email}\n`,
     );
     process.exit(1);
   }
@@ -105,24 +110,67 @@ if (!user) {
 //    profiles.admin_role column, so we don't write one (that column only exists
 //    if the optional superadmin migration has been applied).
 {
-  const { error } = await supabase
-    .from("profiles")
-    .upsert(
-      {
-        id: user.id,
-        role: "admin",
-        full_name: user.user_metadata?.full_name || "QuickFurno Admin",
-        is_active: true,
-      },
-      { onConflict: "id" }
-    );
+  const { error } = await supabase.from("profiles").upsert(
+    {
+      id: user.id,
+      role: "admin",
+      full_name: user.user_metadata?.full_name || "QuickFurno Admin",
+      is_active: true,
+    },
+    { onConflict: "id" },
+  );
   if (error) {
     console.error("Failed to upsert profile:", error.message);
     process.exit(1);
   }
 }
 
+// 3) Phase 22 durable authority: mirror the legacy server-set provider scope
+// into the stable internal principal. The auth app_metadata value above is kept
+// only for compatibility with pre-Phase-22 guards during the coexistence window.
+{
+  const { data: identity, error: identityError } = await supabase
+    .from("identity_provider_identities")
+    .select("principal_id")
+    .eq("provider_key", "supabase-primary")
+    .eq("provider_subject", user.id)
+    .eq("status", "active")
+    .maybeSingle();
+  if (identityError || !identity?.principal_id) {
+    console.error(
+      "Failed to resolve Phase 22 stable principal:",
+      identityError?.message || "missing mapping",
+    );
+    process.exit(1);
+  }
+  const { error: roleError } = await supabase
+    .from("identity_admin_roles")
+    .upsert(
+      {
+        principal_id: identity.principal_id,
+        admin_role: "Superadmin",
+        status: "active",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "principal_id" },
+    );
+  if (roleError) {
+    console.error(
+      "Failed to persist Core-owned Superadmin role:",
+      roleError.message,
+    );
+    process.exit(1);
+  }
+}
+
 console.log(`\n✓ ${email} is now a Superadmin.`);
-console.log(`  - auth app_metadata.admin_role = "Superadmin"`);
-console.log(`  - profiles.role = "admin"`);
-console.log(`Sign in at /admin/login with this email and its Supabase Auth password.`);
+console.log(`  - profiles.role = "admin" (Core authority)`);
+console.log(
+  `  - identity_admin_roles.admin_role = "Superadmin" (Core authority)`,
+);
+console.log(
+  `  - auth app_metadata.admin_role retained only for legacy coexistence`,
+);
+console.log(
+  `Sign in at /admin/login with this email and its current Auth-provider password.`,
+);

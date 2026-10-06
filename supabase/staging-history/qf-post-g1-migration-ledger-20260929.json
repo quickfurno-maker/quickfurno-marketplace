@@ -654,6 +654,18 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-10-06_BEFORE_DEPLOYMENT"
+    },
+    {
+      "version": "20261006113720",
+      "name": "phase22_identity_portability",
+      "filename": "20261006113720_phase22_identity_portability.sql",
+      "path": "supabase/migrations/20261006113720_phase22_identity_portability.sql",
+      "canonicalSha256": "6f53e1781e4d2bd277645ed17b2eb635be70f1d2c4df7525cd176dfb0c2f28ba",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-06"
     }
   ],
   "supersededLegacyPins": [

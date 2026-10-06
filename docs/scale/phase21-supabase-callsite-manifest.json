@@ -9,11 +9,11 @@
     "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
   },
   "totals": {
-    "files": 137,
+    "files": 138,
     "rpcNames": 85,
-    "tableNames": 116,
+    "tableNames": 120,
     "storageBuckets": 0,
-    "authFiles": 12,
+    "authFiles": 13,
     "realtimeFiles": 0
   },
   "rpcNames": [
@@ -180,6 +180,10 @@
     "domain_events",
     "free_vendor_profile_interests",
     "idempotency_records",
+    "identity_admin_roles",
+    "identity_business_bindings",
+    "identity_principals",
+    "identity_provider_identities",
     "jarvis_os_operator_command_receipts",
     "jarvis_service_availability_pairs",
     "jarvis_service_availability_taxonomy",
@@ -1366,6 +1370,24 @@
       ],
       "storageBuckets": [],
       "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/identityDirectoryService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "client_accounts",
+        "identity_admin_roles",
+        "identity_business_bindings",
+        "identity_principals",
+        "identity_provider_identities",
+        "profiles",
+        "vendor_dashboard_users",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": true,
       "realtime": false
     },
     {

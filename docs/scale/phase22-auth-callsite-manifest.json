@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "generator": "scripts/scale/generate-phase22-auth-callsite-manifest.mjs",
+  "classification": {
+    "getUser": "CURRENT_PROVIDER_ADAPTER_OR_LEGACY_COEXISTENCE",
+    "getSession": "SESSION_TRANSPORT_ONLY_NEVER_AUTHORIZATION",
+    "signInWithPassword": "CREDENTIAL_PROVIDER_ADAPTER",
+    "signInWithOtp": "CREDENTIAL_PROVIDER_ADAPTER",
+    "verifyOtp": "CREDENTIAL_PROVIDER_ADAPTER",
+    "signOut": "SESSION_INVALIDATION_PROVIDER_ADAPTER",
+    "updateUser": "CREDENTIAL_RECOVERY_PROVIDER_ADAPTER",
+    "resetPasswordForEmail": "CREDENTIAL_RECOVERY_PROVIDER_ADAPTER",
+    "admin": "SERVER_SIDE_PROVIDER_PROVISIONING_ONLY",
+    "appMetadata": "LEGACY_TRUSTED_PROVIDER_METADATA_MUST_NOT_BE_NEW_CORE_AUTHORITY",
+    "userMetadata": "NEVER_AUTHORIZATION"
+  },
+  "totals": {
+    "getUser": 11,
+    "getSession": 0,
+    "signInWithPassword": 2,
+    "signInWithOtp": 1,
+    "verifyOtp": 1,
+    "signOut": 3,
+    "updateUser": 1,
+    "resetPasswordForEmail": 0,
+    "admin": 11
+  },
+  "files": [
+    {
+      "file": "app/actions.ts",
+      "operations": {
+        "getUser": 1,
+        "admin": 5
+      },
+      "usesAppMetadata": true,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "app/api/vendor/media/route.ts",
+      "operations": {
+        "getUser": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "app/vendor/set-password/page.tsx",
+      "operations": {
+        "getUser": 1,
+        "signOut": 1,
+        "updateUser": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "lib/crm/crmAuth.ts",
+      "operations": {
+        "getUser": 1
+      },
+      "usesAppMetadata": true,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "lib/identity/sessionInvalidation.ts",
+      "operations": {
+        "signOut": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "middleware.ts",
+      "operations": {
+        "getUser": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "services/clientAccessService.ts",
+      "operations": {
+        "getUser": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "services/clientOtpAuthService.ts",
+      "operations": {
+        "signInWithOtp": 1,
+        "verifyOtp": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "services/identityDirectoryService.ts",
+      "operations": {
+        "getUser": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "services/vendorAccessService.ts",
+      "operations": {
+        "getUser": 3
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "services/vendorAuthService.ts",
+      "operations": {
+        "signInWithPassword": 2,
+        "signOut": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "services/vendorLoginActivationService.ts",
+      "operations": {
+        "getUser": 1,
+        "admin": 5
+      },
+      "usesAppMetadata": true,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "services/vendorPasswordResetService.ts",
+      "operations": {
+        "admin": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    }
+  ]
+}

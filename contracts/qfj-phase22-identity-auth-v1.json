@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "contract": "qfj.phase22.identity-auth.v1",
+  "recordedAt": "2026-10-06T11:36:00Z",
+  "phase21Baselines": {
+    "quickfurno": "07ffcb1c59170ddd183575797b324cc063eeb71e",
+    "jarvis": "95d3fcc6ff8b304e96591a80402f61f52aded825",
+    "agni": "054c6937b0216768cfc5e8f5c04c3bc08901c6c6"
+  },
+  "authority": {
+    "authentication": "PROVIDER_ADAPTER_PROVES_SUBJECT_ONLY",
+    "stableIdentity": "QUICKFURNO_INTERNAL_PRINCIPAL",
+    "authorization": "QUICKFURNO_CORE_ONLY",
+    "providerUserMetadataAuthorization": false,
+    "providerClaimsAuthorization": false,
+    "jarvis": "NO_END_USER_IDP_AUTHORITY",
+    "agni": "NO_END_USER_IDP_OR_AUTHORIZATION_AUTHORITY"
+  },
+  "identityModel": {
+    "principalTable": "public.identity_principals",
+    "providerIdentityTable": "public.identity_provider_identities",
+    "businessBindingTable": "public.identity_business_bindings",
+    "coreAdminRoleTable": "public.identity_admin_roles",
+    "currentProviderKey": "supabase-primary",
+    "allowedProviderKinds": ["supabase", "oidc", "saml", "test"],
+    "providerSubjectUniquePerProvider": true,
+    "multipleProvidersPerPrincipal": true,
+    "existingBusinessIdsRewritten": false,
+    "existingAuthUserForeignKeysRewritten": false,
+    "existingRlsRulesRewritten": false
+  },
+  "currentLiveInventory": {
+    "authUsers": 9,
+    "authIdentities": 9,
+    "providers": {
+      "email": 9
+    },
+    "activeSessions": 19,
+    "mfaFactors": 0,
+    "directPublicForeignKeysToAuthUsers": 5,
+    "policiesUsingAuthUid": 7,
+    "profiles": 9,
+    "vendorDashboardUsers": 8,
+    "clientAccounts": 0
+  },
+  "compatibility": {
+    "supabaseRemainsCurrentProvider": true,
+    "legacySupabaseSessionAndRlsCoexistence": true,
+    "newDomainsPreferStablePrincipal": true,
+    "trustedAppMetadataPrincipalMarkerRetainedForOnboardingCoexistence": true,
+    "legacyAdminRoleProviderCopyRetainedOnlyForCoexistence": true,
+    "newCoreAdminRoleAuthority": "identity_admin_roles"
+  },
+  "cutover": {
+    "existingProviderSessionsAcceptedAfterProviderCutover": false,
+    "reauthenticationRequired": true,
+    "passwordHashPortabilityAssumed": false,
+    "unsupportedPasswordMigrationRequiresResetOrVerifiedProviderMigration": true,
+    "mfaEnrollmentPortabilityAssumed": false,
+    "mfaReenrollmentRequiredWhenProviderCannotImportFactors": true,
+    "recoveryFlowReenrollmentRequiredWhenProviderChanges": true,
+    "tokenTtlMustRemainBounded": true,
+    "refreshTokensNeverBridgedAcrossProviders": true,
+    "jwtSigningKeysNeverSharedSolelyToPreserveOldSessions": true
+  },
+  "certification": {
+    "alternateTestProviderRequired": true,
+    "sameStablePrincipalAcrossProvidersRequired": true,
+    "sameCoreBusinessRecordAcrossProvidersRequired": true,
+    "providerClaimsCannotGrantPrivilege": true,
+    "disabledProviderIdentityFailsClosed": true,
+    "disabledPrincipalFailsClosed": true,
+    "coreBusinessSuspensionStillDeniesAccess": true,
+    "businessRowsRemainByteSemanticallyUnchanged": true,
+    "existingAuthorizationRulesRemainUnchanged": true,
+    "migrationIdempotencyRequired": true,
+    "disposablePostgres17Required": true,
+    "previousPhase21GateRequired": true,
+    "previousPhase20GateRequired": true
+  },
+  "productionBoundary": {
+    "productionDatabaseMigrationPerformed": false,
+    "productionAuthProviderCutoverPerformed": false,
+    "productionSessionInvalidationPerformed": false,
+    "productionPasswordMigrationPerformed": false,
+    "productionMfaMigrationPerformed": false,
+    "productionTrafficCutoverPerformed": false,
+    "agniAuthorityExpanded": false
+  },
+  "exit": {
+    "providerNeutralIdentityPackReady": true,
+    "nextPhase": "Phase 23 - API & Event Compatibility Contracts"
+  }
+}

@@ -75,6 +75,14 @@ add(
     promote.includes('--promotable'),
 );
 add(
+  'promotion binds signed manifest to requested source SHA and exact image digest',
+  promote.includes('--arg sha "$SOURCE_SHA"') &&
+    promote.includes('--arg ref "$IMAGE_REF"') &&
+    promote.includes('.sourceSha == $sha') &&
+    promote.includes('.role == "quickfurno-runtime"') &&
+    promote.includes('.ref == $ref'),
+);
+add(
   'production apply is double gated by cutover flag and protected environment',
   promote.includes("vars.PHASE15_PRODUCTION_CUTOVER_ENABLED == 'true'") &&
     promote.includes('environment: production') &&

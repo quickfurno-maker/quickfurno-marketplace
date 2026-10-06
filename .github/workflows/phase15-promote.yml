@@ -91,13 +91,7 @@ jobs:
           set -euo pipefail
           jq -r '.payload' phase15-attestation.json | head -n 1 | base64 -d | jq -e '.predicate' > phase15-release.json
           node scripts/scale/phase15-release.mjs validate --manifest phase15-release.json --system QUICKFURNO --promotable
-          node - "$IMAGE_REF" "$SOURCE_SHA" <<'NODE'
-const fs=require('node:fs');
-const [imageRef,sourceSha]=process.argv.slice(2);
-const m=JSON.parse(fs.readFileSync('phase15-release.json','utf8'));
-if(m.sourceSha!==sourceSha) throw new Error('source_sha_mismatch');
-if(!m.images.some((x)=>x.role==='quickfurno-runtime'&&x.ref===imageRef)) throw new Error('image_ref_mismatch');
-NODE
+          jq -e --arg sha "$SOURCE_SHA" --arg ref "$IMAGE_REF"             '.sourceSha == $sha and any(.images[]; .role == "quickfurno-runtime" and .ref == $ref)'             phase15-release.json >/dev/null
           sha256sum phase15-release.json > phase15-release.sha256
 
       - name: Upload verified promotion packet

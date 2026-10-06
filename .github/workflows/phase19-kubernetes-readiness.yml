@@ -46,7 +46,7 @@ jobs:
           sudo install -m 0755 kubectl /usr/local/bin/kubectl
           curl -fsSLo kind https://kind.sigs.k8s.io/dl/v0.30.0/kind-linux-amd64
           curl -fsSLo kind.sha256sum https://kind.sigs.k8s.io/dl/v0.30.0/kind-linux-amd64.sha256sum
-          echo "$(cat kind.sha256sum)  kind" | sha256sum -c -
+          test "$(sha256sum kind | awk '{print $1}')" = "$(awk '{print $1}' kind.sha256sum)"
           sudo install -m 0755 kind /usr/local/bin/kind
       - name: Render Kustomize package
         run: kubectl kustomize ops/kubernetes/overlays/certification > /tmp/phase19.yaml

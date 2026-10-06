@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { parseQfjVerificationKeys } from "@/lib/jarvis/coreDecisionAuth";
+import {
+  QFJ_SCALE_HEADERS,
+  qfjCompatibilityResponseHeaders,
+} from "@/lib/jarvis/scaleContract";
+import { addMetric } from "@/lib/observability/runtime";
 import { QFJ_KEY_ID_HEADER, QFJ_SIGNATURE_HEADER, verifyQfjSignedRequestSignature } from "@/lib/jarvis/signedRequestAuth";
 import {
   QFJ_WHATSAPP_TURN_MATERIAL_PATH,
@@ -20,8 +25,15 @@ import { readRiyaQualificationTurnMaterial } from "@/services/leadEnrichmentInbo
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const MAX_BODY_BYTES = 4_096;
-const reply = (status: number, body: unknown) =>
-  NextResponse.json(body, { status, headers: { "cache-control": "no-store" } });
+const reply = (
+  status: number,
+  body: unknown,
+  extraHeaders: Readonly<Record<string, string>> = {},
+) =>
+  NextResponse.json(body, {
+    status,
+    headers: { "cache-control": "no-store", ...extraHeaders },
+  });
 
 function authorityResponse(requestId: string, value: JarvisWhatsAppAuthorityState) {
   return {

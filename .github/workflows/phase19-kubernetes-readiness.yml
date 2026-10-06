@@ -46,8 +46,12 @@ jobs:
           sudo install -m 0755 kubectl /usr/local/bin/kubectl
           curl -fsSLo kind https://kind.sigs.k8s.io/dl/v0.30.0/kind-linux-amd64
           curl -fsSLo kind.sha256sum https://kind.sigs.k8s.io/dl/v0.30.0/kind-linux-amd64.sha256sum
-          test "$(sha256sum kind | awk '{print $1}')" = "$(awk '{print $1}' kind.sha256sum)"
+          expected_kind_sha="$(awk '{print $1}' kind.sha256sum)"
+          actual_kind_sha="$(sha256sum kind | awk '{print $1}')"
+          test "${actual_kind_sha}" = "${expected_kind_sha}"
           sudo install -m 0755 kind /usr/local/bin/kind
+          kubectl version --client=true
+          kind version
       - name: Render Kustomize package
         run: kubectl kustomize ops/kubernetes/overlays/certification > /tmp/phase19.yaml
       - name: Create ephemeral Kubernetes

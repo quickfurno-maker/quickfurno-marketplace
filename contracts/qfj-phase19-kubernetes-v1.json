@@ -1,0 +1,105 @@
+{
+  "contract": "qfj.phase19.kubernetes.v1",
+  "version": 1,
+  "productionKubernetesOperated": false,
+  "packaging": "KUSTOMIZE",
+  "kubernetes": {
+    "minimumMinor": "1.31",
+    "kindVersion": "v0.30.0",
+    "kindNodeImage": "kindest/node:v1.31.6@sha256:28b7cbb993dfe093c76641a0c95807637213c9109b761f1d422c2400e22b8e87"
+  },
+  "images": {
+    "quickfurno": {
+      "sourceSha": "dbe370c6e20aced6762600472d33863eb5306a48",
+      "image": "ghcr.io/quickfurno-maker/quickfurno-marketplace@sha256:3fff3a974cc035efbba25969f4852ea23f80a2ed4382212e7edf188aa8fa7af2"
+    },
+    "jarvisOs": {
+      "sourceSha": "db4575ace7f1b00251d35fea59c9cf3739e9a85d",
+      "image": "ghcr.io/quickfurno-maker/qf-jarvis-os@sha256:4f717aeb8bb1d78c903ebad72fe3bcd256a4c318d1a4afd5b809687718c31568"
+    },
+    "jarvisGateway": {
+      "sourceSha": "db4575ace7f1b00251d35fea59c9cf3739e9a85d",
+      "image": "ghcr.io/quickfurno-maker/qf-jarvis-gateway@sha256:6a82cefebab776609f54f2476b7c6dc3a6e0c54ec88b176c131735b9aea43f5d"
+    },
+    "jarvisWorker": {
+      "sourceSha": "db4575ace7f1b00251d35fea59c9cf3739e9a85d",
+      "image": "ghcr.io/quickfurno-maker/qf-jarvis-worker@sha256:6f9e2c11575620a3fbd191402f4e417e469d2b707406faa042abc609d1e17e63"
+    },
+    "agni": {
+      "sourceSha": "f1fe34a6af0c5bd80970a79203ed426dc0dbc894",
+      "image": "ghcr.io/quickfurno-maker/qf-agni@sha256:b041653608faece55938368ff5cf0f2dd2fc24f9195b1609a3cb3ae9b848799e"
+    }
+  },
+  "security": {
+    "runAsNonRoot": true,
+    "readOnlyRootFilesystem": true,
+    "allowPrivilegeEscalation": false,
+    "dropAllRuntimeCapabilities": true,
+    "seccompRuntimeDefault": true,
+    "automountServiceAccountToken": false,
+    "noBusinessStatePersistentVolumes": true
+  },
+  "availability": {
+    "startupReadinessLivenessDistinct": true,
+    "pdbRequiredForMultiReplicaCriticalServices": true,
+    "topologySpreadRequired": true,
+    "antiAffinityRequired": true,
+    "gracefulTerminationRequired": true
+  },
+  "autoscaling": {
+    "quickfurnoWeb": {
+      "enabled": true,
+      "minReplicas": 2,
+      "maxReplicas": 4,
+      "metric": "cpu",
+      "scaleUpPodsPerMinute": 1
+    },
+    "jarvisOs": {
+      "enabled": true,
+      "minReplicas": 2,
+      "maxReplicas": 4,
+      "metric": "cpu",
+      "scaleUpPodsPerMinute": 1
+    },
+    "jarvisGateway": {
+      "enabled": false,
+      "fixedReplicas": 2,
+      "dbConnectionsPerReplica": 3
+    },
+    "jarvisWorker": {
+      "enabled": false,
+      "fixedReplicas": 2,
+      "dbConnectionsPerReplica": 5
+    },
+    "jarvisApplicationDbCeiling": 16,
+    "agniControlPlane": {
+      "enabled": true,
+      "minReplicas": 1,
+      "maxReplicas": 1,
+      "reason": "authority-preserving metric wiring; no scale-out until multi-replica AGNI is separately certified"
+    }
+  },
+  "network": {
+    "defaultDeny": true,
+    "dnsExplicit": true,
+    "publicIngressOnlyFor": [
+      "quickfurno.web",
+      "qf-jarvis.jarvis-os"
+    ]
+  },
+  "config": {
+    "configMapAndSecretProjection": true,
+    "rotationWithoutImageRebuild": true
+  },
+  "validation": {
+    "staticPolicy": true,
+    "apiServerDryRun": true,
+    "ephemeralKindSmoke": true,
+    "sameDigestAsDocker": true
+  },
+  "nonGoals": {
+    "productionCluster": true,
+    "applicationCodeRewrite": true,
+    "authorityExpansion": true
+  }
+}

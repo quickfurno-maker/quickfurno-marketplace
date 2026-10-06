@@ -1,0 +1,32 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: qf-phase19
+resources:
+  - ../../base
+  - artifact-check-job.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: quickfurno-runtime-config
+    literals:
+      - NEXT_PUBLIC_SUPABASE_URL=https://phase19.invalid
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=phase19-anon
+secretGenerator:
+  - name: quickfurno-runtime-secrets
+    literals:
+      - service-role-key=phase19-service-role-key
+patches:
+  - target:
+      kind: Deployment
+      name: quickfurno-automation-worker
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Deployment
+      name: quickfurno-conversation-transport
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0

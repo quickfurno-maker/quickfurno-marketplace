@@ -1,0 +1,549 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: quickfurno
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quickfurno-web
+  labels:
+    app.kubernetes.io/name: quickfurno
+    app.kubernetes.io/component: web
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quickfurno
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: quickfurno
+        app.kubernetes.io/component: web
+    spec:
+      serviceAccountName: quickfurno
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      imagePullSecrets:
+        - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: quickfurno
+              app.kubernetes.io/component: web
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: quickfurno
+                    app.kubernetes.io/component: web
+      containers:
+        - name: web
+          image: ghcr.io/quickfurno-maker/quickfurno-marketplace@sha256:3fff3a974cc035efbba25969f4852ea23f80a2ed4382212e7edf188aa8fa7af2
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: quickfurno-runtime-config
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: QF_RUNTIME_ENV
+              value: production
+            - name: QF_CONFIG_SCHEMA_VERSION
+              value: "1"
+            - name: QF_SERVICE_ID
+              value: quickfurno.web
+            - name: QF_RUNTIME_ROLE
+              value: web
+            - name: QF_RELEASE_SHA
+              value: dbe370c6e20aced6762600472d33863eb5306a48
+            - name: SUPABASE_SERVICE_ROLE_KEY_FILE
+              value: /run/qf-secrets/service-role-key
+          ports:
+            - name: http
+              containerPort: 3000
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: qf-secrets
+              mountPath: /run/qf-secrets
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi
+        - name: qf-secrets
+          secret:
+            secretName: quickfurno-runtime-secrets
+            defaultMode: 288
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: quickfurno-web
+spec:
+  selector:
+    app.kubernetes.io/name: quickfurno
+    app.kubernetes.io/component: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: quickfurno-web
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quickfurno
+      app.kubernetes.io/component: web
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: quickfurno-web
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: quickfurno-web
+  minReplicas: 2
+  maxReplicas: 4
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 25
+          periodSeconds: 60
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quickfurno-automation-worker
+  labels:
+    app.kubernetes.io/name: quickfurno
+    app.kubernetes.io/component: automation-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quickfurno
+      app.kubernetes.io/component: automation-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: quickfurno
+        app.kubernetes.io/component: automation-worker
+    spec:
+      serviceAccountName: quickfurno
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      imagePullSecrets:
+        - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: ghcr.io/quickfurno-maker/quickfurno-marketplace@sha256:3fff3a974cc035efbba25969f4852ea23f80a2ed4382212e7edf188aa8fa7af2
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: quickfurno-runtime-config
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: QF_RUNTIME_ENV
+              value: production
+            - name: QF_CONFIG_SCHEMA_VERSION
+              value: "1"
+            - name: QF_SERVICE_ID
+              value: quickfurno.automation-worker
+            - name: QF_RUNTIME_ROLE
+              value: automation-worker
+            - name: QF_RELEASE_SHA
+              value: dbe370c6e20aced6762600472d33863eb5306a48
+            - name: SUPABASE_SERVICE_ROLE_KEY_FILE
+              value: /run/qf-secrets/service-role-key
+          startupProbe:
+            exec:
+              command: ["/bin/sh", "-ec", "test -s /run/qf-secrets/service-role-key && kill -0 1"]
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-ec", "test -s /run/qf-secrets/service-role-key && kill -0 1"]
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["/bin/sh", "-ec", "kill -0 1"]
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 750m
+              memory: 768Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: qf-secrets
+              mountPath: /run/qf-secrets
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi
+        - name: qf-secrets
+          secret:
+            secretName: quickfurno-runtime-secrets
+            defaultMode: 288
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quickfurno-conversation-transport
+  labels:
+    app.kubernetes.io/name: quickfurno
+    app.kubernetes.io/component: conversation-transport
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quickfurno
+      app.kubernetes.io/component: conversation-transport
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: quickfurno
+        app.kubernetes.io/component: conversation-transport
+    spec:
+      serviceAccountName: quickfurno
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      imagePullSecrets:
+        - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: ghcr.io/quickfurno-maker/quickfurno-marketplace@sha256:3fff3a974cc035efbba25969f4852ea23f80a2ed4382212e7edf188aa8fa7af2
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: quickfurno-runtime-config
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: QF_RUNTIME_ENV
+              value: production
+            - name: QF_CONFIG_SCHEMA_VERSION
+              value: "1"
+            - name: QF_SERVICE_ID
+              value: quickfurno.conversation-transport
+            - name: QF_RUNTIME_ROLE
+              value: conversation-transport
+            - name: QF_RELEASE_SHA
+              value: dbe370c6e20aced6762600472d33863eb5306a48
+            - name: SUPABASE_SERVICE_ROLE_KEY_FILE
+              value: /run/qf-secrets/service-role-key
+          startupProbe:
+            exec:
+              command: ["/bin/sh", "-ec", "test -s /run/qf-secrets/service-role-key && kill -0 1"]
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-ec", "test -s /run/qf-secrets/service-role-key && kill -0 1"]
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["/bin/sh", "-ec", "kill -0 1"]
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 750m
+              memory: 768Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: qf-secrets
+              mountPath: /run/qf-secrets
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi
+        - name: qf-secrets
+          secret:
+            secretName: quickfurno-runtime-secrets
+            defaultMode: 288
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quickfurno-aarohi-acquisition
+  labels:
+    app.kubernetes.io/name: quickfurno
+    app.kubernetes.io/component: aarohi-acquisition
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quickfurno
+      app.kubernetes.io/component: aarohi-acquisition
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: quickfurno
+        app.kubernetes.io/component: aarohi-acquisition
+    spec:
+      serviceAccountName: quickfurno
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      imagePullSecrets:
+        - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: ghcr.io/quickfurno-maker/quickfurno-marketplace@sha256:3fff3a974cc035efbba25969f4852ea23f80a2ed4382212e7edf188aa8fa7af2
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: quickfurno-runtime-config
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: QF_RUNTIME_ENV
+              value: production
+            - name: QF_CONFIG_SCHEMA_VERSION
+              value: "1"
+            - name: QF_SERVICE_ID
+              value: quickfurno.aarohi-acquisition
+            - name: QF_RUNTIME_ROLE
+              value: aarohi-acquisition
+            - name: QF_RELEASE_SHA
+              value: dbe370c6e20aced6762600472d33863eb5306a48
+            - name: SUPABASE_SERVICE_ROLE_KEY_FILE
+              value: /run/qf-secrets/service-role-key
+          startupProbe:
+            exec:
+              command: ["/bin/sh", "-ec", "test -s /run/qf-secrets/service-role-key && kill -0 1"]
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-ec", "test -s /run/qf-secrets/service-role-key && kill -0 1"]
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["/bin/sh", "-ec", "kill -0 1"]
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: qf-secrets
+              mountPath: /run/qf-secrets
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi
+        - name: qf-secrets
+          secret:
+            secretName: quickfurno-runtime-secrets
+            defaultMode: 288
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: quickfurno
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [quickfurno.in, www.quickfurno.in]
+      secretName: quickfurno-tls
+  rules:
+    - host: quickfurno.in
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: quickfurno-web
+                port: {number: 80}
+    - host: www.quickfurno.in
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: quickfurno-web
+                port: {number: 80}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-and-https-egress
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - ipBlock: {cidr: 0.0.0.0/0}
+      ports:
+        - {protocol: TCP, port: 443}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-controller-to-web
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: quickfurno
+      app.kubernetes.io/component: web
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - {protocol: TCP, port: 3000}

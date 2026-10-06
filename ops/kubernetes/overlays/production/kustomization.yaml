@@ -1,0 +1,7 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: quickfurno-production
+resources:
+  - ../../base
+# Render-only future production overlay. Phase 19 has no workflow that applies this overlay.
+# Runtime values and Secrets are supplied externally; no credential material lives here.

@@ -1,0 +1,91 @@
+name: Phase 19 Kubernetes Readiness
+
+on:
+  pull_request:
+    paths:
+      - 'contracts/qfj-phase19-kubernetes-v1.json'
+      - 'ops/kubernetes/**'
+      - 'scripts/scale/validate-phase19-kubernetes.mjs'
+      - '.github/workflows/phase19-kubernetes-readiness.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/qfj-phase19-kubernetes-v1.json'
+      - 'ops/kubernetes/**'
+      - 'scripts/scale/validate-phase19-kubernetes.mjs'
+      - '.github/workflows/phase19-kubernetes-readiness.yml'
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: phase19-kubernetes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact reviewed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '20'
+      - name: Validate Phase 19 policy
+        run: node scripts/scale/validate-phase19-kubernetes.mjs
+      - name: Install pinned kubectl and Kind
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSLo kubectl https://dl.k8s.io/release/v1.31.6/bin/linux/amd64/kubectl
+          curl -fsSLo kubectl.sha256 https://dl.k8s.io/release/v1.31.6/bin/linux/amd64/kubectl.sha256
+          echo "$(cat kubectl.sha256)  kubectl" | sha256sum -c -
+          sudo install -m 0755 kubectl /usr/local/bin/kubectl
+          curl -fsSLo kind https://kind.sigs.k8s.io/dl/v0.30.0/kind-linux-amd64
+          curl -fsSLo kind.sha256sum https://kind.sigs.k8s.io/dl/v0.30.0/kind-linux-amd64.sha256sum
+          echo "$(cat kind.sha256sum)  kind" | sha256sum -c -
+          sudo install -m 0755 kind /usr/local/bin/kind
+      - name: Render Kustomize package
+        run: kubectl kustomize ops/kubernetes/overlays/certification > /tmp/phase19.yaml
+      - name: Create ephemeral Kubernetes
+        run: kind create cluster --name qf-phase19 --image kindest/node:v1.31.6@sha256:28b7cbb993dfe093c76641a0c95807637213c9109b761f1d422c2400e22b8e87 --wait 120s
+      - name: Prepare certification namespace and registry pull
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          kubectl create namespace qf-phase19
+          kubectl create secret docker-registry ghcr-pull -n qf-phase19 --docker-server=ghcr.io --docker-username="${GITHUB_ACTOR}" --docker-password="${GHCR_TOKEN}"
+      - name: Kubernetes API schema validation
+        run: kubectl apply --server-side --dry-run=server -k ops/kubernetes/overlays/certification
+      - name: Run exact production image in Kubernetes
+        run: |
+          kubectl apply -k ops/kubernetes/overlays/certification
+          kubectl rollout status deployment/quickfurno-web -n qf-phase19 --timeout=180s
+          kubectl wait -n qf-phase19 --for=condition=complete job/quickfurno-artifact-check --timeout=180s
+      - name: Prove readiness differs from liveness
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl port-forward -n qf-phase19 service/quickfurno-web 18080:80 >/tmp/qf-phase19-portforward.log 2>&1 &
+          pf=$!
+          trap 'kill "$pf" 2>/dev/null || true' EXIT
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:18080/livez >/tmp/livez.json && curl -fsS http://127.0.0.1:18080/readyz >/tmp/readyz.json; then
+              break
+            fi
+            sleep 1
+          done
+          grep -q '"status":"alive"' /tmp/livez.json
+          grep -q '"status":"ready"' /tmp/readyz.json
+      - name: Failure evidence
+        if: failure()
+        run: |
+          kubectl get all -n qf-phase19 -o wide || true
+          kubectl describe pods -n qf-phase19 || true
+          kubectl get events -n qf-phase19 --sort-by=.lastTimestamp || true
+      - name: Delete ephemeral cluster
+        if: always()
+        run: kind delete cluster --name qf-phase19

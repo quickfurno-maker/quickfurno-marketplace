@@ -1,0 +1,42 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: quickfurno-artifact-check
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: quickfurno
+        app.kubernetes.io/component: artifact-check
+    spec:
+      restartPolicy: Never
+      serviceAccountName: quickfurno
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: ghcr.io/quickfurno-maker/quickfurno-marketplace@sha256:3fff3a974cc035efbba25969f4852ea23f80a2ed4382212e7edf188aa8fa7af2
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              test -f /app/server.js &&
+              test -f /app/dist/automation-worker.mjs &&
+              test -f /app/dist/conversation-transport-worker.mjs &&
+              test -f /app/dist/aarohi-acquisition-worker.mjs &&
+              node --version
+          resources:
+            requests: {cpu: 25m, memory: 32Mi}
+            limits: {cpu: 100m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

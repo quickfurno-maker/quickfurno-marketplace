@@ -31,12 +31,15 @@ function sleep(ms) {
 async function waitReady(container, database = db) {
   for (let i = 0; i < 90; i += 1) {
     try {
-      run(["exec", container, "pg_isready", "-U", "postgres", "-d", database]);
-      return;
+      const ready = out([
+        "exec", container, "psql", "-U", "postgres", "-d", database,
+        "-Atqc", "select 1",
+      ]);
+      if (ready === "1") return;
     } catch {}
     await sleep(500);
   }
-  throw new Error("PHASE17_POSTGRES_NOT_READY:" + container);
+  throw new Error("PHASE17_POSTGRES_NOT_READY:" + container + ":" + database);
 }
 function psql(container, sql, database = db) {
   return out(["exec", container, "psql", "-U", "postgres", "-d", database, "-Atqc", sql]);

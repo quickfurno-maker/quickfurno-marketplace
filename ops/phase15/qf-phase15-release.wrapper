@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Install manually as /usr/local/sbin/qf-phase15-release during the explicit
+# Phase-15 production cutover. The GitHub runner may invoke this wrapper through
+# a tightly scoped NOPASSWD sudoers rule; it must never invoke repository code
+# directly as root.
+set -Eeuo pipefail
+
+CONTROL_ROOT='/srv/quickfurno/release-control'
+CONTROLLER="$CONTROL_ROOT/ops/phase15/blue-green.sh"
+
+die(){ echo "PHASE15_WRAPPER_REFUSED: $1" >&2; exit 1; }
+
+[[ "$(id -u)" -eq 0 ]] || die "wrapper must execute as root"
+[[ -d "$CONTROL_ROOT" && ! -L "$CONTROL_ROOT" ]] || die "release-control root must be a real directory"
+[[ "$(stat -c '%u' "$CONTROL_ROOT")" == "0" ]] || die "release-control root must be root-owned"
+PERMS="$(stat -c '%A' "$CONTROL_ROOT")"
+[[ "${PERMS:5:1}" != "w" && "${PERMS:8:1}" != "w" ]] ||
+  die "release-control root must not be group/world writable"
+
+[[ -f "$CONTROLLER" && ! -L "$CONTROLLER" && -x "$CONTROLLER" ]] ||
+  die "controller must be an executable regular file"
+[[ "$(stat -c '%u' "$CONTROLLER")" == "0" ]] || die "controller must be root-owned"
+PERMS="$(stat -c '%A' "$CONTROLLER")"
+[[ "${PERMS:5:1}" != "w" && "${PERMS:8:1}" != "w" ]] ||
+  die "controller must not be group/world writable"
+
+case "${1:-}" in
+  stage|promote|rollback|status) ;;
+  *) die "only stage, promote, rollback and status are allowed" ;;
+esac
+
+exec "$CONTROLLER" "$@"

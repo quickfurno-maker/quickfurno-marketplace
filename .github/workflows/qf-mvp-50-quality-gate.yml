@@ -1,4 +1,4 @@
-name: QF MVP 50 Quality Gate
+﻿name: QF MVP 50 Quality Gate
 
 # Repository-only gate: offline validators, typecheck and build on a GitHub-hosted
 # runner. It takes no secrets and makes no staging, provider or deployment calls.
@@ -35,7 +35,7 @@ jobs:
       # a synthetic merge commit that is not the reviewed head. Pin the event head
       # SHA explicitly so the gate proves the exact code under review.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           # The QF-MVP-40.10 containment guards prove a claim over a pinned historical commit
@@ -54,7 +54,7 @@ jobs:
       # The MVP validators import .ts modules through a resolve-only hook and rely
       # on Node's native type stripping, which Node 20 does not provide.
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "24"
           cache: npm
@@ -135,7 +135,7 @@ jobs:
       - name: QF-MVP-70.04 final certification
         run: npm run test:mvp:70-04
 
-      # QF-MVP-75.01 — the marketplace MONEY PATH. The QF-MVP-75.00 audit proved
+      # QF-MVP-75.01 â€” the marketplace MONEY PATH. The QF-MVP-75.00 audit proved
       # this gate did not cover matching or assignment at all, while 75.01 changes
       # which eligible vendors actually win a lead and therefore which wallets are
       # debited. These four are the minimum that must be green at the exact head
@@ -144,7 +144,7 @@ jobs:
       - name: QF-MVP-75.01 MatchCore binding rank order
         run: npm run test:mvp:75-01
 
-      # QF-MVP-75.02 — the geo foundation the money path now carries evidence for.
+      # QF-MVP-75.02 â€” the geo foundation the money path now carries evidence for.
       # It adds the FIRST QuickFurno migration that installs a database extension
       # (postgis), two GENERATED geography columns, two GiST indexes and one
       # read-only service_role-only shortlist RPC, so its offline contract is
@@ -186,7 +186,7 @@ jobs:
       - name: QF-MVP-80.04 fail-closed runtime default
         run: npm run test:mvp:80-04
 
-      # QF-MVP-80.14A — the ONLY authority in the repository that can assign
+      # QF-MVP-80.14A â€” the ONLY authority in the repository that can assign
       # activation_status = 'active', i.e. the switch that turns real outbound
       # WhatsApp on in production. Its narrowness is the whole safety argument:
       # one hard-coded lane, every switch a constant, durable delivered-canary
@@ -196,7 +196,7 @@ jobs:
       - name: QF-MVP-80.14A Meta production activation authority
         run: npm run test:mvp:80-14a
 
-      # QF-MVP-40.14 — the seed + one-at-a-time activation route for the four
+      # QF-MVP-40.14 â€” the seed + one-at-a-time activation route for the four
       # further Meta transactional templates. It is the only repository-side way
       # a fifth, sixth, seventh or eighth template can ever start sending, so its
       # narrowness is proved at the exact head of every change: a closed four-key
@@ -222,7 +222,7 @@ jobs:
       - name: QF-MVP-80.16C delivery safety closure
         run: npm run test:mvp:80-16c
 
-      # QF-MVP-80.17A — the DERIVED lead-assignment intent projection. Production
+      # QF-MVP-80.17A â€” the DERIVED lead-assignment intent projection. Production
       # proved the drift (message failed / intent still dispatched), so the
       # forward-only rules, the deterministic linkage fences and the single-column
       # compare-and-set are executed here against the real pure contract.
@@ -230,7 +230,7 @@ jobs:
       - name: QF-MVP-80.17A lead-assignment terminal reconciliation
         run: npm run test:mvp:80-17a
 
-      # QF-MVP-80.17A-R1 — the ONE-SHOT operator for the single historical
+      # QF-MVP-80.17A-R1 â€” the ONE-SHOT operator for the single historical
       # QF-MVP-80.16D-R2 anomaly (canonical message failed / derived intent
       # dispatched). It can reach production, so its narrowness is proved at the
       # exact head: dry run by default, the production project fence, a frozen
@@ -245,17 +245,17 @@ jobs:
       - name: QF-MVP-80.17A-R1 runtime loader smoke
         run: npm run test:mvp:80-17a-r1-loader
 
-      # QF-MVP-82A-R0 — Realtime publication membership for the two WhatsApp inbox
+      # QF-MVP-82A-R0 â€” Realtime publication membership for the two WhatsApp inbox
       # authorities. A migration is a governance event here: it moves the live tree
       # pin, the post-anchor accounting and the staging-history PENDING set, so its
-      # shape is proved at the exact head — exactly two schema-qualified tables,
+      # shape is proved at the exact head â€” exactly two schema-qualified tables,
       # never FOR ALL TABLES, no RLS or policy change, no grant, no row touched,
       # and no application file riding along.
       # Offline: no secrets, no network, no Supabase, no send.
       - name: QF-MVP-82A-R0 Realtime publication foundation
         run: npm run test:mvp:82a-r0
 
-      # QF-MVP-82A-R0-S1 — the staging deployment record for that migration.
+      # QF-MVP-82A-R0-S1 â€” the staging deployment record for that migration.
       # Documentary only, and its whole job is to keep one distinction from
       # drifting: R0 is applied to STAGING and explicitly NOT to production. It
       # also holds the 80.14A activation authority unapplied in both environments,
@@ -268,7 +268,7 @@ jobs:
       - name: QF-UI-HOTFIX-01 mobile form focus + homepage layout
         run: npm run test:ui:mobile-form-focus
 
-      # QF-UI-TRACKING-01 — paid-acquisition attribution. A production lead filed
+      # QF-UI-TRACKING-01 â€” paid-acquisition attribution. A production lead filed
       # with every utm_* null because both lead surfaces sampled the URL only at
       # submit time. This executes the real tracking module against simulated
       # browsers (including a hostile sessionStorage) and proves the duplicate
@@ -300,7 +300,7 @@ jobs:
       - name: WhatsApp Human Desk certification
         run: npm run test:mvp:whatsapp-human-desk
 
-      # SCALE-P01 — portability ratchet. Offline: no secrets, no network.
+      # SCALE-P01 â€” portability ratchet. Offline: no secrets, no network.
       # Prevents new direct infrastructure coupling while known single-host debt
       # remains explicitly pinned to its remediation phase.
       - name: Infrastructure portability contract
@@ -337,10 +337,10 @@ jobs:
         run: npm run build
 
   # ==========================================================================
-  # QF-MVP-80.17A-R1 — PRODUCTION RUNTIME loader smoke.
+  # QF-MVP-80.17A-R1 â€” PRODUCTION RUNTIME loader smoke.
   #
   # The R1 operator runs on the production VPS, which is Node 20 and cannot load
-  # `.ts` natively at all — that is the entire reason its CommonJS loader exists.
+  # `.ts` natively at all â€” that is the entire reason its CommonJS loader exists.
   # The main gate above runs on Node 24, so it cannot prove the loader works
   # where it will actually be used. An earlier revision passed 76/76 on Node 24
   # while carrying a loader that would have refused its own dependency in
@@ -354,7 +354,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
@@ -368,7 +368,7 @@ jobs:
           test "$ACTUAL_SHA" = "$EXPECTED_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "20"
           cache: npm
@@ -396,7 +396,7 @@ jobs:
           ! grep -q 'server-only' <<< "$OUTPUT"
           ! grep -q 'without native WebSocket support' <<< "$OUTPUT"
 
-  # SCALE-P02 — exact-head immutable image certification.
+  # SCALE-P02 â€” exact-head immutable image certification.
   # Docker-specific configuration stays inside the offline repository script so
   # this locked quality workflow remains free of secrets/providers/staging calls.
   container-certification:
@@ -404,7 +404,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout exact reviewed head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
@@ -418,13 +418,13 @@ jobs:
           test "$ACTUAL_SHA" = "$EXPECTED_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "24"
 
       - name: Run exact-head container certification
         run: node scripts/scale/certify-container-image.mjs
-  # SCALE-P06 — shared ephemeral coordination certification.
+  # SCALE-P06 â€” shared ephemeral coordination certification.
   # Uses a digest-pinned Valkey service and proves two web + two worker
   # replicas share rate limits/cache invalidation/locks while Redis outage
   # remains a safe coordination failure rather than business-state loss.
@@ -443,7 +443,7 @@ jobs:
           --health-retries 10
     steps:
       - name: Checkout exact reviewed head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
@@ -457,7 +457,7 @@ jobs:
           test "$ACTUAL_SHA" = "$EXPECTED_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "24"
           cache: npm
@@ -470,7 +470,7 @@ jobs:
           QF_COORDINATION_REDIS_URL: redis://127.0.0.1:6379
         run: npm run test:scale:coordination
 
-  # SCALE-P07 — durable scheduler/idempotency PostgreSQL certification.
+  # SCALE-P07 â€” durable scheduler/idempotency PostgreSQL certification.
   # Replays one schedule occurrence concurrently, proves one owner/effect,
   # expires a simulated crashed lease and proves a single fenced recovery.
   durable-jobs-certification:
@@ -492,7 +492,7 @@ jobs:
           --health-retries 20
     steps:
       - name: Checkout exact reviewed head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
@@ -506,7 +506,7 @@ jobs:
           test "$ACTUAL_SHA" = "$EXPECTED_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "24"
           cache: npm
@@ -519,7 +519,7 @@ jobs:
           DATABASE_URL: postgresql://qf_phase07:qf_phase07_ci_only@127.0.0.1:5432/qf_phase07
         run: npm run test:scale:durable-jobs:postgres
 
-  # SCALE-P08 — database/matching scale certification.
+  # SCALE-P08 â€” database/matching scale certification.
   # Applies the actual Phase 08 migration to digest-pinned PostgreSQL/PostGIS,
   # proves indexed bounded discovery at 100k + 1M vendors, then executes the
   # repository's real canonical assignment function under overlapping pools.
@@ -542,7 +542,7 @@ jobs:
           --health-retries 20
     steps:
       - name: Checkout exact reviewed head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
@@ -556,7 +556,7 @@ jobs:
           test "$ACTUAL_SHA" = "$EXPECTED_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "24"
           cache: npm
@@ -574,7 +574,7 @@ jobs:
           DATABASE_URL: postgresql://qf_phase08:qf_phase08_ci_only@127.0.0.1:5432/qf_phase08
         run: npm run test:scale:matching-concurrency-postgres
 
-  # SCALE-P09 — bounded operational retention certification.
+  # SCALE-P09 â€” bounded operational retention certification.
   # The job owns a disposable database, applies the exact lifecycle migration,
   # proves concurrent prune batches do not overlap, refuses near-live cutoffs,
   # and proves protected audit/business evidence cannot enter auto-delete.
@@ -597,7 +597,7 @@ jobs:
           --health-retries 20
     steps:
       - name: Checkout exact reviewed head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
@@ -609,7 +609,7 @@ jobs:
           test "$ACTUAL_SHA" = "$EXPECTED_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "24"
           cache: npm
@@ -622,7 +622,7 @@ jobs:
           DATABASE_URL: postgresql://qf_phase09:qf_phase09_ci_only@127.0.0.1:5432/qf_phase09
         run: npm run test:scale:data-lifecycle-postgres
 
-  # SCALE-P12 — horizontal worker and agent scaling certification.
+  # SCALE-P12 â€” horizontal worker and agent scaling certification.
   # Depends on the existing durable-job and matching contention proofs, then
   # certifies 32 concurrent messaging claimers with per-conversation ordering.
   phase12-horizontal-workers-certification:
@@ -647,7 +647,7 @@ jobs:
           --health-retries 20
     steps:
       - name: Checkout exact reviewed head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
@@ -659,7 +659,7 @@ jobs:
           test "$ACTUAL_SHA" = "$EXPECTED_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "24"
           cache: npm
@@ -685,10 +685,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout reviewed tree
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "24"
           cache: npm
@@ -706,20 +706,20 @@ jobs:
         run: npm run typecheck
 
 
-  # SCALE-P14 — AGNI supervisory observability/SRE contract.
+  # SCALE-P14 â€” AGNI supervisory observability/SRE contract.
   phase14-observability-sre-certification:
     name: Phase 14 observability SRE certification
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout exact reviewed head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "24"
           cache: npm
@@ -747,3 +747,34 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+  # SCALE-P15 — immutable release, supply-chain and blue/green contract.
+  phase15-immutable-cicd-certification:
+    name: Phase 15 immutable CI/CD certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact reviewed head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Certify Phase 15 release controls
+        run: npm run test:scale:phase15
+
+      - name: Shell syntax
+        shell: bash
+        run: |
+          bash -n ops/phase15/blue-green.sh
+          bash -n ops/phase15/nginx-switch.sh
+          bash -n ops/phase15/qf-phase15-release.wrapper

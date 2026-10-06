@@ -1,4 +1,4 @@
-name: Scale Container Supply Chain
+﻿name: Scale Container Supply Chain
 
 on:
   pull_request:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: "Publish/sign this exact source SHA to GHCR without deployment"
+        description: "Publish/sign this exact main source SHA to GHCR without deployment"
         required: true
         default: false
         type: boolean
@@ -54,7 +54,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ ("$EVENT_NAME" == "push" && "$REF_NAME" == "refs/heads/main") || ("$EVENT_NAME" == "workflow_dispatch" && "${{ inputs.publish }}" == "true") ]]; then
+          if [[ ("$EVENT_NAME" == "push" && "$REF_NAME" == "refs/heads/main") || ("$EVENT_NAME" == "workflow_dispatch" && "$REF_NAME" == "refs/heads/main" && "${{ inputs.publish }}" == "true") ]]; then
             if [[ -z "$PROD_URL" || -z "$PROD_ANON" ]]; then
               echo "PUBLIC_BUILD_CONFIG_MISSING" >&2
               exit 64
@@ -68,6 +68,9 @@ jobs:
 
       - name: Static artifact contract
         run: node scripts/scale/validate-artifact-contract.mjs
+
+      - name: Phase 15 release CLI syntax
+        run: node --check scripts/scale/phase15-release.mjs
 
       - name: Build exact release candidate once
         env:
@@ -132,11 +135,11 @@ jobs:
             image-id.txt
             candidate.sha256
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
 
   publish:
-    name: Publish and sign exact QuickFurno digest
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.publish == true)
+    name: Publish, attest and sign exact QuickFurno digest
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish == true)
     needs: certify
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -146,6 +149,12 @@ jobs:
       id-token: write
       attestations: write
     steps:
+      - name: Checkout exact published source contract
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.certify.outputs.source_sha }}
+          fetch-depth: 1
+
       - name: Download exact certified release candidate
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -191,7 +200,31 @@ jobs:
         with:
           cosign-release: v3.0.6
 
-      - name: Sign image digest and attach SBOM attestation
+      - name: Create immutable Phase 15 release manifest
+        env:
+          SOURCE_SHA: ${{ needs.certify.outputs.source_sha }}
+          IMAGE: ${{ steps.publish.outputs.image }}
+          DIGEST: ${{ steps.publish.outputs.digest }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/scale/phase15-release.mjs create \
+            --system QUICKFURNO \
+            --sha "$SOURCE_SHA" \
+            --release-id "quickfurno-$SOURCE_SHA-$RUN_ID-$RUN_ATTEMPT" \
+            --image "quickfurno-runtime=$IMAGE@$DIGEST" \
+            --db-policy SOURCE_ONLY \
+            --retain-minutes 60 \
+            --out phase15-release.json
+          node scripts/scale/phase15-release.mjs validate \
+            --manifest phase15-release.json \
+            --system QUICKFURNO \
+            --promotable
+          sha256sum phase15-release.json > phase15-release.sha256
+
+      - name: Sign image digest and attach SBOM + release attestations
         env:
           IMAGE: ${{ steps.publish.outputs.image }}
           DIGEST: ${{ steps.publish.outputs.digest }}
@@ -200,6 +233,7 @@ jobs:
           set -euo pipefail
           cosign sign --yes "$IMAGE@$DIGEST"
           cosign attest --yes --type spdxjson --predicate quickfurno-sbom.spdx.json "$IMAGE@$DIGEST"
+          cosign attest --yes --type https://quickfurno.in/attestations/qf.release.phase15.v1 --predicate phase15-release.json "$IMAGE@$DIGEST"
 
       - name: Attach GitHub build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
@@ -208,17 +242,24 @@ jobs:
           subject-digest: ${{ steps.publish.outputs.digest }}
           push-to-registry: true
 
-      - name: Verify published digest remains pullable
+      - name: Verify published trust chain
         env:
           IMAGE: ${{ steps.publish.outputs.image }}
           DIGEST: ${{ steps.publish.outputs.digest }}
+          REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
-          docker pull "$IMAGE@$DIGEST"
-          test "$(docker image inspect "$IMAGE@$DIGEST" --format '{{ index .RepoDigests 0 }}')" = "$IMAGE@$DIGEST"
+          REF="$IMAGE@$DIGEST"
+          IDENTITY="https://github.com/$REPOSITORY/.github/workflows/scale-container-supply-chain.yml@refs/heads/main"
+          ISSUER="https://token.actions.githubusercontent.com"
+          docker pull "$REF" >/dev/null
+          test "$(docker image inspect "$REF" --format '{{ index .RepoDigests 0 }}')" = "$REF"
+          cosign verify --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER" "$REF" >/dev/null
+          cosign verify-attestation --type spdxjson --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER" "$REF" >/dev/null
+          cosign verify-attestation --type https://quickfurno.in/attestations/qf.release.phase15.v1 --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER" "$REF" >/dev/null
 
-      - name: Upload publication receipt
+      - name: Upload immutable publication receipt
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: quickfurno-published-${{ needs.certify.outputs.source_sha }}
@@ -226,5 +267,7 @@ jobs:
             published-image-ref.txt
             quickfurno-sbom.spdx.json
             candidate.sha256
+            phase15-release.json
+            phase15-release.sha256
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 90

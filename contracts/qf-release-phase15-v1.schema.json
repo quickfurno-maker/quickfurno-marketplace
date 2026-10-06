@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickfurno.in/contracts/qf-release-phase15-v1.schema.json",
+  "title": "QuickFurno Phase 15 Immutable Release Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "releaseId",
+    "system",
+    "sourceSha",
+    "images",
+    "database",
+    "compatibility",
+    "rollout",
+    "provenance",
+    "createdAt"
+  ],
+  "properties": {
+    "protocol": { "const": "qf.release.phase15.v1" },
+    "releaseId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{7,127}$"
+    },
+    "system": { "enum": ["QUICKFURNO", "JARVIS", "AGNI"] },
+    "sourceSha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "images": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "ref", "sourceSha"],
+        "properties": {
+          "role": {
+            "enum": [
+              "quickfurno-runtime",
+              "jarvis-os",
+              "jarvis-gateway",
+              "jarvis-worker",
+              "agni"
+            ]
+          },
+          "ref": {
+            "type": "string",
+            "pattern": "^ghcr\\.io/quickfurno-maker/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$"
+          },
+          "sourceSha": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          }
+        }
+      }
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["productionMigration", "rollbackSafe", "migrationId"],
+      "properties": {
+        "productionMigration": {
+          "enum": [
+            "NONE",
+            "SOURCE_ONLY",
+            "EXPAND_COMPATIBLE",
+            "CONTRACT_REQUIRES_MAINTENANCE"
+          ]
+        },
+        "rollbackSafe": { "type": "boolean" },
+        "migrationId": {
+          "type": ["string", "null"],
+          "maxLength": 128
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["crossSystemHttp", "minPeerSchema"],
+      "properties": {
+        "crossSystemHttp": {
+          "enum": ["V0_V1_ROLLING", "V1_ONLY", "NOT_APPLICABLE"]
+        },
+        "minPeerSchema": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 99
+        }
+      }
+    },
+    "rollout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy",
+        "retainPreviousMinutes",
+        "requireHumanApproval",
+        "automaticProductionApply"
+      ],
+      "properties": {
+        "strategy": { "const": "BLUE_GREEN" },
+        "retainPreviousMinutes": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 1440
+        },
+        "requireHumanApproval": { "const": true },
+        "automaticProductionApply": { "const": false }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["builder", "signature", "sbom", "buildProvenance"],
+      "properties": {
+        "builder": { "const": "github-actions" },
+        "signature": { "const": "sigstore-keyless" },
+        "sbom": { "const": "spdx-json" },
+        "buildProvenance": { "const": "github-attestations" }
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

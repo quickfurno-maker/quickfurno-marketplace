@@ -23,7 +23,7 @@ add("bounded HPA matches contract",base.includes("kind: HorizontalPodAutoscaler"
 add("topology spread and anti-affinity exist",base.includes("topologySpreadConstraints:")&&base.includes("podAntiAffinity:"));
 add("default deny plus explicit DNS/HTTPS egress",base.includes("name: default-deny")&&base.includes("allow-dns-and-https-egress")&&base.includes("port: 53")&&base.includes("port: 443"));
 add("no persistent business volume",!base.includes("persistentVolumeClaim")&&!base.includes("hostPath:"));
-add("config and secrets are projected",base.includes("configMapRef:")&&base.includes("secretName: quickfurno-runtime-secrets"));
+add("config and secrets use supported runtime injection",base.includes("configMapRef:")&&base.includes("secretKeyRef:")&&base.includes("name: quickfurno-runtime-secrets")&&base.includes("key: service-role-key")&&!base.includes("SUPABASE_SERVICE_ROLE_KEY_FILE")&&!base.includes("/run/qf-secrets"));
 add("certification disables effect workers but checks shared artifact",cert.includes("quickfurno-automation-worker")&&cert.includes("value: 0")&&job.includes(c.images.quickfurno.image));
 add("staging and production overlays contain no generated secrets",!staging.includes("secretGenerator")&&!prod.includes("secretGenerator"));
 add("Kind and API-server dry-run are CI gates",workflow.includes(c.kubernetes.kindNodeImage)&&workflow.includes("--dry-run=server")&&workflow.includes("kubectl kustomize"));

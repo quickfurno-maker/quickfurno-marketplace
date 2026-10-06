@@ -10,7 +10,7 @@ These manifests prove portability only. They do **not** authorize or operate a p
 - Web autoscaling is CPU based, min 2 / max 4, with scale-up limited to one pod per minute. QuickFurno web uses the Supabase Data API, so this HPA does not create one PostgreSQL pool per pod.
 - Effect-bearing workers remain fixed by default; correctness remains in durable queues/outbox/idempotency, not process-local scheduler uniqueness.
 - Root filesystem is read-only; only memory-backed `/tmp` is writable. No PVC or hostPath carries business state.
-- ConfigMaps and Secrets are projected at runtime so rotation does not require an image rebuild.
+- ConfigMaps are projected at runtime. Kubernetes Secrets enter through the image's already-supported direct-value boundary (`secretKeyRef`) rather than a Secret-volume symlink, because the hardened container intentionally rejects symlinked secret files. Rotation requires a pod rollout but never an image rebuild.
 - Service-account tokens are disabled; pods run non-root with RuntimeDefault seccomp, no privilege escalation and all capabilities dropped.
 - Default-deny NetworkPolicy is the baseline. DNS and HTTPS egress are explicit. Public ingress maps only the QuickFurno web service.
 - PDB uses `maxUnavailable: 1`, so it cannot block a rolling deployment.

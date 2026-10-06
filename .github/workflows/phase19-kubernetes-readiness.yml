@@ -89,6 +89,7 @@ jobs:
         run: |
           kubectl get all -n qf-phase19 -o wide || true
           kubectl describe pods -n qf-phase19 || true
+          kubectl logs -n qf-phase19 deployment/quickfurno-web --all-containers --tail=200 || true
           kubectl get events -n qf-phase19 --sort-by=.lastTimestamp || true
       - name: Delete ephemeral cluster
         if: always()

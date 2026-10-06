@@ -78,8 +78,11 @@ spec:
               value: web
             - name: QF_RELEASE_SHA
               value: dbe370c6e20aced6762600472d33863eb5306a48
-            - name: SUPABASE_SERVICE_ROLE_KEY_FILE
-              value: /run/qf-secrets/service-role-key
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: quickfurno-runtime-secrets
+                  key: service-role-key
           ports:
             - name: http
               containerPort: 3000
@@ -116,18 +119,11 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
-            - name: qf-secrets
-              mountPath: /run/qf-secrets
-              readOnly: true
       volumes:
         - name: tmp
           emptyDir:
             medium: Memory
             sizeLimit: 64Mi
-        - name: qf-secrets
-          secret:
-            secretName: quickfurno-runtime-secrets
-            defaultMode: 288
 ---
 apiVersion: v1
 kind: Service
@@ -236,16 +232,19 @@ spec:
               value: automation-worker
             - name: QF_RELEASE_SHA
               value: dbe370c6e20aced6762600472d33863eb5306a48
-            - name: SUPABASE_SERVICE_ROLE_KEY_FILE
-              value: /run/qf-secrets/service-role-key
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: quickfurno-runtime-secrets
+                  key: service-role-key
           startupProbe:
             exec:
-              command: ["/bin/sh", "-ec", "test -s /run/qf-secrets/service-role-key && kill -0 1"]
+              command: ["/bin/sh", "-ec", "test -n \"$SUPABASE_SERVICE_ROLE_KEY\" && kill -0 1"]
             periodSeconds: 2
             failureThreshold: 30
           readinessProbe:
             exec:
-              command: ["/bin/sh", "-ec", "test -s /run/qf-secrets/service-role-key && kill -0 1"]
+              command: ["/bin/sh", "-ec", "test -n \"$SUPABASE_SERVICE_ROLE_KEY\" && kill -0 1"]
             periodSeconds: 5
             failureThreshold: 3
           livenessProbe:
@@ -268,18 +267,11 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
-            - name: qf-secrets
-              mountPath: /run/qf-secrets
-              readOnly: true
       volumes:
         - name: tmp
           emptyDir:
             medium: Memory
             sizeLimit: 64Mi
-        - name: qf-secrets
-          secret:
-            secretName: quickfurno-runtime-secrets
-            defaultMode: 288
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -332,16 +324,19 @@ spec:
               value: conversation-transport
             - name: QF_RELEASE_SHA
               value: dbe370c6e20aced6762600472d33863eb5306a48
-            - name: SUPABASE_SERVICE_ROLE_KEY_FILE
-              value: /run/qf-secrets/service-role-key
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: quickfurno-runtime-secrets
+                  key: service-role-key
           startupProbe:
             exec:
-              command: ["/bin/sh", "-ec", "test -s /run/qf-secrets/service-role-key && kill -0 1"]
+              command: ["/bin/sh", "-ec", "test -n \"$SUPABASE_SERVICE_ROLE_KEY\" && kill -0 1"]
             periodSeconds: 2
             failureThreshold: 30
           readinessProbe:
             exec:
-              command: ["/bin/sh", "-ec", "test -s /run/qf-secrets/service-role-key && kill -0 1"]
+              command: ["/bin/sh", "-ec", "test -n \"$SUPABASE_SERVICE_ROLE_KEY\" && kill -0 1"]
             periodSeconds: 5
             failureThreshold: 3
           livenessProbe:
@@ -364,18 +359,11 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
-            - name: qf-secrets
-              mountPath: /run/qf-secrets
-              readOnly: true
       volumes:
         - name: tmp
           emptyDir:
             medium: Memory
             sizeLimit: 64Mi
-        - name: qf-secrets
-          secret:
-            secretName: quickfurno-runtime-secrets
-            defaultMode: 288
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -428,16 +416,19 @@ spec:
               value: aarohi-acquisition
             - name: QF_RELEASE_SHA
               value: dbe370c6e20aced6762600472d33863eb5306a48
-            - name: SUPABASE_SERVICE_ROLE_KEY_FILE
-              value: /run/qf-secrets/service-role-key
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: quickfurno-runtime-secrets
+                  key: service-role-key
           startupProbe:
             exec:
-              command: ["/bin/sh", "-ec", "test -s /run/qf-secrets/service-role-key && kill -0 1"]
+              command: ["/bin/sh", "-ec", "test -n \"$SUPABASE_SERVICE_ROLE_KEY\" && kill -0 1"]
             periodSeconds: 2
             failureThreshold: 30
           readinessProbe:
             exec:
-              command: ["/bin/sh", "-ec", "test -s /run/qf-secrets/service-role-key && kill -0 1"]
+              command: ["/bin/sh", "-ec", "test -n \"$SUPABASE_SERVICE_ROLE_KEY\" && kill -0 1"]
             periodSeconds: 5
             failureThreshold: 3
           livenessProbe:
@@ -460,18 +451,11 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
-            - name: qf-secrets
-              mountPath: /run/qf-secrets
-              readOnly: true
       volumes:
         - name: tmp
           emptyDir:
             medium: Memory
             sizeLimit: 64Mi
-        - name: qf-secrets
-          secret:
-            secretName: quickfurno-runtime-secrets
-            defaultMode: 288
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress

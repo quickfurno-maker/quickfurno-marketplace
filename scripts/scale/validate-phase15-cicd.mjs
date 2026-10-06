@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 import { readFile, readdir } from 'node:fs/promises';
 
 const root = new URL('../../', import.meta.url);

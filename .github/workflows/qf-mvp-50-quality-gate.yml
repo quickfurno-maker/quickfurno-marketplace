@@ -1,4 +1,4 @@
-﻿name: QF MVP 50 Quality Gate
+name: QF MVP 50 Quality Gate
 
 # Repository-only gate: offline validators, typecheck and build on a GitHub-hosted
 # runner. It takes no secrets and makes no staging, provider or deployment calls.

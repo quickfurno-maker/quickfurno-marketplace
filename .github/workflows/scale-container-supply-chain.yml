@@ -1,4 +1,4 @@
-﻿name: Scale Container Supply Chain
+name: Scale Container Supply Chain
 
 on:
   pull_request:

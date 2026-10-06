@@ -221,7 +221,8 @@
     "test:scale:phase12": "npm run test:scale:phase12:contract && npm run test:scale:matching-concurrency-postgres && npm run test:scale:durable-jobs:postgres && npm run test:scale:phase12:messages",
     "test:scale:phase13:contract": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/scale/validate-phase13-config-contract.mjs",
     "test:scale:phase13": "npm run test:scale:phase13:contract && node scripts/mvp/jarvis/validate-qf-conversation-fastpath.mjs",
-    "test:scale:phase14": "node --experimental-transform-types scripts/scale/validate-phase14-observability-sre.mjs"
+    "test:scale:phase14": "node --experimental-transform-types scripts/scale/validate-phase14-observability-sre.mjs",
+    "test:scale:phase15": "node scripts/scale/validate-phase15-cicd.mjs"
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.0",

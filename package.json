@@ -232,7 +232,9 @@
     "test:scale:phase17": "npm run test:scale:phase17:contract && npm run test:scale:phase17:objects && npm run test:scale:phase16",
     "test:scale:phase18:contract": "node scripts/scale/validate-phase18-load-chaos.mjs",
     "test:scale:phase18:soak": "node scripts/scale/certify-phase18-soak.mjs",
-    "test:scale:phase18": "npm run test:scale:phase18:contract && npm run test:scale:phase18:soak"
+    "test:scale:phase18": "npm run test:scale:phase18:contract && npm run test:scale:phase18:soak",
+    "test:scale:phase20:contract": "node scripts/scale/validate-phase20-final-launch.mjs",
+    "test:scale:phase20:expand-contract": "node scripts/scale/certify-phase20-expand-contract-postgres.mjs"
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.0",

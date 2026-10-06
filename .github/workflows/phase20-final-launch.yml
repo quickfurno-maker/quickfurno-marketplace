@@ -1,0 +1,83 @@
+name: Phase 20 Final Scale Launch Certification
+
+on:
+  pull_request:
+    paths:
+      - 'contracts/qfj-phase20-final-launch-v1.json'
+      - 'docs/scale/phase-20-final-launch-certification.md'
+      - 'docs/scale/phase-21-supabase-exit-inventory-design.md'
+      - 'docs/scale/phase-22-identity-provider-portability-decision.md'
+      - 'worker/conversationTransportWorker.ts'
+      - 'services/nativeAutomationRuntimeService.ts'
+      - 'supabase/migrations/20260911000000_qf_launch_security_closeout.sql'
+      - 'scripts/scale/validate-phase20-final-launch.mjs'
+      - 'scripts/scale/certify-phase20-expand-contract-postgres.mjs'
+      - 'scripts/scale/certify-durable-jobs-postgres.mjs'
+      - '.github/workflows/phase20-final-launch.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/qfj-phase20-final-launch-v1.json'
+      - 'docs/scale/phase-20-final-launch-certification.md'
+      - 'docs/scale/phase-21-supabase-exit-inventory-design.md'
+      - 'docs/scale/phase-22-identity-provider-portability-decision.md'
+      - 'worker/conversationTransportWorker.ts'
+      - 'services/nativeAutomationRuntimeService.ts'
+      - 'supabase/migrations/20260911000000_qf_launch_security_closeout.sql'
+      - 'scripts/scale/validate-phase20-final-launch.mjs'
+      - 'scripts/scale/certify-phase20-expand-contract-postgres.mjs'
+      - 'scripts/scale/certify-durable-jobs-postgres.mjs'
+      - '.github/workflows/phase20-final-launch.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase20-final-launch-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  certify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+        env:
+          POSTGRES_USER: qf_phase20
+          POSTGRES_PASSWORD: qf_phase20_ci_only
+          POSTGRES_DB: qf_phase20
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qf_phase20 -d qf_phase20"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://qf_phase20:qf_phase20_ci_only@127.0.0.1:5432/qf_phase20
+    steps:
+      - name: Checkout exact reviewed head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Validate final launch contract
+        run: node scripts/scale/validate-phase20-final-launch.mjs
+      - name: Revalidate prior final gates
+        run: |
+          node scripts/scale/validate-phase17-dr.mjs
+          node scripts/scale/validate-phase18-load-chaos.mjs
+          node scripts/scale/validate-phase19-kubernetes.mjs
+      - name: Rehearse expand backfill compatibility and contract
+        run: node scripts/scale/certify-phase20-expand-contract-postgres.mjs
+      - name: Re-certify distributed scheduled-run ownership
+        run: node scripts/scale/certify-durable-jobs-postgres.mjs
+      - name: Verify clean tree
+        run: git diff --check && test -z "$(git status --porcelain)"

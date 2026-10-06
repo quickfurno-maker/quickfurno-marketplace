@@ -22,12 +22,7 @@
     "businessBindingTable": "public.identity_business_bindings",
     "coreAdminRoleTable": "public.identity_admin_roles",
     "currentProviderKey": "supabase-primary",
-    "allowedProviderKinds": [
-      "supabase",
-      "oidc",
-      "saml",
-      "test"
-    ],
+    "allowedProviderKinds": ["supabase", "oidc", "saml", "test"],
     "providerSubjectUniquePerProvider": true,
     "multipleProvidersPerPrincipal": true,
     "existingBusinessIdsRewritten": false,

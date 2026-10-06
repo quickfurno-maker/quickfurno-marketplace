@@ -222,7 +222,10 @@
     "test:scale:phase13:contract": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/scale/validate-phase13-config-contract.mjs",
     "test:scale:phase13": "npm run test:scale:phase13:contract && node scripts/mvp/jarvis/validate-qf-conversation-fastpath.mjs",
     "test:scale:phase14": "node --experimental-transform-types scripts/scale/validate-phase14-observability-sre.mjs",
-    "test:scale:phase15": "node scripts/scale/validate-phase15-cicd.mjs"
+    "test:scale:phase15": "node scripts/scale/validate-phase15-cicd.mjs",
+    "test:scale:phase16:contract": "node scripts/scale/validate-phase16-multihost-ha.mjs",
+    "test:scale:phase16:host-loss": "node scripts/scale/certify-phase16-host-loss.mjs",
+    "test:scale:phase16": "npm run test:scale:phase16:contract && npm run test:scale:phase15"
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.0",

@@ -778,3 +778,109 @@ jobs:
           bash -n ops/phase15/blue-green.sh
           bash -n ops/phase15/nginx-switch.sh
           bash -n ops/phase15/qf-phase15-release.wrapper
+
+
+  # SCALE-P16 - multi-host HA and host-loss certification.
+  phase16-multihost-ha-certification:
+    name: Phase 16 multi-host HA certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16.4-bookworm
+        env:
+          POSTGRES_USER: qf_phase16
+          POSTGRES_PASSWORD: qf_phase16_ci_only
+          POSTGRES_DB: qf_phase16
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qf_phase16 -d qf_phase16"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - name: Checkout exact reviewed head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Phase 16 topology and preserve Phase 15 controls
+        run: npm run test:scale:phase16
+
+      - name: Install HAProxy certification proxy
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends haproxy
+          sudo systemctl stop haproxy || true
+          haproxy -c -f ops/phase16/haproxy-certification.cfg
+
+      - name: Build one reviewed QuickFurno artifact for both host replicas
+        shell: bash
+        run: |
+          docker build --pull=false \
+            --build-arg GIT_SHA="${GITHUB_SHA}" \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL="https://phase16-ci.invalid" \
+            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="phase16-ci-only-anon-key" \
+            -t "qf-phase16:${GITHUB_SHA}" .
+
+      - name: Start two host-affined QuickFurno replicas
+        shell: bash
+        run: |
+          docker run -d --name qf-phase16-host-a-web \
+            --label qf.phase16.host=a \
+            -p 127.0.0.1:3211:3000 \
+            -e QF_RELEASE_SHA="${GITHUB_SHA}" \
+            "qf-phase16:${GITHUB_SHA}"
+          docker run -d --name qf-phase16-host-b-web \
+            --label qf.phase16.host=b \
+            -p 127.0.0.1:3212:3000 \
+            -e QF_RELEASE_SHA="${GITHUB_SHA}" \
+            "qf-phase16:${GITHUB_SHA}"
+          for port in 3211 3212; do
+            for i in $(seq 1 60); do
+              if curl -fsS "http://127.0.0.1:${port}/readyz" >/dev/null; then break; fi
+              sleep 1
+            done
+            curl -fsS "http://127.0.0.1:${port}/readyz" >/dev/null
+          done
+          haproxy -D -p /tmp/qf-phase16-haproxy.pid -f ops/phase16/haproxy-certification.cfg
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8088/readyz >/dev/null; then break; fi
+            sleep 0.25
+          done
+          curl -fsS http://127.0.0.1:8088/readyz >/dev/null
+
+      - name: Terminate one QuickFurno host replica under load
+        env:
+          PHASE16_LB_URL: http://127.0.0.1:8088/readyz
+          PHASE16_VICTIM_CONTAINER: qf-phase16-host-a-web
+          PHASE16_LOAD_DURATION_MS: "5000"
+          PHASE16_KILL_AFTER_MS: "1500"
+          PHASE16_LOAD_CONCURRENCY: "8"
+        run: npm run test:scale:phase16:host-loss
+
+      - name: Certify committed work recovery after owner loss
+        env:
+          DATABASE_URL: postgresql://qf_phase16:qf_phase16_ci_only@127.0.0.1:5432/qf_phase16
+        run: npm run test:scale:durable-jobs:postgres
+
+      - name: Collect failure evidence
+        if: always()
+        shell: bash
+        run: |
+          docker ps -a || true
+          docker logs qf-phase16-host-a-web || true
+          docker logs qf-phase16-host-b-web || true
+          cat /tmp/qf-phase16-haproxy.log 2>/dev/null || true

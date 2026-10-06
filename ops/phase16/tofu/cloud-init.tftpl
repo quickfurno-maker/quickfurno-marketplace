@@ -1,0 +1,17 @@
+#cloud-config
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+
+write_files:
+  - path: /etc/quickfurno/phase16-host.env
+    owner: root:root
+    permissions: "0600"
+    content: |
+      QF_HOST_ID=${host_id}
+      AGNI_OTLP_GATEWAY_ENDPOINT=${agni_otlp_gateway_endpoint}
+
+runcmd:
+  - [ sh, -lc, "install -d -m 0750 -o root -g root /srv/quickfurno /etc/quickfurno" ]
+  - [ sh, -lc, "echo 'Phase16 bootstrap complete for ${host_id}'" ]

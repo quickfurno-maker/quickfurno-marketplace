@@ -89,12 +89,30 @@ export async function POST(request: Request): Promise<Response> {
     signature: request.headers.get(QFJ_SIGNATURE_HEADER),
     keys, requestHeaders: request.headers, now: new Date().toISOString(),
   });
+  const receivedVersion = request.headers.get(QFJ_SCALE_HEADERS.version);
+  const compatibilityMode =
+    receivedVersion === null ? "legacy" : receivedVersion === "1" ? "current" : "unsupported";
+  try {
+    addMetric("qf.compatibility.requests", 1, {
+      boundary: "qfj.scale.http",
+      received_version: receivedVersion ?? "0",
+      mode: compatibilityMode,
+      result: authenticated ? "accepted" : "rejected",
+    });
+  } catch {
+    // Compatibility telemetry is powerless; authentication remains authoritative.
+  }
   if (!authenticated) return reply(401, { error: "authentication_failed" });
+  const compatibilityHeaders = qfjCompatibilityResponseHeaders(
+    compatibilityMode === "legacy" ? "legacy" : "current",
+  );
+  const compatReply = (status: number, body: unknown) =>
+    reply(status, body, compatibilityHeaders);
 
   if (isQfjWhatsAppBoundTurnMaterialRequest(parsed)) {
     if (parsed.turnPurpose === "lead_qualification") {
       if (!qualificationEnabled || !parsed.qualificationRequestId) {
-        return reply(503, { error: "service_unavailable" });
+        return compatReply(503, { error: "service_unavailable" });
       }
       const qualification = await readRiyaQualificationTurnMaterial({
         tenantId: parsed.tenantId,
@@ -104,14 +122,14 @@ export async function POST(request: Request): Promise<Response> {
         qualificationRequestId: parsed.qualificationRequestId,
       });
       if (!qualification.ok) {
-        return reply(qualification.reason === "stale_or_invalid" ? 409 : 503, {
+        return compatReply(qualification.reason === "stale_or_invalid" ? 409 : 503, {
           protocol: QFJ_WHATSAPP_TURN_MATERIAL_PROTOCOL,
           version: QFJ_WHATSAPP_TURN_MATERIAL_VERSION,
           requestId: parsed.requestId,
           status: qualification.reason,
         });
       }
-      return reply(200, {
+      return compatReply(200, {
         protocol: QFJ_WHATSAPP_TURN_MATERIAL_PROTOCOL,
         version: QFJ_WHATSAPP_TURN_MATERIAL_VERSION,
         requestId: parsed.requestId,
@@ -132,7 +150,7 @@ export async function POST(request: Request): Promise<Response> {
         },
       });
     }
-    if (!genericEnabled) return reply(503, { error: "service_unavailable" });
+    if (!genericEnabled) return compatReply(503, { error: "service_unavailable" });
     const material = await readJarvisWhatsAppTurnMaterial({
       tenantId: parsed.tenantId,
       conversationId: parsed.conversationId,
@@ -143,14 +161,14 @@ export async function POST(request: Request): Promise<Response> {
       const status = material.reason === "conversation_not_found" || material.reason === "inbound_message_mismatch" ? 404
         : material.reason === "stale_revision" ? 409
         : 503;
-      return reply(status, {
+      return compatReply(status, {
         protocol: QFJ_WHATSAPP_TURN_MATERIAL_PROTOCOL,
         version: QFJ_WHATSAPP_TURN_MATERIAL_VERSION,
         requestId: parsed.requestId,
         status: material.reason,
       });
     }
-    return reply(200, {
+    return compatReply(200, {
       ...authorityResponse(parsed.requestId, material.value),
       inboundMessageId: material.value.inboundMessageId,
       receivedAt: material.value.receivedAt,
@@ -165,12 +183,12 @@ export async function POST(request: Request): Promise<Response> {
   });
   if (!authority.ok) {
     const status = authority.reason === "conversation_not_found" ? 404 : 503;
-    return reply(status, {
+    return compatReply(status, {
       protocol: QFJ_WHATSAPP_TURN_MATERIAL_PROTOCOL,
       version: QFJ_WHATSAPP_TURN_MATERIAL_VERSION,
       requestId: parsed.requestId,
       status: authority.reason,
     });
   }
-  return reply(200, authorityResponse(parsed.requestId, authority.value));
+  return compatReply(200, authorityResponse(parsed.requestId, authority.value));
 }

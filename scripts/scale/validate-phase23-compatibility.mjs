@@ -26,6 +26,7 @@ const fixtureText = await read("contracts/qfj-phase23-consumer-fixture-v1.json")
 const contract = JSON.parse(contractText);
 const fixture = JSON.parse(fixtureText);
 const guard = await read("lib/jarvis/scaleRequestGuard.ts");
+const turnMaterialRoute = await read("app/api/internal/jarvis/whatsapp-turn-material/route.ts");
 const phase11Contract = JSON.parse(await read("contracts/qfj-scale-contract-v1.json"));
 
 let passed = 0;
@@ -144,11 +145,14 @@ check("actual V1 signed request verifies", () => {
   assert.equal(result.ok, true);
   assert.equal(result.ok && result.mode, "v1");
 });
-check("compatibility telemetry is wired at QuickFurno ingress", () => {
-  assert.match(guard, /qf\.compatibility\.requests/u);
-  assert.match(guard, /received_version/u);
-  assert.match(guard, /legacy/u);
-  assert.match(guard, /unsupported/u);
+check("compatibility telemetry is wired at every current QuickFurno QFJ ingress", () => {
+  for (const source of [guard, turnMaterialRoute]) {
+    assert.match(source, /qf\.compatibility\.requests/u);
+    assert.match(source, /received_version/u);
+    assert.match(source, /legacy/u);
+    assert.match(source, /unsupported/u);
+  }
+  assert.match(turnMaterialRoute, /compatReply/u);
 });
 check("web remains server coupled", () => {
   assert.deepEqual(

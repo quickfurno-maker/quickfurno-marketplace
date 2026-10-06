@@ -1,0 +1,94 @@
+name: Phase 20 Final Scale Launch Certification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'contracts/qfj-phase20-launch-cert-v1.json'
+      - 'docs/scale/phase-20-final-launch-certification.md'
+      - 'docs/scale/phase20-supabase-advisor-disposition.json'
+      - 'docs/scale/phase21-supabase-exit-inventory.md'
+      - 'docs/decisions/ADR-0200-identity-auth-provider-portability.md'
+      - 'scripts/scale/validate-phase20-final-launch.mjs'
+      - 'scripts/scale/certify-phase20-expand-contract-postgres.mjs'
+      - 'package.json'
+      - '.github/workflows/phase20-final-launch-certification.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/qfj-phase20-launch-cert-v1.json'
+      - 'docs/scale/phase-20-final-launch-certification.md'
+      - 'docs/scale/phase20-supabase-advisor-disposition.json'
+      - 'docs/scale/phase21-supabase-exit-inventory.md'
+      - 'docs/decisions/ADR-0200-identity-auth-provider-portability.md'
+      - 'scripts/scale/validate-phase20-final-launch.mjs'
+      - 'scripts/scale/certify-phase20-expand-contract-postgres.mjs'
+      - 'package.json'
+      - '.github/workflows/phase20-final-launch-certification.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase20-final-launch-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  final-launch-certification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DATABASE_URL: postgresql://qf_phase20:qf_phase20_ci_only@127.0.0.1:5432/qf_phase20
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-trixie@sha256:724a4041afdb1750446e3f6b5cfa8f3b0ac5a2cf538ddfa6bfee4f94c2fa85c6
+        env:
+          POSTGRES_DB: qf_phase20
+          POSTGRES_USER: qf_phase20
+          POSTGRES_PASSWORD: qf_phase20_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qf_phase20 -d qf_phase20"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout exact reviewed head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Phase 20 final contract
+        run: npm run test:scale:phase20:contract
+
+      - name: Revalidate hardened container runtime
+        run: npm run test:scale:container
+
+      - name: Revalidate durable distributed ownership contract
+        run: npm run test:scale:durable-jobs:contract
+
+      - name: Re-certify scheduler ownership, crash recovery and fencing
+        run: npm run test:scale:durable-jobs:postgres
+
+      - name: Rehearse expand backfill coexist contract
+        run: npm run test:scale:phase20:expand-contract
+
+      - name: Revalidate Phase 18 failure/load policy
+        run: npm run test:scale:phase18:contract
+
+      - name: Revalidate Phase 19 Kubernetes portability policy
+        run: node scripts/scale/validate-phase19-kubernetes.mjs
+
+      - name: Verify working tree clean
+        run: test -z "$(git status --porcelain)"

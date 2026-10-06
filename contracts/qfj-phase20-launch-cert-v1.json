@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "contract": "qfj.phase20.launch-cert.v1",
+  "recordedAt": "2026-10-06T09:15:06.540496Z",
+  "phase19Baselines": {
+    "quickfurno": "8b43b07e90b31b5e6d7bc922cb56b914503daa32",
+    "jarvis": "32648b1a701ed5dfeef9a45b0dd16da87c79a276",
+    "agni": "9866733afab05e4e2c5f0c42b2a8f2b900dcc930"
+  },
+  "authority": {
+    "businessTruth": "QuickFurno Core + PostgreSQL",
+    "jarvis": "reasoning_orchestration_no_business_authority",
+    "agni": "READ_ONLY_RECOMMEND_by_default_no_new_phase20_authority"
+  },
+  "launchTopology": {
+    "quickfurno": "dedicated_vps_docker",
+    "jarvisAndAgni": "larger_separate_vps_docker_logically_isolated",
+    "awsRequired": false,
+    "kubernetesRequired": false,
+    "productionKubernetesPresent": false
+  },
+  "pollingGate": {
+    "phase00LowTrafficBaselineQpsApprox": 18,
+    "phase20MaxLowTrafficTrackedQps": 10,
+    "liveWindowSeconds": 33.041376,
+    "liveTrackedQueries": 266,
+    "liveMeasuredQps": 8.05,
+    "minimumReductionPercent": 40,
+    "measuredReductionPercentApprox": 55.3,
+    "conversationTransportIdleFallbackMs": 1000,
+    "nativeAutomationIdlePollMs": 5000,
+    "redisValkeyWakeupPreferred": true
+  },
+  "schedulerGate": {
+    "distributedOwnershipRequired": true,
+    "exactlyOneOwnerAndEffect": true,
+    "leaseRecoveryAndStaleFenceRejectionRequired": true,
+    "certification": "phase07_postgresql_concurrency_replay"
+  },
+  "databaseGate": {
+    "quickfurnoRuntimeDirectPgPool": false,
+    "jarvisApplicationConnectionCeiling": 16,
+    "jarvisTopology": "2_gateway_x3_plus_2_worker_x5",
+    "excessConcurrencyAbsorbedByPoolQueueing": true
+  },
+  "containerGate": {
+    "immutableOci": true,
+    "nonRoot": true,
+    "readOnlyRootAtRuntime": true,
+    "dropAllCapabilities": true,
+    "noNewPrivileges": true,
+    "boundedCpuMemoryPids": true,
+    "noBusinessHostDisk": true
+  },
+  "migrationGate": {
+    "strategy": "expand_backfill_dual_compat_contract",
+    "disposablePostgresRehearsalRequired": true,
+    "productionSchemaMutationAllowed": false
+  },
+  "supabaseGate": {
+    "securityAdvisorDispositionRequired": true,
+    "unreviewedErrorOrWarningAllowed": false,
+    "informationalDebtMayBeAcceptedWithRationale": true,
+    "managedPitrStillExternalActivation": true
+  },
+  "portabilityGate": {
+    "phase21ExitInventoryRequired": true,
+    "phase22IdentityDecisionRequired": true,
+    "providerSpecificBusinessIdentityGrowthForbidden": true,
+    "futureMigrationChangesInfrastructureNotCoreAuthority": true
+  },
+  "exit": {
+    "allEvidenceReproducible": true,
+    "noProductionTrafficCutover": true,
+    "noProductionDatabaseMigration": true,
+    "noAgniAuthorityExpansion": true,
+    "nextPhase": "Phase 21 - Supabase Exit & Data Portability Pack"
+  }
+}

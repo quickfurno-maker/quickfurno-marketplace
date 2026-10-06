@@ -241,7 +241,12 @@
     "test:scale:phase21:sql-audit": "node scripts/scale/audit-phase21-sql-portability.mjs",
     "test:scale:phase21:postgres": "node scripts/scale/certify-phase21-portable-postgres.mjs",
     "test:scale:phase21": "npm run test:scale:phase21:manifest && npm run test:scale:phase21:contract && npm run test:scale:phase21:sql-audit && npm run test:scale:phase21:postgres",
-    "export:scale:phase21": "node scripts/scale/export-phase21-supabase-pack.mjs"
+    "export:scale:phase21": "node scripts/scale/export-phase21-supabase-pack.mjs",
+    "gen:scale:phase22:manifest": "node scripts/scale/generate-phase22-auth-callsite-manifest.mjs",
+    "test:scale:phase22:manifest": "node scripts/scale/generate-phase22-auth-callsite-manifest.mjs --check",
+    "test:scale:phase22:contract": "node scripts/scale/validate-phase22-identity-auth.mjs",
+    "test:scale:phase22:postgres": "node --experimental-transform-types scripts/scale/certify-phase22-identity-auth-postgres.mjs",
+    "test:scale:phase22": "npm run test:scale:phase22:manifest && npm run test:scale:phase22:contract && npm run test:scale:phase22:postgres"
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.0",

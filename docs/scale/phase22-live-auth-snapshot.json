@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-10-06T11:35:00Z",
+  "provider": "supabase",
+  "projectRef": "yqpgcsduqbxulrlzwzap",
+  "postgres": {
+    "major": 17,
+    "observedVersion": "17.6"
+  },
+  "auth": {
+    "users": 9,
+    "identities": 9,
+    "identityProviders": {
+      "email": 9
+    },
+    "activeSessions": 19,
+    "mfaFactors": 0,
+    "jwtCutoverBehavior": "REAUTHENTICATION_REQUIRED_WHEN_ISSUER_OR_SIGNING_KEYS_CHANGE"
+  },
+  "coreMappings": {
+    "profiles": 9,
+    "profilesByRole": {
+      "admin": 1,
+      "vendor": 8
+    },
+    "clientAccounts": 0,
+    "vendorDashboardUsers": 8,
+    "activeVendorUsers": 8,
+    "vendorsWithUserId": 8,
+    "authUsersWithoutProfile": 0,
+    "authUsersWithoutVendorOrClient": 1
+  },
+  "coupling": {
+    "publicForeignKeysToAuthUsers": 5,
+    "publicPoliciesUsingAuthUid": 7,
+    "directAuthGetUserRuntimeMatches": 13,
+    "legacyTrustedAdminRole": {
+      "source": "auth.raw_app_meta_data",
+      "valueCounts": {
+        "Superadmin": 1
+      },
+      "phase22Disposition": "MIGRATE_ONCE_TO_CORE_IDENTITY_ADMIN_ROLES_AND_RETAIN_PROVIDER_COPY_ONLY_FOR_COEXISTENCE"
+    }
+  },
+  "security": {
+    "userMetadataAuthorizationAllowed": false,
+    "providerClaimsAuthorizationAllowed": false,
+    "currentIdentityProviderSubjectAuthority": "authentication_only",
+    "coreAuthorizationSources": [
+      "profiles.role",
+      "vendor_dashboard_users",
+      "client_accounts",
+      "Phase 22 identity_admin_roles"
+    ]
+  },
+  "containsSecrets": false,
+  "containsEmails": false,
+  "containsPhoneNumbers": false,
+  "containsProviderSubjects": false
+}

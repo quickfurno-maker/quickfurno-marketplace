@@ -14,6 +14,10 @@ const MIGRATION = new URL(
   "../../supabase/migrations/20261004190001_scale_phase08_matching_prefilter.sql",
   import.meta.url,
 );
+const PHASE18_MIGRATION = new URL(
+  "../../supabase/migrations/20261006113000_scale_phase18_matching_slo.sql",
+  import.meta.url,
+);
 
 const LEAD_ID = "11111111-1111-4111-8111-111111111111";
 const ZONE_ID = "22222222-2222-4222-8222-222222222222";
@@ -156,6 +160,8 @@ async function setup() {
 
   const migration = await readFile(MIGRATION, "utf8");
   await pool.query(migration);
+  const phase18Migration = await readFile(PHASE18_MIGRATION, "utf8");
+  await pool.query(phase18Migration);
 
   await pool.query(
     `insert into public.marketplace_service_zones(id,is_active,matching_enabled,requires_resolved_location)
@@ -260,6 +266,32 @@ async function runPrefilter() {
   return { rows: result.rows, ms: performance.now() - start };
 }
 
+async function explainPrefilter() {
+  const result = await pool.query(
+    `explain (analyze,buffers,format json)
+     select vendor
+       from public.qf_match_vendor_prefilter_v1($1,$2,$3::text[],$4::text[],$5)`,
+    [LEAD_ID, SCOPE, TIER0, TIER1, 512],
+  );
+  const root = result.rows[0]["QUERY PLAN"][0];
+  const nodes = [];
+  const walk = (node, depth = 0) => {
+    nodes.push({
+      depth,
+      nodeType: node["Node Type"],
+      relation: node["Relation Name"] ?? null,
+      index: node["Index Name"] ?? null,
+      actualTotalTime: node["Actual Total Time"] ?? null,
+      actualRows: node["Actual Rows"] ?? null,
+      actualLoops: node["Actual Loops"] ?? null,
+      rowsRemovedByFilter: node["Rows Removed by Filter"] ?? null,
+    });
+    for (const child of node.Plans ?? []) walk(child, depth + 1);
+  };
+  walk(root.Plan);
+  return { executionTime: root["Execution Time"], planningTime: root["Planning Time"], nodes };
+}
+
 async function explainIndexProbe() {
   const result = await pool.query(
     `explain (analyze,buffers,format json)
@@ -297,6 +329,11 @@ async function certify(size, maxMs) {
   const ids = lastRows.map((row) => row.vendor?.id).filter(Boolean);
   assert.ok(ids.includes(WINNER_ID), `high-ID vendor missing at ${size} vendors`);
   assert.ok(lastRows.length > 0 && lastRows.length <= 512);
+  if (worstMs >= maxMs) {
+    const diagnostic = await explainPrefilter();
+    console.error("PHASE18_MATCHING_SLO_DIAGNOSTIC");
+    console.error(JSON.stringify(diagnostic, null, 2));
+  }
   assert.ok(worstMs < maxMs, `${size} prefilter worst ${worstMs.toFixed(1)}ms >= ${maxMs}ms SLO`);
 
   const plan = await explainIndexProbe();
@@ -320,11 +357,11 @@ try {
   await setup();
   await seedRange(1, 100_000);
   await ensureHighIdWinner();
-  const at100k = await certify(100_001, 1_500);
+  const at100k = await certify(100_001, 750);
 
   await seedRange(100_001, 1_000_000);
   await ensureHighIdWinner();
-  const at1m = await certify(1_000_001, 3_500);
+  const at1m = await certify(1_000_001, 1_500);
 
   console.log("QuickFurno Phase 08 matching scale certification PASS");
   console.log(JSON.stringify({ at100k, at1m }, null, 2));

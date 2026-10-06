@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
   "purpose": "POST_G1_EXPLICIT_MIGRATION_PIN_EXTENSION",
-  "observedDate": "2026-10-05",
+  "observedDate": "2026-10-06",
   "databaseMutationAuthorized": false,
   "productionDeploymentAuthorized": false,
   "evidenceProjects": {
@@ -642,6 +642,18 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-10-04_BEFORE_DEPLOYMENT"
+    },
+    {
+      "version": "20261006113000",
+      "name": "scale_phase18_matching_slo",
+      "filename": "20261006113000_scale_phase18_matching_slo.sql",
+      "path": "supabase/migrations/20261006113000_scale_phase18_matching_slo.sql",
+      "canonicalSha256": "da746487c926633d7cc51c53ff959b595f3ea209c597a9e82cb9d0f341192248",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-06_BEFORE_DEPLOYMENT"
     }
   ],
   "supersededLegacyPins": [

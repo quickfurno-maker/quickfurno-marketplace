@@ -1,0 +1,66 @@
+{
+  "contract": "qfj.dr.phase17.v1",
+  "lockedAt": "2026-10-06",
+  "strategy": {
+    "authoritativeWriteRegions": 1,
+    "activeActiveTransactionalWrites": false,
+    "cleanRoomRestoreRequired": true,
+    "productionRestoreRequiresHumanApproval": true
+  },
+  "postgres": {
+    "productionTransactionRpoSeconds": 120,
+    "productionTransactionRtoSeconds": 3600,
+    "managedPitrRequiredToClaimTarget": true,
+    "logicalBackupIntervalHours": 24,
+    "logicalBackupRetentionDays": 30,
+    "logicalBackupOffsiteRequired": true,
+    "restoreMustBeTested": true,
+    "replicationSlotsRecreatedAfterRestore": true,
+    "walRetentionAndSlotLagMustBeMonitoredBeforeCdc": true
+  },
+  "objects": {
+    "sourceProviderVersioningAssumed": false,
+    "externalVersionedBackupRequired": true,
+    "backupIntervalSeconds": 3600,
+    "recoveryPointObjectiveSeconds": 3600,
+    "recoveryTimeObjectiveSeconds": 14400,
+    "minimumRetentionDays": 30,
+    "contentHashManifestRequired": true,
+    "independentRestoreDrillRequired": true
+  },
+  "sourceAndConfig": {
+    "gitRemoteIsRecoverySource": true,
+    "hostLocalConfigAuthoritative": false,
+    "infrastructureAsCodeRequired": true,
+    "recoveryManifestPinsSourceShas": true,
+    "recoveryManifestPinsImageDigests": true
+  },
+  "images": {
+    "immutableDigestRequired": true,
+    "signatureVerificationRequired": true,
+    "minimumRetainedSignedReleases": 10,
+    "minimumRetentionDays": 90,
+    "activeOrRollbackReferencedImagesMustNeverBeGarbageCollected": true
+  },
+  "secrets": {
+    "plaintextBackupForbidden": true,
+    "secretNamesAndOwnersMayBeInventoried": true,
+    "valuesMustBeReissuedOrRotatedDuringRecovery": true,
+    "customDatabaseRolePasswordsResetAfterRestore": true,
+    "recoveryTimeObjectiveSeconds": 7200
+  },
+  "agni": {
+    "telemetryIsBusinessTruth": false,
+    "lostHostReplayStateMustNotBeBlindlyTrusted": true,
+    "actionAuthorityDisabledUntilOldCapabilitiesExpireOrKeysRotate": true,
+    "maximumCapabilityTtlSeconds": 600,
+    "productionAuthorityAfterRestore": "READ_ONLY_RECOMMEND"
+  },
+  "phase17Safety": {
+    "productionRestore": false,
+    "productionDatabaseMutation": false,
+    "productionTrafficCutover": false,
+    "productionSecretRotation": false,
+    "newAgniAuthority": false
+  }
+}

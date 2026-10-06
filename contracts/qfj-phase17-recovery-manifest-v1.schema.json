@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickfurno.in/contracts/qfj.dr.recovery.phase17.v1.schema.json",
+  "title": "QuickFurno Jarvis AGNI Phase 17 Recovery Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "createdAt",
+    "recoveryPointAt",
+    "quickfurno",
+    "jarvis",
+    "agni",
+    "database",
+    "objects"
+  ],
+  "properties": {
+    "contract": { "const": "qfj.dr.recovery.phase17.v1" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "recoveryPointAt": { "type": "string", "format": "date-time" },
+    "quickfurno": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceSha", "imageDigest"],
+      "properties": {
+        "sourceSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "imageDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "jarvis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceSha", "osDigest", "gatewayDigest", "workerDigest"],
+      "properties": {
+        "sourceSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "osDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "gatewayDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "workerDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "agni": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceSha", "imageDigest"],
+      "properties": {
+        "sourceSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "imageDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recoveryTargetAt", "method"],
+      "properties": {
+        "recoveryTargetAt": { "type": "string", "format": "date-time" },
+        "method": { "enum": ["managed-pitr", "logical-backup"] }
+      }
+    },
+    "objects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["snapshotId"],
+      "properties": {
+        "snapshotId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  }
+}

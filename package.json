@@ -225,7 +225,11 @@
     "test:scale:phase15": "node scripts/scale/validate-phase15-cicd.mjs",
     "test:scale:phase16:contract": "node scripts/scale/validate-phase16-multihost-ha.mjs",
     "test:scale:phase16:host-loss": "node scripts/scale/certify-phase16-host-loss.mjs",
-    "test:scale:phase16": "npm run test:scale:phase16:contract && npm run test:scale:phase15"
+    "test:scale:phase16": "npm run test:scale:phase16:contract && npm run test:scale:phase15",
+    "test:scale:phase17:contract": "node scripts/scale/validate-phase17-dr.mjs",
+    "test:scale:phase17:objects": "node scripts/scale/certify-phase17-object-restore.mjs",
+    "test:scale:phase17:postgres": "node scripts/scale/certify-phase17-postgres-pitr.mjs",
+    "test:scale:phase17": "npm run test:scale:phase17:contract && npm run test:scale:phase17:objects && npm run test:scale:phase16"
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.0",

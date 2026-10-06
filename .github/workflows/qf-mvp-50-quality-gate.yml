@@ -898,3 +898,58 @@ jobs:
         if: always()
         shell: bash
         run: docker ps -a --filter "name=qf-p17-" || true
+
+
+  # SCALE-P18 - sustained load, soak and failure certification.
+  phase18-load-soak-chaos-certification:
+    name: Phase 18 load soak chaos certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs:
+      - matching-scale-certification
+      - phase16-multihost-ha-certification
+      - phase17-backup-pitr-dr-certification
+    services:
+      postgres:
+        image: postgis/postgis@sha256:894f570c0cf0664ed5576a8fd5d5bfb8fb1b19d592885b686c3a88c8bd90c41f
+        env:
+          POSTGRES_USER: qf_phase18
+          POSTGRES_PASSWORD: qf_phase18_ci_only
+          POSTGRES_DB: qf_phase18
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qf_phase18 -d qf_phase18"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - name: Checkout exact reviewed head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate canonical Phase 18 contract
+        run: npm run test:scale:phase18:contract
+
+      - name: Re-certify durable worker crash recovery
+        env:
+          DATABASE_URL: postgresql://qf_phase18:qf_phase18_ci_only@127.0.0.1:5432/qf_phase18
+        run: npm run test:scale:durable-jobs:postgres
+
+      - name: Run sustained bounded soak with duplicate and provider failure injection
+        env:
+          PHASE18_SOAK_SECONDS: "60"
+          PHASE18_CONCURRENCY: "32"
+          PHASE18_POOL_MAX: "8"
+        run: npm run test:scale:phase18:soak

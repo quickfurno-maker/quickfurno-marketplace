@@ -1,0 +1,112 @@
+{
+  "contract": "qfj.phase18.cert.v1",
+  "lockedAt": "2026-10-06",
+  "purpose": "Prove correctness, bounded overload behavior, sustained stability, and failure recovery before scale promotion.",
+  "safety": {
+    "isolatedCertificationOnly": true,
+    "productionLoadTestForbidden": true,
+    "productionDatabaseMutation": false,
+    "productionTrafficCutover": false,
+    "newAgniAuthority": false
+  },
+  "workloads": [
+    "public_browsing",
+    "enquiry_bursts",
+    "vendor_registration_login",
+    "concurrent_lead_matching",
+    "vendor_dashboard",
+    "payment_webhook_retries",
+    "whatsapp_storms",
+    "jarvis_conversation_bursts",
+    "campaigns",
+    "admin_operations"
+  ],
+  "datasetTiers": {
+    "current": "current representative size",
+    "D1": {"vendors": 100000, "leads": 1000000, "events": 5000000},
+    "D2": {"vendors": 1000000, "leads": 10000000, "events": 50000000}
+  },
+  "slo": {
+    "publicP95Ms": 500,
+    "publicP99Ms": 1000,
+    "coreReadP95Ms": 300,
+    "coreReadP99Ms": 750,
+    "coreWriteP95Ms": 500,
+    "coreWriteP99Ms": 1000,
+    "leadMatchP95Ms": 750,
+    "leadMatchP99Ms": 1500,
+    "webhookAckP95Ms": 250,
+    "webhookAckP99Ms": 500,
+    "qfJarvisOverheadP95Ms": 300,
+    "qfJarvisOverheadP99Ms": 750,
+    "criticalQueueAgeP95Ms": 2000,
+    "criticalQueueAgeP99Ms": 5000
+  },
+  "resourceGates": {
+    "dbConnectionsSteadyPercentMax": 70,
+    "dbConnectionsBurstPercentMax": 85,
+    "cpuSustainedPercentMax": 70,
+    "cpuBurstPercentMax": 85,
+    "memorySustainedPercentMax": 75,
+    "waitingLocksFromApplicationDesign": 0
+  },
+  "overloadPolicy": {
+    "rateLimitedStatus": 429,
+    "saturatedStatus": 503,
+    "boundedRetryRequired": true,
+    "transactionalPriorityOverBulk": true,
+    "unboundedQueueGrowthForbidden": true,
+    "unboundedConnectionGrowthForbidden": true,
+    "unboundedRetryGrowthForbidden": true,
+    "correctnessViolationAllowed": false
+  },
+  "failureInjection": {
+    "killWebContainer": true,
+    "killWorkerMidJob": true,
+    "redisUnavailable": true,
+    "redisSlow": true,
+    "dbConnectionPressure": true,
+    "metaTimeout": true,
+    "duplicateWebhook": true,
+    "providerTimeout": true,
+    "providerRateLimit": true,
+    "jarvisUnavailable": true,
+    "loadBalancerRemoveReaddReplica": true,
+    "objectStorageLatencyFailure": true
+  },
+  "auditScenarios": {
+    "schedulerRaceIdenticalOccurrence": true,
+    "idleWorkersAtLeast": 10,
+    "redisNotificationLossWithDurableWork": true,
+    "adaptivePollingDuringRedisOutage": true,
+    "rollingNAndNMinus1": true,
+    "dbPoolNearSaturation": true,
+    "runtimeSettingsInvalidationStorm": true,
+    "concurrentOneCityCategoryMatching": true,
+    "realtimeReconnectStorm": true,
+    "massWebhookDuplicateReorder": true
+  },
+  "correctness": {
+    "maxVendorsPerLead": 3,
+    "oneCreditPerDeliveredLead": true,
+    "duplicateBusinessEffectForbidden": true,
+    "duplicateProviderSendForbidden": true,
+    "durableTruthRemainsPostgres": true,
+    "authorizationFailsClosed": true,
+    "providerFailureMustNotCorruptBusinessState": true
+  },
+  "soak": {
+    "minimumAutomatedSeconds": 60,
+    "heapGrowthBytesMax": 67108864,
+    "queueMustDrain": true,
+    "connectionLeakForbidden": true,
+    "lockLeakForbidden": true,
+    "monotonicQueueLagGrowthForbidden": true
+  },
+  "agni": {
+    "observesPhase18Evidence": true,
+    "mayRecommendRemediation": true,
+    "mayExpandAuthority": false,
+    "securityControlsRemainFailClosed": true
+  }
+}

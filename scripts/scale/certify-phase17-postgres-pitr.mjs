@@ -117,7 +117,7 @@ run([
   "-e", "TARGET_TIME=" + targetTime,
   "-v", names.restoreData + ":/restore",
   image, "-lc",
-  "printf \"\\nrestore_command = 'cp /archive/%f %p'\\nrecovery_target_time = '%s'\\nrecovery_target_action = 'promote'\\n\" \"$TARGET_TIME\" >> /restore/postgresql.auto.conf && touch /restore/recovery.signal && chown -R postgres:postgres /restore",
+  "printf \"\\nrestore_command = 'cp /archive/%%f %%p'\\nrecovery_target_time = '%s'\\nrecovery_target_action = 'promote'\\n\" \"$TARGET_TIME\" >> /restore/postgresql.auto.conf && touch /restore/recovery.signal && chown -R postgres:postgres /restore",
 ]);
 
 run([

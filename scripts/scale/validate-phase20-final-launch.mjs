@@ -60,7 +60,11 @@ check("container hardening baseline", () => {
 });
 check("all live security advisor warnings/errors have dispositions", () => {
   const important = advisor.security.filter((x) => x.level === "ERROR" || x.level === "WARN");
-  assert.ok(important.length >= 3);
+  assert.equal(important.length, 2);
+  assert.deepEqual(important.map((x) => x.lint).sort(), [
+    "authenticated_security_definer_function_executable",
+    "security_definer_view",
+  ]);
   for (const item of important) {
     assert.ok(item.disposition && item.rationale);
     assert.equal(item.launchBlocking, false);

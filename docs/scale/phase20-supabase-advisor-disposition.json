@@ -8,7 +8,9 @@
       "lint": "security_definer_view",
       "level": "ERROR",
       "count": 1,
-      "objects": ["public.vendor_public_v"],
+      "objects": [
+        "public.vendor_public_v"
+      ],
       "disposition": "ACCEPTED_BY_DESIGN",
       "launchBlocking": false,
       "rationale": "Owner-rights is deliberate so anon can read only the structural public projection while holding zero base-table SELECT. The view has a fixed 21-column allowlist, an internal Approved+active+public_visibility+credit row predicate, and all write privileges are revoked and asserted by migration."
@@ -17,19 +19,13 @@
       "lint": "authenticated_security_definer_function_executable",
       "level": "WARN",
       "count": 2,
-      "objects": ["public.is_admin()", "public.owns_vendor(uuid)"],
+      "objects": [
+        "public.is_admin()",
+        "public.owns_vendor(uuid)"
+      ],
       "disposition": "ACCEPTED_REQUIRED_RLS_HELPERS",
       "launchBlocking": false,
       "rationale": "These helpers are referenced by authenticated RLS policies. PUBLIC and anon EXECUTE are revoked; authenticated/service_role EXECUTE is intentional. Each returns only a current-user authorization boolean and does not expose row data or mutate business state."
-    },
-    {
-      "lint": "auth_leaked_password_protection",
-      "level": "WARN",
-      "count": 1,
-      "objects": ["Supabase Auth"],
-      "disposition": "ACCEPTED_WITH_SECURITY_FOLLOWUP",
-      "launchBlocking": false,
-      "rationale": "The project is on Pro and the control should be enabled before broad password-auth growth. It does not affect scale architecture or authority correctness. Phase 26 owns the production Auth hardening bundle so password-strength, leaked-password, reauthentication and MFA controls are changed and regression-tested together rather than piecemeal."
     },
     {
       "lint": "rls_enabled_no_policy",
@@ -72,10 +68,35 @@
   ],
   "jarvisProject": {
     "projectRef": "coilipywdvxklewquqvv",
-    "security": [{"lint":"rls_enabled_no_policy","level":"INFO","count":2,"disposition":"ACCEPTED_NON_EXPOSED_SCHEMA"}],
+    "security": [
+      {
+        "lint": "rls_enabled_no_policy",
+        "level": "INFO",
+        "count": 2,
+        "disposition": "ACCEPTED_NON_EXPOSED_SCHEMA"
+      }
+    ],
     "performance": [
-      {"lint":"unused_index","level":"INFO","count":4,"disposition":"KEEP_UNTIL_TRAFFIC"},
-      {"lint":"auth_db_connections_absolute","level":"INFO","count":1,"disposition":"TRACK_WITH_COMPUTE_SCALING"}
+      {
+        "lint": "unused_index",
+        "level": "INFO",
+        "count": 4,
+        "disposition": "KEEP_UNTIL_TRAFFIC"
+      },
+      {
+        "lint": "auth_db_connections_absolute",
+        "level": "INFO",
+        "count": 1,
+        "disposition": "TRACK_WITH_COMPUTE_SCALING"
+      }
     ]
-  }
+  },
+  "refreshedAt": "2026-10-06T09:54:56.829Z",
+  "resolved": [
+    {
+      "lint": "auth_leaked_password_protection",
+      "evidence": "not_present_in_live_security_advisor_at_phase20_closeout",
+      "launchBlocking": false
+    }
+  ]
 }

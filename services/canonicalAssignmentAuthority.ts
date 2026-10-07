@@ -39,6 +39,7 @@
 //   docs/QF-MVP-20-3R1-CONSUMER-MIGRATION.md.
 // ============================================================================
 import { adminClient } from "../lib/supabase";
+import { emitAgniOwnerCaseBestEffort } from "../lib/agni/ownerCaseClient";
 import { fail, ok, type Result } from "../lib/errors";
 import {
   CANONICAL_ASSIGNMENT_RPC,
@@ -91,11 +92,41 @@ export async function executeCanonicalAssignment(
 
     if (error) {
       if (isMissingAuthorityError(error)) {
+        await emitAgniOwnerCaseBestEffort({
+          sourceRef: `assignment:${request.leadId}`,
+          subjectType: "CLIENT",
+          subjectRef: request.leadId,
+          domain: "LEAD_ASSIGNMENT",
+          severity: "CRITICAL",
+          summaryCode: CANONICAL_ASSIGNMENT_AUTHORITY_MISSING,
+          evidenceRefs: [`assignment-mode:${request.mode}`],
+          platformFault: {
+            targetSystem: "QUICKFURNO",
+            targetService: "quickfurno.web",
+            category: "RELIABILITY",
+            signalType: CANONICAL_ASSIGNMENT_AUTHORITY_MISSING,
+          },
+        });
         return { ok: false, code: CANONICAL_ASSIGNMENT_AUTHORITY_MISSING, error: CANONICAL_AUTHORITY_MIGRATION_HINT };
       }
       // The authority raises only to roll the whole transaction back, so an
       // error here means NOTHING was committed. Surface it; never retry with a
       // different path.
+      await emitAgniOwnerCaseBestEffort({
+        sourceRef: `assignment:${request.leadId}`,
+        subjectType: "CLIENT",
+        subjectRef: request.leadId,
+        domain: "LEAD_ASSIGNMENT",
+        severity: "CRITICAL",
+        summaryCode: "CANONICAL_ASSIGNMENT_FAILED",
+        evidenceRefs: [`assignment-mode:${request.mode}`],
+        platformFault: {
+          targetSystem: "QUICKFURNO",
+          targetService: "quickfurno.web",
+          category: "RELIABILITY",
+          signalType: "CANONICAL_ASSIGNMENT_FAILED",
+        },
+      });
       return {
         ok: false,
         code: "CANONICAL_ASSIGNMENT_FAILED",
@@ -105,6 +136,21 @@ export async function executeCanonicalAssignment(
 
     return ok(normalizeCanonicalAssignmentResult(data, request));
   } catch (e) {
+    await emitAgniOwnerCaseBestEffort({
+      sourceRef: `assignment:${request.leadId}`,
+      subjectType: "CLIENT",
+      subjectRef: request.leadId,
+      domain: "LEAD_ASSIGNMENT",
+      severity: "CRITICAL",
+      summaryCode: "CANONICAL_ASSIGNMENT_EXCEPTION",
+      evidenceRefs: [`assignment-mode:${request.mode}`],
+      platformFault: {
+        targetSystem: "QUICKFURNO",
+        targetService: "quickfurno.web",
+        category: "RELIABILITY",
+        signalType: "CANONICAL_ASSIGNMENT_EXCEPTION",
+      },
+    });
     return fail(e);
   }
 }

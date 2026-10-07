@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "qf.owner.case.v1",
+  "title": "QuickFurno Owner Case V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "caseId",
+    "sourceSystem",
+    "sourceRef",
+    "subjectType",
+    "domain",
+    "severity",
+    "summaryCode",
+    "evidenceRefs"
+  ],
+  "properties": {
+    "protocol": { "const": "qf.owner.case.v1" },
+    "caseId": { "type": "string", "format": "uuid" },
+    "sourceSystem": { "enum": ["QUICKFURNO", "JARVIS"] },
+    "sourceRef": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$" },
+    "subjectType": { "enum": ["CLIENT", "VENDOR", "PROSPECT", "SYSTEM", "AGENT", "UNKNOWN"] },
+    "subjectRef": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$" },
+    "domain": {
+      "enum": [
+        "CLIENT_SUPPORT",
+        "VENDOR_SUPPORT",
+        "ACQUISITION",
+        "AUTH",
+        "LEAD_ASSIGNMENT",
+        "MATCHING",
+        "PAYMENT",
+        "WHATSAPP",
+        "AGENT",
+        "INFRA",
+        "SECURITY",
+        "OTHER"
+      ]
+    },
+    "severity": { "enum": ["INFO", "WARNING", "CRITICAL", "EMERGENCY"] },
+    "summaryCode": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$" },
+    "evidenceRefs": {
+      "type": "array",
+      "maxItems": 24,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$" }
+    },
+    "platformFault": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targetSystem", "targetService", "category", "signalType"],
+      "properties": {
+        "targetSystem": { "enum": ["QUICKFURNO", "JARVIS"] },
+        "targetService": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$" },
+        "category": {
+          "enum": ["RELIABILITY", "SECURITY", "PERFORMANCE", "COST", "DEPENDENCY", "OBSERVABILITY"]
+        },
+        "signalType": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$" }
+      }
+    }
+  }
+}

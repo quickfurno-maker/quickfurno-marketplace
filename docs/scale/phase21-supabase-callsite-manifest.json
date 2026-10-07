@@ -9,7 +9,7 @@
     "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
   },
   "totals": {
-    "files": 138,
+    "files": 139,
     "rpcNames": 85,
     "tableNames": 120,
     "storageBuckets": 0,
@@ -924,6 +924,21 @@
       "rpc": [],
       "tables": [
         "agni_action_proposals"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/agniOwnerSnapshotService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "cities",
+        "lead_assignments",
+        "leads",
+        "payments",
+        "vendors"
       ],
       "storageBuckets": [],
       "auth": false,

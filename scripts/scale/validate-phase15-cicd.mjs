@@ -11,6 +11,7 @@ const [
   controller,
   switcher,
   wrapper,
+  bootstrap,
   schema,
   docs,
 ] = await Promise.all([
@@ -20,6 +21,7 @@ const [
   read('ops/phase15/blue-green.sh'),
   read('ops/phase15/nginx-switch.sh'),
   read('ops/phase15/qf-phase15-release.wrapper'),
+  read('ops/phase15/bootstrap-production-host.sh'),
   read('contracts/qf-release-phase15-v1.schema.json'),
   read('docs/operations/phase15-immutable-cicd-bluegreen.md'),
 ]);
@@ -143,6 +145,20 @@ add(
     wrapper.includes('group/world writable') &&
     wrapper.includes("CONTROL_ROOT='/srv/quickfurno/release-control'") &&
     wrapper.includes('CONTROLLER="$CONTROL_ROOT/ops/phase15/blue-green.sh"'),
+);
+add(
+  'host bootstrap preserves legacy traffic and installs fail-closed release controls',
+  bootstrap.includes('TRAFFIC_UNCHANGED upstream=127.0.0.1:3000') &&
+    bootstrap.includes('QF_PHASE15_BOOTSTRAP_READY') &&
+    bootstrap.includes('phase15-active-upstream.conf') &&
+    bootstrap.includes('legacy-pm2 bootstrap') &&
+    bootstrap.includes('rollback_nginx') &&
+    bootstrap.includes('/etc/quickfurno/production.env') &&
+    bootstrap.includes('/srv/quickfurno/release-control') &&
+    bootstrap.includes('visudo -cf') &&
+    bootstrap.includes('docker compose -f "$CONTROL_ROOT/ops/container/compose.production.yml" config --quiet') &&
+    !bootstrap.includes('docker system prune') &&
+    !bootstrap.includes('docker image prune'),
 );
 add(
   'release contract requires human approval and forbids automatic production apply',

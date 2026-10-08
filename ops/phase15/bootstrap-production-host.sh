@@ -12,7 +12,8 @@ SOURCE_ROOT="$(cd "$HERE/../.." && pwd)"
 CONTROL_ROOT="/srv/quickfurno/release-control"
 ENV_FILE="/etc/quickfurno/production.env"
 STATE_ROOT="/var/lib/quickfurno-phase15"
-NGINX_SITE="/etc/nginx/sites-enabled/quickfurno"
+NGINX_SITE_ENTRY="/etc/nginx/sites-enabled/quickfurno"
+NGINX_SITE=""
 NGINX_INCLUDE="/etc/nginx/quickfurno/phase15-active-upstream.conf"
 LIVE_LINK="/var/www/quickfurno-marketplace"
 
@@ -24,7 +25,16 @@ die(){ echo "QF_PHASE15_BOOTSTRAP_REFUSED: $1" >&2; exit 1; }
 command -v docker >/dev/null 2>&1 || die "Docker must be installed before bootstrap"
 docker compose version >/dev/null 2>&1 || die "Docker Compose v2 missing"
 [[ -L "$LIVE_LINK" ]] || die "legacy production link missing"
-[[ -f "$NGINX_SITE" && ! -L "$NGINX_SITE" ]] || die "QuickFurno Nginx site invalid"
+if [[ -L "$NGINX_SITE_ENTRY" ]]; then
+  NGINX_SITE="$(readlink -f "$NGINX_SITE_ENTRY")"
+  [[ "$NGINX_SITE" == /etc/nginx/sites-available/* ]] || die "QuickFurno Nginx symlink target invalid"
+elif [[ -f "$NGINX_SITE_ENTRY" ]]; then
+  NGINX_SITE="$NGINX_SITE_ENTRY"
+else
+  die "QuickFurno Nginx site missing"
+fi
+[[ -f "$NGINX_SITE" && ! -L "$NGINX_SITE" ]] || die "QuickFurno Nginx site target invalid"
+[[ "$(stat -c '%u' "$NGINX_SITE")" == "0" ]] || die "QuickFurno Nginx site must be root-owned"
 
 for port in 3101 3102; do
   if ss -lnt | awk '{print $4}' | grep -Eq "[:.]$port$"; then

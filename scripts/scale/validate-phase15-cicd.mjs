@@ -151,6 +151,10 @@ add(
   bootstrap.includes('TRAFFIC_UNCHANGED upstream=127.0.0.1:3000') &&
     bootstrap.includes('QF_PHASE15_BOOTSTRAP_READY') &&
     bootstrap.includes('phase15-active-upstream.conf') &&
+    bootstrap.includes('NGINX_SITE_ENTRY="/etc/nginx/sites-enabled/quickfurno"') &&
+    bootstrap.includes('readlink -f "$NGINX_SITE_ENTRY"') &&
+    bootstrap.includes('/etc/nginx/sites-available/*') &&
+    bootstrap.includes('QuickFurno Nginx site must be root-owned') &&
     bootstrap.includes('legacy-pm2 bootstrap') &&
     bootstrap.includes('rollback_nginx') &&
     bootstrap.includes('/etc/quickfurno/production.env') &&

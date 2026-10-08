@@ -16,6 +16,12 @@ services:
       - ${QF_ENV_FILE:?QF_ENV_FILE must point to an external production env file}
     ports:
       - "127.0.0.1:${QF_WEB_HOST_PORT:-3000}:3000"
+    secrets:
+      - source: agni-case-private-key
+        target: quickfurno-core-agni-private.pem
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m
@@ -59,6 +65,12 @@ services:
       QF_RELEASE_SHA: ${QF_RELEASE_SHA:?QF_RELEASE_SHA must be the exact source git SHA}
     env_file:
       - ${QF_ENV_FILE:?QF_ENV_FILE must point to an external production env file}
+    secrets:
+      - source: agni-case-private-key
+        target: quickfurno-core-agni-private.pem
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m
@@ -140,3 +152,7 @@ services:
 networks:
   qf-private:
     driver: bridge
+
+secrets:
+  agni-case-private-key:
+    file: /etc/quickfurno/secrets/quickfurno-core-agni-private.pem

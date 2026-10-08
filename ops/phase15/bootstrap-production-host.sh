@@ -62,7 +62,7 @@ install -d -o 0 -g 0 -m 0700 "$BACKUP"
 install -o 0 -g 0 -m 0600 "$NGINX_SITE" "$BACKUP/nginx-site"
 
 # Secret material is copied only locally on the server and is never printed.
-install -d -o 0 -g 0 -m 0755 /etc/quickfurno
+install -d -o 0 -g 0 -m 0755 /etc/quickfurno /etc/quickfurno/secrets
 install -o 0 -g 0 -m 0600 "$LEGACY_ENV" "$ENV_FILE"
 
 # Install the minimum reviewed release-control closure instead of a writable repo.

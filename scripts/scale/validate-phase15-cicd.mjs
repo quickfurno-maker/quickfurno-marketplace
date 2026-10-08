@@ -12,6 +12,7 @@ const [
   switcher,
   wrapper,
   bootstrap,
+  compose,
   schema,
   docs,
 ] = await Promise.all([
@@ -22,6 +23,7 @@ const [
   read('ops/phase15/nginx-switch.sh'),
   read('ops/phase15/qf-phase15-release.wrapper'),
   read('ops/phase15/bootstrap-production-host.sh'),
+  read('ops/container/compose.production.yml'),
   read('contracts/qf-release-phase15-v1.schema.json'),
   read('docs/operations/phase15-immutable-cicd-bluegreen.md'),
 ]);
@@ -163,6 +165,15 @@ add(
     bootstrap.includes('docker compose -f "$CONTROL_ROOT/ops/container/compose.production.yml" config --quiet') &&
     !bootstrap.includes('docker system prune') &&
     !bootstrap.includes('docker image prune'),
+);
+add(
+  'AGNI case signing key uses a file-backed secret only in eligible runtimes',
+  compose.includes('agni-case-private-key:') &&
+    compose.includes('file: /etc/quickfurno/secrets/quickfurno-core-agni-private.pem') &&
+    compose.includes('target: quickfurno-core-agni-private.pem') &&
+    (compose.match(/source: agni-case-private-key/gu) ?? []).length === 2 &&
+    !compose.includes('/run/quickfurno-secrets') &&
+    bootstrap.includes('/etc/quickfurno/secrets'),
 );
 add(
   'release contract requires human approval and forbids automatic production apply',

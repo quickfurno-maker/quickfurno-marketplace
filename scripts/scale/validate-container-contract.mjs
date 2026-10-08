@@ -94,6 +94,14 @@ const checks = [
     compose.includes('"127.0.0.1:${QF_WEB_HOST_PORT:-3000}:3000"'),
   ],
   [
+    "web ISR route cache is ephemeral on read-only runtime",
+    compose.includes('/app/.next/server/route-cache:rw,noexec,nosuid,nodev,size=64m'),
+  ],
+  [
+    "non-HTTP workers disable inherited HTTP image healthcheck",
+    (compose.match(/healthcheck:\s*\n\s*disable: true/gu) ?? []).length === 3,
+  ],
+  [
     "read-only containers",
     (compose.match(/read_only: true/g) ?? []).length >= 4,
   ],

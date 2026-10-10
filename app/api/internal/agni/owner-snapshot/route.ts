@@ -4,6 +4,7 @@ import {
   AGNI_OWNER_ACTOR,
   AGNI_OWNER_SNAPSHOT_PATH,
   parseAgniOwnerSnapshotRequest,
+  parseAgniParentHeartbeatRequest,
 } from "@/lib/agni/ownerContract";
 import { parseQfjVerificationKeys } from "@/lib/jarvis/coreDecisionAuth";
 import {
@@ -12,6 +13,7 @@ import {
   verifyQfjScaleWebRequest,
 } from "@/lib/jarvis/scaleRequestGuard";
 import { getAgniOwnerQuickFurnoSnapshot } from "@/services/agniOwnerSnapshotService";
+import { getAgniQuickFurnoParentHeartbeat } from "@/services/agniParentHeartbeatService";
 
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
@@ -36,7 +38,8 @@ export async function POST(request:Request):Promise<Response>{
   let decoded:unknown;
   try{decoded=JSON.parse(Buffer.from(raw).toString("utf8"));}
   catch{return reply(400,{error:"invalid_request"});}
-  if(!parseAgniOwnerSnapshotRequest(decoded))return reply(400,{error:"invalid_request"});
+  const challenge=parseAgniParentHeartbeatRequest(decoded);
+  if(!parseAgniOwnerSnapshotRequest(decoded)&&challenge===null)return reply(400,{error:"invalid_request"});
 
   const keys=parseQfjVerificationKeys(process.env.QF_AGNI_VERIFICATION_KEYS_JSON);
   if(!keys)return reply(503,{error:"service_unavailable"});
@@ -51,7 +54,9 @@ export async function POST(request:Request):Promise<Response>{
   }
 
   try{
-    return reply(200,await getAgniOwnerQuickFurnoSnapshot(),qfjScaleHeadersForResult(verified));
+    return reply(200,challenge!==null
+      ?await getAgniQuickFurnoParentHeartbeat(challenge)
+      :await getAgniOwnerQuickFurnoSnapshot(),qfjScaleHeadersForResult(verified));
   }catch{
     return reply(503,{error:"service_unavailable"},qfjScaleHeadersForResult(verified,"QFJ_UPSTREAM_UNAVAILABLE"));
   }

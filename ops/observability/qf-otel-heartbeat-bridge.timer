@@ -1,0 +1,11 @@
+[Unit]
+Description=Emit QuickFurno health heartbeat every 15 seconds
+
+[Timer]
+OnBootSec=5s
+OnUnitActiveSec=15s
+AccuracySec=1s
+Unit=qf-otel-heartbeat-bridge.service
+
+[Install]
+WantedBy=timers.target

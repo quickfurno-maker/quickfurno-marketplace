@@ -50,6 +50,26 @@ if(
   !overlay.includes('QF_OTEL_SECRET_DIR')||
   overlay.includes('depends_on')
 )fail('QuickFurno agent overlay invalid or telemetry became blocking');
+const heartbeatBridge=read('ops/observability/qf-otel-heartbeat-bridge.py');
+const heartbeatService=read('ops/observability/qf-otel-heartbeat-bridge.service');
+const heartbeatTimer=read('ops/observability/qf-otel-heartbeat-bridge.timer');
+const heartbeatInstaller=read('ops/observability/install-qf-otel-heartbeat-bridge.sh');
+if(!heartbeatBridge.includes('http://127.0.0.1:4318/v1/metrics'))fail('PM2 heartbeat bridge must export only to local OTEL agent');
+if(!heartbeatBridge.includes('qf.telemetry.heartbeat.unixtime'))fail('PM2 heartbeat metric missing');
+if(!heartbeatBridge.includes('os.scandir("/proc")'))fail('PM2 heartbeat bridge must use read-only procfs liveness');
+if(heartbeatBridge.includes('subprocess')||heartbeatBridge.includes('os.system')||heartbeatBridge.includes('Popen'))fail('PM2 heartbeat bridge may not execute processes');
+if(!heartbeatBridge.includes('/var/www/quickfurno-marketplace/dist/automation-worker.mjs'))fail('automation worker liveness marker missing');
+if(!heartbeatBridge.includes('/var/www/quickfurno-marketplace/dist/conversation-transpor'))fail('conversation transport PM2 process-title prefix missing');
+if(heartbeatBridge.includes('/var/run/docker.sock'))fail('PM2 heartbeat bridge must not gain Docker authority');
+if(!heartbeatService.includes('DynamicUser=yes')||!heartbeatService.includes('NoNewPrivileges=yes')||!heartbeatService.includes('ProtectSystem=strict'))fail('PM2 heartbeat service hardening drift');
+if(!heartbeatService.includes('Requires=qf-otel-agent.service'))fail('PM2 heartbeat service must depend on local OTEL agent only');
+if(!heartbeatTimer.includes('OnUnitActiveSec=15s')||!heartbeatTimer.includes('WantedBy=timers.target'))fail('PM2 heartbeat timer cadence/boot contract drift');
+if(!heartbeatInstaller.includes('systemctl enable --now qf-otel-heartbeat-bridge.timer'))fail('PM2 heartbeat installer boot persistence missing');
+if(!heartbeatInstaller.includes('qf-otel-agent.service is not active'))fail('PM2 heartbeat installer must fail closed without local OTEL agent');
+if(!heartbeatInstaller.includes('QF_OTEL_HEARTBEAT_BRIDGE_INSTALLED'))fail('PM2 heartbeat installer completion token missing');
+if(!heartbeatBridge.includes('response.status < 300'))fail('PM2 bridge Web health may not mark 4xx/5xx healthy');
+if(!heartbeatBridge.includes('title == expected'))fail('PM2 bridge must match exact PM2 process title');
+if(!heartbeatBridge.includes('class _NoRedirect'))fail('PM2 bridge must not follow external redirects');
 for(const forbidden of ['compose.observability.yml','prometheus.yml','tempo.yaml','loki.yaml','otel-collector.yaml']){
   if(existsSync('ops/observability/'+forbidden))fail('central observability ownership leaked into QuickFurno: '+forbidden);
 }

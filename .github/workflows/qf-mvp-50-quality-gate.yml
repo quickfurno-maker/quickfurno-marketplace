@@ -730,6 +730,9 @@ jobs:
       - name: Certify Phase 14 observability and AGNI governance
         run: npm run test:scale:phase14
 
+      - name: Exercise PM2 bridge fail-closed heartbeat contracts
+        run: python3 -m unittest discover -s ops/observability/tests -p 'test_*.py' -v
+
       - name: Render Phase 14 telemetry overlay
         shell: bash
         run: |

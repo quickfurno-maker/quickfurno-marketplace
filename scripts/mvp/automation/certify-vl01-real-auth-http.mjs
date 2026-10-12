@@ -61,7 +61,7 @@ try {
   "-e","GOTRUE_SITE_URL=http://localhost","-e","API_EXTERNAL_URL=http://localhost:9999","-e","GOTRUE_API_EXTERNAL_URL=http://localhost:9999",
   "-e","GOTRUE_JWT_SECRET="+jwtSecret,"-e","GOTRUE_JWT_AUD=authenticated","-e","GOTRUE_JWT_DEFAULT_GROUP_NAME=authenticated",
   "-e","GOTRUE_EXTERNAL_EMAIL_ENABLED=true","-e","GOTRUE_MAILER_AUTOCONFIRM=true",
-  "-e","GOTRUE_DISABLE_SIGNUP=false","public.ecr.aws/supabase/gotrue:v2.196.0");dbs.push(gt);
+  "-e","GOTRUE_DISABLE_SIGNUP=false","supabase/gotrue:v2.196.0");dbs.push(gt);
  const authPort=Number(docker("port",gt,"9999/tcp").match(/127\.0\.0\.1:(\d+)/)?.[1]);
  await ready("http://127.0.0.1:"+authPort+"/health");
  docker("run","-d","--name",rest,"--network",net,"-p","127.0.0.1::3000",

@@ -41,6 +41,14 @@ export function safeTraceCode(value: unknown): string | null {
   return value;
 }
 
+/** Correlation IDs are opaque internal references, not user-supplied contact data.
+ * Reject unscoped values and phone-like digit runs even if they pass safeTraceCode. */
+export function safeTraceCorrelationId(value: unknown): string | null {
+  if (typeof value !== "string" || value.length > 100) return null;
+  if (!/^(?:qf|qfj|agni|jarvis|automation|aos)[.:_-][A-Za-z0-9._:-]{1,96}$/i.test(value)) return null;
+  if (/[0-9]{9,}/.test(value)) return null;
+  return value;
+}
 export function traceStateForStatus(value: unknown): AutomationTraceState {
   if (value === "authorized") return "observed";
   if (value === "succeeded" || value === "completed") return "succeeded";

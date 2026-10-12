@@ -3,7 +3,7 @@ import "server-only";
 import { adminClient } from "@/lib/supabase";
 import { getAutomationStudioWorkflowKeyForFamily } from "@/services/automationStudioService";
 import { getWorkflowFamilyForAction, isAutomationActionType } from "@/lib/automation/actionRegistry";
-import { isAutomationTraceJobId, safeTraceCode, sortTraceEvents, traceStateForStatus, type AutomationTraceEvent, type AutomationStudioExecutionTrace } from "@/lib/automation/studioTraceContract";
+import { isAutomationTraceJobId, safeTraceCode, safeTraceCorrelationId, sortTraceEvents, traceStateForStatus, type AutomationTraceEvent, type AutomationStudioExecutionTrace } from "@/lib/automation/studioTraceContract";
 
 const MAX_EVIDENCE_ROWS = 40;
 
@@ -107,7 +107,7 @@ export async function getAutomationStudioExecutionTrace(jobId: string): Promise<
       ? getAutomationStudioWorkflowKeyForFamily(getWorkflowFamilyForAction(request.action_type))
       : "unknown",
     entityType: code(request.entity_type) ?? "unknown",
-    correlationId: code(request.correlation_id),
+    correlationId: safeTraceCorrelationId(request.correlation_id),
     jobStatus: code(job.status) ?? "unknown",
     decisionStatus: code(request.decision_status) ?? "unknown",
     events: sortTraceEvents(events),

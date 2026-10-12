@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
-import { isAutomationTraceJobId, safeTraceCode, sortTraceEvents, traceStateForStatus } from "../../../lib/automation/studioTraceContract.ts";
+import { isAutomationTraceJobId, safeTraceCode, safeTraceCorrelationId, sortTraceEvents, traceStateForStatus } from "../../../lib/automation/studioTraceContract.ts";
 
 assert.equal(safeTraceCode("QF_EXEC_VARIABLES_UNRESOLVED"), "QF_EXEC_VARIABLES_UNRESOLVED");
+assert.equal(safeTraceCorrelationId("qf.trace:anisha-safe-123"), "qf.trace:anisha-safe-123");
+assert.equal(safeTraceCorrelationId("9876543210"), null);
+assert.equal(safeTraceCorrelationId("qf.trace:919876543210"), null);
+assert.equal(safeTraceCorrelationId("customer_abc"), null);
+assert.equal(safeTraceCorrelationId("qf.trace:abc+9198"), null);
 assert.equal(safeTraceCode("vendor.response_reminder"), "vendor.response_reminder");
 assert.equal(safeTraceCode("phone:+919876543210 somebody's response"), null);
 assert.equal(safeTraceCode("<script>alert(1)</script>"), null);

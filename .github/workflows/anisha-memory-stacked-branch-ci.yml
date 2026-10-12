@@ -1,0 +1,38 @@
+name: Anisha Core Stacked Branch CI
+
+on:
+  push:
+    branches:
+      - feat/anisha-core-memory-consent
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anisha-core-consent-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  memory-core-cert:
+    name: Anisha Core consent cert
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24.18.0
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Confirm Core consent and user dashboard boundaries
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-anisha-memory-consent.mjs
+      - name: Confirm Core purge and ACK contracts
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-anisha-memory-purge.mjs
+      - name: Test the actual Core signed request verifier
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-anisha-memory-signature.mjs
+      - name: Typecheck the entire Core application
+        run: npm run typecheck

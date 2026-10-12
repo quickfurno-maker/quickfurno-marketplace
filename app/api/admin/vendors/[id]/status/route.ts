@@ -10,7 +10,7 @@ import { activateVendorLogin } from "@/services/vendorLoginActivationService";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_ACTIONS: VendorStatusAction[] = ["approve", "reject", "suspend", "activate", "deactivate"];
+const ALLOWED_ACTIONS: VendorStatusAction[] = ["approve", "reject", "suspend", "activate", "deactivate", "activate_leads", "pause_leads"];
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getAdminSession();

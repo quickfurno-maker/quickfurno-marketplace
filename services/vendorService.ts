@@ -80,9 +80,9 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
 
     // Signup is capture-only: never award matching eligibility from self-asserted
     // Google fields. The office must pass an independent admin Place ID lookup.
-    if (isFullOnboarding && (!input.google_place_id || !input.google_city ||
+    if (!input.google_place_id || !input.google_city ||
       !input.formatted_address ||
-      !normalizeCoordinate(input.office_latitude, input.office_longitude))) {
+      !normalizeCoordinate(input.office_latitude, input.office_longitude)) {
       return { ok: false, code: "VALIDATION", error: "Select an exact Google Places business location before registering." };
     }
     // City is already resolved against active markets; coordinates are not trusted

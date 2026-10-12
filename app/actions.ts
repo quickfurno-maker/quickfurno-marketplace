@@ -527,6 +527,26 @@ export async function vendorCreatePackageOrder(formData: FormData) {
   redirect("/vendor/dashboard/package?order=created");
 }
 
+export async function vendorSubmitOfficeLocationChangeRequest(formData: FormData) {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/profile?request=no-vendor");
+  const user = await currentUser();
+  if (!user?.id) redirect("/vendor/dashboard/profile?request=failed&code=UNAUTHORIZED");
+
+  // No office, zone or matching edit from a vendor session. This creates an
+  // approval-only request; Google Place ID is re-resolved by Core on review.
+  const result = await vendorProfileChanges.createVendorOfficeLocationChangeRequest(me.data.id, user.id, {
+    google_place_id: String(formData.get("google_place_id") ?? ""),
+    google_city: String(formData.get("google_city") ?? ""),
+    formatted_address: String(formData.get("formatted_address") ?? ""),
+    latitude: Number(formData.get("latitude")),
+    longitude: Number(formData.get("longitude")),
+  });
+  revalidatePath("/vendor/dashboard/profile");
+  if (!result.ok) redirect(`/vendor/dashboard/profile?request=failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/profile?request=submitted");
+}
+
 export async function vendorSubmitProfileChangeRequest(formData: FormData) {
   const me = await getMyVendor();
   if (!me.ok || !me.data) redirect("/vendor/dashboard/profile?request=no-vendor");

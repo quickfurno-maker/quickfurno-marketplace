@@ -1,0 +1,28 @@
+name: VL-01 Real Auth HTTP Certification
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  integrated-auth-trace:
+    name: Real GoTrue + PostgREST + Core HTTP
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Configure Node 20
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install pinned dependencies
+        run: npm ci
+      - name: Real signed session, Postgres and Next HTTP
+        run: node scripts/mvp/automation/certify-vl01-real-auth-http.mjs

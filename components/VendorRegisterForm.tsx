@@ -26,6 +26,7 @@ import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
 // and public category pages show the correct category.
 // ---------------------------------------------------------------------------
 
+// VL-02: Only a selected Google Place qualifies as the vendor's business base; free text is not verified.
 // Phase 1: static per-city service-area chips (CITY_SERVICE_AREAS) were removed.
 // Vendors now set a single Google business base area/locality (with manual
 // fallback), which produces canonical base coordinates for future matching.
@@ -421,8 +422,8 @@ export function VendorRegisterForm({
         if (!cityStr) {
           e.push({ key: "city", message: "Select your city." });
         }
-        if (baseAreaStr.length < 2) {
-          e.push({ key: "baseArea", message: "Enter your business base area / locality." });
+        if (baseAreaStr.length < 2 || !f.googlePlaceId || !f.googleCity || !f.formattedAddress || f.baseLatitude == null || f.baseLongitude == null) {
+          e.push({ key: "baseArea", message: "Choose your business location from Google Places suggestions." });
         }
         if (address1Str.length < 5) {
           e.push({ key: "addressLine1", message: "Enter your office or business address." });
@@ -585,6 +586,8 @@ export function VendorRegisterForm({
       (selectedMain.subcategories.length === 0 || f.subCategory) &&
       cityValue &&
       baseAreaValue.length >= 2 &&
+      Boolean(f.googlePlaceId && f.googleCity && f.formattedAddress) &&
+      f.baseLatitude != null && f.baseLongitude != null &&
       address1Str.length >= 5 &&
       stateStr.length > 0 &&
       (!usesSqftRate || rateValid);
@@ -949,6 +952,7 @@ export function VendorRegisterForm({
                           baseArea: "",
                           baseAreaNormalized: "",
                           googlePlaceId: "",
+                          googleCity: "",
                           formattedAddress: "",
                           sublocality: "",
                           neighborhood: "",
@@ -1000,8 +1004,8 @@ export function VendorRegisterForm({
             <p className="qf-vrf-subhead">Exact office / business location</p>
             {(() => {
               const baseTouched = touched.baseArea || showErrors;
-              const baseValid = baseAreaValue.length >= 2;
-              const basePrecise = Boolean(f.googlePlaceId);
+              const basePrecise = Boolean(f.googlePlaceId && f.googleCity && f.formattedAddress && f.baseLatitude != null && f.baseLongitude != null);
+              const baseValid = baseAreaValue.length >= 2 && basePrecise;
               const baseInvalid = baseTouched && !baseValid;
               const wrapperClass = `qf-rf-field${baseInvalid ? " has-error" : ""}${basePrecise ? " is-valid" : ""}`;
               return (
@@ -1043,7 +1047,7 @@ export function VendorRegisterForm({
                     </span>
                   ) : (
                     <span className="qf-rf-loc-note" style={{ marginTop: "0.25rem" }}>
-                      Pick a Google suggestion for precise matching. Manual entry remains available.
+                      Select a Google Places suggestion. Typed addresses alone cannot verify your business base location.
                     </span>
                   )}
                 </label>

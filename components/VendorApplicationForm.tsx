@@ -3,7 +3,10 @@
 import { FormEvent, useState } from "react";
 import { submitVendorRegistration } from "@/app/actions";
 import { SERVICES } from "@/lib/config";
-import { cities } from "@/lib/quickfurno-data";
+import GooglePlaceAutocomplete from "@/components/location/GooglePlaceAutocomplete";
+import { isPlaceCompatibleWithSelectedCity } from "@/lib/google-maps/normalizePlace";
+import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
+import { useActiveCities } from "@/lib/locations/useActiveCities";
 
 type VendorFormState = {
   businessName: string;
@@ -40,9 +43,26 @@ export function VendorApplicationForm() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<NormalizedGooglePlace | null>(null);
+  const { cities: activeCities, records: activeCityRecords } = useActiveCities();
 
   function updateField(field: keyof VendorFormState, value: string) {
+    if (field === "address" || field === "city") setSelectedPlace(null);
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function selectGoogleOffice(place: NormalizedGooglePlace) {
+    const city = activeCityRecords.find((item) => item.name.toLowerCase() === form.city.toLowerCase());
+    const labels = city?.acceptedCityLabels ?? [form.city];
+    if (!form.city || !isPlaceCompatibleWithSelectedCity(place, form.city, labels) ||
+      !place.placeId || !place.city || !place.formattedAddress || place.lat == null || place.lng == null) {
+      setSelectedPlace(null);
+      setError("Choose an exact Google Places address inside your selected city.");
+      return;
+    }
+    setSelectedPlace(place);
+    setForm((current) => ({ ...current, address: place.formattedAddress ?? "" }));
+    setError("");
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -61,6 +81,11 @@ export function VendorApplicationForm() {
       setError("Please enter a valid 10 digit phone number.");
       return;
     }
+    if (!selectedPlace?.placeId || !selectedPlace.city || !selectedPlace.formattedAddress ||
+      selectedPlace.lat == null || selectedPlace.lng == null) {
+      setError("Select your business address from Google Places suggestions before applying.");
+      return;
+    }
 
     setSubmitting(true);
     const messageParts = [
@@ -77,6 +102,15 @@ export function VendorApplicationForm() {
         owner_name: form.ownerName.trim(),
         phone: form.phone.trim(),
         city: form.city,
+        // Captured for Core admin review only: not matching authority at signup.
+        google_place_id: selectedPlace.placeId,
+        google_city: selectedPlace.city,
+        formatted_address: selectedPlace.formattedAddress,
+        office_latitude: selectedPlace.lat,
+        office_longitude: selectedPlace.lng,
+        area_normalized: selectedPlace.areaNormalized ?? undefined,
+        sublocality: selectedPlace.sublocality ?? undefined,
+        neighborhood: selectedPlace.neighborhood ?? undefined,
         service_categories: [form.serviceCategory],
         experience: form.experience.trim() || undefined,
         portfolio_urls: form.projectImage.trim() ? [form.projectImage.trim()] : [],
@@ -87,8 +121,9 @@ export function VendorApplicationForm() {
         return;
       }
 
-      setSuccess("Vendor application received. QuickFurno will review your profile and contact you shortly.");
+      setSuccess("Vendor application received. Your Google-selected business location is pending Core verification.");
       setForm(initialVendorForm);
+      setSelectedPlace(null);
     } catch (err) {
       console.error("[vendor application form] submission error", {
         message: err instanceof Error ? err.message : "Unknown error",
@@ -131,7 +166,7 @@ export function VendorApplicationForm() {
           <span>City</span>
           <select value={form.city} onChange={(event) => updateField("city", event.target.value)}>
             <option value="">Select city</option>
-            {cities.map((city) => <option key={city} value={city}>{city}</option>)}
+            {activeCities.map((city) => <option key={city} value={city}>{city}</option>)}
           </select>
         </label>
         <label>
@@ -158,8 +193,17 @@ export function VendorApplicationForm() {
           <input value={form.projectImage} onChange={(event) => updateField("projectImage", event.target.value)} placeholder="Future upload URL or file picker" />
         </label>
         <label className="form-grid-full">
-          <span>Address</span>
-          <input value={form.address} onChange={(event) => updateField("address", event.target.value)} />
+          <span>Exact Google business / office location</span>
+          <GooglePlaceAutocomplete
+            value={form.address}
+            city={form.city}
+            mode="address"
+            onManualChange={(value) => updateField("address", value)}
+            onPlaceSelected={selectGoogleOffice}
+            disabled={!form.city}
+            placeholder={form.city ? "Search building, shop, society or street" : "Select your city first"}
+          />
+          <small>{selectedPlace?.placeId ? "Google location selected; Core verification pending." : "Select a Google suggestion. Typed addresses are not verified."}</small>
         </label>
         <label className="form-grid-full">
           <span>Message</span>

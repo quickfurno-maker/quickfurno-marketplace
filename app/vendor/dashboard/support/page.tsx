@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { anishaMemoryConsentStagingEnabled } from "@/lib/jarvis/anishaMemoryConsentContract";
 import { getMyVendor } from "@/app/actions";
 import { VendorNoProfileFallback } from "@/app/vendor/dashboard/_components/VendorNoProfileFallback";
 import { VendorSupportWorkspace } from "@/components/vendor-dashboard-v2/support/VendorSupportWorkspace";
@@ -30,10 +32,19 @@ export default async function VendorSupportPage(props: VendorSupportPageProps) {
   const threadsResult = await listVendorSupportThreads(vendor.id);
 
   return (
-    <VendorSupportWorkspace
-      threads={threadsResult.ok ? threadsResult.data : []}
-      feedback={readSupportFeedback(searchParams?.support)}
-      loadError={!threadsResult.ok}
-    />
+    <>
+      {anishaMemoryConsentStagingEnabled() ? (
+        <p>
+          <Link href="/vendor/dashboard/memory">
+            Anisha optional memory consent &amp; deletion preferences (staging)
+          </Link>
+        </p>
+      ) : null}
+      <VendorSupportWorkspace
+        threads={threadsResult.ok ? threadsResult.data : []}
+        feedback={readSupportFeedback(searchParams?.support)}
+        loadError={!threadsResult.ok}
+      />
+    </>
   );
 }

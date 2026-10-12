@@ -60,4 +60,19 @@ check('physical erasure outbox is durable', migration.includes('vendor_anisha_me
 check('no authenticated direct writes', migration.includes('revoke all on public.vendor_anisha_memory_consents from public, anon, authenticated;'));
 check('atomic revocation blocks regrant until erase', migration.includes('vendor_memory_erasure_pending'));
 check('stage migration has no live activation directive', migration.includes('DO NOT APPLY BEFORE MANAGED STAGING MIGRATION APPROVAL'));
+
+const page = fs.readFileSync(path.join(root, 'app/vendor/dashboard/memory/page.tsx'), 'utf8');
+const panel = fs.readFileSync(path.join(root, 'components/vendor-dashboard-v2/AnishaMemoryConsentPanel.tsx'), 'utf8');
+const support = fs.readFileSync(path.join(root, 'app/vendor/dashboard/support/page.tsx'), 'utf8');
+check('vendor memory UI blocked outside stage consent gate',
+  page.includes('anishaMemoryConsentStagingEnabled()') && page.includes('notFound()'));
+check('vendor memory UI validates canonical signed-in vendor access',
+  page.includes('requireVendorAccess()'));
+check('vendor consent requires explicit unticked opt-in',
+  panel.includes('useState(false)') && panel.includes('acceptedNotice'));
+check('vendor UI covers revocation and pending deletion',
+  panel.includes('REVOKE') && panel.includes('erasurePending'));
+check('vendor support links to staging-only memory settings',
+  support.includes('anishaMemoryConsentStagingEnabled()') &&
+  support.includes('/vendor/dashboard/memory'));
 console.log('RESULT ' + n + ' passed, 0 failed');

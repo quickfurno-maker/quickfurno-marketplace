@@ -11,3 +11,17 @@ The Jarvis companion adds an independent stage-only worker and atomic Postgres e
 Local checks: 22/22 Core purpose consent tests, 27/27 Core purge contract checks, Core TypeScript PASS. Read-only connected QuickFurno staging inventory has no Anisha vendor memory consent/outbox tables as of the audit. SQL migrations are **NOT APPLIED**, not real SQL execution certified.
 
 Required before stage activation: backed-up staging DB; migration review; exact function grants and ownership review; live DB claim/expiry/ACK drill; staging Core/Jarvis signed request verification; vendor privacy consent UI and per-vendor deletion receipts; controlled re-enrollment handshake after fence. Production remains unchanged.
+
+
+## Staging-only vendor consent dashboard addition
+
+Added /vendor/dashboard/memory and an opt-in/out component under the existing
+vendor-dashboard layout, linked from Vendor Support only in staging. The server
+page verifies canonical vendor access and checks the exact Core staging gate.
+An optional purpose-specific 30-day memory permission starts unchecked;
+revocation and pending physical erasure are shown explicitly. Calls use existing
+authenticated same-origin GET/POST routes, never caller-supplied vendor IDs.
+
+This is reviewed engineering copy only; the formal vendor privacy disclosure
+has not been approved. Nothing is public or deployed. Core consent harness now
+27/27 PASS including five static staging/scope/UI invariants.

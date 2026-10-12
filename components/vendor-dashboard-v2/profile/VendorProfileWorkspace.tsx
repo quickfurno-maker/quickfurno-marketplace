@@ -7,6 +7,7 @@ import type {
 import type { VendorContactVerificationSummary } from "@/services/vendorVerificationSummaryService";
 import { VendorIcon } from "../icons";
 import { VendorProfileEditor } from "./VendorProfileEditor";
+import { VendorOfficeLocationChangeForm } from "./VendorOfficeLocationChangeForm";
 import { VendorProfileFeedback } from "./VendorProfileFeedback";
 import { VendorWhatsAppVerificationCard } from "./VendorWhatsAppVerificationCard";
 import {
@@ -114,6 +115,10 @@ export function VendorProfileWorkspace({
         <div className="qf-vendor-v2-profile-main">
           {contactVerification ? <VendorWhatsAppVerificationCard initial={contactVerification} /> : null}
           <VendorProfileEditor current={current} />
+          <VendorOfficeLocationChangeForm
+            city={vendor.city ?? ""}
+            pending={requests.some((request) => request.request_type === "office_location_change" && request.status === "pending")}
+          />
           <VendorProfileAccountDetails vendor={vendor} />
           <VendorProfileRequestHistory requests={requests} />
         </div>

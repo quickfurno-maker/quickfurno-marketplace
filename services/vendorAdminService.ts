@@ -20,11 +20,13 @@ import { evaluateVendorEligibility, type VendorEligibility } from "../lib/vendor
 // payment-confirmed wallet path (assign_package_to_vendor), manual grants from the
 // dedicated credits endpoint.
 import { applyVendorCreditDelta } from "./vendorCreditWalletService";
+import { getActiveCities } from "../lib/locations/cityService";
+import { normalizeCoordinate } from "../lib/geo/canonicalCoordinate";
 
 const VENDOR_FIELDS =
-  "id, business_name, owner_name, phone, email, city, areas_covered, covers_full_city, service_categories, status, total_credits, remaining_credits, rating, completed_projects, is_active, public_visibility, paid_status, package_name, package_status, package_expires_at, created_at";
+  "id, business_name, owner_name, phone, email, city, areas_covered, covers_full_city, service_categories, status, total_credits, remaining_credits, rating, completed_projects, is_active, public_visibility, paid_status, package_name, package_status, package_expires_at, created_at, accepting_leads, user_id, google_place_id, location_verification_status, service_zone_id, office_latitude, office_longitude";
 
-export type VendorStatusAction = "approve" | "reject" | "suspend" | "activate" | "deactivate";
+export type VendorStatusAction = "approve" | "reject" | "suspend" | "activate" | "deactivate" | "activate_leads" | "pause_leads";
 
 const STATUS_BY_ACTION: Record<"approve" | "reject" | "suspend", string> = {
   approve: "Approved",
@@ -168,13 +170,52 @@ export async function setVendorStatusAction(
   try {
     const db = adminClient();
     let update: Record<string, unknown>;
+    let expected: Record<string, unknown> | null = null;
     if (action === "activate") update = { is_active: true };
     else if (action === "deactivate") update = { is_active: false };
-    else if (action in STATUS_BY_ACTION) update = { status: STATUS_BY_ACTION[action as keyof typeof STATUS_BY_ACTION] };
+    else if (action === "pause_leads") update = { accepting_leads: false };
+    else if (action === "activate_leads") {
+      expected = await getVendorRow(id);
+      if (!expected) return { ok: false, error: "Vendor not found.", code: "NOT_FOUND" };
+      const verified = ["verified", "provisional"].includes(String(expected.location_verification_status ?? ""));
+      const zone = String(expected.service_zone_id ?? "");
+      const placeId = String(expected.google_place_id ?? "");
+      const point = normalizeCoordinate(expected.office_latitude, expected.office_longitude);
+      if (String(expected.status ?? "").toLowerCase() !== "approved" ||
+          expected.is_active !== true || !expected.user_id || !verified ||
+          !zone || !placeId || !point || Number(expected.remaining_credits ?? 0) < 1) {
+        return {
+          ok: false,
+          code: "VALIDATION",
+          error: "Approve and activate the vendor, link a dashboard login, verify the Google office/service zone, and add eligible credits first.",
+        };
+      }
+      const activeMarkets = await getActiveCities();
+      const market = activeMarkets.find((city) =>
+        city.name.toLowerCase() === String(expected?.city ?? "").toLowerCase());
+      if (!market || (market.serviceZoneId && market.serviceZoneId !== zone)) {
+        return { ok: false, code: "VALIDATION", error: "The verified service zone is no longer active for this city.", };
+      }
+      update = { accepting_leads: true };
+    } else if (action in STATUS_BY_ACTION) update = { status: STATUS_BY_ACTION[action as keyof typeof STATUS_BY_ACTION] };
     else return { ok: false, error: "Unknown vendor action.", code: "VALIDATION" };
 
-    const { error } = await db.from("vendors").update(update).eq("id", id);
-    if (error) return { ok: false, error: "Could not update the vendor.", code: "UPDATE_FAILED" };
+    // For opt-in only, apply a compare-and-swap on the verification evidence so
+    // a concurrent location/login/status change cannot enable matching on stale data.
+    let mutation = db.from("vendors").update(update).eq("id", id);
+    if (expected) {
+      mutation = mutation.eq("status", "Approved").eq("is_active", true)
+        .eq("user_id", String(expected.user_id))
+        .eq("service_zone_id", String(expected.service_zone_id))
+        .eq("google_place_id", String(expected.google_place_id))
+        .eq("location_verification_status", String(expected.location_verification_status))
+        .eq("office_latitude", Number(expected.office_latitude))
+        .eq("office_longitude", Number(expected.office_longitude));
+    }
+    const { data: changed, error } = await mutation.select("id");
+    if (error || !changed?.length) {
+      return { ok: false, error: "Could not update the vendor, or the verified state changed. Refresh and try again.", code: "UPDATE_FAILED" };
+    };
 
     await recomputeVisibility(id);
     await bestEffortAudit(`vendor.${action}`, id, { ...update, updatedBy }, actor);

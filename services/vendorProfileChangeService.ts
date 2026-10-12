@@ -6,6 +6,8 @@
 import { adminClient } from "../lib/supabase";
 import { appError, fail, ok, type Result } from "../lib/errors";
 import { createVendorNotification } from "./vendorNotificationService";
+import { backfillVendorExactLocation, type VendorLocationBackfillInput } from "./adminVendorLocationService";
+import { normalizeCoordinate } from "../lib/geo/canonicalCoordinate";
 
 export type VendorProfileChangeInput = {
   public_business_name?: string;
@@ -144,6 +146,62 @@ export async function createVendorProfileChangeRequest(
   }
 }
 
+export async function createVendorOfficeLocationChangeRequest(
+  vendorId: string,
+  requestedBy: string,
+  input: VendorLocationBackfillInput,
+): Promise<Result<VendorProfileChangeRequest>> {
+  try {
+    if (!requestedBy || !/^[0-9a-f-]{36}$/i.test(vendorId)) throw appError("UNAUTHORIZED");
+    const placeId = typeof input.google_place_id === "string" ? input.google_place_id.trim() : "";
+    const googleCity = typeof input.google_city === "string" ? input.google_city.trim() : "";
+    const address = typeof input.formatted_address === "string" ? input.formatted_address.trim() : "";
+    const point = normalizeCoordinate(input.latitude, input.longitude);
+    if (!/^[A-Za-z0-9_-]{8,300}$/.test(placeId) ||
+        !googleCity || googleCity.length > 200 ||
+        !address || address.length > 1000 || !point) throw appError("VALIDATION");
+
+    const db = adminClient();
+    const { data: vendor, error: vendorError } = await db.from("vendors")
+      .select("id,city,office_latitude,office_longitude,google_place_id,location_verification_status")
+      .eq("id", vendorId).maybeSingle();
+    if (vendorError) throw vendorError;
+    if (!vendor) throw appError("UNAUTHORIZED");
+
+    // Only one outstanding office request per vendor. Do not adopt a profile
+    // update or mutate the existing Core vendor while the request is pending.
+    const { data: existing, error: existingError } = await db.from("vendor_profile_change_requests")
+      .select("id").eq("vendor_id", vendorId).eq("request_type", "office_location_change")
+      .eq("status", "pending").limit(1);
+    if (existingError) throw existingError;
+    if (existing?.length) throw appError("VALIDATION");
+
+    const { data, error } = await db.from("vendor_profile_change_requests").insert({
+      vendor_id: vendorId,
+      requested_by: requestedBy,
+      request_type: "office_location_change",
+      proposed_changes: {
+        google_place_id: placeId,
+        google_city: googleCity,
+        formatted_address: address,
+        latitude: point.latitude,
+        longitude: point.longitude,
+      },
+      current_snapshot: {
+        google_place_id: vendor.google_place_id ?? null,
+        office_latitude: vendor.office_latitude ?? null,
+        office_longitude: vendor.office_longitude ?? null,
+        location_verification_status: vendor.location_verification_status ?? null,
+      },
+      status: "pending",
+    }).select("*").single();
+    if (error) throw error;
+    return ok(data as VendorProfileChangeRequest);
+  } catch (error) {
+    return fail(error);
+  }
+}
+
 export async function approveVendorProfileChangeRequest(
   requestId: string,
   reviewedBy: string | null,
@@ -160,11 +218,31 @@ export async function approveVendorProfileChangeRequest(
     if (requestError) throw requestError;
     if (!request) throw appError("UNKNOWN");
 
-    const proposed = sanitizeProfileInput((request.proposed_changes ?? {}) as VendorProfileChangeInput);
-    const update = mapApprovedChangesToVendorUpdate(proposed);
-    if (Object.keys(update).length > 0) {
-      const { error: updateError } = await db.from("vendors").update(update).eq("id", request.vendor_id);
-      if (updateError) throw updateError;
+    if (request.request_type === "office_location_change") {
+      // Ordinary profile approval cannot silently mark location evidence verified.
+      // Core must independently resolve the Place ID and geofence at review time.
+      const proposed = request.proposed_changes as Record<string, unknown> | null;
+      if (!proposed || typeof proposed.google_place_id !== "string" ||
+          typeof proposed.google_city !== "string" || typeof proposed.formatted_address !== "string") {
+        throw appError("VALIDATION");
+      }
+      const verified = await backfillVendorExactLocation(request.vendor_id, {
+        google_place_id: proposed.google_place_id,
+        google_city: proposed.google_city,
+        formatted_address: proposed.formatted_address,
+        latitude: Number(proposed.latitude),
+        longitude: Number(proposed.longitude),
+      }, reviewedBy ?? "");
+      if (!verified.ok) return fail(verified.error);
+    } else if (request.request_type === "profile_update") {
+      const proposed = sanitizeProfileInput((request.proposed_changes ?? {}) as VendorProfileChangeInput);
+      const update = mapApprovedChangesToVendorUpdate(proposed);
+      if (Object.keys(update).length > 0) {
+        const { error: updateError } = await db.from("vendors").update(update).eq("id", request.vendor_id);
+        if (updateError) throw updateError;
+      }
+    } else {
+      throw appError("VALIDATION");
     }
 
     const { data, error } = await db
@@ -183,8 +261,10 @@ export async function approveVendorProfileChangeRequest(
     if (error) throw error;
 
     await createVendorNotification(request.vendor_id, {
-      title: "Profile changes approved",
-      message: "Your public profile changes were approved and are now live.",
+      title: request.request_type === "office_location_change" ? "Office location verified" : "Profile changes approved",
+      message: request.request_type === "office_location_change"
+        ? "Your Google-selected business location has passed Core verification. Lead acceptance requires separate approval and available credits."
+        : "Your public profile changes were approved and are now live.",
       type: "profile",
       priority: "normal",
       cta_label: "View profile",

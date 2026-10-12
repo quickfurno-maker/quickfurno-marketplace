@@ -373,6 +373,7 @@ export function VendorsPage({ data, error }: { data: VendorsDirectoryData | null
           emptyMessage="Vendor profile edits that need approval will appear here."
           columns={[
             { header: "Vendor", cell: (request) => <Strong title={vendorName(vendorPool, request.vendor_id)} subtitle={formatDate(request.created_at)} /> },
+            { header: "Request", cell: (request) => request.request_type === "office_location_change" ? "Google office verification" : "Public profile changes" },
             { header: "Current", cell: (request) => <ProfileChangeSnapshot value={request.current_snapshot} /> },
             { header: "Proposed", cell: (request) => <ProfileChangeSnapshot value={request.proposed_changes} /> },
             { header: "Status", cell: (request) => <StatusBadge value={request.status || "pending"} tone="amber" /> },
@@ -442,8 +443,10 @@ export function VendorsPage({ data, error }: { data: VendorsDirectoryData | null
                   { label: "Approve vendor", onClick: () => void mutate(vendor.id, "status", { action: "approve" }, "Vendor approved.") },
                   { label: "Reject vendor", onClick: () => void mutate(vendor.id, "status", { action: "reject" }, "Vendor rejected.") },
                   { label: "Suspend vendor", onClick: () => void mutate(vendor.id, "status", { action: "suspend" }, "Vendor suspended.") },
-                  { label: "Enable lead eligibility", onClick: () => void mutate(vendor.id, "status", { action: "activate" }, "Lead eligibility enabled.") },
-                  { label: "Disable lead eligibility", onClick: () => void mutate(vendor.id, "status", { action: "deactivate" }, "Lead eligibility disabled.") },
+                  { label: "Activate vendor account", onClick: () => void mutate(vendor.id, "status", { action: "activate" }, "Vendor account activated; lead acceptance unchanged.") },
+                  { label: "Deactivate vendor account", onClick: () => void mutate(vendor.id, "status", { action: "deactivate" }, "Vendor account deactivated.") },
+                  { label: "Enable lead acceptance (verified only)", onClick: () => void mutate(vendor.id, "status", { action: "activate_leads" }, "Verified vendor lead acceptance enabled.") },
+                  { label: "Pause lead acceptance", onClick: () => void mutate(vendor.id, "status", { action: "pause_leads" }, "Vendor lead acceptance paused.") },
                   { label: "Manage Credits", onClick: () => setCreditsFor(vendor) },
                   { label: "Assign / Update Package", onClick: () => setPackageFor(vendor) },
                   { label: "Mark Package Expired", onClick: () => void mutate(vendor.id, "package", { packageStatus: "expired", packageName: vendor.package_name ?? null }, "Package marked expired.") },

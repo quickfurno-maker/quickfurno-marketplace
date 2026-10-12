@@ -11,7 +11,7 @@ import { evaluateAssignedLeadContactAccess } from "../lib/vendors/assignedLeadCo
 // the server authority, the live form and the notification lane cannot drift.
 import { isValidIndianMobile } from "../lib/vendors/vendorContactContract";
 import { resolveActiveCity } from "../lib/locations/cityService";
-import { isOutsideServiceArea, verifyLocationForServiceArea } from "./locationVerificationService";
+import { normalizeCoordinate } from "../lib/geo/canonicalCoordinate";
 import { allowPublicMutation } from "../lib/security/publicMutationRateLimit";
 import type {
   VendorRegistrationInput, VendorDashboardStats,
@@ -78,12 +78,16 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       return { ok: false, code: "RATE_LIMITED", error: "Too many registration attempts. Please try again later." };
     }
 
-    const locationVerification = await verifyLocationForServiceArea({
-      latitude: input.office_latitude,
-      longitude: input.office_longitude,
-      googleCity: input.google_city,
-    });
-    const outsideServiceArea = isOutsideServiceArea(locationVerification);
+    // Signup is capture-only: never award matching eligibility from self-asserted
+    // Google fields. The office must pass an independent admin Place ID lookup.
+    if (!input.google_place_id || !input.google_city ||
+      !input.formatted_address ||
+      !normalizeCoordinate(input.office_latitude, input.office_longitude)) {
+      return { ok: false, code: "VALIDATION", error: "Select an exact Google Places business location before registering." };
+    }
+    // City is already resolved against active markets; coordinates are not trusted
+    // at signup and therefore cannot establish an outside-area verdict either.
+    const outsideServiceArea = false;
 
     // Exact column set written to public.vendors (matches the onboarding wizard).
     // Outside-area applications are retained for future expansion but cannot
@@ -103,8 +107,10 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       office_state: input.office_state ?? null,
       // office_pincode intentionally not written (Phase 1: pincode retired). The
       // legacy column stays in the schema; existing vendor rows are untouched.
-      office_latitude: input.office_latitude ?? null,
-      office_longitude: input.office_longitude ?? null,
+      // Browser-provided Google coordinates are not authoritative until Core
+      // independently verifies the Place ID in the guarded admin backfill.
+      office_latitude: null,
+      office_longitude: null,
       areas_covered: input.areas_covered ?? [],
       covers_full_city: input.covers_full_city ?? false,
       service_categories: input.service_categories ?? [],
@@ -128,7 +134,9 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       verification_status: "Pending",
       paid_status: "Unpaid",
       is_active: !outsideServiceArea,
-      accepting_leads: !outsideServiceArea,
+      // Registration alone cannot confer matching eligibility. The Google
+      // office point must be independently verified before admin activation.
+      accepting_leads: false,
       public_visibility: false,
       source_url: input.source_url ?? null,
       utm_source: input.utm_source ?? null,
@@ -150,10 +158,12 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       area_normalized: input.area_normalized ?? null,
       sublocality: input.sublocality ?? null,
       neighborhood: input.neighborhood ?? null,
-      service_zone_id: locationVerification.serviceZoneId,
-      location_verification_status: locationVerification.status,
-      location_verification_method: locationVerification.method,
-      location_verified_at: locationVerification.verifiedAt,
+      // Browser-selected Places metadata is a review candidate, not proof.
+      // No new account can self-assign a verified zone or trusted office point.
+      service_zone_id: null,
+      location_verification_status: outsideServiceArea ? "outside_service_area" : "unverified",
+      location_verification_method: "none",
+      location_verified_at: null,
     };
 
     if (process.env.NODE_ENV === "development") {

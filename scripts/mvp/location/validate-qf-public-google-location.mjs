@@ -177,11 +177,11 @@ check("vendor registration has no device-location wizard step",
   files.vendorRegister.includes("Step 5 of 5")
   && !files.vendorRegister.includes("Allow location for better matching")
   && !files.vendorRegister.includes("requestLocation"));
-check("new vendor server writes Google office coordinates only",
-  files.vendorService.includes("office_latitude: input.office_latitude")
-  && files.vendorService.includes("office_longitude: input.office_longitude")
-  && !files.vendorService.includes("latitude: input.latitude")
-  && !files.vendorService.includes("longitude: input.longitude")
+check("new vendor registration never promotes browser-selected coordinates to matching authority",
+  files.vendorService.includes("office_latitude: null")
+  && files.vendorService.includes("office_longitude: null")
+  && files.vendorService.includes("accepting_leads: false")
+  && files.vendorService.includes('location_verification_method: "none"')
   && !files.vendorService.includes("input.location_permission_status"));
 check("vendor registration input contract exposes no device-coordinate fields",
   !/base_latitude\?:|base_longitude\?:|location_permission_status\?:/.test(files.types.split("export interface VendorRegistrationInput")[1]?.split("export interface VendorProfileSummary")[0] ?? ""));

@@ -43,6 +43,39 @@ function same(value: unknown, expected: string): boolean {
   return typeof value === "string" && value.trim().toLowerCase() === expected.trim().toLowerCase();
 }
 
+// Independently verify every admin-selected office Place ID. Browser coordinates
+// and the submitted city are NOT evidence of the Google Place itself.
+async function readGoogleOffice(placeId: string) {
+  const key = process.env.GOOGLE_MAPS_PLACES_SERVER_KEY?.trim();
+  if (!key || !/^[A-Za-z0-9_-]{8,300}$/.test(placeId)) throw appError("VALIDATION");
+  const response = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`, {
+    headers: { "X-Goog-Api-Key": key, "X-Goog-FieldMask": "id,formattedAddress,location,addressComponents" },
+    cache: "no-store",
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!response.ok) throw appError("VALIDATION");
+  const result = await response.json() as {
+    id?: string;
+    formattedAddress?: string;
+    location?: { latitude?: number; longitude?: number };
+    addressComponents?: Array<{ longText?: string; types?: string[] }>;
+  };
+  const point = normalizeCoordinate(result.location?.latitude, result.location?.longitude);
+  const address = text(result.formattedAddress, 1000);
+  const parts = Array.isArray(result.addressComponents) ? result.addressComponents : [];
+  const labels = parts.filter((part) => part.types?.some((t) =>
+    ["locality", "postal_town", "administrative_area_level_3", "administrative_area_level_2"].includes(t)))
+    .map((part) => text(part.longText, 200)).filter((part): part is string => Boolean(part));
+  if (result.id !== placeId || !point || !address || labels.length === 0) throw appError("VALIDATION");
+  const fromGoogle = (kind: string) => text(parts.find((part) => part.types?.includes(kind))?.longText, 200);
+  const sublocality = fromGoogle("sublocality_level_1") ?? fromGoogle("sublocality");
+  return {
+    point, address, labels, sublocality,
+    areaNormalized: sublocality?.toLowerCase() ?? fromGoogle("locality")?.toLowerCase() ?? null,
+    neighborhood: fromGoogle("neighborhood"),
+  };
+}
+
 export async function backfillVendorExactLocation(
   vendorId: string,
   input: VendorLocationBackfillInput,
@@ -57,8 +90,13 @@ export async function backfillVendorExactLocation(
     const placeId = text(input.google_place_id, 500);
     const googleCity = text(input.google_city, 200);
     const formattedAddress = text(input.formatted_address, 1000);
-    const point = normalizeCoordinate(input.latitude, input.longitude);
-    if (!placeId || !googleCity || !formattedAddress || !point) throw appError("VALIDATION");
+    const browserPoint = normalizeCoordinate(input.latitude, input.longitude);
+    if (!placeId || !googleCity || !formattedAddress || !browserPoint) throw appError("VALIDATION");
+    const googlePlace = await readGoogleOffice(placeId);
+    const point = googlePlace.point;
+    // A forged UI Place ID paired with a different address/point must fail closed.
+    if (Math.abs(browserPoint.latitude - point.latitude) > 0.0005 ||
+        Math.abs(browserPoint.longitude - point.longitude) > 0.0005) throw appError("VALIDATION");
 
     const db = adminClient();
     const { data: vendor, error: vendorError } = await db
@@ -78,13 +116,17 @@ export async function backfillVendorExactLocation(
     );
     if (!market) throw appError("OUTSIDE_SERVICE_AREA");
 
-    const googleCityAccepted = market.acceptedCityLabels.some((label) => same(googleCity, label));
-    if (!googleCityAccepted) throw appError("OUTSIDE_SERVICE_AREA");
+    // Trust Google-returned city components, NOT the submitted form's google_city.
+    const accepted = market.acceptedCityLabels.length ? market.acceptedCityLabels : [market.name];
+    const verifiedGoogleCity = googlePlace.labels.find((label) => accepted.some((city) => same(label, city)));
+    if (!verifiedGoogleCity || !accepted.some((city) => same(googleCity, city))) {
+      throw appError("OUTSIDE_SERVICE_AREA");
+    }
 
     const verification = await verifyLocationForServiceArea({
       latitude: point.latitude,
       longitude: point.longitude,
-      googleCity,
+      googleCity: verifiedGoogleCity,
     });
 
     if (
@@ -108,11 +150,12 @@ export async function backfillVendorExactLocation(
         office_latitude: point.latitude,
         office_longitude: point.longitude,
         google_place_id: placeId,
-        google_city: googleCity,
-        formatted_address: formattedAddress,
-        area_normalized: text(input.area_normalized, 500),
-        sublocality: text(input.sublocality, 300),
-        neighborhood: text(input.neighborhood, 300),
+        google_city: verifiedGoogleCity,
+        formatted_address: googlePlace.address,
+        // Persist only metadata resolved independently from the Place ID.
+        area_normalized: googlePlace.areaNormalized,
+        sublocality: googlePlace.sublocality,
+        neighborhood: googlePlace.neighborhood,
         service_zone_id: verification.serviceZoneId,
         location_verification_status: verification.status,
         location_verification_method: verification.method,

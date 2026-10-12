@@ -20,9 +20,9 @@ const directoryPage = read("app/admin/vendor-crm/page.tsx");
 const validation = read("lib/crm/vendorCrmValidation.ts");
 
 check("01 backfill requires Google Place ID, Google city, formatted address and canonical coordinates",
-  /!placeId \|\| !googleCity \|\| !formattedAddress \|\| !point/.test(service));
-check("02 server checks Google city against admin-managed accepted labels",
-  /acceptedCityLabels\.some/.test(service) && /googleCityAccepted/.test(service));
+  /!placeId \|\| !googleCity \|\| !formattedAddress \|\| !browserPoint/.test(service));
+check("02 server checks Google-returned city against admin-managed accepted labels",
+  /acceptedCityLabels/.test(service) && /googlePlace\.labels/.test(service) && /verifiedGoogleCity/.test(service));
 check("03 server independently runs the QuickFurno service-zone resolver",
   /verifyLocationForServiceArea/.test(service) && /serviceZoneId/.test(service));
 check("04 outside/unresolved location cannot be promoted to a matching point",

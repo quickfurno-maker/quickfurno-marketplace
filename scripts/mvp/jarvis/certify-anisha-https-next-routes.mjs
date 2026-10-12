@@ -382,6 +382,100 @@ async function main() {
     "actual Next consent route fails closed without Core vendor authority",
     noAuthority.status === 503 && noAuthority.data?.error === "unavailable",
   );
+  // A2h cross-repository application test: use the actual Jarvis production
+  // signed transport and purge worker from an esbuild-bundled source artifact.
+  // The bundle is injected read-only into the container; its source is tracked
+  // separately in the Jarvis repo. A2g remains runnable without it.
+  if (process.env.ANISHA_CERT_JARVIS_BUNDLE) {
+    const jarvis = await import(process.env.ANISHA_CERT_JARVIS_BUNDLE);
+    const jarvisHttpPost = (url, init) =>
+      new Promise((resolve, reject) => {
+        const endpoint = new URL(url);
+        const request = httpsRequest(
+          {
+            hostname: endpoint.hostname,
+            port: Number(endpoint.port),
+            path: endpoint.pathname,
+            method: init.method,
+            headers: init.headers,
+            ca: readFileSync(join(temp, "cert.pem")),
+            timeout: 20000,
+          },
+          async (response) => {
+            let output = "";
+            for await (const part of response) output += part;
+            resolve({
+              status: response.statusCode,
+              text: async () => output,
+            });
+          },
+        );
+        request.on("error", reject);
+        request.on("timeout", () =>
+          request.destroy(new Error("jarvis-https-timeout")),
+        );
+        request.end(init.body);
+      });
+    const jarvisConfig = {
+      baseUrl: "https://127.0.0.1:" + tlsPort + "/",
+      keyId,
+      privateKeyPem: signing.privateKey
+        .export({ type: "pkcs8", format: "pem" })
+        .toString(),
+      requestId: randomUUID,
+      clock: () => new Date().toISOString(),
+      httpPost: jarvisHttpPost,
+      timeoutMs: 5000,
+    };
+    acknowledged = false;
+    erased = false;
+    const actualCore =
+      jarvis.createQuickFurnoAnishaMemoryPurgeCore(jarvisConfig);
+    const claimed = await actualCore.claim(5);
+    check(
+      "actual Jarvis signed client claims from real Next HTTPS",
+      claimed.length === 1 &&
+        claimed[0].vendorId === vendorId &&
+        claimed[0].leaseToken === token,
+    );
+    const actualWorker = jarvis.createAnishaMemoryPurgeWorker({
+      core: actualCore,
+      erase: async (task) => {
+        if (task.vendorId !== vendorId)
+          throw new Error("unexpected-test-vendor");
+        // The Core A2g test intentionally has a synthetic DB stub.
+        erased = true;
+        return { deletedCount: 1 };
+      },
+    });
+    const cycle = await actualWorker.runCycle();
+    check(
+      "actual Jarvis worker erases then Core Next HTTPS accepts ACK",
+      cycle.claimed === 1 &&
+        cycle.deleted === 1 &&
+        cycle.acknowledged === 1 &&
+        cycle.failed === 0 &&
+        acknowledged === true,
+    );
+    const realConsent =
+      jarvis.createQuickFurnoAnishaMemoryConsentReader(jarvisConfig);
+    let consentDenied = false;
+    try {
+      await realConsent.read({
+        tenantId: "quickfurno",
+        vendorId,
+        conversationId: "22222222-2222-4222-8222-222222222222",
+        expectedRevision: 9,
+      });
+    } catch (error) {
+      consentDenied =
+        error?.code === "request-failed" || error?.code === "response-invalid";
+    }
+    check(
+      "actual Jarvis consent reader fails closed without Core authority",
+      consentDenied,
+    );
+  }
   console.log(
     "ANISHA_REAL_NEXT_HTTPS_STAGE_CERT_PASS " +
       checked.length +

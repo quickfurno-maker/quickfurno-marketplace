@@ -8,7 +8,7 @@ let created=false;
 try{
   docker("network","create",network);created=true;
   docker("run","--rm","-d","--name",db,"--network",network,"-p","127.0.0.1::5432","-e","POSTGRES_USER=vl01","-e","POSTGRES_PASSWORD="+pass,"-e","POSTGRES_DB=vl01","postgres:16-alpine");
-  let up=false;for(let i=0;i<25;i++){try{docker("exec",db,"pg_isready","-U","vl01");up=true;break;}catch{await sleep(350)}}
+  let up=false;for(let i=0;i<25;i++){try{docker("exec",db,"psql","-U","vl01","-d","vl01","-tAc","SELECT 1");up=true;break;}catch{await sleep(350)}}
   if(!up)throw Error("POSTGRES_NOT_READY");
   docker("exec",db,"psql","-U","vl01","-d","vl01","-c","CREATE SCHEMA IF NOT EXISTS auth;");
   docker("exec",db,"psql","-U","vl01","-d","vl01","-c","CREATE ROLE postgres SUPERUSER LOGIN;");

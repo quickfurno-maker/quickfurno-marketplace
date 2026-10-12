@@ -39,9 +39,9 @@ try{
   "-e","GOTRUE_DISABLE_SIGNUP=false",
   "ghcr.io/supabase/gotrue:v2.196.0");
   console.log("CONTAINER_STATE",docker("inspect","--format","{{.State.Status}} {{.State.ExitCode}} {{json .HostConfig.PortBindings}}",auth));
-  const bind=docker("port",auth,"9999/tcp").match(/127\.0\.0\.1:(\d+)/);if(!bind)throw Error("NOT_LOOPBACK_BOUND");
+  const bind=docker("port",auth,"9999/tcp").match(/127\.0\.0\.1:(\d+)/);if(!bind)throw Error("NOT_LOOPBACK_BOUND");console.log("GOTRUE_LOOPBACK_MAPPING_READY");
   let ok=false;let error="";
-  for(let i=0;i<50;i++){try{const r=await fetch("http://127.0.0.1:"+bind[1]+"/health");if(r.status===200){ok=true;break;}error=String(r.status);}catch(e){error=e.name;}await sleep(450);}
+  for(let i=0;i<50;i++){const abort=new AbortController();const timer=setTimeout(()=>abort.abort(),1800);try{const r=await fetch("http://127.0.0.1:"+bind[1]+"/health",{signal:abort.signal});if(r.status===200){ok=true;break;}error=String(r.status);}catch(e){error=e.name;}finally{clearTimeout(timer);}await sleep(450);}
   if(!ok){throw Error("GOTRUE_BOOT_FAILED_"+error);}
   const payload={email:"vl01-"+tag+"@example.invalid",password:"S-"+crypto.randomBytes(22).toString("hex")};
   const r=await fetch("http://127.0.0.1:"+bind[1]+"/signup",{method:"POST",headers:{"content-type":"application/json","apikey":"synthetic-local-test"},body:JSON.stringify(payload)});

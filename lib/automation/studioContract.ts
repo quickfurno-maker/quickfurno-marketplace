@@ -262,7 +262,7 @@ const ALLOWED_ACTIONS_BY_WORKFLOW: Readonly<Record<AutomationStudioWorkflowKey, 
   vendor_journey: [
     "vendor.lead_offer",
     "vendor.onboarding_reminder",
-    "vendor.document_reminder",
+    "vendor.response_reminder",
     "vendor.package_expiry_warning",
     "vendor.low_credit_warning",
   ],

@@ -88,4 +88,19 @@ test("Studio UI exposes native engine rather than n8n", () => {
   assert.doesNotMatch(source, /n8n/i);
 });
 
+
+test("vendor document reminder remains non-producible", () => {
+  const definition = cloneAutomationStudioDefinition("vendor_journey");
+  const policy = definition.nodes.find((node) => node.id === "vendor-onboard");
+  policy.actionType = "vendor.document_reminder";
+  assert.equal(validateAutomationStudioDefinition(definition).ok, false);
+});
+
+test("vendor response reminder is certified in the Studio allowlist", () => {
+  const definition = cloneAutomationStudioDefinition("vendor_journey");
+  const policy = definition.nodes.find((node) => node.id === "vendor-onboard");
+  policy.actionType = "vendor.response_reminder";
+  assert.equal(validateAutomationStudioDefinition(definition).ok, true);
+});
+
 console.log(`QF Automation Studio guard: ${passed}/${passed} PASS`);

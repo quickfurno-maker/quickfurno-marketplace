@@ -690,6 +690,18 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-10-12_ISOLATED_STAGE_ONLY_NO_PARENT_APPLY"
+    },
+    {
+      "version": "20261012213000",
+      "name": "vendor_assignment_update_authority_closeout",
+      "filename": "20261012213000_vendor_assignment_update_authority_closeout.sql",
+      "path": "supabase/migrations/20261012213000_vendor_assignment_update_authority_closeout.sql",
+      "canonicalSha256": "7cf72f08c39ef88cea33b998e6ca090e6b0a9fd3a61e5068b14cef6b3fa028e4",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-12_DISPOSABLE_LOCAL_PG_CERTIFIED_6_OF_6_NO_REMOTE_APPLY"
     }
   ],
   "supersededLegacyPins": [

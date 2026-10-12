@@ -1,0 +1,39 @@
+# VL-01 evidence — Core vendor authority, legacy cohorts and trace staging
+Date: 2026-10-12 (IST). Evidence mode: read-only production SQL + disposable local PostgreSQL. Owner authorization: VL-01 engineering only, **no live migration authorization**.
+
+## Exact data cohorts (QuickFurno production read-only)
+- 28 vendors: 14 Approved and 14 Pending. Of Approved, 10 have verification_status=Verified and **four are still Pending verification** (separate facet — do not grant leads on Approved status alone). 8 active dashboard-owner links, 6 Approved without dashboard link.
+- 6 vendor office-coordinate pairs overall, only 2 among Approved; 0 formal office verification, 0 linked service_zone_id and 0 Google Place ID. 13 Pending vendors have accepting_leads=true while none is eligible merely by that flag. Treat approval, geo, city and package as independent fail-closed facets.
+- 71 lead_assignments: all carry credit_deducted=true; 49 NULL operation_id entries occurred exclusively in July 2026 (5 admin_assigned, 37 auto_assigned, 7 client_selected); August 6 and September 16 assignments all have valid operation_id references (22/22). Zero leads exceed 3 assignment rows. Historical operation-link null is a legacy cohort, not an active matching regression by itself.
+- 81 vendor_credit_logs: 44 lead_assignment_debit, 16 correction, 7 manual_add, 7 package_credit and 7 authorized_manual_adjustment. Arithmetic holds for every individual row. No duplicated populated idempotency key or repeated nonempty debit assignment reference. 22 old debit rows lack an idempotency key; 16 correction rows and old manual credit grants also lack a key.
+- Three cross-entry credit-continuity discontinuities are confined to 2026-07-04/05 correction entries affecting **two pseudonymized historical vendor cohorts**. Preceding balance 10 versus next before 9; 22 versus 21; 18 versus 17. The entries each calculate correctly, and no vendor has a negative remaining balance or remaining credits above total. Classify LEGACY_OUT_OF_BAND_DEBIT_OR_ORDERING: operator review only; DO NOT modify current balances without separately authorized ledger reconstruction.
+- Automation: 83 jobs (7 client succeeded, 18 failed, 58 cancelled). Native worker heartbeat fresh but jobsProcessed=0; investigate new eligible producer events, not assume worker broken. 134/135 delivery log WhatsApp status preview_only, one linked actual receipt. 169 unresolved inbound identities, zero Anisha-owned conversations. No production Anisha memory consent/purge migration applied.
+- Presence of all these records and timestamps is factual; lack of rows does not prove a missing source implementation or absence of actual external interactions.
+
+## Critical security finding — authenticated lead assignment UPDATE
+- Production RLS `assign owner update` (USING/WITH CHECK owns_vendor(vendor_id)) coexists with a table-wide UPDATE privilege for `authenticated`. Column-privilege checks confirmed authenticated could update credit_deducted, vendor_id, lead_id and lifecycle_status on an accessible assignment row; RLS vendor ownership alone cannot restrict column changes. This can undermine canonical assignment/credit truth. No exploitation was attempted.
+- Production `vendors` has no equivalent UPDATE grant for authenticated, and automation/CRM ledgers are default-deny. Vendor read policies remain scoped to owners/admins; vendor_dashboard_users self SELECT uses auth.uid. Historical RLS INFO `rls_enabled_no_policy` findings must be treated per table, not fixed by broad grants.
+- Source-only remediation `supabase/migrations/20261012213000_vendor_assignment_update_authority_closeout.sql` removes the direct authenticated/anon UPDATE grant and owner-update policy, preserves owner SELECT and Core service_role UPDATE. Vendor acknowledgment uses existing Core `qf_acknowledge_vendor_lead_v1` RPC; source callers reviewed for direct browser assignment update. Migration is exact-hash-pinned in `supabase/staging-history/qf-post-g1-migration-ledger-20260929.json` with staging=false and production=false. NO ACTUAL SUPABASE DEPLOYMENT DONE.
+- Disposable PostgreSQL migration certification: reproduces vulnerable grant; verifies authenticated UPDATE denied including credit and reassignment columns, vendor SELECT still available, service-role Core write remains available, rerun idempotent, all synthetic rows unchanged; **6/6 PASS**.
+- **Hold release** until the migration is separately authorized, the real Supabase Auth/role path is tested in isolated environment, and customer-facing real-role permission regression is certified.
+
+## Core Studio trace certification and limitations
+- Existing [PR #181](https://github.com/quickfurno-maker/quickfurno-marketplace/pull/181) already provides superadmin-only API read-only trace keyed by exact UUID, bounded job/request/attempt/transport evidence, explicit provider-not-verified and unknown states. Current vendor response reminder is retired from authoring; vendor document reminder is non-producible.
+- Disposable local real PostgreSQL with actual Core route/service source bundled and test session/database boundary adapters: 10/10 PASS — logged-out 401, nonsuperadmin 401, bad JSON 400, bad UUID 400, missing job 404, complete joins 200, Core authorization not mistaken for delivery, redacted unsafe correlation, 40-row evidence-source truncation, ordered events, read-only transaction and row counts unchanged. Synthetic data only; cleanup complete.
+- Important limit: authentication session was **mocked**. This is not an automated browser sign-in with actual Supabase Auth or a full real Next.js HTTP test. That remains a separate staging gate before production release.
+- Query performance: production `automation_transport_requests` job_id/created_at query currently uses sequential scan (EXPLAIN estimated cost ≈1216 at ~32k rows). Owner-only trace is bounded to 41 rows/source but query still scans ledger; benchmark and consider targeted `(job_id,created_at)` index through an explicit later pinned migration before high-volume release.
+- Safety: no messages, data correction, live migrations, billing changes, production connection token or worker replay performed.
+
+## VL-01 exit evidence and honest status
+1. GitHub PR CI and source lint/tsc/Studio tests: release CI GREEN on prior trace head; must re-run after security cert sources+pin (status pending until final check).
+2. Read-only live production cohorts, RLS/column grants and historic ledger exceptions: DONE/CLASSIFIED.
+3. Synthetic SQL-backed Core trace with mock-auth route: DONE **10/10**.
+4. Synthetic SQL-backed authenticated privilege closeout: DONE **6/6**; source migration NOT DEPLOYED.
+5. Real Supabase Auth browser + real Core HTTP route against isolated database: NOT YET CERTIFIED.
+6. Production host source SHA/feature flag verification: BLOCKED; qf-prod non-interactive SSH returned exit=255 without a verified host identity result. Neither main SHA nor signed GitHub workflow proves active live deployment.
+7. AGNI owner alert/live vendor joins and Meta delivery: remain VL-04/VL-05 gating, not claimed by VL-01.
+8. Zero production mutations, no merged PR without full source checks: VERIFIED by execution scope; no deployment performed.
+
+## Rollback / release controls
+- The source migration is additive to the immutable ledger and only revokes broad direct UPDATE. If server-side Core assignment acknowledgement depends on a plain authenticated UPDATE rather than the documented Core RPC, that is a launch-blocking regression; test it under isolated real Auth before deployment. Any rollback of permissions MUST be reviewed: restoring broad UPDATE recreates the original vulnerability. Prefer fixing callers using a verified Core-owned path.
+- Do not run `supabase db push` or migration repair. Apply only exact pinned migrations under reviewed production release authorization with backups, prior dry-run, and rollback design.

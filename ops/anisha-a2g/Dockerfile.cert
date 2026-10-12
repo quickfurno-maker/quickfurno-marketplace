@@ -1,0 +1,10 @@
+# A2g: one-shot isolated Next.js route certification; no provider sends.
+FROM node:20.20.2-bookworm-slim
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY . .
+ENV ANISHA_CERT_OPENSSL=openssl
+CMD ["node", "scripts/mvp/jarvis/certify-anisha-https-next-routes.mjs"]

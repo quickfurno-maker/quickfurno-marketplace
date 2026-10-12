@@ -9,6 +9,7 @@ import { qfjSignedRequestSigningInput, verifyQfjSignedRequestSignature } from ".
 import { parseQfjVerificationKeys, rawQfjBodyDigest } from "../../../lib/jarvis/coreDecisionAuth.ts";
 import { resolveQfJarvisRuntimePolicy, isQfJarvisActionTypeEnabled } from "../../../lib/jarvis/runtimePolicy.ts";
 import { readJarvisSanitizedContextFromSource } from "../../../lib/jarvis/contextRead.ts";
+import { requireVerifiedVendorCounts } from "../../../services/jarvisContextService.ts";
 import { submitJarvisRecommendationToStore } from "../../../lib/jarvis/recommendationIntake.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -48,6 +49,21 @@ const vendorSource = { readLead: async () => null, readVendor: async () => ({ ci
 const vendorCtx = await readJarvisSanitizedContextFromSource({ request:parseQfjContextReadRequest(vendorReq), policy:ctxPolicy, source:vendorSource });
 check("56 Anisha receives bounded vendor projection", vendorCtx.ok && vendorCtx.context.kind === "vendor_profile" && vendorCtx.context.packageReadinessBand === "LOW_CREDITS");
 check("57 vendor context exposes a band not an exact credit balance", vendorCtx.ok && !JSON.stringify(vendorCtx.context).includes("remaining_credits") && !JSON.stringify(vendorCtx.context).includes('"2"'));
+
+check("A3 vendor Core counts retain real zeros", JSON.stringify(requireVerifiedVendorCounts([
+  { count:0, error:null }, { count:2, error:null },
+])) === JSON.stringify([0,2]));
+for (const invalid of [
+  [{ count:null, error:null }],
+  [{ count:undefined, error:null }],
+  [{ count:0, error:{ message:"db timeout" } }],
+  [{ count:-1, error:null }],
+  [{ count:0.5, error:null }],
+]) {
+  let refused = false;
+  try { requireVerifiedVendorCounts(invalid); } catch { refused = true; }
+  check("A3 missing/invalid count fails closed", refused);
+}
 
 const actionReq = { protocol:"qfj.action.request", version:1, caller:"qf-jarvis", audience:"quickfurno-core", requestId:"33333333-3333-4333-8333-333333333333", issuedAt:now, source:"riya", actionType:"client.requirement_collection", entityType:"lead", entityId:"11111111-1111-1111-1111-111111111111", evidenceId:"conversation.turn.17", reasonCode:"client_details_incomplete", confidence:0.91, safeContext:{ phase:"DISCOVERY", missingCount:2 } };
 check("58 action-request path/domain are versioned", QFJ_ACTION_REQUEST_PATH === "/api/internal/jarvis/action-request" && QFJ_ACTION_REQUEST_SIGNING_DOMAIN === "qfj.action.request.http.sig.v1");

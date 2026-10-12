@@ -666,6 +666,30 @@
         "production": false
       },
       "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-06"
+    },
+    {
+      "version": "20261012080000",
+      "name": "anisha_vendor_memory_consent_source",
+      "filename": "20261012080000_anisha_vendor_memory_consent_source.sql",
+      "path": "supabase/migrations/20261012080000_anisha_vendor_memory_consent_source.sql",
+      "canonicalSha256": "cc0db795bd74f36015405dccea6b0311b32b37d33819ffb851e174673f5cd2e0",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-12_ISOLATED_STAGE_ONLY_NO_PARENT_APPLY"
+    },
+    {
+      "version": "20261012100000",
+      "name": "anisha_memory_purge_delivery",
+      "filename": "20261012100000_anisha_memory_purge_delivery.sql",
+      "path": "supabase/migrations/20261012100000_anisha_memory_purge_delivery.sql",
+      "canonicalSha256": "bda1609a9da3896599a84d47d1d2eb3f755d5c2c5d8ba5f531bc133a72699eb7",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-12_ISOLATED_STAGE_ONLY_NO_PARENT_APPLY"
     }
   ],
   "supersededLegacyPins": [

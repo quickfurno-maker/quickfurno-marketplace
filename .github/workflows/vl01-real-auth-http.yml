@@ -1,0 +1,32 @@
+name: VL-01 Genuine Auth HTTP Certification
+
+on:
+  pull_request:
+    paths:
+      - 'app/api/admin/automation-studio/**'
+      - 'services/automationStudioTraceService.ts'
+      - 'lib/automation/studioTraceContract.ts'
+      - 'scripts/mvp/automation/certify-vl01-*'
+      - '.github/workflows/vl01-real-auth-http.yml'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-core-auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Install exact lockfile dependencies
+        run: npm ci --no-audit --ignore-scripts --fund=false
+      - name: Certify genuine isolated GoTrue and PostgreSQL
+        run: node scripts/mvp/automation/certify-vl01-gotrue-auth-postgres.mjs
+      - name: Certify real Next HTTP route with genuine Auth and isolated data
+        run: node scripts/mvp/automation/certify-vl01-next-auth-http.mjs

@@ -3,6 +3,20 @@ import { readJarvisSanitizedContextFromSource } from "../lib/jarvis/contextRead"
 import type { QfjContextReadRequestV1 } from "../lib/jarvis/contextContract";
 import type { QfJarvisRuntimePolicy } from "../lib/jarvis/runtimePolicy";
 
+/**
+ * A failed count is not a genuine zero. Fail closed so Anisha does not
+ * misrepresent missing vendor activity/notifications as verified absence.
+ * PII-free error code only; the caller returns unavailable, never invented.
+ */
+export function requireVerifiedVendorCounts(
+  reads: readonly { readonly count: number | null; readonly error: unknown }[],
+): readonly number[] {
+  if (reads.some(({ count, error }) =>
+    error !== null || !Number.isSafeInteger(count) || count === null || count < 0
+  )) throw new TypeError("qfj-vendor-context-count-unavailable");
+  return Object.freeze(reads.map(({ count }) => count as number));
+}
+
 async function productionDb() { const { adminClient } = await import("../lib/supabase"); return adminClient(); }
 
 const productionSource: JarvisContextDataSource = Object.freeze({
@@ -40,12 +54,15 @@ const productionSource: JarvisContextDataSource = Object.freeze({
     ]);
     if (vendorRead.error) throw vendorRead.error;
     if (!vendorRead.data) return null;
+    const [activeLeads, delivered, badReports, unreadNotices] = requireVerifiedVendorCounts([
+      activeLeadRead, unackedRead, reportRead, noticeRead,
+    ]);
     return {
       ...(vendorRead.data as Record<string,unknown>),
-      active_lead_count: activeLeadRead.count ?? 0,
-      delivered_unacknowledged_count: unackedRead.count ?? 0,
-      pending_bad_lead_report_count: reportRead.count ?? 0,
-      unread_notification_count: noticeRead.count ?? 0,
+      active_lead_count: activeLeads,
+      delivered_unacknowledged_count: delivered,
+      pending_bad_lead_report_count: badReports,
+      unread_notification_count: unreadNotices,
     };
   },
 });

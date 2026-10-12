@@ -37,7 +37,7 @@ try{
   "-e","GOTRUE_EXTERNAL_EMAIL_ENABLED=true",
   "-e","GOTRUE_MAILER_AUTOCONFIRM=true",
   "-e","GOTRUE_DISABLE_SIGNUP=false",
-  "public.ecr.aws/supabase/gotrue:v2.196.0");
+  "ghcr.io/supabase/gotrue:v2.196.0");
   console.log("CONTAINER_STATE",docker("inspect","--format","{{.State.Status}} {{.State.ExitCode}} {{json .HostConfig.PortBindings}}",auth));
   const bind=docker("port",auth,"9999/tcp").match(/127\.0\.0\.1:(\d+)/);if(!bind)throw Error("NOT_LOOPBACK_BOUND");
   let ok=false;let error="";
@@ -162,5 +162,5 @@ try{
     await pgPool.end();
   }
 
-}catch(e){console.log("GOTRUE_TEST_FAILURE",e.message);try {const r=spawnSync("docker",["logs","--tail","15",auth],{encoding:"utf8"});const log=(r.stdout+"\n"+r.stderr).replaceAll(pass,"[secret]").replaceAll(secret,"[secret]");console.log("GOTRUE_BOOT_LOG",log.slice(-1800));}catch{};process.exitCode=1;}
+}catch(e){console.log("GOTRUE_TEST_FAILURE",e.code??e.name,"safe_stderr",String(e.stderr??"").replaceAll(pass,"[redacted]").replaceAll(secret,"[redacted]").slice(-420));try {const r=spawnSync("docker",["logs","--tail","15",auth],{encoding:"utf8"});const log=(r.stdout+"\n"+r.stderr).replaceAll(pass,"[secret]").replaceAll(secret,"[secret]");console.log("GOTRUE_BOOT_LOG",log.slice(-1800));}catch{};process.exitCode=1;}
 finally {try{docker("rm","-f",auth)}catch{};try{docker("rm","-f",db)}catch{};if(created)try{docker("network","rm",network)}catch{};console.log("LOCAL_AUTH_TEST_CLEANUP_COMPLETE");}

@@ -72,6 +72,14 @@ export async function getAgniOwnerQuickFurnoSnapshot(now=new Date()):Promise<Agn
     paymentsPending,
     citiesActive,
     assignmentsTotal,
+    vendorsApprovedWithoutLogin,
+    vendorsApprovedWithoutZone,
+    vendorsAcceptingWithoutZone,
+    googleOfficesVerified,
+    googleOfficesProvisional,
+    officeReviewsPending,
+    activeZonesWithoutBoundary,
+    paidVendorOrdersWithoutActivation,
     operations,
   ]=await Promise.all([
     exactCount(db.from("leads").select("id",{count:"exact",head:true}).gte("created_at",today)),
@@ -84,6 +92,16 @@ export async function getAgniOwnerQuickFurnoSnapshot(now=new Date()):Promise<Agn
     exactCount(db.from("payments").select("id",{count:"exact",head:true}).eq("payment_status","Pending")),
     exactCount(db.from("cities").select("id",{count:"exact",head:true}).eq("is_active",true)),
     exactCount(db.from("lead_assignments").select("id",{count:"exact",head:true})),
+    // VL-03 owner-safe vendor launch evidence. No rows, phone/email, Place ID,
+    // wallet identifiers or provider payloads cross the signed AGNI boundary.
+    exactCount(db.from("vendors").select("id",{count:"exact",head:true}).eq("status","Approved").is("user_id",null)),
+    exactCount(db.from("vendors").select("id",{count:"exact",head:true}).eq("status","Approved").is("service_zone_id",null)),
+    exactCount(db.from("vendors").select("id",{count:"exact",head:true}).eq("accepting_leads",true).is("service_zone_id",null)),
+    exactCount(db.from("vendors").select("id",{count:"exact",head:true}).eq("location_verification_status","verified")),
+    exactCount(db.from("vendors").select("id",{count:"exact",head:true}).eq("location_verification_status","provisional")),
+    exactCount(db.from("vendor_profile_change_requests").select("id",{count:"exact",head:true}).eq("request_type","office_location_change").eq("status","pending")),
+    exactCount(db.from("marketplace_service_zones").select("id",{count:"exact",head:true}).eq("is_active",true).eq("matching_enabled",true).is("boundary",null)),
+    exactCount(db.from("vendor_package_orders").select("id",{count:"exact",head:true}).not("paid_at","is",null).is("activated_at",null)),
     getOperationsOverview(),
   ]);
 
@@ -98,6 +116,14 @@ export async function getAgniOwnerQuickFurnoSnapshot(now=new Date()):Promise<Agn
     payments_pending:paymentsPending,
     cities_active:citiesActive,
     assignments_total:assignmentsTotal,
+    vendors_approved_without_login:vendorsApprovedWithoutLogin,
+    vendors_approved_without_service_zone:vendorsApprovedWithoutZone,
+    vendors_accepting_leads_without_service_zone:vendorsAcceptingWithoutZone,
+    vendor_google_offices_verified:googleOfficesVerified,
+    vendor_google_offices_provisional:googleOfficesProvisional,
+    vendor_office_change_reviews_pending:officeReviewsPending,
+    active_matching_zones_missing_polygon:activeZonesWithoutBoundary,
+    vendor_paid_orders_not_activated:paidVendorOrdersWithoutActivation,
   });
 
   return Object.freeze({

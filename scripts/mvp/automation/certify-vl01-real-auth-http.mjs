@@ -12,6 +12,7 @@ import { once } from "node:events";
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../../..");
 const require=createRequire(path.join(ROOT,"package.json"));
 const { Client }=require("pg");
+if(typeof globalThis.WebSocket === "undefined") globalThis.WebSocket=require("ws");
 const {createServerClient}=require("@supabase/ssr");
 const suffix=String(process.pid), net="vl01-http-net-"+suffix, pgname="vl01-http-pg-"+suffix, gt="vl01-http-auth-"+suffix, rest="vl01-http-rest-"+suffix;
 const pass=randomBytes(22).toString("hex"), jwtSecret=randomBytes(32).toString("hex");

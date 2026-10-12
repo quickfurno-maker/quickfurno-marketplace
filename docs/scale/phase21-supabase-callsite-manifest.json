@@ -9,9 +9,9 @@
     "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
   },
   "totals": {
-    "files": 139,
-    "rpcNames": 85,
-    "tableNames": 120,
+    "files": 144,
+    "rpcNames": 88,
+    "tableNames": 121,
     "storageBuckets": 0,
     "authFiles": 13,
     "realtimeFiles": 0
@@ -34,6 +34,7 @@
     "qf_aarohi_link_vendor_conversion_v1",
     "qf_aarohi_set_human_takeover_v1",
     "qf_aarohi_suppress_prospect_v1",
+    "qf_ack_vendor_anisha_memory_purge_v1",
     "qf_acknowledge_vendor_lead_v1",
     "qf_acquire_domain_event",
     "qf_activate_vendor_package_order_v2",
@@ -65,6 +66,7 @@
     "qf_claim_due_workflow_task",
     "qf_claim_jarvis_turn_outbox_v1",
     "qf_claim_scale_scheduler_occurrence_v1",
+    "qf_claim_vendor_anisha_memory_purges_v1",
     "qf_claim_vendor_package_razorpay_order_v2",
     "qf_complete_automation_attempt_transport_v1",
     "qf_complete_automation_attempt_v1",
@@ -94,6 +96,7 @@
     "qf_scale_worker_heartbeat_v1",
     "qf_schedule_domain_event_retry",
     "qf_select_stale_automation_attempt_v1",
+    "qf_set_vendor_anisha_memory_consent_v1",
     "qf_snapshot_vendor_fair_opportunity_v1",
     "qf_terminalize_consent_ack_intent",
     "update_vendor_visibility",
@@ -207,6 +210,7 @@
     "payments",
     "profiles",
     "service_categories",
+    "vendor_anisha_memory_consents",
     "vendor_campaigns",
     "vendor_credit_logs",
     "vendor_crm_profiles",
@@ -945,6 +949,55 @@
       "realtime": false
     },
     {
+      "file": "services/agniParentHeartbeatService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "cities"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/anishaMemoryConsentService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_set_vendor_anisha_memory_consent_v1"
+      ],
+      "tables": [
+        "vendor_anisha_memory_consents"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/anishaMemoryPurgeService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_ack_vendor_anisha_memory_purge_v1",
+        "qf_claim_vendor_anisha_memory_purges_v1"
+      ],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/aosMarketCapacitySnapshotService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "lead_assignments",
+        "leads",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
       "file": "services/aosService.ts",
       "directImports": [],
       "rpc": [],
@@ -1075,6 +1128,20 @@
         "automation_action_requests",
         "automation_jobs",
         "marketplace_runtime_settings"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/automationStudioTraceService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "automation_action_requests",
+        "automation_execution_attempts",
+        "automation_jobs",
+        "automation_transport_requests"
       ],
       "storageBuckets": [],
       "auth": false,

@@ -174,7 +174,7 @@
     "test:launch:city-authority": "node scripts/mvp/launch/validate-db-city-authority.mjs",
     "test:launch:service-zone-boundary": "node scripts/mvp/launch/validate-admin-service-zone-boundary.mjs",
     "test:aos:v2": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs ./scripts/mvp/aos/validate-qf-aos-v2.mjs",
-    "test:automation-studio": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-automation-studio.mjs",
+    "test:automation-studio": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/automation/validate-qf-automation-studio.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/automation/validate-qf-automation-trace.mjs",
     "test:mvp:60": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-mvp-60-integration.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-mvp-60-context-recommendations.mjs",
     "test:mvp:60-availability": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-mvp-60-service-availability.mjs",
     "test:mvp:whatsapp-jarvis": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-jarvis-readiness.mjs",

@@ -14,6 +14,9 @@ import {
   setAutomationStudioWorkflowEnabled,
 } from "@/services/automationStudioService";
 
+import { getAutomationStudioExecutionTrace } from "@/services/automationStudioTraceService";
+import { isAutomationTraceJobId } from "@/lib/automation/studioTraceContract";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -46,6 +49,13 @@ export async function POST(request: Request) {
 
   const action = typeof body.action === "string" ? body.action : "";
   try {
+    if (action === "trace") {
+      if (!isAutomationTraceJobId(body.jobId)) {
+        return json({ ok: false, error: "Invalid job ID." }, 400);
+      }
+      const trace = await getAutomationStudioExecutionTrace(body.jobId);
+      return trace ? json(trace, 200) : json({ ok: false, error: "Execution not found." }, 404);
+    }
     if (action === "set_global_enabled") {
       if (typeof body.enabled !== "boolean") return json({ ok: false, error: "enabled must be boolean." }, 400);
       await setAutomationStudioGlobalEnabled(body.enabled, session.userId);

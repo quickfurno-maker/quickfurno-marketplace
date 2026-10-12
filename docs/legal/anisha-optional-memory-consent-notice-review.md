@@ -1,7 +1,7 @@
 # DRAFT — Vendor notice for optional Anisha long-term preferences
 
-**Status: Owner and legal/privacy review required. NOT approved, published, or activated.**  
-Proposed purpose ID: `anisha_derived_preferences_v1`; consent policy version: `1`.  
+**Status: Owner and legal/privacy review required. NOT approved, published, or activated.**
+Proposed purpose ID: `anisha_derived_preferences_v1`; consent policy version: `1`.
 Scope: QuickFurno vendors using Anisha on supported channels, staged rollout only.
 
 ## Proposed vendor-facing notice

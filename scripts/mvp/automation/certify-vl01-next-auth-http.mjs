@@ -116,7 +116,11 @@ try{
     });
     await new Promise(resolve=>gateway.listen(0,"127.0.0.1",resolve));
     const gatewayURL="http://127.0.0.1:"+gateway.address().port;
-    // Test fixture only: Node 20 has no native WebSocket global. This helper uses\n    // Supabase SSR only for Auth cookies. Fail closed if any Realtime call occurs.\n    // The actual Next.js HTTP server runs in a separate, unmodified process.\n    if(typeof globalThis.WebSocket==="undefined") globalThis.WebSocket=class {constructor(){throw Error("VL01_REALTIME_OUT_OF_SCOPE");}};\n    const authCookies=async(email,password)=>{
+    // Test fixture only: Node 20 has no native WebSocket global. This helper uses
+    // Supabase SSR only for Auth cookies. Fail closed if any Realtime call occurs.
+    // The actual Next.js HTTP server runs in a separate, unmodified process.
+    if(typeof globalThis.WebSocket==="undefined") globalThis.WebSocket=class {constructor(){throw Error("VL01_REALTIME_OUT_OF_SCOPE");}};
+    const authCookies=async(email,password)=>{
       const jar=new Map();
       const sb=createServerClient(gatewayURL,"synthetic-local-anon-key",{cookies:{getAll:()=>Array.from(jar,([name,value])=>({name,value})),setAll:items=>items.forEach(x=>jar.set(x.name,x.value))}});
       const login=await sb.auth.signInWithPassword({email,password});

@@ -34,5 +34,7 @@ jobs:
         run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-anisha-memory-purge.mjs
       - name: Test the actual Core signed request verifier
         run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-anisha-memory-signature.mjs
+      - name: Certify actual Next.js HTTPS Core memory routes (loopback only)
+        run: node scripts/mvp/jarvis/certify-anisha-https-next-routes.mjs
       - name: Typecheck the entire Core application
         run: npm run typecheck

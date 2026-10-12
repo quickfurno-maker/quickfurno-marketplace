@@ -18,7 +18,8 @@ create table if not exists public.vendor_anisha_memory_consents (
 
 create table if not exists public.vendor_anisha_memory_purge_outbox (
   purge_id uuid primary key default gen_random_uuid(),
-  vendor_id uuid not null references public.vendors(id) on delete cascade,
+  -- Keep purge task even after vendor is erased from Core.
+  vendor_id uuid not null,
   reason text not null check (reason in ('consent_revoked','vendor_erasure')),
   created_at timestamptz not null default now(),
   completed_at timestamptz,
@@ -27,6 +28,23 @@ create table if not exists public.vendor_anisha_memory_purge_outbox (
 create unique index if not exists vendor_anisha_memory_purge_pending_vendor_idx
  on public.vendor_anisha_memory_purge_outbox (vendor_id)
  where completed_at is null;
+
+create or replace function public.qf_vendor_anisha_memory_erasure_trigger_v1()
+returns trigger language plpgsql security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+begin
+  insert into public.vendor_anisha_memory_purge_outbox(vendor_id, reason)
+  values(old.id, 'vendor_erasure')
+  on conflict do nothing;
+  return old;
+end; $$;
+revoke all on function public.qf_vendor_anisha_memory_erasure_trigger_v1()
+ from public, anon, authenticated;
+drop trigger if exists qf_vendor_anisha_memory_erasure_trigger on public.vendors;
+create trigger qf_vendor_anisha_memory_erasure_trigger
+before delete on public.vendors for each row
+execute function public.qf_vendor_anisha_memory_erasure_trigger_v1();
 
 alter table public.vendor_anisha_memory_consents enable row level security;
 alter table public.vendor_anisha_memory_purge_outbox enable row level security;

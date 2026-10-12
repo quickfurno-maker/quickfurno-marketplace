@@ -96,11 +96,11 @@ test("vendor document reminder remains non-producible", () => {
   assert.equal(validateAutomationStudioDefinition(definition).ok, false);
 });
 
-test("vendor response reminder is certified in the Studio allowlist", () => {
+test("retired vendor response reminder cannot be enabled by a Studio draft", () => {
   const definition = cloneAutomationStudioDefinition("vendor_journey");
   const policy = definition.nodes.find((node) => node.id === "vendor-onboard");
   policy.actionType = "vendor.response_reminder";
-  assert.equal(validateAutomationStudioDefinition(definition).ok, true);
+  assert.equal(validateAutomationStudioDefinition(definition).ok, false);
 });
 
 console.log(`QF Automation Studio guard: ${passed}/${passed} PASS`);

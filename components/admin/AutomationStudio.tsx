@@ -10,7 +10,7 @@ import type {
   AutomationStudioWorkflowKey,
   AutomationStudioWorkflowRuntime,
 } from "@/lib/automation/studioContract";
-import type { AutomationStudioExecutionTrace } from "@/lib/automation/studioTraceContract";
+import { isAutomationTraceJobId, type AutomationStudioExecutionTrace } from "@/lib/automation/studioTraceContract";
 
 const ENDPOINT = "/api/admin/automation-studio";
 const NODE_W = 194;
@@ -37,7 +37,6 @@ const ACTION_OPTIONS: Readonly<Record<AutomationStudioWorkflowKey, readonly (rea
   ],
   vendor_journey: [
     ["vendor.onboarding_reminder", "Vendor onboarding reminder"],
-    ["vendor.response_reminder", "Vendor lead response reminder"],
     ["vendor.package_expiry_warning", "Package expiry warning"],
     ["vendor.low_credit_warning", "Low credit warning"],
     ["vendor.lead_offer", "Vendor Client Match alert"],
@@ -592,10 +591,10 @@ function ActivityPanel({ overview, workflow, tab, onTab, onRollback, onTrace, tr
         <button onClick={() => location.reload()} className="ml-auto mb-2 rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-600">Refresh</button>
       </div>
       {tab === "executions" ? <>
-        <form className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3" onSubmit={(event) => { event.preventDefault(); if (/^[0-9a-f-]{36}$/i.test(jobLookup.trim())) void onTrace(jobLookup.trim()); }}>
+        <form className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3" onSubmit={(event) => { event.preventDefault(); if (isAutomationTraceJobId(jobLookup.trim())) void onTrace(jobLookup.trim()); }}>
           <label htmlFor="automation-job-lookup" className="text-[11px] font-bold text-slate-700">Trace any job ID</label>
           <input id="automation-job-lookup" value={jobLookup} onChange={(event) => setJobLookup(event.target.value)} placeholder="Paste exact execution UUID" className="min-w-[240px] flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs" />
-          <button type="submit" disabled={traceLoading || !/^[0-9a-f-]{36}$/i.test(jobLookup.trim())} className="rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-bold text-white disabled:opacity-40">Trace events</button>
+          <button type="submit" disabled={traceLoading || !isAutomationTraceJobId(jobLookup.trim())} className="rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-bold text-white disabled:opacity-40">Trace events</button>
         </form>
         <ExecutionTable rows={executions} onTrace={onTrace} selectedJobId={trace?.jobId ?? null} />
         {traceLoading ? <div className="border-t border-slate-100 p-4 text-xs text-slate-500">Loading persisted execution events...</div> : null}
@@ -627,7 +626,7 @@ function ExecutionTracePanel({ trace }: { trace: AutomationStudioExecutionTrace 
         </div>
         <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-bold text-amber-800">PROVIDER DELIVERY NOT VERIFIED</span>
       </div>
-      <p className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-[11px] leading-5 text-blue-800">{trace.notice}</p>
+      <p className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-[11px] leading-5 text-blue-800">{trace.notice}{trace.evidenceTruncated ? " Evidence was truncated to the safe row limit; do not infer that later attempts or transports were absent." : ""}</p>
       <ol className="mt-4 space-y-2">
         {trace.events.map((event, index) => (
           <li key={event.id} className="flex gap-3 rounded-lg border border-slate-200 bg-white p-3">

@@ -15,6 +15,7 @@ import {
 } from "@/services/automationStudioService";
 
 import { getAutomationStudioExecutionTrace } from "@/services/automationStudioTraceService";
+import { isAutomationTraceJobId } from "@/lib/automation/studioTraceContract";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
   const action = typeof body.action === "string" ? body.action : "";
   try {
     if (action === "trace") {
-      if (typeof body.jobId !== "string" || !/^[0-9a-f-]{36}$/i.test(body.jobId)) {
+      if (!isAutomationTraceJobId(body.jobId)) {
         return json({ ok: false, error: "Invalid job ID." }, 400);
       }
       const trace = await getAutomationStudioExecutionTrace(body.jobId);

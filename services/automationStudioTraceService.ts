@@ -3,13 +3,12 @@ import "server-only";
 import { adminClient } from "@/lib/supabase";
 import { getAutomationStudioWorkflowKeyForFamily } from "@/services/automationStudioService";
 import { getWorkflowFamilyForAction, isAutomationActionType } from "@/lib/automation/actionRegistry";
-import { safeTraceCode, sortTraceEvents, traceStateForStatus, type AutomationTraceEvent, type AutomationStudioExecutionTrace } from "@/lib/automation/studioTraceContract";
+import { isAutomationTraceJobId, safeTraceCode, sortTraceEvents, traceStateForStatus, type AutomationTraceEvent, type AutomationStudioExecutionTrace } from "@/lib/automation/studioTraceContract";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_EVIDENCE_ROWS = 40;
 
 export async function getAutomationStudioExecutionTrace(jobId: string): Promise<AutomationStudioExecutionTrace | null> {
-  if (!UUID.test(jobId)) return null;
+  if (!isAutomationTraceJobId(jobId)) return null;
   const db = adminClient();
   const { data: job, error: jobError } = await db.from("automation_jobs")
     .select("id,action_request_id,status,attempt_count,available_at,locked_at,completed_at,created_at,updated_at,last_safe_code")
@@ -23,16 +22,20 @@ export async function getAutomationStudioExecutionTrace(jobId: string): Promise<
       .eq("id", job.action_request_id).maybeSingle(),
     db.from("automation_execution_attempts")
       .select("id,attempt_number,status,classification,safe_code,started_at,finished_at")
-      .eq("job_id", jobId).order("started_at", { ascending: true }).limit(MAX_EVIDENCE_ROWS),
+      .eq("job_id", jobId).order("started_at", { ascending: true }).limit(MAX_EVIDENCE_ROWS + 1),
     db.from("automation_transport_requests")
       .select("id,attempt_id,direction,route_key,state,created_at,finalized_at")
-      .eq("job_id", jobId).order("created_at", { ascending: true }).limit(MAX_EVIDENCE_ROWS),
+      .eq("job_id", jobId).order("created_at", { ascending: true }).limit(MAX_EVIDENCE_ROWS + 1),
   ]);
   if (requestResult.error) throw requestResult.error;
   if (attemptsResult.error) throw attemptsResult.error;
   if (transportsResult.error) throw transportsResult.error;
   const request = requestResult.data;
   if (!request) return null;
+  const attempts = (attemptsResult.data ?? []).slice(0, MAX_EVIDENCE_ROWS);
+  const transports = (transportsResult.data ?? []).slice(0, MAX_EVIDENCE_ROWS);
+  const evidenceTruncated = (attemptsResult.data?.length ?? 0) > MAX_EVIDENCE_ROWS ||
+    (transportsResult.data?.length ?? 0) > MAX_EVIDENCE_ROWS;
 
   const events: AutomationTraceEvent[] = [];
   const add = (event: AutomationTraceEvent) => events.push(event);
@@ -64,7 +67,7 @@ export async function getAutomationStudioExecutionTrace(jobId: string): Promise<
     state: "observed", safeCode: null,
   });
 
-  for (const attempt of attemptsResult.data ?? []) {
+  for (const attempt of attempts) {
     const number = Number.isInteger(attempt.attempt_number) ? attempt.attempt_number : "?";
     if (attempt.started_at) add({
       id: "attempt:start:" + attempt.id, at: attempt.started_at, source: "worker",
@@ -78,7 +81,7 @@ export async function getAutomationStudioExecutionTrace(jobId: string): Promise<
       state: traceStateForStatus(attempt.status), safeCode: code(attempt.safe_code),
     });
   }
-  for (const transport of transportsResult.data ?? []) {
+  for (const transport of transports) {
     add({
       id: "transport:" + transport.id, at: transport.created_at, source: "transport",
       title: "Transport: " + (code(transport.direction) ?? "unknown"),
@@ -108,7 +111,10 @@ export async function getAutomationStudioExecutionTrace(jobId: string): Promise<
     jobStatus: code(job.status) ?? "unknown",
     decisionStatus: code(request.decision_status) ?? "unknown",
     events: sortTraceEvents(events),
-    coverage: "core_queue_worker_transport",
+    coverage: attempts.length > 0
+      ? (transports.length > 0 ? "core_queue_worker_transport" : "core_queue_worker")
+      : (transports.length > 0 ? "core_queue_transport" : "core_queue"),
+    evidenceTruncated,
     providerDeliveryVerified: false,
     notice: "Read-only persisted event evidence. A draft canvas is not a historical execution replay. Provider delivery and Anisha/AOS effects are NOT verified by this trace.",
   };

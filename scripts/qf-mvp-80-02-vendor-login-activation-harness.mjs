@@ -1294,10 +1294,14 @@ check("88 [static] `repaired` means an actual repair, not a re-issued link", () 
 });
 
 check("89 [static] menu labels are unambiguous and bound to the right handlers", () => {
-  assert(/\{ label: "Enable lead eligibility", onClick: \(\) => void mutate\(vendor\.id, "status", \{ action: "activate" \}/.test(flatUi),
-    "Enable lead eligibility must call the activate STATUS mutation");
-  assert(/\{ label: "Disable lead eligibility", onClick: \(\) => void mutate\(vendor\.id, "status", \{ action: "deactivate" \}/.test(flatUi),
-    "Disable lead eligibility must call the deactivate STATUS mutation");
+  assert(/\{ label: "Activate vendor account", onClick: \(\) => void mutate\(vendor\.id, "status", \{ action: "activate" \}/.test(flatUi),
+    "Activate vendor account must only call the is_active STATUS mutation");
+  assert(/\{ label: "Deactivate vendor account", onClick: \(\) => void mutate\(vendor\.id, "status", \{ action: "deactivate" \}/.test(flatUi),
+    "Deactivate vendor account must only call the is_active STATUS mutation");
+  assert(/\{ label: "Enable lead acceptance \(verified only\)", onClick: \(\) => void mutate\(vendor\.id, "status", \{ action: "activate_leads" \}/.test(flatUi),
+    "Lead acceptance must use separate verified-office guarded activation");
+  assert(/\{ label: "Pause lead acceptance", onClick: \(\) => void mutate\(vendor\.id, "status", \{ action: "pause_leads" \}/.test(flatUi),
+    "Pause lead acceptance must use its own explicit action");
   assert(/\{ label: "Create \/ repair vendor login", onClick: \(\) => void activateLogin\(vendor\) \}/.test(flatUi),
     "Create / repair vendor login must call the auth provisioning handler");
   assert(!/label: "Activate vendor"/.test(flatUi), "the ambiguous status label must be gone");

@@ -162,5 +162,5 @@ try{
     await pgPool.end();
   }
 
-}catch(e){console.log("GOTRUE_TEST_FAILURE",e.code??e.name,"safe_stderr",String(e.stderr??"").replaceAll(pass,"[redacted]").replaceAll(secret,"[redacted]").slice(-420));try {const r=spawnSync("docker",["logs","--tail","15",auth],{encoding:"utf8"});const log=(r.stdout+"\n"+r.stderr).replaceAll(pass,"[secret]").replaceAll(secret,"[secret]");console.log("GOTRUE_BOOT_LOG",log.slice(-1800));}catch{};process.exitCode=1;}
+}catch(e){const safeMessage=String(e.message??"").replaceAll(pass,"[redacted]").replaceAll(secret,"[redacted]").replace(/Command failed: docker[^\n]*/g,"Docker subprocess failed");console.log("GOTRUE_TEST_FAILURE",e.code??e.name,"reason",safeMessage.slice(-360));try {const r=spawnSync("docker",["logs","--tail","15",auth],{encoding:"utf8"});const log=(r.stdout+"\n"+r.stderr).replaceAll(pass,"[secret]").replaceAll(secret,"[secret]");console.log("GOTRUE_BOOT_LOG",log.slice(-1800));}catch{};process.exitCode=1;}
 finally {try{docker("rm","-f",auth)}catch{};try{docker("rm","-f",db)}catch{};if(created)try{docker("network","rm",network)}catch{};console.log("LOCAL_AUTH_TEST_CLEANUP_COMPLETE");}

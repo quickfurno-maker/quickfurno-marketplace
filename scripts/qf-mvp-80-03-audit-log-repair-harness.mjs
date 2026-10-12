@@ -178,6 +178,19 @@ NodeModule._resolveFilename = function (request, ...rest) {
   return originalResolve.call(this, request, ...rest);
 };
 
+// VL-02 adds an active-city lookup only for the independent lead-acceptance
+// action. This 80.03 audit harness never executes that action, and its compiled
+// CommonJS harness must not import Next's server-only browser boundary package.
+// The new guarded activation action has its own executable 9-case certification.
+const originalLoad = NodeModule._load;
+NodeModule._load = function (request, parent, ...rest) {
+  const fromAdmin = String(parent?.filename ?? "").replace(/\\/g, "/").endsWith("/services/vendorAdminService.js");
+  if (fromAdmin && request === "../lib/locations/cityService") {
+    return { getActiveCities: async () => [] };
+  }
+  return originalLoad.call(this, request, parent, ...rest);
+};
+
 const requireFromBuild = createRequire(`${outDir}/`);
 const supabaseMod = requireFromBuild("./lib/supabase.js");
 supabaseMod.adminClient = () => fakeAdminClient();

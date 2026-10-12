@@ -165,6 +165,9 @@ jobs:
       - name: Vendor location backfill authority
         run: npm run test:mvp:vendor-location-backfill
 
+      - name: Owner-safe vendor journey AGNI readiness snapshot
+        run: npm run test:mvp:vendor-agni-readiness
+
       - name: Public Google location surfaces
         run: npm run test:mvp:public-google-location
 

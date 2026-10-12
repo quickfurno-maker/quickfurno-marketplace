@@ -941,7 +941,10 @@
         "cities",
         "lead_assignments",
         "leads",
+        "marketplace_service_zones",
         "payments",
+        "vendor_package_orders",
+        "vendor_profile_change_requests",
         "vendors"
       ],
       "storageBuckets": [],

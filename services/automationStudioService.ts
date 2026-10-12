@@ -151,7 +151,7 @@ function currentStepForStatus(status: string) {
 export async function getAutomationStudioOverview(): Promise<AutomationStudioOverview> {
   const now = new Date();
   const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-  const [settings, jobsResult, nativeSnapshot] = await Promise.all([
+  const [settings, jobsResult, nativeSnapshot, historyResult] = await Promise.all([
     loadStudioSettingRows(),
     adminClient()
       .from("automation_jobs")
@@ -160,10 +160,15 @@ export async function getAutomationStudioOverview(): Promise<AutomationStudioOve
       .order("created_at", { ascending: false })
       .limit(250),
     readNativeAutomationRuntimeSnapshot(),
+    adminClient().from("automation_jobs")
+      .select("id,action_request_id,status,attempt_count,created_at,updated_at")
+      .order("created_at", { ascending: false }).limit(100),
   ]);
   if (jobsResult.error) throw jobsResult.error;
+  if (historyResult.error) throw historyResult.error;
   const jobs = (jobsResult.data ?? []) as JobRow[];
-  const actionIds = [...new Set(jobs.map((job) => job.action_request_id))];
+  const historicJobs = (historyResult.data ?? []) as JobRow[];
+  const actionIds = [...new Set([...jobs, ...historicJobs].map((job) => job.action_request_id))];
   let actionRequests: ActionRequestRow[] = [];
   if (actionIds.length) {
     const { data, error } = await adminClient()
@@ -208,7 +213,7 @@ export async function getAutomationStudioOverview(): Promise<AutomationStudioOve
       draftDefinition: draft, publishedDefinition: published, versions: history,
     };
   });
-  const executions: AutomationStudioExecutionRow[] = jobs.slice(0, 40).map((job) => {
+  const executions: AutomationStudioExecutionRow[] = historicJobs.slice(0, 40).map((job) => {
     const actionType = actionTypeByRequest.get(job.action_request_id) ?? null;
     return {
       id: job.id,

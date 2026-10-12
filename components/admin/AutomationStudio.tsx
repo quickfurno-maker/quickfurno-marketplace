@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AutomationStudioDefinition,
   AutomationStudioNode,
@@ -10,6 +10,7 @@ import type {
   AutomationStudioWorkflowKey,
   AutomationStudioWorkflowRuntime,
 } from "@/lib/automation/studioContract";
+import type { AutomationStudioExecutionTrace } from "@/lib/automation/studioTraceContract";
 
 const ENDPOINT = "/api/admin/automation-studio";
 const NODE_W = 194;
@@ -36,7 +37,7 @@ const ACTION_OPTIONS: Readonly<Record<AutomationStudioWorkflowKey, readonly (rea
   ],
   vendor_journey: [
     ["vendor.onboarding_reminder", "Vendor onboarding reminder"],
-    ["vendor.document_reminder", "Vendor document reminder"],
+    ["vendor.response_reminder", "Vendor lead response reminder"],
     ["vendor.package_expiry_warning", "Package expiry warning"],
     ["vendor.low_credit_warning", "Low credit warning"],
     ["vendor.lead_offer", "Vendor Client Match alert"],
@@ -93,6 +94,10 @@ export function AutomationStudio() {
   const [toast, setToast] = useState<string | null>(null);
   const [simulation, setSimulation] = useState<AutomationStudioSimulationResult | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [trace, setTrace] = useState<AutomationStudioExecutionTrace | null>(null);
+  const [traceLoading, setTraceLoading] = useState(false);
+  const [traceError, setTraceError] = useState<string | null>(null);
+  const traceRequestToken = useRef(0);
 
   const notify = useCallback((message: string) => {
     setToast(message);
@@ -139,6 +144,28 @@ export function AutomationStudio() {
     const result = await response.json() as { ok?: boolean; error?: string; [key: string]: unknown };
     if (!response.ok || result.ok === false) throw new Error(result.error || "Automation Studio action failed.");
     return result;
+  }
+
+  async function openTrace(jobId: string) {
+    const requestToken = ++traceRequestToken.current;
+    setTraceLoading(true);
+    setTraceError(null);
+    setTrace(null);
+    try {
+      const result = await post({ action: "trace", jobId });
+      const evidence = result as unknown as AutomationStudioExecutionTrace;
+      if (evidence.ok !== true || !Array.isArray(evidence.events)) throw new Error("Invalid trace response.");
+      if (requestToken !== traceRequestToken.current) return;
+      setTrace(evidence);
+      // An outlined draft node is a pointer, NOT proof the historic node ran.
+      const node = draft?.nodes.find((item) => item.actionType === evidence.actionType);
+      if (node && evidence.workflowKey === selectedKey) setSelectedNodeId(node.id);
+      setTab("executions");
+    } catch (cause) {
+      if (requestToken === traceRequestToken.current) setTraceError(cause instanceof Error ? cause.message : "Could not trace execution.");
+    } finally {
+      if (requestToken === traceRequestToken.current) setTraceLoading(false);
+    }
   }
 
   async function runAction(task: () => Promise<void>) {
@@ -296,18 +323,18 @@ export function AutomationStudio() {
     <div className="min-h-[calc(100vh-8rem)] w-full min-w-0 max-w-full overflow-x-hidden bg-[#f7f8fc] p-1 text-slate-900 sm:p-2">
       {toast ? <div className="fixed right-5 top-20 z-[90] rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-2xl">{toast}</div> : null}
       <StudioHeader overview={overview} saving={saving} onGlobalToggle={setGlobalEnabled} />
-      <WorkflowCards workflows={overview.workflows} selectedKey={selectedKey} onSelect={setSelectedKey} onToggle={setWorkflowEnabled} />
+      <WorkflowCards workflows={overview.workflows} selectedKey={selectedKey} onSelect={(key) => { traceRequestToken.current++; setSelectedKey(key); setTrace(null); setTraceLoading(false); setTraceError(null); }} onToggle={setWorkflowEnabled} />
       <div className="mt-4 grid gap-4 2xl:grid-cols-[1fr_340px]">
         <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <BuilderToolbar workflow={selectedWorkflow} dirty={dirty} saving={saving} onSave={saveDraft} onSimulate={simulate} onPublish={publish} />
           <div className="grid min-h-[690px] min-w-0 lg:grid-cols-[190px_1fr]">
             <BlockLibrary onAdd={addPolicyNode} />
-            <WorkflowCanvas definition={draft} selectedNodeId={selectedNodeId} simulation={simulation} onSelect={setSelectedNodeId} onMove={(id, x, y) => updateDraft((next) => { const node = next.nodes.find((item) => item.id === id); if (node) { node.x = x; node.y = y; } })} />
+            <WorkflowCanvas definition={draft} selectedNodeId={selectedNodeId} simulation={simulation} traceActionType={trace?.workflowKey === selectedKey ? trace.actionType : null} onSelect={setSelectedNodeId} onMove={(id, x, y) => updateDraft((next) => { const node = next.nodes.find((item) => item.id === id); if (node) { node.x = x; node.y = y; } })} />
           </div>
         </div>
         <NodeInspector node={selectedNode} workflow={selectedWorkflow} definition={draft} onPatch={patchSelectedNode} onSetting={patchSelectedSetting} onConnect={setEdgeTarget} onRemove={removeSelectedNode} />
       </div>
-      <ActivityPanel overview={overview} workflow={selectedWorkflow} tab={tab} onTab={setTab} onRollback={rollback} />
+      <ActivityPanel overview={overview} workflow={selectedWorkflow} tab={tab} onTab={setTab} onRollback={rollback} onTrace={openTrace} trace={trace} traceLoading={traceLoading} traceError={traceError} />
     </div>
   );
 }
@@ -324,7 +351,7 @@ function StudioHeader({ overview, saving, onGlobalToggle }: {
         <p className="mt-1 max-w-full break-words text-sm leading-5 text-slate-500">Design, control and monitor QuickFurno automation from the native engine.</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <HealthPill label={healthy ? "System healthy" : "Native engine needs attention"} healthy={healthy} />
+        <HealthPill label={healthy ? "Worker heartbeat OK" : "Native engine needs attention"} healthy={healthy} />
         <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">{overview.nativeEngine.mode.toUpperCase()}</span>
         <button
           type="button"
@@ -408,10 +435,11 @@ function BlockLibrary({ onAdd }: { onAdd: (kind: AutomationStudioNodeKind) => vo
     </aside>
   );
 }
-function WorkflowCanvas({ definition, selectedNodeId, simulation, onSelect, onMove }: {
+function WorkflowCanvas({ definition, selectedNodeId, simulation, traceActionType, onSelect, onMove }: {
   definition: AutomationStudioDefinition;
   selectedNodeId: string | null;
   simulation: AutomationStudioSimulationResult | null;
+  traceActionType: string | null;
   onSelect: (id: string) => void;
   onMove: (id: string, x: number, y: number) => void;
 }) {
@@ -439,7 +467,7 @@ function WorkflowCanvas({ definition, selectedNodeId, simulation, onSelect, onMo
             }}
             onClick={() => onSelect(node.id)}
             style={{ left: node.x, top: node.y, width: NODE_W, minHeight: NODE_H }}
-            className={`absolute rounded-xl border bg-white p-2.5 text-left shadow-sm transition hover:shadow-md ${selectedNodeId === node.id ? "border-violet-400 ring-2 ring-violet-100" : visited.has(node.id) ? "border-emerald-300 ring-2 ring-emerald-100" : "border-slate-200"}`}>
+            className={`absolute rounded-xl border bg-white p-2.5 text-left shadow-sm transition hover:shadow-md ${traceActionType && node.actionType === traceActionType ? "border-amber-400 ring-2 ring-amber-100" : selectedNodeId === node.id ? "border-violet-400 ring-2 ring-violet-100" : visited.has(node.id) ? "border-emerald-300 ring-2 ring-emerald-100" : "border-slate-200"}`}>
             <div className="flex items-start gap-2">
               <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${nodeTone[node.kind]}`}><NodeGlyph kind={node.kind} /></span>
               <span className="min-w-0"><span className="block truncate text-[11px] font-extrabold text-slate-900">{node.label}</span><span className="mt-0.5 block line-clamp-2 text-[9px] leading-3 text-slate-500">{node.description}</span></span>
@@ -447,6 +475,7 @@ function WorkflowCanvas({ definition, selectedNodeId, simulation, onSelect, onMo
             <span className={`absolute -right-1.5 -top-1.5 h-3 w-3 rounded-full border-2 border-white ${node.authority === "locked_core" ? "bg-blue-500" : "bg-violet-500"}`} />
           </button>
         ))}
+        {traceActionType ? <div className="absolute left-4 right-4 top-2 rounded-lg border border-amber-200 bg-amber-50/95 px-3 py-2 text-[10px] font-semibold text-amber-900 shadow-sm">Execution selected: matching action outlined in amber. Draft nodes are not verified execution steps; inspect the persisted timeline below.</div> : null}
         {simulation ? <div className="absolute bottom-4 left-4 right-4 rounded-xl border border-emerald-200 bg-emerald-50/95 p-3 text-[10px] text-emerald-800 shadow-sm"><b>Simulation path:</b> {simulation.visited.map((item) => item.label).join(" -> ")}<span className="ml-2 text-emerald-600">No live mutation or send.</span></div> : null}
       </div>
     </div>
@@ -541,13 +570,18 @@ function ConnectionSelect({ label, value, targets, onChange }: {
   );
 }
 
-function ActivityPanel({ overview, workflow, tab, onTab, onRollback }: {
+function ActivityPanel({ overview, workflow, tab, onTab, onRollback, onTrace, trace, traceLoading, traceError }: {
   overview: AutomationStudioOverview;
   workflow: AutomationStudioWorkflowRuntime;
   tab: Tab;
   onTab: (tab: Tab) => void;
   onRollback: (version: number) => Promise<void>;
+  onTrace: (jobId: string) => Promise<void>;
+  trace: AutomationStudioExecutionTrace | null;
+  traceLoading: boolean;
+  traceError: string | null;
 }) {
+  const [jobLookup, setJobLookup] = useState("");
   const executions = overview.executions.filter((item) => item.workflowKey === workflow.key || item.workflowKey === "unknown").slice(0, 12);
   return (
     <section className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -557,16 +591,61 @@ function ActivityPanel({ overview, workflow, tab, onTab, onRollback }: {
         <TabButton active={tab === "alerts"} onClick={() => onTab("alerts")}>Runtime Health</TabButton>
         <button onClick={() => location.reload()} className="ml-auto mb-2 rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-600">Refresh</button>
       </div>
-      {tab === "executions" ? <ExecutionTable rows={executions} /> : null}
+      {tab === "executions" ? <>
+        <form className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3" onSubmit={(event) => { event.preventDefault(); if (/^[0-9a-f-]{36}$/i.test(jobLookup.trim())) void onTrace(jobLookup.trim()); }}>
+          <label htmlFor="automation-job-lookup" className="text-[11px] font-bold text-slate-700">Trace any job ID</label>
+          <input id="automation-job-lookup" value={jobLookup} onChange={(event) => setJobLookup(event.target.value)} placeholder="Paste exact execution UUID" className="min-w-[240px] flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs" />
+          <button type="submit" disabled={traceLoading || !/^[0-9a-f-]{36}$/i.test(jobLookup.trim())} className="rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-bold text-white disabled:opacity-40">Trace events</button>
+        </form>
+        <ExecutionTable rows={executions} onTrace={onTrace} selectedJobId={trace?.jobId ?? null} />
+        {traceLoading ? <div className="border-t border-slate-100 p-4 text-xs text-slate-500">Loading persisted execution events...</div> : null}
+        {traceError ? <div role="alert" className="border-t border-rose-100 bg-rose-50 p-4 text-xs text-rose-800">{traceError}</div> : null}
+        {trace ? <ExecutionTracePanel trace={trace} /> : null}
+      </> : null}
       {tab === "versions" ? <VersionTable workflow={workflow} onRollback={onRollback} /> : null}
       {tab === "alerts" ? <RuntimeHealth overview={overview} /> : null}
     </section>
   );
 }
 
-function ExecutionTable({ rows }: { rows: AutomationStudioOverview["executions"] }) {
+function ExecutionTable({ rows, onTrace, selectedJobId }: {
+  rows: AutomationStudioOverview["executions"];
+  onTrace: (jobId: string) => Promise<void>;
+  selectedJobId: string | null;
+}) {
   if (!rows.length) return <EmptyPanel text="No recent executions for this workflow." />;
-  return <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-[11px]"><thead className="bg-slate-50 text-slate-500"><tr>{["ID","Action","Current step","Status","Started","Attempts"].map((h) => <th key={h} className="px-4 py-2.5 font-bold">{h}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{rows.map((row) => <tr key={row.id} className="text-slate-700"><td className="px-4 py-3 font-mono text-[10px]">{shortId(row.id)}</td><td className="px-4 py-3">{row.actionType ?? "Maintenance"}</td><td className="px-4 py-3 font-semibold">{row.currentStep}</td><td className="px-4 py-3"><Status value={row.status} /></td><td className="px-4 py-3">{formatDate(row.startedAt)}</td><td className="px-4 py-3">{row.attemptCount}</td></tr>)}</tbody></table></div>;
+  return <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-[11px]"><thead className="bg-slate-50 text-slate-500"><tr>{["ID","Action","Current step","Status","Started","Attempts","Evidence"].map((h) => <th key={h} className="px-4 py-2.5 font-bold">{h}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{rows.map((row) => <tr key={row.id} className="text-slate-700"><td className="px-4 py-3 font-mono text-[10px]">{shortId(row.id)}</td><td className="px-4 py-3">{row.actionType ?? "Maintenance"}</td><td className="px-4 py-3 font-semibold">{row.currentStep}</td><td className="px-4 py-3"><Status value={row.status} /></td><td className="px-4 py-3">{formatDate(row.startedAt)}</td><td className="px-4 py-3">{row.attemptCount}</td><td className="px-4 py-3"><button type="button" onClick={() => void onTrace(row.id)} className={"rounded-lg border px-2.5 py-1.5 font-bold " + (row.id === selectedJobId ? "border-amber-300 bg-amber-50 text-amber-800" : "border-slate-200 text-violet-700")}>Trace</button></td></tr>)}</tbody></table></div>;
+}
+function ExecutionTracePanel({ trace }: { trace: AutomationStudioExecutionTrace }) {
+  return (
+    <div className="border-t border-slate-200 bg-slate-50/50 p-4" aria-label="Persisted automation event timeline">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-extrabold text-slate-900">Execution Event Trace</h3>
+          <p className="mt-1 text-[11px] text-slate-500">Job <code>{trace.jobId}</code> · Action <b>{trace.actionType}</b> · Current state <b>{trace.jobStatus}</b></p>
+          <p className="mt-1 text-[11px] text-slate-500">Core decision: <b>{trace.decisionStatus}</b> · Subject type: {trace.entityType} · Correlation: <code>{trace.correlationId ?? "not recorded"}</code></p>
+        </div>
+        <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-bold text-amber-800">PROVIDER DELIVERY NOT VERIFIED</span>
+      </div>
+      <p className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-[11px] leading-5 text-blue-800">{trace.notice}</p>
+      <ol className="mt-4 space-y-2">
+        {trace.events.map((event, index) => (
+          <li key={event.id} className="flex gap-3 rounded-lg border border-slate-200 bg-white p-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-[10px] font-extrabold text-slate-600">{index + 1}</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <b className="text-xs text-slate-900">{event.title}</b>
+                <Status value={event.state} />
+                <span className="text-[10px] font-semibold uppercase text-slate-400">{event.source}</span>
+              </div>
+              <p className="mt-1 text-[11px] text-slate-600">{event.detail}{event.safeCode ? " · " + event.safeCode : ""}</p>
+              <time className="mt-1 block text-[10px] text-slate-400" dateTime={event.at}>{formatDate(event.at)}</time>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
 }
 function VersionTable({ workflow, onRollback }: { workflow: AutomationStudioWorkflowRuntime; onRollback: (version: number) => Promise<void> }) {
   if (!workflow.versions.length) return <EmptyPanel text="No published version history yet. Publish this workflow to create v1." />;
@@ -616,7 +695,9 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 function Status({ value }: { value: string }) {
   const positive = value === "succeeded";
   const active = value === "pending" || value === "processing" || value === "retry_scheduled";
-  return <span className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase ${positive ? "bg-emerald-50 text-emerald-700" : active ? "bg-blue-50 text-blue-700" : "bg-rose-50 text-rose-700"}`}>{value.replaceAll("_", " ")}</span>;
+  const unknown = value === "unknown" || value === "uncertain";
+  const neutral = value === "observed" || value === "cancelled";
+  return <span className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase ${positive ? "bg-emerald-50 text-emerald-700" : active ? "bg-blue-50 text-blue-700" : unknown ? "bg-amber-50 text-amber-800" : neutral ? "bg-slate-100 text-slate-600" : "bg-rose-50 text-rose-700"}`}>{value.replaceAll("_", " ")}</span>;
 }
 
 function humanize(value: string) {

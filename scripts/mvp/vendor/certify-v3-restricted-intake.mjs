@@ -87,6 +87,8 @@ check("coverage cannot grant matching",vendor.city==="Pune" && canonicalWrites==
  !("location_verification_status" in inserts[1].proposed_changes));
 const action=read("app/actions.ts");
 check("session actor required",action.includes('actor.role !== "vendor"'));
+check("server action sources canonical vendor id",action.includes("const scope = await requireVendorAccess()") &&
+  action.includes("createGovernedVendorChangeRequest(scope.data.vendorId, actor.id, payload)"));
 check("canonical vendor membership rechecked",source.includes("requireVendorScope(vendorId)") && source.includes("access.data.vendorId"));
 check("admin queue locks approval for restricted",read("components/admin/vendor-approvals/VendorApprovalQueue.tsx")
  .includes("office || restricted || fields.length === 0"));

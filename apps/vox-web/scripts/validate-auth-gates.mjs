@@ -21,4 +21,12 @@ check("backend token only server-side",()=>assert.match(read("lib/core.ts"),/imp
 check("read-only proxy",()=>assert.match(read("app/api/overview/route.ts"),/function POST\(\).*405/));
 check("production homepage still locked",()=>assert.match(read("app/page.tsx"),/NODE_ENV==="development"/));
 check("no browser uses access token",()=>assert.doesNotMatch(read("app/login/form.tsx")+read("app/mfa/form.tsx"),/access_token|service_role/));
-console.log("VOX_02_SECURE_BFF_GUARDS_PASS "+n+"/18");
+check("TOTP enrollment disabled by default",()=>assert.match(read("app/api/auth/mfa/enroll/route.ts"),/VOX_STAFF_PORTAL_ENABLED!=="staging"/));
+check("TOTP enrollment requires verified owner",()=>assert.match(read("app/api/auth/mfa/enroll/route.ts"),/admin_role!=="Superadmin"/));
+check("TOTP enrollment requires same origin",()=>assert.match(read("app/api/auth/mfa/enroll/route.ts"),/allowedOrigin\(request\)/));
+check("TOTP re-enrollment blocked",()=>assert.match(read("app/api/auth/mfa/enroll/route.ts"),/ALREADY_ENROLLED/));
+check("TOTP confirmation disabled by default",()=>assert.match(read("app/api/auth/mfa/confirm/route.ts"),/VOX_STAFF_PORTAL_ENABLED!=="staging"/));
+check("TOTP factor owned and unverified",()=>assert.match(read("app/api/auth/mfa/confirm/route.ts"),/f\.id===factorId&&f\.factor_type==="totp"&&f\.status==="unverified"/));
+check("TOTP confirmation requires actual challenge",()=>assert.match(read("app/api/auth/mfa/confirm/route.ts"),/challengeAndVerify/));
+check("enrollment secret only through owner UI",()=>assert.doesNotMatch(read("app/mfa/enroll/form.tsx"),/localStorage|sessionStorage|console\.log/));
+console.log("VOX_02_SECURE_BFF_GUARDS_PASS "+n+"/26");

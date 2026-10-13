@@ -6,7 +6,7 @@
 import { adminClient } from "../lib/supabase";
 import { appError, fail, ok, type Result } from "../lib/errors";
 import { createVendorNotification } from "./vendorNotificationService";
-import { backfillVendorExactLocation, type VendorLocationBackfillInput } from "./adminVendorLocationService";
+import type { VendorLocationBackfillInput } from "./adminVendorLocationService";
 import { normalizeCoordinate } from "../lib/geo/canonicalCoordinate";
 
 export type VendorProfileChangeInput = {
@@ -265,36 +265,6 @@ export async function approveVendorProfileChangeRequest(
       throw appError("VALIDATION");
     }
 
-    // Google office verification currently delegates to Core's guarded
-    // Place-ID authority. Until an atomic external-proof finalization exists,
-    // do not let this path bypass the approved status compare-and-swap.
-    const { data, error } = await db
-      .from("vendor_profile_change_requests")
-      .update({
-        status: "approved",
-        admin_notes: adminNotes?.trim() || null,
-        rejection_reason: null,
-        reviewed_by: reviewedBy,
-        reviewed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", requestId)
-      .eq("status", "pending")
-      .select("*")
-      .single();
-    if (error) throw error;
-
-    await createVendorNotification(request.vendor_id, {
-      title: request.request_type === "office_location_change" ? "Office location verified" : "Profile changes approved",
-      message: request.request_type === "office_location_change"
-        ? "Your Google-selected business location has passed Core verification. Lead acceptance requires separate approval and available credits."
-        : "Your public profile changes were approved and are now live.",
-      type: "profile",
-      priority: "normal",
-      cta_label: "View profile",
-      cta_url: "/vendor/dashboard/profile",
-    });
-    return ok(data as VendorProfileChangeRequest);
   } catch (e) {
     return fail(e);
   }

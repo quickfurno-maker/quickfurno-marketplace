@@ -1,0 +1,38 @@
+name: Vendor Admin Approval Governance
+
+on:
+  pull_request:
+    paths:
+      - "app/admin/vendor-approvals/**"
+      - "app/admin/dashboard/page.tsx"
+      - "components/admin/vendor-approvals/**"
+      - "components/admin/adminConfig.ts"
+      - "components/admin/sections/VendorsSection.tsx"
+      - "services/vendorProfileChangeService.ts"
+      - "app/actions.ts"
+      - "supabase/migrations/20261013133000_vendor_profile_approval_atomic.sql"
+      - "scripts/mvp/vendor/validate-vendor-admin-first-approvals.mjs"
+      - ".github/workflows/vendor-admin-approvals.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/admin/vendor-approvals/**"
+      - "components/admin/vendor-approvals/**"
+      - "services/vendorProfileChangeService.ts"
+      - "supabase/migrations/20261013133000_vendor_profile_approval_atomic.sql"
+      - "scripts/mvp/vendor/validate-vendor-admin-first-approvals.mjs"
+
+permissions:
+  contents: read
+
+jobs:
+  approval-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate Superadmin queue and fail-closed Core approval
+        run: node scripts/mvp/vendor/validate-vendor-admin-first-approvals.mjs

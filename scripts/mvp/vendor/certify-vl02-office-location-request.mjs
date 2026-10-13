@@ -90,6 +90,9 @@ const replay = await api.createVendorOfficeLocationChangeRequest(vendorId,actorI
 check("same vendor pending request rejected",!replay.ok && rows.length === 1);
 const malformed = await api.createVendorOfficeLocationChangeRequest(vendorId,actorId,{...candidate, google_place_id:"bad"});
 check("malformed Place ID rejected",!malformed.ok && rows.length === 1);
+const unapprovedRuntime = await api.approveVendorProfileChangeRequest(created.data.id,actorId);
+check("office approval stays disabled before final certification", !unapprovedRuntime.ok && verifiedCount === 0 && rows[0].status === "pending");
+process.env.QF_VENDOR_OFFICE_ATOMIC_APPROVAL_CERTIFIED = "1"; // disposable in-memory test only
 verifyAllowed = false;
 const failure = await api.approveVendorProfileChangeRequest(created.data.id,actorId);
 check("Google verification failure cannot approve",!failure.ok && rows[0].status === "pending" && vendorWrites.length === 0);
@@ -99,4 +102,5 @@ check("admin approval invokes Core verifier",success.ok && verifiedCount === 2 &
 check("approved office request transitions once",rows[0].status === "approved" && rows[0].reviewed_by === actorId);
 const double = await api.approveVendorProfileChangeRequest(created.data.id,actorId);
 check("approved request cannot replay",!double.ok && vendorWrites.length === 1);
-console.log("VL-02 vendor office request certification: 8/8 PASS");
+delete process.env.QF_VENDOR_OFFICE_ATOMIC_APPROVAL_CERTIFIED;
+console.log("VL-02 vendor office request certification: 9/9 PASS");

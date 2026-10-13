@@ -106,9 +106,24 @@ export async function listPendingVendorProfileChangeRequests(): Promise<Result<V
       .from("vendor_profile_change_requests")
       .select("*")
       .eq("status", "pending")
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true })
+      .limit(100);
     if (error) throw error;
     return ok((data ?? []) as VendorProfileChangeRequest[]);
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Bounded single-count read for the Superadmin dashboard's approvals shortcut. */
+export async function countPendingVendorProfileChangeRequests(): Promise<Result<number>> {
+  try {
+    const { count, error } = await adminClient()
+      .from("vendor_profile_change_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending");
+    if (error) throw error;
+    return ok(count ?? 0);
   } catch (e) {
     return fail(e);
   }
@@ -219,6 +234,11 @@ export async function approveVendorProfileChangeRequest(
     if (!request) throw appError("UNKNOWN");
 
     if (request.request_type === "office_location_change") {
+      // Location changes need an external Google Place Details proof AND an
+      // atomic Core vendor+request transition. Legacy backfill and request
+      // status updates are separate writes, so this path stays fail-closed
+      // until an independently certified atomic office review is supplied.
+      if (process.env.QF_VENDOR_OFFICE_ATOMIC_APPROVAL_CERTIFIED !== "1") throw appError("VALIDATION");
       // Ordinary profile approval cannot silently mark location evidence verified.
       // Core must independently resolve the Place ID and geofence at review time.
       const proposed = request.proposed_changes as Record<string, unknown> | null;
@@ -235,16 +255,34 @@ export async function approveVendorProfileChangeRequest(
       }, reviewedBy ?? "");
       if (!verified.ok) return fail(verified.error);
     } else if (request.request_type === "profile_update") {
-      const proposed = sanitizeProfileInput((request.proposed_changes ?? {}) as VendorProfileChangeInput);
-      const update = mapApprovedChangesToVendorUpdate(proposed);
-      if (Object.keys(update).length > 0) {
-        const { error: updateError } = await db.from("vendors").update(update).eq("id", request.vendor_id);
-        if (updateError) throw updateError;
-      }
+      // One Core transaction, not a vendor write followed by an independently
+      // fallible status write. Locks the request+vendor, verifies immutable
+      // submit-time snapshot, validates the field allowlist, applies exactly
+      // once and commits the approval atomically. No missing-RPC fallback.
+      if (!reviewedBy) throw appError("UNAUTHORIZED");
+      const { data, error } = await db.rpc("qf_approve_vendor_profile_update_v3", {
+        p_request_id: requestId,
+        p_admin_id: reviewedBy,
+        p_notes: adminNotes?.trim() || null,
+      });
+      if (error) throw error;
+      if (!data || data.status !== "approved") throw appError("UNKNOWN");
+      await createVendorNotification(request.vendor_id, {
+        title: "Profile changes approved",
+        message: "Your public profile changes were approved and are now live.",
+        type: "profile",
+        priority: "normal",
+        cta_label: "View profile",
+        cta_url: "/vendor/dashboard/profile",
+      }).catch(() => undefined);
+      return ok(data as VendorProfileChangeRequest);
     } else {
       throw appError("VALIDATION");
     }
 
+    // Google office verification currently delegates to Core's guarded
+    // Place-ID authority. Until an atomic external-proof finalization exists,
+    // do not let this path bypass the approved status compare-and-swap.
     const { data, error } = await db
       .from("vendor_profile_change_requests")
       .update({
@@ -256,6 +294,7 @@ export async function approveVendorProfileChangeRequest(
         updated_at: new Date().toISOString(),
       })
       .eq("id", requestId)
+      .eq("status", "pending")
       .select("*")
       .single();
     if (error) throw error;
@@ -305,10 +344,14 @@ export async function rejectVendorProfileChangeRequest(
         updated_at: new Date().toISOString(),
       })
       .eq("id", requestId)
+      .eq("status", "pending")
       .select("*")
       .single();
     if (error) throw error;
 
+    // The review transaction has committed; notification is a best-effort
+    // side effect and must never turn a successful rejection into an apparent
+    // failure that encourages a confusing/replayed operator action.
     await createVendorNotification(current.vendor_id, {
       title: "Profile changes rejected",
       message: reason,
@@ -316,7 +359,7 @@ export async function rejectVendorProfileChangeRequest(
       priority: "normal",
       cta_label: "View request",
       cta_url: "/vendor/dashboard/profile",
-    });
+    }).catch(() => undefined);
     return ok(data as VendorProfileChangeRequest);
   } catch (e) {
     return fail(e);

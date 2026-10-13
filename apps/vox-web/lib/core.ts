@@ -78,3 +78,50 @@ export async function fetchScopedServiceDesk(){
   return {ok:true,status:200,view:{support,humanInbox}} as const;
  }catch{return {ok:false,status:503,error:"STAFF_DESK_UNAVAILABLE"} as const;}
 }
+
+/** VOX staff CRM adapters — no browser tokens, no service-role and no outbound writes.
+ * Core owns record scope; the BFF independently drops all undeclared fields. */
+export async function fetchScopedCrm(kind:"acquisition"|"vendor360"){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_STAFF_VIEW_MODE!=="scoped")return {ok:false,status:503,error:"STAFF_SCOPE_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ const key=kind==="acquisition"?"acquisition":"vendor360";
+ try{
+  const r=await fetch(base+"/api/vox/v1/"+key,{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!r.ok)return {ok:false,status:r.status===403?403:503,error:"CORE_SCOPE_DENIED_OR_UNAVAILABLE"} as const;
+  const payload:unknown=await r.json();
+  if(!payload||typeof payload!=="object"||!("ok" in payload)||payload.ok!==true||!("view" in payload))
+   return {ok:false,status:503,error:"INVALID_CORE_SCHEMA"} as const;
+  const view=(payload as {view:Record<string,unknown>}).view;
+  const expected=key==="acquisition"?"qf.vox.aarohi.reuse.v1":"qf.vox.vendor360.reuse.v1";
+  if(view?.schema!==expected||view.readOnly!==true||view.owner!=="quickfurno-core")
+   return {ok:false,status:503,error:"INVALID_CORE_SCHEMA"} as const;
+  const array=(x:unknown)=>Array.isArray(x)&&x.length<=12?x:[];
+  if(key==="acquisition"){
+   const prospects=array(view.prospects).map(x=>{
+    const p=x&&typeof x==="object"?x as Record<string,unknown>:{};
+    return {id:uid(p.id),businessName:safeLabel(p.businessName,120),stage:safeLabel(p.stage,40),
+     priority:safeLabel(p.priority,8),nextAction:safeLabel(p.nextAction,50),
+     humanTakeover:p.humanTakeover===true,doNotContact:p.doNotContact===true};});
+   const tasks=array(view.tasks).map(x=>{const t=x&&typeof x==="object"?x as Record<string,unknown>:{};
+    return {id:uid(t.id),prospectId:uid(t.prospectId),status:safeLabel(t.status,30),
+     type:safeLabel(t.type,60),dueAt:typeof t.dueAt==="string"?t.dueAt:null};});
+   return {ok:true,status:200,kind:key,view:{prospects,tasks}} as const;
+  }
+  const vendors=array(view.vendors).map(x=>{const v=x&&typeof x==="object"?x as Record<string,unknown>:{};
+   return {vendorId:uid(v.vendorId),businessName:safeLabel(v.businessName,120),
+    status:safeLabel(v.status,45),verificationStatus:safeLabel(v.verificationStatus,45),
+    locationVerification:safeLabel(v.locationVerification,45),active:v.active===true};});
+  const crm=array(view.crm).map(x=>{const v=x&&typeof x==="object"?x as Record<string,unknown>:{};
+   return {vendorId:uid(v.vendorId),onboarding:safeLabel(v.onboarding,60),
+     relationship:safeLabel(v.relationship,60)};});
+  const tasks=array(view.tasks).map(x=>{const t=x&&typeof x==="object"?x as Record<string,unknown>:{};
+   return {id:uid(t.id),vendorId:uid(t.vendorId),title:safeLabel(t.title,120),
+     status:safeLabel(t.status,30)};});
+  return {ok:true,status:200,kind:key,view:{vendors,crm,tasks}} as const;
+ }catch{return {ok:false,status:503,error:"CORE_CRM_UNAVAILABLE"} as const;}
+}

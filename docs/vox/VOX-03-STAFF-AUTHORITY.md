@@ -29,3 +29,8 @@ Role matrix here is intentionally restrictive: acquisition agent has prospect on
 - [ ] Signed isolated Staging artifact, exact host origins/cookies/CSRF, WAF/origin controls, memory/concurrency and rollback.
 
 **No public DNS cutover and no deployment**, pending all gates. All sensitive writes remain under canonical Core authority; no new WhatsApp sender, account balance modification, vendor activation or AOS/AGNI action.
+
+## Disposable PostgreSQL 16 validation (14 Oct 2026)
+The migration executed successfully inside a **local, network-disabled, disposable** `postgres:16-alpine` container. Synthetic `public.profiles` and `public.cities` were created only in that container to satisfy real foreign keys. The complete transactional SQL applied; pg_catalog assertions found **all 4 VOX tables RLS + FORCE, 0 anon/authenticated SELECT/INSERT grants, 4 service-role SELECT grants**, and direct `SET ROLE authenticated; SELECT ...` failed with permission denied as expected. Output marker: `VOX_03_DISPOSABLE_POSTGRES_MIGRATION_PASS RLS_FORCE=4 BROWSER_GRANTS=0 SERVICE_READ=4 DENIED_AUTHENTICATED_SELECT=true`. Cleanup via `docker rm -f` completed. Script: `scripts/mvp/vox/validate-vox-03-postgres.ps1`.
+
+This certifies SQL syntax and generic PostgreSQL role privileges, **not** actual Supabase Staging RLS, Core approved provisioning, migrations tracking, or real Auth/HTTP behavior. No staging database changed.

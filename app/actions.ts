@@ -15,6 +15,7 @@ import * as packages from "../services/packageService";
 import * as vendorPackageOrders from "../services/vendorPackageOrderService";
 import * as vendorProfileChanges from "../services/vendorProfileChangeService";
 import * as governedVendorChanges from "../services/vendorGovernedChangeIntakeService";
+import { requireVendorAccess } from "../services/vendorAccessService";
 import * as vendorNotifications from "../services/vendorNotificationService";
 import * as vendorSupport from "../services/vendorSupportService";
 import * as vendorReviews from "../services/vendorReviewService";
@@ -573,10 +574,11 @@ export async function vendorSubmitProfileChangeRequest(formData: FormData) {
 
 /** Restricted identity / service-coverage REQUEST ONLY. Never applies vendor data. */
 export async function vendorSubmitGovernedChangeRequest(formData: FormData) {
-  const me = await getMyVendor();
-  if (!me.ok || !me.data) redirect("/vendor/dashboard/profile?request=no-vendor");
   const actor = await currentUser();
   if (!actor?.id || actor.role !== "vendor")
+    redirect("/vendor/dashboard/profile?request=failed&code=UNAUTHORIZED");
+  const scope = await requireVendorAccess();
+  if (!scope.ok || scope.data.authUserId !== actor.id)
     redirect("/vendor/dashboard/profile?request=failed&code=UNAUTHORIZED");
   const family = String(formData.get("request_family") ?? "");
   const ownerName = String(formData.get("owner_name") ?? "").trim();
@@ -600,7 +602,7 @@ export async function vendorSubmitGovernedChangeRequest(formData: FormData) {
   // A malformed family is NEVER silently upgraded to another request kind.
   if (family !== "owner_contact_change" && family !== "service_coverage_change")
     redirect("/vendor/dashboard/profile?request=failed&code=VALIDATION");
-  const result = await governedVendorChanges.createGovernedVendorChangeRequest(me.data.id, actor.id, payload);
+  const result = await governedVendorChanges.createGovernedVendorChangeRequest(scope.data.vendorId, actor.id, payload);
   revalidatePath("/vendor/dashboard/profile");
   revalidatePath("/admin/vendor-approvals");
   if (!result.ok) redirect(`/vendor/dashboard/profile?request=failed&code=${encodeURIComponent(result.code)}`);

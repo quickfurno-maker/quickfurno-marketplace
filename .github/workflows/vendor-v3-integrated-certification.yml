@@ -1,0 +1,47 @@
+name: Vendor V3 Integrated Governance Certification
+
+on:
+  pull_request:
+    paths:
+      - "services/vendorGovernedChangeIntakeService.ts"
+      - "app/actions.ts"
+      - "components/admin/vendor-approvals/**"
+      - "components/vendor-dashboard-v2/profile/**"
+      - "scripts/mvp/vendor/certify-v3-restricted-intake.mjs"
+      - "scripts/mvp/vendor/validate-vendor-admin-first-approvals.mjs"
+      - ".github/workflows/vendor-v3-integrated-certification.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/vendorGovernedChangeIntakeService.ts"
+      - "components/vendor-dashboard-v2/profile/**"
+      - "scripts/mvp/vendor/certify-v3-restricted-intake.mjs"
+
+permissions:
+  contents: read
+
+jobs:
+  vendor-governance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Certified restricted request intake and Core role isolation
+        run: node scripts/mvp/vendor/certify-v3-restricted-intake.mjs
+      - name: Centralized Admin atomic review fail-closed gates
+        run: node scripts/mvp/vendor/validate-vendor-admin-first-approvals.mjs
+      - name: Vendor V1/V2 regression
+        run: npm run test:mvp:vendor-v1-v2
+      - name: Vendor V3-V5 regression
+        run: npm run test:mvp:vendor-v3-v5
+      - name: Google office verification stays held until final provider proof
+        run: node scripts/mvp/vendor/certify-vl02-office-location-request.mjs
+      - name: Native automation worker contracts
+        run: npm run test:automation-native
+      - name: Typecheck
+        run: npm run typecheck

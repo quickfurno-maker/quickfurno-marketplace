@@ -180,6 +180,7 @@ export function VendorProfileRequestHistory({
                 {REQUEST_STATUS_LABEL[request.status] ?? request.status}
               </span>
             </div>
+            <p className="qf-vendor-v2-profile-history-meta">{request.request_type === "owner_contact_change" ? "Owner/contact verification" : request.request_type === "service_coverage_change" ? "Service coverage review" : request.request_type === "office_location_change" ? "Google office location review" : "Public profile change"}</p>
             {request.reviewed_at ? (
               <p className="qf-vendor-v2-profile-history-meta">
                 Reviewed {formatRequestDate(request.reviewed_at)}

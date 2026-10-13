@@ -90,7 +90,7 @@ export function VendorApprovalQueue({requests, loadError}: {
         const office = req.request_type === "office_location_change";
         const current = req.current_snapshot ?? {};
         const proposed = req.proposed_changes ?? {};
-        const restricted = req.request_type === "owner_contact_change" || req.request_type === "service_coverage_change";
+        const restricted = req.request_type !== "profile_update" && req.request_type !== "office_location_change";
         const fields = (office ? OFFICE_FIELDS : restricted ? RESTRICTED_FIELDS : FIELDS).filter(([, , k]) => Object.prototype.hasOwnProperty.call(proposed,k));
         return <article key={req.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex flex-wrap justify-between gap-3"><div>

@@ -20,7 +20,7 @@ const ALLOWED_CATEGORIES = new Set([
   "Premium Interiors", "Sofa", "Painter", "Civil Work", "False Ceiling",
 ]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const PHONE = /^\+?[1-9][0-9]{9,14}$/;
+const PHONE = /^\+[1-9][0-9]{7,14}$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 function clean(value: unknown, max: number): string | null {

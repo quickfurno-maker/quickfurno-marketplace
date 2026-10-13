@@ -56,6 +56,7 @@ check("reject invalid family",invalid({family:"credit_edit",remaining_credits:99
 check("reject empty contact",invalid({family:"owner_contact_change"}));
 check("reject invalid email",invalid({family:"owner_contact_change",email:"oops"}));
 check("reject invalid phone",invalid({family:"owner_contact_change",phone:"123"}));
+check("reject ambiguous national number",invalid({family:"owner_contact_change",phone:"9876543210"}));
 check("reject excessive owner",invalid({family:"owner_contact_change",owner_name:"a".repeat(101)}));
 check("accept normalized safe email",
   api.validateGovernedChange({family:"owner_contact_change",email:"  HI@EXAMPLE.TEST "}).proposed.email==="hi@example.test");

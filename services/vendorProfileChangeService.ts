@@ -309,6 +309,7 @@ export async function rejectVendorProfileChangeRequest(
     // side effect and must never turn a successful rejection into an apparent
     // failure that encourages a confusing/replayed operator action.
     await createVendorNotification(current.vendor_id, {
+      dedupe_key: `vendor_approval:${requestId}:rejected`,
       title: "Profile changes rejected",
       message: reason,
       type: "profile",

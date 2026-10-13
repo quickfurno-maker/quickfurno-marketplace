@@ -75,8 +75,8 @@ export async function createGovernedVendorChangeRequest(
     if (!UUID.test(vendorId) || !UUID.test(actorId)) throw appError("UNAUTHORIZED");
     const validated = validateGovernedChange(input);
     const db = adminClient();
-    // Double-check the authenticated owner in Core even though the caller
-    // server action already resolves their vendor from the user session.
+    // Revalidate the authenticated membership and canonical vendor scope in Core.
+    // The legacy vendors.user_id registration field is NOT the dashboard authority.
     const access = await requireVendorScope(vendorId);
     if (!access.ok || access.data.authUserId !== actorId) throw appError("UNAUTHORIZED");
     const { data: vendor, error: vendorError } = await db.from("vendors")

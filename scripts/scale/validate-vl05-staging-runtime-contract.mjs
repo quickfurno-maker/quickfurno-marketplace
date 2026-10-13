@@ -20,8 +20,10 @@ const overlay=read("ops/kubernetes/overlays/staging/kustomization.yaml");
 const targets=[
   ["quickfurno-web","staging-web.yaml","web"],
   ["quickfurno-automation-worker","staging-worker.yaml","worker"],
-  ["quickfurno-conversation-transport","staging-transport.yaml","transport"],
-  ["quickfurno-aarohi-acquisition","staging-aarohi.yaml","aarohi"],
+  // Kustomize must patch the EXISTING named worker container rather than
+  // creating duplicate transport/aarohi containers beside Production workers.
+  ["quickfurno-conversation-transport","staging-transport.yaml","worker"],
+  ["quickfurno-aarohi-acquisition","staging-aarohi.yaml","worker"],
 ];
 for(const [deployment,file,container] of targets){
  const yaml=read("ops/kubernetes/overlays/staging/"+file);

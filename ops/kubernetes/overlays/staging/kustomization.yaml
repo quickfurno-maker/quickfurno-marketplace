@@ -11,3 +11,8 @@ patches:
   - path: staging-worker.yaml
   - path: staging-transport.yaml
   - path: staging-aarohi.yaml
+  # Staging must never claim quickfurno.in, run a production autoscaler,
+  # or acquire a production web disruption budget before approved cutover.
+  - path: staging-remove-production-ingress.yaml
+  - path: staging-remove-web-hpa.yaml
+  - path: staging-remove-web-pdb.yaml

@@ -1,11 +1,11 @@
-# VOX-01 independently deployable staff web — source-only
+# VOX-02 Staff MFA + server-only Core read proxy
 
-Own Next.js 16 app, own lockfile, standalone Docker image, runtime non-root, loopback-only stage port and resource limits. Not imported into the Core root web app or Jarvis runtime.
+The existing standalone VOX shell now has server-side Supabase Auth email/password login, TOTP challenge for an already enrolled verified authenticator, HttpOnly Strict cookies, a staff verified AAL2 session gate, and the `/api/overview` BFF with HTTPS allowlisted Core origin. Its source only contains read-only, bounded preview views. **Feature gate defaults disabled**; no public origin or staging service deployed.
 
-**Production access fail-closed**: the source shell does not implement a login route, nor any privileged data API. Production home renders only an access-hold page; the graphical workspace is LOCAL PREVIEW ONLY (development mode + VOX_DEMO_PREVIEW=local-only). The server binds 127.0.0.1 for local development. The stage Compose service has a named disabled profile; no deployment performed.
+VOX Core JWT authentication requires the same Supabase project and active Superadmin user, AAL2 and Core's own `profiles` state. Other staff are refused until new scoped team/city/vendor grants are verified. The app never gets the Core service-role key. The provider worker, financial actions and Core canonical vendor state remain inaccessible. 
 
-The public health endpoint returns the generic marker source-shell-only and no health secrets. There are no vendor rows, API tokens, credits, inbox messages or live integration data in this app. Source lock is intentional until external staff authentication and Core-verified staff identity, MFA and object scope are certified.
+Current route family: `/login`, `/mfa`, `/operations`, `/api/auth/sign-in`, `/api/auth/mfa`, `/api/auth/sign-out`, `/api/overview`. Sign-in and MFA POST enforce Origin and size caps. Any route handling business data refuses calls when `VOX_STAFF_PORTAL_ENABLED` is not `staging`. Existing root `/` stays locked.
 
-Before any public VOX route, implement a hardened same-origin login and CSRF/origin validation, fresh Core server-validated staff grants, per-city/per-vendor/per-prospect ABAC, audit trail, strict CSP, origin protection and negative test suite. DO NOT use browser-supplied roles, user_metadata or a shared Superadmin token. Do not route vox.quickfurno.in away from DNS placeholder 192.0.2.0.
+Run `npm ci && npm test && npm run typecheck && npm run build` from `apps/vox-web`. The local production HTTP smoke with the feature gate disabled returned sign-in 503, overview 503, `/operations` hold, and `/` hold. **These are source/security-negative gates, not a genuine signed-in Staging E2E.** Required before access: MFA factor enrollment/availability, staff permissions, host security, genuine Core Auth roundtrip, signed image, and rollout verification.
 
-Prepare only: npm ci, npm test, npm run typecheck, npm run build. Compose stage resource controls are provisional, not a certification of production headroom.
+Do not move `vox.quickfurno.in` from Cloudflare's 192.0.2.0 placeholder yet.

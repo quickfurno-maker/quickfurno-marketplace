@@ -43,6 +43,9 @@ const mocks={
   "server-only":{},
   "@/lib/supabase":{adminClient:()=>({from:dbQuery})},
   "@/lib/errors":errors,
+  "@/services/vendorAccessService":{ requireVendorScope: async id => id === vendorId
+    ? {ok:true,data:{vendorId,authUserId:ownerId,role:"owner",membershipStatus:"active"}}
+    : {ok:false,code:"UNAUTHORIZED"} },
 };
 const module={exports:{}};
 new Function("module","exports","require",transpiled)(module,module.exports,k=>{
@@ -84,7 +87,7 @@ check("coverage cannot grant matching",vendor.city==="Pune" && canonicalWrites==
  !("location_verification_status" in inserts[1].proposed_changes));
 const action=read("app/actions.ts");
 check("session actor required",action.includes('actor.role !== "vendor"'));
-check("server ownership rechecked",source.includes('.eq("user_id", actorId)'));
+check("canonical vendor membership rechecked",source.includes("requireVendorScope(vendorId)") && source.includes("access.data.vendorId"));
 check("admin queue locks approval for restricted",read("components/admin/vendor-approvals/VendorApprovalQueue.tsx")
  .includes("office || restricted || fields.length === 0"));
 check("UI marks city non-Google-verified",read("components/vendor-dashboard-v2/profile/VendorGovernedChangeRequestForms.tsx")

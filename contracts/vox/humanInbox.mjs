@@ -1,8 +1,10 @@
 // VOX-00 message-view boundary. No Meta or outbound provider capability lives here.
 const TYPES=Object.freeze({prospect:"AAROHI",vendor:"ANISHA",client:"RIYA"});
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const INBOX_SUBJECT_TYPES=Object.freeze(Object.keys(TYPES));
 export function projectHumanThread(row) {
   if (!row || !Object.hasOwn(TYPES,row.subjectType)) throw new Error("UNKNOWN_SUBJECT_TYPE");
+  if (!UUID.test(String(row.id??""))) throw new Error("INVALID_CONVERSATION_ID");
   if (row.state!=="HUMAN" || row.humanTakeover!==true) throw new Error("NOT_HUMAN_OWNED");
   const revision=Number(row.revision);
   if (!Number.isSafeInteger(revision) || revision < 0) throw new Error("BAD_REVISION");
@@ -10,7 +12,7 @@ export function projectHumanThread(row) {
     conversationId:String(row.id??""),
     agent:TYPES[row.subjectType],
     subjectType:row.subjectType,
-    destinationMasked:typeof row.destinationMasked==="string"?row.destinationMasked.slice(0,40):"—",
+    destinationMasked:typeof row.destinationMasked==="string"?row.destinationMasked.replace(/\d(?=\D*\d\D*\d)/g,"*").slice(0,40):"—",
     humanTakeover:true,
     revision,
     canFreeformReply:typeof row.serviceWindowExpiresAt==="string" &&

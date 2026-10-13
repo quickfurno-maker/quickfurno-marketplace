@@ -22,6 +22,8 @@ test("phone-only merge impossible",()=>assert.throws(()=>projectProspectVendor({
 test("Core-verified ACTIVE link allowed",()=>assert.equal(projectProspectVendor({prospect:{id:UUID,business_name:"Test"},vendor:{id:VENDOR,business_name:"Vendor"},coreAttestation:{source:"quickfurno-core",state:"ACTIVE",verified:true,prospectId:UUID,vendorId:VENDOR}}).identityLinked,true));
 const row={id:UUID,subjectType:"vendor",state:"HUMAN",humanTakeover:true,revision:2,destinationMasked:"***42",serviceWindowExpiresAt:new Date(now+60_000).toISOString()};
 test("Anisha human queue classified",()=>assert.equal(projectHumanThread(row).agent,"ANISHA"));
+test("raw destination digits masked",()=>assert.equal(projectHumanThread({...row,destinationMasked:"9876543210"}).destinationMasked,"********10"));
+test("invalid conversation identifier rejected",()=>assert.throws(()=>projectHumanThread({...row,id:"bad"}),/INVALID_CONVERSATION_ID/));
 test("non-human queue denied",()=>assert.throws(()=>projectHumanThread({...row,state:"AI"}),/HUMAN/));
 test("stale reply rejected",()=>assert.equal(proposeHumanReply(row,"hello",1).accepted,false));
 test("Core-only human reply proposal",()=>assert.equal(proposeHumanReply(row,"hello",2).reason,"PENDING_CORE_VALIDATION"));
@@ -29,4 +31,4 @@ test("closed service window rejected",()=>assert.equal(proposeHumanReply({...row
 test("Core native automation owner",()=>assert.equal(describeStudio("CORE","vendor_journey").owner,"quickfurno-core"));
 test("Jarvis flow owner",()=>assert.equal(describeStudio("JARVIS","ANISHA").owner,"qf-jarvis"));
 test("unknown action not registered",()=>assert.throws(()=>describeStudio("VOX","arbitrary_script"),/UNREGISTERED/));
-console.log("VOX_00_ADAPTER_CONTRACT_PASS "+count+"/18");
+console.log("VOX_00_ADAPTER_CONTRACT_PASS "+count+"/20");

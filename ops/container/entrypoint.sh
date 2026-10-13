@@ -17,10 +17,26 @@ case "$role" in
     ;;
 esac
 
-if [ "$runtime_env" != "production" ]; then
-  echo "quickfurno-container REFUSED QF_RUNTIME_ENV must be production" >&2
-  exit 78
-fi
+staging_url="https://uckafzuochmbvtiodmcl.supabase.co"
+case "$runtime_env" in
+  production)
+    if [ "${NEXT_PUBLIC_SUPABASE_URL:-}" = "$staging_url" ]; then
+      echo "quickfurno-container REFUSED production identity points to Staging" >&2
+      exit 78
+    fi
+    ;;
+  staging)
+    if [ "${QF_ALLOW_STAGING_RUNTIME:-}" != "1" ] || \
+       [ "${NEXT_PUBLIC_SUPABASE_URL:-}" != "$staging_url" ]; then
+      echo "quickfurno-container REFUSED unpinned Staging runtime" >&2
+      exit 78
+    fi
+    ;;
+  *)
+    echo "quickfurno-container REFUSED unsupported QF_RUNTIME_ENV" >&2
+    exit 78
+    ;;
+esac
 if [ "$schema_version" != "1" ]; then
   echo "quickfurno-container REFUSED unsupported QF_CONFIG_SCHEMA_VERSION" >&2
   exit 78

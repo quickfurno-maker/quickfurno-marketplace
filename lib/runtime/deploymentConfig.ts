@@ -59,7 +59,15 @@ export function assertQfRuntimeIdentity(
   if (!SERVICE_ID.test(serviceId) || serviceId !== expectedServiceId) {
     throw new Error("QF_SERVICE_ID_INVALID");
   }
-  if (env.NODE_ENV === "production" && environment !== "production") {
+  // The immutable Node production image may also run isolated Staging workers,
+  // but ONLY with an explicit staging marker AND the pinned Staging project URL.
+  // A Production identity pointing at Staging is equally unsafe.
+  const stagingUrl = "https://uckafzuochmbvtiodmcl.supabase.co";
+  const isPinnedStaging = environment === "staging" &&
+    env.QF_ALLOW_STAGING_RUNTIME === "1" &&
+    env.NEXT_PUBLIC_SUPABASE_URL?.trim() === stagingUrl;
+  if ((env.NODE_ENV === "production" && environment !== "production" && !isPinnedStaging) ||
+      (environment === "production" && env.NEXT_PUBLIC_SUPABASE_URL?.trim() === stagingUrl)) {
     throw new Error("QF_RUNTIME_ENV_MISMATCH");
   }
   return Object.freeze({

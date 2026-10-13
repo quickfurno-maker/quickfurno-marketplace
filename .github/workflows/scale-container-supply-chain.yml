@@ -69,6 +69,9 @@ jobs:
       - name: Static artifact contract
         run: node scripts/scale/validate-artifact-contract.mjs
 
+      - name: VL-05 fail-closed Staging runtime contract
+        run: node scripts/scale/validate-vl05-staging-runtime-contract.mjs
+
       - name: Phase 15 release CLI syntax
         run: node --check scripts/scale/phase15-release.mjs
 

@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quickfurno-automation-worker
+spec:
+  template:
+    spec:
+      containers:
+        - name: worker
+          env:
+            - name: QF_RUNTIME_ENV
+              value: staging
+            - name: QF_ALLOW_STAGING_RUNTIME
+              value: "1"
+            - name: NEXT_PUBLIC_SUPABASE_URL
+              value: https://uckafzuochmbvtiodmcl.supabase.co
+            - name: QF_NATIVE_AUTOMATION_MODE
+              value: shadow
+            - name: QF_NATIVE_AUTOMATION_WORKER_ID
+              value: staging-vl05-shadow-01

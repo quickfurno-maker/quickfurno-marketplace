@@ -1,0 +1,22 @@
+name: Vendor Approval Event Bridge
+on:
+  pull_request:
+    paths:
+      - 'ops/vendor-approval/pending/**'
+      - 'services/vendorNotificationService.ts'
+      - 'services/vendorProfileChangeService.ts'
+      - 'scripts/mvp/vendor/validate-v3-approval-event-bridge.mjs'
+      - '.github/workflows/vendor-approval-event-bridge.yml'
+  workflow_dispatch:
+jobs:
+  approval-event-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/mvp/vendor/validate-v3-approval-event-bridge.mjs

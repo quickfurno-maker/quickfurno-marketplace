@@ -69,3 +69,13 @@
 ## Next PR lanes after G0 (safe parallel development)
 
 A builds VOX BFF and staff identity. B adapts acquisition + vendor CRM and source-timestamped Vendor 360 read models. C owns case/queue/inbox staff workflow and preserves Core communication outbox. D finishes reviewed protected Core RPCs sequentially. E builds signed Jarvis read/handover adapters and memory fences. F scopes existing business and agent studios, AOS and AGNI. G authors role/consent/replay/load and independent certification. All sensitive mutations remain disabled until their own gates pass.
+
+## Staging Supabase metadata checkpoint — read-only (13 October 2026)
+
+**Project:** `uckafzuochmbvtiodmcl` (QuickFurno Staging only). Queries examined `pg_class` table RLS/grants and `pg_proc` execution grants. **No rows of vendor PII were selected and no database mutation occurred.**
+
+- **12/12 queried existing tables present, RLS ON, no direct SELECT/INSERT grants to `anon` or `authenticated` in examined privilege set:** `aarohi_prospects`, `aarohi_conversations`, `aarohi_tasks`, `aarohi_handoffs`, `communication_conversations`, `vendor_internal_notes`, `vendor_crm_profiles`, `vendor_contacts`, `vendor_tags`, `vendor_tag_assignments`, `vendor_tasks`, `vendor_profile_change_requests`. This supports read model reuse through *server-side narrowed interfaces*, not direct client Supabase reads.
+- **Public-profile finalizer installed:** `qf_approve_vendor_profile_update_v3(uuid,uuid,text)`: `service_role EXECUTE=true`; `anon EXECUTE=false`; `authenticated EXECUTE=false`.
+- **Newer source-only family not installed:** `qf_approve_vendor_verified_coverage_v1` absent; `vendor_approval_event_consumers_v1` and `vendor_approval_delivery_outbox_v1` tables absent. Any later outbox claim/ACK function remains unverified; do not enable consumers.
+- **Not yet checked:** actual staff scope read policies/endpoints, every table's additional CRUD grants, support-case/SLA full schema, signed Staging browser-to-Core flow, Jarvis installed runtime and worker certification. RLS ON alone does not prove full request authorization if privileged service-role APIs fail to enforce staff scope.
+- **Revision to G0:** existing Aarohi CRM and six-table Vendor CRM must be reused. Create only missing staff/team/case schemas after full metadata audit, never clone CRM tables. Staging function release remains separate from immutable signed app deploy.

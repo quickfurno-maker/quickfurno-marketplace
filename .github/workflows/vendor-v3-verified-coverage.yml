@@ -1,0 +1,22 @@
+name: Vendor V3 Verified Coverage
+on:
+  pull_request:
+    paths:
+      - 'ops/vendor-approval/pending/**'
+      - 'services/vendorVerifiedCoverageApprovalService.ts'
+      - 'app/actions.ts'
+      - 'scripts/mvp/vendor/validate-v3-coverage-finalizer.mjs'
+      - '.github/workflows/vendor-v3-verified-coverage.yml'
+  workflow_dispatch:
+jobs:
+  verified-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/mvp/vendor/validate-v3-coverage-finalizer.mjs

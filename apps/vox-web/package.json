@@ -7,9 +7,11 @@
     "build": "next build",
     "start": "next start -H 127.0.0.1 -p 3107",
     "typecheck": "tsc --noEmit",
-    "test": "node scripts/validate-guard.mjs"
+    "test": "node scripts/validate-guard.mjs && node scripts/validate-auth-gates.mjs"
   },
   "dependencies": {
+    "@supabase/ssr": "0.5.2",
+    "@supabase/supabase-js": "2.57.0",
     "next": "16.3.8",
     "react": "19.2.0",
     "react-dom": "19.2.0"

@@ -52,6 +52,8 @@ jobs:
           sudo install -m 0755 kind /usr/local/bin/kind
           kubectl version --client=true
           kind version
+      - name: Fail-closed VL-05 staging overlay isolation gate
+        run: node scripts/mvp/launch/certify-vl05-staging-overlay.mjs
       - name: Render Kustomize package
         run: kubectl kustomize ops/kubernetes/overlays/certification > /tmp/phase19.yaml
       - name: Create ephemeral Kubernetes

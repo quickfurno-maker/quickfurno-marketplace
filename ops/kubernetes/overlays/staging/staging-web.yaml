@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   name: quickfurno-web
 spec:
+  # Zero replicas until an independent Staging image/host is approved.
+  replicas: 0
   template:
     spec:
       containers:

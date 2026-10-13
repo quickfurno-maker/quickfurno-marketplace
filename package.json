@@ -143,6 +143,7 @@
     "test:mvp:public-google-location": "node scripts/mvp/location/validate-qf-public-google-location.mjs",
     "test:mvp:vendor-location-backfill": "node scripts/mvp/matching/validate-qf-vendor-location-backfill.mjs && node scripts/mvp/matching/certify-vl02-google-office.mjs && node scripts/mvp/vendor/certify-vl02-office-location-request.mjs && node scripts/mvp/vendor/certify-vl02-lead-activation.mjs",
     "test:mvp:vendor-agni-readiness": "node scripts/mvp/agni/certify-vendor-journey-snapshot.mjs",
+    "test:vl05:acceptance": "node scripts/mvp/launch/certify-vl05-final.mjs",
     "test:mvp:vendor-v1-v2": "node scripts/mvp/vendor/validate-qf-vendor-v1-v2.mjs",
     "test:mvp:vendor-package-payment": "node --experimental-transform-types --disable-warning=ExperimentalWarning scripts/mvp/payments/validate-vendor-package-razorpay.mjs",
     "test:mvp:vendor-v3-v5": "node scripts/mvp/vendor/validate-qf-vendor-v3-v5.mjs",

@@ -168,6 +168,9 @@ jobs:
       - name: Owner-safe vendor journey AGNI readiness snapshot
         run: npm run test:mvp:vendor-agni-readiness
 
+      - name: VL-05 fail-closed integrated launch evidence gate
+        run: npm run test:vl05:acceptance
+
       - name: Public Google location surfaces
         run: npm run test:mvp:public-google-location
 

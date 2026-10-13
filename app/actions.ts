@@ -634,6 +634,7 @@ export async function adminApproveVendorProfileChangeRequest(requestId: string, 
     const user = await requireSuperadmin();
     const result = await vendorProfileChanges.approveVendorProfileChangeRequest(requestId, user.id, adminNotes);
     revalidatePath("/admin/vendors");
+    revalidatePath("/admin/vendor-approvals");
     revalidatePath("/vendors");
     return result;
   });
@@ -644,6 +645,7 @@ export async function adminRejectVendorProfileChangeRequest(requestId: string, r
     const user = await requireSuperadmin();
     const result = await vendorProfileChanges.rejectVendorProfileChangeRequest(requestId, user.id, rejectionReason);
     revalidatePath("/admin/vendors");
+    revalidatePath("/admin/vendor-approvals");
     return result;
   });
 }

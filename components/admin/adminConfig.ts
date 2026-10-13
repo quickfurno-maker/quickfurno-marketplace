@@ -2,6 +2,7 @@ export type AdminSectionKey =
   | "dashboard"
   | "leads"
   | "vendors"
+  | "vendor-approvals"
   | "packages"
   | "categories"
   | "cities"
@@ -67,6 +68,7 @@ export const adminSections: AdminSectionConfig[] = [
   { key: "dashboard", href: "/admin/dashboard", label: "Dashboard", description: "Marketplace command center", icon: "dashboard", addLabel: "Add Lead" },
   { key: "leads", href: "/admin/leads", label: "Leads", description: "Capture, quality, assignments, delivery", icon: "leads", addLabel: "Add Lead" },
   { key: "vendors", href: "/admin/vendors", label: "Vendors", description: "Studios, vendors, verification", icon: "vendors", addLabel: "Add Vendor" },
+  { key: "vendor-approvals", href: "/admin/vendor-approvals", label: "Vendor Approvals", description: "Review vendor-requested changes before publishing", icon: "audit", addLabel: "" },
   { key: "aarohi", href: "/admin/aarohi", label: "Aarohi CRM", description: "Vendor acquisition, prospecting and conversion", icon: "crm", addLabel: "" },
   { key: "vendor-crm", href: "/admin/vendor-crm", label: "Vendor CRM", description: "Vendor relationships, contacts, tags, notes, tasks", icon: "vendors", addLabel: "" },
   { key: "vendor-segments", href: "/admin/vendor-crm/segments", label: "Vendor Segments", description: "Deterministic saved rules — preview only, never send authorization", icon: "vendors", addLabel: "" },
@@ -95,7 +97,7 @@ export const adminSections: AdminSectionConfig[] = [
 export const adminNavGroups: AdminNavGroup[] = [
   {
     title: "Command Center",
-    sections: ["dashboard", "crm", "leads", "aarohi", "vendors", "vendor-crm", "vendor-segments", "vendor-campaigns"],
+    sections: ["dashboard", "crm", "leads", "aarohi", "vendors", "vendor-approvals", "vendor-crm", "vendor-segments", "vendor-campaigns"],
   },
   {
     title: "Business Setup",

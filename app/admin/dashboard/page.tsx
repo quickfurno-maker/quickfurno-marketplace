@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { countPendingVendorProfileChangeRequests } from "@/services/vendorProfileChangeService";
 import { adminCommandCenterData, getAdminSession } from "@/app/actions";
 import { AdminDashboard } from "@/components/AdminDashboard";
 
@@ -13,12 +15,21 @@ export default async function AdminDashboardPage() {
 
   // C-PERF1: dashboard-specific bounded loader — accurate count-query KPIs
   // plus ≤10-row previews, instead of the broad every-table snapshot.
-  const data = await adminCommandCenterData();
-
+  const [data, pending] = await Promise.all([
+    adminCommandCenterData(),
+    countPendingVendorProfileChangeRequests(),
+  ]);
   return (
-    <AdminDashboard
-      data={data.ok ? (data.data as any) : null}
-      error={!data.ok ? data.error : null}
-    />
+    <>
+      <Link href="/admin/vendor-approvals"
+        className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm font-semibold text-orange-950 hover:bg-orange-100">
+        <span>Vendor change approvals</span>
+        <span>{pending.ok ? `${pending.data} pending review` : "Open approval inbox"} →</span>
+      </Link>
+      <AdminDashboard
+        data={data.ok ? (data.data as any) : null}
+        error={!data.ok ? data.error : null}
+      />
+    </>
   );
 }

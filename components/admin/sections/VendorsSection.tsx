@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   adminActivateVendorLogin,
   adminApproveVendorProfileChangeRequest,
@@ -363,6 +364,11 @@ export function VendorsPage({ data, error }: { data: VendorsDirectoryData | null
         filter refines the current page only — eligibility is computed by the shared policy helper, never in SQL.
       </p>
 
+      <div className="flex justify-end">
+        <Link href="/admin/vendor-approvals" className="rounded-lg border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-950 hover:bg-orange-100">
+          Open Vendor Approvals →
+        </Link>
+      </div>
       <SectionCard
         title="Profile Change Requests"
         description="Review vendor-submitted public profile changes. Approval applies only safe public fields."
@@ -381,7 +387,11 @@ export function VendorsPage({ data, error }: { data: VendorsDirectoryData | null
               header: "Actions",
               cell: (request) => (
                 <div className="flex flex-wrap gap-2">
-                  <SecondaryButton onClick={() => void approveProfileRequest(request.id)}>{busyId === request.id ? "Working..." : "Approve"}</SecondaryButton>
+                  {request.request_type === "office_location_change" ? (
+                    <span className="text-xs text-amber-800">Google verification pending — approval locked</span>
+                  ) : (
+                    <SecondaryButton onClick={() => void approveProfileRequest(request.id)}>{busyId === request.id ? "Working..." : "Approve"}</SecondaryButton>
+                  )}
                   <SecondaryButton onClick={() => void rejectProfileRequest(request.id)}>Reject</SecondaryButton>
                 </div>
               ),

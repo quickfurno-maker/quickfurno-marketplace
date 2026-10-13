@@ -10,7 +10,7 @@ const queue = read("components/admin/vendor-approvals/VendorApprovalQueue.tsx");
 const dashboard = read("app/admin/dashboard/page.tsx");
 const vendors = read("components/admin/sections/VendorsSection.tsx");
 const service = read("services/vendorProfileChangeService.ts");
-const migration = read("supabase/migrations/20261013133000_vendor_profile_approval_atomic.sql");
+const migration = read("ops/vendor-approval/pending/20261013133000_vendor_profile_approval_atomic.sql");
 const actions = read("app/actions.ts");
 let count=0;
 function check(name,ok){if(!ok)throw new Error("V3_ADMIN_APPROVAL_FAIL:"+name);console.log("PASS",name);count++;}

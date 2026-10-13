@@ -10,7 +10,7 @@ on:
       - "components/admin/sections/VendorsSection.tsx"
       - "services/vendorProfileChangeService.ts"
       - "app/actions.ts"
-      - "supabase/migrations/20261013133000_vendor_profile_approval_atomic.sql"
+      - "ops/vendor-approval/pending/20261013133000_vendor_profile_approval_atomic.sql"
       - "scripts/mvp/vendor/validate-vendor-admin-first-approvals.mjs"
       - ".github/workflows/vendor-admin-approvals.yml"
   push:
@@ -19,7 +19,7 @@ on:
       - "app/admin/vendor-approvals/**"
       - "components/admin/vendor-approvals/**"
       - "services/vendorProfileChangeService.ts"
-      - "supabase/migrations/20261013133000_vendor_profile_approval_atomic.sql"
+      - "ops/vendor-approval/pending/20261013133000_vendor_profile_approval_atomic.sql"
       - "scripts/mvp/vendor/validate-vendor-admin-first-approvals.mjs"
 
 permissions:

@@ -168,19 +168,25 @@ export async function getAdminSession(): Promise<{
   };
 }
 
-/** The vendor business row owned by the signed-in user (or null).
- *  Read-only profile summary used by the vendor dashboard for display. */
+/** Canonical vendor profile read after Supabase Auth AND active membership.
+ *  Vendor access authority: authenticated user -> vendor_dashboard_users ->
+ *  vendors.id. The legacy vendors.user_id is not a dashboard permission.
+ *  Verification, credits, payment and lead eligibility never grant login. */
 export async function getMyVendor(): Promise<Result<import("../lib/types").VendorProfileSummary | null>> {
   const u = await currentUser();
-  if (!u) return fail(appError("UNAUTHORIZED"));
-  const sb = await serverClient();
-  const { data } = await sb
+  if (!u || u.role !== "vendor") return fail(appError("UNAUTHORIZED"));
+  const scope = await requireVendorAccess();
+  if (!scope.ok || scope.data.authUserId !== u.id) return fail(appError("UNAUTHORIZED"));
+  // Service-role read is safe only after canonical active membership and
+  // caller identity validation. No browser-provided vendor id is accepted.
+  const { data, error } = await adminClient()
     .from("vendors")
     .select(
       "id, business_name, owner_name, phone, whatsapp_number, email, city, areas_covered, service_categories, selected_category, business_type, office_address_line1, office_address_line2, office_landmark, office_city, office_state, office_latitude, office_longitude, status, verification_status, paid_status, remaining_credits, total_credits, public_visibility, is_active",
     )
-    .eq("user_id", u.id)
+    .eq("id", scope.data.vendorId)
     .maybeSingle();
+  if (error) return fail(appError("UNAUTHORIZED"));
   return { ok: true, data: (data as any) ?? null };
 }
 

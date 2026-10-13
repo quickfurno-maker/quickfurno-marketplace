@@ -33,6 +33,8 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Certified restricted request intake and Core role isolation
         run: node scripts/mvp/vendor/certify-v3-restricted-intake.mjs
+      - name: Canonical vendor profile access
+        run: node scripts/mvp/vendor/validate-canonical-vendor-profile-access.mjs
       - name: Centralized Admin atomic review fail-closed gates
         run: node scripts/mvp/vendor/validate-vendor-admin-first-approvals.mjs
       - name: Matching-sensitive category approval isolation

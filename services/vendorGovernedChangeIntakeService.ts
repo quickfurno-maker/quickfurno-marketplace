@@ -77,9 +77,11 @@ export async function createGovernedVendorChangeRequest(
     const db = adminClient();
     // Double-check the authenticated owner in Core even though the caller
     // server action already resolves their vendor from the user session.
+    const access = await requireVendorScope(vendorId);
+    if (!access.ok || access.data.authUserId !== actorId) throw appError("UNAUTHORIZED");
     const { data: vendor, error: vendorError } = await db.from("vendors")
-      .select("id,user_id,owner_name,email,phone,city,service_categories,areas_covered")
-      .eq("id", vendorId).eq("user_id", actorId).maybeSingle();
+      .select("id,owner_name,email,phone,city,service_categories,areas_covered")
+      .eq("id", access.data.vendorId).maybeSingle();
     if (vendorError) throw vendorError;
     if (!vendor) throw appError("UNAUTHORIZED");
 

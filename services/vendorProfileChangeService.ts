@@ -253,6 +253,7 @@ export async function approveVendorProfileChangeRequest(
       if (error) throw error;
       if (!data || data.status !== "approved") throw appError("UNKNOWN");
       await createVendorNotification(request.vendor_id, {
+        dedupe_key: `vendor_approval:${requestId}:approved`,
         title: "Profile changes approved",
         message: "Your public profile changes were approved and are now live.",
         type: "profile",

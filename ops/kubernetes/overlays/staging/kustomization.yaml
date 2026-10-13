@@ -3,4 +3,11 @@ kind: Kustomization
 namespace: quickfurno-staging
 resources:
   - ../../base
-# Runtime values and Secrets are supplied externally; no credential material lives here.
+# Fail-closed staging identity is applied to every workload, not only workers.
+# The cluster must inject STAGING-only secrets in this namespace. Deployment
+# remains BLOCKED until an independently signed Staging-capable image is pinned.
+patches:
+  - path: staging-web.yaml
+  - path: staging-worker.yaml
+  - path: staging-transport.yaml
+  - path: staging-aarohi.yaml

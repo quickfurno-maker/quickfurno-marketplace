@@ -32,4 +32,12 @@ test("expired service window disclosed closed only",()=>assert.equal(projectStaf
 test("case assignment is held for Core approval",()=>assert.equal(proposeCaseAssignment(thread,vendor,0).reason,"CORE_ATOMIC_APPROVAL_NOT_CONNECTED"));
 test("bad case assignment rejected",()=>assert.equal(proposeCaseAssignment("bad",vendor,0).reason,"INVALID_REQUEST"));
 test("no direct Meta sender reference",()=>assert.doesNotMatch(doc("contracts/vox/serviceDesk.mjs"),/fetch\(|axios|sendMessage\(/));
-console.log("VOX_04_DESK_PROJECTION_PASS "+n+"/21");
+const route=doc("app/api/vox/v1/desk/route.ts");
+test("endpoint requires verified Core staff",()=>assert.match(route,/getVerifiedScopedStaff\(request\.headers\.get\("authorization"\)\)/));
+test("no delegated auditor conversation content",()=>assert.match(route,/!scope\.canReadContent/));
+test("vendor zone intersects staff city",()=>assert.match(route,/\.eq\("city_id",scope\.cityId\)\.eq\("is_active",true\)/));
+test("prospect city exact",()=>assert.match(route,/\.eq\("city_id",scope\.cityId\)/));
+test("case requires both support thread and vendor",()=>assert.match(route,/\.in\("id",\[\.\.\.scope\.supportThreadIds\]\)\.in\("vendor_id",verifiedVendors\)/));
+test("human inbox requires HUMANN state and takeover",()=>assert.match(route,/\.eq\("state","HUMAN"\)\.eq\("human_takeover",true\)/));
+test("mutation methods denied",()=>assert.equal((route.match(/CORE_APPROVAL_REQUIRED"\},405/g)||[]).length,4));
+console.log("VOX_04_DESK_PROJECTION_PASS "+n+"/28");

@@ -10,3 +10,8 @@
 - This independent PR remains logically **stacked on VOX-03 Core permission authority** before an authenticated staff routing API can use it. No deploy, no DB change, no Meta sends.
 
 Current code aligns with the declared reuse-first architecture; further integration is blocked by Staging permission-schema migration and signed Core/Jarvis route E2E.
+
+## Integrated Core read route (stacked on VOX-03)
+The integrated branch adds `GET /api/vox/v1/desk`: it verifies genuine Core AAL2 staff identity/membership, active canonical city/team, explicit vendor/prospect + thread/conversation scopes, enforces city↔zone against `vendors.service_zone_id`, then reads from existing Core `vendor_support_threads` and `communication_conversations` in bounded queries. `projectStaffServiceDesk` returns only safe metadata with no message content, no phone and no provider identifiers. All mutation HTTP methods return **405 CORE_APPROVAL_REQUIRED**. This implementation is real server code but **not deployed**, and a genuine signed Staging access test is still pending.
+
+The joined-source security suite validates 28/28 service desk checks plus 33/33 staff grants tests; full TypeScript must pass before PR review. The migration remains source-only and uninstalled in Staging, so no delegated staff can yet use the route.

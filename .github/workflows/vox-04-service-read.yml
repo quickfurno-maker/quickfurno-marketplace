@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'contracts/vox/serviceDesk.mjs'
+      - 'contracts/vox/serviceDesk.d.mts'
+      - 'app/api/vox/v1/desk/**'
       - 'scripts/mvp/vox/validate-vox-04-desk.mjs'
       - '.github/workflows/vox-04-service-read.yml'
   workflow_dispatch:

@@ -94,9 +94,9 @@ begin
     or lower(trim(z.canonical_city)) is distinct from lower(v_city) then
     raise exception 'QF_COVERAGE_ZONE_UNREADY' using errcode='P0001';
   end if;
-  if not public.st_isvalid(z.boundary)
-    or not public.st_covers(z.boundary,
-         public.st_setsrid(public.st_makepoint(v.office_longitude::double precision,
+  if not extensions.st_isvalid(z.boundary)
+    or not extensions.st_covers(z.boundary,
+         extensions.st_setsrid(extensions.st_makepoint(v.office_longitude::double precision,
                                                v.office_latitude::double precision),4326)) then
     raise exception 'QF_COVERAGE_OUTSIDE_VERIFIED_POLYGON' using errcode='P0001';
   end if;

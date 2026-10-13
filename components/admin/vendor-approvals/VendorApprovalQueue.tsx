@@ -53,7 +53,11 @@ export function VendorApprovalQueue({requests, loadError}: {
     const note = (notes[req.id] ?? "").trim();
     if (!approve && !note) { setFeedback("A rejection reason is required."); return; }
     if (approve && req.request_type !== "profile_update") {
-      setFeedback("Office changes require independent Google verification. Final approval is unavailable until that integration is certified."); return;
+      setFeedback("Sensitive changes require independent verification and a dedicated Core approval finalizer."); return;
+    }
+    if (approve && (Object.prototype.hasOwnProperty.call(req.proposed_changes ?? {}, "public_category") ||
+        Object.prototype.hasOwnProperty.call(req.proposed_changes ?? {}, "services_offered"))) {
+      setFeedback("Legacy matching-sensitive category requests require a separate coverage review. Reject this request with a reason and ask the vendor to resubmit."); return;
     }
     if (approve && !window.confirm("Apply the reviewed public-profile changes?")) return;
     setBusy(req.id);setFeedback("");
@@ -91,6 +95,9 @@ export function VendorApprovalQueue({requests, loadError}: {
         const current = req.current_snapshot ?? {};
         const proposed = req.proposed_changes ?? {};
         const restricted = req.request_type !== "profile_update" && req.request_type !== "office_location_change";
+        const matchingSensitive = !office && !restricted &&
+          (Object.prototype.hasOwnProperty.call(proposed,"public_category") ||
+           Object.prototype.hasOwnProperty.call(proposed,"services_offered"));
         const fields = (office ? OFFICE_FIELDS : restricted ? RESTRICTED_FIELDS : FIELDS).filter(([, , k]) => Object.prototype.hasOwnProperty.call(proposed,k));
         return <article key={req.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex flex-wrap justify-between gap-3"><div>
@@ -98,7 +105,7 @@ export function VendorApprovalQueue({requests, loadError}: {
             <p className="mt-1 break-all text-xs text-slate-500">Vendor: {req.vendor_id} · Request: {req.id}</p>
             <p className="text-xs text-slate-500">Submitted: {req.created_at ? new Date(req.created_at).toLocaleString() : "Unknown"}</p>
           </div><span className="h-fit rounded-full bg-amber-100 px-3 py-1 text-xs text-amber-900">Pending</span></div>
-          {(office || restricted) && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{office ? "Requires server-side Google Place Details and zone verification. Approval remains disabled during inactive Google API testing." : "Sensitive change: request recorded but approval requires independently verified identity/coverage evidence. This inbox must not directly update owner identity, Auth contact, service zones, matching eligibility, credits or wallet."}</p>}
+          {(office || restricted || matchingSensitive) && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{office ? "Requires server-side Google Place Details and zone verification. Approval remains disabled during inactive Google API testing." : matchingSensitive ? "Legacy public-profile request contains matching-sensitive category or service changes. Reject with a reason and ask the vendor to submit a separately governed service coverage request." : "Sensitive change: request recorded but approval requires independently verified identity/coverage evidence. This inbox must not directly update owner identity, Auth contact, service zones, matching eligibility, credits or wallet."}</p>}
           <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[480px] text-left text-sm">
             <thead><tr className="border-b text-slate-500"><th className="p-2">Field</th><th className="p-2">Approved</th><th className="p-2">Requested</th></tr></thead>
             <tbody>{fields.map(([label,oldKey,newKey]) => <tr key={newKey} className="border-b align-top">
@@ -112,7 +119,7 @@ export function VendorApprovalQueue({requests, loadError}: {
             onChange={e => setNotes(s => ({...s,[req.id]:e.target.value}))}
             className="mt-1 w-full rounded-lg border border-slate-300 p-3 text-sm" />
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" disabled={!!busy || office || restricted || fields.length === 0}
+            <button type="button" disabled={!!busy || office || restricted || matchingSensitive || fields.length === 0}
               onClick={() => void decide(req,true)}
               className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Approve reviewed changes</button>
             <button type="button" disabled={!!busy} onClick={() => void decide(req,false)}

@@ -1,0 +1,35 @@
+// Vendor OS V3: matching-sensitive category data may not be changed through
+// the general public-profile approval pathway. Pure source checks only.
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const read = file => fs.readFileSync(path.join(root,file),"utf8");
+const sql = read("ops/vendor-approval/pending/20261013133000_vendor_profile_approval_atomic.sql");
+const service = read("services/vendorProfileChangeService.ts");
+const publicEditor = read("components/vendor-dashboard-v2/profile/VendorProfileEditor.tsx");
+const restricted = read("components/vendor-dashboard-v2/profile/VendorGovernedChangeRequestForms.tsx");
+const admin = read("components/admin/vendor-approvals/VendorApprovalQueue.tsx");
+const legacyAdmin = read("components/admin/sections/VendorsSection.tsx");
+const block = sql.match(/allowed_fields text\[\] := array\[([\s\S]*?)\];/);
+assert.ok(block,"atomic RPC allowlist must remain explicit");
+let n = 0;
+const check = (name,valid) => {assert.equal(Boolean(valid),true,name);console.log("PASS",++n,name);};
+check("category not in general profile RPC allowlist",!block[1].includes("'public_category'"));
+check("services not in general profile RPC allowlist",!block[1].includes("'services_offered'"));
+check("approval RPC cannot write selected category",!sql.includes("selected_category = case when proposed"));
+check("approval RPC cannot write matching service categories",!sql.includes("service_categories = case when proposed"));
+const sanitizer = service.match(/function sanitizeProfileInput\([\s\S]*?return output;\s*}/)?.[0] ?? "";
+check("sanitizer drops matching category",sanitizer && !sanitizer.includes('"public_category"'));
+check("sanitizer drops matching services",sanitizer && !sanitizer.includes('"services_offered"'));
+check("public profile form cannot submit category",!publicEditor.includes('name="public_category"'));
+check("public profile form cannot submit services",!publicEditor.includes('name="services_offered"'));
+check("vendor is guided to separate coverage review",publicEditor.includes("#qf-vendor-service-coverage") && restricted.includes('id="qf-vendor-service-coverage"'));
+check("vendor coverage submission remains request-only",restricted.includes('name="requested_categories"') && restricted.includes('name="request_family" value="service_coverage_change"'));
+check("historic mixed request approval blocked in UI",admin.includes("matchingSensitive || fields.length === 0"));
+check("historic mixed request approval blocked in action",admin.includes('req.proposed_changes ?? {}, "public_category"'));
+check("admin warns legacy requests",admin.includes("Legacy public-profile request contains matching-sensitive"));
+check("legacy Admin also locks category mutation",legacyAdmin.includes('Object.prototype.hasOwnProperty.call(request.proposed_changes ?? {}, "public_category")'));
+check("legacy Admin also locks services mutation",legacyAdmin.includes('Object.prototype.hasOwnProperty.call(request.proposed_changes ?? {}, "services_offered")'));
+console.log("V3_CATEGORY_ELIGIBILITY_ISOLATION_PASS "+n+"/"+n);

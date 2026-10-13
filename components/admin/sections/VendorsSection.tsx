@@ -387,8 +387,10 @@ export function VendorsPage({ data, error }: { data: VendorsDirectoryData | null
               header: "Actions",
               cell: (request) => (
                 <div className="flex flex-wrap gap-2">
-                  {request.request_type === "office_location_change" ? (
-                    <span className="text-xs text-amber-800">Google verification pending — approval locked</span>
+                  {request.request_type !== "profile_update" ||
+                   Object.prototype.hasOwnProperty.call(request.proposed_changes ?? {}, "public_category") ||
+                   Object.prototype.hasOwnProperty.call(request.proposed_changes ?? {}, "services_offered") ? (
+                    <span className="text-xs text-amber-800">Separate identity/location/category verification required — approval locked</span>
                   ) : (
                     <SecondaryButton onClick={() => void approveProfileRequest(request.id)}>{busyId === request.id ? "Working..." : "Approve"}</SecondaryButton>
                   )}

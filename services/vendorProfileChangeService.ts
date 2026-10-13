@@ -325,13 +325,11 @@ function sanitizeProfileInput(input: VendorProfileChangeInput): Record<string, u
   const output: Record<string, unknown> = {};
   setText(output, "public_business_name", input.public_business_name, 100);
   setText(output, "public_description", input.public_description, 700);
-  setText(output, "public_category", ALLOWED_CATEGORIES.has(input.public_category ?? "") ? input.public_category : "", 80);
   setText(output, "starting_price", input.starting_price, 80);
   setText(output, "business_hours", input.business_hours, 140);
   setText(output, "service_area_summary", input.service_area_summary, 220);
   setSafeUrl(output, "profile_image_url", input.profile_image_url);
   setSafeUrl(output, "cover_image_url", input.cover_image_url);
-  setTextArray(output, "services_offered", input.services_offered, 12, 80);
   setUrlArray(output, "portfolio_image_urls", input.portfolio_image_urls, 12);
   return output;
 }
@@ -340,8 +338,6 @@ function mapApprovedChangesToVendorUpdate(changes: Record<string, unknown>) {
   const update: Record<string, unknown> = {};
   if ("public_business_name" in changes) update.business_name = changes.public_business_name;
   if ("public_description" in changes) update.public_description = changes.public_description;
-  if ("public_category" in changes) update.selected_category = changes.public_category;
-  if ("services_offered" in changes) update.service_categories = changes.services_offered;
   if ("starting_price" in changes) update.starting_price = changes.starting_price;
   if ("business_hours" in changes) update.public_business_hours = changes.business_hours;
   if ("service_area_summary" in changes) update.public_service_area_summary = changes.service_area_summary;

@@ -94,8 +94,8 @@ declare
   expected jsonb;
   actual jsonb;
   allowed_fields text[] := array[
-    'public_business_name', 'public_description', 'public_category',
-    'services_offered', 'starting_price', 'business_hours',
+    'public_business_name', 'public_description',
+    'starting_price', 'business_hours',
     'service_area_summary', 'profile_image_url', 'cover_image_url',
     'portfolio_image_urls'
   ];
@@ -204,10 +204,8 @@ begin
   update public.vendors v set
     business_name = case when proposed ? 'public_business_name' then proposed ->> 'public_business_name' else v.business_name end,
     public_description = case when proposed ? 'public_description' then proposed ->> 'public_description' else v.public_description end,
-    selected_category = case when proposed ? 'public_category' then proposed ->> 'public_category' else v.selected_category end,
-    service_categories = case when proposed ? 'services_offered'
-      then array(select jsonb_array_elements_text(proposed -> 'services_offered'))
-      else v.service_categories end,
+    -- Category and matching-service mutations are governed by a separate
+    -- eligibility review, never the general public-profile approval.
     starting_price = case when proposed ? 'starting_price' then proposed ->> 'starting_price' else v.starting_price end,
     public_business_hours = case when proposed ? 'business_hours' then proposed ->> 'business_hours' else v.public_business_hours end,
     public_service_area_summary = case when proposed ? 'service_area_summary'

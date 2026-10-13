@@ -91,7 +91,7 @@ check("server action sources canonical vendor id",action.includes("const scope =
   action.includes("createGovernedVendorChangeRequest(scope.data.vendorId, actor.id, payload)"));
 check("canonical vendor membership rechecked",source.includes("requireVendorScope(vendorId)") && source.includes("access.data.vendorId"));
 check("admin queue locks approval for restricted",read("components/admin/vendor-approvals/VendorApprovalQueue.tsx")
- .includes("office || restricted || fields.length === 0"));
+ .includes("office || restricted || matchingSensitive || fields.length === 0"));
 check("UI marks city non-Google-verified",read("components/vendor-dashboard-v2/profile/VendorGovernedChangeRequestForms.tsx")
  .includes("NOT a verified Google location"));
 check("safe no wallet field in intake",!source.includes("remaining_credits") && !source.includes("credit_balance"));

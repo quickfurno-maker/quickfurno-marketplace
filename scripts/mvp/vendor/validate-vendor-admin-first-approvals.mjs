@@ -22,7 +22,7 @@ check("bounded oldest-first",service.includes('.order("created_at", { ascending:
 check("dashboard pending count",dashboard.includes("countPendingVendorProfileChangeRequests()"));
 check("vendor directory link",vendors.includes('href="/admin/vendor-approvals"'));
 check("request-old-new diff",queue.includes("Approved</th>")&&queue.includes("Requested</th>"));
-check("office approval disabled",queue.includes("office || fields.length === 0"));
+check("office approval disabled",queue.includes("office || restricted || fields.length === 0"));
 check("rejection requires reason",queue.includes('if (!approve && !note)'));
 check("client calls existing server actions",queue.includes("adminApproveVendorProfileChangeRequest(req.id,note)")&&queue.includes("adminRejectVendorProfileChangeRequest(req.id,note)"));
 check("admin server actor",actions.includes("const user = await requireSuperadmin()"));

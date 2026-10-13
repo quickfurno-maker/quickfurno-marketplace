@@ -18,6 +18,13 @@ const FIELDS: Array<[string,string,string]> = [
   ["Cover image","cover_image_url","cover_image_url"],
   ["Portfolio","portfolio_urls","portfolio_image_urls"],
 ];
+const RESTRICTED_FIELDS: Array<[string,string,string]> = [
+  ["Owner name", "owner_name", "owner_name"],
+  ["Email", "email", "email"],
+  ["Phone", "phone", "phone"],
+  ["Requested city", "city", "requested_city"],
+  ["Requested categories", "service_categories", "requested_categories"],
+];
 const OFFICE_FIELDS: Array<[string,string,string]> = [
   ["Google Place","google_place_id","google_place_id"],
   ["Latitude","office_latitude","latitude"],
@@ -70,7 +77,7 @@ export function VendorApprovalQueue({requests, loadError}: {
           <Link href="/admin/vendors" className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Vendor directory</Link>
         </div>
         <div className="mt-4 flex flex-wrap gap-2" aria-label="Request filters">
-          {([["all","All"],["profile_update","Profile"],["office_location_change","Google office"]] as const).map(([value,label]) =>
+          {([["all","All"],["profile_update","Profile"],["office_location_change","Google office"],["owner_contact_change","Owner/contact"],["service_coverage_change","Coverage"]] as const).map(([value,label]) =>
             <button type="button" key={value} onClick={() => setFilter(value)} aria-pressed={filter === value}
               className={filter === value ? "rounded-lg bg-orange-600 px-3 py-2 text-sm font-semibold text-white" : "rounded-lg border border-slate-200 px-3 py-2 text-sm"}>{label}</button>)}
         </div>
@@ -83,14 +90,15 @@ export function VendorApprovalQueue({requests, loadError}: {
         const office = req.request_type === "office_location_change";
         const current = req.current_snapshot ?? {};
         const proposed = req.proposed_changes ?? {};
-        const fields = (office ? OFFICE_FIELDS : FIELDS).filter(([, , k]) => Object.prototype.hasOwnProperty.call(proposed,k));
+        const restricted = req.request_type !== "profile_update" && req.request_type !== "office_location_change";
+        const fields = (office ? OFFICE_FIELDS : restricted ? RESTRICTED_FIELDS : FIELDS).filter(([, , k]) => Object.prototype.hasOwnProperty.call(proposed,k));
         return <article key={req.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex flex-wrap justify-between gap-3"><div>
-            <h3 className="font-semibold">{office ? "Office location verification" : "Public profile change"}</h3>
+            <h3 className="font-semibold">{office ? "Office location verification" : restricted ? (req.request_type === "owner_contact_change" ? "Owner/contact verification" : "Service coverage eligibility review") : "Public profile change"}</h3>
             <p className="mt-1 break-all text-xs text-slate-500">Vendor: {req.vendor_id} · Request: {req.id}</p>
             <p className="text-xs text-slate-500">Submitted: {req.created_at ? new Date(req.created_at).toLocaleString() : "Unknown"}</p>
           </div><span className="h-fit rounded-full bg-amber-100 px-3 py-1 text-xs text-amber-900">Pending</span></div>
-          {office && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Requires server-side Google Place Details and zone verification. Approval remains disabled during inactive Google API testing.</p>}
+          {(office || restricted) && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{office ? "Requires server-side Google Place Details and zone verification. Approval remains disabled during inactive Google API testing." : "Sensitive change: request recorded but approval requires independently verified identity/coverage evidence. This inbox must not directly update owner identity, Auth contact, service zones, matching eligibility, credits or wallet."}</p>}
           <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[480px] text-left text-sm">
             <thead><tr className="border-b text-slate-500"><th className="p-2">Field</th><th className="p-2">Approved</th><th className="p-2">Requested</th></tr></thead>
             <tbody>{fields.map(([label,oldKey,newKey]) => <tr key={newKey} className="border-b align-top">
@@ -104,7 +112,7 @@ export function VendorApprovalQueue({requests, loadError}: {
             onChange={e => setNotes(s => ({...s,[req.id]:e.target.value}))}
             className="mt-1 w-full rounded-lg border border-slate-300 p-3 text-sm" />
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" disabled={!!busy || office || fields.length === 0}
+            <button type="button" disabled={!!busy || office || restricted || fields.length === 0}
               onClick={() => void decide(req,true)}
               className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Approve reviewed changes</button>
             <button type="button" disabled={!!busy} onClick={() => void decide(req,false)}

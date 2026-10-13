@@ -14,6 +14,7 @@ import * as vendors from "../services/vendorService";
 import * as packages from "../services/packageService";
 import * as vendorPackageOrders from "../services/vendorPackageOrderService";
 import * as vendorProfileChanges from "../services/vendorProfileChangeService";
+import * as governedVendorChanges from "../services/vendorGovernedChangeIntakeService";
 import * as vendorNotifications from "../services/vendorNotificationService";
 import * as vendorSupport from "../services/vendorSupportService";
 import * as vendorReviews from "../services/vendorReviewService";
@@ -566,6 +567,42 @@ export async function vendorSubmitProfileChangeRequest(formData: FormData) {
   });
 
   revalidatePath("/vendor/dashboard/profile");
+  if (!result.ok) redirect(`/vendor/dashboard/profile?request=failed&code=${encodeURIComponent(result.code)}`);
+  redirect("/vendor/dashboard/profile?request=submitted");
+}
+
+/** Restricted identity / service-coverage REQUEST ONLY. Never applies vendor data. */
+export async function vendorSubmitGovernedChangeRequest(formData: FormData) {
+  const me = await getMyVendor();
+  if (!me.ok || !me.data) redirect("/vendor/dashboard/profile?request=no-vendor");
+  const actor = await currentUser();
+  if (!actor?.id || actor.role !== "vendor")
+    redirect("/vendor/dashboard/profile?request=failed&code=UNAUTHORIZED");
+  const family = String(formData.get("request_family") ?? "");
+  const ownerName = String(formData.get("owner_name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const city = String(formData.get("requested_city") ?? "").trim();
+  const categories = formData.getAll("requested_categories").map(String).filter(Boolean);
+  const payload: governedVendorChanges.GovernedVendorChangeInput =
+    family === "owner_contact_change"
+      ? {
+          family,
+          ...(ownerName ? { owner_name: ownerName } : {}),
+          ...(email ? { email } : {}),
+          ...(phone ? { phone } : {}),
+        }
+      : {
+          family: "service_coverage_change",
+          requested_city: city,
+          requested_categories: categories,
+        };
+  // A malformed family is NEVER silently upgraded to another request kind.
+  if (family !== "owner_contact_change" && family !== "service_coverage_change")
+    redirect("/vendor/dashboard/profile?request=failed&code=VALIDATION");
+  const result = await governedVendorChanges.createGovernedVendorChangeRequest(me.data.id, actor.id, payload);
+  revalidatePath("/vendor/dashboard/profile");
+  revalidatePath("/admin/vendor-approvals");
   if (!result.ok) redirect(`/vendor/dashboard/profile?request=failed&code=${encodeURIComponent(result.code)}`);
   redirect("/vendor/dashboard/profile?request=submitted");
 }

@@ -7,6 +7,7 @@ import type {
 import type { VendorContactVerificationSummary } from "@/services/vendorVerificationSummaryService";
 import { VendorIcon } from "../icons";
 import { VendorProfileEditor } from "./VendorProfileEditor";
+import { VendorGovernedChangeRequestForms } from "./VendorGovernedChangeRequestForms";
 import { VendorOfficeLocationChangeForm } from "./VendorOfficeLocationChangeForm";
 import { VendorProfileFeedback } from "./VendorProfileFeedback";
 import { VendorWhatsAppVerificationCard } from "./VendorWhatsAppVerificationCard";
@@ -119,6 +120,7 @@ export function VendorProfileWorkspace({
             city={vendor.city ?? ""}
             pending={requests.some((request) => request.request_type === "office_location_change" && request.status === "pending")}
           />
+          <VendorGovernedChangeRequestForms vendor={vendor} pendingKinds={requests.filter(request => request.status === "pending").map(request => request.request_type ?? "")} />
           <VendorProfileAccountDetails vendor={vendor} />
           <VendorProfileRequestHistory requests={requests} />
         </div>

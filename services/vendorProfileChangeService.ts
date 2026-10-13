@@ -234,26 +234,11 @@ export async function approveVendorProfileChangeRequest(
     if (!request) throw appError("UNKNOWN");
 
     if (request.request_type === "office_location_change") {
-      // Location changes need an external Google Place Details proof AND an
-      // atomic Core vendor+request transition. Legacy backfill and request
-      // status updates are separate writes, so this path stays fail-closed
-      // until an independently certified atomic office review is supplied.
-      if (process.env.QF_VENDOR_OFFICE_ATOMIC_APPROVAL_CERTIFIED !== "1") throw appError("VALIDATION");
-      // Ordinary profile approval cannot silently mark location evidence verified.
-      // Core must independently resolve the Place ID and geofence at review time.
-      const proposed = request.proposed_changes as Record<string, unknown> | null;
-      if (!proposed || typeof proposed.google_place_id !== "string" ||
-          typeof proposed.google_city !== "string" || typeof proposed.formatted_address !== "string") {
-        throw appError("VALIDATION");
-      }
-      const verified = await backfillVendorExactLocation(request.vendor_id, {
-        google_place_id: proposed.google_place_id,
-        google_city: proposed.google_city,
-        formatted_address: proposed.formatted_address,
-        latitude: Number(proposed.latitude),
-        longitude: Number(proposed.longitude),
-      }, reviewedBy ?? "");
-      if (!verified.ok) return fail(verified.error);
+      // A Google Place Details lookup and a vendor write are NOT a single
+      // transaction with this change request. No env flag may turn an
+      // unverified, split-write office flow into an approval authority.
+      // Only a future signed, atomic, provider-proven Core RPC can unlock it.
+      throw appError("VALIDATION");
     } else if (request.request_type === "profile_update") {
       // One Core transaction, not a vendor write followed by an independently
       // fallible status write. Locks the request+vendor, verifies immutable

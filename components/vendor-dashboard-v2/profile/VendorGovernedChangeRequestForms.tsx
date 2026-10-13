@@ -50,7 +50,7 @@ export function VendorGovernedChangeRequestForms({ vendor, pendingKinds }: {
           </p>
         </div>
       </section>
-      <section className="qf-vendor-v2-panel qf-vendor-v2-profile-section">
+      <section id="qf-vendor-service-coverage" className="qf-vendor-v2-panel qf-vendor-v2-profile-section">
         <header className="qf-vendor-v2-profile-section-head">
           <h2 className="qf-vendor-v2-panel-title">Service city &amp; category request</h2>
           <p className="qf-vendor-v2-profile-section-hint">

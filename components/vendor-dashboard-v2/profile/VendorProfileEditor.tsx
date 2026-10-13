@@ -2,24 +2,18 @@
 
 import { useState } from "react";
 import { vendorSubmitProfileChangeRequest } from "@/app/actions";
-import { VendorIcon } from "../icons";
 import { VendorProfileImageField, VendorProfilePortfolioField } from "./VendorProfileMedia";
 import {
-  ALLOWED_PROFILE_CATEGORIES,
   PROFILE_LIMITS,
-  serializeList,
-  splitListInput,
   type VendorPublicProfileValues,
 } from "./profileModel";
 
 /**
  * The public-profile editor.
  *
- * It is a plain <form action={vendorSubmitProfileChangeRequest}> posting the ten
- * whitelisted field names verbatim. The chip and portfolio managers exist only
- * to build nicer values for `services_offered` and `portfolio_image_urls`; both
- * serialize back into those exact fields as newline-joined text, which is what
- * the server already parses. No new contract, no JSON payload, no new action.
+ * Public descriptions, prices, hours, and approved media links may be
+ * proposed here. Matching-sensitive category and services changes are routed
+ * to the separately governed service-coverage review below.
  *
  * Nothing here goes live. Submitting creates a pending
  * vendor_profile_change_requests row; the live vendors row is only ever written
@@ -40,29 +34,22 @@ export function VendorProfileEditor({ current }: { current: VendorPublicProfileV
           hint="The name clients see on your listing."
         />
 
-        <label className="qf-vendor-v2-profile-field">
-          <span className="qf-vendor-v2-profile-label">Public category</span>
-          <select
-            name="public_category"
-            defaultValue={current.category}
-            className="qf-vendor-v2-profile-input"
-          >
-            <option value="">Select a category</option>
-            {ALLOWED_PROFILE_CATEGORIES.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
-          <span className="qf-vendor-v2-profile-hint">
-            Clients browse by category, so pick the one that matches your main work.
-          </span>
-        </label>
+        <div className="qf-vendor-v2-profile-field">
+          <span className="qf-vendor-v2-profile-label">Approved category</span>
+          <p className="qf-vendor-v2-profile-hint">{current.category || "Not set"}</p>
+          <a href="#qf-vendor-service-coverage" className="qf-vendor-v2-profile-hint">
+            Request a category or service coverage change through separate Core review
+          </a>
+        </div>
       </Section>
 
       <Section title="About &amp; services" hint="What you do, in your own words.">
         <DescriptionField defaultValue={current.description} />
-        <ServicesField defaultValue={current.services} />
+        <div className="qf-vendor-v2-profile-field">
+          <span className="qf-vendor-v2-profile-label">Approved services</span>
+          <p className="qf-vendor-v2-profile-hint">{current.services.length ? current.services.join(", ") : "Not set"}</p>
+          <p className="qf-vendor-v2-profile-hint">To change matching services, submit a service coverage request below.</p>
+        </div>
       </Section>
 
       <Section
@@ -215,110 +202,5 @@ function DescriptionField({ defaultValue }: { defaultValue: string }) {
         </output>
       </span>
     </label>
-  );
-}
-
-/**
- * Services chip editor.
- *
- * Entries are split on comma as well as newline, because the server does the
- * same — typing "Kitchens, wardrobes" would otherwise show as one chip here and
- * arrive as two services there.
- */
-function ServicesField({ defaultValue }: { defaultValue: string[] }) {
-  const [services, setServices] = useState<string[]>(defaultValue);
-  const [draft, setDraft] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const full = services.length >= PROFILE_LIMITS.maxServices;
-
-  function add() {
-    const parts = splitListInput(draft);
-    if (parts.length === 0) return;
-
-    const next = services.slice();
-    let rejected: string | null = null;
-    for (const part of parts) {
-      if (next.length >= PROFILE_LIMITS.maxServices) {
-        rejected = `You can list up to ${PROFILE_LIMITS.maxServices} services.`;
-        break;
-      }
-      const value = part.slice(0, PROFILE_LIMITS.serviceLength);
-      if (next.some((item) => item.toLowerCase() === value.toLowerCase())) {
-        rejected = `"${value}" is already listed.`;
-        continue;
-      }
-      next.push(value);
-    }
-
-    setServices(next);
-    setDraft("");
-    setError(rejected);
-  }
-
-  return (
-    <div className="qf-vendor-v2-profile-field">
-      {/* The exact contract field, newline-joined. */}
-      <input type="hidden" name="services_offered" value={serializeList(services)} />
-
-      <div className="qf-vendor-v2-profile-labelrow">
-        <span className="qf-vendor-v2-profile-label" id="qf-services-label">
-          Services offered
-        </span>
-        <span className="qf-vendor-v2-profile-count">
-          {services.length} / {PROFILE_LIMITS.maxServices}
-        </span>
-      </div>
-
-      {services.length > 0 ? (
-        <ul className="qf-vendor-v2-profile-chips" aria-labelledby="qf-services-label">
-          {services.map((service) => (
-            <li key={service} className="qf-vendor-v2-profile-chip">
-              <span>{service}</span>
-              <button
-                type="button"
-                aria-label={`Remove ${service}`}
-                onClick={() => setServices((current) => current.filter((item) => item !== service))}
-              >
-                <VendorIcon name="close" size={13} />
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      <div className="qf-vendor-v2-profile-chipadd">
-        <input
-          type="text"
-          value={draft}
-          disabled={full}
-          maxLength={PROFILE_LIMITS.serviceLength}
-          onChange={(event) => {
-            setDraft(event.target.value);
-            setError(null);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              add();
-            }
-          }}
-          placeholder={full ? "Maximum services added" : "e.g. Modular kitchens"}
-          className="qf-vendor-v2-profile-input"
-          aria-describedby="qf-services-help"
-        />
-        <button
-          type="button"
-          className="qf-vendor-v2-btn qf-vendor-v2-btn--quiet"
-          onClick={add}
-          disabled={full || draft.trim().length === 0}
-        >
-          Add
-        </button>
-      </div>
-
-      <p className="qf-vendor-v2-profile-hint" id="qf-services-help" role={error ? "alert" : undefined}>
-        {error ?? "Press Enter to add. Up to 12 services, 80 characters each."}
-      </p>
-    </div>
   );
 }

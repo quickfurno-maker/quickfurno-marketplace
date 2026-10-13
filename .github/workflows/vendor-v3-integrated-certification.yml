@@ -35,6 +35,8 @@ jobs:
         run: node scripts/mvp/vendor/certify-v3-restricted-intake.mjs
       - name: Centralized Admin atomic review fail-closed gates
         run: node scripts/mvp/vendor/validate-vendor-admin-first-approvals.mjs
+      - name: Matching-sensitive category approval isolation
+        run: node scripts/mvp/vendor/validate-v3-category-approval-isolation.mjs
       - name: Vendor V1/V2 regression
         run: npm run test:mvp:vendor-v1-v2
       - name: Vendor V3-V5 regression

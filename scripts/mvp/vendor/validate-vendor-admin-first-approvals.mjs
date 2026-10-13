@@ -26,9 +26,10 @@ check("office approval disabled",queue.includes("office || restricted || fields.
 check("rejection requires reason",queue.includes('if (!approve && !note)'));
 check("client calls existing server actions",queue.includes("adminApproveVendorProfileChangeRequest(req.id,note)")&&queue.includes("adminRejectVendorProfileChangeRequest(req.id,note)"));
 check("admin server actor",actions.includes("const user = await requireSuperadmin()"));
+check("DB reviewer requires Superadmin app metadata", migration.includes("raw_app_meta_data ->> 'admin_role' = 'Superadmin'"));
 check("atomic RPC used",service.includes('db.rpc("qf_approve_vendor_profile_update_v3"'));
 check("RPC never falls back to split vendor updates",service.includes("No missing-RPC fallback."));
-check("office atomic gate default deny",service.includes('QF_VENDOR_OFFICE_ATOMIC_APPROVAL_CERTIFIED !== "1"'));
+check("office atomic approval hard hold",service.includes('if (request.request_type === "office_location_change") {') && service.includes('Only a future signed, atomic, provider-proven Core RPC can unlock it.') && !service.includes('backfillVendorExactLocation(request.vendor_id'));
 check("admin review revalidation",actions.includes('revalidatePath("/admin/vendor-approvals")'));
 check("new pending uniqueness",migration.includes("uq_vendor_pending_review_kind_v3"));
 check("authenticated raw INSERT revoked",migration.includes("revoke insert on public.vendor_profile_change_requests from authenticated"));

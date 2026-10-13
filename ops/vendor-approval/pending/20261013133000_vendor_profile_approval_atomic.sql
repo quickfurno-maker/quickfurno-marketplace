@@ -49,7 +49,10 @@ begin
     raise exception 'QF_VENDOR_REVIEW_TRANSITION_DENIED' using errcode = 'P0001';
   end if;
   if new.reviewed_by is null or not exists (
-    select 1 from public.profiles p where p.id = new.reviewed_by and p.role = 'admin'
+    select 1 from public.profiles p
+    join auth.users u on u.id = p.id
+    where p.id = new.reviewed_by and p.role = 'admin'
+      and u.raw_app_meta_data ->> 'admin_role' = 'Superadmin'
   ) then
     raise exception 'QF_VENDOR_REVIEW_AUDITOR_INVALID' using errcode = '42501';
   end if;
@@ -111,7 +114,9 @@ begin
   end if;
   if not exists (
     select 1 from public.profiles p
+    join auth.users u on u.id = p.id
     where p.id = p_admin_id and p.role = 'admin'
+      and u.raw_app_meta_data ->> 'admin_role' = 'Superadmin'
   ) then
     raise exception 'QF_VENDOR_REVIEW_ADMIN_REQUIRED' using errcode = '42501';
   end if;

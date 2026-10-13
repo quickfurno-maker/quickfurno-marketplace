@@ -92,15 +92,15 @@ const malformed = await api.createVendorOfficeLocationChangeRequest(vendorId,act
 check("malformed Place ID rejected",!malformed.ok && rows.length === 1);
 const unapprovedRuntime = await api.approveVendorProfileChangeRequest(created.data.id,actorId);
 check("office approval stays disabled before final certification", !unapprovedRuntime.ok && verifiedCount === 0 && rows[0].status === "pending");
-process.env.QF_VENDOR_OFFICE_ATOMIC_APPROVAL_CERTIFIED = "1"; // disposable in-memory test only
+process.env.QF_VENDOR_OFFICE_ATOMIC_APPROVAL_CERTIFIED = "1";
+const manuallySwitched = await api.approveVendorProfileChangeRequest(created.data.id,actorId);
+check("operator switch cannot bypass atomic office approval",!manuallySwitched.ok && verifiedCount === 0);
 verifyAllowed = false;
-const failure = await api.approveVendorProfileChangeRequest(created.data.id,actorId);
-check("Google verification failure cannot approve",!failure.ok && rows[0].status === "pending" && vendorWrites.length === 0);
+const providerUnavailable = await api.approveVendorProfileChangeRequest(created.data.id,actorId);
+check("inactive Google provider never invoked",!providerUnavailable.ok && verifiedCount === 0);
 verifyAllowed = true;
-const success = await api.approveVendorProfileChangeRequest(created.data.id,actorId);
-check("admin approval invokes Core verifier",success.ok && verifiedCount === 2 && vendorWrites.length === 1);
-check("approved office request transitions once",rows[0].status === "approved" && rows[0].reviewed_by === actorId);
-const double = await api.approveVendorProfileChangeRequest(created.data.id,actorId);
-check("approved request cannot replay",!double.ok && vendorWrites.length === 1);
+const attemptedAgain = await api.approveVendorProfileChangeRequest(created.data.id,actorId);
+check("office decision remains pending without atomic RPC",!attemptedAgain.ok && rows[0].status === "pending");
+check("canonical vendor data remains unchanged",vendorWrites.length === 0 && vendor.google_place_id === null);
 delete process.env.QF_VENDOR_OFFICE_ATOMIC_APPROVAL_CERTIFIED;
 console.log("VL-02 vendor office request certification: 9/9 PASS");

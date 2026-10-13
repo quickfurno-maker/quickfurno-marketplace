@@ -4,6 +4,7 @@
 import "server-only";
 import { adminClient } from "@/lib/supabase";
 import { appError, fail, ok, type Result } from "@/lib/errors";
+import { requireVendorScope } from "@/services/vendorAccessService";
 
 export type GovernedVendorChangeFamily = "owner_contact_change" | "service_coverage_change";
 export type GovernedVendorChangeInput = {
@@ -74,11 +75,13 @@ export async function createGovernedVendorChangeRequest(
     if (!UUID.test(vendorId) || !UUID.test(actorId)) throw appError("UNAUTHORIZED");
     const validated = validateGovernedChange(input);
     const db = adminClient();
-    // Double-check the authenticated owner in Core even though the caller
-    // server action already resolves their vendor from the user session.
+    // Revalidate the authenticated membership and canonical vendor scope in Core.
+    // The legacy vendors.user_id registration field is NOT the dashboard authority.
+    const access = await requireVendorScope(vendorId);
+    if (!access.ok || access.data.authUserId !== actorId) throw appError("UNAUTHORIZED");
     const { data: vendor, error: vendorError } = await db.from("vendors")
-      .select("id,user_id,owner_name,email,phone,city,service_categories,areas_covered")
-      .eq("id", vendorId).eq("user_id", actorId).maybeSingle();
+      .select("id,owner_name,email,phone,city,service_categories,areas_covered")
+      .eq("id", access.data.vendorId).maybeSingle();
     if (vendorError) throw vendorError;
     if (!vendor) throw appError("UNAUTHORIZED");
 

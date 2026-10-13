@@ -5,6 +5,7 @@
 // ============================================================================
 "use server";
 
+import * as vendorVerifiedCoverage from "@/services/vendorVerifiedCoverageApprovalService";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { adminClient, serverClient } from "../lib/supabase";
@@ -672,6 +673,16 @@ export async function vendorSendSupportMessage(formData: FormData) {
   revalidatePath("/admin/vendors");
   if (!result.ok) redirect(`/vendor/dashboard/support?support=failed&code=${encodeURIComponent(result.code)}`);
   redirect("/vendor/dashboard/support?support=sent");
+}
+
+export async function adminApproveVendorVerifiedCoverageChangeRequest(requestId: string, adminNotes?: string) {
+  return asAdmin(async () => {
+    const user = await requireSuperadmin();
+    const result = await vendorVerifiedCoverage.approveVendorVerifiedCoverageChangeRequest(requestId, user.id, adminNotes);
+    revalidatePath("/admin/vendors");
+    revalidatePath("/admin/vendor-approvals");
+    return result;
+  });
 }
 
 export async function adminApproveVendorProfileChangeRequest(requestId: string, adminNotes?: string) {

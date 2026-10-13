@@ -1,0 +1,24 @@
+name: VOX Core Read Gateway
+on:
+  pull_request:
+    paths:
+      - 'app/api/vox/**'
+      - 'services/vox/**'
+      - 'scripts/mvp/vox/**'
+      - '.github/workflows/vox-core-read-gateway.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  read-only-gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288ca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '20.20.2'
+      - name: Prior scoped authority contracts
+        run: node scripts/mvp/vox/validate-vox-00-adapters.mjs
+      - name: Verify Core AAL2 read-only gateway projections
+        run: node scripts/mvp/vox/validate-vox-02-overview.mjs

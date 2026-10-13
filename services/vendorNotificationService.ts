@@ -26,6 +26,8 @@ export type VendorNotificationInput = {
   priority?: string;
   cta_label?: string | null;
   cta_url?: string | null;
+  /** Stable receipt key; prevents duplicate notifications across retries. */
+  dedupe_key?: string;
 };
 
 export async function listVendorNotifications(vendorId: string, filter: "all" | "unread" = "all"): Promise<Result<VendorNotification[]>> {
@@ -81,6 +83,8 @@ export async function createVendorNotification(vendorId: string, input: VendorNo
     const message = cleanText(input.message, 600);
     if (!title || !message) throw appError("VALIDATION");
 
+    const dedupeKey = input.dedupe_key?.trim();
+    if (dedupeKey && (dedupeKey.length > 180 || !/^vendor_approval:[0-9a-f-]{36}:(approved|rejected)$/.test(dedupeKey))) throw appError("VALIDATION");
     const { data, error } = await adminClient()
       .from("vendor_notifications")
       .insert({
@@ -92,9 +96,16 @@ export async function createVendorNotification(vendorId: string, input: VendorNo
         cta_label: cleanText(input.cta_label ?? "", 80) || null,
         cta_url: safeUrl(input.cta_url),
         is_read: false,
+        ...(dedupeKey ? { dedupe_key: dedupeKey } : {}),
       })
       .select("*")
       .single();
+    if (error?.code === "23505" && dedupeKey) {
+      const existing = await adminClient().from("vendor_notifications")
+        .select("*").eq("vendor_id", vendorId).eq("dedupe_key", dedupeKey).maybeSingle();
+      if (existing.error || !existing.data) throw existing.error ?? error;
+      return ok(existing.data as VendorNotification);
+    }
     if (error) throw error;
     return ok(data as VendorNotification);
   } catch (e) {

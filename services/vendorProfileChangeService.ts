@@ -253,6 +253,7 @@ export async function approveVendorProfileChangeRequest(
       if (error) throw error;
       if (!data || data.status !== "approved") throw appError("UNKNOWN");
       await createVendorNotification(request.vendor_id, {
+        dedupe_key: `vendor_approval:${requestId}:approved`,
         title: "Profile changes approved",
         message: "Your public profile changes were approved and are now live.",
         type: "profile",
@@ -308,6 +309,7 @@ export async function rejectVendorProfileChangeRequest(
     // side effect and must never turn a successful rejection into an apparent
     // failure that encourages a confusing/replayed operator action.
     await createVendorNotification(current.vendor_id, {
+      dedupe_key: `vendor_approval:${requestId}:rejected`,
       title: "Profile changes rejected",
       message: reason,
       type: "profile",

@@ -1,6 +1,6 @@
 import "server-only";
 import {verifiedMfaSession} from "./auth";
-const HOSTS=new Set(["quickfurno.in","staging-core.quickfurno.in"]);
+const HOSTS=new Set(["staging-core.quickfurno.in"]);
 function origin():string|null{
  const raw=process.env.VOX_CORE_ORIGIN;
  if(!raw)return null;

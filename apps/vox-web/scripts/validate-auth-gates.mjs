@@ -15,7 +15,7 @@ check("login enforces same Origin",()=>assert.match(read("app/api/auth/sign-in/r
 check("MFA enforces same Origin",()=>assert.match(read("app/api/auth/mfa/route.ts"),/allowedOrigin\(request\)/));
 check("MFA factor only verified",()=>assert.match(read("app/api/auth/mfa/route.ts"),/f\.status==="verified"/));
 check("MFA requires six-digit code",()=>assert.match(read("app/api/auth/mfa/route.ts"),/\[0-9\]\{6\}/));
-check("backend origin allowlisted HTTPS",()=>{assert.match(read("lib/core.ts"),/HOSTS\.has\(url\.hostname\)/);assert.match(read("lib/core.ts"),/url\.protocol==="https:"/)});
+check("backend origin allowlisted HTTPS",()=>{assert.match(read("lib/core.ts"),/HOSTS\.has\(url\.hostname\)/);assert.match(read("lib/core.ts"),/url\.protocol==="https:"/);assert.match(read("lib/core.ts"),/const HOSTS=new Set\(\["staging-core\.quickfurno\.in"\]\)/)});
 check("backend timeout",()=>assert.match(read("lib/core.ts"),/AbortSignal\.timeout\(3500\)/));
 check("backend token only server-side",()=>assert.match(read("lib/core.ts"),/import "server-only"/));
 check("read-only proxy",()=>assert.match(read("app/api/overview/route.ts"),/function POST\(\).*405/));

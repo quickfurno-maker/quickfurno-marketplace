@@ -4,6 +4,7 @@
 import "server-only";
 import { adminClient } from "@/lib/supabase";
 import { appError, fail, ok, type Result } from "@/lib/errors";
+import { requireVendorScope } from "@/services/vendorAccessService";
 
 export type GovernedVendorChangeFamily = "owner_contact_change" | "service_coverage_change";
 export type GovernedVendorChangeInput = {

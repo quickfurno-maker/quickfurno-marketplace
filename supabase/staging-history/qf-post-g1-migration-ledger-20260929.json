@@ -732,7 +732,7 @@
       "name": "vox_v1_approved_grant_finalizer",
       "filename": "20261014030000_vox_v1_approved_grant_finalizer.sql",
       "path": "supabase/migrations/20261014030000_vox_v1_approved_grant_finalizer.sql",
-      "canonicalSha256": "4cff10e941d982d61e23478bd14aa0829d19273785350b67eb2a801f4c23ec96",
+      "canonicalSha256": "1a556c638b9dfe038bdb9cf951e4ee4689c362e5632789c1b97edcd86439184a",
       "exactVersionPresence": {
         "staging": false,
         "production": false
@@ -756,7 +756,7 @@
       "name": "vox_v1_team_leader_review_policy",
       "filename": "20261014050000_vox_v1_team_leader_review_policy.sql",
       "path": "supabase/migrations/20261014050000_vox_v1_team_leader_review_policy.sql",
-      "canonicalSha256": "cde3c748c22a2bfe6c10f8fc95e475bddcb473a4e3cd610964a85eecf604efee",
+      "canonicalSha256": "b1423c1135891610ee6e55709fc088598678f8ee59a58fd9d80f732f481fe7e9",
       "exactVersionPresence": {
         "staging": false,
         "production": false
@@ -768,7 +768,7 @@
       "name": "vox_operational_intent_review",
       "filename": "20261014060000_vox_operational_intent_review.sql",
       "path": "supabase/migrations/20261014060000_vox_operational_intent_review.sql",
-      "canonicalSha256": "738197c9efd3cc36f803b9ad6a0b7b16fa53788c60284ad1efcf971f0edc6489",
+      "canonicalSha256": "6484c66d9eec6ca699414ec97fc50962e22b685949d280ce3c2d2aeb21fa8dfb",
       "exactVersionPresence": {
         "staging": false,
         "production": false
@@ -780,7 +780,7 @@
       "name": "vox_approved_followup_executor",
       "filename": "20261014070000_vox_approved_followup_executor.sql",
       "path": "supabase/migrations/20261014070000_vox_approved_followup_executor.sql",
-      "canonicalSha256": "a87f3f5bcb85382b88779199e3b3bbb82f6935329d7aba669cb698d55bc57167",
+      "canonicalSha256": "454fb0c07ca7589962eddaffa0001a9a2a7562a3304d70da8e091a0499918f01",
       "exactVersionPresence": {
         "staging": false,
         "production": false

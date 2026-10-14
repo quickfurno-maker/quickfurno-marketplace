@@ -1,6 +1,7 @@
 import "server-only";
 import {adminClient,verifySupabaseBearerUser} from "@/lib/supabase";
 import {resolveScopedStaff, type ScopedVoxContext} from "@/contracts/vox/scopedStaff.mjs";
+import {isNeutralVoxStaffPrincipal} from "@/contracts/vox/neutralStaffPrincipal.mjs";
 const JWT=/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 export async function getVerifiedScopedStaff(header:string|null):Promise<ScopedVoxContext|null>{
  const raw=header?.startsWith("Bearer ")?header.slice(7):"";
@@ -19,9 +20,7 @@ export async function getVerifiedScopedStaff(header:string|null):Promise<ScopedV
  const profile=await db.from("profiles").select("id,role,is_active").eq("id",user.id).maybeSingle();
  // Ordinary VOX staff MUST remain neutral Core principals. A legacy Core
  // admin role would inherit admin-only RLS privileges outside VOX.
- if(profile.error||profile.data?.role!==null||profile.data?.is_active!==true||
-    user.app_metadata?.qf_principal!=="vox_staff"||
-    user.app_metadata?.admin_role!=null)return null;
+ if(profile.error||!isNeutralVoxStaffPrincipal(profile.data,user))return null;
  const membership=await db.from("vox_staff_memberships_v1")
    .select("auth_user_id,team_id,staff_role,is_active,expires_at,revoked_at")
    .eq("auth_user_id",user.id).maybeSingle();

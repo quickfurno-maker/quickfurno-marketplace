@@ -427,3 +427,38 @@ export async function submitScopedOperationalProposal(input:{
    state:"PENDING" as const,execution:"NOT_AUTHORIZED" as const} as const;
  }catch{return {ok:false,status:503,error:"CORE_PROPOSAL_UNAVAILABLE"} as const;}
 }
+/** Scope-filtered staff proposal; an owner must independently review, then execute. */
+export async function proposeAarohiInternalFollowup(input:{targetId:string;nonce:string;rationale:string}){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_STAFF_VIEW_MODE!=="scoped"||
+    process.env.VOX_FOLLOWUP_PROPOSALS_WEB_ENABLED!=="staging")
+  return {ok:false,status:503,error:"PROPOSALS_DISABLED"} as const;
+ if(!uid(input.targetId)||!uid(input.nonce)||input.rationale.length<12||
+    input.rationale.length>300)return {ok:false,status:400,error:"INVALID_PROPOSAL"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();
+ if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const response=await fetch(base+"/api/vox/v1/action-intents",{
+   method:"POST",
+   headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+   body:JSON.stringify({action:"propose",intent:{
+    actionKind:"AAROHI_FOLLOWUP",targetId:input.targetId,
+    nonce:input.nonce,rationale:input.rationale
+   }}),
+   redirect:"error",cache:"no-store",signal:AbortSignal.timeout(3500)
+  });
+  if(!response.ok)return {ok:false,
+   status:response.status===403?403:response.status===400?400:503,
+   error:"CORE_PROPOSAL_REJECTED"} as const;
+  const payload:unknown=await response.json();
+  if(!payload||typeof payload!=="object"||!("ok" in payload)||payload.ok!==true||
+    !("intentId" in payload)||!uid(payload.intentId)||
+    !("state" in payload)||payload.state!=="PENDING"||
+    !("execution" in payload)||payload.execution!=="NOT_AUTHORIZED")
+   return {ok:false,status:503,error:"INVALID_PROPOSAL_RECEIPT"} as const;
+  return {ok:true,status:202,intentId:payload.intentId,
+   state:"PENDING" as const,execution:"NOT_AUTHORIZED" as const} as const;
+ }catch{return {ok:false,status:503,error:"PROPOSAL_UNAVAILABLE"} as const;}
+}

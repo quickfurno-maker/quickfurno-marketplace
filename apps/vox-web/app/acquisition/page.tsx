@@ -2,6 +2,7 @@ import Link from "next/link";
 import {fetchScopedCrm} from "../../lib/core";
 import {ScopedQueue} from "../components/ScopedQueue";
 import {StaffProposalForm} from "../components/StaffProposalForm";
+import {AarohiFollowupProposal} from "./components/AarohiFollowupProposal";
 import "../components/scoped-queue.css";
 import "../operations/operations.css";
 export const dynamic="force-dynamic";
@@ -25,7 +26,10 @@ export default async function Acquisition(){
  <ScopedQueue kicker="PROSPECTS" title="Assigned prospects" rows={prospects} emptyLabel="No prospects assigned."/>
  <ScopedQueue kicker="FOLLOW-UPS" title="Aarohi tasks" rows={tasks} emptyLabel="No follow-ups assigned."/>
  </div>
- {process.env.VOX_OPERATIONAL_PROPOSAL_UI_ENABLED==="staging"?<StaffProposalForm kind="AAROHI_FOLLOWUP" targets={r.view.prospects.filter(p=>p.id&&!p.doNotContact).map(p=>({id:p.id!,title:p.businessName}))}/>:null}
+ {process.env.VOX_OPERATIONAL_PROPOSAL_UI_ENABLED==="staging"&&process.env.VOX_FOLLOWUP_PROPOSALS_WEB_ENABLED!=="staging"?<StaffProposalForm kind="AAROHI_FOLLOWUP" targets={r.view.prospects.filter(p=>p.id&&!p.doNotContact&&!p.humanTakeover).map(p=>({id:p.id!,title:p.businessName}))}/>:null}
+ {process.env.VOX_FOLLOWUP_PROPOSALS_WEB_ENABLED==="staging"?
+ <AarohiFollowupProposal prospects={r.view.prospects.filter(p=>p.id&&!p.doNotContact&&!p.humanTakeover)
+  .map(p=>({id:p.id!,businessName:p.businessName}))}/>:null}
  <div className="voxNotice"><b>Core conversion boundary</b><span>Existing Aarohi CRM owns acquisition. Registration intent, KYC, vendor activation, staff edits and provider messages require governed Core validation. This screen cannot approve them.</span></div>
  <footer className="voxBottom">QuickFurno VOX · Scoped acquisition queue · Staging gated</footer></main>;
 }

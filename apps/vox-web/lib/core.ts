@@ -321,3 +321,57 @@ export async function submitOwnerOperationalDecision(id:string,decision:"APPROVE
   return {ok:true,status:200,decision,execution:"NOT_AUTHORIZED" as const} as const;
  }catch{return {ok:false,status:503,error:"DECISION_UNAVAILABLE"} as const;}
 }
+
+/** Owner-only approved Aarohi internal task executions. Never sends WhatsApp. */
+export async function fetchApprovedNativeFollowups(){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||process.env.VOX_STAFF_VIEW_MODE!=="owner"||
+    process.env.VOX_APPROVED_FOLLOWUP_WEB_ENABLED!=="staging")
+  return {ok:false,status:503,error:"EXECUTION_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_UNAVAILABLE"} as const;
+ try{
+  const r=await fetch(base+"/api/vox/v1/execute-followup",{
+   headers:{authorization:"Bearer "+token,accept:"application/json"},
+   redirect:"error",cache:"no-store",signal:AbortSignal.timeout(3500)});
+  if(!r.ok)return {ok:false,status:r.status===403?403:503,error:"CORE_EXECUTION_QUEUE_UNAVAILABLE"} as const;
+  const obj:unknown=await r.json();
+  if(!obj||typeof obj!=="object"||!("ok" in obj)||obj.ok!==true||!("schema" in obj)||
+     obj.schema!=="qf.vox.followup.approved.queue.v1"||!("mode" in obj)||
+     obj.mode!=="EXECUTION_ELIGIBLE_ONLY"||!("pending" in obj)||!Array.isArray(obj.pending)||
+     obj.pending.length>16)return {ok:false,status:503,error:"INVALID_EXECUTION_QUEUE"} as const;
+  const rows=obj.pending.map((item:unknown)=>{
+   const x=item&&typeof item==="object"?item as Record<string,unknown>:{};
+   return {intentId:uid(x.intentId),prospectId:uid(x.prospectId),
+    requesterId:uid(x.requesterId),cityId:uid(x.cityId),
+    expiresAt:typeof x.expiresAt==="string"?x.expiresAt:null,revision:x.revision===1?1:-1};
+  });
+  if(rows.some(x=>!x.intentId||!x.prospectId||!x.requesterId||!x.cityId||x.revision!==1))
+   return {ok:false,status:503,error:"INVALID_EXECUTION_QUEUE"} as const;
+  return {ok:true,status:200,pending:rows} as const;
+ }catch{return {ok:false,status:503,error:"EXECUTION_QUEUE_UNAVAILABLE"} as const;}
+}
+export async function executeApprovedNativeFollowup(intentId:string){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||process.env.VOX_STAFF_VIEW_MODE!=="owner"||
+    process.env.VOX_APPROVED_FOLLOWUP_WEB_ENABLED!=="staging")
+  return {ok:false,status:503,error:"EXECUTION_DISABLED"} as const;
+ if(!uid(intentId))return {ok:false,status:400,error:"INVALID_INTENT"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_UNAVAILABLE"} as const;
+ try{
+  const r=await fetch(base+"/api/vox/v1/execute-followup",{
+   method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+   body:JSON.stringify({intentId,expectedRevision:1}),redirect:"error",
+   cache:"no-store",signal:AbortSignal.timeout(3500)});
+  if(!r.ok)return {ok:false,status:r.status===409?409:503,error:"NOT_APPROVED_OR_STALE"} as const;
+  const response:unknown=await r.json();
+  if(!response||typeof response!=="object"||!("ok" in response)||response.ok!==true||
+    !("taskId" in response)||!uid(response.taskId)||
+    !("effect" in response)||response.effect!=="INTERNAL_FOLLOW_UP_ONLY"||
+    !("externalMessagesSent" in response)||response.externalMessagesSent!==0||
+    !("creditsChanged" in response)||response.creditsChanged!==0)
+   return {ok:false,status:503,error:"INVALID_NATIVE_EXECUTION_RECEIPT"} as const;
+  return {ok:true,status:200,taskId:response.taskId,effect:"INTERNAL_FOLLOW_UP_ONLY" as const} as const;
+ }catch{return {ok:false,status:503,error:"EXECUTION_UNAVAILABLE"} as const;}
+}

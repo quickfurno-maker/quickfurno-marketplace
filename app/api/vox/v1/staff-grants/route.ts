@@ -1,6 +1,7 @@
 import "server-only";
 import {adminClient} from "@/lib/supabase";
 import {verifyVoxOwnerBearer} from "@/services/vox/verifiedStaffBearer";
+import {getVerifiedScopedStaff} from "@/services/vox/verifiedScopedStaff";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -23,13 +24,18 @@ export async function POST(request:Request){
  if(!request.headers.get("content-type")?.startsWith("application/json"))
   return json({ok:false,error:"INVALID_CONTENT_TYPE"},415);
  try{
-  const actor=await verifyVoxOwnerBearer(request.headers.get("authorization"));
-  if(!actor)return json({ok:false,error:"UNAUTHORIZED"},401);
   const raw=await request.text();
   if(raw.length>1500)return json({ok:false,error:"PAYLOAD_TOO_LARGE"},413);
   const data=shape(JSON.parse(raw));
   if(!data)return json({ok:false,error:"INVALID_BODY"},400);
   const action=data.action;
+  // Team Leader can REVIEW within their verified team only. Request,
+  // activation and emergency revocation remain owner Superadmin-only.
+  const leader=action==="review"?await getVerifiedScopedStaff(request.headers.get("authorization")):null;
+  const actor=action==="review"
+   ?(leader?.role==="team_leader" ? leader.userId : null)
+   :await verifyVoxOwnerBearer(request.headers.get("authorization"));
+  if(!actor)return json({ok:false,error:"UNAUTHORIZED"},401);
   const db=adminClient();
   if(action==="request"){
    const requestNonce=asUuid(data.requestNonce);

@@ -70,6 +70,27 @@ export async function POST(request:Request){
  return send({ok:false,error:"UNKNOWN_ACTION"},400);
  }catch{return send({ok:false,error:"INTENT_UNAVAILABLE"},503);}
 }
-export function GET(){return send({ok:false,error:"METHOD_NOT_ALLOWED"},405);}
+export async function GET(request:Request){
+ if(process.env.VOX_OPERATIONAL_INTENTS_ENABLED!=="staging")
+  return send({ok:false,error:"INTENTS_DISABLED"},503);
+ try{
+  const owner=await verifyVoxOwnerBearer(request.headers.get("authorization"));
+  if(!owner)return send({ok:false,error:"OWNER_AAL2_REQUIRED"},403);
+  const u=new URL(request.url);
+  if([...u.searchParams.keys()].length!==0)return send({ok:false,error:"UNKNOWN_FILTER"},400);
+  const rows=await adminClient().from("vox_operational_intents_v1")
+   .select("id,requester_id,action_kind,target_kind,target_id,team_id,city_id,created_at,revision,state")
+   .eq("state","PENDING").eq("revision",0).neq("requester_id",owner)
+   .order("created_at",{ascending:true}).limit(16);
+  if(rows.error||!rows.data)return send({ok:false,error:"INTENT_QUEUE_UNAVAILABLE"},503);
+  return send({ok:true,schema:"qf.vox.operational.intents.v1",mode:"REVIEW_ONLY",
+   owner:"quickfurno-core",pending:rows.data.slice(0,16).map(r=>({
+    id:r.id,requesterId:r.requester_id,actionKind:r.action_kind,
+    targetKind:r.target_kind,targetId:r.target_id,
+    teamId:r.team_id,cityId:r.city_id,revision:r.revision,state:"PENDING",
+    createdAt:r.created_at
+   })),canExecute:false},200);
+ }catch{return send({ok:false,error:"INTENT_QUEUE_UNAVAILABLE"},503);}
+}
 export function PATCH(){return send({ok:false,error:"METHOD_NOT_ALLOWED"},405);}
 export function DELETE(){return send({ok:false,error:"METHOD_NOT_ALLOWED"},405);}

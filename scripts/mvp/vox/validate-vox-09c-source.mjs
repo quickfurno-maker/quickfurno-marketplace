@@ -38,4 +38,12 @@ t("prospect canonical city checked",()=>assert.match(route,/\.eq\("city_id",scop
 t("thread vendor dual grant checked",()=>assert.match(route,/scope.vendorIds.includes\(thread.data.vendor_id\)/));
 t("no accidental action executor",()=>assert.doesNotMatch(route,/createAdminSupportReply|updateAarohiWorkflow|sendWhatsApp|publishAutomationStudio/));
 t("no execution claimed on approval",()=>assert.equal((route.match(/execution:"NOT_AUTHORIZED"/g)||[]).length,2));
-console.log("VOX09C_ATOMIC_INTENT_SOURCE_PASS "+n+"/28");
+t("owner queue separately requires AAL2",()=>assert.match(route,/export async function GET[\s\S]*verifyVoxOwnerBearer\(request.headers.get\("authorization"\)\)/));
+t("owner queue disabled by default",()=>assert.match(route,/export async function GET[\s\S]*VOX_OPERATIONAL_INTENTS_ENABLED!=="staging"/));
+t("owner queue pending-only",()=>assert.match(route,/\.eq\("state","PENDING"\)\.eq\("revision",0\)/));
+t("owner queue excludes self-review",()=>assert.match(route,/\.neq\("requester_id",owner\)/));
+t("owner queue hard bounded",()=>assert.match(route,/\.limit\(16\)/));
+t("owner queue does not expose nonce or rationale",()=>assert.doesNotMatch(route,/\.select\("[^"]*(nonce|rationale)/));
+t("owner queue never claims execution",()=>assert.match(route,/canExecute:false/));
+t("owner queue forbids arbitrary filters",()=>assert.match(route,/UNKNOWN_FILTER/));
+console.log("VOX09C_ATOMIC_INTENT_SOURCE_PASS "+n+"/36");

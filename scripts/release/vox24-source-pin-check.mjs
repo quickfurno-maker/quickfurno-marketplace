@@ -19,7 +19,7 @@ const FILES=[
 const sha=s=>createHash('sha256').update(s).digest('hex');
 const git=(...args)=>execFileSync('git',args,{
  encoding:'utf8',timeout:30000,maxBuffer:1024*1024,stdio:['ignore','pipe','pipe']
-}).trimEnd();
+});
 function run(){
  const pinned=RELEASE.core;
  assert.match(pinned,/^[a-f0-9]{40}$/);
@@ -30,7 +30,7 @@ function run(){
  git('fetch','--no-tags','--depth=1','origin',pinned);
  const hashes=FILES.map(filename=>{
   const raw=git('show',pinned+':supabase/migrations/'+filename);
-  const normalized=raw.replace(/\r\n/g,'\n').replace(/\r/g,'\n')+'\n';
+  const normalized=raw.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
   return {version:filename.slice(0,14),digest:sha(Buffer.from(normalized,'utf8'))};
  });
  assert.equal(new Set(hashes.map(x=>x.version)).size,7,'VOX24_DUPLICATE_VERSION');

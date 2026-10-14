@@ -1,0 +1,71 @@
+{
+  "schema": "qf.vox.security-posture.v1",
+  "projectRef": "uckafzuochmbvtiodmcl",
+  "observedDate": "2026-10-14",
+  "collection": "first-party Supabase read-only SQL plus Security Advisor",
+  "migrationCount": 86,
+  "voxMigrationsApplied": 0,
+  "listing": {
+    "columns": [
+      "id",
+      "business_name",
+      "city",
+      "office_city",
+      "areas_covered",
+      "covers_full_city",
+      "service_categories",
+      "selected_subcategories",
+      "selected_category",
+      "business_type",
+      "experience",
+      "years_experience",
+      "starting_price",
+      "public_description",
+      "public_service_area_summary",
+      "public_business_hours",
+      "profile_image_url",
+      "cover_image_url",
+      "portfolio_urls",
+      "rating",
+      "completed_projects"
+    ],
+    "viewSecurityInvoker": false,
+    "anonymousViewSelect": true,
+    "anonymousBaseSelect": false,
+    "anonymousViewUpdate": false,
+    "authenticatedViewSelect": true,
+    "authenticatedBaseSelect": true,
+    "approvedVisibilityFilters": [
+      "status = 'Approved'",
+      "is_active = true",
+      "public_visibility = true",
+      "remaining_credits > 0"
+    ]
+  },
+  "helpers": {
+    "is_admin": {
+      "securityDefiner": true,
+      "anonymousExecute": false,
+      "authenticatedExecute": true,
+      "qualifiedReferences": true
+    },
+    "owns_vendor": {
+      "securityDefiner": true,
+      "anonymousExecute": false,
+      "authenticatedExecute": true,
+      "qualifiedReferences": true
+    }
+  },
+  "roles": {
+    "anonCreatePublic": false,
+    "authenticatedCreatePublic": false
+  },
+  "denyAllTables": {
+    "withoutRlsPolicies": 102,
+    "anonSelectGranted": 0,
+    "authenticatedSelectGranted": 0
+  },
+  "auth": {
+    "leakedPasswordProtectionEnabled": false
+  }
+}

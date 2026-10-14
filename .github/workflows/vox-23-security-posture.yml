@@ -1,0 +1,21 @@
+name: VOX-23 Security Posture Fail-Closed
+on:
+  pull_request:
+    paths:
+      - 'scripts/mvp/vox/validate-vox23-security-posture.mjs'
+      - 'ops/vox/staging-security-posture-20261014.json'
+      - 'docs/vox/VOX-23-SECURITY-POSTURE.md'
+      - '.github/workflows/vox-23-security-posture.yml'
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  deny-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with: {node-version: '20.20.2'}
+      - run: |
+          node scripts/mvp/vox/validate-vox23-security-posture.mjs --self-test
+          node scripts/mvp/vox/validate-vox17-history-parity.mjs --self-test

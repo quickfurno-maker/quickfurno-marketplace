@@ -7,6 +7,7 @@ on:
       - 'services/vox/**'
       - 'supabase/migrations/*vox_v1*'
       - 'supabase/migrations/*vox_operational_intent_review.sql'
+      - 'supabase/migrations/*vox_approved_followup_executor.sql'
       - 'scripts/mvp/vox/**'
       - 'docs/vox/VOX-11-*'
       - '.github/workflows/vox-11-continuous-qa.yml'
@@ -32,6 +33,8 @@ jobs:
         run: node scripts/mvp/vox/validate-vox-11-qa.mjs
       - name: VOX-11C hardened launch-HOLD checks
         run: node scripts/mvp/vox/validate-vox-11c-safety.mjs
+      - name: VOX-12 atomic Aarohi offline PostgreSQL 17
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-vox12a-postgres.ps1
       - name: Install Core lockfile
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Full Core TypeScript check

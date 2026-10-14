@@ -6,7 +6,7 @@ export async function POST(request:Request){
  try{
   const auth=await staffAuth();
   const {data:{user},error}=await auth.auth.getUser();
-  if(error||!user||user.app_metadata?.admin_role!=="Superadmin"||!user.email_confirmed_at)
+  // Server-verified Supabase app_metadata, never self-editable user_metadata.\n  // Normal staff can enroll BEFORE membership activation, but only when\n  // explicitly server-provisioned and when a separate staging flag is ON.\n  const owner=user?.app_metadata?.admin_role==="Superadmin";\n  const staff=user?.app_metadata?.qf_principal==="vox_staff"&&\n   user?.app_metadata?.admin_role==null&&\n   process.env.VOX_STAFF_MFA_ENROLL_ENABLED==="staging";\n  if(error||!user||!user.email_confirmed_at||(!owner&&!staff))
    return safeJson({ok:false,error:"UNAUTHORIZED"},401);
   const existing=await auth.auth.mfa.listFactors();
   if(existing.error)return safeJson({ok:false,error:"MFA_UNAVAILABLE"},503);

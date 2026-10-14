@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'scripts/release/vox-stage-evidence-preflight.mjs'
+      - 'scripts/release/vox24-source-pin-check.mjs'
       - 'docs/release/VOX-24-STAGING-READINESS.md'
       - '.github/workflows/vox-24-stage-evidence.yml'
   workflow_dispatch:
@@ -19,6 +20,8 @@ jobs:
           node-version: '24.18.0'
       - name: Exercise valid synthetic two-role Ed25519 proof and fail-closed mutants
         run: node scripts/release/vox-stage-evidence-preflight.mjs --self-test
+      - name: Refuse a changed Phase A Core head or seven-migration digest
+        run: node scripts/release/vox24-source-pin-check.mjs
       - name: Assert live stage and production authority remain OFF
         shell: bash
         run: |

@@ -1,0 +1,40 @@
+name: VOX-16 full SQL and governed task certification
+on:
+  pull_request:
+    paths:
+      - 'scripts/mvp/vox/validate-vox16-*'
+      - 'lib/crm/vendorTaskIdempotency.*'
+      - 'services/vendorCrmService.ts'
+      - 'docs/vox/VOX-16-*'
+      - '.github/workflows/vox-16-full-sql-and-task.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: vox-16-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  full-seven-sql-pg17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Seven chronological migrations, RLS and definer privilege test
+        shell: pwsh
+        run: ./scripts/mvp/vox/validate-vox16-full-seven-pg17.ps1
+  native-crm-task-and-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: |
+          node scripts/mvp/vox/validate-vox16-task-idempotency.mjs
+          node scripts/mvp/vox/validate-vox15-staging-preflight.mjs
+          node scripts/mvp/vox/validate-vox-11-qa.mjs
+          node scripts/mvp/vox/validate-vox-11c-safety.mjs
+      - run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck

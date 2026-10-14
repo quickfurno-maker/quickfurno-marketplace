@@ -55,3 +55,21 @@ export async function serverClient(): Promise<SupabaseClient> {
     },
   });
 }
+
+/**
+ * Server-side bearer identity verification at the approved portable Auth boundary.
+ * Never treat decoding JWT claims alone as signature verification.
+ * VOX consumers separately enforce AAL2, Core role, and live object/city grants.
+ */
+export async function verifySupabaseBearerUser(token: string) {
+  if (!token || token.length > 8192) return null;
+  try {
+    const auth = createClient(supabaseUrl(), anonKey(), {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: { user }, error } = await auth.auth.getUser(token);
+    return error ? null : user;
+  } catch {
+    return null;
+  }
+}

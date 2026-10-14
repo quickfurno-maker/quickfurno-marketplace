@@ -1,0 +1,5 @@
+# VOX-19 Service Desk internal follow-up singleflight
+
+This closes the same rapid-double-submit race already fixed in Vendor 360 for the **existing Service Desk follow-up form**. React state setters do not synchronously block two requests before rerender, so a fast second click previously could create a different nonce and duplicate a canonical Core task. The form now immediately reserves a synchronous `busyRef` and `nonceRef` before any await, disables changes while an HTTP request is in progress and preserves a stable nonce after uncertain network and invalid acknowledgement. It clears the nonce only on a valid Core task receipt or deliberate change of assigned case, priority or due date. The existing native Core `submitScopedSupportTask`, MFA/city/vendor authorization and database unique idempotency authority remain unchanged.
+
+No support replies, WhatsApp sends, vendor profile updates, wallets or automatic case closure. Tests and TypeScript are source/isolated certification only; genuine staging staff AAL2 and real Core database are still pending. Do not activate provider sends or production.

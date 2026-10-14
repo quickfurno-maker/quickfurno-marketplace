@@ -1,0 +1,21 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {resolve} from "node:path";
+import {projectVoxOverview} from "../../../services/vox/overviewProjection.mjs";
+const base=resolve(import.meta.dirname,"../../..");const read=(p)=>readFileSync(resolve(base,p),"utf8");
+const uuid="f00dbabe-0000-4000-8000-000000000001";
+let n=0;function test(name,fn){fn();n++;console.log("PASS "+name);}
+test("four bounded domains",()=>{const out=projectVoxOverview({prospects:Array(50).fill({id:uuid}),crm:[],vendorSupport:[],humanConversations:[]});assert.equal(out.prospectPreview.length,8)});
+test("no raw PII leak",()=>{const out=projectVoxOverview({prospects:[{id:uuid,business_name:"A",phone:"9876543210",email:"private@example.com"}],crm:[],vendorSupport:[],humanConversations:[]});assert.doesNotMatch(JSON.stringify(out),/9876543210|private@example/);});
+test("support messages not leaked",()=>{const out=projectVoxOverview({prospects:[],crm:[],vendorSupport:[{id:uuid,message:"sensitive",phone:"9876543210"}],humanConversations:[]});assert.doesNotMatch(JSON.stringify(out),/sensitive|9876543210/);});
+test("no direct action authority",()=>assert.equal(projectVoxOverview({}).actionsEnabled,false));
+test("Core only source",()=>assert.equal(projectVoxOverview({}).source,"quickfurno-core"));
+test("nonhuman desk remains unknown",()=>{const out=projectVoxOverview({humanConversations:[{id:uuid,subject_type:"vendor",state:"AI",revision:3}]});assert.equal(out.humanDeskPreview[0].state,"UNKNOWN")});
+test("Core bearer uses remote Auth via portable boundary",()=>{const service=read("services/vox/verifiedStaffBearer.ts"),boundary=read("lib/supabase.ts");assert.match(service,/verifySupabaseBearerUser\(token\)/);assert.match(boundary,/auth\.auth\.getUser\(token\)/);assert.doesNotMatch(service,/@supabase\/supabase-js/);});
+test("Core bearer enforces aal2",()=>assert.match(read("services/vox/verifiedStaffBearer.ts"),/data\.aal==="aal2"/));
+test("Core active admin and superadmin checked",()=>assert.match(read("services/vox/verifiedStaffBearer.ts"),/admin_role!=="Superadmin"/));
+test("service role isolated server-side",()=>assert.match(read("services/vox/verifiedStaffBearer.ts"),/import "server-only"/));
+test("read route rejects mutations",()=>assert.match(read("app/api/vox/v1/overview/route.ts"),/function POST\(\).*405/));
+test("read route no store",()=>assert.match(read("app/api/vox/v1/overview/route.ts"),/no-store/));
+test("read route bounded at query",()=>assert.equal((read("app/api/vox/v1/overview/route.ts").match(/\.limit\(8\)/g)||[]).length,4));
+console.log("VOX_02_CORE_READ_PASS "+n+"/13");

@@ -267,3 +267,57 @@ export async function submitScopedVendorTask(input:{vendorId:string;nonce:string
   return {ok:true,status:201,taskId:data.taskId,approval:"INTERNAL_TASK_ONLY" as const} as const;
  }catch{return {ok:false,status:503,error:"CORE_TASK_UNAVAILABLE"} as const;}
 }
+
+/** Owner-only review queue for non-executing operational proposals. */
+export async function fetchOwnerOperationalIntents(){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_STAFF_VIEW_MODE!=="owner"||
+    process.env.VOX_OPERATIONAL_REVIEW_UI_ENABLED!=="staging")
+  return {ok:false,status:503,error:"APPROVALS_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const r=await fetch(base+"/api/vox/v1/action-intents",{method:"GET",
+   headers:{authorization:"Bearer "+token,accept:"application/json"},
+   redirect:"error",cache:"no-store",signal:AbortSignal.timeout(3500)});
+  if(!r.ok)return {ok:false,status:r.status===403?403:503,error:"CORE_APPROVALS_UNAVAILABLE"} as const;
+  const payload:unknown=await r.json();
+  if(!payload||typeof payload!=="object"||!("ok" in payload)||payload.ok!==true||
+     !("schema" in payload)||payload.schema!=="qf.vox.operational.intents.v1"||
+     !("mode" in payload)||payload.mode!=="REVIEW_ONLY"||
+     !("pending" in payload)||!Array.isArray(payload.pending)||payload.pending.length>16)
+   return {ok:false,status:503,error:"INVALID_APPROVALS_SCHEMA"} as const;
+  const pending=payload.pending.map((raw:unknown)=>{
+   const x=raw&&typeof raw==="object"?raw as Record<string,unknown>:{};
+   return {id:uid(x.id),requesterId:uid(x.requesterId),
+    actionKind:safeLabel(x.actionKind,48),targetKind:safeLabel(x.targetKind,40),
+    targetId:uid(x.targetId),teamId:uid(x.teamId),cityId:uid(x.cityId),
+    revision:x.revision===0?0:-1,state:"PENDING" as const};
+  });
+  if(pending.some(x=>!x.id||!x.requesterId||!x.targetId||!x.teamId||!x.cityId||x.revision!==0))
+   return {ok:false,status:503,error:"INVALID_APPROVALS_SCHEMA"} as const;
+  return {ok:true,status:200,pending} as const;
+ }catch{return {ok:false,status:503,error:"APPROVALS_UNAVAILABLE"} as const;}
+}
+export async function submitOwnerOperationalDecision(id:string,decision:"APPROVED"|"REJECTED"){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+   process.env.VOX_STAFF_VIEW_MODE!=="owner"||
+   process.env.VOX_OPERATIONAL_REVIEW_UI_ENABLED!=="staging")return {ok:false,status:503,error:"APPROVALS_DISABLED"} as const;
+ if(!uid(id)||!["APPROVED","REJECTED"].includes(decision))return {ok:false,status:400,error:"INVALID_DECISION"} as const;
+ const token=await verifiedMfaSession();if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const r=await fetch(base+"/api/vox/v1/action-intents",{method:"POST",
+   headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+   body:JSON.stringify({action:"review",intentId:id,decision,expectedRevision:0}),
+   redirect:"error",cache:"no-store",signal:AbortSignal.timeout(3500)});
+  if(!r.ok)return {ok:false,status:r.status===409?409:503,error:"DECISION_REJECTED_OR_STALE"} as const;
+  const x:unknown=await r.json();
+  if(!x||typeof x!=="object"||!("ok" in x)||x.ok!==true||
+     !("state" in x)||x.state!==decision||!("revision" in x)||x.revision!==1||
+     !("execution" in x)||x.execution!=="NOT_AUTHORIZED")
+   return {ok:false,status:503,error:"INVALID_DECISION_RECEIPT"} as const;
+  return {ok:true,status:200,decision,execution:"NOT_AUTHORIZED" as const} as const;
+ }catch{return {ok:false,status:503,error:"DECISION_UNAVAILABLE"} as const;}
+}

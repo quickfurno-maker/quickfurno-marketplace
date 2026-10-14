@@ -17,7 +17,11 @@ export async function getVerifiedScopedStaff(header:string|null):Promise<ScopedV
  }catch{return null;}
  const db=adminClient();
  const profile=await db.from("profiles").select("id,role,is_active").eq("id",user.id).maybeSingle();
- // Ordinary VOX staff MUST remain neutral Core principals. A legacy Core\n // admin role would inherit admin-only RLS privileges outside VOX.\n if(profile.error||profile.data?.role!==null||profile.data?.is_active!==true||\n    user.app_metadata?.qf_principal!=="vox_staff"||\n    user.app_metadata?.admin_role!=null)return null;
+ // Ordinary VOX staff MUST remain neutral Core principals. A legacy Core
+ // admin role would inherit admin-only RLS privileges outside VOX.
+ if(profile.error||profile.data?.role!==null||profile.data?.is_active!==true||
+    user.app_metadata?.qf_principal!=="vox_staff"||
+    user.app_metadata?.admin_role!=null)return null;
  const membership=await db.from("vox_staff_memberships_v1")
    .select("auth_user_id,team_id,staff_role,is_active,expires_at,revoked_at")
    .eq("auth_user_id",user.id).maybeSingle();

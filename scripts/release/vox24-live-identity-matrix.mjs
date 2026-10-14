@@ -26,7 +26,7 @@ export async function runReadOnlyIdentityMatrix({fetchImpl,credentials}){
   assert.equal(credentials[r].length>=100&&credentials[r].length<=8192&&jwt.test(credentials[r]),true,
    'INVALID_TOKEN_'+r);
  }
- assert.equal(new Set(ROLES.map(r=>credentials[r])).size,4,true,'ROLE_CREDENTIAL_REUSE_FORBIDDEN');
+ assert.equal(new Set(ROLES.map(r=>credentials[r])).size,4,'ROLE_CREDENTIAL_REUSE_FORBIDDEN');
  let pass=0;
  for(const check of cases){
   // NO cross-site, mutation or arbitrary path ever accepted by this harness.

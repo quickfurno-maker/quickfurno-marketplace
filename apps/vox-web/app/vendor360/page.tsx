@@ -2,6 +2,7 @@ import Link from "next/link";
 import {fetchScopedCrm} from "../../lib/core";
 import {ScopedQueue} from "../components/ScopedQueue";
 import {TaskCreator} from "./components/TaskCreator";
+import {ProfileReviewQueue} from "./components/ProfileReviewQueue";
 import {StaffProposalForm} from "../components/StaffProposalForm";
 import "../components/scoped-queue.css";
 import "../operations/operations.css";
@@ -27,6 +28,7 @@ export default async function Vendor360(){
  </div>
  {process.env.VOX_VENDOR_TASK_UI_ENABLED==="staging"?<TaskCreator vendors={r.view.vendors.filter(v=>v.vendorId).map(v=>({vendorId:v.vendorId!,businessName:v.businessName}))}/>:null}
  {process.env.VOX_OPERATIONAL_PROPOSAL_UI_ENABLED==="staging"?<StaffProposalForm kind="VENDOR_PROFILE_CHANGE" targets={r.view.vendors.filter(v=>v.vendorId).map(v=>({id:v.vendorId!,title:v.businessName}))}/>:null}
+ {process.env.VOX_VENDOR_PROFILE_REVIEW_UI_ENABLED==="staging"?<ProfileReviewQueue vendors={r.view.vendors.filter(v=>v.vendorId).map(v=>({vendorId:v.vendorId!,businessName:v.businessName}))}/>:null}
  <div className="voxNotice"><b>Atomic approvals</b><span>Vendor profile, verification, service-area changes and any financial or lead-assignment actions require the existing Core approval workflow. VOX cannot make direct edits.</span></div>
  <footer className="voxBottom">QuickFurno VOX · Staff Vendor 360 · Staging gated</footer></main>;
 }

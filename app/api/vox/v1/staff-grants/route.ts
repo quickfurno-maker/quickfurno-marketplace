@@ -60,7 +60,7 @@ export async function POST(request:Request){
     db.from("profiles").select("id,role,is_active").eq("id",targetId).maybeSingle()
    ]);
    if(team.error||target.error)return json({ok:false,error:"AUTHORITY_UNAVAILABLE"},503);
-   if(!team.data?.is_active||target.data?.role!=="admin"||target.data?.is_active!==true)
+   // Membership may only target a neutral Core principal; SQL finalizer\n   // separately verifies trusted server-owned qf_principal=vox_staff.\n   if(!team.data?.is_active||target.data?.role!==null||target.data?.is_active!==true)
     return json({ok:false,error:"INVALID_TARGET_OR_TEAM"},403);
    const result=await db.from("vox_staff_access_requests_v1")
     .insert({request_nonce:requestNonce,requested_by:actor,target_profile_id:targetId,

@@ -9,6 +9,43 @@ function origin():string|null{
   return url.protocol==="https:"&&HOSTS.has(url.hostname)&&url.port===""&&url.pathname==="/"&&url.search===""&&url.hash===""?url.origin:null;
  }catch{return null;}
 }
+const vendorUUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+/** Never pass Core's raw profile request snapshots or proposed changes to Web. */
+export async function fetchScopedProfileReviews(vendorId:string){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_VENDOR_PROFILE_REVIEW_UI_ENABLED!=="staging"||
+    !vendorUUID.test(vendorId))return {ok:false,status:503,error:"REVIEW_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const response=await fetch(base+"/api/vox/v1/vendor-profile-review?vendorId="+encodeURIComponent(vendorId),{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!response.ok)return {ok:false,status:response.status===403?403:503,error:"CORE_REVIEW_DENIED"} as const;
+  const body:unknown=await response.json();
+  if(!body||typeof body!=="object"||Array.isArray(body))return {ok:false,status:503,error:"BAD_CORE_RESPONSE"} as const;
+  const v=body as Record<string,unknown>;
+  if(v.ok!==true||v.schema!=="qf.vox.vendor.profile.review.v1"||v.vendorId!==vendorId||
+    v.mode!=="READ_ONLY"||v.actionsEnabled!==false||!Array.isArray(v.requests)||v.requests.length>20)
+    return {ok:false,status:503,error:"BAD_CORE_RESPONSE"} as const;
+  const requests=[] as Array<{id:string;requestType:string;status:string;createdAt:string|null;reason:string}>;
+  for(const record of v.requests){
+   if(!record||typeof record!=="object"||Array.isArray(record))return {ok:false,status:503,error:"BAD_CORE_RESPONSE"} as const;
+   const row=record as Record<string,unknown>;
+   if(!vendorUUID.test(String(row.id))||row.status!=="pending"||row.canExecute!==false||
+     row.requiresNativeCoreReview!==true||
+     !["profile_update","office_location_change"].includes(String(row.requestType)))
+    return {ok:false,status:503,error:"BAD_CORE_RESPONSE"} as const;
+   requests.push({id:String(row.id),requestType:String(row.requestType),status:"pending",
+    createdAt:typeof row.createdAt==="string"&&Number.isFinite(Date.parse(row.createdAt))?row.createdAt:null,
+    reason:row.requestType==="office_location_change"?"GOOGLE_PROVIDER_PROOF_REQUIRED":"CORE_ATOMIC_V3_APPROVAL_REQUIRED"});
+  }
+  return {ok:true,status:200,schema:"qf.vox.vendor.profile.review.v1" as const,
+   mode:"READ_ONLY" as const,actionsEnabled:false as const,requests} as const;
+ }catch{return {ok:false,status:503,error:"REVIEW_UNAVAILABLE"} as const;}
+}
+
 export async function fetchStaffOverview(){
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging")return {ok:false,status:503,error:"STAFF_GATE_DISABLED"} as const;
  const token=await verifiedMfaSession();

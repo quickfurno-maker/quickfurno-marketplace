@@ -2,7 +2,7 @@
 // Does not accept a browser role or claim. Inputs MUST be from Core-authenticated
 // server-side profiles, membership, team and active grants.
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const ROLES=new Set(["operations_manager","acquisition_agent","vendor_success_agent","support_agent","auditor"]);
+const ROLES=new Set(["operations_manager","acquisition_agent","vendor_success_agent","support_agent","auditor","team_leader"]);
 const KINDS=new Set(["prospect","vendor","support_thread","conversation"]);
 function uuid(s){return typeof s==="string"&&UUID.test(s);}
 function live(until,now){const n=Date.parse(String(until??""));return Number.isFinite(n)&&n>now;}
@@ -31,7 +31,7 @@ export function resolveScopedStaff({userId,identityVerified,membership,team,gran
    vendorIds:Object.freeze(allowed.vendor?[...permitted.vendor].slice(0,200):[]),
    supportThreadIds:Object.freeze(allowed.support_thread?[...permitted.support_thread].slice(0,200):[]),
    conversationIds:Object.freeze(allowed.conversation?[...permitted.conversation].slice(0,200):[]),
-   canReadContent:role!=="auditor",canMutate:false,
+   canReadContent:role!=="auditor"&&role!=="team_leader",canMutate:false,
  });
 }
 export function filterHumanConversations(rows,context,validatedProspectIds,validatedVendorIds){

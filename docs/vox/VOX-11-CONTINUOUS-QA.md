@@ -2,7 +2,7 @@
 
 This branch includes the merged-in **test-only** Core source composition: previously validated VOX-07 Core staff/desk/CRM/studio/atomic grants, plus the restricted Team Leader policy and real Core AOS V2 health reader. **It does not represent a reviewed merge to Core main.**
 
-Local source-adversarial regression runner `scripts/mvp/vox/validate-vox-11-qa.mjs` drives the ten existing Core suites, verifies exact **218/218** totals, checks that all Core routes continue requiring owner/staff remote authorization, checks source feature-gates and ensures the release readiness manifest is **HOLD** until independently demonstrated.
+Local source-adversarial regression runner `scripts/mvp/vox/validate-vox-11-qa.mjs` drives the ten existing Core suites, verifies exact **232/232** totals, checks that all Core routes continue requiring owner/staff remote authorization, checks source feature-gates and ensures the release readiness manifest is **HOLD** until independently demonstrated.
 
 GitHub CI triggers on changes to VOX Core APIs/contracts/migrations/tests, on pushes to the QA branch and (once the workflow is on default branch) daily at 02:17 UTC. Scheduled workflows on GitHub only execute from the default branch: **do not describe the daily job as active before it is merged**. CI also runs full root `npm run typecheck`.
 

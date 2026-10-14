@@ -16,6 +16,7 @@ const checks=[
  ["scripts/mvp/vox/validate-vox-07-finalizer-source.mjs",38],
  ["scripts/mvp/vox/validate-vox08-source.mjs",16],
  ["scripts/mvp/vox/validate-vox-10-aos.mjs",17],
+ ["scripts/mvp/vox/validate-vox-09-review-queue.mjs",14],
 ];
 let count=0;
 for(const [path,expected] of checks){
@@ -25,14 +26,14 @@ for(const [path,expected] of checks){
  count+=expected;
  console.log("PASS "+path+" = "+expected);
 }
-if(count!==218)throw Error("SOURCE_TOTAL_MISMATCH "+count);
+if(count!==232)throw Error("SOURCE_TOTAL_MISMATCH "+count);
 const manifest=JSON.parse(read("docs/vox/VOX-11-RELEASE-MANIFEST.json"));
 assert.equal(manifest.releaseStatus,"HOLD");
 for(const [gate,pass] of Object.entries(manifest.criticalGates)){
  if(pass!==false)throw Error("UNSUPPORTED_LAUNCH_CLAIM: "+gate);
 }
 const ownerRoutes=["app/api/vox/v1/aos-health/route.ts","app/api/vox/v1/staff-grants/route.ts"];
-const staffRoutes=["app/api/vox/v1/acquisition/route.ts","app/api/vox/v1/vendor360/route.ts","app/api/vox/v1/desk/route.ts"];
+const staffRoutes=["app/api/vox/v1/acquisition/route.ts","app/api/vox/v1/vendor360/route.ts","app/api/vox/v1/desk/route.ts","app/api/vox/v1/staff-review-queue/route.ts"];
 const owner=ownerRoutes.map(read).join("\n"),staff=staffRoutes.map(read).join("\n");
 assert.match(owner,/verifyVoxOwnerBearer/);
 assert.match(staff,/getVerifiedScopedStaff/);
@@ -49,4 +50,4 @@ assert.doesNotMatch(read("app/api/vox/v1/staff-grants/route.ts"),/process\.env\.
 assert.match(read("services/vox/verifiedStaffBearer.ts"),/auth\.getUser\(token\)/);
 assert.match(read("supabase/migrations/20261014050000_vox_v1_team_leader_review_policy.sql"),/VOX_TEAM_LEADER_ESCALATION_DENIED/);
 assert.match(read("contracts/vox/aosHealth.mjs"),/AGNI|agni:"NOT_CONNECTED"/i);
-console.log("VOX11_QA_SOURCE_AND_RELEASE_HOLD_PASS "+count+"/218; releaseStatus=HOLD");
+console.log("VOX11_QA_SOURCE_AND_RELEASE_HOLD_PASS "+count+"/232; releaseStatus=HOLD");

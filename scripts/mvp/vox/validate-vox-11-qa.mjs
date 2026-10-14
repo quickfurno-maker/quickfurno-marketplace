@@ -19,6 +19,7 @@ const checks=[
  ["scripts/mvp/vox/validate-vox-09-review-queue.mjs",14],
  ["scripts/mvp/vox/validate-vox-09b-task.mjs",24],
  ["scripts/mvp/vox/validate-vox-10b-studio.mjs",18],
+ ["scripts/mvp/vox/validate-vox-09c-source.mjs",36],
 ];
 let count=0;
 for(const [path,expected] of checks){
@@ -28,7 +29,7 @@ for(const [path,expected] of checks){
  count+=expected;
  console.log("PASS "+path+" = "+expected);
 }
-if(count!==274)throw Error("SOURCE_TOTAL_MISMATCH "+count);
+if(count!==310)throw Error("SOURCE_TOTAL_MISMATCH "+count);
 const manifest=JSON.parse(read("docs/vox/VOX-11-RELEASE-MANIFEST.json"));
 assert.equal(manifest.releaseStatus,"HOLD");
 for(const [gate,pass] of Object.entries(manifest.criticalGates)){
@@ -52,4 +53,4 @@ assert.doesNotMatch(read("app/api/vox/v1/staff-grants/route.ts"),/process\.env\.
 assert.match(read("services/vox/verifiedStaffBearer.ts"),/auth\.getUser\(token\)/);
 assert.match(read("supabase/migrations/20261014050000_vox_v1_team_leader_review_policy.sql"),/VOX_TEAM_LEADER_ESCALATION_DENIED/);
 assert.match(read("contracts/vox/aosHealth.mjs"),/AGNI|agni:"NOT_CONNECTED"/i);
-console.log("VOX11_QA_SOURCE_AND_RELEASE_HOLD_PASS "+count+"/274; releaseStatus=HOLD");
+console.log("VOX11_QA_SOURCE_AND_RELEASE_HOLD_PASS "+count+"/310; releaseStatus=HOLD");

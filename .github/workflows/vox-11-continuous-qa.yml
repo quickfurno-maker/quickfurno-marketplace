@@ -6,6 +6,7 @@ on:
       - 'contracts/vox/**'
       - 'services/vox/**'
       - 'supabase/migrations/*vox_v1*'
+      - 'supabase/migrations/*vox_operational_intent_review.sql'
       - 'scripts/mvp/vox/**'
       - 'docs/vox/VOX-11-*'
       - '.github/workflows/vox-11-continuous-qa.yml'
@@ -29,6 +30,8 @@ jobs:
           cache: 'npm'
       - name: Fail-closed source contract and release gates
         run: node scripts/mvp/vox/validate-vox-11-qa.mjs
+      - name: VOX-11C hardened launch-HOLD checks
+        run: node scripts/mvp/vox/validate-vox-11c-safety.mjs
       - name: Install Core lockfile
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Full Core TypeScript check

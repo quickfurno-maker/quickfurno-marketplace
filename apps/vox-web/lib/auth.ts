@@ -14,9 +14,20 @@ export async function staffAuth() {
  });
 }
 export function allowedOrigin(request:Request):boolean {
- const u=new URL(request.url);
- const expected=process.env.VOX_EXPECTED_ORIGIN ?? (process.env.NODE_ENV==="production"?"https://vox.quickfurno.in":"http://127.0.0.1:3107");
- return u.origin===expected && request.headers.get("origin")===expected;
+ // Next.js standalone may normalize request.url to a loopback origin even
+ // when the browser and reverse proxy correctly use the configured public host.
+ // Trust neither request.url nor forwarded-host for CSRF: pin both the exact
+ // browser Origin and the actual Host header to a configured expected origin.
+ const configured=process.env.VOX_EXPECTED_ORIGIN ??
+  (process.env.NODE_ENV==="production"?"https://vox.quickfurno.in":"http://127.0.0.1:3107");
+ try{
+  const expected=new URL(configured);
+  if(!["http:","https:"].includes(expected.protocol) || expected.username ||
+     expected.password || expected.pathname!=="/" ||
+     expected.search || expected.hash)return false;
+  return request.headers.get("origin")===expected.origin &&
+   request.headers.get("host")===expected.host;
+ }catch{return false;}
 }
 export function safeJson(value:unknown,status=200){
  return Response.json(value,{status,headers:{"cache-control":"private, no-store, max-age=0","x-content-type-options":"nosniff"}});

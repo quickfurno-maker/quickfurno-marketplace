@@ -5,11 +5,14 @@ $root=(Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 $fixture=Get-Content (Join-Path $root 'scripts\mvp\vox\vox07-finalizer-fixture.sql') -Raw
 $pieces=$fixture -split '-- Synthetic profiles:',2
 if($pieces.Count -ne 2){throw 'FIXTURE_BOUNDARY_MISSING'}
+$pgImage=$env:VOX_TEST_PG_IMAGE
+if(-not $pgImage){$pgImage='postgres:16-alpine'}
+if($pgImage -notin @('postgres:16-alpine','postgres:17-alpine')){throw 'DISALLOWED_TEST_IMAGE'}
 $migrations=@('20261014010000_vox_v1_scoped_staff_authority.sql','20261014020000_vox_v1_staff_review_workflow.sql','20261014030000_vox_v1_approved_grant_finalizer.sql','20261014040000_vox_v1_staff_emergency_revocation.sql')
 if(docker ps -aq --filter "name=^/$name$"){throw 'REFUSING_OTHER_CONTAINER'}
 $cid=$null
 try {
- $cid=docker run --rm --network none -d --name $name -e POSTGRES_PASSWORD=vox_synthetic_only postgres:16-alpine
+ $cid=docker run --rm --network none -d --name $name -e POSTGRES_PASSWORD=vox_synthetic_only $pgImage
  if($LASTEXITCODE -ne 0){throw 'START_FAILED'}
  $up=$false
  for($i=0;$i -lt 30;$i++){ docker exec $name pg_isready -U postgres *> $null; if($LASTEXITCODE -eq 0){$up=$true;break};Start-Sleep -Seconds 1 }

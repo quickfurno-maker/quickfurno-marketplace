@@ -6,6 +6,7 @@ on:
       - 'supabase/migrations/*vox_v1_staff_emergency_revocation.sql'
       - 'app/api/vox/v1/staff-grants/**'
       - 'scripts/mvp/vox/validate-vox-07-finalizer-source.mjs'
+      - 'scripts/mvp/vox/validate-vox-07-finalizer-postgres.ps1'
       - '.github/workflows/vox-07-grants.yml'
   workflow_dispatch:
 permissions:

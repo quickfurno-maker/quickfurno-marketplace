@@ -17,12 +17,12 @@ grant usage on schema public to anon,authenticated,service_role;
 insert into public.profiles(id,role,is_active) values
  ('10000000-0000-4000-8000-000000000001','admin',true),
  ('10000000-0000-4000-8000-000000000002','admin',true),
- ('10000000-0000-4000-8000-000000000003','admin',true),
+ ('10000000-0000-4000-8000-000000000003',NULL,true),
  ('10000000-0000-4000-8000-000000000004','admin',true);
 insert into auth.users(id,raw_app_meta_data) values
  ('10000000-0000-4000-8000-000000000001','{}'),
  ('10000000-0000-4000-8000-000000000002','{"admin_role":"Superadmin"}'),
- ('10000000-0000-4000-8000-000000000003','{}'),
+ ('10000000-0000-4000-8000-000000000003','{"qf_principal":"vox_staff"}'),
  ('10000000-0000-4000-8000-000000000004','{"admin_role":"Basic Staff"}');
 insert into public.cities(id,is_active) values
  ('20000000-0000-4000-8000-000000000001',true),

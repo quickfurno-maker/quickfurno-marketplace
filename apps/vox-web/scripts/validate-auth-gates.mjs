@@ -22,7 +22,8 @@ check("read-only proxy",()=>assert.match(read("app/api/overview/route.ts"),/func
 check("production homepage still locked",()=>assert.match(read("app/page.tsx"),/NODE_ENV==="development"/));
 check("no browser uses access token",()=>assert.doesNotMatch(read("app/login/form.tsx")+read("app/mfa/form.tsx"),/access_token|service_role/));
 check("TOTP enrollment disabled by default",()=>assert.match(read("app/api/auth/mfa/enroll/route.ts"),/VOX_STAFF_PORTAL_ENABLED!=="staging"/));
-check("TOTP enrollment requires verified owner",()=>assert.match(read("app/api/auth/mfa/enroll/route.ts"),/admin_role!=="Superadmin"/));
+check("TOTP enrollment retains verified owner",()=>assert.match(read("app/api/auth/mfa/enroll/route.ts"),/admin_role==="Superadmin"/));
+check("TOTP staff enrollment separately gated and trusted",()=>{const code=read("app/api/auth/mfa/enroll/route.ts");assert.match(code,/qf_principal==="vox_staff"/);assert.match(code,/VOX_STAFF_MFA_ENROLL_ENABLED==="staging"/);assert.match(code,/admin_role==null/);});
 check("TOTP enrollment requires same origin",()=>assert.match(read("app/api/auth/mfa/enroll/route.ts"),/allowedOrigin\(request\)/));
 check("TOTP re-enrollment blocked",()=>assert.match(read("app/api/auth/mfa/enroll/route.ts"),/ALREADY_ENROLLED/));
 check("TOTP confirmation disabled by default",()=>assert.match(read("app/api/auth/mfa/confirm/route.ts"),/VOX_STAFF_PORTAL_ENABLED!=="staging"/));

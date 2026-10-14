@@ -6,7 +6,14 @@ export async function POST(request:Request){
  try{
   const auth=await staffAuth();
   const {data:{user},error}=await auth.auth.getUser();
-  if(error||!user||user.app_metadata?.admin_role!=="Superadmin"||!user.email_confirmed_at)
+  // Server-verified Supabase app_metadata, never self-editable user_metadata.
+  // Normal staff can enroll BEFORE membership activation, but only when
+  // explicitly server-provisioned and when a separate staging flag is ON.
+  const owner=user?.app_metadata?.admin_role==="Superadmin";
+  const staff=user?.app_metadata?.qf_principal==="vox_staff"&&
+   user?.app_metadata?.admin_role==null&&
+   process.env.VOX_STAFF_MFA_ENROLL_ENABLED==="staging";
+  if(error||!user||!user.email_confirmed_at||(!owner&&!staff))
    return safeJson({ok:false,error:"UNAUTHORIZED"},401);
   const existing=await auth.auth.mfa.listFactors();
   if(existing.error)return safeJson({ok:false,error:"MFA_UNAVAILABLE"},503);
@@ -17,7 +24,7 @@ export async function POST(request:Request){
   const secret=String(enrolled.data.totp.secret??"");
   if(!/^data:image\/svg\+xml/.test(qr)||!/^[-A-Z2-7]{16,100}$/i.test(secret))
    return safeJson({ok:false,error:"ENROLLMENT_INVALID"},503);
-  // One-time secret returned ONLY to the verified same-origin owner browser.
+  // One-time secret returned ONLY to the eligible verified same-origin account.
   return safeJson({ok:true,factorId:enrolled.data.id,qrCode:qr,secret},200);
  }catch{return safeJson({ok:false,error:"ENROLLMENT_UNAVAILABLE"},503);}
 }

@@ -67,8 +67,12 @@ BEGIN
   SELECT 1 FROM public.vox_staff_memberships_v1 m
   JOIN public.vox_staff_teams_v1 t ON t.id=m.team_id
   JOIN public.profiles p ON p.id=m.auth_user_id
+  JOIN auth.users a ON a.id=p.id
   WHERE m.auth_user_id=v.requester_id AND m.team_id=v.team_id AND t.city_id=v.city_id
-    AND p.is_active=true AND m.is_active=true AND t.is_active=true
+    AND p.is_active=true AND p.role is null
+    AND a.raw_app_meta_data->>'qf_principal'='vox_staff'
+    AND a.raw_app_meta_data->>'admin_role' is null
+    AND m.is_active=true AND t.is_active=true
     AND m.revoked_at IS NULL AND m.expires_at>now()
     AND ( (v.action_kind='AAROHI_FOLLOWUP' AND m.staff_role IN('acquisition_agent','operations_manager'))
        OR (v.action_kind='VENDOR_PROFILE_CHANGE' AND m.staff_role IN('vendor_success_agent','operations_manager'))

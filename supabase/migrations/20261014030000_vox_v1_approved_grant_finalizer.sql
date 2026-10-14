@@ -52,7 +52,9 @@ begin
  if exists(select 1 from public.vox_staff_access_activations_v1 a where a.request_id=r.id)
  then raise exception 'VOX_ALREADY_ACTIVATED' using errcode='P0001'; end if;
  if not exists(select 1 from public.profiles p join auth.users a on a.id=p.id
-     where p.id=r.target_profile_id and p.role='admin' and p.is_active=true)
+     where p.id=r.target_profile_id and p.role is null and p.is_active=true
+       and a.raw_app_meta_data->>'qf_principal'='vox_staff'
+       and a.raw_app_meta_data->>'admin_role' is null)
  then raise exception 'VOX_TARGET_INACTIVE' using errcode='P0001'; end if;
  select * into t from public.vox_staff_teams_v1 where id=r.team_id for update;
  if not found or not t.is_active

@@ -1,10 +1,10 @@
 -- Synthetic-only team leader reviewer acceptance and escalation refusal.
 insert into public.profiles(id,role,is_active) values
- ('10000000-0000-4000-8000-000000000005','admin',true),
- ('10000000-0000-4000-8000-000000000006','admin',true);
+ ('10000000-0000-4000-8000-000000000005',NULL,true),
+ ('10000000-0000-4000-8000-000000000006',NULL,true);
 insert into auth.users(id,raw_app_meta_data) values
- ('10000000-0000-4000-8000-000000000005','{"vox_role":"team_leader"}'),
- ('10000000-0000-4000-8000-000000000006','{}');
+ ('10000000-0000-4000-8000-000000000005','{"vox_role":"team_leader","qf_principal":"vox_staff"}'),
+ ('10000000-0000-4000-8000-000000000006','{"qf_principal":"vox_staff"}');
 insert into public.vox_staff_memberships_v1
  (auth_user_id,team_id,staff_role,is_active,expires_at,granted_by)
  values('10000000-0000-4000-8000-000000000005',

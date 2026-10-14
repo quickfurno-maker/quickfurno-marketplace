@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start -H 127.0.0.1 -p 3107",
     "typecheck": "tsc --noEmit",
-    "test": "node scripts/validate-guard.mjs && node scripts/validate-auth-gates.mjs && node scripts/validate-scope-gates.mjs && node scripts/validate-crm-gates.mjs && node scripts/validate-operations-09.mjs && node scripts/validate-review-workflow-09.mjs"
+    "test": "node scripts/validate-guard.mjs && node scripts/validate-auth-gates.mjs && node scripts/validate-scope-gates.mjs && node scripts/validate-crm-gates.mjs && node scripts/validate-operations-09.mjs && node scripts/validate-review-workflow-09.mjs && node scripts/validate-09b-10b-web.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.5.2",

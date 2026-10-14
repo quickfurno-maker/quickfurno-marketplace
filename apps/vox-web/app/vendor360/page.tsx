@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {fetchScopedCrm} from "../../lib/core";
 import {ScopedQueue} from "../components/ScopedQueue";
+import {TaskCreator} from "./components/TaskCreator";
 import "../components/scoped-queue.css";
 import "../operations/operations.css";
 export const dynamic="force-dynamic";
@@ -23,6 +24,7 @@ export default async function Vendor360(){
   <ScopedQueue kicker="VENDORS" title="Assigned Core vendors" rows={vendors} emptyLabel="No vendors assigned."/>
   <ScopedQueue kicker="CRM" title="Vendor relationships" rows={crm} emptyLabel="No vendor CRM records."/>
  </div>
+ {process.env.VOX_VENDOR_TASK_UI_ENABLED==="staging"?<TaskCreator vendors={r.view.vendors.filter(v=>v.vendorId).map(v=>({vendorId:v.vendorId!,businessName:v.businessName}))}/>:null}
  <div className="voxNotice"><b>Atomic approvals</b><span>Vendor profile, verification, service-area changes and any financial or lead-assignment actions require the existing Core approval workflow. VOX cannot make direct edits.</span></div>
  <footer className="voxBottom">QuickFurno VOX · Staff Vendor 360 · Staging gated</footer></main>;
 }

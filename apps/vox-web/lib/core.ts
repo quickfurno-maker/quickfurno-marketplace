@@ -220,3 +220,50 @@ export async function submitTeamLeaderReview(requestId:string,decision:"APPROVE"
    note:"Reviewed only. Owner activation remains separately required."} as const;
  }catch{return {ok:false,status:503,error:"REVIEW_UNAVAILABLE"} as const;}
 }
+
+const WORKFLOWS=["vendor_journey","client_journey","campaigns","recovery","orphan_cleanup","stale_cleanup"] as const;
+export async function fetchScopedStudioSimulation(key:string){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||process.env.VOX_STAFF_VIEW_MODE!=="scoped"||
+    process.env.VOX_STUDIO_WEB_ENABLED!=="staging")
+  return {ok:false,status:503,error:"STUDIO_DISABLED"} as const;
+ if(!WORKFLOWS.some(v=>v===key))return {ok:false,status:400,error:"UNKNOWN_WORKFLOW"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const r=await fetch(base+"/api/vox/v1/studio-simulate?workflowKey="+encodeURIComponent(key),{
+   headers:{authorization:"Bearer "+token,accept:"application/json"},
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!r.ok)return {ok:false,status:r.status===403?403:503,error:"STUDIO_UNAVAILABLE"} as const;
+  const body:unknown=await r.json();
+  if(!body||typeof body!=="object"||!("ok" in body)||body.ok!==true||!("schema" in body)||
+     body.schema!=="qf.vox.studio.simulation.v1"||!("visited" in body)||!Array.isArray(body.visited)||
+     body.visited.length>50||!("mode" in body)||body.mode!=="DRY_RUN_ONLY"||
+     !("workflowKey" in body)||body.workflowKey!==key)return {ok:false,status:503,error:"UNTRUSTED_SIMULATION"} as const;
+  const nodes=body.visited.map((n:unknown)=>{
+   const x=n&&typeof n==="object"?n as Record<string,unknown>:{};
+   return {label:safeLabel(x.label,80),kind:safeLabel(x.kind,40),
+    authority:safeLabel(x.authority,40)};
+  });
+  return {ok:true,status:200,view:{workflowKey:key,nodes,
+   source:"NATIVE_DEFAULT_DEFINITION" as const,runtime:"NOT_QUERIED" as const,
+   canPublish:false as const,canExecute:false as const}} as const;
+ }catch{return {ok:false,status:503,error:"STUDIO_UNAVAILABLE"} as const;}
+}
+export async function submitScopedVendorTask(input:{vendorId:string;nonce:string;taskType:string;title:string;priority:string;dueAt:string}){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||process.env.VOX_STAFF_VIEW_MODE!=="scoped"||
+    process.env.VOX_VENDOR_TASK_UI_ENABLED!=="staging")return {ok:false,status:503,error:"TASK_WRITE_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const r=await fetch(base+"/api/vox/v1/vendor-task",{
+   method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+   body:JSON.stringify(input),cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!r.ok)return {ok:false,status:r.status===403?403:r.status===400?400:503,error:"CORE_TASK_REJECTED"} as const;
+  const data:unknown=await r.json();
+  if(!data||typeof data!=="object"||!("ok" in data)||data.ok!==true||
+     !("taskId" in data)||!uid(data.taskId))return {ok:false,status:503,error:"UNTRUSTED_TASK_RESPONSE"} as const;
+  return {ok:true,status:201,taskId:data.taskId,approval:"INTERNAL_TASK_ONLY" as const} as const;
+ }catch{return {ok:false,status:503,error:"CORE_TASK_UNAVAILABLE"} as const;}
+}

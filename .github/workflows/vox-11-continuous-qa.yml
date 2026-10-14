@@ -1,0 +1,35 @@
+name: VOX-11 Continuous Source & Release QA
+on:
+  pull_request:
+    paths:
+      - 'app/api/vox/**'
+      - 'contracts/vox/**'
+      - 'services/vox/**'
+      - 'supabase/migrations/*vox_v1*'
+      - 'scripts/mvp/vox/**'
+      - 'docs/vox/VOX-11-*'
+      - '.github/workflows/vox-11-continuous-qa.yml'
+  push:
+    branches:
+      - 'test/vox-11-qa'
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  all-core-source-and-hold:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+          cache: 'npm'
+      - name: Fail-closed source contract and release gates
+        run: node scripts/mvp/vox/validate-vox-11-qa.mjs
+      - name: Install Core lockfile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Full Core TypeScript check
+        run: npm run typecheck

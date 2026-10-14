@@ -1,0 +1,30 @@
+name: VOX-12B Staff Proposal Web
+on:
+  pull_request:
+    paths:
+      - 'apps/vox-web/app/api/followup-proposals/**'
+      - 'apps/vox-web/app/acquisition/**'
+      - 'apps/vox-web/lib/core.ts'
+      - 'apps/vox-web/scripts/validate-staff-proposals-12b.mjs'
+      - '.github/workflows/vox-12b-staff-proposal.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  staff-proposals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/vox-web
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+          cache: npm
+          cache-dependency-path: apps/vox-web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build

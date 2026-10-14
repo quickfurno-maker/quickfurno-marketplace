@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {fetchScopedServiceDesk} from "../../lib/core";
 import {ScopedQueue} from "../components/ScopedQueue";
+import {StaffProposalForm} from "../components/StaffProposalForm";
 import "../components/scoped-queue.css";
 import "../operations/operations.css";
 export const dynamic="force-dynamic";
@@ -25,6 +26,7 @@ export default async function ServiceDesk(){
   <ScopedQueue kicker="SUPPORT" title="Assigned service cases" rows={cases} emptyLabel="No service cases assigned."/>
   <ScopedQueue kicker="HUMAN" title="Aarohi and Anisha handovers" rows={human} emptyLabel="No assigned HUMAN handovers."/>
  </div>
+ {process.env.VOX_OPERATIONAL_PROPOSAL_UI_ENABLED==="staging"?<StaffProposalForm kind="SUPPORT_REPLY" targets={r.view.support.filter(c=>c.threadId).map(c=>({id:c.threadId!,title:"Case "+c.threadId!.slice(0,8)}))}/>:null}
  <div className="voxNotice"><b>Core service boundary</b><span>Replies, handover, case close, assignment and SLA actions remain disabled pending native Core atomic approval, conversation revision and provider delivery certification.</span></div>
  <footer className="voxBottom">QuickFurno VOX · Staff operations · No direct WhatsApp sends</footer></main>;
 }

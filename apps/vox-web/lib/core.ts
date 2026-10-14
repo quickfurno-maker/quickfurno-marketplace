@@ -375,3 +375,43 @@ export async function executeApprovedNativeFollowup(intentId:string){
   return {ok:true,status:200,taskId:response.taskId,effect:"INTERNAL_FOLLOW_UP_ONLY" as const} as const;
  }catch{return {ok:false,status:503,error:"EXECUTION_UNAVAILABLE"} as const;}
 }
+
+/** One fixed, metadata-only proposal path, never a provider or profile action. */
+export async function submitScopedOperationalProposal(input:{
+ actionKind:"AAROHI_FOLLOWUP"|"VENDOR_PROFILE_CHANGE"|"SUPPORT_REPLY";
+ targetId:string;nonce:string;reasonCode:"INTERNAL_FOLLOWUP"|"PROFILE_REVIEW"|"SUPPORT_REVIEW";
+}){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_STAFF_VIEW_MODE!=="scoped"||
+    process.env.VOX_OPERATIONAL_PROPOSAL_UI_ENABLED!=="staging")
+  return {ok:false,status:503,error:"PROPOSAL_DISABLED"} as const;
+ if(!uid(input.targetId)||!uid(input.nonce))return {ok:false,status:400,error:"INVALID_REFERENCE"} as const;
+ const fixed={
+  AAROHI_FOLLOWUP:{reasonCode:"INTERNAL_FOLLOWUP",rationale:"Request owner review of internal Aarohi follow-up"},
+  VENDOR_PROFILE_CHANGE:{reasonCode:"PROFILE_REVIEW",rationale:"Request owner review of vendor profile change"},
+  SUPPORT_REPLY:{reasonCode:"SUPPORT_REVIEW",rationale:"Request owner review of vendor support response"},
+ } as const;
+ const kind=fixed[input.actionKind];
+ if(!kind||kind.reasonCode!==input.reasonCode)
+  return {ok:false,status:400,error:"INVALID_PROPOSAL_KIND"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_UNAVAILABLE"} as const;
+ try{
+  const response=await fetch(base+"/api/vox/v1/action-intents",{
+   method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+   body:JSON.stringify({action:"propose",intent:{
+    actionKind:input.actionKind,targetId:input.targetId,nonce:input.nonce,rationale:kind.rationale,
+   }}),cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!response.ok)return {ok:false,status:response.status===403?403:response.status===409?409:503,
+    error:"CORE_PROPOSAL_DENIED"} as const;
+  const body:unknown=await response.json();
+  if(!body||typeof body!=="object"||!("ok" in body)||body.ok!==true||
+     !("intentId" in body)||!uid(body.intentId)||
+     !("state" in body)||body.state!=="PENDING"||
+     !("execution" in body)||body.execution!=="NOT_AUTHORIZED")
+   return {ok:false,status:503,error:"INVALID_PROPOSAL_RECEIPT"} as const;
+  return {ok:true,status:202,intentId:body.intentId,
+   state:"PENDING" as const,execution:"NOT_AUTHORIZED" as const} as const;
+ }catch{return {ok:false,status:503,error:"CORE_PROPOSAL_UNAVAILABLE"} as const;}
+}

@@ -1,0 +1,5 @@
+# VOX-16D security matrix: staff role, revoked scope and HUMAN-only isolation
+
+Runs deterministic pure Core staff role × canonical prospect/vendor/support-thread/conversation scopes and revocation/expiry/identity-negative cases. Verifies neither Team Leader nor auditor is given human content mutation, that revoked grants and cross-actor objects are excluded, that AI-owned/client conversations are not disclosed as vendor HUMAN handover, and that assigned case projection denies cross-vendor records. Uses only **synthetic UUIDs** with no real staff or vendor data.
+
+This is a hardened source regression, not substitute for genuine Supabase Staging bearer AAL2, RLS as anon/authenticated, signed Core/Jarvis gateway, SQL injection, origin/host, load, authentication revocation or production rollback. **RELEASE HOLD**. Existing database findings `vendor_public_v`, `is_admin()`, `owns_vendor()` and disabled leaked-password feature remain open and must be tested before independent reviewed remediation.

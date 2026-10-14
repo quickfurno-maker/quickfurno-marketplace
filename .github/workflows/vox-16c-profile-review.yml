@@ -1,0 +1,22 @@
+name: VOX-16C canonical vendor approval queue
+on:
+  pull_request:
+    paths:
+      - 'app/api/vox/v1/vendor-profile-review/**'
+      - 'scripts/mvp/vox/validate-vox16c-profile-review.mjs'
+      - '.github/workflows/vox-16c-profile-review.yml'
+  workflow_dispatch:
+permissions: { contents: read }
+jobs:
+  read-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with: { node-version: '20.20.2' }
+      - run: |
+          node scripts/mvp/vox/validate-vox16c-profile-review.mjs
+          node scripts/mvp/vox/validate-vox-11-qa.mjs
+      - run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck

@@ -17,9 +17,21 @@ export async function fetchStaffOverview(){
  if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
  try{
   const mode=process.env.VOX_STAFF_VIEW_MODE;
-  const path=mode==="owner"?"/api/vox/v1/overview":mode==="scoped"?"/api/vox/v1/my-work":null;
-  if(!path)return {ok:false,status:503,error:"STAFF_SCOPE_MODE_DISABLED"} as const;
-  const r=await fetch(base+path,{method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  const paths=mode==="owner"?["/api/vox/v1/overview"]:
+    mode==="scoped"?["/api/vox/v1/my-work"]:
+    mode==="dual"?["/api/vox/v1/overview","/api/vox/v1/my-work"]:null;
+  if(!paths)return {ok:false,status:503,error:"STAFF_SCOPE_MODE_DISABLED"} as const;
+  let r:Response|null=null;
+  // In dual mode fallback ONLY when Core refuses owner privileges (403).
+  // Every fallback must pass its own Core active staff/city/team/grant validation.
+  for(const path of paths){
+   const candidate=await fetch(base+path,{method:"GET",
+    headers:{authorization:"Bearer "+token,accept:"application/json"},
+    cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+   if(mode==="dual"&&path==="/api/vox/v1/overview"&&candidate.status===403)continue;
+   r=candidate;break;
+  }
+  if(!r)return {ok:false,status:403,error:"CORE_SCOPE_DENIED"} as const;
   if(!r.ok)return {ok:false,status:r.status===401?401:503,error:r.status===401?"NOT_AUTHORIZED":"CORE_UNAVAILABLE"} as const;
   const payload:unknown=await r.json();
   if(!payload||typeof payload!=="object"||!("ok" in payload)||payload.ok!==true||!("view" in payload))return {ok:false,status:503,error:"UNTRUSTED_CORE_RESPONSE"} as const;
@@ -42,7 +54,7 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 const uid=(x:unknown):string|null=>typeof x==="string"&&UUID.test(x)?x:null;
 export async function fetchScopedServiceDesk(){
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
-    process.env.VOX_STAFF_VIEW_MODE!=="scoped")
+    (process.env.VOX_STAFF_VIEW_MODE!=="scoped"&&process.env.VOX_STAFF_VIEW_MODE!=="dual"))
    return {ok:false,status:503,error:"STAFF_DESK_DISABLED"} as const;
  const token=await verifiedMfaSession();
  if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
@@ -79,11 +91,11 @@ export async function fetchScopedServiceDesk(){
  }catch{return {ok:false,status:503,error:"STAFF_DESK_UNAVAILABLE"} as const;}
 }
 
-/** VOX staff CRM adapters — no browser tokens, no service-role and no outbound writes.
+/** VOX staff CRM adapters â€” no browser tokens, no service-role and no outbound writes.
  * Core owns record scope; the BFF independently drops all undeclared fields. */
 export async function fetchScopedCrm(kind:"acquisition"|"vendor360"){
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
-    process.env.VOX_STAFF_VIEW_MODE!=="scoped")return {ok:false,status:503,error:"STAFF_SCOPE_DISABLED"} as const;
+    (process.env.VOX_STAFF_VIEW_MODE!=="scoped"&&process.env.VOX_STAFF_VIEW_MODE!=="dual"))return {ok:false,status:503,error:"STAFF_SCOPE_DISABLED"} as const;
  const token=await verifiedMfaSession();
  if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
  const base=origin();if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
@@ -129,7 +141,7 @@ export async function fetchScopedCrm(kind:"acquisition"|"vendor360"){
 /** Owner-only, read-only AOS operational observation. No agent or AGNI claims. */
 export async function fetchOwnerAosHealth(){
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
-    process.env.VOX_STAFF_VIEW_MODE!=="owner"||
+    (process.env.VOX_STAFF_VIEW_MODE!=="owner"&&process.env.VOX_STAFF_VIEW_MODE!=="dual")||
     process.env.VOX_INTELLIGENCE_VIEW_ENABLED!=="staging")
    return {ok:false,status:503,error:"INTELLIGENCE_DISABLED"} as const;
  const token=await verifiedMfaSession();
@@ -165,7 +177,7 @@ export async function fetchOwnerAosHealth(){
 /** Staff access-review queue and single-use decision via existing Core RPC. */
 export async function fetchTeamLeaderReviewQueue(){
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
-    process.env.VOX_STAFF_VIEW_MODE!=="scoped"||
+    (process.env.VOX_STAFF_VIEW_MODE!=="scoped"&&process.env.VOX_STAFF_VIEW_MODE!=="dual")||
     process.env.VOX_STAFF_REVIEW_WEB_ENABLED!=="staging")
    return {ok:false,status:503,error:"REVIEW_DISABLED"} as const;
  const token=await verifiedMfaSession();
@@ -197,7 +209,7 @@ export async function fetchTeamLeaderReviewQueue(){
 }
 export async function submitTeamLeaderReview(requestId:string,decision:"APPROVE"|"REJECT",reference:string){
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
-    process.env.VOX_STAFF_VIEW_MODE!=="scoped"||
+    (process.env.VOX_STAFF_VIEW_MODE!=="scoped"&&process.env.VOX_STAFF_VIEW_MODE!=="dual")||
     process.env.VOX_STAFF_REVIEW_WEB_ENABLED!=="staging")
    return {ok:false,status:503,error:"REVIEW_DISABLED"} as const;
  if(!uid(requestId)||!["APPROVE","REJECT"].includes(decision)||reference.length<8||reference.length>128)
@@ -223,7 +235,7 @@ export async function submitTeamLeaderReview(requestId:string,decision:"APPROVE"
 
 const WORKFLOWS=["vendor_journey","client_journey","campaigns","recovery","orphan_cleanup","stale_cleanup"] as const;
 export async function fetchScopedStudioSimulation(key:string){
- if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||process.env.VOX_STAFF_VIEW_MODE!=="scoped"||
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||(process.env.VOX_STAFF_VIEW_MODE!=="scoped"&&process.env.VOX_STAFF_VIEW_MODE!=="dual")||
     process.env.VOX_STUDIO_WEB_ENABLED!=="staging")
   return {ok:false,status:503,error:"STUDIO_DISABLED"} as const;
  if(!WORKFLOWS.some(v=>v===key))return {ok:false,status:400,error:"UNKNOWN_WORKFLOW"} as const;
@@ -251,7 +263,7 @@ export async function fetchScopedStudioSimulation(key:string){
  }catch{return {ok:false,status:503,error:"STUDIO_UNAVAILABLE"} as const;}
 }
 export async function submitScopedVendorTask(input:{vendorId:string;nonce:string;taskType:string;title:string;priority:string;dueAt:string}){
- if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||process.env.VOX_STAFF_VIEW_MODE!=="scoped"||
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||(process.env.VOX_STAFF_VIEW_MODE!=="scoped"&&process.env.VOX_STAFF_VIEW_MODE!=="dual")||
     process.env.VOX_VENDOR_TASK_UI_ENABLED!=="staging")return {ok:false,status:503,error:"TASK_WRITE_DISABLED"} as const;
  const token=await verifiedMfaSession();
  if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
@@ -271,7 +283,7 @@ export async function submitScopedVendorTask(input:{vendorId:string;nonce:string
 /** Owner-only review queue for non-executing operational proposals. */
 export async function fetchOwnerOperationalIntents(){
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
-    process.env.VOX_STAFF_VIEW_MODE!=="owner"||
+    (process.env.VOX_STAFF_VIEW_MODE!=="owner"&&process.env.VOX_STAFF_VIEW_MODE!=="dual")||
     process.env.VOX_OPERATIONAL_REVIEW_UI_ENABLED!=="staging")
   return {ok:false,status:503,error:"APPROVALS_DISABLED"} as const;
  const token=await verifiedMfaSession();
@@ -302,7 +314,7 @@ export async function fetchOwnerOperationalIntents(){
 }
 export async function submitOwnerOperationalDecision(id:string,decision:"APPROVED"|"REJECTED"){
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
-   process.env.VOX_STAFF_VIEW_MODE!=="owner"||
+   (process.env.VOX_STAFF_VIEW_MODE!=="owner"&&process.env.VOX_STAFF_VIEW_MODE!=="dual")||
    process.env.VOX_OPERATIONAL_REVIEW_UI_ENABLED!=="staging")return {ok:false,status:503,error:"APPROVALS_DISABLED"} as const;
  if(!uid(id)||!["APPROVED","REJECTED"].includes(decision))return {ok:false,status:400,error:"INVALID_DECISION"} as const;
  const token=await verifiedMfaSession();if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
@@ -324,7 +336,7 @@ export async function submitOwnerOperationalDecision(id:string,decision:"APPROVE
 
 /** Owner-only approved Aarohi internal task executions. Never sends WhatsApp. */
 export async function fetchApprovedNativeFollowups(){
- if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||process.env.VOX_STAFF_VIEW_MODE!=="owner"||
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||(process.env.VOX_STAFF_VIEW_MODE!=="owner"&&process.env.VOX_STAFF_VIEW_MODE!=="dual")||
     process.env.VOX_APPROVED_FOLLOWUP_WEB_ENABLED!=="staging")
   return {ok:false,status:503,error:"EXECUTION_DISABLED"} as const;
  const token=await verifiedMfaSession();
@@ -352,7 +364,7 @@ export async function fetchApprovedNativeFollowups(){
  }catch{return {ok:false,status:503,error:"EXECUTION_QUEUE_UNAVAILABLE"} as const;}
 }
 export async function executeApprovedNativeFollowup(intentId:string){
- if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||process.env.VOX_STAFF_VIEW_MODE!=="owner"||
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||(process.env.VOX_STAFF_VIEW_MODE!=="owner"&&process.env.VOX_STAFF_VIEW_MODE!=="dual")||
     process.env.VOX_APPROVED_FOLLOWUP_WEB_ENABLED!=="staging")
   return {ok:false,status:503,error:"EXECUTION_DISABLED"} as const;
  if(!uid(intentId))return {ok:false,status:400,error:"INVALID_INTENT"} as const;
@@ -382,7 +394,7 @@ export async function submitScopedOperationalProposal(input:{
  targetId:string;nonce:string;reasonCode:"INTERNAL_FOLLOWUP"|"PROFILE_REVIEW"|"SUPPORT_REVIEW";
 }){
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
-    process.env.VOX_STAFF_VIEW_MODE!=="scoped"||
+    (process.env.VOX_STAFF_VIEW_MODE!=="scoped"&&process.env.VOX_STAFF_VIEW_MODE!=="dual")||
     process.env.VOX_OPERATIONAL_PROPOSAL_UI_ENABLED!=="staging")
   return {ok:false,status:503,error:"PROPOSAL_DISABLED"} as const;
  if(!uid(input.targetId)||!uid(input.nonce))return {ok:false,status:400,error:"INVALID_REFERENCE"} as const;

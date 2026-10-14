@@ -7,7 +7,7 @@ export async function staffAuth() {
  return createServerClient(required("VOX_SUPABASE_URL"),required("VOX_SUPABASE_PUBLISHABLE_KEY"),{
   cookies:{
    getAll:()=>store.getAll(),
-   setAll(items){for(const {name,value,options} of items)store.set(name,value,{
+   setAll(items: Array<{name:string; value:string; options?:object}>){for(const {name,value,options} of items)store.set(name,value,{
     ...options,httpOnly:true,sameSite:"strict",secure:process.env.NODE_ENV==="production",path:"/"
    });}
   },

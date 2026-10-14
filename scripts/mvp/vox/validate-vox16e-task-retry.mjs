@@ -16,7 +16,7 @@ check('clears nonce on confirmed success',()=>assert.match(vendor,/nonceRef\.cur
 check('resets nonce for every changed field',()=>assert.equal((vendor.match(/nonceRef\.current=null/g)||[]).length,6));
 check('disables input edits midflight',()=>assert.equal((vendor.match(/disabled=\{busy\}/g)||[]).length,5));
 check('does not send vendor-facing message',()=>assert.doesNotMatch(vendor,/sendWhatsApp|provider\.send|wallet\.credit/));
-check('same behavior on SupportFollowup',()=>assert.match(support,/nonce\?\?crypto.randomUUID\(\)/));
+check('SupportFollowup reuses a reserved nonce without React state lag',()=>assert.match(support,/nonceRef\.current\?\?crypto.randomUUID\(\)/));
 check('native Core writer checks DB unique conflict',()=>assert.match(server,/error\.code === "23505"/));
 check('native Core writer compares immutable action payload',()=>assert.match(server,/sameVendorTaskCreate\(/));
 check('BFF origin bound',()=>assert.match(route,/allowedOrigin\(request\)/));

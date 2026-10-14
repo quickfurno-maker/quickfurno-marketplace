@@ -4,7 +4,9 @@
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const isUuid=x=>typeof x==="string"&&UUID.test(x);
 const AGE_HOUR=3600_000;
-const allowedStates=new Set(["open","pending","resolved","closed"]);
+// Exact live Core CHECK constraint: open/admin_replied/vendor_replied/closed.
+// Do not invent pending/resolved lifecycle values or map valid replies to UNKNOWN.
+const allowedStates=new Set(["open","admin_replied","vendor_replied","closed"]);
 function ageBand(when,now){
  const t=Date.parse(String(when??""));
  if(!Number.isFinite(t)||t>now+30000)return "UNKNOWN";

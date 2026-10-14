@@ -1,0 +1,22 @@
+name: VOX-07 Atomic Staff Grants
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/*vox_v1_approved_grant_finalizer.sql'
+      - 'supabase/migrations/*vox_v1_staff_emergency_revocation.sql'
+      - 'app/api/vox/v1/staff-grants/**'
+      - 'scripts/mvp/vox/validate-vox-07-finalizer-source.mjs'
+      - '.github/workflows/vox-07-grants.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  atomic-grants-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: node scripts/mvp/vox/validate-vox-07-finalizer-source.mjs

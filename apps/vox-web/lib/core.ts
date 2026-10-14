@@ -125,3 +125,39 @@ export async function fetchScopedCrm(kind:"acquisition"|"vendor360"){
   return {ok:true,status:200,kind:key,view:{vendors,crm,tasks}} as const;
  }catch{return {ok:false,status:503,error:"CORE_CRM_UNAVAILABLE"} as const;}
 }
+
+/** Owner-only, read-only AOS operational observation. No agent or AGNI claims. */
+export async function fetchOwnerAosHealth(){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_STAFF_VIEW_MODE!=="owner"||
+    process.env.VOX_INTELLIGENCE_VIEW_ENABLED!=="staging")
+   return {ok:false,status:503,error:"INTELLIGENCE_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const r=await fetch(base+"/api/vox/v1/aos-health",{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!r.ok)return {ok:false,status:r.status===403?403:503,error:"CORE_AOS_UNAVAILABLE"} as const;
+  const body:unknown=await r.json();
+  if(!body||typeof body!=="object"||!("ok" in body)||body.ok!==true||!("view" in body))
+   return {ok:false,status:503,error:"INVALID_AOS_SCHEMA"} as const;
+  const view=(body as {view:Record<string,unknown>}).view;
+  if(view.schema!=="qf.vox.aos.health.v1"||view.owner!=="quickfurno-core"||
+     view.scope!=="PLATFORM_OWNER_ONLY"||view.mode!=="READ_ONLY"||
+     view.actionsEnabled!==false||view.advisoryOnly!==true)
+   return {ok:false,status:503,error:"INVALID_AOS_SCHEMA"} as const;
+  const count=(x:unknown):number|null=>Number.isSafeInteger(x)&&typeof x==="number"&&x>=0&&x<=1e9?x:null;
+  const ready=view.observation==="READY";
+  return {ok:true,status:200,view:{
+   observation:ready?"READY":"UNAVAILABLE",runtime:view.runtime==="SHADOW"?"SHADOW":"OFF_OR_UNKNOWN",
+   agentCount:count(view.agentCount),operationalAgentCount:count(view.operationalAgentCount),
+   runs24h:ready?count(view.runs24h):null,
+   completed24h:ready?count(view.completed24h):null,
+   failed24h:ready?count(view.failed24h):null,
+   recommendations24h:ready?count(view.recommendations24h):null,
+   agni:"NOT_CONNECTED" as const,actionsEnabled:false as const,
+  }} as const;
+ }catch{return {ok:false,status:503,error:"CORE_AOS_UNAVAILABLE"} as const;}
+}

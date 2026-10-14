@@ -68,7 +68,8 @@ export async function POST(request:Request){
   const requestId=asUuid(data.requestId);
   const expectedRevision=data.expectedRevision;
   const reference=typeof data.reference==="string"?data.reference.trim():"";
-  if(!requestId||reference.length<8||reference.length>128)
+  if(reference.length<8||reference.length>128||
+     ((action==="review"||action==="activate")&&!requestId))
    return json({ok:false,error:"INVALID_REQUEST"},400);
   if(action==="review"){
    if(expectedRevision!==0||!["APPROVE","REJECT"].includes(String(data.decision)))
@@ -88,6 +89,20 @@ export async function POST(request:Request){
    if(error||!Array.isArray(result)||result.length!==1)
     return json({ok:false,error:"ACTIVATION_REJECTED_OR_STALE"},409);
    return json({ok:true,appliedKind:result[0].applied_kind,authorizedByCore:true},200);
+  }
+  if(action==="emergencyRevoke"){
+   const targetId=asUuid(data.targetProfileId);
+   const expectedTeamId=asUuid(data.expectedTeamId);
+   const incidentId=asUuid(data.incidentId);
+   if(!targetId||targetId===actor||!expectedTeamId||!incidentId)
+    return json({ok:false,error:"INVALID_INCIDENT"},400);
+   const {data:result,error}=await db.rpc("qf_vox_emergency_revoke_staff_v1",{
+    p_authenticated_owner_id:actor,p_target_id:targetId,
+    p_expected_team_id:expectedTeamId,p_unique_incident_id:incidentId,
+    p_incident_reference:reference});
+   if(error||!Array.isArray(result)||result.length!==1)
+    return json({ok:false,error:"REVOCATION_DENIED_OR_STALE"},409);
+   return json({ok:true,state:"REVOKED",revokedScopes:result[0].revoked_scopes},200);
   }
   return json({ok:false,error:"UNKNOWN_ACTION"},400);
  }catch{return json({ok:false,error:"UNAVAILABLE"},503);}

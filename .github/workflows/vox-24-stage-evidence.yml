@@ -1,0 +1,35 @@
+name: VOX-24 Signed Staging Evidence - Offline HOLD Gate
+on:
+  pull_request:
+    paths:
+      - 'scripts/release/vox-stage-evidence-preflight.mjs'
+      - 'scripts/release/vox24-source-pin-check.mjs'
+      - 'scripts/release/vox24-live-identity-matrix.mjs'
+      - 'docs/release/VOX-24-STAGING-READINESS.md'
+      - '.github/workflows/vox-24-stage-evidence.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  attestations-are-not-live-certification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24.18.0'
+      - name: Exercise valid synthetic two-role Ed25519 proof and fail-closed mutants
+        run: node scripts/release/vox-stage-evidence-preflight.mjs --self-test
+      - name: Refuse a changed Phase A Core head or seven-migration digest
+        run: node scripts/release/vox24-source-pin-check.mjs
+      - name: Exercise owner/staff/team-leader/vendor role matrix (synthetic only)
+        run: node scripts/release/vox24-live-identity-matrix.mjs --self-test
+      - name: Assert live stage and production authority remain OFF
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/release/vox-stage-evidence-preflight.mjs --status > status.json
+          node -e "const r=require('./status.json'); if(r.status!=='RELEASE_HOLD'||r.backupVerified!==false||r.stagingMigrationAuthorized!==false||r.productionPromotionAuthorized!==false)process.exit(1)"
+      - name: Do not publish or deploy
+        run: echo 'SOURCE_ONLY_TESTS_PASS; REAL_STAGING_RELEASE_HOLD; NO_MIGRATIONS_NO_PROVIDER_ACTIONS'

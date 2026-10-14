@@ -43,3 +43,14 @@ This change adds a small *verification-only* Node utility and synthetic CI cover
 The source-only CI now also reads the actual Core Phase A branch tip and hashes all seven SQL blobs via read-only Git access. A newer branch commit, changed migration bytes, missing source branch, or mismatched frozen SHA **fails the check** rather than silently approving a stale candidate. The other two remote-repository heads still require separate review.
 
 **No green CI result, positive operator attestation or check mark from VOX-24 is a staging or production go/no-go.** Human go/no-go remains separate. Unmerged release candidates must not be activated on staging until proven recovery and security clearance.
+
+
+## Phase A owner/staff/team-leader/vendor authenticated matrix — nonproduction testing
+
+The new `scripts/release/vox24-live-identity-matrix.mjs` is a **read-only GET-only** check for exactly ten allow/deny cases under the hardcoded HTTPS host `staging-core.quickfurno.in`. It tests owner-only overview, AAL2 staff and Team Leader scoped views, Team Leader-only review queue, and vendor/role denial. The check rejects HTTP 503 as proof of denial; feature-flagged route unavailability is **NOT** a successful authorization result. It cannot be invoked against production and cannot submit approvals, send WhatsApp, create users or mutate a database.
+
+CI calls `node scripts/release/vox24-live-identity-matrix.mjs --self-test`: **synthetic responses and fake role JWT shapes only**. This self-test is not genuine Supabase sign-in or role certification.
+
+An authorized isolated operator may later supply **four distinct already-created ephemeral AAL2 test JWTs** using process environment variables `VOX_PHASE_A_OWNER_JWT`, `VOX_PHASE_A_STAFF_JWT`, `VOX_PHASE_A_LEADER_JWT`, `VOX_PHASE_A_VENDOR_JWT`, then set `VOX_PHASE_A_REAL_STAGING_QA_APPROVED=YES_I_HAVE_TEST_ACCOUNTS` and invoke `node scripts/release/vox24-live-identity-matrix.mjs --live`. Keep tokens out of shell history, CI logs, GitHub, Notion and tickets. Vendor bearer may be AAL1 but must be a genuine least-privileged vendor identity; staff and owner/leader must be AAL2. Do not run `--live` until actual managed Staging recovery, separate role provisioning and required source/migrations are approved. A passing GET matrix is supplementary evidence, not privilege/RLS, rollback, or penetration-test certification.
+
+These checks do **not** bypass the Phase A P0 gates: independent staging backup/restore [#246](https://github.com/quickfurno-maker/quickfurno-marketplace/issues/246), security owner decision [#254](https://github.com/quickfurno-maker/quickfurno-marketplace/issues/254), and neutral staff onboarding [#256](https://github.com/quickfurno-maker/quickfurno-marketplace/issues/256).

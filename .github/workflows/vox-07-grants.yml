@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'supabase/migrations/*vox_v1_approved_grant_finalizer.sql'
+      - 'supabase/migrations/*vox_v1_staff_emergency_revocation.sql'
       - 'app/api/vox/v1/staff-grants/**'
       - 'scripts/mvp/vox/validate-vox-07-finalizer-source.mjs'
       - '.github/workflows/vox-07-grants.yml'

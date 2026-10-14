@@ -24,7 +24,7 @@ export async function POST(request:Request){
   const secret=String(enrolled.data.totp.secret??"");
   if(!/^data:image\/svg\+xml/.test(qr)||!/^[-A-Z2-7]{16,100}$/i.test(secret))
    return safeJson({ok:false,error:"ENROLLMENT_INVALID"},503);
-  // One-time secret returned ONLY to the verified same-origin owner browser.
+  // One-time secret returned ONLY to the eligible verified same-origin account.
   return safeJson({ok:true,factorId:enrolled.data.id,qrCode:qr,secret},200);
  }catch{return safeJson({ok:false,error:"ENROLLMENT_UNAVAILABLE"},503);}
 }

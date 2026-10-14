@@ -1,0 +1,24 @@
+name: VOX-19 Service Desk follow-up singleflight
+on:
+  pull_request:
+    paths:
+      - 'apps/vox-web/app/service-desk/components/SupportFollowup.tsx'
+      - 'scripts/mvp/vox/validate-vox19-support-singleflight.mjs'
+      - '.github/workflows/vox-19-support-singleflight.yml'
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  retry-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with: {node-version: '20.20.2'}
+      - run: |
+          node scripts/mvp/vox/validate-vox19-support-singleflight.mjs
+          node scripts/mvp/vox/validate-vox16e-task-retry.mjs
+      - run: |
+          cd apps/vox-web
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck

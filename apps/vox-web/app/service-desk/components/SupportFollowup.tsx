@@ -1,5 +1,5 @@
 "use client";
-import {useState} from "react";
+import {useRef,useState} from "react";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type Item={id:string;title:string};
 export function SupportFollowup({cases}: {cases:Item[]}){
@@ -7,14 +7,16 @@ export function SupportFollowup({cases}: {cases:Item[]}){
  const [threadId,setThreadId]=useState(options[0]?.id??"");
  const [priority,setPriority]=useState("medium");
  const [dueAt,setDueAt]=useState("");
- const [nonce,setNonce]=useState<string|null>(null);
+ const nonceRef=useRef<string|null>(null);
+ const busyRef=useRef(false);
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState("No vendor message will be sent.");
  async function submit(){
-  if(busy||!options.some(x=>x.id===threadId)||!dueAt)return;
+  if(busyRef.current||!options.some(x=>x.id===threadId)||!dueAt)return;
+  busyRef.current=true;
   setBusy(true);
-  const requestNonce=nonce??crypto.randomUUID();
-  setNonce(requestNonce);
+  const requestNonce=nonceRef.current??crypto.randomUUID();
+  nonceRef.current=requestNonce;
   try{
    const response=await fetch("/api/support-task",{method:"POST",credentials:"same-origin",
     headers:{"content-type":"application/json"},cache:"no-store",
@@ -27,20 +29,20 @@ export function SupportFollowup({cases}: {cases:Item[]}){
     setMessage("Invalid Core acknowledgement. No task confirmation.");return;
    }
    setMessage("Core confirmed internal support task. No reply was sent.");
-   setNonce(null);
+   nonceRef.current=null;
   }catch{setMessage("Network outcome unknown. Retry safely with the same request ID.");}
-  finally{setBusy(false);}
+  finally{busyRef.current=false;setBusy(false);}
  }
  if(!options.length)return null;
  return <section className="voxNotice" aria-label="Create internal case follow-up">
   <b>Internal Service Desk follow-up</b>
   <p>Creates a Core CRM task only. No WhatsApp, vendor-facing message, case closure or financial change.</p>
-  <label>Assigned case <select value={threadId} onChange={e=>{setThreadId(e.target.value);setNonce(null);}}>
+  <label>Assigned case <select disabled={busy} value={threadId} onChange={e=>{setThreadId(e.target.value);nonceRef.current=null;}}>
    {options.map(x=><option key={x.id} value={x.id}>{x.title}</option>)}</select></label>
-  <label>Priority <select value={priority} onChange={e=>{setPriority(e.target.value);setNonce(null);}}>
+  <label>Priority <select disabled={busy} value={priority} onChange={e=>{setPriority(e.target.value);nonceRef.current=null;}}>
    <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
   </select></label>
-  <label>Due date/time <input type="datetime-local" value={dueAt} onChange={e=>{setDueAt(e.target.value);setNonce(null);}}/></label>
+  <label>Due date/time <input disabled={busy} type="datetime-local" value={dueAt} onChange={e=>{setDueAt(e.target.value);nonceRef.current=null;}}/></label>
   <button type="button" disabled={busy||!dueAt} onClick={submit}>{busy?"Submitting":"Create internal task"}</button>
   <p role="status">{message}</p>
  </section>;

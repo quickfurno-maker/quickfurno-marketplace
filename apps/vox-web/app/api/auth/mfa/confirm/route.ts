@@ -14,7 +14,7 @@ export async function POST(request:Request){
   if(!UUID.test(factorId)||!/^[0-9]{6}$/.test(code))return safeJson({ok:false,error:"INVALID_CODE"},400);
   const auth=await staffAuth();
   const {data:{user},error}=await auth.auth.getUser();
-  if(error||!user||user.app_metadata?.admin_role!=="Superadmin"||!user.email_confirmed_at)
+  const owner=user?.app_metadata?.admin_role==="Superadmin";\n  const staff=user?.app_metadata?.qf_principal==="vox_staff"&&\n   user?.app_metadata?.admin_role==null&&\n   process.env.VOX_STAFF_MFA_ENROLL_ENABLED==="staging";\n  if(error||!user||!user.email_confirmed_at||(!owner&&!staff))
    return safeJson({ok:false,error:"UNAUTHORIZED"},401);
   const factors=await auth.auth.mfa.listFactors();
   if(factors.error||!factors.data?.all?.some(f=>f.id===factorId&&f.factor_type==="totp"&&f.status==="unverified"))

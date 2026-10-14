@@ -4,6 +4,7 @@ on:
     paths:
       - 'scripts/release/vox-stage-evidence-preflight.mjs'
       - 'scripts/release/vox24-source-pin-check.mjs'
+      - 'scripts/release/vox24-live-identity-matrix.mjs'
       - 'docs/release/VOX-24-STAGING-READINESS.md'
       - '.github/workflows/vox-24-stage-evidence.yml'
   workflow_dispatch:
@@ -22,6 +23,8 @@ jobs:
         run: node scripts/release/vox-stage-evidence-preflight.mjs --self-test
       - name: Refuse a changed Phase A Core head or seven-migration digest
         run: node scripts/release/vox24-source-pin-check.mjs
+      - name: Exercise owner/staff/team-leader/vendor role matrix (synthetic only)
+        run: node scripts/release/vox24-live-identity-matrix.mjs --self-test
       - name: Assert live stage and production authority remain OFF
         shell: bash
         run: |

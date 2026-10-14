@@ -28,3 +28,4 @@ jobs:
       - run: npm test
       - run: npm run typecheck
       - run: npm run build
+      - run: node scripts/smoke-standalone-origin-12b.mjs

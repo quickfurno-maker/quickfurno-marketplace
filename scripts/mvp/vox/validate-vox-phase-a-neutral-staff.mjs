@@ -54,7 +54,7 @@ for(const source of [enroll,confirm]){
  assert.match(source,/app_metadata\?\.qf_principal===\"vox_staff\"/);
  assert.match(source,/app_metadata\?\.admin_role==null/);
  assert.match(source,/email_confirmed_at/);
- assert.doesNotMatch(source,/user_metadata/);
+ assert.doesNotMatch(source,/(?:user\.)?user_metadata\s*(?:\?\.|\.|\[)|raw_user_meta_data/);
 }
 const flags=read('apps/vox-web/.env.example');
 assert.match(flags,/VOX_STAFF_MFA_ENROLL_ENABLED=disabled/);

@@ -6,12 +6,12 @@ import {createPublicKey,generateKeyPairSync,sign,verify} from 'node:crypto';
 import assert from 'node:assert/strict';
 
 export const RELEASE=Object.freeze({
-  core:'384d8e0cc066603a5400030afd0b64a1daa220fe',
+  core:'d8c3e1e1b8698873f652a459164214cb665ba235',
   jarvis:'1bbc916ccc095bd656b3bbcf373736a728037177',
   agni:'84c4a0f09d010045c40073824da112855a3ebb18'
 });
 export const STAGING_PROJECT='uckafzuochmbvtiodmcl';
-export const VOX_SEVEN_DIGEST='798b6b5182817807cabf5e6b5373960fca7f6f26ecb9896f43ec55dc2d7a0022';
+export const VOX_SEVEN_DIGEST='8fb8d1c4fce97fbac7282f1ad8647b584429f2e58950c4293a7784f4667d1eaa';
 const HEX64=/^[a-f0-9]{64}$/;
 const HEX40=/^[a-f0-9]{40}$/;
 const mandatory=(v,reason)=>{if(!v)throw Error('VOX24_'+reason);};

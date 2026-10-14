@@ -65,5 +65,22 @@ THEN 'PASS' ELSE 'FAIL' END;
 '@
  $proof=($checks|docker exec -i $name psql -X -A -t -U postgres -d postgres -v ON_ERROR_STOP=1)
  if($LASTEXITCODE -ne 0 -or ([string]$proof).Trim() -ne 'PASS'){throw ('VOX16_RLS_RPC_GRANTS_FAILED '+$proof)}
+ # Execute actual denied actions as both unprivileged database roles, not
+ # only metadata checks. No privileged RPC executes: revoke must fail first.
+ $denials=@(
+  @{role='anon';sql='SELECT * FROM public.vox_staff_memberships_v1 LIMIT 1;'},
+  @{role='authenticated';sql='SELECT * FROM public.vox_operational_intents_v1 LIMIT 1;'},
+  @{role='anon';sql="SELECT public.qf_vox_decide_operational_intent_v1(null::uuid,null::uuid,0,'approve');"},
+  @{role='authenticated';sql='SELECT public.qf_vox_execute_approved_aarohi_followup_v1(null::uuid,null::uuid,0);'}
+ )
+ foreach($case in $denials){
+  $previous=$ErrorActionPreference;$ErrorActionPreference='Continue'
+  try{$attempt=(("SET ROLE "+$case.role+"; "+$case.sql) | docker exec -i $name psql -X -q -U postgres -d postgres -v ON_ERROR_STOP=1 2>&1 | Out-String)}finally{$ErrorActionPreference=$previous}
+  if($LASTEXITCODE -eq 0 -or $attempt -notmatch '(?i)permission denied'){
+   throw ('VOX16E_RLS_ROLE_PROBE_UNEXPECTED_'+$case.role+' exit='+$LASTEXITCODE+' details='+([string]$attempt).Substring(0,[Math]::Min(([string]$attempt).Length,300)))
+  }
+ }
+ Write-Output 'VOX16E_PG17_ROLE_NEGATIVE_PASS attempted=4 role_anon=true role_authenticated=true no_business_effects=true'
+
  Write-Output 'VOX16_FULL_SEVEN_SQL_PG17_PASS migrations=7 rls=true anon_denied=true authenticated_denied=true definer_rpc_locked=true live_database_modified=false'
 }finally{if($cid){docker rm -f $name *> $null}}

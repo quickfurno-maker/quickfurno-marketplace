@@ -13,7 +13,7 @@
 
 - Core source and adversarial contracts: **343/343 PASS**.
 - Hardened launch-HOLD checks: **15/15 PASS**.
-- Disposable PostgreSQL 17: native task=1, native event=1, receipt=1, replay blocked and revoked staff scope denied.
+- Disposable PostgreSQL 17: native task=1, native event=1, receipt=1, replay blocked and revoked staff scope denied. Harness now waits for the official PostgreSQL init-complete marker and authenticated final-server SELECT 1, avoiding a temporary bootstrap-server readiness race. Local rerun PASS; exact Linux CI rerun required.
 - Combined Web guards: source scripts PASS (including generic 28/28, dual role 19/19, pinned Origin/Host 14/14, acquisition-specific 21/21); Web TypeScript and optimized Next build PASS.
 - Core TypeScript: PASS (local). Initial Linux TS7006 cross-platform failure corrected in explicit cookie writer typing; PR recheck required.
 - Next standalone live HTTP smoke on developer Windows: **NOT CERTIFIED** (local server readiness failure; failure may be Windows/test environment dependent). Linux GitHub CI checks actual HTTP response gates.

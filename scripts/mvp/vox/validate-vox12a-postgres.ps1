@@ -9,9 +9,24 @@ $cid=$null
 try{
  $cid=docker run --rm --network none -d --name $name -e POSTGRES_PASSWORD=synthetic_only_vox12 postgres:17-alpine
  if($LASTEXITCODE -ne 0){throw 'POSTGRES_START_FAIL'}
+ # postgres:17-alpine briefly starts a TEMPORARY bootstrap server before its
+ # final post-init restart. pg_isready may report ready too early; wait for
+ # the official init-complete marker AND an authenticated final-server query.
  $ready=$false
- for($i=0;$i -lt 30;$i++){docker exec $name pg_isready -U postgres *> $null;if($LASTEXITCODE -eq 0){$ready=$true;break};Start-Sleep -Seconds 1}
- if(-not $ready){throw 'POSTGRES_NOT_READY'}
+ for($i=0;$i -lt 60;$i++){
+  # Docker writes healthy Postgres startup messages to stderr; PowerShell 5
+  # must collect that native stream without treating each line as a PS error.
+  $previousPreference=$ErrorActionPreference
+  $ErrorActionPreference='Continue'
+  try{$logs=(docker logs $name 2>&1 | Out-String)}finally{$ErrorActionPreference=$previousPreference}
+  if($LASTEXITCODE -ne 0){throw 'POSTGRES_LOG_UNAVAILABLE'}
+  if($logs.Contains('PostgreSQL init process complete; ready for start up.')){
+   $probe=docker exec $name psql -X -q -A -t -v ON_ERROR_STOP=1 -U postgres -d postgres -c 'SELECT 1;'
+   if($LASTEXITCODE -eq 0 -and ([string]$probe).Trim() -eq '1'){$ready=$true;break}
+  }
+  Start-Sleep -Seconds 1
+ }
+ if(-not $ready){throw 'POSTGRES_FINAL_SERVER_NOT_READY'}
  $parts[0] | docker exec -i $name psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres
  if($LASTEXITCODE -ne 0){throw 'BOOTSTRAP_FAIL'}
  # Native Aarohi tables used in production are defined by an existing acquisition CRM migration.

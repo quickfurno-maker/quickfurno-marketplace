@@ -51,7 +51,8 @@ for(const route of [...ownerRoutes,...staffRoutes]){
  }
 }
 assert.doesNotMatch(read("app/api/vox/v1/staff-grants/route.ts"),/process\.env\.SUPABASE_SERVICE_ROLE_KEY/);
-assert.match(read("services/vox/verifiedStaffBearer.ts"),/auth\.getUser\(token\)/);
+assert.match(read("services/vox/verifiedStaffBearer.ts"),/verifySupabaseBearerUser\(token\)/);
+assert.match(read("lib/supabase.ts"),/auth\.auth\.getUser\(token\)/);
 assert.match(read("supabase/migrations/20261014050000_vox_v1_team_leader_review_policy.sql"),/VOX_TEAM_LEADER_ESCALATION_DENIED/);
 assert.match(read("contracts/vox/aosHealth.mjs"),/AGNI|agni:"NOT_CONNECTED"/i);
 console.log("VOX11_QA_SOURCE_AND_RELEASE_HOLD_PASS "+count+"/343; releaseStatus=HOLD");

@@ -1,6 +1,5 @@
 import "server-only";
-import {createClient} from "@supabase/supabase-js";
-import {adminClient} from "@/lib/supabase";
+import {adminClient,verifySupabaseBearerUser} from "@/lib/supabase";
 const JWT=/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 function headerBearer(value:string|null):string|null {
  if(!value || !value.startsWith("Bearer ")) return null;
@@ -22,13 +21,9 @@ function aal2ClaimMatches(token:string,userId:string):boolean {
 export async function verifyVoxOwnerBearer(authorization:string|null):Promise<string|null>{
  const token=headerBearer(authorization);
  if(!token) return null;
- const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
- const key=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
- if(!url||!key) return null;
- const auth=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
- // NEVER trust JWT metadata or client-provided roles without this remote verification.
- const {data:{user},error}=await auth.auth.getUser(token);
- if(error||!user||!aal2ClaimMatches(token,user.id)) return null;
+ // NEVER trust JWT metadata or client-provided roles without remote Auth verification.
+ const user=await verifySupabaseBearerUser(token);
+ if(!user||!aal2ClaimMatches(token,user.id)) return null;
  const profile=await adminClient().from("profiles").select("role,is_active").eq("id",user.id).maybeSingle();
  if(profile.error||profile.data?.role!=="admin"||profile.data?.is_active!==true) return null;
  if(user.app_metadata?.admin_role!=="Superadmin") return null;

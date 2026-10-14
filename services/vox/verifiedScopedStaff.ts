@@ -1,17 +1,12 @@
 import "server-only";
-import {createClient} from "@supabase/supabase-js";
-import {adminClient} from "@/lib/supabase";
+import {adminClient,verifySupabaseBearerUser} from "@/lib/supabase";
 import {resolveScopedStaff, type ScopedVoxContext} from "@/contracts/vox/scopedStaff.mjs";
 const JWT=/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 export async function getVerifiedScopedStaff(header:string|null):Promise<ScopedVoxContext|null>{
  const raw=header?.startsWith("Bearer ")?header.slice(7):"";
  if(!raw||raw.length<100||raw.length>8192||!JWT.test(raw))return null;
- const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
- const key=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
- if(!url||!key)return null;
- const auth=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
- const {data:{user},error}=await auth.auth.getUser(raw);
- if(error||!user)return null;
+ const user=await verifySupabaseBearerUser(raw);
+ if(!user)return null;
  // JWT is used only AFTER real Supabase Auth confirms this exact identity.
  try{
   const jwt=JSON.parse(Buffer.from(raw.split(".")[1],"base64url").toString("utf8"));

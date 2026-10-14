@@ -11,7 +11,7 @@ test("support messages not leaked",()=>{const out=projectVoxOverview({prospects:
 test("no direct action authority",()=>assert.equal(projectVoxOverview({}).actionsEnabled,false));
 test("Core only source",()=>assert.equal(projectVoxOverview({}).source,"quickfurno-core"));
 test("nonhuman desk remains unknown",()=>{const out=projectVoxOverview({humanConversations:[{id:uuid,subject_type:"vendor",state:"AI",revision:3}]});assert.equal(out.humanDeskPreview[0].state,"UNKNOWN")});
-test("Core bearer uses Auth getUser",()=>assert.match(read("services/vox/verifiedStaffBearer.ts"),/auth\.auth\.getUser\(token\)/));
+test("Core bearer uses remote Auth via portable boundary",()=>{const service=read("services/vox/verifiedStaffBearer.ts"),boundary=read("lib/supabase.ts");assert.match(service,/verifySupabaseBearerUser\(token\)/);assert.match(boundary,/auth\.auth\.getUser\(token\)/);assert.doesNotMatch(service,/@supabase\/supabase-js/);});
 test("Core bearer enforces aal2",()=>assert.match(read("services/vox/verifiedStaffBearer.ts"),/data\.aal==="aal2"/));
 test("Core active admin and superadmin checked",()=>assert.match(read("services/vox/verifiedStaffBearer.ts"),/admin_role!=="Superadmin"/));
 test("service role isolated server-side",()=>assert.match(read("services/vox/verifiedStaffBearer.ts"),/import "server-only"/));

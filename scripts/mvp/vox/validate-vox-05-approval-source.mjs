@@ -1,0 +1,21 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {resolve} from "node:path";
+const sql=readFileSync(resolve(import.meta.dirname,"../../../supabase/migrations/20261014020000_vox_v1_staff_review_workflow.sql"),"utf8");
+let n=0;function test(label,fn){fn();n++;console.log("PASS "+label);}
+test("review requests require unique nonce",()=>assert.match(sql,/request_nonce uuid not null unique/));
+test("new review pending by default",()=>assert.match(sql,/state text not null default 'PENDING'/));
+test("one decision per request",()=>assert.match(sql,/request_id uuid not null unique references/));
+test("distinct reviewer and requester",()=>assert.match(sql,/p_reviewer_profile_id in \(v_request\.requested_by,v_request\.target_profile_id\)/));
+test("trusted Supabase Superadmin app metadata",()=>assert.match(sql,/raw_app_meta_data->>'admin_role'\)='Superadmin'/));
+test("reviewer active profile required",()=>assert.match(sql,/p\.is_active=true/));
+test("revision optimistic fence and row lock",()=>{assert.match(sql,/for update;/);assert.match(sql,/v_request\.revision<>p_expected_revision/);});
+test("request expiry checked",()=>assert.match(sql,/v_request\.desired_expires_at <= now\(\)/));
+test("no membership grant executor",()=>assert.doesNotMatch(sql,/insert into public\.vox_staff_memberships_v1|update public\.vox_staff_memberships_v1|insert into public\.vox_staff_object_scopes_v1/));
+test("review audit immutable to service role",()=>assert.match(sql,/grant select,insert on public\.vox_staff_access_decisions_v1 to service_role/));
+test("request and decisions forced RLS",()=>assert.equal((sql.match(/force row level security/g)||[]).length,2));
+test("direct browser roles revoked",()=>assert.match(sql,/revoke all on function public\.qf_vox_review_staff_access_v1/));
+test("SQL function available only to service role",()=>assert.match(sql,/grant execute on function public\.qf_vox_review_staff_access_v1/));
+test("function does not accept browser actor claim",()=>assert.match(sql,/A real authenticated Core service must derive reviewer identity/));
+test("review status constrained",()=>assert.match(sql,/state in \('PENDING','APPROVED','REJECTED'\)/));
+console.log("VOX_05_STAFF_APPROVAL_SOURCE_PASS "+n+"/15");

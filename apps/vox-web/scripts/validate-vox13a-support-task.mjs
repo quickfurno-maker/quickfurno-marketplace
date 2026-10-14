@@ -1,0 +1,26 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {resolve} from "node:path";
+const root=resolve(import.meta.dirname,".."),read=f=>readFileSync(resolve(root,f),"utf8");
+const api=read("app/api/support-task/route.ts");
+const core=read("lib/core.ts");
+const view=read("app/service-desk/page.tsx");
+const form=read("app/service-desk/components/SupportFollowup.tsx");
+let n=0;function t(name,fn){fn();console.log("PASS",name);n++;}
+t("own UI OFF",()=>assert.match(core,/VOX_SUPPORT_TASK_UI_ENABLED!=="staging"/));
+t("server rendered UI OFF",()=>assert.match(view,/VOX_SUPPORT_TASK_UI_ENABLED==="staging"/));
+t("AAL2 cookie exchange",()=>assert.match(core,/submitScopedSupportTask[\s\S]*verifiedMfaSession\(\)/));
+t("Core only HTTPS origin",()=>assert.match(core,/const base=origin\(\)/));
+t("independent Core route",()=>assert.match(core,/api\/vox\/v1\/support-task/));
+t("task receipt strict",()=>assert.match(core,/INTERNAL_SUPPORT_TASK_ONLY/));
+t("provider count zero",()=>assert.match(core,/providerMessagesSent!==0/));
+t("browser origin checked",()=>assert.match(api,/allowedOrigin\(request\)/));
+t("no free text message",()=>assert.doesNotMatch(form,/message:|sendWhatsApp|vendorId:/));
+t("payload bounded and allowlisted",()=>assert.match(api,/raw.length>320/));
+t("reject unexpected keys",()=>assert.match(api,/Object.keys\(v\).some/));
+t("retry stable nonce",()=>assert.match(form,/nonce\?\?crypto.randomUUID\(\)/));
+t("UI suppresses no cases",()=>assert.match(form,/if\(!options.length\)return null/));
+t("no optimistic success",()=>assert.match(form,/if\(!response.ok/));
+t("same-origin browser only",()=>assert.match(form,/fetch\("\/api\/support-task"/));
+t("POST only",()=>assert.equal((api.match(/METHOD_NOT_ALLOWED/g)||[]).length,3));
+console.log("VOX13A_WEB_INTERNAL_SUPPORT_TASK_PASS "+n+"/"+n);

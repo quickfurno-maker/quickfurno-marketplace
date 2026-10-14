@@ -125,3 +125,98 @@ export async function fetchScopedCrm(kind:"acquisition"|"vendor360"){
   return {ok:true,status:200,kind:key,view:{vendors,crm,tasks}} as const;
  }catch{return {ok:false,status:503,error:"CORE_CRM_UNAVAILABLE"} as const;}
 }
+
+/** Owner-only, read-only AOS operational observation. No agent or AGNI claims. */
+export async function fetchOwnerAosHealth(){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_STAFF_VIEW_MODE!=="owner"||
+    process.env.VOX_INTELLIGENCE_VIEW_ENABLED!=="staging")
+   return {ok:false,status:503,error:"INTELLIGENCE_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const r=await fetch(base+"/api/vox/v1/aos-health",{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!r.ok)return {ok:false,status:r.status===403?403:503,error:"CORE_AOS_UNAVAILABLE"} as const;
+  const body:unknown=await r.json();
+  if(!body||typeof body!=="object"||!("ok" in body)||body.ok!==true||!("view" in body))
+   return {ok:false,status:503,error:"INVALID_AOS_SCHEMA"} as const;
+  const view=(body as {view:Record<string,unknown>}).view;
+  if(view.schema!=="qf.vox.aos.health.v1"||view.owner!=="quickfurno-core"||
+     view.scope!=="PLATFORM_OWNER_ONLY"||view.mode!=="READ_ONLY"||
+     view.actionsEnabled!==false||view.advisoryOnly!==true)
+   return {ok:false,status:503,error:"INVALID_AOS_SCHEMA"} as const;
+  const count=(x:unknown):number|null=>Number.isSafeInteger(x)&&typeof x==="number"&&x>=0&&x<=1e9?x:null;
+  const ready=view.observation==="READY";
+  return {ok:true,status:200,view:{
+   observation:ready?"READY":"UNAVAILABLE",runtime:view.runtime==="SHADOW"?"SHADOW":"OFF_OR_UNKNOWN",
+   agentCount:count(view.agentCount),operationalAgentCount:count(view.operationalAgentCount),
+   runs24h:ready?count(view.runs24h):null,
+   completed24h:ready?count(view.completed24h):null,
+   failed24h:ready?count(view.failed24h):null,
+   recommendations24h:ready?count(view.recommendations24h):null,
+   agni:"NOT_CONNECTED" as const,actionsEnabled:false as const,
+  }} as const;
+ }catch{return {ok:false,status:503,error:"CORE_AOS_UNAVAILABLE"} as const;}
+}
+
+/** Staff access-review queue and single-use decision via existing Core RPC. */
+export async function fetchTeamLeaderReviewQueue(){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_STAFF_VIEW_MODE!=="scoped"||
+    process.env.VOX_STAFF_REVIEW_WEB_ENABLED!=="staging")
+   return {ok:false,status:503,error:"REVIEW_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const response=await fetch(base+"/api/vox/v1/staff-review-queue",{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!response.ok)return {ok:false,status:response.status===403?403:503,error:"NOT_TEAM_LEADER_OR_UNAVAILABLE"} as const;
+  const payload:unknown=await response.json();
+  if(!payload||typeof payload!=="object"||!("ok" in payload)||payload.ok!==true||!("schema" in payload)||
+     payload.schema!=="qf.vox.staff.review.queue.v1"||!("pending" in payload)||!Array.isArray(payload.pending)||
+     payload.pending.length>16||!("mode" in payload)||payload.mode!=="READ_ONLY")
+   return {ok:false,status:503,error:"INVALID_REVIEW_SCHEMA"} as const;
+  const safe=payload.pending.map((x:unknown)=>{
+   const p=x&&typeof x==="object"?x as Record<string,unknown>:{};
+   return {requestId:uid(p.requestId),targetId:uid(p.targetId),
+    kind:p.kind==="STAFF_MEMBERSHIP"?"STAFF_MEMBERSHIP":p.kind==="OBJECT_SCOPE"?"OBJECT_SCOPE":"UNKNOWN",
+    role:typeof p.role==="string"?safeLabel(p.role,40):null,
+    scopeKind:typeof p.scopeKind==="string"?safeLabel(p.scopeKind,40):null,
+    expiresAt:typeof p.expiresAt==="string"?p.expiresAt:null,
+    revision:p.revision===0?0:-1,state:"PENDING" as const};
+  });
+  if(safe.some(x=>!x.requestId||!x.targetId||x.revision!==0||x.kind==="UNKNOWN"))
+   return {ok:false,status:503,error:"INVALID_REVIEW_SCHEMA"} as const;
+  return {ok:true,status:200,pending:safe} as const;
+ }catch{return {ok:false,status:503,error:"REVIEW_QUEUE_UNAVAILABLE"} as const;}
+}
+export async function submitTeamLeaderReview(requestId:string,decision:"APPROVE"|"REJECT",reference:string){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_STAFF_VIEW_MODE!=="scoped"||
+    process.env.VOX_STAFF_REVIEW_WEB_ENABLED!=="staging")
+   return {ok:false,status:503,error:"REVIEW_DISABLED"} as const;
+ if(!uid(requestId)||!["APPROVE","REJECT"].includes(decision)||reference.length<8||reference.length>128)
+  return {ok:false,status:400,error:"INVALID_REVIEW"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const response=await fetch(base+"/api/vox/v1/staff-grants",{
+   method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+   body:JSON.stringify({action:"review",requestId,decision,expectedRevision:0,reference}),
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!response.ok)return {ok:false,status:response.status===409?409:503,error:"REVIEW_REJECTED_OR_STALE"} as const;
+  const data:unknown=await response.json();
+  if(!data||typeof data!=="object"||!("ok" in data)||data.ok!==true||
+     !("state" in data)||data.state!==(decision==="APPROVE"?"APPROVED":"REJECTED")||
+     !("revision" in data)||data.revision!==1)
+   return {ok:false,status:503,error:"INVALID_REVIEW_ACK"} as const;
+  return {ok:true,status:200,state:decision==="APPROVE"?"APPROVED":"REJECTED",
+   note:"Reviewed only. Owner activation remains separately required."} as const;
+ }catch{return {ok:false,status:503,error:"REVIEW_UNAVAILABLE"} as const;}
+}

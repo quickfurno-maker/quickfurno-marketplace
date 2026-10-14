@@ -462,3 +462,28 @@ export async function proposeAarohiInternalFollowup(input:{targetId:string;nonce
    state:"PENDING" as const,execution:"NOT_AUTHORIZED" as const} as const;
  }catch{return {ok:false,status:503,error:"PROPOSAL_UNAVAILABLE"} as const;}
 }
+
+/** Scoped internal support task; never forwards message text, provider actions, or a vendor ID. */
+export async function submitScopedSupportTask(input:{threadId:string;nonce:string;priority:string;dueAt:string}){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+  (process.env.VOX_STAFF_VIEW_MODE!=="scoped"&&process.env.VOX_STAFF_VIEW_MODE!=="dual")||
+  process.env.VOX_SUPPORT_TASK_UI_ENABLED!=="staging")
+  return {ok:false,status:503,error:"SUPPORT_TASK_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const r=await fetch(base+"/api/vox/v1/support-task",{method:"POST",
+   headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+   body:JSON.stringify(input),cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!r.ok)return {ok:false,status:r.status===403?403:r.status===400?400:503,error:"CORE_SUPPORT_TASK_DENIED"} as const;
+  const data:unknown=await r.json();
+  if(!data||typeof data!=="object"||!("ok" in data)||data.ok!==true||
+   !("taskId" in data)||!uid(data.taskId)||
+   !("threadId" in data)||data.threadId!==input.threadId||
+   !("effect" in data)||data.effect!=="INTERNAL_SUPPORT_TASK_ONLY"||
+   !("providerMessagesSent" in data)||data.providerMessagesSent!==0)
+   return {ok:false,status:503,error:"INVALID_NATIVE_TASK_RECEIPT"} as const;
+  return {ok:true,status:201,taskId:data.taskId,effect:"INTERNAL_SUPPORT_TASK_ONLY" as const} as const;
+ }catch{return {ok:false,status:503,error:"CORE_SUPPORT_TASK_UNAVAILABLE"} as const;}
+}

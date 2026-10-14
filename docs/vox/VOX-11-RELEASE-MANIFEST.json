@@ -1,0 +1,20 @@
+{
+  "schema": "qf.vox.release-gates.v1",
+  "releaseStatus": "HOLD",
+  "scope": "Source-only and isolated synthetic PostgreSQL certification, not signed Staging",
+  "criticalGates": {
+    "reviewedStackedPrMerge": false,
+    "stagingBackupAndRestoreVerified": false,
+    "orderedStagingMigrationsCertified": false,
+    "genuineOwnerAndTeamLeaderAal2Http": false,
+    "realStaffCityVendorIdorNegativeTests": false,
+    "coreApprovedCrmAndHumanOutboxActions": false,
+    "jarvisDurableReplayRuntime": false,
+    "agniSignedPrivateAdapter": false,
+    "signedIsolatedStagingContainer": false,
+    "privateOriginRateAndWafCertified": false,
+    "soakAndRollbackCertified": false,
+    "publicDomainActivationApproved": false
+  },
+  "notes": "Every false value is a deliberately incomplete release gate. Do not flip true from unit tests or source CI. Provider sends and production database actions remain disabled."
+}

@@ -38,11 +38,13 @@ create table public.vox_staff_department_activations_v1(
 insert into public.profiles values
  ('00000000-0000-4000-8000-000000000001',null,true),
  ('00000000-0000-4000-8000-000000000002','admin',true),
- ('00000000-0000-4000-8000-000000000003',null,true);
+ ('00000000-0000-4000-8000-000000000003',null,true),
+ ('00000000-0000-4000-8000-000000000004',null,true);
 insert into auth.users values
  ('00000000-0000-4000-8000-000000000001','{"qf_principal":"vox_staff"}'),
  ('00000000-0000-4000-8000-000000000002','{"admin_role":"Superadmin"}'),
- ('00000000-0000-4000-8000-000000000003','{"qf_principal":"vox_staff"}');
+ ('00000000-0000-4000-8000-000000000003','{"qf_principal":"vox_staff","vox_role":"team_leader"}'),
+ ('00000000-0000-4000-8000-000000000004','{"qf_principal":"vox_staff"}');
 insert into public.cities values
  ('00000000-0000-4000-8000-000000000101',true),
  ('00000000-0000-4000-8000-000000000102',true);
@@ -51,7 +53,8 @@ insert into public.vox_staff_teams_v1 values
  ('00000000-0000-4000-8000-000000000202','00000000-0000-4000-8000-000000000102',true);
 insert into public.vox_staff_memberships_v1 values
  ('00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000201','acquisition_agent',true,null,now()+interval '7 days'),
- ('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000202','support_agent',true,null,now()+interval '7 days');
+ ('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000201','team_leader',true,null,now()+interval '7 days'),
+ ('00000000-0000-4000-8000-000000000004','00000000-0000-4000-8000-000000000202','support_agent',true,null,now()+interval '7 days');
 insert into public.vox_staff_object_scopes_v1 values
  ('00000000-0000-4000-8000-000000000001','prospect','00000000-0000-4000-8000-000000000301',now()+interval '7 days',null);
 insert into public.vox_staff_department_requests_v1 values

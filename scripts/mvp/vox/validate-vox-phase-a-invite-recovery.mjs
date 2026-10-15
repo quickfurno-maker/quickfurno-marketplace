@@ -4,14 +4,14 @@ const id=(x)=>'00000000-0000-4000-8000-'+String(x).padStart(12,'0');
 const now=Date.now(),email='example.staff@example.invalid';
 const owner={id:id(1),profileRole:'admin',adminRole:'Superadmin',verifiedByCore:true,aal:'aal2',isActive:true};
 const review={id:id(2),role:'team_leader',teamId:id(3),verifiedByCore:true,aal:'aal2',isActive:true,
- decision:'APPROVED',requestNonce:id(4),targetEmailSha256:'f'.repeat(64)};
+ decision:'APPROVED',signedCoreReceiptVerified:true,requestNonce:id(4),targetEmailSha256:'f'.repeat(64)};
 const team={id:id(3),cityId:id(5),isActive:true};
 const request={nonce:id(4),email,emailSha256:'f'.repeat(64),staffRole:'support_agent',
  expiresAtMs:now+86400000,existingUser:false,existingCoreAdmin:false,
  targetHasVendorAccount:false,userMetadataAuthority:false};
 const input={environment:'staging',authorizedOwner:owner,team,request,review,nowMs:now};
 const recovery={environment:'staging',authorizedOwner:owner,incidentId:id(6),
- review:{id:id(7),verifiedByCore:true,aal:'aal2',decision:'APPROVED',targetId:id(8),incidentId:id(6)},
+ review:{id:id(7),verifiedByCore:true,aal:'aal2',decision:'APPROVED',signedCoreReceiptVerified:true,targetId:id(8),incidentId:id(6)},
  subject:{id:id(8),profileRole:null,qfPrincipal:'vox_staff',adminRole:null,membershipActive:false,
  allScopesRevoked:true,sessionsRevoked:true,recoveryAuditWritten:true}};
 let positive=0,negative=0;
@@ -41,7 +41,8 @@ for(const [name,change] of [
  ['expired lease',{request:{...request,expiresAtMs:now-10}}],
  ['long lease',{request:{...request,expiresAtMs:now+40*86400000}}],
  ['bad address',{request:{...request,email:'not an email'}}],
- ['unverified reviewer',{review:{...review,verifiedByCore:false}}]
+ ['unverified reviewer',{review:{...review,verifiedByCore:false}}],
+ ['forged reviewer decision',{review:{...review,signedCoreReceiptVerified:false}}]
 ])no(name,{...input,...change},prepareStaffInvitation);
 for(const [name,change] of [
  ['production',{environment:'production'}],
@@ -50,6 +51,7 @@ for(const [name,change] of [
  ['target reviewer',{review:{...recovery.review,id:id(8)}}],
  ['wrong incident',{review:{...recovery.review,incidentId:id(10)}}],
  ['unreviewed',{review:{...recovery.review,decision:'PENDING'}}],
+ ['unverified recovery receipt',{review:{...recovery.review,signedCoreReceiptVerified:false}}],
  ['non-neutral staff',{subject:{...recovery.subject,profileRole:'admin'}}],
  ['vendor identity',{subject:{...recovery.subject,qfPrincipal:'vendor'}}],
  ['active staff',{subject:{...recovery.subject,membershipActive:true}}],

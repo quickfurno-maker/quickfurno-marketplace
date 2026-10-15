@@ -55,11 +55,27 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          pg_dump -Fc --no-owner -f /tmp/vox05-offline-synthetic.dump vox05_synthetic
-          test -s /tmp/vox05-offline-synthetic.dump
-          sha256sum /tmp/vox05-offline-synthetic.dump | tee /tmp/vox05-offline-synthetic.sha256
-          pg_restore --list /tmp/vox05-offline-synthetic.dump > /tmp/vox05-offline-contents.txt
+          # GitHub Ubuntu's host pg_dump may be older than our PG17 server.
+          # Pin dump and restore CLIENTS to exact PostgreSQL 17 image, too.
+          mkdir -p "$RUNNER_TEMP/vox05-rehearsal"
+          chmod 700 "$RUNNER_TEMP/vox05-rehearsal"
+          docker run --rm --network host \
+            -e PGHOST=127.0.0.1 -e PGPORT=5432 -e PGUSER=postgres \
+            -e PGPASSWORD=synthetic_fixture_only \
+            -v "$RUNNER_TEMP/vox05-rehearsal:/out" postgres:17 \
+            pg_dump --no-owner -Fc -f /out/vox05-offline-synthetic.dump vox05_synthetic
+          test -s "$RUNNER_TEMP/vox05-rehearsal/vox05-offline-synthetic.dump"
+          sha256sum "$RUNNER_TEMP/vox05-rehearsal/vox05-offline-synthetic.dump" \
+            | tee "$RUNNER_TEMP/vox05-rehearsal/vox05-offline-synthetic.sha256"
+          docker run --rm --network host \
+            -v "$RUNNER_TEMP/vox05-rehearsal:/out" postgres:17 \
+            pg_restore --list /out/vox05-offline-synthetic.dump \
+            > "$RUNNER_TEMP/vox05-rehearsal/archive-list.txt"
           createdb vox05_restored
-          pg_restore --no-owner --exit-on-error -d vox05_restored /tmp/vox05-offline-synthetic.dump
+          docker run --rm --network host \
+            -e PGHOST=127.0.0.1 -e PGPORT=5432 -e PGUSER=postgres \
+            -e PGPASSWORD=synthetic_fixture_only \
+            -v "$RUNNER_TEMP/vox05-rehearsal:/out" postgres:17 \
+            pg_restore --no-owner --exit-on-error -d vox05_restored /out/vox05-offline-synthetic.dump
           PGDATABASE=vox05_restored psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to05a-restored-state-assertions.sql
           echo 'VOX05A_DISPOSABLE_COMBINED_SQL_BACKUP_RESTORE_PASS_NOT_SUPABASE_STAGING'

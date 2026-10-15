@@ -5,7 +5,7 @@ on:
       - 'contracts/vox/neutralStaffPrincipal.*'
       - 'services/vox/verifiedScopedStaff.ts'
       - 'app/api/vox/v1/staff-grants/route.ts'
-      - 'supabase/migrations/202610140*vox*.sql'
+      - 'ops/vox/quarantined-migrations/legacy-20261014/202610140*vox*.sql'
       - 'apps/vox-web/app/api/auth/mfa/**'
       - 'apps/vox-web/.env.example'
       - 'apps/vox-web/scripts/validate-auth-gates.mjs'

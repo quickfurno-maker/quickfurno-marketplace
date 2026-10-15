@@ -39,7 +39,7 @@ export async function POST(request:Request){
    return send({ok:false,error:"INVALID_BODY"},400);
   const data=parsed as Record<string,unknown>;
   const action=data.action;
-  if(typeof action!=="string"||!Object.hasOwn(ALLOWED,action))
+  if(typeof action!=="string"||!Object.prototype.hasOwnProperty.call(ALLOWED,action))
    return send({ok:false,error:"UNKNOWN_ACTION"},400);
   const keys=Object.keys(data).sort();
   if(keys.join("|")!==[...ALLOWED[action]].sort().join("|"))

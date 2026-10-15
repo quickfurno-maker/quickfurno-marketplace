@@ -40,7 +40,7 @@ begin
  -- a corrupted request row is relabelled to another owner between review
  -- and activation. Test ONLY in disposable synthetic PG17.
  update public.vox_staff_department_requests_v1
-  set requested_by='00000000-0000-4000-8000-000000000099'
+  set requested_by='00000000-0000-4000-8000-000000000003'
   where id=v_request;
  begin
   perform public.qf_vox_department_activate_v1(

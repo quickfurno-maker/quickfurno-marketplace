@@ -1,0 +1,33 @@
+name: VOX Phase A Recovery and Cross-Repo Integration
+on:
+  pull_request:
+    paths:
+      - 'scripts/release/vox-phase-a-restore-parity.mjs'
+      - 'scripts/release/vox-phase-a-crossrepo-contract.mjs'
+      - 'ops/vox/phase-a-live-staging-migrations-baseline-20261015.json'
+      - 'docs/release/VOX-PHASE-A-RECOVERY-INTEGRATION.md'
+      - '.github/workflows/vox-phase-a-integration.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recovery-parity-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24.18.0'
+      - run: node scripts/release/vox-phase-a-restore-parity.mjs --self-test
+      - run: echo 'SYNTHETIC_ONLY; ACTUAL_ARCHIVE_RESTORE_NOT_VERIFIED; RELEASE_HOLD'
+  core-jarvis-agni-contract-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24.18.0'
+      - run: node scripts/release/vox-phase-a-crossrepo-contract.mjs
+      - run: echo 'EXACT_HEAD_SOURCE_ONLY; NO_STAGING_OR_PRODUCTION_ACTION; RELEASE_HOLD'

@@ -126,6 +126,7 @@ begin
  select * into r from public.vox_staff_department_requests_v1
  where id=p_request for update;
  if not found or r.state<>'APPROVED' or r.revision<>1
+  or r.requested_by<>p_owner
   or r.decided_by is null or r.decided_by=p_owner
   or r.target_staff_id=p_owner or r.expires_at<=now()
  then raise exception 'VOX_DEPT_ACTIVATION_STALE' using errcode='P0001'; end if;

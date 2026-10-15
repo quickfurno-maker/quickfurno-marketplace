@@ -19,7 +19,7 @@ export function prepareStaffInvitation(input){
  if(!request||!review||!team||team.isActive!==true||
     !UUID.test(team.id)||!UUID.test(team.cityId))return deny('TEAM_OR_REVIEW_UNAVAILABLE');
  if(!leader(review,team.id)||review.id===admin.id)return deny('INDEPENDENT_TEAM_LEADER_REVIEW_REQUIRED');
- if(review.decision!=='APPROVED'||review.requestNonce!==request.nonce||
+ if(review.signedCoreReceiptVerified!==true||review.decision!=='APPROVED'||review.requestNonce!==request.nonce||
     !UUID.test(String(request.nonce??''))||review.targetEmailSha256!==request.emailSha256)
    return deny('REVIEW_RECEIPT_MISMATCH');
  if(typeof request.email!=='string'||request.email.length>254||
@@ -44,7 +44,7 @@ export function prepareStaffMfaRecovery(input){
  if(!subject||!UUID.test(subject.id)||!UUID.test(incidentId)||
    subject.profileRole!==null||subject.qfPrincipal!=='vox_staff'||
    subject.adminRole!=null)return deny('NEUTRAL_STAFF_REQUIRED');
- if(!review||review.verifiedByCore!==true||review.aal!=='aal2'||
+ if(!review||review.verifiedByCore!==true||review.signedCoreReceiptVerified!==true||review.aal!=='aal2'||
    review.decision!=='APPROVED'||!UUID.test(review.id)||
    review.id===admin.id||review.id===subject.id||
    review.targetId!==subject.id||review.incidentId!==incidentId)

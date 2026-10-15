@@ -47,5 +47,6 @@ export default async function TeamOperations(){
   ...project("Support",view.supportPreview,"threadId","status"),
   ...project("Human desk",view.humanDeskPreview,"conversationId","state")
  ].slice(0,32);
- return <TeamBoard rows={rows}/>;
+ const adminSetup=await fetchAdminStaffCapabilityCatalog();
+ return <TeamBoard rows={rows} adminStaffSetupAvailable={adminSetup.ok}/>;
 }

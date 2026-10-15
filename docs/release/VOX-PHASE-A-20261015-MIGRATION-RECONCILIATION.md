@@ -29,7 +29,7 @@ Compared all **86** exact applied staging versions to repository migration filen
 |---|---:|---|
 | Exact version AND name in repository | 55 | Source candidate exists; contents must still be independently reviewed |
 | Same migration name, different version | 25 | **NOT proven equivalent SQL**; never mark applied automatically |
-| Applied Staging migration has no exact-name SQL file | 6 | Missing authoritative source/replay or baseline material |
+| Applied Staging migration has no exact-name SQL file | 6 | **Applied SQL now recovered into restricted owner-only evidence**; no exact versioned file is present in repository; replay remains uncertified |
 | Same version with different name | 0 | No such collision found |
 
 The **six missing by exact name** are:
@@ -41,7 +41,7 @@ The **six missing by exact name** are:
 5. `20261013053959_vl05_scale_phase12_horizontal_worker_claims_staging`
 6. `20261013144901_vendor_profile_approval_atomic_v3_staging_20261013`
 
-**Do not synthesize, retimestamp, or 'repair' live migration ledgers.**
+**15 Oct source recovery update:** All six staging-specific applied SQL bodies were recovered from the genuine offline Staging backup and independently MD5-matched to the live read-only ledger. The ledger contains SQL for 85/86 migrations; one audit repair has no recorded statements. Body comparison: 22/25 different-version aliases match text (after line endings), three differ; 12/55 same-version candidates match text, 43 differ. See [authoritative source evidence](VOX-APPLIED-MIGRATION-SQL-RECOVERY-20261015.md). Original SQL lives only in a restricted JARVIS folder; **do not check it into GitHub**. These results do not certify semantic equivalence or empty-database replay.\n\n**Do not synthesize, retimestamp, or 'repair' live migration ledgers.**
 Retrieve authoritative applied SQL sources or approved immutable deployment artifacts,
 validate hashes and ordering, then run a clean-room replay in a network-isolated
 Supabase-compatible PostgreSQL sandbox. Where a historical staging baseline cannot

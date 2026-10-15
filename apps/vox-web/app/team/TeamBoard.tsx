@@ -70,6 +70,7 @@ export function TeamBoard({rows,adminStaffSetupAvailable=false}:{rows:readonly T
      <h2>Governed team management</h2>
      <p>Core owns the authoritative member directory, role, city, team and object-scoped permissions. Member and transfer actions are deliberately unavailable.</p>
      <p>Team Leader review remains a separate permission-checked workflow.</p>
+     {adminStaffSetupAvailable?<p><Link href="/team/admin/staff">Admin · Preview staff department setup →</Link></p>:null}
      <Link href="/staff-reviews">Open Team Leader reviews →</Link>
     </section>:current==="Reports"?<section className="teamPanel">
      <h2>Daily reports — not configured</h2>

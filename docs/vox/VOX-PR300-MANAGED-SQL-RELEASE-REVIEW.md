@@ -1,3 +1,11 @@
+# VOX-06A source-only quarantine amendment (16 Oct 2026)
+
+The seven previously auto-discoverable legacy VOX SQL files have been copied **byte-identically** into `ops/vox/quarantined-migrations/legacy-20261014/` and removed from `supabase/migrations/` **in review branch feat/vox-06a-managed-migration-quarantine-20261016 only**. Source checks and synthetic PostgreSQL fixtures were repointed to the archived copies; the historical ledger retains its original staging path as provenance. No database was modified and no permission/feature activation is authorized.
+
+The v2 release manifest now requires **zero VOX SQL files** in the managed migration directory and validates all seven quarantined Git blob hashes plus three separate proposed department/work SQL candidates. This quarantine avoids accidental application of the legacy DDL on branch merge only *if independently reviewed and integrated*; it does not reconcile 86 historical migrations, select the final authority design, or permit the newer candidate SQL to apply automatically.
+
+---
+
 # VOX release candidate #300 — exact SQL migration preflight / DBA decision packet
 
 **Verified 15 October 2026; read-only Supabase staging and production queries.** No managed SQL, Staff invitation, human reviewer, provider message or deployment occurred.

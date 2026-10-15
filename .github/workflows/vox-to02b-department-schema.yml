@@ -2,7 +2,7 @@ name: VOX TO-02B Department Schema - Isolated PG17
 on:
   pull_request:
     paths:
-      - 'supabase/migrations/*vox_to02b_staff_department_governance.sql'
+      - 'ops/vox/sql-candidates/*vox_to02b_staff_department_governance.sql'
       - 'scripts/mvp/vox/fixtures/vox-to02b-*.sql'
       - 'scripts/mvp/vox/validate-to02b-directory.test.mjs'
       - 'app/api/vox/v1/staff-directory/**'

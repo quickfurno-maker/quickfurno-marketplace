@@ -2,6 +2,7 @@ import "server-only";
 import {adminClient} from "@/lib/supabase";
 import {getVerifiedScopedStaff} from "@/services/vox/verifiedScopedStaff";
 import {projectScopedWorkQueue} from "@/contracts/vox/workQueuePreview.mjs";
+import {selectScopedWorkCandidates} from "@/contracts/vox/scopedWorkCandidates.mjs";
 import {deriveCanonicalCityVendorIds} from "@/contracts/vox/canonicalZoneGate.mjs";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
@@ -65,12 +66,38 @@ export async function GET(request:Request){
     actionsEnabled:false,boundedWindow:true,completeness:"BOUNDED_NOT_TOTAL",items:[]},200);
   // Candidate SQL table remains absent in staging/production. If feature
   // flags are enabled prematurely, no fallback or fabricated work appears.
-  const work=await db.from("vox_work_items_candidate_v1")
-   .select("id,team_id,city_id,source_kind,source_id,assignee_id,state,revision,updated_at")
-   .eq("team_id",scope.teamId).eq("city_id",scope.cityId)
-   .order("updated_at",{ascending:false}).limit(25);
-  if(work.error||!work.data)return send({ok:false,error:"WORK_SOURCE_UNAVAILABLE"},503);
-  const result=projectScopedWorkQueue({scope,rows:work.data,
+  // A global limit(25) BEFORE the current Staff/source filter can hide
+  // valid work behind thousands of unrelated tasks. Query only exact,
+  // server-verified subject IDs and the current assignee/unassigned state.
+  // Each of the 3 lanes has at most 2 bounded queries (<=25 rows each).
+  const lanes=[
+   {kind:"prospect",ids:verifiedProspectIds},
+   {kind:"vendor",ids:verifiedVendorIds},
+   {kind:"support_thread",ids:verifiedSupportThreadIds}
+  ];
+  const reads=lanes.filter(lane=>lane.ids.length).flatMap(lane=>[
+   db.from("vox_work_items_candidate_v1")
+    .select("id,team_id,city_id,source_kind,source_id,assignee_id,state,revision,updated_at")
+    .eq("team_id",scope.teamId).eq("city_id",scope.cityId)
+    .eq("source_kind",lane.kind).in("source_id",lane.ids)
+    .eq("assignee_id",scope.userId)
+    .order("updated_at",{ascending:false}).limit(25),
+   db.from("vox_work_items_candidate_v1")
+    .select("id,team_id,city_id,source_kind,source_id,assignee_id,state,revision,updated_at")
+    .eq("team_id",scope.teamId).eq("city_id",scope.cityId)
+    .eq("source_kind",lane.kind).in("source_id",lane.ids)
+    .is("assignee_id",null).eq("state","NEW")
+    .order("updated_at",{ascending:false}).limit(25)
+  ]);
+  const snapshots=await Promise.all(reads);
+  if(snapshots.some(x=>x.error||!x.data||x.data.length>25))
+   return send({ok:false,error:"WORK_SOURCE_UNAVAILABLE"},503);
+  const candidate=selectScopedWorkCandidates({
+   scope,rows:snapshots.flatMap(x=>x.data??[]),
+   verifiedProspectIds,verifiedVendorIds,verifiedSupportThreadIds
+  });
+  if(!candidate.ok)return send({ok:false,error:"UNVERIFIED_WORK_SOURCE"},503);
+  const result=projectScopedWorkQueue({scope,rows:[...candidate.rows],
    verifiedProspectIds,verifiedVendorIds,verifiedSupportThreadIds});
   if(!result.ok)return send({ok:false,error:"INVALID_CORE_WORK_PROJECTION"},503);
   return send(result,200);

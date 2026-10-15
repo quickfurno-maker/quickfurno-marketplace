@@ -5,7 +5,7 @@
 The proposal reuses the existing `vox_staff_memberships_v1`, `vox_staff_teams_v1` and Core Superadmin verification. It does not alter the existing single `staff_role`, nor weaken the independent Team Leader reviewer and owner finalizer.
 
 ## Source added
-- `20261015010000_vox_to02b_staff_department_governance.sql`: five additive tables for request, independent decision, reviewed capability, activation and append-only events. Force RLS, no anon/authenticated direct permissions, no DELETE privileges for service role, nonce uniqueness, unique unrevoked staff/team/department capability. Actual review/activation/revoke RPCs and request-authorizer bridge are **not present**; a schema alone grants **zero** functional permissions.
+- `ops/vox/sql-candidates/20261015010000_vox_to02b_staff_department_governance.sql` (NON-DEPLOYABLE; specifically excluded from certified migration ledger): five additive tables for request, independent decision, reviewed capability, activation and append-only events. Force RLS, no anon/authenticated direct permissions, no DELETE privileges for service role, nonce uniqueness, unique unrevoked staff/team/department capability. Actual review/activation/revoke RPCs and request-authorizer bridge are **not present**; a schema alone grants **zero** functional permissions.
 - `GET /api/vox/v1/staff-directory`: exact Core-verified Superadmin AAL2, staging flags for both staff grants and directory, bounded maximum 40, city/team/role/current-state preview. NO user emails, raw client/vendor records, object grants, wallet details or invitation operations. All mutation methods 405.
 - Independent Node source tests and PostgreSQL17 isolated tests. A synthetic service-role-only schema proof is not permission to access managed staging.
 

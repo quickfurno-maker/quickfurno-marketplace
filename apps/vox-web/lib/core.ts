@@ -524,3 +524,46 @@ export async function submitScopedSupportTask(input:{threadId:string;nonce:strin
   return {ok:true,status:201,taskId:data.taskId,effect:"INTERNAL_SUPPORT_TASK_ONLY" as const} as const;
  }catch{return {ok:false,status:503,error:"CORE_SUPPORT_TASK_UNAVAILABLE"} as const;}
 }
+
+/**
+ * TO-02: display-only department catalogue, retrieved from Core under its
+ * existing OWNER/Superadmin AAL2 verification. No Auth Admin, grants or invites.
+ */
+export async function fetchAdminStaffCapabilityCatalog(){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_TEAM_WORKSPACE_ENABLED!=="staging"||
+    process.env.VOX_MULTI_DEPARTMENT_UI_ENABLED!=="staging"||
+    !["owner","dual"].includes(String(process.env.VOX_STAFF_VIEW_MODE)))
+  return {ok:false,status:503,error:"STAFF_SETUP_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();
+ if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const response=await fetch(base+"/api/vox/v1/staff-capability-catalog",{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!response.ok)return {ok:false,status:response.status===403?403:503,error:"OWNER_PERMISSION_REQUIRED"} as const;
+  const body:unknown=await response.json();
+  if(!body||typeof body!=="object"||Array.isArray(body))return {ok:false,status:503,error:"BAD_CORE_SCHEMA"} as const;
+  const x=body as Record<string,unknown>;
+  if(x.ok!==true||x.schema!=="qf.vox.staff.department.catalog.v1"||
+     x.mode!=="READ_ONLY"||x.owner!=="quickfurno-core"||
+     x.canInvite!==false||x.canActivate!==false||
+     x.requiresSeparateReview!==true||x.requiresObjectScopes!==true||
+     !Array.isArray(x.capabilities)||x.capabilities.length!==4)
+    return {ok:false,status:503,error:"BAD_CORE_SCHEMA"} as const;
+  const wanted=new Set(["client_success","vendor_success","acquisition","service_support"]);
+  const packs=[] as Array<{key:string;label:string}>;
+  for(const raw of x.capabilities){
+   if(!raw||typeof raw!=="object"||Array.isArray(raw))return {ok:false,status:503,error:"BAD_CORE_PACK"} as const;
+   const v=raw as Record<string,unknown>;
+   if(typeof v.key!=="string"||!wanted.has(v.key)||packs.some(p=>p.key===v.key)||
+      typeof v.label!=="string"||v.label.length<4||v.label.length>80)
+    return {ok:false,status:503,error:"BAD_CORE_PACK"} as const;
+   packs.push({key:v.key,label:v.label});
+  }
+  if(packs.length!==4)return {ok:false,status:503,error:"MISSING_PACK"} as const;
+  return {ok:true,status:200,mode:"READ_ONLY" as const,capabilities:packs} as const;
+ }catch{return {ok:false,status:503,error:"CORE_UNAVAILABLE"} as const;}
+}

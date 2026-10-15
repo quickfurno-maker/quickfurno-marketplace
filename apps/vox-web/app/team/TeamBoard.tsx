@@ -26,7 +26,7 @@ const SECTION_DESCRIPTION:Record<Tab,string>={
  Approvals:"Owner / Admin uses one governed approval center. Existing Core Superadmin authorization and independent reviewer requirements still apply."
 };
 
-export function TeamBoard({rows}:{rows:readonly TeamPreview[]}){
+export function TeamBoard({rows,adminStaffSetupAvailable=false}:{rows:readonly TeamPreview[];adminStaffSetupAvailable?:boolean}){
  const [current,setCurrent]=useState<Tab>("Overview");
  const counts={Acquisition:0,Vendor:0,Support:0,"Human desk":0};
  for(const row of rows)counts[row.kind]++;
@@ -70,6 +70,7 @@ export function TeamBoard({rows}:{rows:readonly TeamPreview[]}){
      <h2>Governed team management</h2>
      <p>Core owns the authoritative member directory, role, city, team and object-scoped permissions. Member and transfer actions are deliberately unavailable.</p>
      <p>Team Leader review remains a separate permission-checked workflow.</p>
+     {adminStaffSetupAvailable?<p><Link href="/team/admin/staff">Admin · Preview staff department setup →</Link></p>:null}
      <Link href="/staff-reviews">Open Team Leader reviews →</Link>
     </section>:current==="Reports"?<section className="teamPanel">
      <h2>Daily reports — not configured</h2>

@@ -1,6 +1,6 @@
 export interface WorkCandidate {
  id:string;team_id:string;city_id:string;
- source_kind:"prospect"|"vendor"|"support_thread";source_id:string;
+ source_kind:string;source_id:string;
  assignee_id:string|null;state:string;revision:number;updated_at:string;
 }
 export declare function selectScopedWorkCandidates(args:{

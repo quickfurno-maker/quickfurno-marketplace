@@ -23,7 +23,7 @@ const SECTION_DESCRIPTION:Record<Tab,string>={
  Inbox:"External conversation sends stay disabled until Core consent, DNC and human handover are certified.",
  Team:"Team directory, staff transfer and grants will reuse Core team membership and two-person approvals.",
  Reports:"Daily reports will derive immutable operational counts from Core events; no employee performance claims are generated.",
- Approvals:"Use the existing individually permission-checked review routes. This workspace does not grant or activate access."
+ Approvals:"Owner / Admin uses one governed approval center. Existing Core Superadmin authorization and independent reviewer requirements still apply."
 };
 
 export function TeamBoard({rows}:{rows:readonly TeamPreview[]}){
@@ -75,10 +75,10 @@ export function TeamBoard({rows}:{rows:readonly TeamPreview[]}){
      <h2>Daily reports — not configured</h2>
      <p>Work events, shift rules, end-of-day rollups and staff check-ins need source-backed Core contracts. No counts or scheduled reports are fabricated here.</p>
     </section>:<section className="teamPanel">
-     <h2>Independent access decisions</h2>
-     <p>Staff permission review and owner activation are distinct Core-governed steps, never granted from the Team Operations preview.</p>
+     <h2>Owner / Admin · Governed approvals</h2>
+     <p>One Owner / Admin workspace. The existing Core Superadmin identity alone controls owner-only decisions. Operations Managers, Team Leaders and Staff do not inherit this authority. Separate review and activation remain mandatory.</p>
      <div className="teamLinks"><Link href="/staff-reviews">Team Leader queue →</Link>
-      <Link href="/approvals">Owner approvals →</Link></div>
+      <Link href="/approvals">Owner / Admin approvals →</Link></div>
     </section>}
     <section className="teamPanel">
      <h2>Existing guarded workspaces</h2>

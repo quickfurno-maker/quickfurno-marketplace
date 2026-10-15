@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 const route=readFileSync(new URL("../../../app/api/vox/v1/staff-directory/route.ts",import.meta.url),"utf8");
-const sql=readFileSync(new URL("../../../supabase/migrations/20261015010000_vox_to02b_staff_department_governance.sql",import.meta.url),"utf8");
+const sql=readFileSync(new URL("../../../ops/vox/sql-candidates/20261015010000_vox_to02b_staff_department_governance.sql",import.meta.url),"utf8");
 test("directory requires independent Core Superadmin AAL2 verifier",()=>{
  assert.match(route,/verifyVoxOwnerBearer\(request\.headers\.get\("authorization"\)\)/);
  assert.match(route,/VOX_STAFF_DIRECTORY_ENABLED!=="staging"/);

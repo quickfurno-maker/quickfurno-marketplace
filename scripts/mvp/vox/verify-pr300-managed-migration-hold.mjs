@@ -1,4 +1,4 @@
-import {readFileSync} from "node:fs";
+import {readFileSync,readdirSync} from "node:fs";
 import {resolve} from "node:path";
 import {createHash} from "node:crypto";
 const root=resolve(import.meta.dirname,"../../..");
@@ -23,7 +23,10 @@ const approvals=["independentDbReviewer","securityReviewer","firstTeamLeaderHuma
 const deployment=["managedMigrationAutoApplyPermitted","activationFlagsEnabled",
  "aiProviderSendsEnabled","productionAuthorized"];
 const fail=error=>({ok:false,releaseAllowed:false,error});
-export function checkVoxPr300MigrationHold(evidence,read=(p)=>readFileSync(resolve(root,p))){
+export function checkVoxPr300MigrationHold(
+ evidence,read=(p)=>readFileSync(resolve(root,p)),
+ listManaged=()=>readdirSync(resolve(root,"supabase/migrations"))
+){
  if(!evidence||typeof evidence!=="object"||
    evidence.schema!=="qf.vox.release.migration.compatibility.v1"||
    !Array.isArray(evidence.legacyManagedMigrations)||
@@ -33,6 +36,18 @@ export function checkVoxPr300MigrationHold(evidence,read=(p)=>readFileSync(resol
  const names2=evidence.proposedSqlCandidates.map(x=>x?.path);
  if(JSON.stringify(names1)!==JSON.stringify(old)||
     JSON.stringify(names2)!==JSON.stringify(newer))return fail("MISSING_OR_REORDERED_MANAGED_SQL");
+ // Fail closed on any surprise managed VOX migration not independently
+ // inventoried. Checking only listed SQL blobs misses an eighth migration
+ // added beside the seven known files. This is source integrity, not
+ // deployment permission or a substitute for actual reviewer signatures.
+ let managed;
+ try{managed=listManaged();}catch{return fail("MANAGED_MIGRATION_DISCOVERY_FAILED");}
+ if(!Array.isArray(managed)||managed.some(x=>typeof x!=="string"))
+  return fail("MANAGED_MIGRATION_DISCOVERY_INVALID");
+ const observed=managed.filter(n=>/vox/i.test(n)&&n.endsWith(".sql")).sort();
+ const expected=old.map(p=>p.slice("supabase/migrations/".length)).sort();
+ if(JSON.stringify(observed)!==JSON.stringify(expected))
+  return fail("UNDECLARED_MANAGED_VOX_SQL");
  const all=[...evidence.legacyManagedMigrations,...evidence.proposedSqlCandidates];
  for(const item of all){
   if(item.approvedForAutoApply!==false||

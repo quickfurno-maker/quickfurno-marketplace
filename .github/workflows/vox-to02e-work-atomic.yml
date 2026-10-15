@@ -5,6 +5,7 @@ on:
       - 'ops/vox/sql-candidates/*vox_to02e_work_queue_atomic_candidate.sql'
       - 'scripts/mvp/vox/fixtures/vox-to02e-work-*'
       - 'scripts/mvp/vox/fixtures/vox-to04f-50-distinct-capacity.sh'
+      - 'scripts/mvp/vox/fixtures/vox-to04f-capacity-denial-assertions.sql'
       - '.github/workflows/vox-to02e-work-atomic.yml'
 permissions:
   contents: read

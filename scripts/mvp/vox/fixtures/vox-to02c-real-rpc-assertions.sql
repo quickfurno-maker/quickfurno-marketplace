@@ -36,6 +36,21 @@ begin
  perform public.qf_vox_department_review_v1(
   '00000000-0000-4000-8000-000000000003',v_request,0,'APPROVE',
   'TEST_TL_REVIEW_OK','00000000-0000-4000-8000-000000000024');
+ -- SQL candidate must enforce the original auditable requestor, even if
+ -- a corrupted request row is relabelled to another owner between review
+ -- and activation. Test ONLY in disposable synthetic PG17.
+ update public.vox_staff_department_requests_v1
+  set requested_by='00000000-0000-4000-8000-000000000003'
+  where id=v_request;
+ begin
+  perform public.qf_vox_department_activate_v1(
+   '00000000-0000-4000-8000-000000000001',v_request,1,
+   'TEST_WRONG_REQUEST_OWNER','00000000-0000-4000-8000-000000000086');
+  raise exception 'NON_REQUESTING_OWNER_ACTIVATED';
+ exception when sqlstate 'P0001' then null; end;
+ update public.vox_staff_department_requests_v1
+  set requested_by='00000000-0000-4000-8000-000000000001'
+  where id=v_request;
  -- TL may not perform owner activation.
  begin
  perform public.qf_vox_department_activate_v1(

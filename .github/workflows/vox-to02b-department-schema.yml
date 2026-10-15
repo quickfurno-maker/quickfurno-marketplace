@@ -1,0 +1,45 @@
+name: VOX TO-02B Department Schema - Isolated PG17
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/*vox_to02b_staff_department_governance.sql'
+      - 'scripts/mvp/vox/fixtures/vox-to02b-*.sql'
+      - '.github/workflows/vox-to02b-department-schema.yml'
+permissions:
+  contents: read
+jobs:
+  isolated-postgres-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: vox_to02b_synthetic
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: fixture_only_do_not_reuse
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vox_to02b_synthetic"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Apply synthetic schema, candidate migration, test real constraints
+        env:
+          PGPASSWORD: fixture_only_do_not_reuse
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGDATABASE: vox_to02b_synthetic
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to02b-minimal-staff-schema.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/20261015010000_vox_to02b_staff_department_governance.sql
+          psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to02b-schema-assertions.sql
+          echo 'VOX_TO02B_DISPOSABLE_POSTGRES_ONLY_NO_STAGING_MUTATION'

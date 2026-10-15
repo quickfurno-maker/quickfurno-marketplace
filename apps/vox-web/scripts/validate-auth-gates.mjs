@@ -10,7 +10,7 @@ check("no public Supabase service_role",()=>assert.doesNotMatch(read("lib/auth.t
 check("validated Supabase Auth session",()=>assert.match(read("lib/auth.ts"),/auth\.auth\.getUser\(\)/));
 check("verified AAL2 before proxy",()=>assert.match(read("lib/auth.ts"),/currentLevel!=="aal2"/));
 check("session belongs to verified user",()=>assert.match(read("lib/auth.ts"),/session\.user\.id!==user\.id/));
-check("auth cookie httpOnly strict",()=>{assert.match(read("lib/auth.ts"),/httpOnly:true/);assert.match(read("lib/auth.ts"),/sameSite:"strict"/)});
+check("auth cookie httpOnly strict",()=>{assert.match(read("lib/auth.ts"),/httpOnly:true/);assert.match(read("lib/auth.ts"),/sameSite:name\.endsWith\("-code-verifier"\)\?"lax":"strict"/)});
 check("login enforces same Origin",()=>assert.match(read("app/api/auth/sign-in/route.ts"),/allowedOrigin\(request\)/));
 check("MFA enforces same Origin",()=>assert.match(read("app/api/auth/mfa/route.ts"),/allowedOrigin\(request\)/));
 check("MFA factor only verified",()=>assert.match(read("app/api/auth/mfa/route.ts"),/f\.status==="verified"/));

@@ -72,7 +72,20 @@ try{
  assert.match(hold.body,/Acquisition unavailable/);
  const noGet=await http("GET","/api/followup-proposals");
  assert.equal(noGet.status,405,"proposal must not expose GET");
- console.log("VOX12B_STANDALONE_ORIGIN_HOST_CERT_PASS 6/6");
+ // Recovery must remain unavailable while its independent staging flag is OFF.
+ const reqRecovery=await http("POST","/api/auth/recovery/request",reqHeaders,JSON.stringify({email:"qa@example.invalid"}));
+ assert.equal(reqRecovery.status,503,"recovery mail must not be sent while off");
+ const completeRecovery=await http("POST","/api/auth/recovery/complete",reqHeaders,JSON.stringify({password:"example-only-qa"}));
+ assert.equal(completeRecovery.status,503,"password update must be disabled");
+ const callback=await http("GET","/auth/callback?code=syntheticinvalidrecoverycode");
+ assert.equal(callback.status,404,"recovery callback must not be available");
+ const recoverPage=await http("GET","/password/recover");
+ assert.equal(recoverPage.status,200);
+ assert.match(recoverPage.body,/Recovery unavailable/);
+ const resetPage=await http("GET","/password/reset");
+ assert.equal(resetPage.status,200);
+ assert.match(resetPage.body,/Recovery unavailable/);
+ console.log("VOX12B_STANDALONE_ORIGIN_HOST_AND_RECOVERY_DISABLED_PASS 11/11");
 }finally{
  server.kill("SIGTERM");
 }

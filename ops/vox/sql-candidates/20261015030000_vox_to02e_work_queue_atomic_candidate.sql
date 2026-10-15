@@ -91,6 +91,10 @@ begin
   join public.vox_staff_department_decisions_v1 d on d.request_id=r.id
   join public.vox_staff_department_activations_v1 x
    on x.request_id=r.id and x.capability_id=g.id
+  join public.profiles reviewer on reviewer.id=r.decided_by
+  join auth.users auth_reviewer on auth_reviewer.id=reviewer.id
+  join public.vox_staff_memberships_v1 tl on tl.auth_user_id=reviewer.id
+  join public.vox_staff_teams_v1 reviewer_team on reviewer_team.id=tl.team_id
   where g.auth_user_id=p_actor and g.team_id=w.team_id
    and g.city_id=w.city_id and g.department=v_pack
    and g.revoked_at is null and g.revision=2 and g.expires_at>now()
@@ -101,6 +105,14 @@ begin
    and d.reviewer_id=r.decided_by and d.decision='APPROVED'
    and d.decision_reference=r.decision_reference
    and x.activated_by=r.requested_by and g.granted_by=r.requested_by
+   and reviewer.role is null and reviewer.is_active=true
+   and auth_reviewer.raw_app_meta_data->>'qf_principal'='vox_staff'
+   and auth_reviewer.raw_app_meta_data->>'vox_role'='team_leader'
+   and auth_reviewer.raw_app_meta_data->>'admin_role' is null
+   and tl.staff_role='team_leader' and tl.is_active=true
+   and tl.revoked_at is null and tl.expires_at>now()
+   and reviewer_team.id=r.team_id and reviewer_team.is_active=true
+   and reviewer_team.city_id=r.city_id
  ) then raise exception 'VOX_WORK_DEPARTMENT_NOT_REVIEWED' using errcode='P0001'; end if;
  if not exists(select 1 from public.vox_staff_object_scopes_v1 s
    where s.auth_user_id=p_actor and s.scope_kind=w.source_kind

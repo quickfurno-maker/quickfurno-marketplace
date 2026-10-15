@@ -36,3 +36,18 @@ test("real staging and production history cannot be described as a DB restore",(
   assert.equal(base.databaseReadiness[site].voxMigrationVersionsApplied,0);
  }
 });
+
+test("an eighth or renamed VOX managed migration cannot bypass the pinned manifest",()=>{
+ const known=base.legacyManagedMigrations.map(x=>x.path.split("/").at(-1));
+ assert.equal(checkVoxPr300MigrationHold(copy(),undefined,()=>known).ok,true);
+ const extra=[...known,"20261016010000_vox_unreviewed_grant.sql"];
+ const newSql=checkVoxPr300MigrationHold(copy(),undefined,()=>extra);
+ assert.equal(newSql.ok,false);
+ assert.equal(newSql.error,"UNDECLARED_MANAGED_VOX_SQL");
+ const dropped=checkVoxPr300MigrationHold(copy(),undefined,()=>known.slice(1));
+ assert.equal(dropped.error,"UNDECLARED_MANAGED_VOX_SQL");
+ const reordered=checkVoxPr300MigrationHold(copy(),undefined,()=>[...known].reverse());
+ assert.equal(reordered.ok,true);
+ const inaccessible=checkVoxPr300MigrationHold(copy(),undefined,()=>{throw Error("directory unavailable");});
+ assert.equal(inaccessible.error,"MANAGED_MIGRATION_DISCOVERY_FAILED");
+});

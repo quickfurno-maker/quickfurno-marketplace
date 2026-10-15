@@ -6,6 +6,7 @@ on:
       - 'app/api/vox/v1/work-queue/route.ts'
       - 'scripts/mvp/vox/validate-to04f-zone-scope.test.mjs'
       - 'scripts/mvp/vox/fixtures/vox-to04f-50-distinct-capacity.sh'
+      - 'scripts/mvp/vox/fixtures/vox-to04f-capacity-denial-assertions.sql'
       - '.github/workflows/vox-to04f-zone-and-capacity.yml'
 permissions:
   contents: read

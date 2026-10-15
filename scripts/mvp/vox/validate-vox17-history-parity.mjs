@@ -39,9 +39,12 @@ function prove(candidate,expectedProject='uckafzuochmbvtiodmcl'){
  return {ok:true,matched:a.length,sourceProjectRef:source.projectRef,
   requiresLiveAuthenticatedSchemaAndRestore:true,permittedToApplyVox:false};
 }
-const versionFiles=readdirSync(resolve(root,'supabase/migrations'))
+const managedVox=readdirSync(resolve(root,'supabase/migrations'))
+ .filter(x=>/vox.*\.sql$/i.test(x));
+assert.deepEqual(managedVox,[],'UNAPPROVED_MANAGED_VOX_MIGRATION');
+const versionFiles=readdirSync(resolve(root,'ops/vox/quarantined-migrations/legacy-20261014'))
  .filter(x=>/^20261014\d{6}_vox.*\.sql$/.test(x));
-assert.equal(versionFiles.length,7,'seven pinned VOX files required');
+assert.equal(versionFiles.length,7,'seven historical VOX sources must remain quarantined');
 assert.equal(parent.filter(x=>x.version.startsWith('20261014')).length,0,'source cannot already contain VOX versions');
 if(process.argv.includes('--self-test')){
  assert.equal(prove(source).ok,true);

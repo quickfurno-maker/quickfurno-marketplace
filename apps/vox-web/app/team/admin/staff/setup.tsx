@@ -3,13 +3,17 @@ import {useState} from "react";
 import Link from "next/link";
 
 type Pack={key:string;label:string};
+type StaffTeamOption={teamId:string;cityId:string};
 type StaffPreview={staffRef:string;teamRef:string;cityRef:string;role:string;
  state:"ACTIVE"|"SUSPENDED_OR_EXPIRED";expiresAt:string};
-export function AdminStaffSetup({packs,roster,rosterVerified=false}:{
- packs:readonly Pack[];roster:readonly StaffPreview[];rosterVerified?:boolean
+export function AdminStaffSetup({packs,roster,rosterVerified=false,teams=[],teamsVerified=false}:{
+ packs:readonly Pack[];roster:readonly StaffPreview[];rosterVerified?:boolean;
+ teams?:readonly StaffTeamOption[];teamsVerified?:boolean
 }){
  const [selected,setSelected]=useState<string[]>([]);
  const [filter,setFilter]=useState("");
+ const [teamId,setTeamId]=useState("");
+ const selectedTeam=teams.find(t=>t.teamId===teamId);
  const list=roster.filter(r=>(r.staffRef+" "+r.teamRef+" "+r.cityRef+" "+r.role).toLowerCase().includes(filter.toLowerCase()));
  const toggle=(key:string,on:boolean)=>setSelected(prev=>on?[...new Set([...prev,key])]:prev.filter(x=>x!==key));
  const ordered=packs.filter(p=>selected.includes(p.key));
@@ -60,7 +64,18 @@ export function AdminStaffSetup({packs,roster,rosterVerified=false}:{
    </section>
    <section className="staffSetupCard">
     <h2>Next: Verified identity and city/team</h2>
-    <p>Invitation email, employee identity and active team selection must come from the protected Core onboarding workflow. They are intentionally not collected here until the governed write path is certified.</p>
+    <p>Only existing active teams in Core verified cities are eligible for future onboarding. This selection stays in your browser and cannot create an invitation.</p>
+    {!teamsVerified?<p role="status">The protected team/city selector is disabled or unavailable. No city or team can be selected.</p>:
+     <label className="staffRosterSearch">Core-verified team and city
+      <select value={teamId} onChange={e=>setTeamId(e.target.value)}>
+       <option value="">Select an eligible team</option>
+       {teams.map(t=><option key={t.teamId} value={t.teamId}>
+        {"TEAM-"+t.teamId.slice(0,8)+" · CITY-"+t.cityId.slice(0,8)}
+       </option>)}
+      </select>
+     </label>}
+    <p role="status">Request preview: {ordered.length} department responsibilities · {selectedTeam?"Core team/city selected":"Team/city not selected"} · Staff identity unverified · Independent review pending.</p>
+    <p>Invitation email and staff identity will be handled only through the future approved Core onboarding workflow. This page collects neither credentials nor personal identifiers.</p>
     <button disabled type="button" title="Core governed invitation not implemented">
      Create &amp; invite staff — unavailable until certified
     </button>

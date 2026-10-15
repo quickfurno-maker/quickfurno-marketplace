@@ -59,3 +59,16 @@ test("HTTP queue is default OFF, actual Core AAL2, city proof, no writes or leak
  assert.doesNotMatch(src,/\.insert\(|\.update\(|\.delete\(|inviteUserByEmail|provider\.send/);
  assert.match(src,/export function POST\(\)/);
 });
+
+const authSource=readFileSync(new URL("../../../services/vox/verifiedScopedStaff.ts",import.meta.url),"utf8");
+const authContract=readFileSync(new URL("../../../contracts/vox/effectiveDepartments.mjs",import.meta.url),"utf8");
+test("queue GET cannot rely on a flag without an ACTUAL reviewed department intersection",()=>{
+ assert.match(authSource,/VOX_DEPARTMENT_ENFORCEMENT_ENABLED/);
+ assert.match(authSource,/restrictScopedStaffByDepartment\(/);
+ assert.match(authSource,/db\.auth\.admin\.getUserById\(id\)/);
+ assert.match(authSource,/reviewers:reviewers|activations:activations\.data,reviewers/);
+ assert.match(authContract,/!liveReviewers\.has\(r\.decided_by\)/);
+ assert.match(authContract,/g\.revoked_at!==null/);
+ assert.match(authContract,/r\.state!=="APPROVED"/);
+ assert.match(authContract,/conversationIds:Object\.freeze\(\[\]\)/);
+});

@@ -3,7 +3,10 @@ on:
   pull_request:
     paths:
       - "contracts/vox/staffDepartmentPacks.mjs"
+      - "contracts/vox/staffDepartmentPacks.d.mts"
+      - "app/api/vox/v1/staff-capability-catalog/**"
       - "scripts/mvp/vox/validate-to02-multi-department.test.mjs"
+      - "scripts/mvp/vox/validate-to02-admin-catalog.test.mjs"
       - "docs/vox/VOX-TO02-MULTI-DEPARTMENT-STAFF.md"
       - ".github/workflows/vox-to02-multi-department-staff.yml"
 permissions:
@@ -20,6 +23,6 @@ jobs:
         with:
           node-version: "20.20.2"
       - name: Pure contract negative authorization suite — no credentials
-        run: node --test scripts/mvp/vox/validate-to02-multi-department.test.mjs
+        run: node --test scripts/mvp/vox/validate-to02-multi-department.test.mjs scripts/mvp/vox/validate-to02-admin-catalog.test.mjs
       - name: Syntax and no generated application writes
         run: node --check contracts/vox/staffDepartmentPacks.mjs

@@ -26,7 +26,7 @@ const SECTION_DESCRIPTION:Record<Tab,string>={
  Approvals:"Owner / Admin uses one governed approval center. Existing Core Superadmin authorization and independent reviewer requirements still apply."
 };
 
-export function TeamBoard({rows}:{rows:readonly TeamPreview[]}){
+export function TeamBoard({rows,adminStaffSetupAvailable=false}:{rows:readonly TeamPreview[];adminStaffSetupAvailable?:boolean}){
  const [current,setCurrent]=useState<Tab>("Overview");
  const counts={Acquisition:0,Vendor:0,Support:0,"Human desk":0};
  for(const row of rows)counts[row.kind]++;

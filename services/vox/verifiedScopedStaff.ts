@@ -84,7 +84,7 @@ export async function getVerifiedScopedStaff(header:string|null):Promise<ScopedV
    staffRole:m?.staff_role??null,membershipActive:m?.is_active===true,
    revokedAt:m?.revoked_at??null,expiresAt:m?.expires_at??null,
    teamId:m?.team_id??null,cityId:scoped.cityId,
-   teamActive:team.data.is_active===true};
+   teamActive:team.data?.is_active===true};
  });
  return restrictScopedStaffByDepartment({scoped,capabilities:caps.data,
    requests:requests.data,decisions:decisions.data,

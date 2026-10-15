@@ -41,7 +41,7 @@ jobs:
       - name: BLOCK real release until DBA and actual Auth/owner approvals
         shell: bash
         run: |
-          for file in scripts/mvp/vox/check-to04c-schema-readiness.mjs scripts/mvp/vox/verify-to04g-migration-history.mjs scripts/mvp/vox/check-to04i-rls-boundary.mjs; do
+          for file in scripts/mvp/vox/check-to04c-schema-readiness.mjs scripts/mvp/vox/verify-to04g-migration-history.mjs scripts/mvp/vox/check-to04i-rls-boundary.mjs scripts/mvp/vox/verify-pr300-managed-migration-hold.mjs; do
             set +e
             node "$file" --release-check
             CODE=$?

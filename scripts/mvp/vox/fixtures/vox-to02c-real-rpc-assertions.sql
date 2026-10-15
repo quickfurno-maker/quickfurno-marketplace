@@ -8,8 +8,8 @@ select * from public.qf_vox_department_request_v1(
  'client_success',
  '00000000-0000-4000-8000-000000000021',
  now()+interval '1 day','Approved test client responsibility');
-DO $$
-declare v_request uuid;
+DO $
+declare v_request uuid; v_self_denied boolean; v_rejection text;
 begin
  select id into v_request from public.vox_staff_department_requests_v1
  where request_nonce='00000000-0000-4000-8000-000000000021';
@@ -36,6 +36,34 @@ begin
  perform public.qf_vox_department_review_v1(
   '00000000-0000-4000-8000-000000000003',v_request,0,'APPROVE',
   'TEST_TL_REVIEW_OK','00000000-0000-4000-8000-000000000024');
+ -- Adversarial persisted state: valid, current TL reviewer later becomes the
+ -- target of the SAME already APPROVED request. A request-stage validation
+ -- alone cannot protect atomic activation. Existing TL is a neutral Core
+ -- Staff identity with a live membership and would otherwise qualify.
+ update public.vox_staff_department_requests_v1
+    set target_staff_id='00000000-0000-4000-8000-000000000003'
+    where id=v_request;
+ v_self_denied:=false; v_rejection:=null;
+ begin
+  perform public.qf_vox_department_activate_v1(
+   '00000000-0000-4000-8000-000000000001',v_request,1,
+   'TEST_TARGET_SELF_DENIED','00000000-0000-4000-8000-000000000087');
+ exception when sqlstate 'P0001' then
+  get stacked diagnostics v_rejection=MESSAGE_TEXT;
+  v_self_denied:=v_rejection='VOX_DEPT_ACTIVATION_STALE';
+ end;
+ if not v_self_denied then
+  raise exception 'TARGET_SELF_APPROVAL_NOT_ATOMICALLY_DENIED: %',
+    coalesce(v_rejection,'no error');
+ end if;
+ if exists(select 1 from public.vox_staff_department_capabilities_v1
+     where request_id=v_request) or
+    exists(select 1 from public.vox_staff_department_activations_v1
+     where request_id=v_request)
+ then raise exception 'SELF_APPROVAL_CREATED_GRANT_OR_ACTIVATION'; end if;
+ update public.vox_staff_department_requests_v1
+  set target_staff_id='00000000-0000-4000-8000-000000000002'
+  where id=v_request;
  -- SQL candidate must enforce the original auditable requestor, even if
  -- a corrupted request row is relabelled to another owner between review
  -- and activation. Test ONLY in disposable synthetic PG17.

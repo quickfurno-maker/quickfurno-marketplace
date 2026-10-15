@@ -1,5 +1,6 @@
 import {adminClient} from "@/lib/supabase";
 import {getVerifiedScopedStaff} from "@/services/vox/verifiedScopedStaff";
+import {deriveCanonicalCityVendorIds} from "@/contracts/vox/canonicalZoneGate.mjs";
 import {projectStaffServiceDesk} from "@/contracts/vox/serviceDesk.mjs";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
@@ -15,15 +16,25 @@ export async function GET(request:Request){
   let verifiedVendors:string[]=[];
   let verifiedProspects:string[]=[];
   if(scope.vendorIds.length){
-   const zones=await db.from("marketplace_service_zones").select("id")
-     .eq("city_id",scope.cityId).eq("is_active",true).limit(201);
-   if(zones.error||!zones.data||zones.data.length>200)return json({ok:false,error:"ZONE_SCOPE_UNAVAILABLE"},503);
-   if(zones.data.length){
-    const valid=await db.from("vendors").select("id,service_zone_id")
-      .in("id",[...scope.vendorIds]).in("service_zone_id",zones.data.map(z=>z.id)).limit(201);
-    if(valid.error||!valid.data||valid.data.length>200)return json({ok:false,error:"VENDOR_SCOPE_UNAVAILABLE"},503);
-    verifiedVendors=valid.data.map(v=>v.id);
-   }
+   // Verify exact object grants BEFORE resolving canonical active city zones.
+   // City-wide LIMIT 201 misses valid Staff vendors in large marketplaces.
+   const vendors=await db.from("vendors").select("id,service_zone_id")
+     .in("id",[...scope.vendorIds]).limit(201);
+   if(vendors.error||!vendors.data||vendors.data.length>200)
+     return json({ok:false,error:"VENDOR_SCOPE_UNAVAILABLE"},503);
+   const zoneIds=[...new Set(vendors.data.map(v=>v.service_zone_id))];
+   const zones=zoneIds.length?await db.from("marketplace_service_zones")
+     .select("id,city_id,is_active").in("id",zoneIds)
+     .eq("city_id",scope.cityId).eq("is_active",true).limit(201)
+     :{data:[],error:null};
+   if(zones.error||!zones.data||zones.data.length>200)
+     return json({ok:false,error:"ZONE_SCOPE_UNAVAILABLE"},503);
+   const proof=deriveCanonicalCityVendorIds({
+     cityId:scope.cityId,grantedVendorIds:scope.vendorIds,
+     vendors:vendors.data,zones:zones.data
+   });
+   if(!proof.ok)return json({ok:false,error:"INVALID_CORE_VENDOR_ZONE"},503);
+   verifiedVendors=proof.ids;
   }
   if(scope.prospectIds.length){
    const valid=await db.from("aarohi_prospects").select("id")

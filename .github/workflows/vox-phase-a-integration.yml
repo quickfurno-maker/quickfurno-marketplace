@@ -12,6 +12,7 @@ on:
       - 'ops/vox/phase-a-live-staging-migrations-baseline-20261015.json'
       - 'docs/release/VOX-PHASE-A-RECOVERY-INTEGRATION.md'
       - 'ops/vox/stage-host/**'
+      - 'apps/vox-web/**'
       - '.github/workflows/vox-phase-a-integration.yml'
   workflow_dispatch:
 permissions:
@@ -46,3 +47,35 @@ jobs:
           node-version: '24.18.0'
       - run: node scripts/release/vox-phase-a-crossrepo-contract.mjs
       - run: echo 'EXACT_HEAD_SOURCE_ONLY; NO_STAGING_OR_PRODUCTION_ACTION; RELEASE_HOLD'
+  closed-image-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Build draft source image locally, no registry push or signing
+        run: |
+          set -euo pipefail
+          docker build --pull -f apps/vox-web/Dockerfile -t qf-vox-private:ci .
+          test "$(docker image inspect qf-vox-private:ci --format '{{.Config.User}}')" = "10001"
+      - name: Run closed-network read-only image regression, never deploy
+        run: |
+          set -euo pipefail
+          test ! -e .env
+          docker run --detach --name vox-ci-smoke --network none \
+            --memory 768m --cpus 0.50 --pids-limit 128 \
+            --read-only --tmpfs /tmp:rw,size=64m \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            --mount "type=bind,source=$PWD/ops/vox/stage-host/verify-image-runtime.cjs,target=/app/check.cjs,readonly" \
+            -e VOX_STAFF_PORTAL_ENABLED=disabled \
+            -e VOX_STAFF_VIEW_MODE=disabled \
+            -e VOX_OPERATIONAL_PROPOSAL_UI_ENABLED=disabled \
+            -e VOX_APPROVED_FOLLOWUP_WEB_ENABLED=disabled \
+            -e VOX_STAFF_MFA_ENROLL_ENABLED=disabled \
+            qf-vox-private:ci
+          trap 'docker rm -f vox-ci-smoke >/dev/null 2>&1 || true' EXIT
+          test "$(docker inspect vox-ci-smoke --format '{{.HostConfig.NetworkMode}}')" = "none"
+          test -z "$(docker port vox-ci-smoke)"
+          docker exec vox-ci-smoke node /app/check.cjs
+          echo "VOX_PRIVATE_IMAGE_SOURCE_ONLY_PASS; NOT_SIGNED_NOT_PUSHED_NOT_DEPLOYED; RELEASE_HOLD"

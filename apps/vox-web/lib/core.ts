@@ -524,3 +524,147 @@ export async function submitScopedSupportTask(input:{threadId:string;nonce:strin
   return {ok:true,status:201,taskId:data.taskId,effect:"INTERNAL_SUPPORT_TASK_ONLY" as const} as const;
  }catch{return {ok:false,status:503,error:"CORE_SUPPORT_TASK_UNAVAILABLE"} as const;}
 }
+
+/**
+ * TO-02: display-only department catalogue, retrieved from Core under its
+ * existing OWNER/Superadmin AAL2 verification. No Auth Admin, grants or invites.
+ */
+export async function fetchAdminStaffCapabilityCatalog(){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_TEAM_WORKSPACE_ENABLED!=="staging"||
+    process.env.VOX_MULTI_DEPARTMENT_UI_ENABLED!=="staging"||
+    !["owner","dual"].includes(String(process.env.VOX_STAFF_VIEW_MODE)))
+  return {ok:false,status:503,error:"STAFF_SETUP_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();
+ if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const response=await fetch(base+"/api/vox/v1/staff-capability-catalog",{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!response.ok)return {ok:false,status:response.status===403?403:503,error:"OWNER_PERMISSION_REQUIRED"} as const;
+  const body:unknown=await response.json();
+  if(!body||typeof body!=="object"||Array.isArray(body))return {ok:false,status:503,error:"BAD_CORE_SCHEMA"} as const;
+  const x=body as Record<string,unknown>;
+  if(x.ok!==true||x.schema!=="qf.vox.staff.department.catalog.v1"||
+     x.mode!=="READ_ONLY"||x.owner!=="quickfurno-core"||
+     x.canInvite!==false||x.canActivate!==false||
+     x.requiresSeparateReview!==true||x.requiresObjectScopes!==true||
+     !Array.isArray(x.capabilities)||x.capabilities.length!==4)
+    return {ok:false,status:503,error:"BAD_CORE_SCHEMA"} as const;
+  const wanted=new Set(["client_success","vendor_success","acquisition","service_support"]);
+  const packs=[] as Array<{key:string;label:string}>;
+  for(const raw of x.capabilities){
+   if(!raw||typeof raw!=="object"||Array.isArray(raw))return {ok:false,status:503,error:"BAD_CORE_PACK"} as const;
+   const v=raw as Record<string,unknown>;
+   if(typeof v.key!=="string"||!wanted.has(v.key)||packs.some(p=>p.key===v.key)||
+      typeof v.label!=="string"||v.label.length<4||v.label.length>80)
+    return {ok:false,status:503,error:"BAD_CORE_PACK"} as const;
+   packs.push({key:v.key,label:v.label});
+  }
+  if(packs.length!==4)return {ok:false,status:503,error:"MISSING_PACK"} as const;
+  return {ok:true,status:200,mode:"READ_ONLY" as const,capabilities:packs} as const;
+ }catch{return {ok:false,status:503,error:"CORE_UNAVAILABLE"} as const;}
+}
+
+/**
+ * TO-02B: masked staff directory. Core owner-only AAL2 verified on EVERY GET.
+ * Never ship staff emails, phones, Auth users, metadata, raw grants or tokens.
+ */
+export async function fetchAdminStaffDirectory(){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_TEAM_WORKSPACE_ENABLED!=="staging"||
+    process.env.VOX_MULTI_DEPARTMENT_UI_ENABLED!=="staging"||
+    process.env.VOX_ADMIN_STAFF_DIRECTORY_UI_ENABLED!=="staging"||
+    !["owner","dual"].includes(String(process.env.VOX_STAFF_VIEW_MODE)))
+  return {ok:false,status:503,error:"STAFF_DIRECTORY_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();
+ if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const response=await fetch(base+"/api/vox/v1/staff-directory",{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!response.ok)return {ok:false,status:response.status===403?403:503,error:"CORE_OWNER_DIRECTORY_DENIED"} as const;
+  const body:unknown=await response.json();
+  if(!body||typeof body!=="object"||Array.isArray(body))
+   return {ok:false,status:503,error:"BAD_DIRECTORY_SCHEMA"} as const;
+  const v=body as Record<string,unknown>;
+  if(v.ok!==true||v.schema!=="qf.vox.staff.directory.preview.v1"||
+     v.source!=="quickfurno-core"||v.mode!=="READ_ONLY"||
+     v.actionsEnabled!==false||v.totalKnown!==false||
+     !Number.isSafeInteger(v.previewCount)||typeof v.previewCount!=="number"||
+     v.previewCount<0||v.previewCount>40||!Array.isArray(v.members)||
+     v.members.length!==v.previewCount)
+    return {ok:false,status:503,error:"BAD_DIRECTORY_SCHEMA"} as const;
+  const allowedRoles=new Set(["operations_manager","acquisition_agent","vendor_success_agent","support_agent","team_leader","auditor"]);
+  const reference=/^(?:STAFF|TEAM|CITY)-[0-9a-f]{8}$/i;
+  const rows=[] as Array<{staffRef:string;teamRef:string;cityRef:string;role:string;
+    state:"ACTIVE"|"SUSPENDED_OR_EXPIRED";expiresAt:string}>;
+  for(const m of v.members){
+   if(!m||typeof m!=="object"||Array.isArray(m))
+    return {ok:false,status:503,error:"BAD_DIRECTORY_MEMBER"} as const;
+   const x=m as Record<string,unknown>;
+   if(typeof x.staffRef!=="string"||!reference.test(x.staffRef)||
+      !x.staffRef.startsWith("STAFF-")||typeof x.teamRef!=="string"||
+      !x.teamRef.startsWith("TEAM-")||!reference.test(x.teamRef)||
+      typeof x.cityRef!=="string"||!x.cityRef.startsWith("CITY-")||
+      !reference.test(x.cityRef)||typeof x.staffRole!=="string"||
+      !allowedRoles.has(x.staffRole)||!["ACTIVE","SUSPENDED_OR_EXPIRED"].includes(String(x.state))||
+      typeof x.expiresAt!=="string"||x.expiresAt.length>40||
+      !Number.isFinite(Date.parse(x.expiresAt)))
+    return {ok:false,status:503,error:"BAD_DIRECTORY_MEMBER"} as const;
+   rows.push({staffRef:x.staffRef,teamRef:x.teamRef,cityRef:x.cityRef,
+    role:x.staffRole,state:x.state as "ACTIVE"|"SUSPENDED_OR_EXPIRED",expiresAt:x.expiresAt});
+  }
+  return {ok:true,status:200,mode:"READ_ONLY" as const,
+    members:rows,previewCount:rows.length,totalKnown:false as const} as const;
+ }catch{return {ok:false,status:503,error:"DIRECTORY_UNAVAILABLE"} as const;}
+}
+
+
+/** TO-02E protected, private team/city options for a NON-SAVING staff setup. */
+export async function fetchAdminStaffTeamOptions(){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_TEAM_WORKSPACE_ENABLED!=="staging"||
+    process.env.VOX_MULTI_DEPARTMENT_UI_ENABLED!=="staging"||
+    process.env.VOX_ADMIN_STAFF_TEAM_PICKER_UI_ENABLED!=="staging"||
+    !["owner","dual"].includes(String(process.env.VOX_STAFF_VIEW_MODE)))
+  return {ok:false,status:503,error:"STAFF_TEAM_PICKER_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();
+ if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const response=await fetch(base+"/api/vox/v1/staff-team-options",{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   redirect:"error",cache:"no-store",signal:AbortSignal.timeout(3500)});
+  if(!response.ok)return {ok:false,
+   status:response.status===403?403:503,error:"CORE_TEAM_OPTIONS_DENIED"} as const;
+  const body:unknown=await response.json();
+  if(!body||typeof body!=="object"||Array.isArray(body))
+   return {ok:false,status:503,error:"INVALID_CORE_TEAMS"} as const;
+  const x=body as Record<string,unknown>;
+  if(x.ok!==true||x.schema!=="qf.vox.staff.team-options.v1"||
+     x.mode!=="READ_ONLY"||x.actionsEnabled!==false||x.totalKnown!==false||
+     !Array.isArray(x.items)||x.items.length>40||
+     !Number.isInteger(x.previewCount)||x.previewCount!==x.items.length)
+   return {ok:false,status:503,error:"INVALID_CORE_TEAMS"} as const;
+  const seen=new Set<string>();
+  const items:Array<{teamId:string;cityId:string}>=[];
+  for(const raw of x.items){
+   if(!raw||typeof raw!=="object"||Array.isArray(raw))
+    return {ok:false,status:503,error:"INVALID_CORE_TEAM_ROW"} as const;
+   const row=raw as Record<string,unknown>;
+   if(typeof row.teamId!=="string"||!UUID.test(row.teamId)||
+      typeof row.cityId!=="string"||!UUID.test(row.cityId)||
+      seen.has(row.teamId))
+    return {ok:false,status:503,error:"INVALID_CORE_TEAM_ROW"} as const;
+   seen.add(row.teamId);
+   items.push({teamId:row.teamId,cityId:row.cityId});
+  }
+  return {ok:true,status:200,items,mode:"READ_ONLY" as const} as const;
+ }catch{return {ok:false,status:503,error:"CORE_TEAM_OPTIONS_UNAVAILABLE"} as const;}
+}

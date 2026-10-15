@@ -5,6 +5,8 @@ on:
       - 'scripts/release/vox-phase-a-restore-parity.mjs'
       - 'scripts/release/vox-phase-a-crossrepo-contract.mjs'
       - 'ops/vox/review-snapshots/**'
+      - 'ops/vox/phase-a-security-catalog-20261015.json'
+      - 'scripts/release/vox-phase-a-security-catalog-guard.mjs'
       - 'ops/vox/phase-a-live-staging-migrations-baseline-20261015.json'
       - 'docs/release/VOX-PHASE-A-RECOVERY-INTEGRATION.md'
       - '.github/workflows/vox-phase-a-integration.yml'
@@ -21,6 +23,7 @@ jobs:
         with:
           node-version: '24.18.0'
       - run: node scripts/release/vox-phase-a-restore-parity.mjs --self-test
+      - run: node scripts/release/vox-phase-a-security-catalog-guard.mjs --self-test
       - run: echo 'SYNTHETIC_ONLY; ACTUAL_ARCHIVE_RESTORE_NOT_VERIFIED; RELEASE_HOLD'
   core-jarvis-agni-contract-source:
     runs-on: ubuntu-latest

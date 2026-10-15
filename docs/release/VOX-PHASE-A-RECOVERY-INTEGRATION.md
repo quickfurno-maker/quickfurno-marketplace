@@ -29,7 +29,7 @@ This is supplementary to VOX-24 separate owner/DBA Ed25519 attestations, not a s
 - Jarvis #336: `1bbc916ccc095bd656b3bbcf373736a728037177`
 - AGNI #83: `84c4a0f09d010045c40073824da112855a3ebb18`
 
-It refuses remote source drift, checks neutral Core staff identity, actual Core AAROHI role/subject scope, Jarvis signed read-only event verifier with forged/expired/tampered rejection, and AGNI owner-only/replay guard source. The AGNI TypeScript guard is inspected as source, not runtime executed here. CI does not deploy, mint credentials, read real messages or enter a production endpoint.
+GitHub CI cannot authenticate from Core into private AGNI/Jarvis repositories. Therefore this script verifies the Git blob hashes of the exact four source files captured by the authenticated GitHub connector from the above frozen commit SHAs and executes offline Core/Jarvis tests on those reviewed snapshots. It tests Core neutral staff and Aarohi role/subject rejection, Jarvis signed read-only event verification with forged/expired/tampered rejection, and AGNI owner-only/replay guard source. The AGNI TypeScript guard is inspected as source, not runtime executed here. **This CI does not independently verify that remote PR heads remain unchanged; a separate authenticated connector review must do so.** CI does not deploy, mint credentials, read real messages or enter a production endpoint.
 
 ## Remaining boundaries
 

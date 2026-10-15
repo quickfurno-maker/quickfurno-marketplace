@@ -3,7 +3,6 @@ import {adminClient} from "@/lib/supabase";
 import {verifyVoxOwnerBearer} from "@/services/vox/verifiedStaffBearer";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
-const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 // Core uses ONLY its existing verified Superadmin principal. No second Admin.
 const send=(body:unknown,status:number)=>Response.json(body,{status,headers:{
  "cache-control":"private, no-store, max-age=0","vary":"Authorization",

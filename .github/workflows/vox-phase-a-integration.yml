@@ -54,10 +54,18 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - name: Build draft source image locally, no registry push or signing
+      - name: Fetch separately reviewed immutable Core VOX PR head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 1eb62ddd4780dd97366e332c70a23f5dfd94c1aa
+          path: core-vox-candidate
+          persist-credentials: false
+      - name: Build exact Core VOX draft image locally, no registry push or signing
         run: |
           set -euo pipefail
-          docker build --pull -f apps/vox-web/Dockerfile -t qf-vox-private:ci .
+          test "$(git -C core-vox-candidate rev-parse HEAD)" = "1eb62ddd4780dd97366e332c70a23f5dfd94c1aa"
+          test -f core-vox-candidate/apps/vox-web/Dockerfile
+          docker build --pull -f core-vox-candidate/apps/vox-web/Dockerfile -t qf-vox-private:ci core-vox-candidate
           test "$(docker image inspect qf-vox-private:ci --format '{{.Config.User}}')" = "10001"
       - name: Run closed-network read-only image regression, never deploy
         run: |

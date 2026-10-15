@@ -5,6 +5,7 @@ on:
       - 'ops/vox/certification/TO04A-HOLD.json'
       - 'docs/vox/VOX-TO04A-BOOTSTRAP-REVIEW.md'
       - 'scripts/mvp/vox/validate-to04a-bootstrap-evidence.test.mjs'
+      - 'scripts/mvp/vox/validate-to04a-single-grant-chain.test.mjs'
       - '.github/workflows/vox-to04a-release-hold.yml'
 permissions:
   contents: read
@@ -19,4 +20,4 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: '20.20.2'
-      - run: node --test scripts/mvp/vox/validate-to04a-bootstrap-evidence.test.mjs
+      - run: node --test scripts/mvp/vox/validate-to04a-bootstrap-evidence.test.mjs scripts/mvp/vox/validate-to04a-single-grant-chain.test.mjs

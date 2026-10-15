@@ -1,0 +1,47 @@
+name: VOX TO-02C Atomic Departments - Synthetic PG17
+on:
+  pull_request:
+    paths:
+      - 'ops/vox/sql-candidates/*vox_to02c_staff_department_atomic_actions.sql'
+      - 'ops/vox/sql-candidates/*vox_to02b_staff_department_governance.sql'
+      - 'scripts/mvp/vox/fixtures/vox-to02c-*.sql'
+      - '.github/workflows/vox-to02c-atomic-department-actions.yml'
+permissions:
+  contents: read
+jobs:
+  atomic-grants-no-provider:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: vox_to02c_synthetic
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: fixture_only_do_not_reuse
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vox_to02c_synthetic"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Synthetic Auth and approved-grant transaction tests
+        env:
+          PGPASSWORD: fixture_only_do_not_reuse
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGDATABASE: vox_to02c_synthetic
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to02b-minimal-staff-schema.sql
+          psql -X -v ON_ERROR_STOP=1 -f ops/vox/sql-candidates/20261015010000_vox_to02b_staff_department_governance.sql
+          psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to02c-auth-staff-fixture.sql
+          psql -X -v ON_ERROR_STOP=1 -f ops/vox/sql-candidates/20261015020000_vox_to02c_staff_department_atomic_actions.sql
+          psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to02c-atomic-action-assertions.sql
+          echo 'VOX_TO02C_NO_LIVE_AUTH_NO_STAGING_NO_PROVIDER'

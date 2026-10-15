@@ -623,3 +623,48 @@ export async function fetchAdminStaffDirectory(){
     members:rows,previewCount:rows.length,totalKnown:false as const} as const;
  }catch{return {ok:false,status:503,error:"DIRECTORY_UNAVAILABLE"} as const;}
 }
+
+
+/** TO-02E protected, private team/city options for a NON-SAVING staff setup. */
+export async function fetchAdminStaffTeamOptions(){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_TEAM_WORKSPACE_ENABLED!=="staging"||
+    process.env.VOX_MULTI_DEPARTMENT_UI_ENABLED!=="staging"||
+    process.env.VOX_ADMIN_STAFF_TEAM_PICKER_UI_ENABLED!=="staging"||
+    !["owner","dual"].includes(String(process.env.VOX_STAFF_VIEW_MODE)))
+  return {ok:false,status:503,error:"STAFF_TEAM_PICKER_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();
+ if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const response=await fetch(base+"/api/vox/v1/staff-team-options",{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   redirect:"error",cache:"no-store",signal:AbortSignal.timeout(3500)});
+  if(!response.ok)return {ok:false,
+   status:response.status===403?403:503,error:"CORE_TEAM_OPTIONS_DENIED"} as const;
+  const body:unknown=await response.json();
+  if(!body||typeof body!=="object"||Array.isArray(body))
+   return {ok:false,status:503,error:"INVALID_CORE_TEAMS"} as const;
+  const x=body as Record<string,unknown>;
+  if(x.ok!==true||x.schema!=="qf.vox.staff.team-options.v1"||
+     x.mode!=="READ_ONLY"||x.actionsEnabled!==false||x.totalKnown!==false||
+     !Array.isArray(x.items)||x.items.length>40||
+     !Number.isInteger(x.previewCount)||x.previewCount!==x.items.length)
+   return {ok:false,status:503,error:"INVALID_CORE_TEAMS"} as const;
+  const seen=new Set<string>();
+  const items:Array<{teamId:string;cityId:string}>=[];
+  for(const raw of x.items){
+   if(!raw||typeof raw!=="object"||Array.isArray(raw))
+    return {ok:false,status:503,error:"INVALID_CORE_TEAM_ROW"} as const;
+   const row=raw as Record<string,unknown>;
+   if(typeof row.teamId!=="string"||!UUID.test(row.teamId)||
+      typeof row.cityId!=="string"||!UUID.test(row.cityId)||
+      seen.has(row.teamId))
+    return {ok:false,status:503,error:"INVALID_CORE_TEAM_ROW"} as const;
+   seen.add(row.teamId);
+   items.push({teamId:row.teamId,cityId:row.cityId});
+  }
+  return {ok:true,status:200,items,mode:"READ_ONLY" as const} as const;
+ }catch{return {ok:false,status:503,error:"CORE_TEAM_OPTIONS_UNAVAILABLE"} as const;}
+}

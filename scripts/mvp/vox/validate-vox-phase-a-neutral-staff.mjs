@@ -58,6 +58,9 @@ for(const source of [enroll,confirm]){
 }
 const flags=read('apps/vox-web/.env.example');
 assert.match(flags,/VOX_STAFF_MFA_ENROLL_ENABLED=disabled/);
-assert.equal(readdirSync(resolve(root,'supabase/migrations')).filter(x=>/^20261014\d{6}_vox.*\.sql$/.test(x)).length,7);
+// SQL must still exist for source review, but never be auto-discoverable.
+assert.equal(readdirSync(resolve(root,'supabase/migrations')).filter(x=>/^20261014\d{6}_vox.*\.sql$/.test(x)).length,0);
+assert.equal(readdirSync(resolve(root,'ops/vox/quarantined-migrations/legacy-20261014'))
+ .filter(x=>/^20261014\d{6}_vox.*\.sql$/.test(x)).length,7);
 console.log('VOX_PHASE_A_NON_ADMIN_PRINCIPAL_SOURCE_PASS positive='+pos+' negative='+neg+
  ' databaseApplied=false staffInvitationsSent=false');

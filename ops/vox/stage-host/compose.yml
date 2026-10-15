@@ -1,0 +1,66 @@
+# VOX private, inert stage-host template. DO NOT deploy without independent change approval.
+# Host: authorized JARVIS shared VPS (200.141.10.108).
+# No build, no tag, no implicit network fetch: signed OCI digest must first exist locally.
+# Existing Traefik, Core, Jarvis, AGNI, Cloudflare, ports 80/443 unchanged.
+name: qf-vox-stage
+services:
+  vox-web:
+    profiles:
+      - vox-private-review-only
+    image: ${VOX_STAGE_IMAGE:?VOX_STAGE_IMAGE_MUST_BE_APPROVED_IMMUTABLE_DIGEST}
+    pull_policy: never
+    restart: "no"
+    user: "10001:10001"
+    ports:
+      - "127.0.0.1:3107:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      VOX_DEMO_PREVIEW: disabled
+      VOX_STAFF_PORTAL_ENABLED: disabled
+      VOX_STAFF_VIEW_MODE: disabled
+      VOX_STAFF_MFA_ENROLL_ENABLED: disabled
+      VOX_INTELLIGENCE_VIEW_ENABLED: disabled
+      VOX_STAFF_REVIEW_WEB_ENABLED: disabled
+      VOX_VENDOR_TASK_UI_ENABLED: disabled
+      VOX_SUPPORT_TASK_UI_ENABLED: disabled
+      VOX_STUDIO_WEB_ENABLED: disabled
+      VOX_OPERATIONAL_REVIEW_UI_ENABLED: disabled
+      VOX_APPROVED_FOLLOWUP_WEB_ENABLED: disabled
+      VOX_OPERATIONAL_PROPOSAL_UI_ENABLED: disabled
+      VOX_FOLLOWUP_PROPOSALS_WEB_ENABLED: disabled
+      VOX_EXPECTED_ORIGIN: https://vox.quickfurno.in
+    networks:
+      - closed-local
+    mem_limit: 768m
+    mem_reservation: 192m
+    cpus: 0.50
+    pids_limit: 128
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "2m"
+        max-file: "2"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('node:http').get('http://127.0.0.1:3000/api/health',r=>{r.resume();process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
+      interval: 30s
+      timeout: 4s
+      retries: 3
+      start_period: 25s
+networks:
+  closed-local:
+    internal: true
+    driver: bridge

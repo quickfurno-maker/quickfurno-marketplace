@@ -11,6 +11,7 @@ on:
       - 'scripts/release/vox-phase-a-security-catalog-guard.mjs'
       - 'ops/vox/phase-a-live-staging-migrations-baseline-20261015.json'
       - 'docs/release/VOX-PHASE-A-RECOVERY-INTEGRATION.md'
+      - 'ops/vox/stage-host/**'
       - '.github/workflows/vox-phase-a-integration.yml'
   workflow_dispatch:
 permissions:
@@ -27,6 +28,12 @@ jobs:
       - run: node scripts/release/vox-phase-a-restore-parity.mjs --self-test
       - run: node scripts/release/vox-phase-a-migration-reconcile.mjs --self-test
       - run: node scripts/release/vox-phase-a-migration-reconcile.mjs
+      - run: node ops/vox/stage-host/verify-template.mjs --self-test
+      - run: node ops/vox/stage-host/verify-template.mjs
+      - name: Validate inert private VOX Compose template syntax only
+        env:
+          VOX_STAGE_IMAGE: ghcr.io/quickfurno-maker/vox-stage@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        run: docker compose -f ops/vox/stage-host/compose.yml --profile vox-private-review-only config --quiet
       - run: node scripts/release/vox-phase-a-security-catalog-guard.mjs --self-test
       - run: echo 'SYNTHETIC_ONLY; ACTUAL_ARCHIVE_RESTORE_NOT_VERIFIED; RELEASE_HOLD'
   core-jarvis-agni-contract-source:

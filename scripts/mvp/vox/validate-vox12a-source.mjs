@@ -3,7 +3,7 @@ import {readFileSync} from "node:fs";
 import {resolve} from "node:path";
 const root=resolve(import.meta.dirname,"../../..");
 const read=p=>readFileSync(resolve(root,p),"utf8");
-const sql=read("supabase/migrations/20261014070000_vox_approved_followup_executor.sql");
+const sql=read("ops/vox/quarantined-migrations/legacy-20261014/20261014070000_vox_approved_followup_executor.sql");
 const route=read("app/api/vox/v1/execute-followup/route.ts");
 let n=0;const t=(x,f)=>{f();n++;console.log("PASS "+x)};
 t("feature flag disabled by default",()=>assert.match(route,/VOX_APPROVED_FOLLOWUP_EXECUTION_ENABLED!=="staging"/));

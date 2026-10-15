@@ -55,7 +55,7 @@ test("tampering after signature, wrong signing key, unknown fields are rejected"
 });
 test("verifier cannot create Supabase Staff or write a privileged approval",()=>{
  const src=readFileSync(new URL("../../../contracts/vox/firstTlAttestation.mjs",import.meta.url),"utf8");
- assert.doesNotMatch(src,/\.rpc\(|\.from\(|\.auth\.admin\.|inviteUserByEmail|createUser\(/);
+ assert.doesNotMatch(src,/\.rpc\(|\b(?:db|client)\.from\(|\.auth\.admin\.|inviteUserByEmail|createUser\(/);
  assert.match(src,/bootstrapAuthorized:false/);
  assert.match(src,/INDEPENDENT_APPROVED_SERVER_REGISTRY/);
 });

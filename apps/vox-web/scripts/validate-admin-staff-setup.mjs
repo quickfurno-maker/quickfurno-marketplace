@@ -1,0 +1,26 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {resolve} from "node:path";
+const root=resolve(import.meta.dirname,"..");
+const read=x=>readFileSync(resolve(root,x),"utf8");
+const api=read("lib/core.ts"),page=read("app/team/admin/staff/page.tsx");
+const ui=read("app/team/admin/staff/setup.tsx"),team=read("app/team/page.tsx");
+const board=read("app/team/TeamBoard.tsx"),env=read(".env.example");
+let count=0;function check(label,fn){fn();count++;console.log("PASS "+label);}
+check("setup disabled by default",()=>assert.match(env,/VOX_MULTI_DEPARTMENT_UI_ENABLED=disabled/));
+check("staff portal gate",()=>assert.match(api,/fetchAdminStaffCapabilityCatalog[\s\S]*VOX_STAFF_PORTAL_ENABLED!=="staging"/));
+check("team portal gate",()=>assert.match(api,/fetchAdminStaffCapabilityCatalog[\s\S]*VOX_TEAM_WORKSPACE_ENABLED!=="staging"/));
+check("separate catalog gate",()=>assert.match(api,/fetchAdminStaffCapabilityCatalog[\s\S]*VOX_MULTI_DEPARTMENT_UI_ENABLED!=="staging"/));
+check("owner view modes only",()=>assert.match(api,/\["owner","dual"\]\.includes/));
+check("real AAL2 staff session required",()=>assert.match(api,/fetchAdminStaffCapabilityCatalog[\s\S]*verifiedMfaSession\(\)/));
+check("core origin pinned and redirect blocked",()=>assert.match(api,/fetchAdminStaffCapabilityCatalog[\s\S]*redirect:"error"/));
+check("actual Core owner catalogue route",()=>assert.match(api,/api\/vox\/v1\/staff-capability-catalog/));
+check("exact schema and non-executable contract",()=>{for(const part of ["qf.vox.staff.department.catalog.v1","canInvite!==false","canActivate!==false","requiresSeparateReview!==true","requiresObjectScopes!==true"])assert.ok(api.includes(part));});
+check("admin page has protected server check",()=>assert.match(page,/await fetchAdminStaffCapabilityCatalog\(\)/));
+check("denied users see no form",()=>assert.match(page,/if\(!result.ok\)return/));
+check("multi-department checkboxes are preview only",()=>assert.match(ui,/type="checkbox"/));
+check("no email/PII is sent from component",()=>assert.doesNotMatch(ui,/fetch\(|localStorage|sessionStorage|sendMessage|inviteUserByEmail|service_role|POST|\.save\(/));
+check("create action locked",()=>assert.match(ui,/<button disabled type="button"/));
+check("no team setup link without owner Core confirmation",()=>{assert.match(team,/adminSetupAvailable=\{adminSetup.ok\}/);assert.match(board,/adminStaffSetupAvailable\?<p>/);});
+check("no admin role is selectable",()=>assert.doesNotMatch(ui,/value="admin"|value="Superadmin"|value="owner"/));
+console.log("VOX_TO02_ADMIN_STAFF_SETUP_LOCKED_PASS "+count+"/16");

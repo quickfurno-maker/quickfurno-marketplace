@@ -19,3 +19,14 @@ test("real PG17 fixture simulates forged reviewed TL target and checks exact rej
  assert.match(fixture,/SELF_APPROVAL_CREATED_GRANT_OR_ACTIVATION/);
  assert.match(fixture,/set target_staff_id='00000000-0000-4000-8000-000000000002'/);
 });
+
+test("negative SQL assertions never swallow their own sentinel P0001",()=>{
+ for(const name of [
+  "WRONG_CITY_ALLOWED","OWNER_SELF_REVIEWED",
+  "NON_REQUESTING_OWNER_ACTIVATED","TL_ACTIVATED_ADMIN_GRANT",
+  "DUPLICATE_ACTIVATION_ALLOWED","REVOKE_REPLAY_ALLOWED"
+ ]){
+  assert.ok(fixture.includes("raise exception '"+name+"' using errcode='XX000';"),name);
+  assert.ok(!fixture.includes("raise exception '"+name+"';"),name);
+ }
+});

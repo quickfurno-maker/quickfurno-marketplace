@@ -30,8 +30,8 @@ assert.doesNotMatch(scoped,/profile\.data\?\.role!==\"admin\"/);
 const grants=read('app/api/vox/v1/staff-grants/route.ts');
 assert.match(grants,/target\.data\?\.role!==null/);
 for(const [path,required] of [
- ['supabase/migrations/20261014030000_vox_v1_approved_grant_finalizer.sql',1],
- ['supabase/migrations/20261014050000_vox_v1_team_leader_review_policy.sql',3]
+ ['ops/vox/quarantined-migrations/legacy-20261014/20261014030000_vox_v1_approved_grant_finalizer.sql',1],
+ ['ops/vox/quarantined-migrations/legacy-20261014/20261014050000_vox_v1_team_leader_review_policy.sql',3]
 ]){
  const sql=read(path);
  assert.equal((sql.match(/role is null/gi)||[]).length,required,path+' neutral roles');
@@ -39,8 +39,8 @@ for(const [path,required] of [
  assert.equal((sql.match(/admin_role' is null/g)||[]).length,required,path+' no Core admin tag');
 }
 for(const path of [
- 'supabase/migrations/20261014060000_vox_operational_intent_review.sql',
- 'supabase/migrations/20261014070000_vox_approved_followup_executor.sql'
+ 'ops/vox/quarantined-migrations/legacy-20261014/20261014060000_vox_operational_intent_review.sql',
+ 'ops/vox/quarantined-migrations/legacy-20261014/20261014070000_vox_approved_followup_executor.sql'
 ]){
  const sql=read(path);
  assert.match(sql,/p\.role is null/);

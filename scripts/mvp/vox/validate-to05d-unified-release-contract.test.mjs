@@ -20,7 +20,7 @@ test("one synthetically tested PostgreSQL transaction and backup/restore verify 
  const workflow=file(".github/workflows/vox-to05a-unified-pg17-restore.yml");
  assert.match(workflow,/vox-to02c-real-rpc-assertions\.sql/);
  assert.match(workflow,/vox-to05a-department-work-assertions\.sql/);
- assert.match(workflow,/pg_dump -Fc/);
+ assert.match(workflow,/pg_dump --no-owner -Fc/);
  assert.match(workflow,/pg_restore --no-owner --exit-on-error/);
  assert.match(workflow,/vox-to05a-restored-state-assertions\.sql/);
 });

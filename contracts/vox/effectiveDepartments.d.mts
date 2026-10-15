@@ -5,5 +5,6 @@ export declare function restrictScopedStaffByDepartment(input:{
  requests:ReadonlyArray<Record<string,unknown>>;
  decisions:ReadonlyArray<Record<string,unknown>>;
  activations:ReadonlyArray<Record<string,unknown>>;
+ reviewers:ReadonlyArray<Record<string,unknown>>;
  now?:number;
 }):ScopedVoxContext|null;

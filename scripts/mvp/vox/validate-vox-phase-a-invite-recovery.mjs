@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {prepareStaffInvitation,prepareStaffMfaRecovery} from '../../../contracts/vox/staffBootstrapGovernance.mjs';
 const id=(x)=>'00000000-0000-4000-8000-'+String(x).padStart(12,'0');
 const now=Date.now(),email='example.staff@example.invalid';
+const emailSha256=createHash('sha256').update(email.toLowerCase(),'utf8').digest('hex');
 const owner={id:id(1),profileRole:'admin',adminRole:'Superadmin',verifiedByCore:true,aal:'aal2',isActive:true};
 const review={id:id(2),role:'team_leader',teamId:id(3),verifiedByCore:true,aal:'aal2',isActive:true,
- decision:'APPROVED',signedCoreReceiptVerified:true,requestNonce:id(4),targetEmailSha256:'f'.repeat(64)};
+ decision:'APPROVED',signedCoreReceiptVerified:true,requestNonce:id(4),targetEmailSha256:emailSha256,staffRole:'support_agent',cityId:id(5),validUntilMs:now+3600000};
 const team={id:id(3),cityId:id(5),isActive:true};
-const request={nonce:id(4),email,emailSha256:'f'.repeat(64),staffRole:'support_agent',
+const request={nonce:id(4),email,emailSha256,staffRole:'support_agent',
  expiresAtMs:now+86400000,existingUser:false,existingCoreAdmin:false,
  targetHasVendorAccount:false,userMetadataAuthority:false};
 const input={environment:'staging',authorizedOwner:owner,team,request,review,nowMs:now};
@@ -33,6 +35,10 @@ for(const [name,change] of [
  ['wrong city team',{team:{...team,isActive:false}}],
  ['wrong nonce',{review:{...review,requestNonce:id(23)}}],
  ['wrong email receipt',{review:{...review,targetEmailSha256:'0'.repeat(64)}}],
+ ['email changed after review',{request:{...request,email:'other@example.invalid'}}],
+ ['wrong approved role',{review:{...review,staffRole:'acquisition_agent'}}],
+ ['wrong approved city',{review:{...review,cityId:id(88)}}],
+ ['stale review',{review:{...review,validUntilMs:now-1}}],
  ['unknown staff role',{request:{...request,staffRole:'Superadmin'}}],
  ['legacy Core administrator candidate',{request:{...request,existingCoreAdmin:true}}],
  ['existing account claimed',{request:{...request,existingUser:true}}],

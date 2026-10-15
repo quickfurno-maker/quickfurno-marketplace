@@ -668,3 +668,68 @@ export async function fetchAdminStaffTeamOptions(){
   return {ok:true,status:200,items,mode:"READ_ONLY" as const} as const;
  }catch{return {ok:false,status:503,error:"CORE_TEAM_OPTIONS_UNAVAILABLE"} as const;}
 }
+
+
+/** VOX TO-04B read-only staff queue through the EXISTING Supabase AAL2 session.
+ * The Core route independently revalidates reviewed department, current TL,
+ * team/city, exact object grants, source city and assignment.
+ * Never trust an unverified/overlarge response, and NEVER expose provider data.
+ */
+export async function fetchStaffWorkQueuePreview(){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_STAFF_VIEW_MODE!=="scoped"&&
+    process.env.VOX_STAFF_VIEW_MODE!=="dual"||
+    process.env.VOX_WORK_QUEUE_UI_ENABLED!=="staging")
+  return {ok:false,status:503,error:"STAFF_QUEUE_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();
+ if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const response=await fetch(base+"/api/vox/v1/work-queue",{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   redirect:"error",cache:"no-store",signal:AbortSignal.timeout(3500)});
+  if(!response.ok)return {ok:false,status:response.status===403?403:503,
+   error:"CORE_STAFF_SCOPE_DENIED_OR_UNAVAILABLE"} as const;
+  const data:unknown=await response.json();
+  if(!data||typeof data!=="object"||Array.isArray(data))
+   return {ok:false,status:503,error:"INVALID_QUEUE_SCHEMA"} as const;
+  const v=data as Record<string,unknown>;
+  if(Object.keys(v).sort().join("|")!==
+     ["actionsEnabled","boundedWindow","completeness","items","mode","ok","schema"].sort().join("|")||
+    v.ok!==true||v.schema!=="qf.vox.work.queue.preview.v1"||
+    v.actionsEnabled!==false||v.mode!=="READ_ONLY"||
+    v.boundedWindow!==true||v.completeness!=="BOUNDED_NOT_TOTAL"||
+    !Array.isArray(v.items)||v.items.length>25)
+   return {ok:false,status:503,error:"INVALID_QUEUE_SCHEMA"} as const;
+  const uu=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const permittedKinds=new Set(["prospect","vendor","support_thread"]);
+  const permittedStates=new Set(["NEW","ASSIGNED","IN_PROGRESS",
+   "WAITING_EXTERNAL","WAITING_APPROVAL","BLOCKED","DONE"]);
+  const seen=new Set<string>();
+  const items:Array<{workItemId:string;kind:string;state:string;revision:number;
+    updatedAt:string;assignedToMe:boolean}>=[];
+  for(const raw of v.items){
+   if(!raw||typeof raw!=="object"||Array.isArray(raw))
+    return {ok:false,status:503,error:"INVALID_QUEUE_ITEM"} as const;
+   const item=raw as Record<string,unknown>;
+   if(Object.keys(item).sort().join("|")!==
+      ["assignedToMe","canClaim","canTransition","kind","revision","state","updatedAt","workItemId"].sort().join("|")||
+      typeof item.workItemId!=="string"||!uu.test(item.workItemId)||
+      seen.has(item.workItemId)||!permittedKinds.has(String(item.kind))||
+      !permittedStates.has(String(item.state))||
+      !Number.isSafeInteger(item.revision)||(item.revision as number)<0||
+      typeof item.updatedAt!=="string"||
+      !Number.isFinite(Date.parse(item.updatedAt))||
+      item.canClaim!==false||item.canTransition!==false||
+      typeof item.assignedToMe!=="boolean")
+    return {ok:false,status:503,error:"INVALID_QUEUE_ITEM"} as const;
+   seen.add(item.workItemId);
+   items.push({workItemId:item.workItemId,kind:String(item.kind),
+    state:String(item.state),revision:item.revision as number,
+    updatedAt:item.updatedAt,assignedToMe:item.assignedToMe});
+  }
+  return {ok:true,status:200,mode:"READ_ONLY" as const,items,
+   completeness:"BOUNDED_NOT_TOTAL" as const} as const;
+ }catch{return {ok:false,status:503,error:"CORE_QUEUE_UNAVAILABLE"} as const;}
+}

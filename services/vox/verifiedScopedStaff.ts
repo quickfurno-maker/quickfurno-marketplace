@@ -2,6 +2,7 @@ import "server-only";
 import {adminClient,verifySupabaseBearerUser} from "@/lib/supabase";
 import {resolveScopedStaff, type ScopedVoxContext} from "@/contracts/vox/scopedStaff.mjs";
 import {isNeutralVoxStaffPrincipal} from "@/contracts/vox/neutralStaffPrincipal.mjs";
+import {restrictScopedStaffByDepartment} from "@/contracts/vox/effectiveDepartments.mjs";
 const JWT=/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 export async function getVerifiedScopedStaff(header:string|null):Promise<ScopedVoxContext|null>{
  const raw=header?.startsWith("Bearer ")?header.slice(7):"";
@@ -34,6 +35,29 @@ export async function getVerifiedScopedStaff(header:string|null):Promise<ScopedV
    .select("auth_user_id,scope_kind,object_id,expires_at,revoked_at")
    .eq("auth_user_id",user.id).is("revoked_at",null).limit(201);
  if(scopes.error||!scopes.data||scopes.data.length>200)return null;
- return resolveScopedStaff({userId:user.id,identityVerified:true,
+ const scoped=resolveScopedStaff({userId:user.id,identityVerified:true,
    membership:membership.data,team:team.data,grants:scopes.data});
+ if(!scoped||process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED!=="staging")return scoped;
+ // Default OFF: a newly enabled department layer MUST narrow, never enlarge,
+ // existing Core grants. Missing/unreviewed schema or query error denies all.
+ const caps=await db.from("vox_staff_department_capabilities_v1")
+  .select("id,request_id,auth_user_id,team_id,city_id,department,granted_by,expires_at,revoked_at,revision")
+  .eq("auth_user_id",user.id).is("revoked_at",null).limit(17);
+ if(caps.error||!caps.data||caps.data.length>16)return null;
+ const capIds=caps.data.map(g=>g.id);
+ const reqIds=caps.data.map(g=>g.request_id);
+ const requests=reqIds.length?await db.from("vox_staff_department_requests_v1")
+  .select("id,target_staff_id,team_id,city_id,department,requested_by,decided_by,decision_reference,state,revision,expires_at")
+  .in("id",reqIds).limit(17):{data:[],error:null};
+ const decisions=reqIds.length?await db.from("vox_staff_department_decisions_v1")
+  .select("request_id,reviewer_id,decision,decision_reference")
+  .in("request_id",reqIds).limit(17):{data:[],error:null};
+ const activations=capIds.length?await db.from("vox_staff_department_activations_v1")
+  .select("request_id,capability_id,activated_by")
+  .in("capability_id",capIds).limit(17):{data:[],error:null};
+ if(requests.error||decisions.error||activations.error||
+    !requests.data||!decisions.data||!activations.data)return null;
+ return restrictScopedStaffByDepartment({scoped,capabilities:caps.data,
+   requests:requests.data,decisions:decisions.data,activations:activations.data})
+   as ScopedVoxContext|null;
 }

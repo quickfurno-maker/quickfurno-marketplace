@@ -7,7 +7,7 @@ const item={id:id(4),teamId:context.teamId,cityId:context.cityId,state:"NEW",rev
 const request={action:"CLAIM",nonce:id(5),expectedRevision:0,reason:""};
 const input={context,item,request,now:1792080000000};
 const prep=overrides=>plan({...input,...overrides});
-test("allowed work actions bounded",()=>assert.deepEqual(allowedWorkIntentActions.sort(),["BLOCK","CLAIM","COMPLETE","ESCALATE","REQUEST_APPROVAL","RESUME","START","WAIT_EXTERNAL"].sort()));
+test("allowed work actions bounded",()=>assert.deepEqual([...allowedWorkIntentActions].sort(),["BLOCK","CLAIM","COMPLETE","ESCALATE","REQUEST_APPROVAL","RESUME","START","WAIT_EXTERNAL"].sort()));
 test("planned claim includes only non-executable Core proposal",()=>{
  const r=prep({});
  assert.equal(r.ok,true);assert.equal(r.proposedState,"ASSIGNED");

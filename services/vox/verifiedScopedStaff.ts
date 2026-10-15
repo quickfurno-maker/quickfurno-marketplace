@@ -58,6 +58,5 @@ export async function getVerifiedScopedStaff(header:string|null):Promise<ScopedV
  if(requests.error||decisions.error||activations.error||
     !requests.data||!decisions.data||!activations.data)return null;
  return restrictScopedStaffByDepartment({scoped,capabilities:caps.data,
-   requests:requests.data,decisions:decisions.data,activations:activations.data})
-   as ScopedVoxContext|null;
+   requests:requests.data,decisions:decisions.data,activations:activations.data}) as ScopedVoxContext|null;
 }

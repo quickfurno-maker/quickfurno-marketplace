@@ -48,6 +48,6 @@ jobs:
         run: |
           set -euo pipefail
           psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to02b-minimal-staff-schema.sql
-          psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/20261015010000_vox_to02b_staff_department_governance.sql
+          psql -X -v ON_ERROR_STOP=1 -f ops/vox/sql-candidates/20261015010000_vox_to02b_staff_department_governance.sql
           psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to02b-schema-assertions.sql
           echo 'VOX_TO02B_DISPOSABLE_POSTGRES_ONLY_NO_STAGING_MUTATION'

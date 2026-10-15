@@ -38,7 +38,7 @@ for i in $(seq 1 50); do
     exit 1
   fi
 done
-DENIED=$( (grep -l 'VOX_WORK_STAFF_CAPACITY_REACHED' /tmp/vox-capacity-*.err || true) | wc -l)
+
 AFTER=$(psql -X -Atqc "select count(*) from public.vox_work_items_candidate_v1
  where assignee_id='$ACTOR' and state<>'DONE'")
 EVENTS=$(psql -X -Atqc "select count(*) from public.vox_work_events_candidate_v1 e
@@ -50,6 +50,7 @@ UNASSIGNED=$(psql -X -Atqc "select count(*) from public.vox_work_items_candidate
  where right(id::text,12)::bigint between 2001 and 2050
  and state='NEW' and assignee_id is null and revision=0")
 WINNERS=$((AFTER-BEFORE))
+DENIED="$UNASSIGNED"
 echo "MULTI_ITEM_RACE=50 BEFORE=$BEFORE AFTER=$AFTER EXPECTED_WINS=$AVAILABLE WINNERS=$WINNERS CAPACITY_DENIALS=$DENIED EVENTS=$EVENTS REVISIONS=$REVISIONS UNASSIGNED=$UNASSIGNED"
 test "$WINNERS" -eq "$AVAILABLE"
 test "$DENIED" -eq "$((50-AVAILABLE))"
@@ -58,3 +59,7 @@ test "$EVENTS" -eq "$WINNERS"
 test "$REVISIONS" -eq "$WINNERS"
 test "$UNASSIGNED" -eq "$DENIED"
 echo "VOX_TO04F_DISTINCT_ITEM_CAPACITY_50_WAY_PG17_PASS_NOT_STAGING"
+
+# Prove server rejection code by catching SQLSTATE and MESSAGE_TEXT inside
+# PostgreSQL, not psql client stdout/stderr or shell exit status.
+psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to04f-capacity-denial-assertions.sql

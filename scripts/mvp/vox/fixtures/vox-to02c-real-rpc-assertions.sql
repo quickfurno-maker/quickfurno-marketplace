@@ -23,14 +23,14 @@ begin
   '00000000-0000-4000-8000-000000000099',
   'vendor_success','00000000-0000-4000-8000-000000000022',
   now()+interval '1 day','Wrong city should be rejected');
- raise exception 'WRONG_CITY_ALLOWED';
+ raise exception 'WRONG_CITY_ALLOWED' using errcode='XX000';
  exception when sqlstate 'P0001' then null; end;
  -- Owner may not serve as independent TL reviewer.
  begin
  perform public.qf_vox_department_review_v1(
   '00000000-0000-4000-8000-000000000001',v_request,0,'APPROVE',
   'TEST_WRONG_REVIEWER','00000000-0000-4000-8000-000000000023');
- raise exception 'OWNER_SELF_REVIEWED';
+ raise exception 'OWNER_SELF_REVIEWED' using errcode='XX000';
  exception when sqlstate 'P0001' then null; end;
  -- Legitimate TL reviews exactly same team.
  perform public.qf_vox_department_review_v1(
@@ -74,7 +74,7 @@ begin
   perform public.qf_vox_department_activate_v1(
    '00000000-0000-4000-8000-000000000001',v_request,1,
    'TEST_WRONG_REQUEST_OWNER','00000000-0000-4000-8000-000000000086');
-  raise exception 'NON_REQUESTING_OWNER_ACTIVATED';
+  raise exception 'NON_REQUESTING_OWNER_ACTIVATED' using errcode='XX000';
  exception when sqlstate 'P0001' then null; end;
  update public.vox_staff_department_requests_v1
   set requested_by='00000000-0000-4000-8000-000000000001'
@@ -84,7 +84,7 @@ begin
  perform public.qf_vox_department_activate_v1(
   '00000000-0000-4000-8000-000000000003',v_request,1,
   'TEST_WRONG_OWNER','00000000-0000-4000-8000-000000000025');
- raise exception 'TL_ACTIVATED_ADMIN_GRANT';
+ raise exception 'TL_ACTIVATED_ADMIN_GRANT' using errcode='XX000';
  exception when sqlstate 'P0001' then null; end;
  perform public.qf_vox_department_activate_v1(
   '00000000-0000-4000-8000-000000000001',v_request,1,
@@ -94,7 +94,7 @@ begin
  perform public.qf_vox_department_activate_v1(
   '00000000-0000-4000-8000-000000000001',v_request,1,
   'TEST_DUPLICATE_ACT','00000000-0000-4000-8000-000000000027');
- raise exception 'DUPLICATE_ACTIVATION_ALLOWED';
+ raise exception 'DUPLICATE_ACTIVATION_ALLOWED' using errcode='XX000';
  exception when sqlstate 'P0001' then null; end;
  if (select count(*) from public.vox_staff_department_capabilities_v1
   where auth_user_id='00000000-0000-4000-8000-000000000002'
@@ -139,7 +139,7 @@ begin
  perform public.qf_vox_department_revoke_v1(
   '00000000-0000-4000-8000-000000000001',v_cap,2,
   'TEST_DOUBLE_REVOKE','00000000-0000-4000-8000-000000000035');
- raise exception 'REVOKE_REPLAY_ALLOWED';
+ raise exception 'REVOKE_REPLAY_ALLOWED' using errcode='XX000';
  exception when sqlstate 'P0001' then null; end;
 end $$;
 select 'VOX_TO02C_ISOLATED_CORE_RPCS_PASS' as result;

@@ -19,31 +19,26 @@ AVAILABLE=$((24-BEFORE))
 test "$AVAILABLE" -gt 0 && test "$AVAILABLE" -lt 50
 printf 'Before active=%d; unfilled capacity=%d\n' "$BEFORE" "$AVAILABLE"
 rm -f /tmp/vox-capacity-results
+# SQL psql client exit codes and terminal output are not authorization
+# receipts. The source of truth is committed item revisions + event ledger.
 seq 1 50 | xargs -P 50 -I '{}' bash -c '
-  set -u
   i="$1"
   item=$(printf "00000000-0000-4000-8000-%012d" "$((2000+i))")
-  err="/tmp/vox-capacity-$i.err"
-  # -c may report SQL errors while the client itself exits normally.
-  # The only successful receipt is the exact revision 1 output plus no ERROR.
-  # Match capacity rejection by its SQL error, not by shell exit status.
   psql -X -v ON_ERROR_STOP=1 -Atqc "select new_revision from
     public.qf_vox_work_transition_candidate_v1(
       '\''00000000-0000-4000-8000-000000000001'\'',
       '\''$item'\'',0,gen_random_uuid(),'\''CLAIM'\'','\'''\'')"
-      >"/tmp/vox-capacity-$i.out" 2>"$err" || true
-  if grep -qx "1" "/tmp/vox-capacity-$i.out" && ! grep -q "ERROR:" "$err"; then
-    echo "OK $i"
-  elif test ! -s "/tmp/vox-capacity-$i.out" && grep -q "VOX_WORK_STAFF_CAPACITY_REACHED" "$err"; then
-    echo "DENIED_CAPACITY $i"
-  else
-    echo "UNEXPECTED_FAILURE $i" >&2
-    cat "$err" >&2
+      >"/tmp/vox-capacity-$i.out" 2>"/tmp/vox-capacity-$i.err" || true
+' _ '{}'
+for i in $(seq 1 50); do
+  if grep -q 'ERROR:' "/tmp/vox-capacity-$i.err" &&
+     ! grep -q 'VOX_WORK_STAFF_CAPACITY_REACHED' "/tmp/vox-capacity-$i.err"; then
+    echo "UNEXPECTED_QUERY_ERROR: claim $i" >&2
+    cat "/tmp/vox-capacity-$i.err" >&2
     exit 1
   fi
-' _ '{}' > /tmp/vox-capacity-results
-WINNERS=$(grep -c '^OK ' /tmp/vox-capacity-results || true)
-DENIED=$(grep -c '^DENIED_CAPACITY ' /tmp/vox-capacity-results || true)
+done
+DENIED=$( (grep -l 'VOX_WORK_STAFF_CAPACITY_REACHED' /tmp/vox-capacity-*.err || true) | wc -l)
 AFTER=$(psql -X -Atqc "select count(*) from public.vox_work_items_candidate_v1
  where assignee_id='$ACTOR' and state<>'DONE'")
 EVENTS=$(psql -X -Atqc "select count(*) from public.vox_work_events_candidate_v1 e
@@ -54,6 +49,7 @@ REVISIONS=$(psql -X -Atqc "select coalesce(sum(revision),0) from public.vox_work
 UNASSIGNED=$(psql -X -Atqc "select count(*) from public.vox_work_items_candidate_v1
  where right(id::text,12)::bigint between 2001 and 2050
  and state='NEW' and assignee_id is null and revision=0")
+WINNERS=$((AFTER-BEFORE))
 echo "MULTI_ITEM_RACE=50 BEFORE=$BEFORE AFTER=$AFTER EXPECTED_WINS=$AVAILABLE WINNERS=$WINNERS CAPACITY_DENIALS=$DENIED EVENTS=$EVENTS REVISIONS=$REVISIONS UNASSIGNED=$UNASSIGNED"
 test "$WINNERS" -eq "$AVAILABLE"
 test "$DENIED" -eq "$((50-AVAILABLE))"

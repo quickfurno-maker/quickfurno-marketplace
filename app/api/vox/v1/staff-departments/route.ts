@@ -7,6 +7,12 @@ export const dynamic="force-dynamic";
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PACKS=new Set(["client_success","vendor_success","acquisition","service_support"]);
+const ACTION_FIELDS:Record<string,readonly string[]>={
+ request:["action","targetStaffId","teamId","cityId","nonce","department","reason","expiresAt"],
+ review:["action","requestId","revision","decision","reference","nonce"],
+ activate:["action","requestId","revision","reference","nonce"],
+ revoke:["action","capabilityId","revision","reference","nonce"]
+};
 const send=(value:unknown,status:number)=>Response.json(value,{status,headers:{
  "cache-control":"private, no-store, max-age=0",
  "vary":"Authorization","x-content-type-options":"nosniff"
@@ -39,6 +45,13 @@ export async function POST(request:Request){
  const action=data.action;
  if(!["request","review","activate","revoke"].includes(String(action)))
   return send({ok:false,error:"UNKNOWN_ACTION"},400);
+ // Never accept browser-supplied actor/role claims or silently ignored keys.
+ // A typo/extra field is a rejected command, not an ambiguous review record.
+ const suppliedFields=Object.keys(data).sort();
+ const expectedFields=[...ACTION_FIELDS[String(action)]].sort();
+ if(suppliedFields.length!==expectedFields.length||
+    suppliedFields.some((key,index)=>key!==expectedFields[index]))
+  return send({ok:false,error:"UNKNOWN_OR_MISSING_FIELDS"},400);
  try{
   const token=request.headers.get("authorization");
   // Independent TL review is the ONLY mutation that does not use owner bearer.

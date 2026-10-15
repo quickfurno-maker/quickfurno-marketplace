@@ -1,5 +1,5 @@
 import Link from "next/link";
-import {fetchStaffOverview} from "../../lib/core";
+import {fetchStaffOverview,fetchAdminStaffCapabilityCatalog} from "../../lib/core";
 import {TeamBoard,type TeamPreview} from "./TeamBoard";
 import "./team.css";
 

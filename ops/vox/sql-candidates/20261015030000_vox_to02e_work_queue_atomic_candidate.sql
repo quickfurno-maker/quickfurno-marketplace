@@ -125,6 +125,32 @@ begin
    and s.object_id=w.related_vendor_id and s.revoked_at is null
    and s.expires_at>now())
  then raise exception 'VOX_WORK_VENDOR_DUAL_GRANT_REQUIRED' using errcode='P0001'; end if;
+ -- A work item cannot launder a source from another city into this team.
+ -- Source location is checked against canonical Core rows, not browser coordinates.
+ if w.source_kind='prospect' and not exists(
+  select 1 from public.aarohi_prospects p
+  where p.id=w.source_id and p.city_id=w.city_id)
+ then raise exception 'VOX_WORK_PROSPECT_CITY_DENIED' using errcode='P0001'; end if;
+ if w.source_kind='vendor' and not exists(
+  select 1 from public.vendors v
+  join public.marketplace_service_zones z on z.id=v.service_zone_id
+  where v.id=w.source_id and z.city_id=w.city_id and z.is_active)
+ then raise exception 'VOX_WORK_VENDOR_CITY_DENIED' using errcode='P0001'; end if;
+ if w.source_kind='support_thread' and not exists(
+  select 1 from public.vendor_support_threads s
+  join public.vendors v on v.id=s.vendor_id
+  join public.marketplace_service_zones z on z.id=v.service_zone_id
+  where s.id=w.source_id and s.vendor_id=w.related_vendor_id
+    and z.city_id=w.city_id and z.is_active)
+ then raise exception 'VOX_WORK_SUPPORT_CITY_DENIED' using errcode='P0001'; end if;
+ if p_action='CLAIM' then
+   -- Serialize capacity for distinct work items claimed by the same Staff user.
+   perform 1 from public.vox_staff_memberships_v1
+      where auth_user_id=p_actor for update;
+   if (select count(*) from public.vox_work_items_candidate_v1
+       where assignee_id=p_actor and state not in ('DONE'))>=24
+   then raise exception 'VOX_WORK_STAFF_CAPACITY_REACHED' using errcode='P0001'; end if;
+ end if;
  v_from:=w.state;
  v_next:=case
   when p_action='CLAIM' and w.state='NEW' and w.assignee_id is null then 'ASSIGNED'

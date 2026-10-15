@@ -98,4 +98,29 @@ declare fail boolean;begin
   where work_item_id='00000000-0000-4000-8000-000000000602')<>0
  then raise exception 'FAILED_ACTION_EMITTED_EVENT';end if;
 end $$;
+-- Proof against out-of-city canonical source laundering, even when the
+-- staff has a manually inserted object grant for the wrong source.
+insert into public.vox_staff_object_scopes_v1 values
+ ('00000000-0000-4000-8000-000000000001','prospect',
+  '00000000-0000-4000-8000-000000000302',now()+interval '7 days',null);
+insert into public.vox_work_items_candidate_v1
+ (id,team_id,city_id,source_kind,source_id)
+ values('00000000-0000-4000-8000-000000000603',
+ '00000000-0000-4000-8000-000000000201',
+ '00000000-0000-4000-8000-000000000101','prospect',
+ '00000000-0000-4000-8000-000000000302');
+do $vox_negative$
+declare denied boolean:=false;
+begin
+ begin
+  perform public.qf_vox_work_transition_candidate_v1(
+   '00000000-0000-4000-8000-000000000001',
+   '00000000-0000-4000-8000-000000000603',
+   0,gen_random_uuid(),'CLAIM','');
+ exception when sqlstate 'P0001' then denied:=true; end;
+ if not denied then raise exception 'CROSS_CITY_SOURCE_LAUNDERING'; end if;
+ if (select count(*) from public.vox_work_events_candidate_v1
+  where work_item_id='00000000-0000-4000-8000-000000000603')<>0
+ then raise exception 'INVALID_SOURCE_EMITTED_EVENT';end if;
+end $vox_negative$;
 select 'VOX_TO02E_SYNTHETIC_PG17_PASS' as result;

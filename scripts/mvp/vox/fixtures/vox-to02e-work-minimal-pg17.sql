@@ -55,6 +55,23 @@ insert into public.vox_staff_memberships_v1 values
  ('00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000201','acquisition_agent',true,null,now()+interval '7 days'),
  ('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000201','team_leader',true,null,now()+interval '7 days'),
  ('00000000-0000-4000-8000-000000000004','00000000-0000-4000-8000-000000000202','support_agent',true,null,now()+interval '7 days');
+-- Canonical source ownership and Google-verified zone mapping are Core-owned.
+create table public.aarohi_prospects(id uuid primary key,city_id uuid not null);
+create table public.marketplace_service_zones(
+ id uuid primary key,city_id uuid not null,is_active boolean not null);
+create table public.vendors(id uuid primary key,service_zone_id uuid not null);
+create table public.vendor_support_threads(id uuid primary key,vendor_id uuid not null);
+insert into public.aarohi_prospects values
+ ('00000000-0000-4000-8000-000000000301','00000000-0000-4000-8000-000000000101'),
+ ('00000000-0000-4000-8000-000000000302','00000000-0000-4000-8000-000000000102');
+insert into public.marketplace_service_zones values
+ ('00000000-0000-4000-8000-000000000901','00000000-0000-4000-8000-000000000101',true),
+ ('00000000-0000-4000-8000-000000000902','00000000-0000-4000-8000-000000000102',true);
+insert into public.vendors values
+ ('00000000-0000-4000-8000-000000000911','00000000-0000-4000-8000-000000000901'),
+ ('00000000-0000-4000-8000-000000000912','00000000-0000-4000-8000-000000000902');
+insert into public.vendor_support_threads values
+ ('00000000-0000-4000-8000-000000000921','00000000-0000-4000-8000-000000000911');
 insert into public.vox_staff_object_scopes_v1 values
  ('00000000-0000-4000-8000-000000000001','prospect','00000000-0000-4000-8000-000000000301',now()+interval '7 days',null);
 insert into public.vox_staff_department_requests_v1 values

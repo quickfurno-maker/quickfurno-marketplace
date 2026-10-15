@@ -8,7 +8,7 @@ select * from public.qf_vox_department_request_v1(
  'client_success',
  '00000000-0000-4000-8000-000000000021',
  now()+interval '1 day','Approved test client responsibility');
-DO $
+DO $vox_first$
 declare v_request uuid; v_self_denied boolean; v_rejection text;
 begin
  select id into v_request from public.vox_staff_department_requests_v1
@@ -102,7 +102,7 @@ begin
  then raise exception 'CAPABILITY_NOT_UNIQUE'; end if;
  if (select count(*) from public.vox_staff_department_events_v1
   where request_id=v_request)<>3 then raise exception 'AUDIT_CHAIN_MISSING'; end if;
-end $$;
+end $vox_first$;
 -- Same employee can hold a second reviewed department, separately.
 select * from public.qf_vox_department_request_v1(
  '00000000-0000-4000-8000-000000000001',

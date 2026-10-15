@@ -31,7 +31,7 @@
     },
     {
       "path": "supabase/migrations/20261014060000_vox_operational_intent_review.sql",
-      "gitBlobSha": "195035e2abbbd5fc9b7fe24dc903b6572dc31e8",
+      "gitBlobSha": "195035e2abbbd5fc9b7fe24dc903b6572dc31e8e",
       "approvedForAutoApply": false
     },
     {

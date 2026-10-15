@@ -1,0 +1,22 @@
+name: VOX TO-04M Independent Activation and Genuine Denial Test Integrity
+on:
+  pull_request:
+    paths:
+      - 'ops/vox/sql-candidates/*vox_to02c_reviewed_department_actions.sql'
+      - 'scripts/mvp/vox/fixtures/vox-to02c-real-rpc-assertions.sql'
+      - 'scripts/mvp/vox/validate-to04m-independent-activation.test.mjs'
+      - '.github/workflows/vox-to04m-activation-reviewer-separation.yml'
+permissions:
+  contents: read
+jobs:
+  deny-target-as-reviewer-before-activation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: node --test scripts/mvp/vox/validate-to04m-independent-activation.test.mjs

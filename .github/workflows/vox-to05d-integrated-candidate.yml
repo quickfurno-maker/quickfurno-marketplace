@@ -1,0 +1,50 @@
+name: VOX-05D Unified Core Staff OS Candidate - Source GREEN / Release HOLD
+on:
+  pull_request:
+    paths:
+      - 'apps/vox-web/app/team/**'
+      - 'contracts/vox/**'
+      - 'ops/vox/certification/**'
+      - 'scripts/mvp/vox/*to05d*'
+      - 'scripts/mvp/vox/fixtures/vox-to05a-*'
+      - '.github/workflows/vox-to05d-integrated-candidate.yml'
+permissions:
+  contents: read
+jobs:
+  combined-core-and-web-mfa-scoped-work:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - name: Test actual integration preconditions, no fake approvals
+        run: |
+          node --test scripts/mvp/vox/validate-to05d-unified-release-contract.test.mjs
+          node --test apps/vox-web/scripts/validate-to05c-team-hub.mjs
+          node --test scripts/mvp/vox/validate-to04m-independent-activation.test.mjs
+          node --test scripts/mvp/vox/validate-to04k-boundary-and-auth.test.mjs
+      - name: Core compilation
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+      - name: VOX Web tests, TypeScript and Next.js build
+        working-directory: apps/vox-web
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          npm run typecheck
+          npm run build
+      - name: BLOCK real release until DBA and actual Auth/owner approvals
+        shell: bash
+        run: |
+          for file in scripts/mvp/vox/check-to04c-schema-readiness.mjs scripts/mvp/vox/verify-to04g-migration-history.mjs scripts/mvp/vox/check-to04i-rls-boundary.mjs; do
+            set +e
+            node "$file" --release-check
+            CODE=$?
+            set -e
+            test "$CODE" -eq 42
+          done

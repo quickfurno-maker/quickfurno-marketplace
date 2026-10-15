@@ -4,6 +4,7 @@ on:
     paths:
       - 'scripts/release/vox-phase-a-restore-parity.mjs'
       - 'scripts/release/vox-phase-a-crossrepo-contract.mjs'
+      - 'ops/vox/review-snapshots/**'
       - 'ops/vox/phase-a-live-staging-migrations-baseline-20261015.json'
       - 'docs/release/VOX-PHASE-A-RECOVERY-INTEGRATION.md'
       - '.github/workflows/vox-phase-a-integration.yml'

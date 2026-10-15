@@ -40,6 +40,7 @@ export function projectCurrentCoreWorkEod({scope,workItems,events,verifiedSource
   items.set(row.id,row);
  }
  const counts=Object.fromEntries(Object.values(map).map(k=>[k,0]));
+ let included=0;
  const seen=new Set(),revisions=new Set();
  for(const e of events){
   if(!obj(e)||!id(e.id)||seen.has(e.id)||!id(e.work_item_id)||
@@ -59,12 +60,12 @@ export function projectCurrentCoreWorkEod({scope,workItems,events,verifiedSource
   // Event source has to be both the current Core object grant and
   // independently verified canonical source city; no unrestricted EOD export.
   if(!verified[source.source_kind].has(source.source_id))continue;
-  counts[map[e.event_type]]++;
+  counts[map[e.event_type]]++;included++;
  }
  return Object.freeze({ok:true,schema:"qf.vox.eod.core-work.partial.v1",
   mode:"READ_ONLY",actionsEnabled:false,businessDate,
   source:"CORE_WORK_LEDGER_ONLY",completeness:"PARTIAL_UNVERIFIED_TOTAL",
-  sourceWatermark:"UNAVAILABLE",eventsConsidered:events.length,
+  sourceWatermark:"UNAVAILABLE",eventsIncluded:included,
   counts:Object.freeze(counts),canSubmit:false,canAcknowledge:false,
   canExport:false,providerMessagesSent:0});
 }

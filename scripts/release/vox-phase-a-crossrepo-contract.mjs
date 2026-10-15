@@ -2,7 +2,6 @@
 // Fetches exact frozen PR heads, executes only bounded pure Core/Jarvis modules,
 // and checks AGNI owner-only guard shape. Never publishes, deploys, or calls APIs.
 import {createHash,randomUUID} from 'node:crypto';
-import {execFileSync} from 'node:child_process';
 import {mkdtempSync,writeFileSync,rmSync,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -10,39 +9,29 @@ import {pathToFileURL} from 'node:url';
 import assert from 'node:assert/strict';
 import {RELEASE} from './vox-stage-evidence-preflight.mjs';
 
-const TARGETS=[
- {name:'core',repo:'quickfurno-marketplace',
-  branch:'security/vox-phase-a-isolated-staff-principal',
-  files:['contracts/vox/agentSubjectAccess.mjs','contracts/vox/neutralStaffPrincipal.mjs']},
- {name:'jarvis',repo:'qf-jarvis',
-  branch:'release/vox-final-jarvis-aggregate',
-  files:['contracts/vox/agentView.mjs']},
- {name:'agni',repo:'qf-agni',
-  branch:'feat/vox21-agni-current-main-owner-bridge',
-  files:['packages/observability-intelligence/src/voxOwnerAttestation.ts']}
-];
-const git=(cwd,...args)=>execFileSync('git',args,{cwd,encoding:'utf8',
- timeout:40000,maxBuffer:2*1024*1024,stdio:['ignore','pipe','pipe']});
+// These are exact, pinned, non-executable contract snapshots fetched through
+// the linked first-party GitHub API from the verified release SHAs. GitHub
+// Actions for Core cannot access the PRIVATE Jarvis/AGNI repositories.
+// Therefore CI checks Git blob SHA of the frozen files and exercises them
+// offline. A separate connector review must re-verify LIVE external heads.
+const FILES=Object.freeze([
+ ['core_agentSubjectAccess.mjs','ops/vox/review-snapshots/core-vox-agentSubjectAccess.mjs','6b8356d7cc5cb7f443b4839f1ca2c1c0e138c26f'],
+ ['core_neutralStaffPrincipal.mjs','ops/vox/review-snapshots/core-vox-neutralStaffPrincipal.mjs','ed7445cb396deece6308b1f3281ff0b7be7ef2f5'],
+ ['jarvis_agentView.mjs','ops/vox/review-snapshots/jarvis-vox-agentView.mjs','869208894544a3ee2e09707d43d31421059bb0c4'],
+ ['agni_voxOwnerAttestation.ts','ops/vox/review-snapshots/agni-vox-ownerAttestation.ts','2f9f78ca7099460d334ffe6d220a27aca31deb9f']
+]);
 async function run(){
- const scratch=mkdtempSync(join(tmpdir(),'vox-phase-a-crossrepo-'));
  let checks=0;
+ const content={};
+ for(const [label,file,blob] of FILES){
+  const bytes=readFileSync(new URL('../../'+file,import.meta.url));
+  const actual=createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex');
+  assert.equal(actual,blob,'FROZEN_SOURCE_SNAPSHOT_TAMPER_'+label);
+  content[label]=bytes.toString('utf8');checks++;
+ }
+ const scratch=mkdtempSync(join(tmpdir(),'vox-phase-a-offline-'));
  try{
-  for(const target of TARGETS){
-   const url='https://github.com/quickfurno-maker/'+target.repo+'.git';
-   const ref='refs/heads/'+target.branch;
-   const head=git(scratch,'ls-remote','--heads',url,ref).trim();
-   assert.equal(head,RELEASE[target.name]+'\t'+ref,'DRIFT_'+target.name);
-   const sub=join(scratch,target.name);
-   execFileSync('mkdir',['-p',sub]);
-   git(sub,'init','--quiet');
-   git(sub,'fetch','--no-tags','--depth=1',url,RELEASE[target.name]);
-   for(const filename of target.files){
-    const body=git(sub,'show','FETCH_HEAD:'+filename);
-    writeFileSync(join(scratch,target.name+'_'+filename.split('/').at(-1)),body,'utf8');
-    checks++;
-   }
-   checks++;
-  }
+  for(const [label] of FILES)writeFileSync(join(scratch,label),content[label],'utf8');
   const read=(name)=>readFileSync(join(scratch,name),'utf8');
   const agni=read('agni_voxOwnerAttestation.ts');
   assert.match(agni,/authorizeCurrentOwner/);
@@ -90,7 +79,7 @@ async function run(){
   assert.throws(()=>jarvis.signAgentView({...e,outboundBody:'private'},secret));checks++;
   assert.throws(()=>jarvis.signAgentView({...e,agent:'ANISHA',channel:'ACQUISITION'},secret));checks++;
   const proof={schema:'qf.vox.phase-a.crossrepo.offline.v1',checks,
-    checkedHeads:{...RELEASE},roles:'OWNER_AND_SCOPED_STAFF_SEPARATE',
+    reviewedSnapshotHeads:{...RELEASE},liveRemoteHeadsCheckedByThisTool:false,roles:'OWNER_AND_SCOPED_STAFF_SEPARATE',
     jarvis:'SIGNED_READ_ONLY_REPLAY_REQUIRES_DURABLE_RUNTIME',
     agni:'OWNER_ONLY_AND_DURABLE_REPLAY_REQUIRED',
     managedStagingTested:false,productionAuthorized:false,

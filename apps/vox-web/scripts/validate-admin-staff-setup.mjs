@@ -21,6 +21,6 @@ check("denied users see no form",()=>assert.match(page,/if\(!result.ok\)return/)
 check("multi-department checkboxes are preview only",()=>assert.match(ui,/type="checkbox"/));
 check("no email/PII is sent from component",()=>assert.doesNotMatch(ui,/fetch\(|localStorage|sessionStorage|sendMessage|inviteUserByEmail|service_role|POST|\.save\(/));
 check("create action locked",()=>assert.match(ui,/<button disabled type="button"/));
-check("no team setup link without owner Core confirmation",()=>{assert.match(team,/adminSetupAvailable=\{adminSetup.ok\}/);assert.match(board,/adminStaffSetupAvailable\?<p>/);});
+check("no team setup link without owner Core confirmation",()=>{assert.match(team,/adminStaffSetupAvailable=\{adminSetup.ok\}/);assert.match(board,/adminStaffSetupAvailable\?<p>/);});
 check("no admin role is selectable",()=>assert.doesNotMatch(ui,/value="admin"|value="Superadmin"|value="owner"/));
 console.log("VOX_TO02_ADMIN_STAFF_SETUP_LOCKED_PASS "+count+"/16");

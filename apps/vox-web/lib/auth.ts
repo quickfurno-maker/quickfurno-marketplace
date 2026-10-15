@@ -8,7 +8,11 @@ export async function staffAuth() {
   cookies:{
    getAll:()=>store.getAll(),
    setAll(items: Array<{name:string; value:string; options?:object}>){for(const {name,value,options} of items)store.set(name,value,{
-    ...options,httpOnly:true,sameSite:"strict",secure:process.env.NODE_ENV==="production",path:"/"
+    ...options,httpOnly:true,
+    // The temporary PKCE verifier must cross from an email link on a top-level
+    // navigation; Supabase session cookies remain SameSite Strict.
+    sameSite:name.endsWith("-code-verifier")?"lax":"strict",
+    secure:process.env.NODE_ENV==="production",path:"/"
    });}
   },
  });

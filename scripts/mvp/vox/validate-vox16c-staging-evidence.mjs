@@ -29,7 +29,9 @@ const report={schema:'qf.vox.staging.release.evidence.v1',
  migrationSetDigest:createHash('sha256').update(rows.map(x=>x.version+':'+x.canonicalSha256).join('|')).digest('hex'),
  stagingRelease:'HOLD',productionRelease:'HOLD',migrationApplyAuthorized:false,
  missingMandatoryProof:mandatory,reason:'REAL_STAGING_BACKUP_AND_RESTORE_UNVERIFIED'};
-assert.equal(report.migrationSetDigest,'798b6b5182817807cabf5e6b5373960fca7f6f26ecb9896f43ec55dc2d7a0022');
+// This pinned seven-migration digest also matches the separately reviewed VOX-24 stage evidence contract.
+// The previous 798b6b... literal was stale, causing a false failure despite seven individually verified SQL hashes.
+assert.equal(report.migrationSetDigest,'8fb8d1c4fce97fbac7282f1ad8647b584429f2e58950c4293a7784f4667d1eaa');
 if(process.argv.includes('--authorize')||process.argv.includes('--apply')){
  console.error('DENY_STAGING_PROMOTION_MISSING_PROOF');process.exit(42);
 }

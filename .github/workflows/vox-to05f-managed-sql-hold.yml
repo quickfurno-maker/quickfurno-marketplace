@@ -2,7 +2,8 @@ name: VOX-05F Auto-Apply SQL Source Inventory and Release HOLD
 on:
   pull_request:
     paths:
-      - 'supabase/migrations/*vox*.sql'
+      - 'ops/vox/quarantined-migrations/legacy-20261014/*vox*.sql'
+      - 'supabase/migrations/*.sql'
       - 'ops/vox/sql-candidates/*vox*.sql'
       - 'ops/vox/certification/VOX-PR300-MANAGED-SQL-RELEASE-HOLD.json'
       - 'scripts/mvp/vox/*pr300-managed-migration*'

@@ -1,0 +1,89 @@
+name: VOX Phase A Recovery and Cross-Repo Integration
+on:
+  pull_request:
+    paths:
+      - 'scripts/release/vox-phase-a-restore-parity.mjs'
+      - 'scripts/release/vox-phase-a-migration-reconcile.mjs'
+      - 'docs/release/VOX-PHASE-A-20261015-MIGRATION-RECONCILIATION.md'
+      - 'scripts/release/vox-phase-a-crossrepo-contract.mjs'
+      - 'ops/vox/review-snapshots/**'
+      - 'ops/vox/phase-a-security-catalog-20261015.json'
+      - 'scripts/release/vox-phase-a-security-catalog-guard.mjs'
+      - 'ops/vox/phase-a-live-staging-migrations-baseline-20261015.json'
+      - 'docs/release/VOX-PHASE-A-RECOVERY-INTEGRATION.md'
+      - 'ops/vox/stage-host/**'
+      - 'apps/vox-web/**'
+      - '.github/workflows/vox-phase-a-integration.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recovery-parity-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24.18.0'
+      - run: node scripts/release/vox-phase-a-restore-parity.mjs --self-test
+      - run: node scripts/release/vox-phase-a-migration-reconcile.mjs --self-test
+      - run: node scripts/release/vox-phase-a-migration-reconcile.mjs
+      - run: node ops/vox/stage-host/verify-template.mjs --self-test
+      - run: node ops/vox/stage-host/verify-template.mjs
+      - name: Validate inert private VOX Compose template syntax only
+        env:
+          VOX_STAGE_IMAGE: ghcr.io/quickfurno-maker/vox-stage@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        run: docker compose -f ops/vox/stage-host/compose.yml --profile vox-private-review-only config --quiet
+      - run: node scripts/release/vox-phase-a-security-catalog-guard.mjs --self-test
+      - run: echo 'SYNTHETIC_ONLY; ACTUAL_ARCHIVE_RESTORE_NOT_VERIFIED; RELEASE_HOLD'
+  core-jarvis-agni-contract-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24.18.0'
+      - run: node scripts/release/vox-phase-a-crossrepo-contract.mjs
+      - run: echo 'EXACT_HEAD_SOURCE_ONLY; NO_STAGING_OR_PRODUCTION_ACTION; RELEASE_HOLD'
+  closed-image-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Fetch separately reviewed immutable Core VOX PR head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 1eb62ddd4780dd97366e332c70a23f5dfd94c1aa
+          path: core-vox-candidate
+          persist-credentials: false
+      - name: Build exact Core VOX draft image locally, no registry push or signing
+        run: |
+          set -euo pipefail
+          test "$(git -C core-vox-candidate rev-parse HEAD)" = "1eb62ddd4780dd97366e332c70a23f5dfd94c1aa"
+          test -f core-vox-candidate/apps/vox-web/Dockerfile
+          docker build --pull -f core-vox-candidate/apps/vox-web/Dockerfile -t qf-vox-private:ci core-vox-candidate
+          test "$(docker image inspect qf-vox-private:ci --format '{{.Config.User}}')" = "10001"
+      - name: Run closed-network read-only image regression, never deploy
+        run: |
+          set -euo pipefail
+          test ! -e .env
+          docker run --detach --name vox-ci-smoke --network none \
+            --memory 768m --cpus 0.50 --pids-limit 128 \
+            --read-only --tmpfs /tmp:rw,size=64m \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            --mount "type=bind,source=$PWD/ops/vox/stage-host/verify-image-runtime.cjs,target=/app/check.cjs,readonly" \
+            -e VOX_STAFF_PORTAL_ENABLED=disabled \
+            -e VOX_STAFF_VIEW_MODE=disabled \
+            -e VOX_OPERATIONAL_PROPOSAL_UI_ENABLED=disabled \
+            -e VOX_APPROVED_FOLLOWUP_WEB_ENABLED=disabled \
+            -e VOX_STAFF_MFA_ENROLL_ENABLED=disabled \
+            qf-vox-private:ci
+          trap 'docker rm -f vox-ci-smoke >/dev/null 2>&1 || true' EXIT
+          test "$(docker inspect vox-ci-smoke --format '{{.HostConfig.NetworkMode}}')" = "none"
+          test -z "$(docker port vox-ci-smoke)"
+          docker exec vox-ci-smoke node /app/check.cjs
+          echo "VOX_PRIVATE_IMAGE_SOURCE_ONLY_PASS; NOT_SIGNED_NOT_PUSHED_NOT_DEPLOYED; RELEASE_HOLD"

@@ -1,0 +1,66 @@
+{
+  "schema": "qf.vox.phase-a.security-catalog.v1",
+  "capturedDate": "2026-10-15",
+  "projectRef": "uckafzuochmbvtiodmcl",
+  "evidence": "first-party Supabase execute_sql read-only PG catalog",
+  "vendorPublicView": {
+    "name": "public.vendor_public_v",
+    "securityInvoker": false,
+    "anonSelect": true,
+    "authenticatedSelect": true,
+    "anonBaseVendorsSelect": false,
+    "expectedColumns": [
+      "id",
+      "business_name",
+      "city",
+      "office_city",
+      "areas_covered",
+      "covers_full_city",
+      "service_categories",
+      "selected_subcategories",
+      "selected_category",
+      "business_type",
+      "experience",
+      "years_experience",
+      "starting_price",
+      "public_description",
+      "public_service_area_summary",
+      "public_business_hours",
+      "profile_image_url",
+      "cover_image_url",
+      "portfolio_urls",
+      "rating",
+      "completed_projects"
+    ],
+    "requiredPredicates": [
+      "status = 'Approved'",
+      "is_active = true",
+      "public_visibility = true",
+      "remaining_credits > 0"
+    ]
+  },
+  "helpers": [
+    {
+      "name": "public.is_admin()",
+      "securityDefiner": true,
+      "anonExecute": false,
+      "authenticatedExecute": true,
+      "searchPath": "public",
+      "coreAdminClaim": "profiles.role='admin'"
+    },
+    {
+      "name": "public.owns_vendor(uuid)",
+      "securityDefiner": true,
+      "anonExecute": false,
+      "authenticatedExecute": true,
+      "searchPath": "public",
+      "usesAuthUid": true
+    }
+  ],
+  "openIssues": [
+    254,
+    256
+  ],
+  "riskDecision": "OWNER_REVIEW_REQUIRED",
+  "managedStagingChanged": false
+}

@@ -55,7 +55,7 @@ test("grant audit append only",()=>assert.match(sql,/grant select, insert on pub
 const route=file("app/api/vox/v1/my-work/route.ts");
 test("route requires authenticated scope",()=>assert.match(route,/getVerifiedScopedStaff/));
 test("prospect exact city",()=>assert.match(route,/\.eq\("city_id",scope\.cityId\)/));
-test("vendor validated by Core service zones",()=>assert.match(route,/\.in\("service_zone_id",zoneIds\)/));
+test("vendor validated by exact Core grants followed by active canonical service zones",()=>{assert.match(route,/\.in\("id",\[\.\.\.scope\.vendorIds\]\)/);assert.match(route,/\.in\("id",zoneIds\)/);assert.match(route,/deriveCanonicalCityVendorIds\(/);});
 test("support requires dual scope",()=>assert.match(route,/\.in\("id",\[\.\.\.scope\.supportThreadIds\]\)\.in\("vendor_id",permittedVendorIds\)/));
 test("all mutations refused",()=>assert.equal((route.match(/READ_ONLY"\},405/g)||[]).length,4));
 console.log("VOX_03_SCOPED_STAFF_PASS "+count+"/33");

@@ -1,0 +1,22 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {resolve} from "node:path";
+const root=resolve(import.meta.dirname,".."),read=x=>readFileSync(resolve(root,x),"utf8");
+const core=read("lib/core.ts"),page=read("app/team/admin/staff/page.tsx"),ui=read("app/team/admin/staff/setup.tsx"),env=read(".env.example");
+let count=0;function check(name,cb){cb();count++;console.log("PASS "+name);}
+check("directory must remain disabled by default",()=>assert.match(env,/VOX_ADMIN_STAFF_DIRECTORY_UI_ENABLED=disabled/));
+check("Core directory independent feature gate",()=>assert.match(core,/fetchAdminStaffDirectory[\s\S]*VOX_ADMIN_STAFF_DIRECTORY_UI_ENABLED!=="staging"/));
+check("Core directory staff portal and Team gates",()=>{assert.match(core,/fetchAdminStaffDirectory[\s\S]*VOX_STAFF_PORTAL_ENABLED!=="staging"/);assert.match(core,/fetchAdminStaffDirectory[\s\S]*VOX_TEAM_WORKSPACE_ENABLED!=="staging"/);});
+check("real AAL2 Auth token needed",()=>assert.match(core,/fetchAdminStaffDirectory[\s\S]*verifiedMfaSession\(\)/));
+check("read-only request at pinned Core URL",()=>assert.match(core,/fetchAdminStaffDirectory[\s\S]*base\+"\/api\/vox\/v1\/staff-directory"/));
+check("Core response actions must be disabled",()=>assert.match(core,/fetchAdminStaffDirectory[\s\S]*v.actionsEnabled!==false/));
+check("no fake total employee count",()=>assert.match(core,/v.totalKnown!==false/));
+check("strict bounded return count",()=>{assert.match(core,/v.previewCount>40/);assert.match(core,/v.members.length!==v.previewCount/);});
+check("identity reference stays masked",()=>assert.match(core,/reference=\/\^\(\?:STAFF\|TEAM\|CITY\)-/));
+check("no source token/metadata in browser UI",()=>assert.doesNotMatch(ui,/fetch\(|Authorization|Bearer|service_role|SUPABASE_|clientName|customerPhone|userEmail/));
+check("no mutating staff directory controls",()=>assert.doesNotMatch(ui,/<button[^>]+onClick|inviteUserByEmail|type="submit"/));
+check("both real owner/role and masked roster fetched server-side",()=>{assert.match(page,/await fetchAdminStaffCapabilityCatalog\(\)/);assert.match(page,/await fetchAdminStaffDirectory\(\)/);});
+check("lock when directory not Core verified",()=>assert.match(page,/roster=\{directory.ok\?directory.members:\[\]\}/));
+check("UI discloses bounded preview not total",()=>assert.match(ui,/not the total employee count/));
+check("the actual create and invite button still disabled",()=>assert.match(ui,/<button disabled type="button"/));
+console.log("VOX_TO02B_ADMIN_ROSTER_GATES_PASS "+count+"/15");

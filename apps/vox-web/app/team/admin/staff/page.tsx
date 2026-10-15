@@ -1,5 +1,5 @@
 import Link from "next/link";
-import {fetchAdminStaffCapabilityCatalog} from "../../../../lib/core";
+import {fetchAdminStaffCapabilityCatalog,fetchAdminStaffDirectory} from "../../../../lib/core";
 import {AdminStaffSetup} from "./setup";
 import "./staff.css";
 
@@ -14,5 +14,6 @@ export default async function StaffSetupPage(){
       "The private Admin setup requires separate Core and VOX activation and certification."}</p>
   <Link href="/team">Back to Team Operations</Link>
  </section></main>;
- return <AdminStaffSetup packs={result.capabilities}/>;
+ const directory=await fetchAdminStaffDirectory();
+ return <AdminStaffSetup packs={result.capabilities} roster={directory.ok?directory.members:[]} rosterVerified={directory.ok}/>;
 }

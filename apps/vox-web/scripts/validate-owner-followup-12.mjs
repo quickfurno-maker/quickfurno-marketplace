@@ -25,6 +25,6 @@ t("zero credits required",()=>assert.match(core,/response.creditsChanged!==0/));
 t("no payments or message sending in UI",()=>assert.doesNotMatch(component,/sendWhatsApp\(|payment|credit_recharge/));
 t("only approved if flag ON",()=>assert.match(page,/approved.ok\?<ApprovedFollowups/));
 t("explicit second confirmation",()=>assert.match(component,/Confirm create task/));
-t("no operation if owner inbox locked",()=>assert.match(page,/Owner approval queue unavailable/));
+t("no operation if owner inbox locked",()=>assert.match(page,/Owner \\/ Admin approval queue unavailable/));
 t("POST only no patch/delete",()=>assert.equal((route.match(/METHOD_NOT_ALLOWED/g)||[]).length,2));
 console.log("VOX12_OWNER_NATIVE_FOLLOWUP_WEB_PASS "+n+"/22");

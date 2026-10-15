@@ -64,6 +64,36 @@ A same-name alias is never mistaken for identical SQL content.
 To compare a separate Core checkout, pass `--core-root <path>`. Keep
 operator-generated JSON in restricted evidence storage (not a source commit).
 
+## Follow-up archival source search
+
+Historical Git object inspection recovered an **archived copy** of the staging
+baseline SQL (not present at this branch HEAD): Git blob
+`65e56c0419a986cc14a5abcfb184dd4a82625630`,
+former path `supabase/staging-baseline/20260722000100_qf_mvp_staging_baseline_269c9265.sql`
+(291,816 bytes; source commit `61f18c1`). This reduces the baseline's
+*source-location* uncertainty but does **not** certify reproduction in a
+fresh instance. The other five staging-specific applied migration IDs have no
+exact-named .sql objects in the local Git object index. Historical
+`ops/vendor-approval/pending/20261013133000_vendor_profile_approval_atomic.sql`
+and Core VL/scale SQL files are candidate **provenance leads only** and MUST
+NOT be treated as identical to those applied under different staging IDs.
+
+## Live Supabase security advisor read-only snapshot (15 October 2026)
+
+| Supabase linter | Severity | Findings | Current interpretation |
+|---|---|---:|---|
+| `security_definer_view` | ERROR | 1 | `public.vendor_public_v` is an intentional owner-rights projection; reviewed 21-column public allowlist, strict visibility/credit predicates and denial of base vendors table access. Formal security-exception signoff still outstanding. |
+| `authenticated_security_definer_function_executable` | WARN | 2 | Authenticated-executable `is_admin` and `owns_vendor` helper functions; verify owner and security boundary with actual role tests. |
+| `rls_enabled_no_policy` | INFO | 102 | SQL audit found **0 anon/auth SELECT and 0 anon/auth INSERT table grants** in this set, a plausible intentional server-only posture; continue permissions audit. |
+| `auth_leaked_password_protection` | WARN | 1 | **Disabled** in managed Auth. Enable via approved Dashboard/Auth policy change after compatibility review. Not fixed by running a SQL migration. |
+
+Official remediation references:
+[definer view](https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view),
+[authenticated callable definer](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable),
+[RLS no policy](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy),
+[leaked password protection](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
+These live advisor findings are NOT CI-certified remediations.
+
 ## Still required for an approved staged release
 
 - Genuine independent DBA and owner signoff including Auth/Storage scope and

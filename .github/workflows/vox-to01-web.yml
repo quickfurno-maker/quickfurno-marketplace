@@ -1,0 +1,33 @@
+name: VOX TO-01 Team Web (Closed-Mode)
+on:
+  pull_request:
+    paths:
+      - "apps/vox-web/app/team/**"
+      - "apps/vox-web/app/operations/page.tsx"
+      - "apps/vox-web/.env.example"
+      - "apps/vox-web/package.json"
+      - "apps/vox-web/scripts/validate-team-operations-01.mjs"
+      - ".github/workflows/vox-to01-web.yml"
+permissions:
+  contents: read
+jobs:
+  closed-mode-team-shell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/vox-web
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "20.20.2"
+          cache: npm
+          cache-dependency-path: apps/vox-web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      - run: node scripts/smoke-standalone-origin-12b.mjs

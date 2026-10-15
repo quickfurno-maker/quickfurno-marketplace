@@ -20,7 +20,7 @@ t("BFF rejects unknown approval fields",()=>assert.match(api,/Object.keys\(x\).s
 t("BFF only expected revision zero",()=>assert.match(api,/x\.expectedRevision!==0/));
 t("UI requires explicit second confirmation",()=>assert.match(ui,/Confirm review/));
 t("UI only sends to same origin",()=>assert.match(ui,/fetch\("\/api\/action-intents"/));
-t("approvals page fail closed",()=>assert.match(page,/Owner approval queue unavailable/));
+t("approvals page fail closed",()=>assert.match(page,/Owner \/ Admin approval queue unavailable/));
 t("owner queue linked from mission control",()=>assert.match(ops,/href="\/approvals"/));
 t("never claims approved action executed",()=>assert.match(ui,/No operational action has been executed/));
 t("no WhatsApp send or direct CRM write in page",()=>assert.doesNotMatch(ui+page,/sendWhatsApp\(|createVendorTask\(|updateAarohiWorkflow\(/));

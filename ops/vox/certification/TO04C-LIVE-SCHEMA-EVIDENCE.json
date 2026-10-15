@@ -1,0 +1,253 @@
+{
+  "schema": "qf.vox.live-schema-metadata.v1",
+  "capturedAtUtc": "2026-10-15T14:52:00Z",
+  "evidenceSource": "connected_supabase_metadata_read_only",
+  "includesUserRows": false,
+  "releaseAuthorization": false,
+  "requiredTables": [
+    {
+      "table": "aarohi_prospects",
+      "columns": [
+        "id",
+        "city_id"
+      ]
+    },
+    {
+      "table": "cities",
+      "columns": [
+        "id",
+        "is_active"
+      ]
+    },
+    {
+      "table": "marketplace_service_zones",
+      "columns": [
+        "id",
+        "city_id",
+        "is_active"
+      ]
+    },
+    {
+      "table": "profiles",
+      "columns": [
+        "id",
+        "role",
+        "is_active"
+      ]
+    },
+    {
+      "table": "vendor_support_threads",
+      "columns": [
+        "id",
+        "vendor_id"
+      ]
+    },
+    {
+      "table": "vendors",
+      "columns": [
+        "id",
+        "service_zone_id"
+      ]
+    },
+    {
+      "table": "vox_staff_department_activations_v1",
+      "columns": [
+        "request_id",
+        "capability_id",
+        "activated_by"
+      ]
+    },
+    {
+      "table": "vox_staff_department_capabilities_v1",
+      "columns": [
+        "id",
+        "request_id",
+        "auth_user_id",
+        "team_id",
+        "city_id",
+        "department",
+        "granted_by",
+        "expires_at",
+        "revoked_at",
+        "revision"
+      ]
+    },
+    {
+      "table": "vox_staff_department_decisions_v1",
+      "columns": [
+        "request_id",
+        "reviewer_id",
+        "decision",
+        "decision_reference"
+      ]
+    },
+    {
+      "table": "vox_staff_department_events_v1",
+      "columns": [
+        "id"
+      ]
+    },
+    {
+      "table": "vox_staff_department_requests_v1",
+      "columns": [
+        "id",
+        "requested_by",
+        "target_staff_id",
+        "team_id",
+        "city_id",
+        "department",
+        "state",
+        "revision",
+        "expires_at",
+        "decided_by",
+        "decision_reference"
+      ]
+    },
+    {
+      "table": "vox_staff_memberships_v1",
+      "columns": [
+        "auth_user_id",
+        "team_id",
+        "staff_role",
+        "is_active",
+        "revoked_at",
+        "expires_at"
+      ]
+    },
+    {
+      "table": "vox_staff_object_scopes_v1",
+      "columns": [
+        "auth_user_id",
+        "scope_kind",
+        "object_id",
+        "expires_at",
+        "revoked_at"
+      ]
+    },
+    {
+      "table": "vox_staff_teams_v1",
+      "columns": [
+        "id",
+        "city_id",
+        "is_active"
+      ]
+    },
+    {
+      "table": "vox_work_events_candidate_v1",
+      "columns": [
+        "id",
+        "work_item_id",
+        "event_nonce",
+        "to_revision"
+      ]
+    },
+    {
+      "table": "vox_work_items_candidate_v1",
+      "columns": [
+        "id",
+        "team_id",
+        "city_id",
+        "source_kind",
+        "source_id",
+        "assignee_id",
+        "revision",
+        "state",
+        "updated_at"
+      ]
+    }
+  ],
+  "environments": {
+    "staging": {
+      "migrationCount": 86,
+      "publicTableCount": 142,
+      "missingRequiredTables": [
+        "vox_staff_department_activations_v1",
+        "vox_staff_department_capabilities_v1",
+        "vox_staff_department_decisions_v1",
+        "vox_staff_department_events_v1",
+        "vox_staff_department_requests_v1",
+        "vox_staff_memberships_v1",
+        "vox_staff_object_scopes_v1",
+        "vox_staff_teams_v1",
+        "vox_work_events_candidate_v1",
+        "vox_work_items_candidate_v1"
+      ],
+      "observedPresent": [
+        "aarohi_prospects",
+        "cities",
+        "marketplace_service_zones",
+        "profiles",
+        "vendor_support_threads",
+        "vendors"
+      ]
+    },
+    "production": {
+      "migrationCount": 86,
+      "publicTableCount": 141,
+      "missingRequiredTables": [
+        "vox_staff_department_activations_v1",
+        "vox_staff_department_capabilities_v1",
+        "vox_staff_department_decisions_v1",
+        "vox_staff_department_events_v1",
+        "vox_staff_department_requests_v1",
+        "vox_staff_memberships_v1",
+        "vox_staff_object_scopes_v1",
+        "vox_staff_teams_v1",
+        "vox_work_events_candidate_v1",
+        "vox_work_items_candidate_v1"
+      ],
+      "observedPresent": [
+        "aarohi_prospects",
+        "cities",
+        "marketplace_service_zones",
+        "profiles",
+        "vendor_support_threads",
+        "vendors"
+      ]
+    }
+  },
+  "migrationComparison": {
+    "sharedVersionIds": 34,
+    "stagingOnlyVersionIds": 52,
+    "productionOnlyVersionIds": 52,
+    "meaning": "Migration counts are equal, but version histories are not identical; requires DBA-reviewed manifest/checksum/restore reconciliation."
+  },
+  "securityAdvisories": [
+    {
+      "kind": "security_definer_view",
+      "severity": "ERROR",
+      "object": "public.vendor_public_v",
+      "affects": [
+        "staging",
+        "production"
+      ],
+      "reviewRequired": true
+    },
+    {
+      "kind": "authenticated_security_definer_function_executable",
+      "severity": "WARN",
+      "object": "public.is_admin()",
+      "affects": [
+        "staging",
+        "production"
+      ],
+      "reviewRequired": true
+    },
+    {
+      "kind": "authenticated_security_definer_function_executable",
+      "severity": "WARN",
+      "object": "public.owns_vendor(uuid)",
+      "affects": [
+        "staging",
+        "production"
+      ],
+      "reviewRequired": true
+    }
+  ],
+  "reviewState": "UNREVIEWED_RELEASE_HOLD",
+  "dbaApproved": false,
+  "independentSecurityApproved": false,
+  "restoreVerified": false,
+  "realAal2StagingVerified": false,
+  "note": "Read-only point-in-time metadata. Never use this snapshot to claim live readiness or approve schema changes; rerun evidence against the exact protected staging release."
+}

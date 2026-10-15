@@ -24,13 +24,17 @@ seq 1 50 | xargs -P 50 -I '{}' bash -c '
   i="$1"
   item=$(printf "00000000-0000-4000-8000-%012d" "$((2000+i))")
   err="/tmp/vox-capacity-$i.err"
-  if psql -X -v ON_ERROR_STOP=1 -Atqc "select new_revision from
+  # -c may report SQL errors while the client itself exits normally.
+  # The only successful receipt is the exact revision 1 output plus no ERROR.
+  # Match capacity rejection by its SQL error, not by shell exit status.
+  psql -X -v ON_ERROR_STOP=1 -Atqc "select new_revision from
     public.qf_vox_work_transition_candidate_v1(
       '\''00000000-0000-4000-8000-000000000001'\'',
       '\''$item'\'',0,gen_random_uuid(),'\''CLAIM'\'','\'''\'')"
-      >"/tmp/vox-capacity-$i.out" 2>"$err"; then
+      >"/tmp/vox-capacity-$i.out" 2>"$err" || true
+  if grep -qx "1" "/tmp/vox-capacity-$i.out" && ! grep -q "ERROR:" "$err"; then
     echo "OK $i"
-  elif grep -q "VOX_WORK_STAFF_CAPACITY_REACHED" "$err"; then
+  elif test ! -s "/tmp/vox-capacity-$i.out" && grep -q "VOX_WORK_STAFF_CAPACITY_REACHED" "$err"; then
     echo "DENIED_CAPACITY $i"
   else
     echo "UNEXPECTED_FAILURE $i" >&2

@@ -109,7 +109,7 @@ insert into public.vox_work_items_candidate_v1
  '00000000-0000-4000-8000-000000000201',
  '00000000-0000-4000-8000-000000000101','prospect',
  '00000000-0000-4000-8000-000000000302');
-do $
+do $vox_negative$
 declare denied boolean:=false;
 begin
  begin
@@ -122,5 +122,5 @@ begin
  if (select count(*) from public.vox_work_events_candidate_v1
   where work_item_id='00000000-0000-4000-8000-000000000603')<>0
  then raise exception 'INVALID_SOURCE_EMITTED_EVENT';end if;
-end $;
+end $vox_negative$;
 select 'VOX_TO02E_SYNTHETIC_PG17_PASS' as result;

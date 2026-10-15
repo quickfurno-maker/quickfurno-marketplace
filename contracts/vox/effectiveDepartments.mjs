@@ -12,18 +12,30 @@ const closed=()=>null;
  * canonical Core owner-verified subject and consent/handover joins exist.
  * TL/auditor never receives subject content from this resolver.
  */
-export function restrictScopedStaffByDepartment({scoped,capabilities,requests,decisions,activations,now=Date.now()}={}){
+export function restrictScopedStaffByDepartment({scoped,capabilities,requests,decisions,activations,reviewers,now=Date.now()}={}){
  if(!obj(scoped)||!id(scoped.userId)||!id(scoped.teamId)||!id(scoped.cityId)||
     !Number.isSafeInteger(now)||now<=0||
     !Array.isArray(capabilities)||capabilities.length>16||
     !Array.isArray(requests)||requests.length>16||
     !Array.isArray(decisions)||decisions.length>16||
-    !Array.isArray(activations)||activations.length>16)return closed();
+    !Array.isArray(activations)||activations.length>16||
+    !Array.isArray(reviewers)||reviewers.length>16)return closed();
  for(const key of ["prospectIds","vendorIds","supportThreadIds","conversationIds"]){
   if(!Array.isArray(scoped[key])||scoped[key].length>200||
      scoped[key].some(x=>!id(x)))return closed();
  }
- const req=new Map(), dec=new Map(), act=new Map(), packs=new Set();
+ const req=new Map(), dec=new Map(), act=new Map(), packs=new Set(),liveReviewers=new Map();
+ for(const proof of reviewers){
+  if(!obj(proof)||!id(proof.userId)||liveReviewers.has(proof.userId)||
+     proof.userId===scoped.userId||proof.role!==null||
+     proof.isActive!==true||proof.qfPrincipal!=="vox_staff"||
+     proof.adminRole!==null||proof.voxRole!=="team_leader"||
+     proof.staffRole!=="team_leader"||proof.membershipActive!==true||
+     proof.revokedAt!==null||proof.teamId!==scoped.teamId||
+     proof.cityId!==scoped.cityId||proof.teamActive!==true||
+     !until(proof.expiresAt,now))return closed();
+  liveReviewers.set(proof.userId,true);
+ }
  for(const row of requests){
   if(!obj(row)||!id(row.id)||req.has(row.id))return closed();
   req.set(row.id,row);
@@ -50,7 +62,8 @@ export function restrictScopedStaffByDepartment({scoped,capabilities,requests,de
      r.department!==g.department||r.state!=="APPROVED"||r.revision!==1||
      !until(r.expires_at,now)||r.requested_by!==g.granted_by||
      !id(r.decided_by)||r.decided_by===r.requested_by||
-     r.decided_by===r.target_staff_id||d.reviewer_id!==r.decided_by||
+     r.decided_by===r.target_staff_id||!liveReviewers.has(r.decided_by)||
+     d.reviewer_id!==r.decided_by||
      d.decision!=="APPROVED"||d.decision_reference!==r.decision_reference||
      a.request_id!==r.id||a.capability_id!==g.id||
      a.activated_by!==g.granted_by)return closed();

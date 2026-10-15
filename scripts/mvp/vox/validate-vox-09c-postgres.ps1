@@ -15,7 +15,7 @@ try{
  $parts[0] | docker exec -i $name psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres
  if($LASTEXITCODE -ne 0){throw 'FIXTURE_BOOTSTRAP_FAILED'}
  foreach($f in @('20261014010000_vox_v1_scoped_staff_authority.sql','20261014060000_vox_operational_intent_review.sql')){
- (Get-Content (Join-Path $root ('supabase\migrations\'+$f)) -Raw) |
+ (Get-Content (Join-Path $root ('ops\vox\quarantined-migrations\legacy-20261014\'+$f)) -Raw) |
   docker exec -i $name psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres
  if($LASTEXITCODE -ne 0){throw ('MIGRATION_FAILED '+$f)}
  }

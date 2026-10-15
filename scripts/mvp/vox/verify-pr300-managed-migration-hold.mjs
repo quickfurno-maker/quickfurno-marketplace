@@ -11,7 +11,7 @@ const old=[
  "20261014050000_vox_v1_team_leader_review_policy.sql",
  "20261014060000_vox_operational_intent_review.sql",
  "20261014070000_vox_approved_followup_executor.sql"
-].map(name=>"supabase/migrations/"+name);
+].map(name=>"ops/vox/quarantined-migrations/legacy-20261014/"+name);
 const newer=[
  "20261015010000_vox_to02b_staff_department_governance.sql",
  "20261015020000_vox_to02c_reviewed_department_actions.sql",
@@ -28,7 +28,7 @@ export function checkVoxPr300MigrationHold(
  listManaged=()=>readdirSync(resolve(root,"supabase/migrations"))
 ){
  if(!evidence||typeof evidence!=="object"||
-   evidence.schema!=="qf.vox.release.migration.compatibility.v1"||
+   evidence.schema!=="qf.vox.release.migration.quarantine.v2"||
    !Array.isArray(evidence.legacyManagedMigrations)||
    !Array.isArray(evidence.proposedSqlCandidates))
   return fail("INVALID_SOURCE_PROVENANCE");
@@ -45,7 +45,7 @@ export function checkVoxPr300MigrationHold(
  if(!Array.isArray(managed)||managed.some(x=>typeof x!=="string"))
   return fail("MANAGED_MIGRATION_DISCOVERY_INVALID");
  const observed=managed.filter(n=>/vox/i.test(n)&&n.endsWith(".sql")).sort();
- const expected=old.map(p=>p.slice("supabase/migrations/".length)).sort();
+ const expected=[];
  if(JSON.stringify(observed)!==JSON.stringify(expected))
   return fail("UNDECLARED_MANAGED_VOX_SQL");
  const all=[...evidence.legacyManagedMigrations,...evidence.proposedSqlCandidates];
@@ -78,8 +78,8 @@ export function checkVoxPr300MigrationHold(
  if(!evidence.deployment||!deployment.every(k=>evidence.deployment[k]===false))
   return fail("UNAUTHORIZED_DEPLOYMENT_STATE");
  return Object.freeze({ok:true,releaseAllowed:false,
-  reason:"TWO_SQL_AUTHORITY_TRACKS_UNAPPROVED_LIVE_SCHEMA_ABSENT",
-  managedMigrationCount:old.length,unappliedCandidateCount:newer.length,
+  reason:"QUARANTINED_TWO_SQL_AUTHORITY_TRACKS_UNAPPROVED_LIVE_SCHEMA_ABSENT",
+  managedMigrationCount:0,quarantinedLegacyCount:old.length,unappliedCandidateCount:newer.length,
   latestStageAndProductionVoxTablesPresent:0,
   independentDbaAndStageReviewRequired:true});
 }

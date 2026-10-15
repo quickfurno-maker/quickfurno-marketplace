@@ -18,4 +18,5 @@ test("chat send not exposed",()=>assert.doesNotMatch(board,/sendWhatsApp|sendMes
 test("desktop and mobile navigation",()=>{assert.match(css,/\.teamRail/);assert.match(css,/\.teamMobileNav/);});
 test("locked default configuration documented",()=>assert.match(read(".env.example"),/VOX_TEAM_WORKSPACE_ENABLED=disabled/));
 test("operations links only when explicitly enabled",()=>assert.match(read("app/operations/page.tsx"),/VOX_TEAM_WORKSPACE_ENABLED==="staging"/));
-console.log("VOX_TO01_TEAM_WEB_GATES_PASS "+checks+"/14");
+test("one Owner/Admin persona and preserved Superadmin authority",()=>{const approvals=read("app/approvals/page.tsx");assert.match(board,/Owner \/ Admin · Governed approvals/);assert.match(board,/Operations Managers, Team Leaders and Staff do not inherit/);assert.match(approvals,/CORE SUPERADMIN AAL2/);assert.match(read("app/operations/page.tsx"),/Owner \/ Admin Approvals/);});
+console.log("VOX_TO01_TEAM_WEB_GATES_PASS "+checks+"/15");

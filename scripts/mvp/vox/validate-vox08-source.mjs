@@ -10,7 +10,7 @@ const ctx=resolveScopedStaff({userId:id(1),identityVerified:true,
  membership:{auth_user_id:id(1),team_id:id(2),staff_role:"team_leader",is_active:true,revoked_at:null,expires_at:until},
  team:{id:id(2),city_id:id(3),is_active:true},
  grants:[{auth_user_id:id(1),scope_kind:"prospect",object_id:id(4),expires_at:until,revoked_at:null}],now});
-const sql=read("supabase/migrations/20261014050000_vox_v1_team_leader_review_policy.sql");
+const sql=read("ops/vox/quarantined-migrations/legacy-20261014/20261014050000_vox_v1_team_leader_review_policy.sql");
 const route=read("app/api/vox/v1/staff-grants/route.ts");
 test("active verified Team Leader eligible",()=>assert.equal(ctx?.role,"team_leader"));
 test("Team Leader sees no general prospects",()=>assert.deepEqual(ctx.prospectIds,[]));

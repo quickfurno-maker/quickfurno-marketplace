@@ -67,7 +67,7 @@ try {
  docker("run","-d","--name",rest,"--network",net,"-p","127.0.0.1::3000",
  "-e","PGRST_DB_URI=postgres://authenticator:"+pass+"@"+pgname+":5432/vl01",
  "-e","PGRST_DB_SCHEMAS=public","-e","PGRST_DB_ANON_ROLE=anon","-e","PGRST_JWT_SECRET="+jwtSecret,
- "-e","PGRST_SERVER_PORT=3000","public.ecr.aws/supabase/postgrest:v16.1");dbs.push(rest);
+ "-e","PGRST_SERVER_PORT=3000","ghcr.io/supabase/postgrest:v16.1@sha256:5922bde07147b82b1c9d8f749e48c1e5b99ebb233f3888bb7ab65f07cf4ac82d");dbs.push(rest);
  const restPort=Number(docker("port",rest,"3000/tcp").match(/127\.0\.0\.1:(\d+)/)?.[1]);
  await ready("http://127.0.0.1:"+restPort+"/");
  const server=createServer((request,response)=>{

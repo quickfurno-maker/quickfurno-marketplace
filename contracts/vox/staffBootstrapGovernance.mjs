@@ -1,4 +1,5 @@
 // VOX Phase A: pure guard for staff invitations and MFA recovery.
+import {createHash,timingSafeEqual} from 'node:crypto';
 // NO Auth Admin API, email sending, token minting, browser action or DB write.
 // Only trusted Core-side, independently verified authorizers may populate input.
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -20,12 +21,21 @@ export function prepareStaffInvitation(input){
     !UUID.test(team.id)||!UUID.test(team.cityId))return deny('TEAM_OR_REVIEW_UNAVAILABLE');
  if(!leader(review,team.id)||review.id===admin.id)return deny('INDEPENDENT_TEAM_LEADER_REVIEW_REQUIRED');
  if(review.signedCoreReceiptVerified!==true||review.decision!=='APPROVED'||review.requestNonce!==request.nonce||
+    review.staffRole!==request.staffRole||review.cityId!==team.cityId||
+    !Number.isFinite(review.validUntilMs)||review.validUntilMs<nowMs||
+    review.validUntilMs>nowMs+86400000||
     !UUID.test(String(request.nonce??''))||review.targetEmailSha256!==request.emailSha256)
    return deny('REVIEW_RECEIPT_MISMATCH');
  if(typeof request.email!=='string'||request.email.length>254||
     !EMAIL.test(request.email)||request.email!==request.email.trim()||
     !/^[a-f0-9]{64}$/.test(String(request.emailSha256??'')))
    return deny('INVALID_IDENTITY');
+ // Independently bind the email to the approved receipt before any operator step.
+ const emailDigest=createHash('sha256').update(request.email.toLowerCase(),'utf8').digest('hex');
+ const claimed=Buffer.from(request.emailSha256,'hex');
+ const actual=Buffer.from(emailDigest,'hex');
+ if(claimed.length!==actual.length||!timingSafeEqual(claimed,actual))
+   return deny('REVIEWED_EMAIL_BINDING_DENIED');
  if(!ROLES.has(request.staffRole)||!validTime(request.expiresAtMs,nowMs))
    return deny('ROLE_OR_LEASE_DENIED');
  if(request.existingUser===true||request.existingCoreAdmin===true||

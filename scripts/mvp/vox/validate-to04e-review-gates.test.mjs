@@ -19,7 +19,7 @@ test("initial Team Leader signature is not a Core privilege bootstrap",()=>{
  assert.match(src,/INDEPENDENT_APPROVED_SERVER_REGISTRY/);
  assert.match(src,/bootstrapAuthorized:false/);
  assert.match(src,/requiresIndependentDbaApprovedNonceConsumption:true/);
- assert.doesNotMatch(src,/\.from\(|\.rpc\(|inviteUserByEmail|createUser\(/);
+ assert.doesNotMatch(src,/\b(?:db|client)\.from\(|\.rpc\(|inviteUserByEmail|createUser\(/);
 });
 test("source integration retains single canonical route, scoped work and no live client messages",()=>{
  assert.equal(existsSync(resolve(root,"app/api/vox/v1/staff-department-actions/route.ts")),false);

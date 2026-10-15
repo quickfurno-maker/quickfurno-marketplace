@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {resolve} from "node:path";
-const sql=readFileSync(resolve(import.meta.dirname,"../../../supabase/migrations/20261014020000_vox_v1_staff_review_workflow.sql"),"utf8");
+const sql=readFileSync(resolve(import.meta.dirname,"../../../ops/vox/quarantined-migrations/legacy-20261014/20261014020000_vox_v1_staff_review_workflow.sql"),"utf8");
 let n=0;function test(label,fn){fn();n++;console.log("PASS "+label);}
 test("review requests require unique nonce",()=>assert.match(sql,/request_nonce uuid not null unique/));
 test("new review pending by default",()=>assert.match(sql,/state text not null default 'PENDING'/));

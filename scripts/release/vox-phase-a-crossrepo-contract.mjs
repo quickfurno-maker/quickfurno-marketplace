@@ -1,6 +1,7 @@
 // VOX Phase A cross-repository, READ-ONLY source contract proof.
-// Fetches exact frozen PR heads, executes only bounded pure Core/Jarvis modules,
-// and checks AGNI owner-only guard shape. Never publishes, deploys, or calls APIs.
+// Verifies checked-in source snapshots from authenticated pinned PR heads,
+// executes bounded pure Core/Jarvis modules and checks AGNI source guard.
+// Does not check LIVE private repository heads or deploy, publish or call APIs.
 import {createHash,randomUUID} from 'node:crypto';
 import {mkdtempSync,writeFileSync,rmSync,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';

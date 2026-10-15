@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {resolve} from "node:path";
 const root=resolve(import.meta.dirname,"../../.."),read=p=>readFileSync(resolve(root,p),"utf8");
-const sql=read("supabase/migrations/20261014030000_vox_v1_approved_grant_finalizer.sql");
+const sql=read("ops/vox/quarantined-migrations/legacy-20261014/20261014030000_vox_v1_approved_grant_finalizer.sql");
 const api=read("app/api/vox/v1/staff-grants/route.ts");
 let n=0;function t(title,fn){fn();console.log("PASS "+title);n++;}
 t("no production write without explicit staging gate",()=>assert.match(api,/VOX_STAFF_GRANTS_ENABLED!=="staging"/));
@@ -35,7 +35,7 @@ t("browser RLS forced",()=>assert.match(sql,/force row level security/));
 t("no direct browser RPC execute",()=>assert.match(sql,/revoke all on function public\.qf_vox_activate_reviewed_access_v1/));
 t("all HTTP read mutation methods shut",()=>assert.equal((api.match(/METHOD_NOT_ALLOWED/g)||[]).length,4));
 t("no direct vendor money or Meta send",()=>assert.doesNotMatch(api,/\.from\("vendors"\)\.update|sendWhatsApp|remaining_credits|lead_assignments/));
-const revocation=read("supabase/migrations/20261014040000_vox_v1_staff_emergency_revocation.sql");
+const revocation=read("ops/vox/quarantined-migrations/legacy-20261014/20261014040000_vox_v1_staff_emergency_revocation.sql");
 t("revocation role verified in database",()=>assert.match(revocation,/admin_role'='Superadmin'/));
 t("revocation exact team optimistic fence",()=>assert.match(revocation,/m.team_id<>p_expected_team_id/));
 t("revocation requires target not owner",()=>assert.match(revocation,/p_authenticated_owner_id=p_target_id/));

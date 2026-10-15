@@ -3,8 +3,14 @@ import {useState} from "react";
 import Link from "next/link";
 
 type Pack={key:string;label:string};
-export function AdminStaffSetup({packs}:{packs:readonly Pack[]}){
+type StaffPreview={staffRef:string;teamRef:string;cityRef:string;role:string;
+ state:"ACTIVE"|"SUSPENDED_OR_EXPIRED";expiresAt:string};
+export function AdminStaffSetup({packs,roster,rosterVerified=false}:{
+ packs:readonly Pack[];roster:readonly StaffPreview[];rosterVerified?:boolean
+}){
  const [selected,setSelected]=useState<string[]>([]);
+ const [filter,setFilter]=useState("");
+ const list=roster.filter(r=>(r.staffRef+" "+r.teamRef+" "+r.cityRef+" "+r.role).toLowerCase().includes(filter.toLowerCase()));
  const toggle=(key:string,on:boolean)=>setSelected(prev=>on?[...new Set([...prev,key])]:prev.filter(x=>x!==key));
  const ordered=packs.filter(p=>selected.includes(p.key));
  return <main className="staffSetup">
@@ -34,6 +40,23 @@ export function AdminStaffSetup({packs}:{packs:readonly Pack[]}){
      <strong>Selected responsibilities: {ordered.length}</strong>
      <p>{ordered.length?ordered.map(x=>x.label).join(" · "):"Choose at least one department to preview a future staff request."}</p>
     </aside>
+   </section>
+   <section className="staffSetupCard" aria-labelledby="roster-heading">
+    <h2 id="roster-heading">Existing Staff · Core-authorized preview</h2>
+    {!rosterVerified?<p role="status">Staff directory is unavailable or not independently enabled. No personnel information is displayed.</p>:<>
+     <p>{roster.length} records in a bounded preview, not the total employee count. No contact details or staff access changes are available.</p>
+     <label className="staffRosterSearch">Filter permitted preview
+      <input value={filter} onChange={e=>setFilter(e.target.value)} type="search"
+        placeholder="Staff, role, team or city" maxLength={80}/></label>
+     {list.length===0?<p role="status">No matching staff in this bounded preview.</p>:
+      <div className="staffRosterList" role="list" aria-label="Existing staff directory preview">
+       {list.map((member,i)=><article key={member.staffRef+":"+i} role="listitem" className="staffRosterRow">
+        <div><strong>{member.staffRef}</strong><small>{member.role.replaceAll("_"," ")}</small></div>
+        <div><small>{member.teamRef} · {member.cityRef}</small>
+         <small>{member.state==="ACTIVE"?"Active":"Suspended / expired"} · Expires {new Date(member.expiresAt).toLocaleDateString("en-IN",{timeZone:"Asia/Kolkata"})}</small></div>
+       </article>)}
+      </div>}
+    </>}
    </section>
    <section className="staffSetupCard">
     <h2>Next: Verified identity and city/team</h2>

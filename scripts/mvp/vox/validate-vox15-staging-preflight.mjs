@@ -7,7 +7,8 @@ const ROOT=resolve(fileURLToPath(new URL("../../..",import.meta.url)));
 const read=(f)=>readFileSync(resolve(ROOT,f));
 const hash=b=>createHash("sha256").update(b).digest("hex");
 const normalized=b=>Buffer.from(b.toString("utf8").replace(/\r\n/g,"\n").replace(/\r/g,"\n"),"utf8");
-const prefix="supabase/migrations/";
+const prefix="supabase/migrations/"; // original historical ledger path, immutable
+const sourcePrefix="ops/vox/quarantined-migrations/legacy-20261014/"; // review-only source
 const exact=[
  "20261014010000_vox_v1_scoped_staff_authority.sql",
  "20261014020000_vox_v1_staff_review_workflow.sql",
@@ -28,7 +29,7 @@ function validate(records,files=exact){
    r.evidence!==evidence||
    r.exactVersionPresence?.staging!==false||
    r.exactVersionPresence?.production!==false)return false;
-  if(r.canonicalSha256!==hash(normalized(read(prefix+f))))return false;
+  if(r.canonicalSha256!==hash(normalized(read(sourcePrefix+f))))return false;
  }
  return true;
 }

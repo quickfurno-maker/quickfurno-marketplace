@@ -48,8 +48,12 @@ CREATE UNIQUE INDEX aarohi_events_idempotency_idx ON public.aarohi_events
 '@
  $native | docker exec -i $source psql -X -q -U postgres -d postgres -v ON_ERROR_STOP=1
  if($LASTEXITCODE -ne 0){throw 'NATIVE_AAROHI_FIXTURE_FAILED'}
- $sqls=@(Get-ChildItem (Join-Path $root 'supabase\migrations') -Filter '20261014*vox*.sql'|Sort-Object Name)
- if($sqls.Count -ne 7){throw 'EXACT_SEVEN_VOX_SQL_FILES_REQUIRED'}
+ # Preserve original migration semantics for OFFLINE recovery while refusing
+ # to re-introduce the unapproved legacy SQL to managed deploy discovery.
+ $managed=@(Get-ChildItem (Join-Path $root 'supabase\migrations') -Filter '*vox*.sql' -File)
+ if($managed.Count -ne 0){throw 'UNAPPROVED_MANAGED_VOX_SQL_PRESENT'}
+ $sqls=@(Get-ChildItem (Join-Path $root 'ops\vox\quarantined-migrations\legacy-20261014') -Filter '20261014*vox*.sql' -File|Sort-Object Name)
+ if($sqls.Count -ne 7){throw 'EXACT_SEVEN_QUARANTINED_VOX_SQL_FILES_REQUIRED'}
  foreach($sql in $sqls){
   (Get-Content $sql.FullName -Raw)|docker exec -i $source psql -X -q -U postgres -d postgres -v ON_ERROR_STOP=1
   if($LASTEXITCODE -ne 0){throw ('MIGRATION_FAILED_'+$sql.Name)}

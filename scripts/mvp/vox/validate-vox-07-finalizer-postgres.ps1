@@ -17,7 +17,7 @@ try {
  $pieces[0] | docker exec -i $name psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres
  if($LASTEXITCODE -ne 0){throw 'BOOTSTRAP_FAILED'}
  foreach($namePart in $migrations){
-   (Get-Content (Join-Path $root ('supabase\migrations\'+$namePart)) -Raw) |
+   (Get-Content (Join-Path $root ('ops\vox\quarantined-migrations\legacy-20261014\'+$namePart)) -Raw) |
     docker exec -i $name psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres
    if($LASTEXITCODE -ne 0){throw ('MIGRATION_FAILED='+$namePart)}
  }

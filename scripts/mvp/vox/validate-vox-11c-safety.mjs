@@ -7,7 +7,7 @@ const manifest=JSON.parse(read("docs/vox/VOX-11-RELEASE-MANIFEST.json"));
 const intent=read("app/api/vox/v1/action-intents/route.ts"),
  task=read("app/api/vox/v1/vendor-task/route.ts"),
  studio=read("app/api/vox/v1/studio-simulate/route.ts"),
- sql=read("supabase/migrations/20261014060000_vox_operational_intent_review.sql");
+ sql=read("ops/vox/quarantined-migrations/legacy-20261014/20261014060000_vox_operational_intent_review.sql");
 let n=0;function check(name,fn){fn();console.log("PASS "+name);n++;}
 check("global release stays hold",()=>assert.equal(manifest.releaseStatus,"HOLD"));
 check("no launch gate silently certified",()=>assert.ok(Object.values(manifest.criticalGates).every(v=>v===false)));

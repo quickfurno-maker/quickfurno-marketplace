@@ -47,7 +47,7 @@ CREATE UNIQUE INDEX aarohi_events_idempotency_idx
  foreach($file in @('20261014010000_vox_v1_scoped_staff_authority.sql',
  '20261014060000_vox_operational_intent_review.sql',
  '20261014070000_vox_approved_followup_executor.sql')){
- (Get-Content (Join-Path $root ('supabase\migrations\'+$file)) -Raw) |
+ (Get-Content (Join-Path $root ('ops\vox\quarantined-migrations\legacy-20261014\'+$file)) -Raw) |
  docker exec -i $name psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres
  if($LASTEXITCODE -ne 0){throw ('MIGRATION_FAILED '+$file)}
  }

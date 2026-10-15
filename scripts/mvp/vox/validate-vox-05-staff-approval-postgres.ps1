@@ -2,8 +2,8 @@
 $ErrorActionPreference="Stop"
 $name="qf-vox05-grant-review-cert"
 $root=(Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
-$m1=Join-Path $root "supabase\migrations\20261014010000_vox_v1_scoped_staff_authority.sql"
-$m2=Join-Path $root "supabase\migrations\20261014020000_vox_v1_staff_review_workflow.sql"
+$m1=Join-Path $root "ops\vox\quarantined-migrations\legacy-20261014\20261014010000_vox_v1_scoped_staff_authority.sql"
+$m2=Join-Path $root "ops\vox\quarantined-migrations\legacy-20261014\20261014020000_vox_v1_staff_review_workflow.sql"
 if(docker ps -aq --filter "name=^/$name$"){throw "REFUSING_EXISTING_CONTAINER"}
 $cid=$null
 try{

@@ -4,7 +4,7 @@ $original=Get-Content (Join-Path $root 'scripts\mvp\vox\validate-vox-07-finalize
 $needle=" Write-Output 'VOX07_DISPOSABLE_FINALIZER_PASS"
 if(-not $original.Contains($needle)){throw 'VALIDATOR_BASE_CHANGED'}
 $inject=@'
- $policy=Join-Path $root 'supabase\migrations\20261014050000_vox_v1_team_leader_review_policy.sql'
+ $policy=Join-Path $root 'ops\vox\quarantined-migrations\legacy-20261014\20261014050000_vox_v1_team_leader_review_policy.sql'
  (Get-Content $policy -Raw) | docker exec -i $name psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres
  if($LASTEXITCODE -ne 0){throw 'TEAM_LEADER_SQL_FAILED'}
  $f=Join-Path $root 'scripts\mvp\vox\vox08-team-leader-fixture.sql'

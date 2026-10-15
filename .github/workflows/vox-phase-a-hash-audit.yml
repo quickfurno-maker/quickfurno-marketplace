@@ -2,7 +2,7 @@ name: VOX Phase A Migration Fingerprint Audit (No Apply)
 on:
   pull_request:
     paths:
-      - 'supabase/migrations/202610140*vox*.sql'
+      - 'ops/vox/quarantined-migrations/legacy-20261014/202610140*vox*.sql'
       - '.github/workflows/vox-phase-a-hash-audit.yml'
   workflow_dispatch:
 permissions:
@@ -33,7 +33,7 @@ jobs:
           ];
           const sha=b=>createHash('sha256').update(b).digest('hex');
           const records=names.map(n=>({version:n.slice(0,14),name:n.slice(15,-4),
-           canonicalSha256:sha(Buffer.from(readFileSync('supabase/migrations/'+n,'utf8').replace(/\r\n/g,'\n').replace(/\r/g,'\n')))}));
+           canonicalSha256:sha(Buffer.from(readFileSync('ops/vox/quarantined-migrations/legacy-20261014/'+n,'utf8').replace(/\r\n/g,'\n').replace(/\r/g,'\n')))}));
           console.log('VOX_A_REPIN_REVIEW_ONLY '+JSON.stringify(records));
           console.log('VOX_A_SET_REVIEW_ONLY '+sha(Buffer.from(records.map(r=>r.version+':'+r.canonicalSha256).join('|'))));
           console.log('VOX_A_DATABASE_APPLIED=false RELEASE_HOLD=true');

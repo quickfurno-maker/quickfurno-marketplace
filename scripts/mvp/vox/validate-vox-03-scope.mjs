@@ -47,7 +47,7 @@ test("client human thread denied",()=>assert.equal(filterHumanConversations([{..
 test("AI conversation denied",()=>assert.equal(filterHumanConversations([{...row,state:"AI"}],resolve(),[],[vendor]).length,0));
 test("unassigned conversation denied",()=>assert.equal(filterHumanConversations([{...row,id:prospect}],resolve(),[],[vendor]).length,0));
 test("private message not exposed",()=>assert.doesNotMatch(JSON.stringify(filterHumanConversations([{...row,message:"PRIVATE",phone:"9876543210"}],resolve(),[],[vendor])),/PRIVATE|9876543210/));
-const sql=file("supabase/migrations/20261014010000_vox_v1_scoped_staff_authority.sql");
+const sql=file("ops/vox/quarantined-migrations/legacy-20261014/20261014010000_vox_v1_scoped_staff_authority.sql");
 test("all four tables RLS enabled",()=>assert.equal((sql.match(/enable row level security;/g)||[]).length,4));
 test("memberships default inactive",()=>assert.match(sql,/is_active boolean not null default false/));
 test("no authenticated table grants",()=>assert.doesNotMatch(sql,/grant .* to authenticated/));
@@ -55,7 +55,7 @@ test("grant audit append only",()=>assert.match(sql,/grant select, insert on pub
 const route=file("app/api/vox/v1/my-work/route.ts");
 test("route requires authenticated scope",()=>assert.match(route,/getVerifiedScopedStaff/));
 test("prospect exact city",()=>assert.match(route,/\.eq\("city_id",scope\.cityId\)/));
-test("vendor validated by Core service zones",()=>assert.match(route,/\.in\("service_zone_id",zoneIds\)/));
+test("vendor validated by exact Core grants followed by active canonical service zones",()=>{assert.match(route,/\.in\("id",\[\.\.\.scope\.vendorIds\]\)/);assert.match(route,/\.in\("id",zoneIds\)/);assert.match(route,/deriveCanonicalCityVendorIds\(/);});
 test("support requires dual scope",()=>assert.match(route,/\.in\("id",\[\.\.\.scope\.supportThreadIds\]\)\.in\("vendor_id",permittedVendorIds\)/));
 test("all mutations refused",()=>assert.equal((route.match(/READ_ONLY"\},405/g)||[]).length,4));
 console.log("VOX_03_SCOPED_STAFF_PASS "+count+"/33");

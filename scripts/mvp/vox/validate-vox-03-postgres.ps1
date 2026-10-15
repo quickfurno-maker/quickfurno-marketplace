@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 $name = 'qf-vox03-isolated-schema-cert'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repo = (Resolve-Path (Join-Path $scriptDir '..\..\..')).Path
-$sql = Join-Path $repo 'supabase\migrations\20261014010000_vox_v1_scoped_staff_authority.sql'
+$sql = Join-Path $repo 'ops\vox\quarantined-migrations\legacy-20261014\20261014010000_vox_v1_scoped_staff_authority.sql'
 if(-not (Test-Path $sql)){throw 'SQL_MIGRATION_NOT_FOUND'}
 $existing = docker ps -aq --filter "name=^/$name$"
 if($existing){throw 'EXISTING_CONTAINER_REFUSING_TO_TOUCH'}

@@ -1,5 +1,6 @@
 import {adminClient} from "@/lib/supabase";
 import {getVerifiedScopedStaff} from "@/services/vox/verifiedScopedStaff";
+import {deriveCanonicalCityVendorIds} from "@/contracts/vox/canonicalZoneGate.mjs";
 import {projectVoxOverview} from "@/services/vox/overviewProjection.mjs";
 import {filterHumanConversations} from "@/contracts/vox/scopedStaff.mjs";
 export const runtime="nodejs";
@@ -27,18 +28,25 @@ export async function GET(request:Request){
    prospects=q.data??[];
   }
   if(scope.vendorIds.length){
-   // A vendor assignment is NOT sufficient. Resolve Core verified zones to
-   // canonical city ID, then intersect assigned vendors with that city.
-   const zones=await db.from("marketplace_service_zones")
-    .select("id").eq("city_id",scope.cityId).eq("is_active",true).limit(201);
-   if(zones.error||!zones.data||zones.data.length>200)return json({ok:false,error:"ZONE_SCOPE_UNAVAILABLE"},503);
-   const zoneIds=zones.data.map(z=>z.id);
-   if(zoneIds.length){
-    const valid=await db.from("vendors").select("id,service_zone_id")
-     .in("id",[...scope.vendorIds]).in("service_zone_id",zoneIds).limit(201);
-    if(valid.error||!valid.data||valid.data.length>200)return json({ok:false,error:"VENDOR_SCOPE_UNAVAILABLE"},503);
-    permittedVendorIds=valid.data.map(v=>v.id);
-   }
+   // Verify exact object grants BEFORE resolving canonical active city zones.
+   // City-wide LIMIT 201 misses valid Staff vendors in large marketplaces.
+   const vendors=await db.from("vendors").select("id,service_zone_id")
+     .in("id",[...scope.vendorIds]).limit(201);
+   if(vendors.error||!vendors.data||vendors.data.length>200)
+     return json({ok:false,error:"VENDOR_SCOPE_UNAVAILABLE"},503);
+   const zoneIds=[...new Set(vendors.data.map(v=>v.service_zone_id))];
+   const zones=zoneIds.length?await db.from("marketplace_service_zones")
+     .select("id,city_id,is_active").in("id",zoneIds)
+     .eq("city_id",scope.cityId).eq("is_active",true).limit(201)
+     :{data:[],error:null};
+   if(zones.error||!zones.data||zones.data.length>200)
+     return json({ok:false,error:"ZONE_SCOPE_UNAVAILABLE"},503);
+   const proof=deriveCanonicalCityVendorIds({
+     cityId:scope.cityId,grantedVendorIds:scope.vendorIds,
+     vendors:vendors.data,zones:zones.data
+   });
+   if(!proof.ok)return json({ok:false,error:"INVALID_CORE_VENDOR_ZONE"},503);
+   permittedVendorIds=proof.ids;
   }
   if(permittedVendorIds.length){
    const q=await db.from("vendor_crm_profiles")

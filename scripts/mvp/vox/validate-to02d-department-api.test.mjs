@@ -47,3 +47,22 @@ test("no raw user or company data emitted",()=>{
  assert.doesNotMatch(src,/select\(.*email|password|phone|wallet|chat_message/i);
  assert.match(src,/private, no-store/);
 });
+
+
+test("every department action rejects missing or surplus JSON fields",()=>{
+ const fields={
+  request:["action","targetStaffId","teamId","cityId","nonce","department","reason","expiresAt"],
+  review:["action","requestId","revision","decision","reference","nonce"],
+  activate:["action","requestId","revision","reference","nonce"],
+  revoke:["action","capabilityId","revision","reference","nonce"]
+ };
+ for(const [name,keys] of Object.entries(fields)){
+  const declaration=name+":["+keys.map(key=>JSON.stringify(key)).join(",")+"]";
+  assert.ok(src.includes(declaration),"missing exact field contract: "+name);
+ }
+ assert.match(src,/Object\.keys\(data\)\.sort\(\)/);
+ assert.match(src,/suppliedFields\.length!==expectedFields\.length/);
+ assert.match(src,/suppliedFields\.some\(\(key,index\)=>key!==expectedFields\[index\]\)/);
+ assert.match(src,/UNKNOWN_OR_MISSING_FIELDS/);
+ assert.match(src,/const expectedFields=\[\.\.\.ACTION_FIELDS\[String\(action\)\]\]\.sort\(\)/);
+});

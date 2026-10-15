@@ -8,8 +8,8 @@ select * from public.qf_vox_department_request_v1(
  'client_success',
  '00000000-0000-4000-8000-000000000021',
  now()+interval '1 day','Approved test client responsibility');
-DO $$
-declare v_request uuid;
+DO $vox_first$
+declare v_request uuid; v_self_denied boolean; v_rejection text;
 begin
  select id into v_request from public.vox_staff_department_requests_v1
  where request_nonce='00000000-0000-4000-8000-000000000021';
@@ -23,19 +23,47 @@ begin
   '00000000-0000-4000-8000-000000000099',
   'vendor_success','00000000-0000-4000-8000-000000000022',
   now()+interval '1 day','Wrong city should be rejected');
- raise exception 'WRONG_CITY_ALLOWED';
+ raise exception 'WRONG_CITY_ALLOWED' using errcode='XX000';
  exception when sqlstate 'P0001' then null; end;
  -- Owner may not serve as independent TL reviewer.
  begin
  perform public.qf_vox_department_review_v1(
   '00000000-0000-4000-8000-000000000001',v_request,0,'APPROVE',
   'TEST_WRONG_REVIEWER','00000000-0000-4000-8000-000000000023');
- raise exception 'OWNER_SELF_REVIEWED';
+ raise exception 'OWNER_SELF_REVIEWED' using errcode='XX000';
  exception when sqlstate 'P0001' then null; end;
  -- Legitimate TL reviews exactly same team.
  perform public.qf_vox_department_review_v1(
   '00000000-0000-4000-8000-000000000003',v_request,0,'APPROVE',
   'TEST_TL_REVIEW_OK','00000000-0000-4000-8000-000000000024');
+ -- Adversarial persisted state: valid, current TL reviewer later becomes the
+ -- target of the SAME already APPROVED request. A request-stage validation
+ -- alone cannot protect atomic activation. Existing TL is a neutral Core
+ -- Staff identity with a live membership and would otherwise qualify.
+ update public.vox_staff_department_requests_v1
+    set target_staff_id='00000000-0000-4000-8000-000000000003'
+    where id=v_request;
+ v_self_denied:=false; v_rejection:=null;
+ begin
+  perform public.qf_vox_department_activate_v1(
+   '00000000-0000-4000-8000-000000000001',v_request,1,
+   'TEST_TARGET_SELF_DENIED','00000000-0000-4000-8000-000000000087');
+ exception when sqlstate 'P0001' then
+  get stacked diagnostics v_rejection=MESSAGE_TEXT;
+  v_self_denied:=v_rejection='VOX_DEPT_ACTIVATION_STALE';
+ end;
+ if not v_self_denied then
+  raise exception 'TARGET_SELF_APPROVAL_NOT_ATOMICALLY_DENIED: %',
+    coalesce(v_rejection,'no error');
+ end if;
+ if exists(select 1 from public.vox_staff_department_capabilities_v1
+     where request_id=v_request) or
+    exists(select 1 from public.vox_staff_department_activations_v1
+     where request_id=v_request)
+ then raise exception 'SELF_APPROVAL_CREATED_GRANT_OR_ACTIVATION'; end if;
+ update public.vox_staff_department_requests_v1
+  set target_staff_id='00000000-0000-4000-8000-000000000002'
+  where id=v_request;
  -- SQL candidate must enforce the original auditable requestor, even if
  -- a corrupted request row is relabelled to another owner between review
  -- and activation. Test ONLY in disposable synthetic PG17.
@@ -46,7 +74,7 @@ begin
   perform public.qf_vox_department_activate_v1(
    '00000000-0000-4000-8000-000000000001',v_request,1,
    'TEST_WRONG_REQUEST_OWNER','00000000-0000-4000-8000-000000000086');
-  raise exception 'NON_REQUESTING_OWNER_ACTIVATED';
+  raise exception 'NON_REQUESTING_OWNER_ACTIVATED' using errcode='XX000';
  exception when sqlstate 'P0001' then null; end;
  update public.vox_staff_department_requests_v1
   set requested_by='00000000-0000-4000-8000-000000000001'
@@ -56,7 +84,7 @@ begin
  perform public.qf_vox_department_activate_v1(
   '00000000-0000-4000-8000-000000000003',v_request,1,
   'TEST_WRONG_OWNER','00000000-0000-4000-8000-000000000025');
- raise exception 'TL_ACTIVATED_ADMIN_GRANT';
+ raise exception 'TL_ACTIVATED_ADMIN_GRANT' using errcode='XX000';
  exception when sqlstate 'P0001' then null; end;
  perform public.qf_vox_department_activate_v1(
   '00000000-0000-4000-8000-000000000001',v_request,1,
@@ -66,7 +94,7 @@ begin
  perform public.qf_vox_department_activate_v1(
   '00000000-0000-4000-8000-000000000001',v_request,1,
   'TEST_DUPLICATE_ACT','00000000-0000-4000-8000-000000000027');
- raise exception 'DUPLICATE_ACTIVATION_ALLOWED';
+ raise exception 'DUPLICATE_ACTIVATION_ALLOWED' using errcode='XX000';
  exception when sqlstate 'P0001' then null; end;
  if (select count(*) from public.vox_staff_department_capabilities_v1
   where auth_user_id='00000000-0000-4000-8000-000000000002'
@@ -74,7 +102,7 @@ begin
  then raise exception 'CAPABILITY_NOT_UNIQUE'; end if;
  if (select count(*) from public.vox_staff_department_events_v1
   where request_id=v_request)<>3 then raise exception 'AUDIT_CHAIN_MISSING'; end if;
-end $$;
+end $vox_first$;
 -- Same employee can hold a second reviewed department, separately.
 select * from public.qf_vox_department_request_v1(
  '00000000-0000-4000-8000-000000000001',
@@ -111,7 +139,7 @@ begin
  perform public.qf_vox_department_revoke_v1(
   '00000000-0000-4000-8000-000000000001',v_cap,2,
   'TEST_DOUBLE_REVOKE','00000000-0000-4000-8000-000000000035');
- raise exception 'REVOKE_REPLAY_ALLOWED';
+ raise exception 'REVOKE_REPLAY_ALLOWED' using errcode='XX000';
  exception when sqlstate 'P0001' then null; end;
 end $$;
 select 'VOX_TO02C_ISOLATED_CORE_RPCS_PASS' as result;

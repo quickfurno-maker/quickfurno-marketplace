@@ -128,6 +128,7 @@ begin
  if not found or r.state<>'APPROVED' or r.revision<>1
   or r.requested_by<>p_owner
   or r.decided_by is null or r.decided_by=p_owner
+  or r.decided_by=r.target_staff_id
   or r.target_staff_id=p_owner or r.expires_at<=now()
  then raise exception 'VOX_DEPT_ACTIVATION_STALE' using errcode='P0001'; end if;
  if not exists(select 1 from public.vox_staff_department_decisions_v1 d

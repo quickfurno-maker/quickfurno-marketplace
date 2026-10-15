@@ -1,0 +1,22 @@
+name: VOX Phase A Staff Invite and Recovery Source QA
+on:
+  pull_request:
+    paths:
+      - 'contracts/vox/staffBootstrapGovernance.mjs'
+      - 'scripts/mvp/vox/validate-vox-phase-a-invite-recovery.mjs'
+      - '.github/workflows/vox-phase-a-invite-recovery.yml'
+      - 'docs/vox/VOX-PHASE-A-STAFF-INVITE-RECOVERY.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fail-closed-invitation-and-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24.18.0'
+      - run: node scripts/mvp/vox/validate-vox-phase-a-invite-recovery.mjs
+      - run: echo 'SOURCE_PREPARATION_ONLY; NO_AUTH_ADMIN_CALLS; NO_INVITES; NO_FACTOR_RESET; STAGING_HOLD'

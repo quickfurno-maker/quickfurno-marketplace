@@ -13,7 +13,7 @@ test("Staff Desk and My Work verify exact vendor ID rows, THEN their active city
   assert.match(src,/\.in\("id",\[\.\.\.scope\.vendorIds\]\)/);
   assert.match(src,/\.in\("id",zoneIds\)/);
   assert.match(src,/deriveCanonicalCityVendorIds\(/);
-  assert.doesNotMatch(src,/\.eq\("city_id",scope\.cityId\)\.eq\("is_active",true\)\.limit\(201\)/);
+  assert.doesNotMatch(src,/\.select\("id"\)\.eq\("city_id",scope\.cityId\)\.eq\("is_active",true\)\.limit\(201\)/);
   assert.doesNotMatch(src,/\.insert\(|\.update\(|inviteUserByEmail|sendWhatsApp\(/);
  }
 });

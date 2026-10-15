@@ -17,13 +17,17 @@ const mk=n=>{
    department,requested_by:id(100),decided_by:reviewer,decision_reference:"VALID_REVIEW_REF",
    state:"APPROVED",revision:1,expires_at:future},
   decision:{request_id:rid,reviewer_id:reviewer,decision:"APPROVED",decision_reference:"VALID_REVIEW_REF"},
-  activation:{request_id:rid,capability_id:capid,activated_by:id(100)}
+  activation:{request_id:rid,capability_id:capid,activated_by:id(100)},
+  reviewer:{userId:reviewer,role:null,isActive:true,qfPrincipal:"vox_staff",adminRole:null,
+   voxRole:"team_leader",staffRole:"team_leader",membershipActive:true,
+   revokedAt:null,expiresAt:future,teamId:scoped.teamId,cityId:scoped.cityId,teamActive:true}
  };
 };
 function input(packs=[0,1,2,3]){
  const x=packs.map(mk);
  return {scoped,capabilities:x.map(y=>y.grant),requests:x.map(y=>y.request),
-  decisions:x.map(y=>y.decision),activations:x.map(y=>y.activation),now};
+  decisions:x.map(y=>y.decision),activations:x.map(y=>y.activation),
+  reviewers:x.map(y=>y.reviewer),now};
 }
 test("one staff can hold several approved packs but never gains new subject IDs",()=>{
  const r=restrict(input());assert.ok(r);
@@ -89,4 +93,22 @@ test("missing/doubled proof, malformed datasets, large sets fail closed",()=>{
  assert.equal(restrict({...input(),scoped:{...scoped,prospectIds:["bad"]}}),null);
  assert.equal(restrict({...input(),now:0}),null);
  assert.equal(restrict({...input(),capabilities:Array(17).fill(mk(0).grant)}),null);
+});
+
+test("current reviewer revocation, identity downgrade and cross-team TL move deny all packs",()=>{
+ const changes=[
+  ["role","admin"],["isActive",false],["qfPrincipal",null],["adminRole","Superadmin"],
+  ["voxRole","support_agent"],["staffRole","support_agent"],["membershipActive",false],
+  ["revokedAt",new Date(now-1).toISOString()],
+  ["expiresAt",new Date(now-1).toISOString()],["teamId",id(900)],
+  ["cityId",id(901)],["teamActive",false],["userId",id(999)]
+ ];
+ for(const [field,value] of changes){
+  const data=input([0]);data.reviewers[0]={...data.reviewers[0],[field]:value};
+  assert.equal(restrict(data),null,field);
+ }
+ const missing=input([0]);missing.reviewers=[];
+ assert.equal(restrict(missing),null);
+ const duplicate=input([0]);duplicate.reviewers.push(duplicate.reviewers[0]);
+ assert.equal(restrict(duplicate),null);
 });

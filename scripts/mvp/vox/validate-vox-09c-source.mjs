@@ -21,7 +21,7 @@ t("PII content/unknown fields rejected",()=>assert.equal(normalizeOperationalInt
 t("rationale too short rejected",()=>assert.equal(normalizeOperationalIntent({...input,rationale:"ok"},scope),null));
 t("invalid nonce rejected",()=>assert.equal(normalizeOperationalIntent({...input,nonce:"1"},scope),null));
 t("no execution payload emitted",()=>assert.doesNotMatch(JSON.stringify(normalizeOperationalIntent(input,scope)),/messageBody|provider|activation|credit/));
-const sql=read("supabase/migrations/20261014060000_vox_operational_intent_review.sql"),route=read("app/api/vox/v1/action-intents/route.ts");
+const sql=read("ops/vox/quarantined-migrations/legacy-20261014/20261014060000_vox_operational_intent_review.sql"),route=read("app/api/vox/v1/action-intents/route.ts");
 t("pending requests default",()=>assert.match(sql,/DEFAULT 'PENDING'/));
 t("nonce unique by requester",()=>assert.match(sql,/UNIQUE\(requester_id,nonce\)/));
 t("atomic row lock on decision",()=>assert.match(sql,/FOR UPDATE/));

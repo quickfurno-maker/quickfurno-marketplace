@@ -22,6 +22,7 @@
 
 import "server-only";
 import { adminClient } from "../lib/supabase";
+import {sameVendorTaskCreate} from "../lib/crm/vendorTaskIdempotency.mjs";
 import {
   validateCrmProfile, validateContact, validateTag, validateNote,
   validateTaskCreate, validateTaskUpdate, requireCompletionResult, requireUuid,
@@ -341,13 +342,33 @@ export async function createVendorNote(vendorId: string, input: Record<string, u
 export async function createVendorTask(vendorId: string, input: Record<string, unknown>, actor: Actor) {
   const id = requireUuid(vendorId, "vendorId");
   const v = validateTaskCreate(input);
+  // Exact replay, never "same key means authorized" across vendor/actor
+  // or a different payload. The unique DB index remains the concurrency arbiter.
+  async function readExistingTask() {
+    const result = await db().from(CRM_TASKS)
+      .select("id,vendor_id,created_by,task_type,title,description,priority,due_at")
+      .eq("idempotency_key",v.idempotency_key).maybeSingle();
+    if (result.error) throw new Error(result.error.message);
+    if (!result.data) return null;
+    if (!sameVendorTaskCreate(result.data,v,id,actor))
+      throw new Error("VENDOR_TASK_IDEMPOTENCY_CONFLICT");
+    return result.data.id as string;
+  }
   if (v.idempotency_key) {
-    const { data: existing } = await db().from(CRM_TASKS).select("id").eq("idempotency_key", v.idempotency_key).maybeSingle();
-    if (existing) return { ok: true as const, id: existing.id, idempotent: true };
+    const existing = await readExistingTask();
+    if (existing) return { ok: true as const, id: existing, idempotent: true };
   }
   const { data, error } = await db().from(CRM_TASKS)
     .insert({ ...v, vendor_id: id, source: "manual", status: "open", created_by: actor, updated_by: actor }).select("id").single();
-  if (error) throw new Error(error.message);
+  if (error) {
+    // Two requests may both see no row, but only one INSERT can win the
+    // existing UNIQUE(idempotency_key) constraint. Re-read only on 23505.
+    if (error.code === "23505" && v.idempotency_key) {
+      const existing = await readExistingTask();
+      if (existing) return { ok: true as const, id: existing, idempotent: true };
+    }
+    throw new Error(error.message);
+  }
   return { ok: true as const, id: data.id };
 }
 export async function updateVendorTask(taskId: string, input: Record<string, unknown>, actor: Actor) {

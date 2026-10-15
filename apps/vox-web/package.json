@@ -1,0 +1,25 @@
+{
+  "name": "@quickfurno/vox-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -H 127.0.0.1 -p 3107",
+    "build": "next build",
+    "start": "next start -H 127.0.0.1 -p 3107",
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/validate-recovery-gates.mjs && node scripts/validate-guard.mjs && node scripts/validate-auth-gates.mjs && node scripts/validate-scope-gates.mjs && node scripts/validate-crm-gates.mjs && node scripts/validate-operations-09.mjs && node scripts/validate-review-workflow-09.mjs && node scripts/validate-09b-10b-web.mjs && node scripts/validate-owner-approvals-09c.mjs && node scripts/validate-owner-followup-12.mjs && node scripts/validate-staff-proposals-12b.mjs && node scripts/validate-dual-role-12c.mjs && node scripts/validate-pinned-origin-12b.mjs && node scripts/validate-aarohi-staff-proposal-12b.mjs"
+  },
+  "dependencies": {
+    "@supabase/ssr": "0.5.2",
+    "@supabase/supabase-js": "2.57.0",
+    "next": "16.3.8",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.0",
+    "@types/react": "19.2.0",
+    "@types/react-dom": "19.2.0",
+    "typescript": "5.6.3"
+  }
+}

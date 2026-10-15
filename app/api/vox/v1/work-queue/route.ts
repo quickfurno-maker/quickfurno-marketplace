@@ -2,6 +2,7 @@ import "server-only";
 import {adminClient} from "@/lib/supabase";
 import {getVerifiedScopedStaff} from "@/services/vox/verifiedScopedStaff";
 import {projectScopedWorkQueue} from "@/contracts/vox/workQueuePreview.mjs";
+import {deriveCanonicalCityVendorIds} from "@/contracts/vox/canonicalZoneGate.mjs";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 const send=(body:unknown,status:number)=>Response.json(body,{status,headers:{
@@ -28,20 +29,30 @@ export async function GET(request:Request){
   const prospects=scope.prospectIds.length?await db.from("aarohi_prospects")
    .select("id").eq("city_id",scope.cityId)
    .in("id",[...scope.prospectIds]).limit(201):{data:[],error:null};
-  const zones=scope.vendorIds.length?await db.from("marketplace_service_zones")
-   .select("id").eq("city_id",scope.cityId).eq("is_active",true)
-   .limit(201):{data:[],error:null};
-  if(prospects.error||zones.error||!prospects.data||!zones.data||
-     prospects.data.length>200||zones.data.length>200)
-   return send({ok:false,error:"CANONICAL_PROSPECT_ZONE_PROOF_FAILED"},503);
+  if(prospects.error||!prospects.data||prospects.data.length>200)
+   return send({ok:false,error:"CANONICAL_PROSPECT_PROOF_FAILED"},503);
   const verifiedProspectIds=prospects.data.map(p=>p.id);
-  const validVendors=scope.vendorIds.length&&zones.data.length?
-   await db.from("vendors").select("id")
-   .in("id",[...scope.vendorIds]).in("service_zone_id",zones.data.map(z=>z.id))
+  // Fetch ONLY vendors already explicitly granted to this Staff principal.
+  // A city may have >200 service zones; broad zone enumeration must not
+  // hide a valid scoped queue or expand rights across other vendors.
+  const vendorRows=scope.vendorIds.length?await db.from("vendors")
+   .select("id,service_zone_id").in("id",[...scope.vendorIds])
    .limit(201):{data:[],error:null};
-  if(validVendors.error||!validVendors.data||validVendors.data.length>200)
+  if(vendorRows.error||!vendorRows.data||vendorRows.data.length>200)
    return send({ok:false,error:"CANONICAL_VENDOR_PROOF_FAILED"},503);
-  const verifiedVendorIds=validVendors.data.map(v=>v.id);
+  const scopedZoneIds=[...new Set(vendorRows.data.map(v=>v.service_zone_id))];
+  const zones=scopedZoneIds.length?await db.from("marketplace_service_zones")
+   .select("id,city_id,is_active").in("id",scopedZoneIds)
+   .eq("city_id",scope.cityId).eq("is_active",true)
+   .limit(201):{data:[],error:null};
+  if(zones.error||!zones.data||zones.data.length>200)
+   return send({ok:false,error:"CANONICAL_ZONE_PROOF_FAILED"},503);
+  const vendorProof=deriveCanonicalCityVendorIds({
+   cityId:scope.cityId,grantedVendorIds:scope.vendorIds,
+   vendors:vendorRows.data,zones:zones.data
+  });
+  if(!vendorProof.ok)return send({ok:false,error:"INVALID_CORE_ZONE_RELATION"},503);
+  const verifiedVendorIds=vendorProof.ids;
   const threads=scope.supportThreadIds.length&&verifiedVendorIds.length?
    await db.from("vendor_support_threads").select("id")
    .in("id",[...scope.supportThreadIds])

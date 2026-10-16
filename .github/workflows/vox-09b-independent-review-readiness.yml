@@ -1,0 +1,22 @@
+name: VOX-09B Independent Human Reviewer Readiness (Release HOLD)
+on:
+  pull_request:
+    paths:
+      - 'contracts/vox/migrationParityEvidence.mjs'
+      - 'scripts/mvp/vox/validate-vox09b-*'
+      - 'docs/vox/VOX-09B-*'
+      - '.github/workflows/vox-09b-independent-review-readiness.yml'
+permissions:
+  contents: read
+jobs:
+  metadata-only-no-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: node --test scripts/mvp/vox/*.test.mjs

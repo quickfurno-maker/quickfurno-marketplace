@@ -4,6 +4,7 @@ import "./team.css";
 export const dynamic="force-dynamic";
 
 const workstreams=[
+ {name:"Staff Command Center",status:"Unified view",detail:"Current Core-authorized queue, internal notices and partial EOD with department navigation",href:"/team/command-center"},
  {name:"My Work",status:"Read-only",detail:"Only your current Core-authorized tasks",href:"/team/work-queue"},
  {name:"Needs Attention",status:"Read-only",detail:"Bounded Core work blockers and approval waits; no push sends",href:"/team/attention"},
  {name:"Work Notifications",status:"In-app only",detail:"Current Core work-event notices and read receipts; no push-delivery claim",href:"/team/notifications"},

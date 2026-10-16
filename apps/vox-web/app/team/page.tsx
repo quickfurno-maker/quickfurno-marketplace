@@ -5,11 +5,12 @@ export const dynamic="force-dynamic";
 
 const workstreams=[
  {name:"My Work",status:"Read-only",detail:"Only your current Core-authorized tasks",href:"/team/work-queue"},
+ {name:"Needs Attention",status:"Read-only",detail:"Bounded Core work blockers and approval waits; no push sends",href:"/team/attention"},
  {name:"Aarohi Acquisition",status:"Read-only",detail:"Core-scoped acquisition pipeline; no direct send",href:"/acquisition"},
  {name:"Anisha Vendor Success",status:"Read-only",detail:"Core-scoped Vendor 360, support and verified zones",href:"/vendor360"},
  {name:"Service Desk / Human Inbox",status:"Read-only",detail:"Authorized support and handover metadata only; replies disabled",href:"/service-desk"},
  {name:"Riya Client Success",status:"Not activated",detail:"Client access and handover await Core subject grants"},
- {name:"Daily Operations",status:"Evidence pending",detail:"Real Core event and source-watermark reports only"},
+ {name:"Daily Operations",status:"Partial preview",detail:"Only your current-day verified Core work events; not submitted",href:"/team/daily-report"},
  {name:"AGNI / AOS",status:"Advisory",detail:"Diagnostics and suggestions never grant Core authority"}
 ] as const;
 

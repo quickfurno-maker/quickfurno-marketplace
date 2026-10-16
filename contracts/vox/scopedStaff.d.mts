@@ -3,6 +3,8 @@ export interface ScopedVoxContext {
  prospectIds:readonly string[];vendorIds:readonly string[];
  supportThreadIds:readonly string[];conversationIds:readonly string[];
  canReadContent:boolean;canMutate:false;
+ /** Present only after actual current independent department-grant review. */
+ verifiedDepartments?:readonly string[];
 }
 export declare function resolveScopedStaff(input:{
  userId:string;identityVerified:boolean;

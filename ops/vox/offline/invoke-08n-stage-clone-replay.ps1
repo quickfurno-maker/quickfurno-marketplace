@@ -84,6 +84,8 @@ try{
  $count=(& docker exec -u postgres $container psql -X -At -U postgres -d $db -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name LIKE 'vox_%'").Trim()
  $history=(& docker exec -u postgres $container psql -X -At -U postgres -d $db -c 'SELECT count(*) FROM supabase_migrations.schema_migrations').Trim()
  if($count -ne '16' -or $history -ne '86'){throw 'VOX_SQL_PROVENANCE_INVALID'}
+ $concurrencyProof=Join-Path $repo 'ops\vox\offline\invoke-08n-two-session-claim.ps1'
+ & $concurrencyProof -Container $container -DatabaseName $db -Repo $repo
  Write-Output 'OFFLINE_TEST_PASS: 8 SQL candidates; 3 actual SQL security+outbox proofs; 16 disposable VOX tables; 86 untouched staging migrations'
 }finally{
  & docker rm -f $container 2>$null|Out-Null

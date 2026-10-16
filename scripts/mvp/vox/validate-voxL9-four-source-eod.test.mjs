@@ -34,6 +34,13 @@ test("cross-user, city, team, time, unknown action and replay denied",async()=>{
  assert.equal((await go({readings:sources.map((v,i)=>i===0||i===1?
   {...v,events:[event]}:v)})).ok,false);
 });
+test("one object revision cannot be counted twice under different event IDs",async()=>{
+ const repeated={...event,id:id(32)};
+ const r=await go({readings:sources.map((v,i)=>i? v:
+  {...v,events:[event,repeated]})});
+ assert.equal(r.ok,false);assert.equal(r.reason,"DUPLICATE_CANONICAL_OBJECT_REVISION");
+ assert.equal(r.rollup,null);assert.equal(r.canSubmit,false);
+});
 test("current scope or independent verifier denial forbids rollup",async()=>{
  assert.equal((await go({scope:{...scope,currentAal:"aal1"}})).ok,false);
  assert.equal((await go({verifyCurrentScope:async()=>false})).ok,false);

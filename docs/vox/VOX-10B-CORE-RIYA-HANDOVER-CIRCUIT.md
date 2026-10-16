@@ -1,0 +1,6 @@
+# VOX-10B — Governed Core-to-Jarvis Riya handover observation
+16 October 2026. **SOURCE ONLY.** Stacked on Core VOX-08P PR #313, paired with Jarvis 10B contract on Jarvis draft #336.
+
+The new Core `riyaHandoverCircuit.mjs` reuses strict `preflightRiyaClientHandover`, then obtains a separately signed/verified Jarvis READ_ONLY observation for the exact conversation/client/project/revision, re-fetches **current** Core canonical grant/Staff/consent after asynchronous Jarvis observation and reruns the independent checks. Rejects wrong user, cross-team/city, reassignments, expired proofs, bad revision, consent revoke, stale Jarvis state, signature or replay mismatch. It DOES NOT transition Core state or enable a transcript/reply.
+The paired Jarvis `riyaReadOnlyHandoverObservation.mjs` reads separately authenticated Core request and Jarvis durable Riya state but does not pause the agent, send provider messages or attest that a real pause ACK happened. Observations must be signed via existing Jarvis service transport and independently verified at Core; tests use injected synthetic verifiers.
+Source QA: Core circuit 8/8, Jarvis contract 6/6. Still required: actual canonical client-project/Staff grant schema, real signed Jarvis pause ACK and state transition, Core atomic replay/scope validation, consent-checked governed provider outbox and protected Staging AAL2.

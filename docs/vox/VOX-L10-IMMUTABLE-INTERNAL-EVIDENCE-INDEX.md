@@ -1,0 +1,4 @@
+# L10 immutable internal evidence index
+The source contract requires three exact 40-hex Git source heads, seven separate ISO-verified offline QA suite identities and 64-hex evidence digests, and **correctly bounded four-schema** staging archive provenance. It explicitly refuses attempts to relabel the archive as a complete backup, or mark production tests as internal isolated tests.
+The index is an internal reviewer HANDOFF ONLY, with no trusted external human signatures and no power to approve protected staging/production. Actual CI/Docker outputs must be hashed by the operator: tests with synthetic hex strings do not constitute provenance.
+Pending: real exact-head multi-repo manifest generation, complete EOD adapters and signed Agent/Jarvis/AGNI transports, AAL2 and full authenticated staging.

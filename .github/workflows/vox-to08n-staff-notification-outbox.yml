@@ -4,7 +4,7 @@ on:
     paths:
       - 'ops/vox/sql-candidates/20261016040000_vox08n*'
       - 'ops/vox/tests/vox08n*'
-      - 'ops/vox/offline/invoke-08n-stage-clone-replay.ps1'
+      - 'ops/vox/offline/invoke-08n-*'
       - 'contracts/vox/notificationOutboxWorker.mjs'
       - 'scripts/mvp/vox/validate-to08n-notification-outbox-worker.test.mjs'
       - 'docs/vox/VOX-08N*'

@@ -1,0 +1,36 @@
+name: VOX-08N Transactional Staff Notification Outbox (Release HOLD)
+on:
+  pull_request:
+    paths:
+      - 'ops/vox/sql-candidates/20261016040000_vox08n*'
+      - 'ops/vox/tests/vox08n*'
+      - 'ops/vox/offline/invoke-08n-*'
+      - 'contracts/vox/notificationOutboxWorker.mjs'
+      - 'scripts/mvp/vox/validate-to08n-notification-outbox-worker.test.mjs'
+      - 'docs/vox/VOX-08N*'
+      - '.github/workflows/vox-to08n-staff-notification-outbox.yml'
+permissions:
+  contents: read
+jobs:
+  nondeployable-contract-and-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node --test scripts/mvp/vox/*.test.mjs
+      - run: node --experimental-vm-modules --test scripts/mvp/vox/validate-to08j-governed-core.spec.mjs scripts/mvp/vox/validate-to08l-staff-notification-core.spec.mjs
+      - run: npm run typecheck
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: apps/vox-web
+      - run: npm test
+        working-directory: apps/vox-web
+      - run: npm run typecheck
+        working-directory: apps/vox-web
+      - run: npm run build
+        working-directory: apps/vox-web

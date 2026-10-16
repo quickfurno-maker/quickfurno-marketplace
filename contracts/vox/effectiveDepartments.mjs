@@ -77,5 +77,6 @@ export function restrictScopedStaffByDepartment({scoped,capabilities,requests,de
  return Object.freeze({...scoped,
   prospectIds:Object.freeze([...prospect]),vendorIds:Object.freeze([...vendor]),
   supportThreadIds:Object.freeze([...support]),conversationIds:Object.freeze([]),
+  verifiedDepartments:Object.freeze([...packs].sort()),
   canReadContent:!leader&&scoped.canReadContent===true,canMutate:false});
 }

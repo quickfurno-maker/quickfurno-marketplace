@@ -1,0 +1,4 @@
+# L8 canonical source manifest and actual migration ledger evidence
+This adds an exact nine-file ordered candidate SQL hash manifest (one quarantined legacy + eight uninstalled source candidates), duplicate version guard, and a strict first-party Stage-vs-Prod metadata-only migration ledger normalizer.
+Historical 16 October first-party metadata says 86 Stage and 86 Prod, 34 shared versions and 52 exclusive each. **Do not infer SQL-body equality from a matching name/version.** The legacy candidate and TO-02C path are proposal-only; real human DBA must decide source truth and independently sign complete managed backup/restore before any staging DDL. Even verified hash list + successful offline PG17 replay can NEVER authorize protected Stage/Prod.
+No SQL was applied to managed environments. No existing Core identities changed.

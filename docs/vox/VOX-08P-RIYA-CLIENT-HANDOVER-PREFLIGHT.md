@@ -1,0 +1,11 @@
+# VOX-08P — Riya client-project Core verified preflight, no outbound send
+
+**16 October 2026. SOURCE + ISOLATED QA only, NOT a live Riya integration or client inbox.** Stacked on QF Core VOX-08N draft #311; reuse `prepareRiyaHandoverIntent`, existing Core Supabase AAL2 Staff scope and Jarvis signed transport contract. This module does **not** introduce separate client-side Auth or grant a Staff client role.
+
+`contracts/vox/riyaClientHandoverGate.mjs` accepts only server-supplied, current neutral Staff subject scope and approved client-success department grant, exact Core client/project/city/team/conversation/assigned operator, verified Google Places location (server-side verifier), independent canonical client project subject grant (separate trusted Core callback) and signed, fresh Jarvis context (separate trusted verifier). It enforces revision/one-use nonce, current consent, do-not-contact and human-stop. The existing Riya handover state machine validates AI/TAKEOVER_PENDING/HUMAN transitions, pause receipt and the Core decision boundary. No caller-supplied browser authority flags.
+
+Success means **NON_EXECUTABLE_PREFLIGHT** only. Response `executionAuthorized=false`, `canReadTranscript=false`, `canSendReply=false`, `providerMessagesSent=0`. A future Core atomic authority + true Jarvis pause ACK + consent-checked provider outbox still required. No WhatsApp send, AI resume, owner impersonation or team/department permission expansion.
+
+**Actual tests:** `node --test scripts/mvp/vox/validate-to08p-riya-preflight.test.mjs` **12/12 PASS**, covering missing/false/throwing verifiers, owner/TL/wrong Staff role, revoked department/client grant, cross-city/team, Google-typed address, stale Jarvis signature/revision, DNC/consent stop, forged request fields, wrong state and no PII. Full Core VOX regression on this branch **216/216 PASS**. Tests inject stub verifier callbacks and do NOT prove any actual signed Jarvis message, real client-project Core grant schema or real provider send.
+
+**Known blocker:** Existing Staff canonical grant model has no independently approved client subject scope that can grant execution authority. A genuine Core client-subject authorization schema and signed production Jarvis handshake with real AAL2 must be reviewed before any protected browser/client inbox action.

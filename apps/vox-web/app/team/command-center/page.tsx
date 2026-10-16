@@ -2,6 +2,7 @@ import Link from "next/link";
 import {fetchStaffWorkQueuePreview} from "../../../lib/core";
 import {fetchStaffNotifications} from "../../../lib/staffNotifications";
 import {fetchStaffEodPreview} from "../../../lib/eod";
+import {fetchScopedRiyaClientCases,fetchStaffSourceReadiness} from "../../../lib/clientSourceStatus";
 import "../workflow.css";
 import "./command-center.css";
 export const dynamic="force-dynamic";
@@ -11,6 +12,8 @@ const modules=[
  ["Internal team chat","/team/chat","Internal Staff-only conversation"],
  ["In-app notifications","/team/notifications","Persisted work events; not push delivery"],
  ["Daily activity","/team/daily-report","Core work ledger only; partial"],
+ ["Four-source EOD readiness","/team/eod-sources","Real Core source objects, no fabricated event totals"],
+ ["Riya client cases","/team/client-cases","Client-success grants and Google-verified read-only cases"],
  ["Governed EOD submission","/team/eod-submissions","Independent Team Leader review required"],
  ["Team Leader review","/team/eod-reviews","Never approve your own report"],
  ["Aarohi CRM","/acquisition","Authorized acquisition preview"],
@@ -18,10 +21,11 @@ const modules=[
  ["Service Desk","/service-desk","Current support and handover metadata"]
 ] as const;
 export default async function StaffCommandCenter(){
- const [work,notifications,eod]=await Promise.all([
-  fetchStaffWorkQueuePreview(),fetchStaffNotifications(),fetchStaffEodPreview()
+ const [work,notifications,eod,clientCases,sourceReadiness]=await Promise.all([
+  fetchStaffWorkQueuePreview(),fetchStaffNotifications(),fetchStaffEodPreview(),
+  fetchScopedRiyaClientCases(),fetchStaffSourceReadiness()
  ]);
- const available=work.ok||notifications.ok||eod.ok;
+ const available=work.ok||notifications.ok||eod.ok||clientCases.ok||sourceReadiness.ok;
  return <main className="voxFlow voxCommandCenter">
   <nav className="voxFlowNav" aria-label="Breadcrumb">
    <Link href="/team">Team Operations</Link><span>/</span><span>Command Center</span>
@@ -50,6 +54,12 @@ export default async function StaffCommandCenter(){
     <article><span>In-app unread</span>
      <strong>{notifications.ok?String(notifications.unreadInWindow):"Locked"}</strong>
      <small>Bounded internal notifications, no push receipt</small></article>
+    <article><span>Current Riya cases</span>
+     <strong>{clientCases.ok?String(clientCases.items.length):"Locked"}</strong>
+     <small>Scoped client metadata only · no replies</small></article>
+    <article><span>Four-source report</span>
+     <strong>{sourceReadiness.ok?"Incomplete":"Locked"}</strong>
+     <small>No signed event watermarks or audited totals</small></article>
     <article><span>Today's Core work events</span>
      <strong>{eod.ok?String(eod.eventsIncluded):"Locked"}</strong>
      <small>Partial ledger only; CRM and agents not certified</small></article>

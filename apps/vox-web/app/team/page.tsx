@@ -6,11 +6,14 @@ export const dynamic="force-dynamic";
 const workstreams=[
  {name:"My Work",status:"Read-only",detail:"Only your current Core-authorized tasks",href:"/team/work-queue"},
  {name:"Needs Attention",status:"Read-only",detail:"Bounded Core work blockers and approval waits; no push sends",href:"/team/attention"},
+ {name:"Internal Team Chat",status:"Staging gated",detail:"Current-team internal messages; no customer or WhatsApp sends",href:"/team/chat"},
  {name:"Aarohi Acquisition",status:"Read-only",detail:"Core-scoped acquisition pipeline; no direct send",href:"/acquisition"},
  {name:"Anisha Vendor Success",status:"Read-only",detail:"Core-scoped Vendor 360, support and verified zones",href:"/vendor360"},
  {name:"Service Desk / Human Inbox",status:"Read-only",detail:"Authorized support and handover metadata only; replies disabled",href:"/service-desk"},
  {name:"Riya Client Success",status:"Not activated",detail:"Client access and handover await Core subject grants"},
  {name:"Daily Operations",status:"Partial preview",detail:"Only your current-day verified Core work events; not submitted",href:"/team/daily-report"},
+ {name:"Partial EOD Submission",status:"Staging gated",detail:"Submit only Core work-event evidence for independent review",href:"/team/eod-submissions"},
+ {name:"Team Leader EOD Review",status:"Staging gated",detail:"Separate verified Team Leader acknowledgment; no self-review",href:"/team/eod-reviews"},
  {name:"AGNI / AOS",status:"Advisory",detail:"Diagnostics and suggestions never grant Core authority"}
 ] as const;
 

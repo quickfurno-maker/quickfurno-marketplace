@@ -49,8 +49,9 @@ export default async function MyDailyReport(){
     </div>
     <p className="voxReportSummary">Verified Core work transitions in this bounded preview:
      <strong> {r.eventsIncluded}</strong></p>
-    <p className="voxReportRestriction">Report submission, acknowledgment, download
-     and automated delivery are not enabled. All decisions remain in Core.</p>
+    <p className="voxReportRestriction">This preview cannot submit or acknowledge work. A separate staging-gated
+     partial Core report workflow requires independent Team Leader review.
+     Export and automated delivery are not enabled.</p>
    </section>
    <section aria-labelledby="next-actions" className="voxReportCard">
     <h2 id="next-actions">Follow up on current work</h2>
@@ -59,6 +60,7 @@ export default async function MyDailyReport(){
     <div className="voxReportLinks">
      <Link href="/team/work-queue">My Work Queue</Link>
      <Link href="/team/attention">Needs Attention</Link>
+     <Link href="/team/eod-submissions">Governed partial submissions</Link>
     </div>
    </section>
   </>}

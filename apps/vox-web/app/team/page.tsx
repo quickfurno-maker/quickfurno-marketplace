@@ -6,6 +6,7 @@ export const dynamic="force-dynamic";
 const workstreams=[
  {name:"My Work",status:"Read-only",detail:"Only your current Core-authorized tasks",href:"/team/work-queue"},
  {name:"Needs Attention",status:"Read-only",detail:"Bounded Core work blockers and approval waits; no push sends",href:"/team/attention"},
+ {name:"Work Notifications",status:"In-app only",detail:"Current Core work-event notices and read receipts; no push-delivery claim",href:"/team/notifications"},
  {name:"Internal Team Chat",status:"Staging gated",detail:"Current-team internal messages; no customer or WhatsApp sends",href:"/team/chat"},
  {name:"Aarohi Acquisition",status:"Read-only",detail:"Core-scoped acquisition pipeline; no direct send",href:"/acquisition"},
  {name:"Anisha Vendor Success",status:"Read-only",detail:"Core-scoped Vendor 360, support and verified zones",href:"/vendor360"},

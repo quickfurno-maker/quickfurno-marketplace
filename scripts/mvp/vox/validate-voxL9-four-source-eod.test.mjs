@@ -42,4 +42,5 @@ test("current scope or independent verifier denial forbids rollup",async()=>{
 });
 test("business day requires complete 24-hour UTC window, never short sampling",async()=>{
  assert.equal((await go({window:{startMs:start,endMs:end-5000}})).ok,false);
+ assert.equal((await go({businessDate:"2026-10-15"})).ok,false);
 });

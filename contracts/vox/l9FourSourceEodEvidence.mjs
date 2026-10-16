@@ -18,6 +18,8 @@ export async function previewAttributableFourSourceEod({
   !window||!Number.isSafeInteger(window.startMs)||
   !Number.isSafeInteger(window.endMs)||
   window.endMs-window.startMs!==86400000||
+  window.startMs!==Date.parse(businessDate+"T00:00:00+05:30")||
+  new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(window.startMs))!==businessDate||
   !Array.isArray(readings)||readings.length!==4||
   typeof verifyReading!=="function"||
   typeof verifyCurrentScope!=="function")

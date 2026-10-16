@@ -57,7 +57,7 @@ create trigger qf_vox_staff_notification_immutable_v1
 create function public.qf_vox_staff_notification_scope_v1(
  p_actor uuid,p_work_item uuid
 ) returns boolean language plpgsql volatile security definer set search_path='' as $$
-declare r record;
+declare r record;v_department text;
 begin
  if p_actor is null or p_work_item is null then return false;end if;
  select w.id,w.team_id,w.city_id,w.source_kind,w.source_id,w.related_vendor_id
@@ -80,6 +80,41 @@ begin
   and (m.staff_role<>'team_leader'
    or u.raw_app_meta_data->>'vox_role'='team_leader');
  if not found then return false;end if;
+ v_department:=case r.source_kind
+  when 'prospect' then 'acquisition'
+  when 'vendor' then 'vendor_success'
+  when 'support_thread' then 'service_support'
+  else null end;
+ if v_department is null or not exists(
+  select 1 from public.vox_staff_department_capabilities_v1 g
+  join public.vox_staff_department_requests_v1 req on req.id=g.request_id
+  join public.vox_staff_department_decisions_v1 d on d.request_id=req.id
+  join public.vox_staff_department_activations_v1 x
+   on x.request_id=req.id and x.capability_id=g.id
+  join public.vox_staff_memberships_v1 tl on tl.auth_user_id=req.decided_by
+  join public.vox_staff_teams_v1 tt on tt.id=tl.team_id
+  join public.profiles reviewer on reviewer.id=req.decided_by
+  join auth.users ru on ru.id=req.decided_by
+  where g.auth_user_id=p_actor and g.team_id=r.team_id
+   and g.city_id=r.city_id and g.department=v_department
+   and g.revoked_at is null and g.revision=2
+   and g.expires_at>clock_timestamp()
+   and req.state='APPROVED' and req.revision=1
+   and req.expires_at>clock_timestamp() and req.target_staff_id=p_actor
+   and req.team_id=r.team_id and req.city_id=r.city_id
+   and req.department=v_department
+   and req.decided_by<>req.requested_by and req.decided_by<>p_actor
+   and d.reviewer_id=req.decided_by and d.decision='APPROVED'
+   and d.decision_reference=req.decision_reference
+   and x.activated_by=req.requested_by and g.granted_by=req.requested_by
+   and reviewer.role is null and reviewer.is_active=true
+   and ru.raw_app_meta_data->>'qf_principal'='vox_staff'
+   and ru.raw_app_meta_data->>'vox_role'='team_leader'
+   and ru.raw_app_meta_data->>'admin_role' is null
+   and tl.staff_role='team_leader' and tl.is_active=true
+   and tl.revoked_at is null and tl.expires_at>clock_timestamp()
+   and tt.id=r.team_id and tt.city_id=r.city_id and tt.is_active=true
+ ) then return false;end if;
 
  if not exists(select 1 from public.vox_staff_object_scopes_v1 s
   where s.auth_user_id=p_actor and s.scope_kind=r.source_kind

@@ -26,3 +26,7 @@ Core already includes admin_notifications, vendor_notifications and client_notif
 - Underlying VOX-08J, 08K drafts remain unmerged. All protected staging and production changes remain HOLD.
 
 **Current GO/NO-GO: safe isolated source work can be reviewed. Cannot release, grant privileges, create Staff, certify end-to-end or claim any external delivery.**
+
+## Security-hardening follow-up — exact independently approved department chain
+Before source certification, `qf_vox_staff_notification_scope_v1` was tightened to also demand the **current approved department grant chain** (capability, request, independent Team Leader decision, activation, live reviewer/nominee scope and non-revoked expiration), matching existing governed partial EOD. Having a Staff object scope alone is insufficient when the department grant has been revoked. This does not bypass human bootstrap or grant a capability.
+The COMPLETE seven-file reviewed source sequence was rerun against a NEW disposable `--network none` PostgreSQL17 restore of the exact same verified Staging backup. All 7 files PASS, all prior 08J and 08L actual negative SQL checks PASS, 15 VOX tables, original 86 migration-history entries unchanged and disposable container removed. Latest isolated certificate SHA256 `AB82C6355288B1440B0A387081411F0AFE5E13976747D9729FFB1D51721F86FE`, saved on JARVIS as `D:\QuickFurno-Workspace\Artifacts\VOX-08L-20261016-Department-Scope-Verified.json`. This supersedes the earlier pre-hardening offline certificate for this SQL candidate. No live Staging/Prod writes or human approval.

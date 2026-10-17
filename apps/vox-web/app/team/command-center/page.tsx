@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {fetchStaffWorkQueuePreview} from "../../../lib/core";
+import {fetchVerifiedUnifiedWorkspace} from "../../../lib/ui04Workspace";
 import {fetchStaffNotifications} from "../../../lib/staffNotifications";
 import {fetchStaffEodPreview} from "../../../lib/eod";
 import {fetchScopedRiyaClientCases,fetchStaffSourceReadiness} from "../../../lib/clientSourceStatus";
@@ -21,11 +22,11 @@ const modules=[
  ["Service Desk","/service-desk","Current support and handover metadata"]
 ] as const;
 export default async function StaffCommandCenter(){
- const [work,notifications,eod,clientCases,sourceReadiness]=await Promise.all([
+ const [work,notifications,eod,clientCases,sourceReadiness,unified]=await Promise.all([
   fetchStaffWorkQueuePreview(),fetchStaffNotifications(),fetchStaffEodPreview(),
-  fetchScopedRiyaClientCases(),fetchStaffSourceReadiness()
+  fetchScopedRiyaClientCases(),fetchStaffSourceReadiness(),fetchVerifiedUnifiedWorkspace()
  ]);
- const available=work.ok||notifications.ok||eod.ok||clientCases.ok||sourceReadiness.ok;
+ const available=work.ok||notifications.ok||eod.ok||clientCases.ok||sourceReadiness.ok||unified.ok;
  return <main className="voxFlow voxCommandCenter">
   <nav className="voxFlowNav" aria-label="Breadcrumb">
    <Link href="/team">Team Operations</Link><span>/</span><span>Command Center</span>
@@ -65,6 +66,24 @@ export default async function StaffCommandCenter(){
      <small>Partial ledger only; CRM and agents not certified</small></article>
    </div>
   </section>}
+  <section className="voxFlowCard" aria-labelledby="unified-workspace-title">
+   <h2 id="unified-workspace-title">My unified Core work</h2>
+   {!unified.ok?<p className="voxFlowMuted" role="status">
+    {unified.status===401?"Verified Staff MFA required.":
+     unified.status===403?"Current Core role or exact client grant does not permit this combined view.":
+     "Combined Core work is not activated in protected staging."}
+   </p>:<>
+    <p className="voxFlowMuted">Read-only, bounded {unified.items.length}-item window.
+     Separate Core authorization is enforced for each work item and client case.
+     It is not the complete staff workload.</p>
+    {unified.items.length===0?<p role="status">No authorized items in the current bounded window.</p>:
+     <ul className="voxFlowList">{unified.items.map(item=><li key={item.referenceId} className="voxFlowRow">
+       <div><span>{item.source==="CORE_CLIENT_RIYA"?"Riya client case":"Core work"}</span>
+        <p>{item.subjectKind.replaceAll("_"," ")} · {item.state.replaceAll("_"," ")} · {item.referenceId.slice(0,8)}</p></div>
+       <time dateTime={item.updatedAt}>{item.updatedAt.slice(0,16)} UTC</time>
+      </li>)}</ul>}
+   </>}
+  </section>
   <section className="voxFlowCard" aria-labelledby="module-title">
    <h2 id="module-title">Department operations</h2>
    <div className="voxCommandModules">

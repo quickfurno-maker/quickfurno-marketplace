@@ -27,7 +27,7 @@ export async function previewAttributableFourSourceEod({
  try{if((await verifyCurrentScope(scope))!==true)
   return fail("STAFF_ROLE_OR_SCOPE_REVOKED");}
  catch{return fail("CURRENT_SCOPE_UNAVAILABLE");}
- const seenSources=new Set(),seenEvents=new Set(),summaries=[];
+ const seenSources=new Set(),seenEvents=new Set(),seenObjectRevisions=new Set(),summaries=[];
  for(const r of readings){
   if(!r||!SOURCES.includes(r.source)||seenSources.has(r.source)||
    !Number.isSafeInteger(r.cursorStartMs)||
@@ -49,6 +49,12 @@ export async function previewAttributableFourSourceEod({
     e.cityId!==scope.cityId||seenEvents.has(e.id)||
     typeof e.kind!=="string"||!/^[A-Z_]{3,32}$/.test(e.kind))
     return fail("UNATTRIBUTABLE_OR_DUPLICATE_EOD_EVENT");
+   // One canonical revision per source/object: distinct event UUIDs must not
+   // inflate employee totals for the same persisted action revision.
+   const revisionKey=r.source+":"+e.objectId+":"+e.revision;
+   if(seenObjectRevisions.has(revisionKey))
+    return fail("DUPLICATE_CANONICAL_OBJECT_REVISION");
+   seenObjectRevisions.add(revisionKey);
    seenEvents.add(e.id);kinds.set(e.kind,(kinds.get(e.kind)||0)+1);
   }
   summaries.push(Object.freeze({source:r.source,verifiedEventCount:r.events.length,

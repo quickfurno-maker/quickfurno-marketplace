@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {fetchStaffWorkQueuePreview} from "../../../lib/core";
+import {fetchAb3DomainWindow} from "../../../lib/ab3Domain";
 import WorkActionControl from "./WorkActionControl";
 import "./queue.css";
 export const dynamic="force-dynamic";
@@ -7,7 +8,9 @@ export const dynamic="force-dynamic";
  * Queue is bounded and current; UI forms never grant a work transition.
  */
 export default async function VoxMyWorkQueue(){
- const result=await fetchStaffWorkQueuePreview();
+ const [result,department]=await Promise.all([
+  fetchStaffWorkQueuePreview(),fetchAb3DomainWindow()
+ ]);
  const actionUiEnabled=process.env.VOX_WORK_ACTIONS_UI_ENABLED==="staging"&&
   process.env.VOX_WORK_ACTIONS_ENABLED==="staging"&&
   process.env.VOX_STAFF_PORTAL_ENABLED==="staging"&&
@@ -26,6 +29,25 @@ export default async function VoxMyWorkQueue(){
     certified in protected staging. Client replies and Team Leader
     approvals remain separate governed flows.</p>
   </header>
+  <section className="voxQueueCard" aria-labelledby="ab3-domain-window-title">
+   <h2 id="ab3-domain-window-title">My verified department lane</h2>
+   {!department.ok?<p role="status">{department.status===401?
+    "Verified Staff MFA required.":department.status===403?
+    "Current Core department or item grants do not permit this lane.":
+    "Department-only Core work is not activated in protected staging."}</p>:
+    <>
+     <p className="voxQueueCaution">Read-only, bounded {department.items.length} items
+      for {department.department.replaceAll("_"," ")}. Not a workload total or
+      an authorization to send messages, claim work or open the next page.</p>
+     {department.items.length===0?<p role="status">No authorized work in this bounded lane.</p>:
+      <ul className="voxQueueList">{department.items.map(item=><li className="voxQueueItem" key={item.id}>
+       <div><span className="voxQueueKind">{item.kind.replaceAll("_"," ")}</span>
+        <h3>Work {item.id.slice(0,8)}</h3>
+        <p>{item.state.replaceAll("_"," ")}</p></div>
+       <time dateTime={item.updatedAt}>{item.updatedAt.slice(0,16)} UTC</time>
+      </li>)}</ul>}
+    </>}
+  </section>
   {!result.ok?
    <section className="voxQueueCard" role="status">
     <h2>My Work is currently locked</h2>

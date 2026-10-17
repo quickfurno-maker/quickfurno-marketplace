@@ -1,0 +1,20 @@
+name: VOX AB4 Native Core Work Activity - RELEASE HOLD
+on:
+  pull_request:
+    paths:
+      - 'ops/vox/sql-candidates/20261018010000_vox_ab4_native_work_source_writer_candidate.sql'
+      - 'scripts/mvp/vox/validate-voxAB4-native-work-pg17.ps1'
+      - '.github/workflows/vox-ab4-native-activity-hold.yml'
+permissions:
+  contents: read
+jobs:
+  synthetic-transactional-pg17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Offline PG17 atomic native Work event F1 attribution
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB4-native-work-pg17.ps1
+      - run: node --test scripts/mvp/vox/*.test.mjs

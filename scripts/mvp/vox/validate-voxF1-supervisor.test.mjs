@@ -63,3 +63,41 @@ test("invalid receipt prevents next batch regardless of telemetry outcome",async
  assert.equal(r.ok,false);assert.equal(r.cycles,0);
  assert.equal(r.totalExternalMessagesSent,0);
 });
+
+test("confirmed Core SQL failure is retried via lease-bound RPC, no send",async()=>{
+ const f=setup();let failureCalls=0;
+ const r=await run({...f.args,maxCycles:1,rpc:async(name)=>{
+  if(name===n.claim)return {data:[{job_id:id(3),work_event_id:id(4),
+   lease_token:id(5),attempt:2}]};
+  if(name===n.process)return {error:{code:"P0001"}};
+  failureCalls++;return {data:[{job_id:id(3),new_state:"PENDING",attempt:2}]};
+ }});
+ assert.equal(r.ok,true);assert.equal(failureCalls,1);
+ assert.equal(r.jobsRetried,1);assert.equal(r.jobsDeadLettered,0);
+ assert.equal(r.totalInternalRecords,0);assert.equal(r.totalExternalMessagesSent,0);
+});
+test("fifth attempt enters dead letter, classified for human Owner review",async()=>{
+ const f=setup();let failed=0;
+ const r=await run({...f.args,maxCycles:1,rpc:async(name)=>{
+  if(name===n.claim)return {data:[{job_id:id(3),work_event_id:id(4),
+   lease_token:id(5),attempt:5}]};
+  if(name===n.process)return {error:{code:"P0001"}};
+  failed++;return {data:[{job_id:id(3),new_state:"DEAD_LETTER",attempt:5}]};
+ }});
+ assert.equal(r.ok,true);assert.equal(failed,1);
+ assert.equal(r.jobsDeadLettered,1);assert.equal(r.requiresOwnerAlert,true);
+ assert.equal(r.status,"DEAD_LETTERS_REQUIRE_OWNER_REVIEW");
+ assert.equal(r.totalExternalMessagesSent,0);
+});
+test("uncertain database receipt stops the next supervisor batch",async()=>{
+ const f=setup();let claimed=0;
+ const r=await run({...f.args,rpc:async(name)=>{
+  if(name===n.claim){claimed++;return {data:[{job_id:id(3),
+   work_event_id:id(4),lease_token:id(5),attempt:1}]};}
+  if(name===n.process)return {data:[{job_id:id(99),internal_records:2}]};
+  return {error:{code:"NO_RETRY"}};
+ }});
+ assert.equal(r.ok,false);assert.equal(r.cycles,0);
+ assert.equal(claimed,1);assert.equal(r.requiresOwnerAlert,true);
+ assert.equal(r.totalExternalMessagesSent,0);
+});

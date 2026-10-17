@@ -18,7 +18,7 @@ export async function runApprovedStagingOutboxCycles({
   !Number.isSafeInteger(maxCycles)||maxCycles<1||maxCycles>20||
   !Number.isSafeInteger(maxJobs)||maxJobs<1||maxJobs>10)
   return fail("APPROVED_STAGING_SUPERVISOR_REQUIRED");
- let cycles=0,totalInternalRecords=0;
+ let cycles=0,totalInternalRecords=0,jobsRetried=0,jobsDeadLettered=0;
  for(let i=0;i<maxCycles;i++){
   let keepGoing;
   try{keepGoing=await shouldContinue(i);}catch{
@@ -31,11 +31,15 @@ export async function runApprovedStagingOutboxCycles({
    emitObservation,maxJobs
   });
   if(!result.ok)return Object.freeze({ok:false,reason:result.status,
-   cycles,totalInternalRecords,totalExternalMessagesSent:0,source:"CORE_ONLY"});
+   cycles,totalInternalRecords,jobsRetried,jobsDeadLettered,
+   requiresOwnerAlert:true,totalExternalMessagesSent:0,source:"CORE_ONLY"});
   cycles++;totalInternalRecords+=result.internalRecords;
-  if(result.status==="PARTIAL_UNVERIFIED")return fail("SQL_OUTCOME_UNKNOWN");
+  jobsRetried+=result.jobsRetried;jobsDeadLettered+=result.jobsDeadLettered;
  }
- return Object.freeze({ok:true,status:"BOUNDED_INTERNAL_CYCLES_COMPLETE",
-  cycles,totalInternalRecords,totalExternalMessagesSent:0,
-  pushDeliveriesVerified:0,source:"CORE_ONLY",releaseCertified:false});
+ return Object.freeze({ok:true,status:jobsDeadLettered>0?
+  "DEAD_LETTERS_REQUIRE_OWNER_REVIEW":"BOUNDED_INTERNAL_CYCLES_COMPLETE",
+  cycles,totalInternalRecords,jobsRetried,jobsDeadLettered,
+  requiresOwnerAlert:jobsDeadLettered>0,
+  totalExternalMessagesSent:0,pushDeliveriesVerified:0,
+  source:"CORE_ONLY",releaseCertified:false});
 }

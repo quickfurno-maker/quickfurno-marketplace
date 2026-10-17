@@ -1,3 +1,6 @@
+"use client";
+
+import {useEffect,useRef,useState} from "react";
 import Link from "next/link";
 import "./vox-workspace.css";
 
@@ -32,23 +35,59 @@ const navigation: {heading: string; items: NavigationItem[]}[] = [
 export function VoxWorkspaceNav({active, preview = false, admin = false}: {
   active: NavKey; preview?: boolean; admin?: boolean;
 }) {
+  const [query,setQuery]=useState("");
+  const inputRef=useRef<HTMLInputElement>(null);
+  useEffect(()=>{
+    function shortcut(event:KeyboardEvent){
+      const target=event.target;
+      const editable=target instanceof HTMLElement &&
+        (target.isContentEditable || ["INPUT","TEXTAREA","SELECT"].includes(target.tagName));
+      if (!editable && !event.metaKey && !event.ctrlKey && !event.altKey && event.key==="/"){
+        event.preventDefault();
+        inputRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown",shortcut);
+    return ()=>window.removeEventListener("keydown",shortcut);
+  },[]);
+
+  const term=query.trim().toLocaleLowerCase();
+  const visible=navigation.map(group=>({
+    ...group,
+    items:group.items.filter(item=>(preview||admin||!item.adminOnly) &&
+      (!term || item.label.toLocaleLowerCase().includes(term) || group.heading.toLocaleLowerCase().includes(term))),
+  })).filter(group=>group.items.length>0);
+
   return <aside className="voxWorkspaceSidebar" aria-label="VOX workspace navigation">
     <Link className="voxWorkspaceIdentity" href="/" aria-label="VOX Mission Control">
       <span className="voxWorkspaceLogo">V</span>
       <span><strong>VOX</strong><small>QUICKFURNO OPERATIONS</small></span>
     </Link>
+    <label className="voxWorkspaceNavSearch">
+      <span className="voxWorkspaceSearchGlyph" aria-hidden="true">⌕</span>
+      <input ref={inputRef} type="search" placeholder="Find workspace" aria-label="Find a VOX workspace"
+        value={query} onChange={event=>setQuery(event.target.value)} maxLength={65}/>
+      <kbd aria-hidden="true">/</kbd>
+    </label>
     <div className="voxWorkspaceNavScroll">
-      {navigation.map(group => <nav aria-label={group.heading} className="voxWorkspaceNavGroup" key={group.heading}>
+      {visible.length===0?<p className="voxWorkspaceNoResults" role="status">No matching workspaces</p>:null}
+      {visible.map(group=><nav aria-label={group.heading} className="voxWorkspaceNavGroup" key={group.heading}>
         <p>{group.heading}</p>
-        {group.items.filter(item => preview || admin || !item.adminOnly).map(item => {
+        {group.items.map(item=>{
           const href = preview && item.id === "staff" ? "/preview/staff-management" : item.href;
-          return <Link href={href} key={item.id} aria-current={active===item.id ? "page" : undefined}
-            className={"voxWorkspaceNavItem"+(active===item.id ? " voxWorkspaceNavActive" : "")}
-            title={preview && item.id !== "mission" && item.id !== "staff" ? "Protected live workspace; authorization required" : undefined}>
+          const classes="voxWorkspaceNavItem"+(active===item.id ? " voxWorkspaceNavActive" : "");
+          const contents=<>
             <span className="voxWorkspaceNavIcon" aria-hidden="true">{item.symbol}</span>
             <span>{item.label}</span>
-            {preview && item.id !== "mission" && item.id !== "staff" ? <span className="voxWorkspaceNavLock" aria-hidden="true">·</span> : null}
-          </Link>;
+            {preview && item.id !== "mission" && item.id !== "staff"
+              ? <span className="voxWorkspaceNavLock" aria-hidden="true">Locked</span> : null}
+          </>;
+          if (preview && item.id !== "mission" && item.id !== "staff"){
+            return <span key={item.id} className={classes+" voxWorkspaceNavUnavailable"}
+              aria-disabled="true" title="Protected workflow, not available in local preview">{contents}</span>;
+          }
+          return <Link href={href} key={item.id} aria-current={active===item.id?"page":undefined}
+            className={classes}>{contents}</Link>;
         })}
       </nav>)}
     </div>
@@ -70,8 +109,8 @@ export function VoxWorkspaceFrame({active, title, eyebrow, children, preview = f
         <div className="voxWorkspaceTopIdentity"><span>{eyebrow}</span><strong>{title}</strong></div>
         <div className="voxWorkspaceTopRight">
           <span className="voxWorkspaceTopDate">STAFF OPERATIONS</span>
-          <span className={"voxWorkspaceMode"+(preview ? " voxWorkspaceModePreview" : "")}>
-            {preview ? "LOCAL PREVIEW ONLY" : "CORE-VERIFIED WORKSPACE"}
+          <span className={"voxWorkspaceMode"+(preview?" voxWorkspaceModePreview":"")}>
+            {preview?"LOCAL PREVIEW ONLY":"CORE-VERIFIED WORKSPACE"}
           </span>
         </div>
       </header>

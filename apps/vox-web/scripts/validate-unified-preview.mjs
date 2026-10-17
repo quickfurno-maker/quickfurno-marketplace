@@ -44,4 +44,32 @@ check("mobile layout has responsive navigation and cards",
   ()=>{assert.match(source("app/components/vox-workspace.css"),/@media \(max-width: 760px\)/);assert.match(source("app/mission.css"),/@media\(max-width: 580px\)/);});
 check("development eval allowed only for React dev debugging, production retains strict CSP",
   ()=>{assert.match(csp,/NODE_ENV === "development" \? " 'unsafe-eval'" : ""/);assert.match(csp,/Content-Security-Policy/);});
+const role=source("app/components/VoxRolePerspective.tsx");
+
+check("role perspectives are only local display state, never authorization",
+  ()=>{assert.match(home,/<VoxRolePerspective \/>/);assert.match(role,/useState<Role>\("admin"\)/);
+    assert.match(role,/NO PERMISSION CHANGES/);assert.doesNotMatch(role,/\bfetch\s*\(|createClient|service_role|document\.cookie/);});
+check("role preview has Admin, Leader and Staff with pressed-state semantics",
+  ()=>{assert.match(role,/Admin \/ Superadmin/);assert.match(role,/Team Leader/);assert.match(role,/Staff Member/);
+    assert.match(role,/aria-pressed=\{selected===role\}/);});
+check("Staff leader preview acknowledges independent initial bootstrap",
+  ()=>assert.match(role,/independently approved bootstrap/));
+check("navigation search is bounded and local, with no network or service role",
+  ()=>{assert.match(nav,/maxLength=\{65\}/);assert.match(nav,/inputRef\.current\?\.focus\(\)/);
+    assert.doesNotMatch(nav,/\bfetch\s*\(|service_role|window\.location\.assign/);});
+check("preview routes beyond Mission and Staff are not clickable links",
+  ()=>{assert.match(nav,/if \(preview && item\.id !== "mission" && item\.id !== "staff"\)/);
+    assert.match(nav,/aria-disabled="true"/);assert.match(nav,/voxWorkspaceNavUnavailable/);});
+check("staff department search filters only passed-in Core capability catalogue",
+  ()=>{assert.match(staff,/const visiblePacks=packs\.filter/);assert.match(staff,/maxLength=\{60\}/);
+    assert.doesNotMatch(staff,/localStorage|sessionStorage/);});
+check("directory status/search filters only provided scoped roster",
+  ()=>{assert.match(staff,/const list=roster\.filter/);assert.match(staff,/r\.state===statusFilter/);
+    assert.match(staff,/list\.map\(\(member,i\)/);});
+check("planning draft may be cleared but cannot invite",
+  ()=>{assert.match(staff,/onClick=\{\(\)=>setSelected\(\[\]\)\}/);
+    assert.match(staff,/className="staffSetupInvite" disabled/);});
+check("staff lifecycle labels are explicit plans, not real user operations",
+  ()=>{assert.match(staff,/Planning and review only/);assert.match(staff,/No automatic changes/);
+    assert.match(staff,/Joiner|JOINER/);assert.match(staff,/MOVER/);assert.match(staff,/LEAVER/);});
 console.log("VOX_UNIFIED_PREVIEW_SECURITY_QA_PASS "+passed+"/"+passed);

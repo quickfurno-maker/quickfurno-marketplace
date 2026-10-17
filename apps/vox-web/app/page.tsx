@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {VoxWorkspaceFrame} from "./components/VoxWorkspaceNav";
+import {VoxRolePerspective} from "./components/VoxRolePerspective";
 import "./mission.css";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +54,8 @@ function LocalPreview() {
           <p>Real counts, queues, alerts and Staff activity remain hidden until authenticated staging certification. No actions or provider sends are available here.</p>
         </div>
       </div>
+
+      <VoxRolePerspective />
 
       <section aria-labelledby="mission-focus">
         <div className="voxWorkspaceSectionTitle">

@@ -38,7 +38,18 @@ test("single Core+Web Staff session, read-only queue UI and owner-controlled set
  assert.match(bff,/base\+"\/api\/vox\/v1\/work-queue"/);
  assert.match(bff,/x-content-type-options|CORE_STAFF_SCOPE_DENIED_OR_UNAVAILABLE/);
  assert.match(env,/VOX_WORK_QUEUE_UI_ENABLED=disabled/);
- assert.match(page,/await fetchStaffWorkQueuePreview\(\)/);
+ // Preserve the original MFA Core reader even when independent AB3
+ // department read executes concurrently. Never replace it with browser data.
+ assert.ok(/await fetchStaffWorkQueuePreview\(\)/.test(page)||
+  (/await Promise\.all\(\[/.test(page)&&
+   /fetchStaffWorkQueuePreview\(\)/.test(page)&&
+   /fetchAb3DomainWindow\(\)/.test(page)));
+ if(page.includes("fetchAb3DomainWindow()")){
+  const domain=read("apps/vox-web/lib/ab3Domain.ts");
+  assert.match(domain,/verifiedMfaSession\(\)/);
+  assert.match(domain,/VOX_AB3_DOMAIN_WEB_ENABLED/);
+  assert.match(domain,/cache:"no-store"/);
+ }
  assert.match(page,/<button type="button" disabled/);
  assert.doesNotMatch(page,/fetch\(|localStorage|sessionStorage|createUser|sendMessage/);
  assert.ok(existsSync(resolve(root,"apps/vox-web/app/team/admin/staff/page.tsx")));

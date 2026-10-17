@@ -20,6 +20,7 @@ export async function attestAb2FourSourceReviewWindow({
   scope.canMutate!==false||
   typeof businessDate!=="string"||
   !/^\d{4}-\d\d-\d\d$/.test(businessDate)||
+  !Number.isFinite(Date.parse(businessDate+"T00:00:00Z"))||
   new Date(businessDate+"T00:00:00Z").toISOString().slice(0,10)!==businessDate||
   !Array.isArray(sourceSeals)||sourceSeals.length!==4||
   !Number.isSafeInteger(now)||now<=0||

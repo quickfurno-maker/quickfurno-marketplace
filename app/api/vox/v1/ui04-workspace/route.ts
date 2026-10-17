@@ -74,7 +74,7 @@ export async function GET(request:Request):Promise<Response>{
   const object=async({source,itemId,kind,expectedRevision,
    expectedState,expectedProjectId}:Check)=>{
    if(!id(itemId)||!Number.isSafeInteger(expectedRevision)||
-    expectedRevision<0||!await current())return false;
+    expectedRevision<0)return false;
    if(source==="CORE_WORK_LEDGER"){
     const w=await db.from("vox_work_items_candidate_v1")
      .select("id,source_kind,source_id,team_id,city_id,assignee_id,state,revision")

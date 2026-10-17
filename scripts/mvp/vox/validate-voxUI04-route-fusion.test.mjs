@@ -145,3 +145,19 @@ test("T2 route is server-only, strictly gated and all mutations return 405",()=>
   assert.match(source,new RegExp("export const "+method+"=reject"));
  assert.doesNotMatch(source,/auth\.admin\.createUser|\.insert\(|\.update\(|whatsapp\.send|fetch\(/);
 });
+
+test("Phase A scope read is bracketed, not repeated per individual object",async()=>{
+ let checks=0;
+ const x=params(),r=await composeAuthorizedCoreWorkspace({...x.a,
+  verifyCurrentScope:async()=>{checks++;return true}});
+ assert.equal(r.ok,true);
+ assert.equal(checks,3); // outer before reads, composer before objects, after objects
+ assert.equal(x.proofs.length,2);
+});
+test("Phase A any grant revocation after object reads withholds all work",async()=>{
+ let checks=0;
+ const x=params(),r=await composeAuthorizedCoreWorkspace({...x.a,
+  verifyCurrentScope:async()=>++checks<3});
+ assert.equal(checks,3);assert.equal(r.ok,false);
+ assert.equal(r.status,403);assert.deepEqual(r.items,[]);
+});

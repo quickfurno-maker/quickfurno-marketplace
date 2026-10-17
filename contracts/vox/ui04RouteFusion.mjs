@@ -64,6 +64,11 @@ export async function composeAuthorizedCoreWorkspace({
    verifyCurrentObjectGrant
   });
   if(result.ok!==true)return denied("OBJECT_AND_SOURCE_SCOPE_DENIED",403);
+  // Two current remote Auth/Core entitlement checks bracket the bounded
+  // object-specific DB reads. Per-item current() would repeat full Supabase
+  // Auth, reviewer memberships and grants 37 times; never cache across calls.
+  if(await verifyCurrentScope(scope)!==true)
+   return denied("STAFF_SCOPE_REVOKED_DURING_READ",403);
   // No transcript, phone, address, email, staff grants or provider payload.
   return Object.freeze({...result,
    owner:"quickfurno-core",source:"EXISTING_PROTECTED_CORE_ROUTES",

@@ -138,7 +138,7 @@ export function AdminStaffSetup({packs,roster,rosterVerified=false,teams=[],team
               </label>}
             <p role="status" className="staffSetupRequestState">Preview: {ordered.length} responsibilities · {selectedTeam?"Core team selected":"No verified team selected"} · Identity not verified · Review pending</p>
           </div>
-          <button className="staffSetupInvite" disabled type="button" title="Staff invitations require approved Core workflow">
+          <button disabled type="button" className="staffSetupInvite" title="Staff invitations require approved Core workflow">
             Create &amp; invite Staff <span aria-hidden="true">→</span>
           </button>
           <p className="staffSetupNotice">Not available in preview. Staff identity, invitations, grants, payments, vendor access and approval decisions are never created by this screen.</p>

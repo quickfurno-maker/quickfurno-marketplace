@@ -68,7 +68,7 @@ check("directory status/search filters only provided scoped roster",
     assert.match(staff,/list\.map\(\(member,i\)/);});
 check("planning draft may be cleared but cannot invite",
   ()=>{assert.match(staff,/onClick=\{\(\)=>setSelected\(\[\]\)\}/);
-    assert.match(staff,/className="staffSetupInvite" disabled/);});
+    assert.match(staff,/<button disabled type="button" className="staffSetupInvite"/);});
 check("staff lifecycle labels are explicit plans, not real user operations",
   ()=>{assert.match(staff,/Planning and review only/);assert.match(staff,/No automatic changes/);
     assert.match(staff,/Joiner|JOINER/);assert.match(staff,/MOVER/);assert.match(staff,/LEAVER/);});

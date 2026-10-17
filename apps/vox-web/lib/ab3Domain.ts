@@ -32,7 +32,7 @@ export function parseAb3DomainWindow(raw:unknown):Ab3DomainView{
   p.completeness!=="BOUNDED_NOT_TOTAL"||
   p.canChange!==false||p.canSend!==false||
   p.providerMessagesSent!==0||p.nextPageAuthorized!==false||
-  !Object.hasOwn(kinds,String(p.department))||
+  !Object.prototype.hasOwnProperty.call(kinds,String(p.department))||
   !Array.isArray(p.items)||p.items.length>25)
   return denied(503,"UNVERIFIED_CORE_DOMAIN_SOURCE");
  const dep=p.department as Lane,seen=new Set<string>(),items:Ab3DomainItem[]=[];

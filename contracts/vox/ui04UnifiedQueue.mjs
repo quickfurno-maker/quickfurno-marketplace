@@ -53,7 +53,8 @@ export async function composeCoreVerifiedUnifiedQueue({
     w.canClaim!==false||w.canTransition!==false)
     return deny("WORK_ITEM_PROVENANCE_FAILED");
    if(await verifyCurrentObjectGrant({scope,source:"CORE_WORK_LEDGER",
-    itemId:w.workItemId,kind:w.kind})!==true)
+    itemId:w.workItemId,kind:w.kind,expectedRevision:w.revision,
+    expectedState:w.state})!==true)
     return deny("WORK_OBJECT_ACCESS_REVOKED");
    seen.add(w.workItemId);
    items.push({source:"CORE_WORK_LEDGER",referenceId:w.workItemId,
@@ -72,7 +73,9 @@ export async function composeCoreVerifiedUnifiedQueue({
     c.revision<0||!goodTime(c.lastUpdated))
     return deny("CLIENT_SOURCE_PROVENANCE_FAILED");
    if(await verifyCurrentObjectGrant({scope,source:"CORE_CLIENT_RIYA",
-    itemId:c.conversationId,kind:"client"})!==true)
+    itemId:c.conversationId,kind:"client",
+    expectedRevision:c.revision,expectedState:c.caseState,
+    expectedProjectId:c.clientProjectId})!==true)
     return deny("CLIENT_OBJECT_ACCESS_REVOKED");
    seen.add(c.conversationId);
    items.push({source:"CORE_CLIENT_RIYA",referenceId:c.conversationId,

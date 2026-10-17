@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {fetchStaffWorkQueuePreview} from "../../../lib/core";
 import {fetchVerifiedUnifiedWorkspace} from "../../../lib/ui04Workspace";
+import {deriveBoundedAttention} from "../../../lib/ab2Attention";
 import {fetchStaffNotifications} from "../../../lib/staffNotifications";
 import {fetchStaffEodPreview} from "../../../lib/eod";
 import {fetchScopedRiyaClientCases,fetchStaffSourceReadiness} from "../../../lib/clientSourceStatus";
@@ -27,6 +28,7 @@ export default async function StaffCommandCenter(){
   fetchScopedRiyaClientCases(),fetchStaffSourceReadiness(),fetchVerifiedUnifiedWorkspace()
  ]);
  const available=work.ok||notifications.ok||eod.ok||clientCases.ok||sourceReadiness.ok||unified.ok;
+ const attention=deriveBoundedAttention(unified);
  return <main className="voxFlow voxCommandCenter">
   <nav className="voxFlowNav" aria-label="Breadcrumb">
    <Link href="/team">Team Operations</Link><span>/</span><span>Command Center</span>
@@ -66,6 +68,18 @@ export default async function StaffCommandCenter(){
      <small>Partial ledger only; CRM and agents not certified</small></article>
    </div>
   </section>}
+  <section className="voxFlowCard" aria-labelledby="ab2-attention-title">
+   <h2 id="ab2-attention-title">Needs attention · bounded Core window</h2>
+   {!unified.ok?<p role="status" className="voxFlowMuted">Verified Core work unavailable; no synthetic alerts are shown.</p>:
+    <>
+     <p className="voxFlowMuted">Read-only attention labels from {attention.totalBounded} currently authorized items. Not an SLA breach count, complete workload or notification.</p>
+     {attention.candidates.length===0?<p role="status">No blocked or waiting items in this bounded window.</p>:
+      <ul className="voxFlowList">{attention.candidates.map(item=><li className="voxFlowRow" key={item.referenceId}>
+       <div><strong>{item.reason.replaceAll("_"," ")}</strong><p>{item.kind.replaceAll("_"," ")} · {item.referenceId.slice(0,8)}</p></div>
+       <time dateTime={item.updatedAt}>{item.updatedAt.slice(0,16)} UTC</time>
+      </li>)}</ul>}
+    </>}
+  </section>
   <section className="voxFlowCard" aria-labelledby="unified-workspace-title">
    <h2 id="unified-workspace-title">My unified Core work</h2>
    {!unified.ok?<p className="voxFlowMuted" role="status">

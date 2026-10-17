@@ -1,6 +1,7 @@
 import "server-only";
 import {adminClient} from "@/lib/supabase";
 import {getVerifiedScopedStaff} from "@/services/vox/verifiedScopedStaff";
+import {canReadWriteTeamInternalChat} from "@/contracts/vox/teamChatEligibility.mjs";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -12,11 +13,9 @@ const send=(body:unknown,status:number)=>Response.json(body,{status,headers:{
 const enabled=()=>process.env.VOX_STAFF_GRANTS_ENABLED==="staging"&&
  process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED==="staging"&&
  process.env.VOX_STAFF_TEAM_CHAT_ENABLED==="staging";
-const canChat=(s:Awaited<ReturnType<typeof getVerifiedScopedStaff>>)=>{
- return !!s&&s.canMutate===false&&s.canReadContent===true&&
- ["operations_manager","acquisition_agent","vendor_success_agent",
-  "support_agent","team_leader"].includes(s.role);
-};
+const canChat=(s:Awaited<ReturnType<typeof getVerifiedScopedStaff>>)=>
+ canReadWriteTeamInternalChat({scope:s,teamLeaderEnabled:
+  process.env.VOX_TL_INTERNAL_CHAT_ENABLED==="staging"});
 /** Team-scoped private internal chat, NOT a Core conversation with customers,
  * vendor/provider delivery, WhatsApp, or agent human-handover. */
 export async function GET(request:Request){

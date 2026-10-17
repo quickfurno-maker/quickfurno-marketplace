@@ -3,9 +3,11 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import vm from "node:vm";
 import ts from "typescript";
+import {canReadWriteTeamInternalChat} from "../../../contracts/vox/teamChatEligibility.mjs";
 const uuid=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 const scope={userId:uuid(1),teamId:uuid(2),cityId:uuid(3),role:"support_agent",
- canMutate:false,canReadContent:true,prospectIds:[],vendorIds:[],supportThreadIds:[]};
+ canMutate:false,canReadContent:true,verifiedDepartments:["service_support"],
+ prospectIds:[],vendorIds:[],supportThreadIds:[]};
 const date="2026-10-16";
 class FixedDate extends Date{
  constructor(...args){super(...(args.length?args:["2026-10-16T08:00:00.000Z"]));}
@@ -57,6 +59,7 @@ async function load(relative,short){
  const m=new vm.SourceTextModule(js,{context:ctx,identifier:"route-"+short});
  const imports=new Map([
   ["server-only",{}],
+  ["@/contracts/vox/teamChatEligibility.mjs",{canReadWriteTeamInternalChat}],
   ["@/lib/supabase",{adminClient:db}],
   ["@/services/vox/verifiedScopedStaff",{
    getVerifiedScopedStaff:async hdr=>{state.authCalls++;return hdr==="Bearer TEST_ONLY"?state.scope:null;}
@@ -170,6 +173,17 @@ test("chat GET only current team, bounded and never external send",async()=>{
  assert.equal(doc.totalKnown,false);assert.equal(doc.messages.length,1);
  assert.equal(doc.messages[0].isMine,true);
  assert.equal(JSON.stringify(doc).includes(scope.userId),false);
+});
+test("Team Leader team-chat uses separate current grant flag without client access",async()=>{
+ state.scope={...scope,role:"team_leader",canReadContent:false,
+  verifiedDepartments:[]};
+ flags.VOX_TL_INTERNAL_CHAT_ENABLED="off";
+ assert.equal((await chat.GET(get("staff-chat"))).status,403);
+ flags.VOX_TL_INTERNAL_CHAT_ENABLED="staging";
+ const result=await chat.GET(get("staff-chat"));
+ assert.equal(result.status,200);
+ assert.equal(state.scope.canReadContent,false);
+ assert.equal((await result.json()).externalMessagesSent,0);
 });
 test("chat POST derives actor and team from verified Core, receipt internal-only",async()=>{
  state.rpcData=[{message_id:uuid(66),created_time:"2026-10-16T09:00:00Z"}];

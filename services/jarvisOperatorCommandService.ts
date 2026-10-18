@@ -71,6 +71,13 @@ async function claimReceipt(command:QfjOperatorCommand,rawBody:Uint8Array):Promi
   if(row.state==="FINALIZED"&&typeof row.result_status==="string"&&typeof row.reason_code==="string"){
     return {kind:"FINAL",result:result(command.commandId,row.result_status as QfjOperatorCommandResult["status"],row.reason_code)};
   }
+  // AB7J: a signed STOP command can remain CLAIMED until independent
+  // human approval. Exact M2M signed bytes/idempotency already matched above.
+  // Never reopen final receipts, RESUME or ordinary approval commands.
+  if(row.state==="CLAIMED"&&
+     process.env.VOX_AB7H_SIGNED_OPERATOR_ATOMIC_ENABLED==="staging"&&
+     (command.action==="CONVERSATION_PAUSE_AI"||command.action==="CONVERSATION_TAKEOVER"))
+    return {kind:"CLAIMED"};
   return {kind:"CONFLICT",reason:"COMMAND_INDETERMINATE"};
 }
 
@@ -330,6 +337,14 @@ export async function executeJarvisOperatorCommand(args:{
   else if(args.command.action==="CONVERSATION_PAUSE_AI")outcome=await pauseConversation(args.command,actorId,args.rawBody);
   else outcome=await resumeConversation(args.command,actorId);
 
+  // A signed staged STOP command awaiting independent human approval must
+  // remain CLAIMED so the *exact same signed bytes* can be retried. Never
+  // finalize an uncertain SQL transport outcome as terminal denial either.
+  if(process.env.VOX_AB7H_SIGNED_OPERATOR_ATOMIC_ENABLED==="staging"&&
+     (args.command.action==="CONVERSATION_PAUSE_AI"||
+      args.command.action==="CONVERSATION_TAKEOVER")&&
+     outcome.status==="UNAVAILABLE")
+    return outcome;
   if(!(await finalizeReceipt(args.command.commandId,outcome))){
     return result(args.command.commandId,"UNAVAILABLE","COMMAND_RESULT_INDETERMINATE");
   }

@@ -12,6 +12,12 @@ on:
       - 'ops/vox/sql-candidates/20261018080000*'
       - 'ops/vox/sql-candidates/20261018090000*'
       - 'scripts/mvp/vox/validate-voxAB7F-*'
+      - 'scripts/mvp/vox/validate-voxAB7G-*'
+      - 'ops/vox/sql-candidates/20261018100000*'
+      - 'app/api/vox/v1/official-eod-publish/**'
+      - 'scripts/mvp/vox/validate-voxAB7G-*'
+      - 'ops/vox/sql-candidates/20261018100000*'
+      - 'app/api/vox/v1/official-eod-publish/**'
       - 'worker/voxAb7fIntegratedInternalWorker.mjs'
       - 'app/api/vox/v1/support-task/**'
       - 'app/api/vox/v1/aarohi-task/**'
@@ -37,6 +43,8 @@ jobs:
         run: node --test scripts/mvp/vox/validate-voxAB7-final-*.test.mjs
       - name: AB7F genuine Core atomic adapter contracts
         run: node --test scripts/mvp/vox/validate-voxAB7F-*.test.mjs
+      - name: AB7G independent reviewer signature and EOD gates
+        run: node --test scripts/mvp/vox/validate-voxAB7G-*.test.mjs
       - run: node --test scripts/mvp/vox/*.test.mjs
       - run: npm run typecheck
       - run: npm run build

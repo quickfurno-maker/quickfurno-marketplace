@@ -80,7 +80,8 @@ INSERT INTO public.vox_ab3_staff_source_snapshots_candidate_v1
  foreach($f in @(
  '20261018070000_vox_ab7f_conversation_atomic_operator_candidate.sql',
  '20261018080000_vox_ab7f_staff_atomic_suspend_candidate.sql',
- '20261018090000_vox_ab7f_four_source_eod_persist_candidate.sql')){
+ '20261018090000_vox_ab7f_four_source_eod_persist_candidate.sql',
+ '20261018100000_vox_ab7g_eod_official_release_candidate.sql')){
   $q=Get-Content (Join-Path $root "ops\vox\sql-candidates\$f") -Raw
   $r=Sql $q;if($r.code -ne 0){throw "DDL_FAILED $f $($r.text)"}
   Write-Output "PASS DDL $f"
@@ -90,6 +91,15 @@ INSERT INTO public.vox_ab3_staff_source_snapshots_candidate_v1
  Must 'EOD four source reviewed DB receipt' "select source_count||'|'||published from public.qf_vox_ab7f_four_source_eod_atomic_candidate_v1('$staff','$tl','$team','$city','2026-10-17','$n3','$($digest.text)');" '4|false'
  Denied 'EOD same nonce replay' "select * from public.qf_vox_ab7f_four_source_eod_atomic_candidate_v1('$staff','$tl','$team','$city','2026-10-17','$n3','$($digest.text)');"
  Denied 'EOD forged four source digest' "select * from public.qf_vox_ab7f_four_source_eod_atomic_candidate_v1('$staff','$tl','$team','$city','2026-10-16','00000000-0000-4000-8000-000000000040','$(('c'*64))');"
+ $report=Sql "select id::text from public.vox_ab7f_four_source_eod_candidate_v1 where nonce='$n3';"
+ if($report.code -ne 0 -or $report.text -notmatch '^[0-9a-f-]{36}$'){throw 'AB7G_REPORT_ID_REQUIRED'}
+ Denied 'Official EOD release without independently reviewed attestation' "select * from public.qf_vox_ab7g_official_eod_publish_candidate_v1('$($report.text)','$owner','$tl','00000000-0000-4000-8000-000000000046','$($digest.text)');"
+ Denied 'No service role may manufacture Owner attestation' "set role service_role;insert into public.vox_ab7g_eod_owner_approvals_candidate_v1(report_id,owner_id,team_leader_id,digest,verified_signature_digest,expires_at) values('$($report.text)','$owner','$tl','$($digest.text)',repeat('f',64),clock_timestamp()+interval '5 minutes');"
+ $approval=Sql "insert into public.vox_ab7g_eod_owner_approvals_candidate_v1(report_id,owner_id,team_leader_id,digest,verified_signature_digest,expires_at) values('$($report.text)','$owner','$tl','$($digest.text)',repeat('f',64),clock_timestamp()+interval '5 minutes');"
+ if($approval.code -ne 0){throw "AB7G_OFFLINE_OWNER_PROOF_SETUP_FAILED $($approval.text)"}
+ Must 'Official EOD release requires exact Owner TL evidence' "select publication_state from public.qf_vox_ab7g_official_eod_publish_candidate_v1('$($report.text)','$owner','$tl','00000000-0000-4000-8000-000000000046','$($digest.text)');" 'OFFICIALLY_RELEASED_BY_OWNER'
+ Must 'EOD exactly one independent publication ledger row' "select count(*) from public.vox_ab7g_eod_official_publications_candidate_v1 where report_id='$($report.text)';" '1'
+ Denied 'Official EOD duplicate publication replay' "select * from public.qf_vox_ab7g_official_eod_publish_candidate_v1('$($report.text)','$owner','$tl','00000000-0000-4000-8000-000000000047','$($digest.text)');"
  Must 'Conversation real PAUSE revision' "select new_state||'|'||revision from public.qf_vox_ab7f_conversation_atomic_operator_candidate_v1('$conv',1,'$owner','$n1','PAUSE_AI');" 'PAUSED|2'
  Must 'Conversation native event and nonce exactly one' "select (select count(*) from public.communication_conversation_events where conversation_id='$conv')||'|'||(select count(*) from public.vox_ab7f_conversation_operator_receipts_candidate_v1 where nonce='$n1');" '1|1'
  Denied 'Conversation stale revision rejected' "select * from public.qf_vox_ab7f_conversation_atomic_operator_candidate_v1('$conv',1,'$owner','00000000-0000-4000-8000-000000000041','TAKEOVER');"

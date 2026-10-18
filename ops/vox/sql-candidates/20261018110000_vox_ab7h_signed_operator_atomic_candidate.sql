@@ -8,6 +8,7 @@ create table public.vox_ab7h_operator_review_candidate_v1(
   public.jarvis_os_operator_command_receipts(command_id) on delete restrict,
  conversation_id uuid not null references
   public.communication_conversations(id) on delete restrict,
+ expected_destination_hash text not null check(expected_destination_hash~'^[a-f0-9]{64}$'),
  owner_id uuid not null references public.profiles(id) on delete restrict,
  reviewer_id uuid not null references public.vox_staff_memberships_v1(auth_user_id) on delete restrict,
  action text not null check(action in ('CONVERSATION_PAUSE_AI','CONVERSATION_TAKEOVER')),
@@ -61,7 +62,7 @@ begin
  if not found or r.request_digest<>p_digest or r.action<>p_action or
   r.state<>'CLAIMED' then raise exception 'AB7H_SIGNED_RECEIPT_MISSING';end if;
  select owner_id,reviewer_id,action,request_digest,conversation_id,
-   verified_operator_label,verified_signature_sha256,expires_at into a
+   expected_destination_hash,verified_operator_label,verified_signature_sha256,expires_at into a
  from public.vox_ab7h_operator_review_candidate_v1 approved
  where approved.command_id=p_command for update;
  if not found or a.action<>p_action or a.request_digest<>p_digest or
@@ -77,11 +78,12 @@ begin
   and m.is_active=true and m.revoked_at is null
   and m.expires_at>clock_timestamp() and p.is_active=true and p.role is null)
  then raise exception 'AB7H_CURRENT_OWNER_TEAM_LEADER_REQUIRED';end if;
- select cv.id,cv.tenant_id,cv.state,cv.assigned_actor,
-  cv.human_takeover,cv.revision into c
+ select cv.id,cv.tenant_id,cv.channel,cv.destination_hash,cv.state,
+  cv.assigned_actor,cv.human_takeover,cv.revision into c
  from public.communication_conversations cv
  where cv.id=p_conversation for update;
- if not found or c.tenant_id<>'quickfurno' or c.revision<>p_revision
+ if not found or c.tenant_id<>'quickfurno' or c.channel<>'whatsapp'
+  or c.destination_hash<>a.expected_destination_hash or c.revision<>p_revision
   or c.human_takeover is distinct from false
   or c.assigned_actor not in ('RIYA','ANISHA','AAROHI')
   or (p_action='CONVERSATION_PAUSE_AI' and c.state<>'OPEN')

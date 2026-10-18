@@ -19,6 +19,11 @@ on:
       - 'scripts/mvp/vox/validate-voxAB7H-*'
       - 'scripts/mvp/vox/validate-voxAB7I-*'
       - 'scripts/mvp/vox/validate-voxAB7J-*'
+      - 'scripts/mvp/vox/validate-voxAB7K-*'
+      - 'contracts/vox/ab7k*.mjs'
+      - 'docs/vox/VOX-AB7K-REVIEWED-SOURCE-FINGERPRINT.json'
+      - 'ops/vox/quarantined-migrations/legacy-20261014/*.sql'
+      - 'ops/vox/sql-candidates/*.sql'
       - 'contracts/vox/ab7j*.mjs'
       - 'worker/voxAb7jSignedInternalOnce.mjs'
       - 'ops/vox/sql-candidates/20261018120000*'
@@ -57,6 +62,8 @@ jobs:
         run: node --test scripts/mvp/vox/validate-voxAB7I-*.test.mjs
       - name: AB7J native review, signed operator retry and worker one-shot
         run: node --test scripts/mvp/vox/validate-voxAB7J-*.test.mjs
+      - name: AB7K full 30-file source manifest with explicit release HOLD
+        run: node --test scripts/mvp/vox/validate-voxAB7K-*.test.mjs
       - run: node --test scripts/mvp/vox/*.test.mjs
       - run: npm run typecheck
       - run: npm run build
@@ -85,6 +92,8 @@ jobs:
         run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7B-aarohi-atomic-pg17.ps1
       - name: AB7F atomic source PostgreSQL17 candidate verification
         run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7F-native-writers-pg17.ps1
+      - name: AB7K full 7 foundation and 23 VOX candidates in isolated PostgreSQL17
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7K-full-schema-pg17.ps1
   web-locked-state-regressions:
     runs-on: ubuntu-latest
     timeout-minutes: 35

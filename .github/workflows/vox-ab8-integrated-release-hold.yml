@@ -4,6 +4,9 @@ on:
     paths:
       - 'contracts/vox/ab7*.mjs'
       - 'scripts/mvp/vox/validate-voxAB7-*'
+      - 'scripts/mvp/vox/validate-voxAB7B-*'
+      - 'app/api/vox/v1/support-task/**'
+      - 'ops/vox/sql-candidates/20261018040000*'
       - 'ops/vox/sql-candidates/20261018020000*'
       - 'ops/vox/sql-candidates/20261018030000*'
       - 'apps/vox-web/**'
@@ -44,6 +47,8 @@ jobs:
         run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7A-staff-pg17.ps1
       - name: AB7B source F1 atomic grant and consent replay re-audit
         run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7B-native-pg17.ps1
+      - name: AB7B native support task F1 nonce transaction and rollback
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7B-support-pg17.ps1
   web-locked-state-regressions:
     runs-on: ubuntu-latest
     timeout-minutes: 35

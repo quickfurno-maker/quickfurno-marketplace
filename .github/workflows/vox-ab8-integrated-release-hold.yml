@@ -17,6 +17,8 @@ on:
       - 'ops/vox/sql-candidates/20261018110000*'
       - 'services/jarvisOperatorCommandService.ts'
       - 'scripts/mvp/vox/validate-voxAB7H-*'
+      - 'scripts/mvp/vox/validate-voxAB7I-*'
+      - 'contracts/vox/ab7i*.mjs'
       - 'app/api/vox/v1/official-eod-publish/**'
       - 'worker/voxAb7fIntegratedInternalWorker.mjs'
       - 'app/api/vox/v1/support-task/**'
@@ -47,6 +49,8 @@ jobs:
         run: node --test scripts/mvp/vox/validate-voxAB7G-*.test.mjs
       - name: AB7H signed Jarvis operator native atomic cutover source regression
         run: node --test scripts/mvp/vox/validate-voxAB7H-*.test.mjs
+      - name: AB7I exact staged schema, reviewed Staff revocation, and internal worker preflight
+        run: node --test scripts/mvp/vox/validate-voxAB7I-*.test.mjs
       - run: node --test scripts/mvp/vox/*.test.mjs
       - run: npm run typecheck
       - run: npm run build

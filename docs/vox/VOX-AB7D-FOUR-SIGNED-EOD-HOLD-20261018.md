@@ -1,0 +1,5 @@
+# VOX AB7D Four independently signed source readiness — 18 October 2026
+
+AB-7D SOURCE-ONLY / RELEASE HOLD. `ab7FourSignedSourceReadiness.mjs` validates Staff AAL2/team/city, complete closed IST day, strict bounded native source event set and exact event/source current-grant callbacks, then produces four independent genuine Ed25519 manifests using separately supplied protected signer keys; each signature is verified against its pinned public key, current Staff scope checked again. Focused 4/4 Node tests include forged event IDs, out-of-day events, revoked grants and mismatched signers. The source rows, protected signer private keys and callbacks in tests are synthetic, not production authorization. Output `official:false`, cannot create official report/Team Leader ACK or claim real canonical source writers. F1 official EOD atomic submission remains separate, uninstalled and human-reviewed.
+
+**All preceding PRs remain draft/unmerged. Cursor review deferred. Independent DBA/AppSec, approved first Team Leader, Staff MFA, migration reconciliation, protected staging tests, signed artifacts and Owner GO remain P0. DO NOT DEPLOY.**

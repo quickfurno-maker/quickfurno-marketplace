@@ -14,9 +14,9 @@ on:
       - 'scripts/mvp/vox/validate-voxAB7F-*'
       - 'scripts/mvp/vox/validate-voxAB7G-*'
       - 'ops/vox/sql-candidates/20261018100000*'
-      - 'app/api/vox/v1/official-eod-publish/**'
-      - 'scripts/mvp/vox/validate-voxAB7G-*'
-      - 'ops/vox/sql-candidates/20261018100000*'
+      - 'ops/vox/sql-candidates/20261018110000*'
+      - 'services/jarvisOperatorCommandService.ts'
+      - 'scripts/mvp/vox/validate-voxAB7H-*'
       - 'app/api/vox/v1/official-eod-publish/**'
       - 'worker/voxAb7fIntegratedInternalWorker.mjs'
       - 'app/api/vox/v1/support-task/**'
@@ -45,6 +45,8 @@ jobs:
         run: node --test scripts/mvp/vox/validate-voxAB7F-*.test.mjs
       - name: AB7G independent reviewer signature and EOD gates
         run: node --test scripts/mvp/vox/validate-voxAB7G-*.test.mjs
+      - name: AB7H signed Jarvis operator native atomic cutover source regression
+        run: node --test scripts/mvp/vox/validate-voxAB7H-*.test.mjs
       - run: node --test scripts/mvp/vox/*.test.mjs
       - run: npm run typecheck
       - run: npm run build

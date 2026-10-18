@@ -141,10 +141,53 @@ async function decideAgniApproval(
   }
 }
 
+const UUID_AB7H=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+/** Signed Jarvis command receipt -> native Core event in ONE SQL transaction.
+ * The separately curated independent Owner+TL approval is required by the
+ * UNINSTALLED SQL candidate, not accepted as a browser bool or service claim.
+ */
+async function applyAb7hSignedAtomicConversation(
+  command:Extract<QfjOperatorCommand,{action:"CONVERSATION_TAKEOVER"|"CONVERSATION_PAUSE_AI"}>,
+  actorId:string,
+  rawBody:Uint8Array,
+):Promise<QfjOperatorCommandResult>{
+  const expectedRevision=command.payload.expectedRevision;
+  const requestDigest=createHash("sha256").update(rawBody).digest("hex");
+  try{
+    const {data,error}=await adminClient().rpc(
+      "qf_vox_ab7h_signed_operator_atomic_candidate_v1",{
+        p_command:command.commandId,
+        p_digest:requestDigest,
+        p_conversation:command.payload.conversationId,
+        p_revision:expectedRevision,
+        p_action:command.action,
+        p_operator_label:actorId,
+      });
+    if(error||!Array.isArray(data)||data.length!==1)
+      return result(command.commandId,"UNAVAILABLE","INDEPENDENT_ATOMIC_OPERATOR_AUTHORITY_MISSING");
+    const receipt=data[0] as Record<string,unknown>;
+    const expectedState=command.action==="CONVERSATION_TAKEOVER"?"HUMAN":"PAUSED";
+    if(!receipt||Object.keys(receipt).sort().join("|")!==
+       "command_id|event_id|new_revision|new_state"||
+      receipt.command_id!==command.commandId||
+      typeof receipt.event_id!=="string"||!UUID_AB7H.test(receipt.event_id)||
+      receipt.new_revision!==expectedRevision+1||
+      receipt.new_state!==expectedState)
+      return result(command.commandId,"UNAVAILABLE","SIGNED_ATOMIC_RECEIPT_UNVERIFIED");
+    return result(command.commandId,"APPLIED_BY_AUTHORITY",
+      command.action==="CONVERSATION_TAKEOVER"?"CORE_TAKEOVER_APPLIED":"CORE_PAUSE_APPLIED");
+  }catch{
+    return result(command.commandId,"UNAVAILABLE","SIGNED_ATOMIC_OPERATOR_UNAVAILABLE");
+  }
+}
+
 async function takeOverConversation(
   command:Extract<QfjOperatorCommand,{action:"CONVERSATION_TAKEOVER"}>,
   actorId:string,
+  rawBody:Uint8Array,
 ):Promise<QfjOperatorCommandResult>{
+  if(process.env.VOX_AB7H_SIGNED_OPERATOR_ATOMIC_ENABLED==="staging")
+    return applyAb7hSignedAtomicConversation(command,actorId,rawBody);
   const revision=command.payload.expectedRevision+1;
   const updated=await adminClient().from("communication_conversations").update({
     assigned_actor:"HUMAN",
@@ -174,7 +217,10 @@ async function takeOverConversation(
 async function pauseConversation(
   command:Extract<QfjOperatorCommand,{action:"CONVERSATION_PAUSE_AI"}>,
   actorId:string,
+  rawBody:Uint8Array,
 ):Promise<QfjOperatorCommandResult>{
+  if(process.env.VOX_AB7H_SIGNED_OPERATOR_ATOMIC_ENABLED==="staging")
+    return applyAb7hSignedAtomicConversation(command,actorId,rawBody);
   const revision=command.payload.expectedRevision+1;
   const updated=await adminClient().from("communication_conversations").update({
     state:"PAUSED",
@@ -280,8 +326,8 @@ export async function executeJarvisOperatorCommand(args:{
   let outcome:QfjOperatorCommandResult;
   if(args.command.action==="APPROVAL_DECIDE")outcome=await decideApproval(args.command,actorId);
   else if(args.command.action==="AGNI_APPROVAL_DECIDE")outcome=await decideAgniApproval(args.command,actorId);
-  else if(args.command.action==="CONVERSATION_TAKEOVER")outcome=await takeOverConversation(args.command,actorId);
-  else if(args.command.action==="CONVERSATION_PAUSE_AI")outcome=await pauseConversation(args.command,actorId);
+  else if(args.command.action==="CONVERSATION_TAKEOVER")outcome=await takeOverConversation(args.command,actorId,args.rawBody);
+  else if(args.command.action==="CONVERSATION_PAUSE_AI")outcome=await pauseConversation(args.command,actorId,args.rawBody);
   else outcome=await resumeConversation(args.command,actorId);
 
   if(!(await finalizeReceipt(args.command.commandId,outcome))){

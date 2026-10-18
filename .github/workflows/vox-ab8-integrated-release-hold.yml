@@ -28,6 +28,8 @@ jobs:
         with:
           node-version: '20.20.2'
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: AB7 final four-track focused security contracts
+        run: node --test scripts/mvp/vox/validate-voxAB7-final-*.test.mjs
       - run: node --test scripts/mvp/vox/*.test.mjs
       - run: npm run typecheck
       - run: npm run build

@@ -1,0 +1,39 @@
+name: VOX AB3 Combined Core Source and Disposable PG17 - RELEASE HOLD
+on:
+  pull_request:
+    paths:
+      - 'app/api/vox/v1/ab3-domain-work/**'
+      - 'contracts/vox/ab3*'
+      - 'scripts/mvp/vox/validate-voxAB3-*'
+      - 'scripts/mvp/vox/benchmark-voxAB3-*'
+      - 'ops/vox/sql-candidates/20261017030000*'
+      - 'ops/vox/sql-candidates/20261017040000*'
+      - '.github/workflows/vox-ab3-core-release-hold.yml'
+permissions:
+  contents: read
+jobs:
+  core-regression-typecheck-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: node --test scripts/mvp/vox/*.test.mjs
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run build
+  isolated-staff-and-eod-postgresql17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Review-only Staff invitation SQL / RLS / replay
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB3-staff-pg17.ps1
+      - name: Closed-day source snapshot SQL and immutability
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB3-eod-pg17.ps1

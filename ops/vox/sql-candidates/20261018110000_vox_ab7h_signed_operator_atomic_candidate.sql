@@ -49,8 +49,10 @@ language plpgsql security definer set search_path='' as $$
 declare r record; a record; c record; v_event uuid;v_new_rev bigint;
 begin
  if p_command is null or p_conversation is null or
-  p_digest !~ '^[a-f0-9]{64}$' or p_revision is null or p_revision<0 or
+  p_digest is null or p_digest !~ '^[a-f0-9]{64}$' or
+  p_revision is null or p_revision<0 or p_action is null or
   p_action not in ('CONVERSATION_PAUSE_AI','CONVERSATION_TAKEOVER') or
+  p_operator_label is null or
   p_operator_label !~ '^jarvis-os:[A-Za-z0-9._:-]{1,64}$'
  then raise exception 'AB7H_COMMAND_INPUT_INVALID';end if;
  select q.command_id,q.request_digest,q.action,q.state into r

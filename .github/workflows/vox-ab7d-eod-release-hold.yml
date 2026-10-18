@@ -1,16 +1,18 @@
-name: VOX AB7D Four Source Official EOD Gate - SOURCE RELEASE HOLD
+name: VOX AB7D Four Ed25519 Signed EOD - RELEASE HOLD
 on:
   pull_request:
     paths:
       - 'contracts/vox/ab7OfficialEod.mjs'
       - 'scripts/mvp/vox/validate-voxAB7-official-eod.test.mjs'
+      - 'contracts/vox/ab7FourSignedSourceReadiness.mjs'
+      - 'scripts/mvp/vox/validate-voxAB7-four-source-sign.test.mjs'
       - '.github/workflows/vox-ab7d-eod-release-hold.yml'
 permissions:
   contents: read
 jobs:
-  source-qa:
+  core-source:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:

@@ -78,10 +78,11 @@ begin
    or m.is_active is distinct from true or m.revoked_at is not null or
    m.expires_at<=clock_timestamp()
  then raise exception 'AB7F_STAFF_MEMBERSHIP_CHANGED';end if;
+ -- Suspend every grant for this identity, including stale cross-team grants.
+ -- Never reset or rewind an existing capability's audit revision.
  update public.vox_staff_department_capabilities_v1 c
-  set revoked_at=clock_timestamp(),revision=3
- where c.auth_user_id=p_target and c.team_id=p_team
-   and c.city_id=p_city and c.revoked_at is null;
+  set revoked_at=clock_timestamp(),revision=c.revision+1
+ where c.auth_user_id=p_target and c.revoked_at is null;
  get diagnostics v_grants=row_count;
  update public.vox_staff_object_scopes_v1 s
   set revoked_at=clock_timestamp()

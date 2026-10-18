@@ -26,5 +26,5 @@ test("AB7I full offline schema still requires human review/Owner GO",()=>{
  assert.equal(x.ready,false);assert.equal(x.canApply,false);
  const y=assess({...spec(),tableNames:[...base,...vox],
  signedIndependentReview:true,ownerGo:true});
- assert.equal(y.ready,true);assert.equal(y.canApply,false);
+ assert.equal(y.ready,false);assert.equal(y.schemaAligned,true);assert.equal(y.canApply,false);
 });

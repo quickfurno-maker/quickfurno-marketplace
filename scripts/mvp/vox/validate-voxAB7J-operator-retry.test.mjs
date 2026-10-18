@@ -9,8 +9,9 @@ const compiled=ts.transpileModule(file,{compilerOptions:{
 }}).outputText;
 const id=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 const flag="VOX_AB7H_SIGNED_OPERATOR_ATOMIC_ENABLED";
-function scenario(){
+function scenario({errorAfterCommit=false,forgedReceipt=false}={}){
  let receipt=null,approved=false,nativeWrites=0,finalizations=0;
+ let nativeCommitted=false;
  let eventId=id(3),splitWrites=0;
  const command={commandId:id(1),idempotencyKey:"signed-1",action:"CONVERSATION_PAUSE_AI",
   payload:{conversationId:id(2),expectedRevision:7}};
@@ -19,6 +20,18 @@ function scenario(){
  function db(){
  return {
   from(table){
+   if(table==="vox_ab7h_operator_atomic_receipts_candidate_v1")
+    return {select:()=>({eq(){return this;},maybeSingle:async()=>({
+      error:null,data:nativeCommitted?{
+       command_id:command.commandId,conversation_id:command.payload.conversationId,
+       event_id:eventId,revision:8}:null})})};
+   if(table==="communication_conversations")
+    return {select:()=>({eq(){return this;},maybeSingle:async()=>({
+     error:null,data:{id:command.payload.conversationId,state:"PAUSED",revision:8}})})};
+   if(table==="communication_conversation_events")
+    return {select:()=>({eq(){return this;},maybeSingle:async()=>({
+     error:null,data:{id:eventId,conversation_id:command.payload.conversationId,
+      event_type:forgedReceipt?"ai.resumed_by_operator":"ai.paused_by_operator"}})})};
    if(table!=="jarvis_os_operator_command_receipts"){
     splitWrites++;throw new Error("LEGACY_SPLIT_WRITER_INVOKED");
    }
@@ -38,6 +51,9 @@ function scenario(){
    assert.equal(p.p_digest,createHash("sha256").update(rawBody).digest("hex"));
    assert.equal(p.p_operator_label,actorId);
    if(!approved)return {error:{code:"AB7H_INDEPENDENT_SIGNED_REVIEW_REQUIRED"},data:null};
+   if(errorAfterCommit){
+    nativeCommitted=true;return {error:{code:"NETWORK_AFTER_DB_COMMIT"},data:null};
+   }
    return {error:null,data:[{
     event_id:eventId,new_revision:8,new_state:"PAUSED",command_id:command.commandId
    }]};
@@ -66,6 +82,32 @@ function scenario(){
   get splitWrites(){return splitWrites}
  };
 }
+test("AB7J ambiguous transport after native commit reconciles exact Core event+state+nonce",async()=>{
+ const before=process.env[flag];process.env[flag]="staging";
+ try{
+  const x=scenario({errorAfterCommit:true});x.approve();
+  const out=await x.execute();
+  assert.equal(out.status,"APPLIED_BY_AUTHORITY");
+  assert.equal(x.finalizations,1);assert.equal(x.nativeWrites,1);
+  assert.equal(x.receipt.state,"FINALIZED");assert.equal(x.splitWrites,0);
+ }finally{
+  if(before===undefined)delete process.env[flag];
+  else process.env[flag]=before;
+ }
+});
+test("AB7J forged native event on ambiguous result stays held not finalized",async()=>{
+ const before=process.env[flag];process.env[flag]="staging";
+ try{
+  const x=scenario({errorAfterCommit:true,forgedReceipt:true});x.approve();
+  const out=await x.execute();
+  assert.equal(out.status,"UNAVAILABLE");
+  assert.equal(x.receipt.state,"CLAIMED");
+  assert.equal(x.finalizations,0);assert.equal(x.splitWrites,0);
+ }finally{
+  if(before===undefined)delete process.env[flag];
+  else process.env[flag]=before;
+ }
+});
 test("AB7J unapproved signed STOP stays claimed; exact retry after independent approval executes once",async()=>{
  const previous=process.env[flag];process.env[flag]="staging";
  try{

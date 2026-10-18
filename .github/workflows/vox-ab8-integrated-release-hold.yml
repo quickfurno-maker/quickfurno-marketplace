@@ -6,6 +6,12 @@ on:
       - 'scripts/mvp/vox/validate-voxAB7-*'
       - 'ops/vox/sql-candidates/20261018020000*'
       - 'ops/vox/sql-candidates/20261018030000*'
+      - 'ops/vox/sql-candidates/20261018040000*'
+      - 'ops/vox/sql-candidates/20261018050000*'
+      - 'app/api/vox/v1/support-task/**'
+      - 'app/api/vox/v1/aarohi-task/**'
+      - 'scripts/mvp/vox/validate-voxAB7B-support-atomic*'
+      - 'scripts/mvp/vox/validate-voxAB7B-aarohi-atomic*'
       - 'apps/vox-web/**'
       - '.github/workflows/vox-ab8-integrated-release-hold.yml'
 permissions:
@@ -44,6 +50,10 @@ jobs:
         run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7A-staff-pg17.ps1
       - name: AB7B source F1 atomic grant and consent replay re-audit
         run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7B-native-pg17.ps1
+      - name: AB7B actual Support Desk original task, immutable Staff F1 and nonce
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7B-support-atomic-pg17.ps1
+      - name: AB7B actual Aarohi task and CRM event, immutable Staff F1 and nonce
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7B-aarohi-atomic-pg17.ps1
   web-locked-state-regressions:
     runs-on: ubuntu-latest
     timeout-minutes: 35

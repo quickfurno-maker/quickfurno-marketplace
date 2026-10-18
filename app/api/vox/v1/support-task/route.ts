@@ -30,7 +30,7 @@ export async function POST(request:Request){
   if(!task)return respond({ok:false,error:"ASSIGNMENT_OR_TASK_DENIED"},400);
   const nonce=(input as {nonce:string}).nonce;
   // Exact identity and active object grant are rechecked by reviewed Core
-  // SQL. Do not use createVendorTask(): it writes without the F1 record.
+  // SQL. Do not use the legacy separate CRM writer: it lacks atomic F1.
   const {data,error}=await adminClient().rpc(
    "qf_vox_ab7b_support_task_atomic_candidate_v1",{
     p_actor:scope.userId,p_team:scope.teamId,p_city:scope.cityId,

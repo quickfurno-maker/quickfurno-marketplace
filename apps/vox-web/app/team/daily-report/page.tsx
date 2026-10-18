@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {fetchStaffEodPreview} from "../../../lib/eod";
+import {fetchAb5SourceCheckpoints} from "../../../lib/ab5SourceCheckpoint";
 import "./report.css";
 export const dynamic="force-dynamic";
 const metrics=[
@@ -13,7 +14,9 @@ const metrics=[
 ] as const;
 /** Counts come only from Core verified Staff work events, never from VOX UI. */
 export default async function MyDailyReport(){
- const r=await fetchStaffEodPreview();
+ const [r,checkpoints]=await Promise.all([
+  fetchStaffEodPreview(),fetchAb5SourceCheckpoints()
+ ]);
  return <main className="voxReport">
   <nav className="voxReportBreadcrumb" aria-label="Breadcrumb">
    <Link href="/team">Team Operations</Link><span aria-hidden="true">/</span>
@@ -64,5 +67,24 @@ export default async function MyDailyReport(){
     </div>
    </section>
   </>}
+  <section className="voxReportCard" aria-labelledby="ab5-sources-title">
+   <h2 id="ab5-sources-title">Previous-day canonical source checkpoints</h2>
+   <p>Separate from today's Core Work preview. Counts below are from an
+    incomplete, read-only source checkpoint; they are not official Staff
+    productivity, cryptographically verified EOD, or proof of sent messages.</p>
+   {!checkpoints.ok?<p role="status">{checkpoints.status===401?
+    "A verified Staff MFA session is required.":checkpoints.status===403?
+    "Your current Core source permissions do not allow this view.":
+    "Four-source checkpoint inventory is not enabled in protected staging."}</p>:
+    <>
+     <p className="voxReportWarning" role="status">Business day {checkpoints.businessDate} IST ·
+      Not cryptographically certified · Cannot submit or approve</p>
+     <div className="voxReportGrid">{checkpoints.checkpoints.map(row=><article
+      className="voxReportMetric" key={row.source}>
+       <span className="voxReportMetricName">{row.source.replaceAll("_"," ")}</span>
+       <strong>{row.present?row.count:"Not recorded"}</strong>
+      </article>)}</div>
+    </>}
+  </section>
  </main>;
 }

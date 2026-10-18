@@ -33,6 +33,27 @@ try{
   if($LASTEXITCODE -eq 0){$ready=$true;break};Start-Sleep -Milliseconds 330
  }
  if(!$ready){throw 'PG17_NOT_READY'}
+
+ # Fresh postgres:17-alpine initially runs a disposable bootstrap server.
+ # pg_isready can succeed during bootstrap, then its socket disappears during
+ # final startup. Wait for the entrypoint's completed-init marker AND a
+ # live final server before any schema fixture writes.
+ $stable=$false
+ for($attempt=0;$attempt -lt 80;$attempt++){
+  $oldLogErrorPreference=$ErrorActionPreference
+  $ErrorActionPreference='Continue'
+  try{
+   $initLog=(docker logs $name 2>&1 | Out-String)
+   $logExit=$LASTEXITCODE
+  }finally{$ErrorActionPreference=$oldLogErrorPreference}
+  if($logExit -eq 0 -and $initLog -match 'PostgreSQL init process complete'){
+   docker exec $name pg_isready -U postgres -d postgres *> $null
+   if($LASTEXITCODE -eq 0){$stable=$true;break}
+  }
+  Start-Sleep -Milliseconds 300
+ }
+ if(!$stable){throw 'PG_FINAL_SERVER_NOT_STABLE'}
+
  $fixture=@'
 CREATE ROLE anon NOLOGIN;
 CREATE ROLE authenticated NOLOGIN;

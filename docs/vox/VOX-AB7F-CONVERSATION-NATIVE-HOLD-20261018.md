@@ -1,0 +1,5 @@
+# AB-7F — Atomic Core Conversation Operator Transaction (candidate, RELEASE HOLD)
+
+Based on certified draft #361. Implements an **uninstalled** privileged SQL candidate for genuine `communication_conversations`, native `communication_conversation_events`, and a unique nonce receipt in one database transaction. The adapter `applyAtomicConversationControl` invokes that RPC **only when** staging gate is on and current signed Core authority plus canonical conversation/consent have been verified. Permitted actions are PAUSE_AI and TAKEOVER; resume and provider messages forbidden.
+
+**Important:** This does not replace the existing split-write Core operator paths until the reviewed SQL is installed and the trusted signed ingress is safely switched. Signed Jarvis commands, current AAL2 and canonical opt-out checks are external Core responsibilities and must never be inferred from the receipt. No live activation. Independent DBA/AppSec review, canonical consent mapping and protected staging E2E pending.

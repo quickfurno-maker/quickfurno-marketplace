@@ -1,0 +1,60 @@
+name: VOX AB8 Integrated Five-Track Release-Hold QA
+on:
+  pull_request:
+    paths:
+      - 'contracts/vox/ab7*.mjs'
+      - 'scripts/mvp/vox/validate-voxAB7-*'
+      - 'ops/vox/sql-candidates/20261018020000*'
+      - 'apps/vox-web/**'
+      - '.github/workflows/vox-ab8-integrated-release-hold.yml'
+permissions:
+  contents: read
+jobs:
+  core-source-typecheck-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node --test scripts/mvp/vox/*.test.mjs
+      - run: npm run typecheck
+      - run: npm run build
+  offline-postgres17-provenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 32
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: AB3 independent Staff review candidate
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB3-staff-pg17.ps1
+      - name: AB3 signed source SQL checkpoint candidate
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB3-eod-pg17.ps1
+      - name: AB4 native Core Work event candidate
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB4-native-work-pg17.ps1
+      - name: AB7B all three synthetic original source writers
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7B-nonwork-pg17.ps1
+  web-locked-state-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: apps/vox-web
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node scripts/validate-ab3-domain.mjs
+      - run: node scripts/validate-ab5-eod-sources.mjs
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build

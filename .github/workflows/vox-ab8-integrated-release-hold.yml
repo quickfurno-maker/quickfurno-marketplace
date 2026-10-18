@@ -8,6 +8,11 @@ on:
       - 'ops/vox/sql-candidates/20261018030000*'
       - 'ops/vox/sql-candidates/20261018040000*'
       - 'ops/vox/sql-candidates/20261018050000*'
+      - 'ops/vox/sql-candidates/20261018070000*'
+      - 'ops/vox/sql-candidates/20261018080000*'
+      - 'ops/vox/sql-candidates/20261018090000*'
+      - 'scripts/mvp/vox/validate-voxAB7F-*'
+      - 'worker/voxAb7fIntegratedInternalWorker.mjs'
       - 'app/api/vox/v1/support-task/**'
       - 'app/api/vox/v1/aarohi-task/**'
       - 'scripts/mvp/vox/validate-voxAB7B-support-atomic*'
@@ -30,6 +35,8 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: AB7 final four-track focused security contracts
         run: node --test scripts/mvp/vox/validate-voxAB7-final-*.test.mjs
+      - name: AB7F genuine Core atomic adapter contracts
+        run: node --test scripts/mvp/vox/validate-voxAB7F-*.test.mjs
       - run: node --test scripts/mvp/vox/*.test.mjs
       - run: npm run typecheck
       - run: npm run build
@@ -56,6 +63,8 @@ jobs:
         run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7B-support-atomic-pg17.ps1
       - name: AB7B actual Aarohi task and CRM event, immutable Staff F1 and nonce
         run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7B-aarohi-atomic-pg17.ps1
+      - name: AB7F atomic source PostgreSQL17 candidate verification
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7F-native-writers-pg17.ps1
   web-locked-state-regressions:
     runs-on: ubuntu-latest
     timeout-minutes: 35

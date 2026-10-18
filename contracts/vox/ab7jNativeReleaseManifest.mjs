@@ -9,7 +9,8 @@ const names=Object.freeze([
 "20261018080000_vox_ab7f_staff_atomic_suspend_candidate.sql",
 "20261018090000_vox_ab7f_four_source_eod_persist_candidate.sql",
 "20261018100000_vox_ab7g_eod_official_release_candidate.sql",
-"20261018110000_vox_ab7h_signed_operator_atomic_candidate.sql"
+"20261018110000_vox_ab7h_signed_operator_atomic_candidate.sql",
+"20261018120000_vox_ab7j_two_person_staff_suspend_candidate.sql"
 ]);
 const hex=/^[a-f0-9]{64}$/;
 export function readAb7jSourceManifest(repoRoot){

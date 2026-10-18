@@ -1,0 +1,3 @@
+# VOX AB-7E — Internal Operations/AGNI/AOS Advisory, Release HOLD
+`ab7OperationsAdvisory.mjs` creates only deterministic, metadata-only Owner review labels from independently attested current Core in-app outbox/nonce grant counters (DLQ, stale leases, revoked Staff grants, rejected replays). Tests reject fake user metrics, stale windows, unknown keys, negative/outlier figures and silent healthy window.
+Never enables worker/scheduler, provider push/WhatsApp, lead assignment, credits, Staff grant or AOS/AGNI automated execution; no live AGNI adapter or server route is registered. Earlier AB5 in-app worker remains a disabled source composition backed by uninstalled SQL. Full operational execution and staging QA still pending.

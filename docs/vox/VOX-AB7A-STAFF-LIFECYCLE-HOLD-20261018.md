@@ -1,0 +1,5 @@
+# VOX AB7A Staff pending governance — 18 October 2026
+
+AB-7A SOURCE-ONLY / RELEASE HOLD. Adds `ab7StaffLifecycle.mjs` with separate currently revalidated Core owner AAL2 and independent TL AAL2 evidence for SUSPEND, REVOKE_DEPARTMENT and TRANSFER_TEAM, and new `ops/vox/sql-candidates/20261018030000_vox_ab7a_staff_lifecycle_pending_candidate.sql` immutable pending-only DB ledger. No Staff Auth user creation, account session invalidation, approved department mutation, direct permission change, notification or actual suspension. Exact source-only QA: 4/4 Node focused and genuine offline PostgreSQL17 `--network none` pending/nonself/inactive/TL-revoked/replay/append-only/forced RLS PASS. SQL and its dependencies are uninstalled; independent DBA/AppSec/TL and Owner GO needed before any protected staging Auth path or activation. Real Core transactional executor and Auth session revocation still NOT COMPLETE.
+
+**All preceding PRs remain draft/unmerged. Cursor review deferred. Independent DBA/AppSec, approved first Team Leader, Staff MFA, migration reconciliation, protected staging tests, signed artifacts and Owner GO remain P0. DO NOT DEPLOY.**

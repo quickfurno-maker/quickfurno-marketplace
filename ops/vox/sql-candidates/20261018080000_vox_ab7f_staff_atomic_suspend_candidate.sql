@@ -19,6 +19,26 @@ alter table public.vox_ab7f_staff_suspend_receipts_candidate_v1 force row level 
 revoke all on public.vox_ab7f_staff_suspend_receipts_candidate_v1
  from public,anon,authenticated;
 grant select on public.vox_ab7f_staff_suspend_receipts_candidate_v1 to service_role;
+create table public.vox_ab7i_staff_suspend_approvals_candidate_v1(
+ nonce uuid primary key,
+ target_id uuid not null references public.vox_staff_memberships_v1(auth_user_id) on delete restrict,
+ owner_id uuid not null references public.profiles(id) on delete restrict,
+ reviewer_id uuid not null references public.vox_staff_memberships_v1(auth_user_id) on delete restrict,
+ team_id uuid not null references public.vox_staff_teams_v1(id) on delete restrict,
+ city_id uuid not null references public.cities(id) on delete restrict,
+ signed_decision_digest text not null check(signed_decision_digest~'^[a-f0-9]{64}$'),
+ expires_at timestamptz not null,
+ reviewed_at timestamptz not null default clock_timestamp(),
+ constraint ab7i_distinct_reviewers check(
+  owner_id<>reviewer_id and owner_id<>target_id and reviewer_id<>target_id),
+ constraint ab7i_review_lease check(expires_at>reviewed_at and
+  expires_at<=reviewed_at+interval '10 minutes')
+);
+alter table public.vox_ab7i_staff_suspend_approvals_candidate_v1 enable row level security;
+alter table public.vox_ab7i_staff_suspend_approvals_candidate_v1 force row level security;
+revoke all on public.vox_ab7i_staff_suspend_approvals_candidate_v1
+ from public,anon,authenticated,service_role;
+grant select on public.vox_ab7i_staff_suspend_approvals_candidate_v1 to service_role;
 create function public.qf_vox_ab7f_staff_suspend_atomic_candidate_v1(
  p_target uuid,p_owner uuid,p_reviewer uuid,p_team uuid,p_city uuid,p_nonce uuid
 ) returns table(target_id uuid,receipt_nonce uuid,
@@ -44,6 +64,13 @@ begin
    and l.revoked_at is null and l.expires_at>clock_timestamp()
    and p.is_active=true and p.role is null)
  then raise exception 'AB7F_CURRENT_INDEPENDENT_TEAM_LEADER_REQUIRED';end if;
+ -- An active TL UUID supplied by a service is NOT independent approval.
+ -- Only the segregated reviewed attestation ledger can authorize this nonce.
+ if not exists(select 1 from public.vox_ab7i_staff_suspend_approvals_candidate_v1 a
+  where a.nonce=p_nonce and a.target_id=p_target and a.owner_id=p_owner
+    and a.reviewer_id=p_reviewer and a.team_id=p_team
+    and a.city_id=p_city and a.expires_at>clock_timestamp())
+ then raise exception 'AB7I_SIGNED_INDEPENDENT_SUSPEND_APPROVAL_MISSING';end if;
  select l.auth_user_id,l.staff_role,l.is_active,l.revoked_at,l.team_id,
    l.expires_at into m from public.vox_staff_memberships_v1 l
  where l.auth_user_id=p_target for update;

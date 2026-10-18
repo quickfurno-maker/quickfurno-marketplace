@@ -11,7 +11,8 @@ const spec=()=>({environment:"staging",enabled:true,
  verifyGlobalSessionRevoke:async()=>true});
 test("AB7G confirmed Auth provider result is distinct from Core revocation",async()=>{
  const x=await run(spec());assert.equal(x.ok,true);
- assert.equal(x.authSessionsInvalidated,true);assert.equal(x.productionCertified,false);
+ assert.equal(x.authSessionsInvalidated,false);assert.equal(x.refreshSessionsRevokedVerified,true);
+ assert.equal(x.activeJwtMayRemainValid,true);assert.equal(x.productionCertified,false);
 });
 test("AB7G stage and identity checks deny before Auth request",async()=>{
  for(const patch of [{enabled:false},{environment:"production"},

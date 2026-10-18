@@ -31,9 +31,9 @@ begin
    and p.role='admin' and p.is_active=true) then
   raise exception 'AB7F_CURRENT_CORE_OWNER_REQUIRED';
  end if;
- select id,tenant_id,state,assigned_actor,human_takeover,revision
-   into c from public.communication_conversations
-   where id=p_conversation for update;
+ select cv.id,cv.tenant_id,cv.state,cv.assigned_actor,cv.human_takeover,cv.revision
+   into c from public.communication_conversations cv
+   where cv.id=p_conversation for update;
  if not found or c.tenant_id<>'quickfurno' or
    c.revision<>p_revision or c.human_takeover is distinct from false or
    c.assigned_actor not in ('RIYA','ANISHA','AAROHI') or
@@ -42,12 +42,12 @@ begin
   raise exception 'AB7F_STALE_OR_FORBIDDEN_CONVERSATION';
  end if;
  v_revision:=p_revision+1;
- update public.communication_conversations set
+ update public.communication_conversations as cv set
    state=case when p_action='TAKEOVER' then 'HUMAN' else 'PAUSED' end,
    assigned_actor=case when p_action='TAKEOVER' then 'HUMAN' else assigned_actor end,
    human_takeover=(p_action='TAKEOVER'),
    jarvis_enabled=false,revision=v_revision,updated_at=clock_timestamp()
-   where id=p_conversation and revision=p_revision;
+   where cv.id=p_conversation and cv.revision=p_revision;
  insert into public.communication_conversation_events(
    conversation_id,event_type,actor_type,safe_summary,event_data
  ) values(p_conversation,

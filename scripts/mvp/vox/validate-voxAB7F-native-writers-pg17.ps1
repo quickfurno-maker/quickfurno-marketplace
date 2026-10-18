@@ -66,6 +66,8 @@ INSERT INTO public.vox_staff_memberships_v1 VALUES
 ('00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000004','team_leader',true,null,now()+interval '2 days'),
 ('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000004','support_agent',true,null,now()+interval '2 days');
 INSERT INTO public.vox_staff_department_capabilities_v1 VALUES('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000004','00000000-0000-4000-8000-000000000005',null,2);
+-- Stale cross-city capability must ALSO be revoked, revision incremented.
+INSERT INTO public.vox_staff_department_capabilities_v1 VALUES('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000004','00000000-0000-4000-8000-000000000066',null,6);
 INSERT INTO public.vox_staff_object_scopes_v1 VALUES('00000000-0000-4000-8000-000000000003',null);
 INSERT INTO public.communication_conversations VALUES
 ('00000000-0000-4000-8000-000000000006','quickfurno','OPEN','RIYA',false,true,1,now()),
@@ -127,8 +129,12 @@ INSERT INTO public.vox_ab3_staff_source_snapshots_candidate_v1
  Must 'Signed Jarvis+human review executes one native Core transaction' "select new_state||'|'||new_revision from public.qf_vox_ab7h_signed_operator_atomic_candidate_v1('$signed',repeat('a',64),'$conv3',1,'CONVERSATION_PAUSE_AI','jarvis-os:operator1');" 'PAUSED|2'
  Must 'Signed operator exactly one event and receipt' "select (select count(*) from public.communication_conversation_events where conversation_id='$conv3')||'|'||(select count(*) from public.vox_ab7h_operator_atomic_receipts_candidate_v1 where command_id='$signed');" '1|1'
  Denied 'Signed Jarvis duplicate receipt replay forbidden' "select * from public.qf_vox_ab7h_signed_operator_atomic_candidate_v1('$signed',repeat('a',64),'$conv3',1,'CONVERSATION_PAUSE_AI','jarvis-os:operator1');"
- Must 'Staff native membership grant scope revoked together' "select department_grants_revoked||'|'||object_scopes_revoked from public.qf_vox_ab7f_staff_suspend_atomic_candidate_v1('$staff','$owner','$tl','$team','$city','$n2');" '1|1'
- Must 'Staff membership and department and scopes fenced' "select (select is_active from public.vox_staff_memberships_v1 where auth_user_id='$staff')||'|'||(select revision from public.vox_staff_department_capabilities_v1 where auth_user_id='$staff')||'|'||(select (revoked_at is not null) from public.vox_staff_object_scopes_v1 where auth_user_id='$staff');" 'false|3|true'
+ Denied 'Staff active TL UUID without independent signed approval forbidden' "select * from public.qf_vox_ab7f_staff_suspend_atomic_candidate_v1('$staff','$owner','$tl','$team','$city','$n2');"
+ Denied 'Service role cannot self-create staff suspension approval' "set role service_role;insert into public.vox_ab7i_staff_suspend_approvals_candidate_v1(nonce,target_id,owner_id,reviewer_id,team_id,city_id,signed_decision_digest,expires_at) values('$n2','$staff','$owner','$tl','$team','$city',repeat('a',64),clock_timestamp()+interval '5 minutes');"
+ $att=Sql "insert into public.vox_ab7i_staff_suspend_approvals_candidate_v1(nonce,target_id,owner_id,reviewer_id,team_id,city_id,signed_decision_digest,expires_at) values('$n2','$staff','$owner','$tl','$team','$city',repeat('a',64),clock_timestamp()+interval '5 minutes');"
+ if($att.code -ne 0){throw "AB7I_STAFF_REVIEW_FIXTURE_FAILED $($att.text)"}
+ Must 'Staff native membership grant scope revoked together' "select department_grants_revoked||'|'||object_scopes_revoked from public.qf_vox_ab7f_staff_suspend_atomic_candidate_v1('$staff','$owner','$tl','$team','$city','$n2');" '2|1'
+ Must 'Staff membership and department and scopes fenced' "select (select is_active from public.vox_staff_memberships_v1 where auth_user_id='$staff')||'|'||(select count(*) from public.vox_staff_department_capabilities_v1 where auth_user_id='$staff' and revoked_at is null)||'|'||(select count(*) from public.vox_staff_department_capabilities_v1 where auth_user_id='$staff' and revoked_at is not null and revision in (3,7))||'|'||(select (revoked_at is not null) from public.vox_staff_object_scopes_v1 where auth_user_id='$staff');" 'false|0|2|true'
  Denied 'Staff replay prevents second grant revoke' "select * from public.qf_vox_ab7f_staff_suspend_atomic_candidate_v1('$staff','$owner','$tl','$team','$city','$n2');"
  Denied 'Anon Core RPC not callable' "set role anon;select * from public.qf_vox_ab7f_conversation_atomic_operator_candidate_v1('$conv2',1,'$owner','00000000-0000-4000-8000-000000000043','PAUSE_AI');"
  Must 'No synthetic provider outbound rows created' "select count(*) from public.communication_conversation_events where event_type not in ('ai.paused_by_operator','human.takeover_started');" '0'

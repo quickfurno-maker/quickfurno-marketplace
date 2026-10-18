@@ -5,6 +5,7 @@ on:
       - 'contracts/vox/ab7*.mjs'
       - 'scripts/mvp/vox/validate-voxAB7-*'
       - 'ops/vox/sql-candidates/20261018020000*'
+      - 'ops/vox/sql-candidates/20261018030000*'
       - 'apps/vox-web/**'
       - '.github/workflows/vox-ab8-integrated-release-hold.yml'
 permissions:
@@ -39,6 +40,10 @@ jobs:
         run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB4-native-work-pg17.ps1
       - name: AB7B all three synthetic original source writers
         run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7B-nonwork-pg17.ps1
+      - name: AB7A independently reviewed pending Staff lifecycle
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7A-staff-pg17.ps1
+      - name: AB7B source F1 atomic grant and consent replay re-audit
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7B-native-pg17.ps1
   web-locked-state-regressions:
     runs-on: ubuntu-latest
     timeout-minutes: 35

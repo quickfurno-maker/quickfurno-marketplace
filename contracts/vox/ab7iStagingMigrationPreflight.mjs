@@ -28,7 +28,8 @@ export function assessAb7iStagingInventory({
  const hashesOk=digest.test(migrationSha256??"")&&digest.test(rollbackSha256??"");
  const approved=signedIndependentReview===true&&ownerGo===true&&hashesOk;
  return Object.freeze({
-  ready:missingBase.length===0&&missingVox.length===0&&approved,
+  ready:false, // caller booleans never certify independent signatures
+  schemaAligned:missingBase.length===0&&missingVox.length===0,
   canApply:false, // separate DBA-controlled migration runner only
   reason:missingBase.length?"MISSING_CANONICAL_CORE_SCHEMA":
    partial?"PARTIALLY_INSTALLED_VOX_SCHEMA_HALT":

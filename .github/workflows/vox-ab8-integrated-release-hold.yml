@@ -18,6 +18,10 @@ on:
       - 'services/jarvisOperatorCommandService.ts'
       - 'scripts/mvp/vox/validate-voxAB7H-*'
       - 'scripts/mvp/vox/validate-voxAB7I-*'
+      - 'scripts/mvp/vox/validate-voxAB7J-*'
+      - 'contracts/vox/ab7j*.mjs'
+      - 'worker/voxAb7jSignedInternalOnce.mjs'
+      - 'ops/vox/sql-candidates/20261018120000*'
       - 'contracts/vox/ab7i*.mjs'
       - 'app/api/vox/v1/official-eod-publish/**'
       - 'worker/voxAb7fIntegratedInternalWorker.mjs'
@@ -51,6 +55,8 @@ jobs:
         run: node --test scripts/mvp/vox/validate-voxAB7H-*.test.mjs
       - name: AB7I exact staged schema, reviewed Staff revocation, and internal worker preflight
         run: node --test scripts/mvp/vox/validate-voxAB7I-*.test.mjs
+      - name: AB7J native review, signed operator retry and worker one-shot
+        run: node --test scripts/mvp/vox/validate-voxAB7J-*.test.mjs
       - run: node --test scripts/mvp/vox/*.test.mjs
       - run: npm run typecheck
       - run: npm run build

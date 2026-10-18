@@ -71,6 +71,13 @@ async function claimReceipt(command:QfjOperatorCommand,rawBody:Uint8Array):Promi
   if(row.state==="FINALIZED"&&typeof row.result_status==="string"&&typeof row.reason_code==="string"){
     return {kind:"FINAL",result:result(command.commandId,row.result_status as QfjOperatorCommandResult["status"],row.reason_code)};
   }
+  // AB7J: a signed STOP command can remain CLAIMED until independent
+  // human approval. Exact M2M signed bytes/idempotency already matched above.
+  // Never reopen final receipts, RESUME or ordinary approval commands.
+  if(row.state==="CLAIMED"&&
+     process.env.VOX_AB7H_SIGNED_OPERATOR_ATOMIC_ENABLED==="staging"&&
+     (command.action==="CONVERSATION_PAUSE_AI"||command.action==="CONVERSATION_TAKEOVER"))
+    return {kind:"CLAIMED"};
   return {kind:"CONFLICT",reason:"COMMAND_INDETERMINATE"};
 }
 
@@ -146,6 +153,43 @@ const UUID_AB7H=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
  * The separately curated independent Owner+TL approval is required by the
  * UNINSTALLED SQL candidate, not accepted as a browser bool or service claim.
  */
+/** On ambiguous RPC transport, verify durable native event+state+receipt
+ * before treating a signed command as applied. Absence is UNKNOWN, not denial.
+ * No write, no provider, and never trust an unjoined receipt alone.
+ */
+async function reconcileAb7jNativeStop(
+ command:Extract<QfjOperatorCommand,{action:"CONVERSATION_TAKEOVER"|"CONVERSATION_PAUSE_AI"}>
+):Promise<QfjOperatorCommandResult|null>{
+ try{
+  const db=adminClient();
+  const p=await db.from("vox_ab7h_operator_atomic_receipts_candidate_v1")
+    .select("command_id,conversation_id,event_id,revision")
+    .eq("command_id",command.commandId).maybeSingle();
+  if(p.error||!p.data||p.data.command_id!==command.commandId||
+     p.data.conversation_id!==command.payload.conversationId||
+     p.data.revision!==command.payload.expectedRevision+1||
+     typeof p.data.event_id!=="string"||!UUID_AB7H.test(p.data.event_id))return null;
+  const [conv,event]=await Promise.all([
+   db.from("communication_conversations").select("id,state,revision")
+    .eq("id",command.payload.conversationId).maybeSingle(),
+   db.from("communication_conversation_events").select("id,conversation_id,event_type")
+    .eq("id",p.data.event_id).maybeSingle(),
+  ]);
+  const expectedState=command.action==="CONVERSATION_TAKEOVER"?"HUMAN":"PAUSED";
+  const expectedEvent=command.action==="CONVERSATION_TAKEOVER"?
+     "human.takeover_started":"ai.paused_by_operator";
+  if(conv.error||event.error||
+     conv.data?.id!==command.payload.conversationId||
+     conv.data?.revision!==p.data.revision||
+     conv.data?.state!==expectedState||
+     event.data?.id!==p.data.event_id||
+     event.data?.conversation_id!==command.payload.conversationId||
+     event.data?.event_type!==expectedEvent)return null;
+  return result(command.commandId,"APPLIED_BY_AUTHORITY",
+   command.action==="CONVERSATION_TAKEOVER"?"CORE_TAKEOVER_APPLIED":"CORE_PAUSE_APPLIED");
+ }catch{return null;}
+}
+
 async function applyAb7hSignedAtomicConversation(
   command:Extract<QfjOperatorCommand,{action:"CONVERSATION_TAKEOVER"|"CONVERSATION_PAUSE_AI"}>,
   actorId:string,
@@ -164,7 +208,8 @@ async function applyAb7hSignedAtomicConversation(
         p_operator_label:actorId,
       });
     if(error||!Array.isArray(data)||data.length!==1)
-      return result(command.commandId,"UNAVAILABLE","INDEPENDENT_ATOMIC_OPERATOR_AUTHORITY_MISSING");
+      return (await reconcileAb7jNativeStop(command)) ??
+       result(command.commandId,"UNAVAILABLE","INDEPENDENT_ATOMIC_OPERATOR_AUTHORITY_MISSING");
     const receipt=data[0] as Record<string,unknown>;
     const expectedState=command.action==="CONVERSATION_TAKEOVER"?"HUMAN":"PAUSED";
     if(!receipt||Object.keys(receipt).sort().join("|")!==
@@ -177,7 +222,8 @@ async function applyAb7hSignedAtomicConversation(
     return result(command.commandId,"APPLIED_BY_AUTHORITY",
       command.action==="CONVERSATION_TAKEOVER"?"CORE_TAKEOVER_APPLIED":"CORE_PAUSE_APPLIED");
   }catch{
-    return result(command.commandId,"UNAVAILABLE","SIGNED_ATOMIC_OPERATOR_UNAVAILABLE");
+    return (await reconcileAb7jNativeStop(command)) ??
+     result(command.commandId,"UNAVAILABLE","SIGNED_ATOMIC_OPERATOR_UNAVAILABLE");
   }
 }
 
@@ -330,6 +376,14 @@ export async function executeJarvisOperatorCommand(args:{
   else if(args.command.action==="CONVERSATION_PAUSE_AI")outcome=await pauseConversation(args.command,actorId,args.rawBody);
   else outcome=await resumeConversation(args.command,actorId);
 
+  // A signed staged STOP command awaiting independent human approval must
+  // remain CLAIMED so the *exact same signed bytes* can be retried. Never
+  // finalize an uncertain SQL transport outcome as terminal denial either.
+  if(process.env.VOX_AB7H_SIGNED_OPERATOR_ATOMIC_ENABLED==="staging"&&
+     (args.command.action==="CONVERSATION_PAUSE_AI"||
+      args.command.action==="CONVERSATION_TAKEOVER")&&
+     outcome.status==="UNAVAILABLE")
+    return outcome;
   if(!(await finalizeReceipt(args.command.commandId,outcome))){
     return result(args.command.commandId,"UNAVAILABLE","COMMAND_RESULT_INDETERMINATE");
   }

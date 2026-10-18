@@ -46,6 +46,9 @@ try{
  $fixture=@'
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE ROLE anon NOLOGIN;CREATE ROLE authenticated NOLOGIN;CREATE ROLE service_role NOLOGIN BYPASSRLS;
+CREATE SCHEMA auth;
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$SELECT coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb$$;
 CREATE TABLE public.profiles(id uuid primary key,role text,is_active boolean);
 CREATE TABLE public.cities(id uuid primary key);
 CREATE TABLE public.vox_staff_teams_v1(id uuid primary key,city_id uuid,is_active boolean);
@@ -85,7 +88,8 @@ INSERT INTO public.vox_ab3_staff_source_snapshots_candidate_v1
  '20261018080000_vox_ab7f_staff_atomic_suspend_candidate.sql',
  '20261018090000_vox_ab7f_four_source_eod_persist_candidate.sql',
  '20261018100000_vox_ab7g_eod_official_release_candidate.sql',
- '20261018110000_vox_ab7h_signed_operator_atomic_candidate.sql')){
+ '20261018110000_vox_ab7h_signed_operator_atomic_candidate.sql',
+ '20261018120000_vox_ab7j_two_person_staff_suspend_candidate.sql')){
   $q=Get-Content (Join-Path $root "ops\vox\sql-candidates\$f") -Raw
   $r=Sql $q;if($r.code -ne 0){throw "DDL_FAILED $f $($r.text)"}
   Write-Output "PASS DDL $f"
@@ -131,8 +135,19 @@ INSERT INTO public.vox_ab3_staff_source_snapshots_candidate_v1
  Denied 'Signed Jarvis duplicate receipt replay forbidden' "select * from public.qf_vox_ab7h_signed_operator_atomic_candidate_v1('$signed',repeat('a',64),'$conv3',1,'CONVERSATION_PAUSE_AI','jarvis-os:operator1');"
  Denied 'Staff active TL UUID without independent signed approval forbidden' "select * from public.qf_vox_ab7f_staff_suspend_atomic_candidate_v1('$staff','$owner','$tl','$team','$city','$n2');"
  Denied 'Service role cannot self-create staff suspension approval' "set role service_role;insert into public.vox_ab7i_staff_suspend_approvals_candidate_v1(nonce,target_id,owner_id,reviewer_id,team_id,city_id,signed_decision_digest,expires_at) values('$n2','$staff','$owner','$tl','$team','$city',repeat('a',64),clock_timestamp()+interval '5 minutes');"
- $att=Sql "insert into public.vox_ab7i_staff_suspend_approvals_candidate_v1(nonce,target_id,owner_id,reviewer_id,team_id,city_id,signed_decision_digest,expires_at) values('$n2','$staff','$owner','$tl','$team','$city',repeat('a',64),clock_timestamp()+interval '5 minutes');"
- if($att.code -ne 0){throw "AB7I_STAFF_REVIEW_FIXTURE_FAILED $($att.text)"}
+ $badOwner=Sql "set role authenticated;select set_config('request.jwt.claim.sub','$owner',false);select set_config('request.jwt.claims',json_build_object('sub','$owner','aal','aal1')::text,false);select public.qf_vox_ab7j_owner_propose_staff_suspend_v1('$n2','$staff','$tl','$team','$city',repeat('a',64));"
+ if($badOwner.code -eq 0){throw 'AB7J_OWNER_AAL1_MUST_FAIL'}
+ Write-Output 'PASS DENIED AB7J Owner AAL1 cannot propose suspension'
+ $ownerProposal=Sql "set role authenticated;select set_config('request.jwt.claim.sub','$owner',false);select set_config('request.jwt.claims',json_build_object('sub','$owner','aal','aal2')::text,false);select public.qf_vox_ab7j_owner_propose_staff_suspend_v1('$n2','$staff','$tl','$team','$city',repeat('a',64));"
+ if($ownerProposal.code -ne 0 -or !$ownerProposal.text.Contains($n2)){throw "AB7J_OWNER_REVIEW_REQUEST_FAILED $($ownerProposal.text)"}
+ Write-Output 'PASS AB7J Owner AAL2 created exact pending suspension intent'
+ $wrongTl=Sql "set role authenticated;select set_config('request.jwt.claim.sub','$staff',false);select set_config('request.jwt.claims',json_build_object('sub','$staff','aal','aal2')::text,false);select public.qf_vox_ab7j_tl_approve_staff_suspend_v1('$n2',repeat('a',64));"
+ if($wrongTl.code -eq 0){throw 'AB7J_UNAUTHORIZED_REVIEWER_MUST_FAIL'}
+ Write-Output 'PASS DENIED AB7J unauthorized reviewer'
+ $tlApproved=Sql "set role authenticated;select set_config('request.jwt.claim.sub','$tl',false);select set_config('request.jwt.claims',json_build_object('sub','$tl','aal','aal2')::text,false);select public.qf_vox_ab7j_tl_approve_staff_suspend_v1('$n2',repeat('a',64));"
+ if($tlApproved.code -ne 0 -or !$tlApproved.text.Contains($n2)){throw "AB7J_TL_REVIEW_FAILED $($tlApproved.text)"}
+ Write-Output 'PASS AB7J independent TL AAL2 approved exact Owner request'
+ Denied 'AB7J role service cannot invoke authenticated TL approval' "set role service_role;select public.qf_vox_ab7j_tl_approve_staff_suspend_v1('$n2',repeat('a',64));"
  Must 'Staff native membership grant scope revoked together' "select department_grants_revoked||'|'||object_scopes_revoked from public.qf_vox_ab7f_staff_suspend_atomic_candidate_v1('$staff','$owner','$tl','$team','$city','$n2');" '2|1'
  Must 'Staff membership and department and scopes fenced' "select (select is_active from public.vox_staff_memberships_v1 where auth_user_id='$staff')||'|'||(select count(*) from public.vox_staff_department_capabilities_v1 where auth_user_id='$staff' and revoked_at is null)||'|'||(select count(*) from public.vox_staff_department_capabilities_v1 where auth_user_id='$staff' and revoked_at is not null and revision in (3,7))||'|'||(select (revoked_at is not null) from public.vox_staff_object_scopes_v1 where auth_user_id='$staff');" 'false|0|2|true'
  Denied 'Staff replay prevents second grant revoke' "select * from public.qf_vox_ab7f_staff_suspend_atomic_candidate_v1('$staff','$owner','$tl','$team','$city','$n2');"

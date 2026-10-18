@@ -4,9 +4,9 @@ import {fileURLToPath} from "node:url";
 import {resolve,dirname} from "node:path";
 import {readAb7jSourceManifest} from "../../../contracts/vox/ab7jNativeReleaseManifest.mjs";
 const repo=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
-test("AB7J 5 exact native SQL source files have deterministic digest and no apply",()=>{
+test("AB7J 6 exact native SQL source files have deterministic digest and no apply",()=>{
  const a=readAb7jSourceManifest(repo),b=readAb7jSourceManifest(repo);
- assert.equal(a.ok,true);assert.equal(a.exactCandidateCount,5);
+ assert.equal(a.ok,true);assert.equal(a.exactCandidateCount,6);
  assert.equal(a.candidateDigest,b.candidateDigest);
  assert.equal(a.releaseReady,false);assert.equal(a.canApply,false);
  assert.equal(a.noDatabaseChanges,true);

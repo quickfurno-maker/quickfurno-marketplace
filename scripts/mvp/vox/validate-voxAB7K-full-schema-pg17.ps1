@@ -61,6 +61,9 @@ grant usage on schema public to anon,authenticated,service_role;
 '@
  $init=Sql $seed
  if($init.code -ne 0){throw "AB7K_OFFLINE_CORE_FIXTURE_INVALID $($init.text)"}
+ # Offline disposable pg_dump before *any* quarantined/candidate VOX DDL.
+ docker exec $name pg_dump -U postgres -d postgres -Fc -f /tmp/ab7k_prevox.dump *> $null
+ if($LASTEXITCODE -ne 0){throw 'AB7K_DISPOSABLE_PREDUMP_FAILED'}
  $index=0
  foreach($f in $files){
   $index++
@@ -91,6 +94,17 @@ select 'tables='||(select count(*) from pg_class where relnamespace='public'::re
 '@
  if($checks.code -ne 0){throw "AB7K_SQL_POSTCHECK_FAILED $($checks.text)"}
  Write-Output "AB7K_FULL_SCHEMA_POSTCHECK $($checks.text)"
+ # On this network-isolated *disposable* container only, re-create the test
+ # database from the pre-VOX pg_dump and prove no VOX relation survives.
+ docker exec $name dropdb -U postgres --force postgres *> $null
+ if($LASTEXITCODE -ne 0){throw 'AB7K_DISPOSABLE_DROPDB_FAILED'}
+ docker exec $name createdb -U postgres postgres *> $null
+ if($LASTEXITCODE -ne 0){throw 'AB7K_DISPOSABLE_CREATEDB_FAILED'}
+ docker exec $name pg_restore -U postgres -d postgres --no-owner /tmp/ab7k_prevox.dump *> $null
+ if($LASTEXITCODE -ne 0){throw 'AB7K_DISPOSABLE_RESTORE_FAILED'}
+ $restored=Sql "select (select count(*) from pg_class where relnamespace='public'::regnamespace and relkind='r' and relname like 'vox_%')||'|'||(select count(*) from information_schema.tables where table_schema='public' and table_name in ('communication_conversations','communication_conversation_events','aarohi_tasks'));"
+ if($restored.code -ne 0 -or $restored.text -ne '0|3'){throw "AB7K_PREVOX_RESTORE_MISMATCH $($restored.text)"}
+ Write-Output 'PASS AB7K_DISPOSABLE_LOGICAL_RESTORE_PREVOX_ZERO_TABLES'
  Write-Output 'AB7K_OFFLINE_FULL_SCHEMA_SOURCE_PASS (QUARANTINED NEVER DEPLOY)'
 }finally{
  docker rm -f $name *> $null

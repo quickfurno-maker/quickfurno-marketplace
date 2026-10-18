@@ -34,8 +34,12 @@ export async function reconcileStaffAuthAfterCoreFence({
    return fail("GOTRUE_GLOBAL_REVOCATION_UNCONFIRMED");
   if(await verifyGlobalSessionRevoke(proof)!==true)
    return fail("AUTH_PROVIDER_SESSION_RECONCILIATION_PENDING");
-  return Object.freeze({ok:true,state:"AUTH_PROVIDER_RECONCILED",
-   coreAccessRevoked:true,authSessionsInvalidated:true,
+  // Supabase global sign-out invalidates refresh sessions, NOT outstanding
+  // JWT access tokens until exp. Never claim instantaneous JWT invalidation.
+  // Each Core operation must still check current neutral Staff membership.
+  return Object.freeze({ok:true,state:"AUTH_REFRESH_SESSIONS_RECONCILED",
+   coreAccessRevoked:true,refreshSessionsRevokedVerified:true,
+   authSessionsInvalidated:false,activeJwtMayRemainValid:true,
    targetId,requiresManualAuthReview:false,
    productionCertified:false,externalMessagesSent:0});
  }catch{return fail("AUTH_RECONCILIATION_OUTCOME_UNKNOWN");}

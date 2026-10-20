@@ -23,7 +23,9 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: '20.20.2'
-      - run: node --test scripts/mvp/vox/*.test.mjs
+      # The full source suite imports TypeScript for HTTP route verification.
+      # Install pinned npm dependencies BEFORE running tests (fail closed).
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node --test scripts/mvp/vox/*.test.mjs
       - run: npm run typecheck
       - run: npm run build

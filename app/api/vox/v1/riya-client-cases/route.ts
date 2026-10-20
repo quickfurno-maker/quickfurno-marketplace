@@ -63,6 +63,27 @@ export async function GET(request:Request):Promise<Response>{
    leads:leads.data,zones:zones.data
   });
   if(!projected.ok)return send({ok:false,error:"CLIENT_CASE_SCOPE_DENIED"},403);
+  // AB7N: multi-hop client read can outlive staff permission revocation.
+  // Reconfirm the real Auth/department/team scope AND each exact active
+  // conversation grant immediately before releasing case metadata.
+  const current=await getVerifiedScopedStaff(request.headers.get("authorization"));
+  if(!current||current.userId!==scope.userId||
+    current.teamId!==scope.teamId||current.cityId!==scope.cityId||
+    current.role!==scope.role||current.canReadContent!==true||
+    current.canMutate!==false||
+    !current.verifiedDepartments?.includes("client_success"))
+   return send({ok:false,error:"CLIENT_CASE_AUTH_REVOKED_DURING_READ"},403);
+  const renewed=await db.from("vox_staff_object_scopes_v1")
+   .select("auth_user_id,scope_kind,object_id,expires_at,revoked_at")
+   .eq("auth_user_id",scope.userId).eq("scope_kind","conversation")
+   .is("revoked_at",null).gt("expires_at",new Date().toISOString()).limit(26);
+  if(renewed.error||!renewed.data||renewed.data.length>25||
+     renewed.data.length!==grants.data.length||
+     renewed.data.some(g=>g.auth_user_id!==scope.userId||
+      g.scope_kind!=="conversation"||
+      !ids.includes(g.object_id))||
+     ids.some(id=>!renewed.data!.some(g=>g.object_id===id)))
+   return send({ok:false,error:"CLIENT_CASE_OBJECT_GRANT_REVOKED_DURING_READ"},403);
   return send(projected,200);
  }catch{return send({ok:false,error:"CLIENT_CASE_UNAVAILABLE"},503);}
 }

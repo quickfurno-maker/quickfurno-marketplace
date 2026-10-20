@@ -27,6 +27,15 @@ export async function runAb7jSignedInternalOnce({
    await verifyInstalledSchema(manifest.migrationSha256)!==true||
    await verifyNoOutboundProviders()!==true)
    return stop("LIVE_OWNER_SCHEMA_OR_PROVIDER_DENIED");
+  // AB7N: slow Auth/managed DB/provider probes must never consume a now-
+  // expired reviewer lease then run a Core job with stale release authority.
+  // Reverify signature+expiry using the actual clock immediately before claim.
+  const currentTime=Date.now();
+  const stillSigned=verifyAb7gIndependentManifest({
+    manifest,signature,pinnedReviewerPublicKey,expectedCoreCommit,
+    now:currentTime});
+  if(!stillSigned.ok||currentTime>=manifest.expiresAtMs)
+   return stop("INDEPENDENT_RELEASE_EXPIRED_DURING_PREFLIGHT");
   // The current signed manifest + read-only DB verification is the only
   // source of release evidence; no caller-provided 'approved' boolean.
   return await runAb7fCoreInternalWorker({

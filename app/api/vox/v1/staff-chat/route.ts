@@ -43,6 +43,13 @@ export async function GET(request:Request){
    messages.push({messageId:row.id,staffRef:"STAFF-"+row.sender_id.slice(0,8),
     isMine:row.sender_id===s!.userId,body:row.body,createdAt:row.created_at});
   }
+  // AB7N: a slow database read must never return team content after
+  // Team Leader revokes chat or a Staff member changes team/city.
+  const current=await getVerifiedScopedStaff(request.headers.get("authorization"));
+  if(!canChat(current)||current!.userId!==s!.userId||
+    current!.teamId!==s!.teamId||current!.cityId!==s!.cityId||
+    current!.role!==s!.role)
+   return send({ok:false,error:"TEAM_CHAT_SCOPE_REVOKED_DURING_READ"},403);
   return send({ok:true,schema:"qf.vox.staff.team.chat.preview.v1",
    mode:"INTERNAL_ONLY",boundedWindow:true,totalKnown:false,
    externalMessagesSent:0,messages},200);

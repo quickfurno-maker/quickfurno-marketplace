@@ -4,12 +4,22 @@ import {readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import {resolve,dirname} from "node:path";
 import {inspectAb7kFullVoxSources} from "../../../contracts/vox/ab7kFullMigrationManifest.mjs";
+import {inspectAb7nIntegratedReleaseTree} from "../../../contracts/vox/ab7nIntegratedReleaseTree.mjs";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
 const file=p=>readFileSync(resolve(root,p),"utf8");
 test("AB7N all four tracks retain exact 30 source SQL manifest, no managed promotion",()=>{
  const x=inspectAb7kFullVoxSources(root);
  assert.equal(x.ok,true,x.reason);assert.equal(x.totalFiles,30);
  assert.equal(x.canApply,false);assert.equal(x.releaseReady,false);
+});
+test("AB7N source tree is independently digested but cannot authorize a release",()=>{
+ const a=inspectAb7nIntegratedReleaseTree(root);
+ const b=inspectAb7nIntegratedReleaseTree(root);
+ assert.equal(a.ok,true,a.reason);
+ assert.equal(a.sourceBoundDigest,b.sourceBoundDigest);
+ assert.match(a.sourceBoundDigest,/^[a-f0-9]{64}$/);
+ assert.equal(a.canDeploy,false);assert.equal(a.canApplyMigrations,false);
+ assert.equal(a.externalMessagesAuthorized,false);
 });
 test("AB7N canonical Core ACL and dual scoped Staff/Riya late-check regressions",()=>{
  const client=file("app/api/vox/v1/riya-client-cases/route.ts");

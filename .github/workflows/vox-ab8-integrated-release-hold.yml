@@ -21,6 +21,8 @@ on:
       - 'scripts/mvp/vox/validate-voxAB7J-*'
       - 'scripts/mvp/vox/validate-voxAB7K-*'
       - 'scripts/mvp/vox/validate-voxAB7L-*'
+      - 'scripts/mvp/vox/validate-voxAB7M-*'
+      - 'contracts/vox/ab7m*.mjs'
       - 'contracts/vox/ab7k*.mjs'
       - 'docs/vox/VOX-AB7K-REVIEWED-SOURCE-FINGERPRINT.json'
       - 'ops/vox/quarantined-migrations/legacy-20261014/*.sql'
@@ -67,6 +69,8 @@ jobs:
         run: node --test scripts/mvp/vox/validate-voxAB7K-*.test.mjs
       - name: AB7L archived real Staging schema-only regression source gates (no private archive in CI)
         run: node --test scripts/mvp/vox/validate-voxAB7L-*.test.mjs
+      - name: AB7M three-track real Staging/identity/cross-service release hold
+        run: node --test scripts/mvp/vox/validate-voxAB7M-*.test.mjs
       - run: node --test scripts/mvp/vox/*.test.mjs
       - run: npm run typecheck
       - run: npm run build

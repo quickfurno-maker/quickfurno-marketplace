@@ -35,6 +35,17 @@ test("AB7J genuinely pinned independent signing + live gates call one bounded in
  assert.equal(r.externalMessagesSent,0);assert.equal(r.productionCertified,false);
  assert.equal(s.emissions.length,1);assert.equal(s.emissions[0].advisoryOnly,true);
 });
+test("AB7N reviewer lease expiring during slow live provider preflight must never claim a job",async()=>{
+ const s=spec();
+ const short={...manifest,issuedAtMs:Date.now()-1000,expiresAtMs:Date.now()+70};
+ const signature=sign(null,Buffer.from(canonicalAb7gManifest(short)),
+  key.privateKey).toString("base64url");
+ const result=await run({...s.args,manifest:short,signature,now:Date.now(),
+  verifyNoOutboundProviders:async()=>{await new Promise(resolve=>setTimeout(resolve,95));return true;}});
+ assert.equal(result.ok,false);assert.equal(result.reason,
+  "INDEPENDENT_RELEASE_EXPIRED_DURING_PREFLIGHT");
+ assert.equal(s.calls,0);
+});
 test("AB7J forged signature/old SHA/owner revoked/schema not installed/provider connected denies before RPC",async()=>{
  const mutations=[{signature:"a".repeat(86)},
   {expectedCoreCommit:"f".repeat(40)},

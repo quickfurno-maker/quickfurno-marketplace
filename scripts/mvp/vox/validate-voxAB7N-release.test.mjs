@@ -37,6 +37,12 @@ test("AB7N signed internal worker lease expiry checked again before any claim",(
  const execute=worker.indexOf('return await runAb7fCoreInternalWorker(');
  assert.ok(pre>=0&&lease>pre&&execute>lease);
 });
+test("AB7N Phase A CI must install pinned TypeScript before running full route tests",()=>{
+ const source=file(".github/workflows/vox-phaseA-core-security.yml");
+ const ci=source.indexOf("npm ci --ignore-scripts --no-audit --no-fund");
+ const tests=source.indexOf("node --test scripts/mvp/vox/*.test.mjs");
+ assert.ok(ci>0&&tests>ci,"Phase A must install dependencies before module-backed tests");
+});
 test("AB7N no developer source QA alone authorizes customer/provider sends",()=>{
  const manifest=file("contracts/vox/ab7mCrossServiceCandidate.mjs");
  assert.match(manifest,/outboundProviderAuthorized:false/);

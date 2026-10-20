@@ -22,6 +22,11 @@ on:
       - 'scripts/mvp/vox/validate-voxAB7K-*'
       - 'scripts/mvp/vox/validate-voxAB7L-*'
       - 'scripts/mvp/vox/validate-voxAB7M-*'
+      - 'scripts/mvp/vox/validate-voxAB7N-*'
+      - 'contracts/vox/ab7n*.mjs'
+      - 'worker/voxAb7jSignedInternalOnce.mjs'
+      - 'app/api/vox/v1/riya-client-cases/route.ts'
+      - 'app/api/vox/v1/staff-chat/route.ts'
       - 'contracts/vox/ab7m*.mjs'
       - 'contracts/vox/ab7k*.mjs'
       - 'docs/vox/VOX-AB7K-REVIEWED-SOURCE-FINGERPRINT.json'
@@ -71,6 +76,8 @@ jobs:
         run: node --test scripts/mvp/vox/validate-voxAB7L-*.test.mjs
       - name: AB7M three-track real Staging/identity/cross-service release hold
         run: node --test scripts/mvp/vox/validate-voxAB7M-*.test.mjs
+      - name: AB7N regression checks
+        run: node --test scripts/mvp/vox/validate-voxAB7N-*.test.mjs
       - run: node --test scripts/mvp/vox/*.test.mjs
       - run: npm run typecheck
       - run: npm run build

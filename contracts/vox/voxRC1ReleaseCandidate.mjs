@@ -13,6 +13,7 @@ const fail=reason=>Object.freeze({ok:false,reason,canDeploy:false,
  canInstallDatabase:false,canEnableProvider:false});
 const guards=[
 "contracts/vox/ab7mIdentityCutover.mjs",
+"contracts/vox/ab7mCrossServiceCandidate.mjs",
 "contracts/vox/ab7mDatabaseReleaseAssessment.mjs",
 "contracts/vox/ab7nCanonicalCoreAclBaseline.mjs",
 "app/api/vox/v1/staff-directory/route.ts",

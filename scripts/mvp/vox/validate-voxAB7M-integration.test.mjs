@@ -24,6 +24,18 @@ test("AB7M pinned independent signature + exact cross-service digest permits sou
  assert.equal(r.candidateLocked,true);assert.equal(r.canDeploy,false);
  assert.equal(r.productionAuthorized,false);assert.equal(r.outboundProviderAuthorized,false);
 });
+test("RC1 independently re-signed newer Core commit is reviewed but NEVER deployed",()=>{
+ const coreCommit="e".repeat(40);
+ const refreshed={...manifest,coreCommit};
+ const reviewSignature=sign(null,Buffer.from(canonicalAb7gManifest(refreshed)),
+  key.privateKey).toString("base64url");
+ const r=check({...spec(),coreCommit,signedManifest:refreshed,reviewSignature});
+ assert.equal(r.ok,true,r.reason);
+ assert.equal(r.exactCommits.core,coreCommit);
+ assert.equal(r.canDeploy,false);
+ const stale=check({...spec(),coreCommit,signedManifest:manifest});
+ assert.equal(stale.ok,false);
+});
 test("AB7M stale Jarvis/AGNI SHA, fake signature, no-send flag, schema drift deny",()=>{
  for(const patch of [
  {jarvisCommit:"f".repeat(40)},

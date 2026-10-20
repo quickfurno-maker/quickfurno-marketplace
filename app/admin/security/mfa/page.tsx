@@ -8,7 +8,9 @@ export const metadata = { title: "Owner MFA setup — QuickFurno Staging" };
 export default async function OwnerMfaSecurityPage() {
   // Feature switch is strictly server-side. Source review and CI never turn it on.
   if (process.env.VOX_OWNER_MFA_STAGING_ENABLED !== "true" ||
-      process.env.VOX_DEPLOYMENT_ENV !== "staging") {
+      process.env.VOX_DEPLOYMENT_ENV !== "staging" ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL !==
+        "https://uckafzuochmbvtiodmcl.supabase.co") {
     redirect("/admin/login");
   }
   const owner = await getAdminSession();

@@ -5,7 +5,7 @@ const page=readFileSync(new URL("../../../app/admin/security/mfa/page.tsx",impor
 test("P1 Owner enrollment route is server-gated to Staging and genuine Superadmin session",()=>{
  for(const marker of [
   'VOX_OWNER_MFA_STAGING_ENABLED','VOX_DEPLOYMENT_ENV',
-  '!== "staging"','getAdminSession','!owner.isSuperadmin','!owner.userId'
+  '!== "staging"','uckafzuochmbvtiodmcl.supabase.co','getAdminSession','!owner.isSuperadmin','!owner.userId'
  ])assert.ok(page.includes(marker),marker);
  assert.match(page,/redirect\("\/admin\/login"\)/);
  assert.doesNotMatch(page,/auth\.admin\.inviteUserByEmail|createUser|service_role/);

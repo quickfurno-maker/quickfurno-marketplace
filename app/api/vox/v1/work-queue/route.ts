@@ -2,6 +2,7 @@ import "server-only";
 import {adminClient} from "@/lib/supabase";
 import {getVerifiedScopedStaff} from "@/services/vox/verifiedScopedStaff";
 import {projectScopedWorkQueue} from "@/contracts/vox/workQueuePreview.mjs";
+import {unchangedAuthorizedStaffScope} from "@/contracts/vox/rc1CurrentStaffScope.mjs";
 import {selectScopedWorkCandidates} from "@/contracts/vox/scopedWorkCandidates.mjs";
 import {deriveCanonicalCityVendorIds} from "@/contracts/vox/canonicalZoneGate.mjs";
 export const runtime="nodejs";
@@ -61,9 +62,13 @@ export async function GET(request:Request){
   if(threads.error||!threads.data||threads.data.length>200)
    return send({ok:false,error:"CANONICAL_SUPPORT_PROOF_FAILED"},503);
   const verifiedSupportThreadIds=threads.data.map(t=>t.id);
-  if(!verifiedProspectIds.length&&!verifiedVendorIds.length&&!verifiedSupportThreadIds.length)
+  if(!verifiedProspectIds.length&&!verifiedVendorIds.length&&!verifiedSupportThreadIds.length){
+   const refreshed=await getVerifiedScopedStaff(request.headers.get("authorization"));
+   if(!unchangedAuthorizedStaffScope(scope,refreshed))
+    return send({ok:false,error:"WORK_QUEUE_SCOPE_REVOKED_DURING_READ"},403);
    return send({ok:true,schema:"qf.vox.work.queue.preview.v1",mode:"READ_ONLY",
     actionsEnabled:false,boundedWindow:true,completeness:"BOUNDED_NOT_TOTAL",items:[]},200);
+  }
   // Candidate SQL table remains absent in staging/production. If feature
   // flags are enabled prematurely, no fallback or fabricated work appears.
   // A global limit(25) BEFORE the current Staff/source filter can hide
@@ -100,6 +105,11 @@ export async function GET(request:Request){
   const result=projectScopedWorkQueue({scope,rows:[...candidate.rows],
    verifiedProspectIds,verifiedVendorIds,verifiedSupportThreadIds});
   if(!result.ok)return send({ok:false,error:"INVALID_CORE_WORK_PROJECTION"},503);
+  // Re-read Auth and exact current object grants immediately before releasing
+  // private queue metadata: a Team/department/object revoke can occur mid-query.
+  const refreshed=await getVerifiedScopedStaff(request.headers.get("authorization"));
+  if(!unchangedAuthorizedStaffScope(scope,refreshed))
+   return send({ok:false,error:"WORK_QUEUE_SCOPE_REVOKED_DURING_READ"},403);
   return send(result,200);
  }catch{return send({ok:false,error:"WORK_QUEUE_UNAVAILABLE"},503);}
 }

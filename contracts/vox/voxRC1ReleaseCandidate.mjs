@@ -21,7 +21,8 @@ const guards=[
 "app/api/vox/v1/riya-client-cases/route.ts",
 "app/api/vox/v1/staff-chat/route.ts",
 "worker/voxAb7jSignedInternalOnce.mjs",
-"contracts/vox/rc1CurrentStaffScope.mjs"
+"contracts/vox/rc1CurrentStaffScope.mjs",
+"contracts/vox/rc1CurrentStaffScope.d.mts"
 ];
 export const rc1ExternalSources=Object.freeze({
  jarvis:{repository:"quickfurno-maker/qf-jarvis",pullRequest:327,

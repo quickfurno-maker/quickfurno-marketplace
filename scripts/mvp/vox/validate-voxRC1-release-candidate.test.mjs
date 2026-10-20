@@ -8,7 +8,7 @@ const spec=()=>({repoRoot:root,coreCommit:"a".repeat(40),workingTreeClean:true,
 test("VOX RC1 complete 30-file and critical code digest is deterministic, locked and NEVER deployable",()=>{
  const a=build(spec()),b=build(spec());
  assert.equal(a.ok,true,a.reason);
- assert.equal(a.ddl.sourceCount,30);assert.equal(a.reviewedCode.length,10);
+ assert.equal(a.ddl.sourceCount,30);assert.equal(a.reviewedCode.length,11);
  assert.equal(a.sourceDigest,b.sourceDigest);
  assert.equal(a.releaseStatus,"HOLD");assert.equal(a.canInstallDatabase,false);
  assert.equal(a.canDeploy,false);assert.equal(a.canEnableProvider,false);

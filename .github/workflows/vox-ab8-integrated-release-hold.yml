@@ -26,6 +26,7 @@ on:
       - 'scripts/mvp/vox/validate-voxRC1-*'
       - 'contracts/vox/voxRC1ReleaseCandidate.mjs'
       - 'contracts/vox/rc1CurrentStaffScope.mjs'
+      - 'contracts/vox/rc1CurrentStaffScope.d.mts'
       - 'app/api/vox/v1/staff-directory/route.ts'
       - 'app/api/vox/v1/work-queue/route.ts'
       - 'app/api/vox/v1/staff-notifications/route.ts'

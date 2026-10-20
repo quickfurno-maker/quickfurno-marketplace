@@ -6,6 +6,7 @@
 import {verifyAb7gIndependentManifest}
  from "./ab7gSignedStagingManifest.mjs";
 const exact=Object.freeze({
+ // Previously certified pre-RC baseline, not a future-release SHA pin.
  core:"724d856fa7d3144f794c26b3fdbafd55cf36d4b3",
  jarvis:"0e6f432985b156bcee148a3521165d2285384da7",
  agni:"6fa59afe8627f9a585189d759daa5bee6648c359"});
@@ -18,7 +19,8 @@ export function inspectAb7mCrossServiceCandidate({
  flags,providerIsolationVerified=false,
  installedSchemaDigest,now=Date.now()
 }={}){
- if(environment!=="staging"||coreCommit!==exact.core||
+ if(environment!=="staging"||
+    !/^[a-f0-9]{40}$/.test(coreCommit??"")||
     jarvisCommit!==exact.jarvis||agniCommit!==exact.agni)
   return fail("EXACT_REVIEWED_THREE_REPOSITORY_DIGESTS_REQUIRED");
  if(!flags||typeof flags!=="object"||
@@ -34,14 +36,15 @@ export function inspectAb7mCrossServiceCandidate({
   manifest:signedManifest,signature:reviewSignature,
   pinnedReviewerPublicKey,expectedCoreCommit:coreCommit,now
  });
- if(!review.ok||signedManifest.jarvisCommit!==jarvisCommit||
+ if(!review.ok||signedManifest.coreCommit!==coreCommit||
+    signedManifest.jarvisCommit!==jarvisCommit||
     signedManifest.agniCommit!==agniCommit)
   return fail("INDEPENDENT_REVIEW_SIGNATURE_AND_SERVICE_COMMIT_BINDING_MISSING");
  if(installedSchemaDigest!==signedManifest.migrationSha256)
   return fail("EXACT_MANAGED_SCHEMA_DIGEST_NOT_PROVEN");
  return Object.freeze({
   ok:true,candidateLocked:true,
-  exactCommits:Object.freeze({...exact}),
+  exactCommits:Object.freeze({core:coreCommit,jarvis:exact.jarvis,agni:exact.agni}),
   reviewExpiresAtMs:review.expiresAtMs,
   canDeploy:false,productionAuthorized:false,outboundProviderAuthorized:false,
   workerSchedulerAuthorized:false,

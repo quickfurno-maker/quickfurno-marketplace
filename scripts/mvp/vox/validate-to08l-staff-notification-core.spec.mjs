@@ -3,11 +3,14 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import vm from "node:vm";
 import ts from "typescript";
+import {unchangedNotificationScope} from "../../../contracts/vox/rc1CurrentStaffScope.mjs";
 const id=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 const scope={userId:id(1),teamId:id(2),cityId:id(3),role:"support_agent",
- canReadContent:true,canMutate:false};
+ canReadContent:true,canMutate:false,
+ verifiedDepartments:[],prospectIds:[],vendorIds:[],
+ supportThreadIds:[],conversationIds:[]};
 const flags={};
-const state={scope:{...scope},authCalls:0,calls:[],error:null,rows:[]};
+const state={scope:{...scope},authCalls:0,calls:[],error:null,rows:[],revokeDuringInbox:false};
 const known=(n,revision=0)=>({
  notification_id:id(n),event_kind:"BLOCK",revision,
  created_time:"2026-10-16T08:00:00Z"
@@ -22,12 +25,15 @@ const mod=new vm.SourceTextModule(transpiled,{context,identifier:"CORE08L_ROUTE"
 const fakeDB=()=>({
  rpc(name,params){
   state.calls.push({name,params});
+  if(name==="qf_vox_staff_notification_inbox_v1"&&state.revokeDuringInbox)
+   state.scope=null;
   return Promise.resolve({data:state.rows,error:state.error});
  }
 });
 const mocks=new Map([
  ["server-only",{}],
  ["@/lib/supabase",{adminClient:fakeDB}],
+ ["@/contracts/vox/rc1CurrentStaffScope.mjs",{unchangedNotificationScope}],
  ["@/services/vox/verifiedScopedStaff",{
   getVerifiedScopedStaff:async token=>{
    state.authCalls++;
@@ -57,6 +63,7 @@ beforeEach(()=>{
  flags.VOX_DEPARTMENT_ENFORCEMENT_ENABLED="staging";
  flags.VOX_STAFF_WORK_NOTIFICATIONS_ENABLED="staging";
  Object.assign(state,{scope:{...scope},authCalls:0,calls:[],error:null,
+  revokeDuringInbox:false,
   rows:[known(44),known(45,1)]});
 });
 test("feature and Staff permission flags default fail-closed before Auth/RPC",async()=>{
@@ -78,6 +85,15 @@ test("authenticated current-staff Core inbox is a bounded partial feed, never pu
  assert.equal(state.calls[0].name,"qf_vox_staff_notification_inbox_v1");
  assert.equal(state.calls[0].params.p_actor,scope.userId);
  assert.equal(response.headers.get("cache-control"),"private, no-store, max-age=0");
+});
+test("RC1 Staff losing genuine AAL2 during Core inbox RPC gets no private event contents",async()=>{
+ state.revokeDuringInbox=true;
+ const response=await api.GET(req());
+ assert.equal(response.status,403);
+ const body=await response.json();
+ assert.equal(body.error,"NOTIFICATION_SCOPE_REVOKED_DURING_READ");
+ assert.equal(state.calls.length,1);
+ assert.equal(state.authCalls,2);
 });
 test("Core GET cannot take a browser team, person, historical or city filter",async()=>{
  const r=await api.GET(req("/api/vox/v1/staff-notifications?recipientId="+id(99)));

@@ -23,6 +23,13 @@ on:
       - 'scripts/mvp/vox/validate-voxAB7L-*'
       - 'scripts/mvp/vox/validate-voxAB7M-*'
       - 'scripts/mvp/vox/validate-voxAB7N-*'
+      - 'scripts/mvp/vox/validate-voxRC1-*'
+      - 'contracts/vox/voxRC1ReleaseCandidate.mjs'
+      - 'contracts/vox/rc1CurrentStaffScope.mjs'
+      - 'contracts/vox/rc1CurrentStaffScope.d.mts'
+      - 'app/api/vox/v1/staff-directory/route.ts'
+      - 'app/api/vox/v1/work-queue/route.ts'
+      - 'app/api/vox/v1/staff-notifications/route.ts'
       - 'contracts/vox/ab7n*.mjs'
       - 'worker/voxAb7jSignedInternalOnce.mjs'
       - 'app/api/vox/v1/riya-client-cases/route.ts'
@@ -78,6 +85,8 @@ jobs:
         run: node --test scripts/mvp/vox/validate-voxAB7M-*.test.mjs
       - name: AB7N regression checks
         run: node --test scripts/mvp/vox/validate-voxAB7N-*.test.mjs
+      - name: VOX RC1 full final internal package and scope-revocation tests
+        run: node --test scripts/mvp/vox/validate-voxRC1-*.test.mjs
       - run: node --test scripts/mvp/vox/*.test.mjs
       - run: npm run typecheck
       - run: npm run build

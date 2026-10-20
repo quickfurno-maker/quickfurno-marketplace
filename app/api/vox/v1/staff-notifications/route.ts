@@ -1,6 +1,7 @@
 import "server-only";
 import {adminClient} from "@/lib/supabase";
 import {getVerifiedScopedStaff} from "@/services/vox/verifiedScopedStaff";
+import {unchangedNotificationScope} from "@/contracts/vox/rc1CurrentStaffScope.mjs";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -51,6 +52,9 @@ export async function GET(request:Request){
     read:n.revision===1});
   }
   const unreadInWindow=records.filter(x=>!x.read).length;
+  const refreshed=await getVerifiedScopedStaff(request.headers.get("authorization"));
+  if(!permitted(refreshed)||!unchangedNotificationScope(staff,refreshed))
+   return send({ok:false,error:"NOTIFICATION_SCOPE_REVOKED_DURING_READ"},403);
   return send({ok:true,schema:"qf.vox.staff.work-notifications.inbox.v1",
    mode:"READ_ONLY",origin:"CORE_PERSISTED_WORK_EVENTS",
    boundedWindow:true,totalKnown:false,unreadTotalKnown:false,

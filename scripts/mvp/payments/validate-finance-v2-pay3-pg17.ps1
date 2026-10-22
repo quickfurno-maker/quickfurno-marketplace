@@ -40,11 +40,13 @@ create role authenticated nologin;
 create role service_role nologin bypassrls;
 create table public.vendors(id uuid primary key);
 create table public.payments(id uuid primary key);
-create table public.vendor_package_orders(id uuid primary key);
+create table public.vendor_package_orders(id uuid primary key,payment_provider text,
+ provider_mode text,provider_order_id text unique,provider_amount_subunits bigint);
 grant usage on schema public to service_role,anon,authenticated;
 insert into public.vendors values ('10000000-0000-4000-8000-000000000007');
 insert into public.payments values ('10000000-0000-4000-8000-000000000001');
-insert into public.vendor_package_orders values ('10000000-0000-4000-8000-000000000001');
+insert into public.vendor_package_orders values ('10000000-0000-4000-8000-000000000001',
+ 'razorpay','test','order_12345',9999);
 '@ | Out-Null
  docker exec $name pg_dump -Fc -U postgres -d postgres -f /tmp/pay3_pre.dump *> $null
  if($LASTEXITCODE -ne 0){throw 'PAY3_BACKUP_FAILED'}
@@ -54,12 +56,14 @@ insert into public.vendor_package_orders values ('10000000-0000-4000-8000-000000
  'ops\finance\sql-candidates\20261022133000_finance_v2_pay3_inbox_candidate.sql',
  'ops\finance\sql-candidates\20261022134000_finance_v2_pay3_refund_reservation_candidate.sql',
  'ops\finance\sql-candidates\20261022135000_finance_v2_pay3_staff_read_candidate.sql',
- 'ops\finance\sql-candidates\20261022140000_finance_v2_pay3_settlement_projection_candidate.sql')){
+ 'ops\finance\sql-candidates\20261022140000_finance_v2_pay3_settlement_projection_candidate.sql',
+ 'ops\finance\sql-candidates\20261022141000_finance_v2_pay3_webhook_receipt_candidate.sql',
+ 'ops\finance\sql-candidates\20261022142000_finance_v2_pay3_bank_proof_candidate.sql')){
   $r=Sql ([IO.File]::ReadAllText((Join-Path $root $file)))
   if($r.code -ne 0){throw "PAY3_SQL_FAILED $file $($r.text)"}
   Write-Host "PASS PAY3_OFFLINE_SQL_APPLIED $file"
  }
- $a=Need 'PAY3_THIRTEEN_FORCE_RLS_TABLES_WITH_STAFF_GRANTS' @'
+ $a=Need 'PAY3_FIFTEEN_FORCE_RLS_TABLES_WITH_BANK_AND_EVENT_LINK' @'
 select count(*)||'|'||
  count(*) filter(where relrowsecurity and relforcerowsecurity)||'|'||
  count(*) filter(where has_table_privilege('anon',oid,'SELECT')
@@ -68,7 +72,7 @@ select count(*)||'|'||
  where relnamespace='public'::regnamespace and relkind='r'
  and relname like 'finance_%';
 '@
- if($a -ne '13|13|0'){throw "PAY3_RLS_MISMATCH $a"}
+ if($a -ne '15|15|0'){throw "PAY3_RLS_MISMATCH $a"}
  Need 'PAY3_SYNTHETIC_APPROVED_BANK_EVIDENCE' @'
 insert into public.finance_manual_receipt_evidence
 (payment_id,receiving_account_ref,normalized_utr,bank_statement_sha256,
@@ -133,6 +137,73 @@ select has_table_privilege('authenticated',
 '@
  if($viewAccess -ne '0'){throw 'PAY3_SETTLEMENT_VIEW_UNSAFE'}
 
+ $notYet=Need 'PAY3_BANK_NOT_CERTIFIED_WITHOUT_EVIDENCE' @'
+select review_state from public.qf_finance_v2_bank_reconciliation_v
+where provider_settlement_id='setl_synthetic';
+'@
+ if($notYet -ne 'BANK_EVIDENCE_NOT_VERIFIED'){throw "PAY3_BANK_PREMATURE_CLAIM $notYet"}
+ Need 'PAY3_BANK_STATEMENT_REVIEW_FIXTURE' @'
+insert into public.finance_bank_settlement_proofs
+(settlement_id,receiving_account_ref,bank_reference,statement_sha256,
+ deposited_subunits,recorded_by,verified_by,approval_reference)
+select id,'bank-account-synthetic','utr-settlement-synthetic',repeat('c',64),
+ 10000,'00000000-0000-4000-8000-000000000011',
+ '00000000-0000-4000-8000-000000000012',
+ '00000000-0000-4000-8000-000000000099'
+from public.finance_settlements where provider_settlement_id='setl_synthetic';
+'@ | Out-Null
+ $three=Need 'PAY3_THREE_WAY_AMOUNT_PROOF' @'
+select review_state from public.qf_finance_v2_bank_reconciliation_v
+where provider_settlement_id='setl_synthetic';
+'@
+ if($three -ne 'THREE_WAY_AMOUNT_MATCH'){throw "PAY3_THREE_WAY_REVIEW_MISMATCH $three"}
+ Refuse 'PAY3_BANK_EVIDENCE_IMMUTABLE' @'
+update public.finance_bank_settlement_proofs set deposited_subunits=1;
+'@
+ $bankAccess=Need 'PAY3_BANK_PROJECTION_SERVICE_ONLY' @'
+select has_table_privilege('authenticated',
+'public.qf_finance_v2_bank_reconciliation_v','SELECT')::int;
+'@
+ if($bankAccess -ne '0'){throw "PAY3_BANK_LEAK $bankAccess"}
+ $evt=Need 'PAY3_ATOMIC_SIGNED_JOURNAL' @'
+select public.qf_finance_v2_record_webhook_v1(
+ 'evt_integrated_12345','test','merchant_synthetic','payment.captured',
+ repeat('d',64),'order_12345','pay_12345',9999);
+'@
+ $evtRetry=Need 'PAY3_SIGNED_JOURNAL_DUPLICATE_SAME_ROW' @'
+select public.qf_finance_v2_record_webhook_v1(
+ 'evt_integrated_12345','test','merchant_synthetic','payment.captured',
+ repeat('d',64),'order_12345','pay_12345',9999);
+'@
+ if($evt -ne $evtRetry){throw "PAY3_WEBHOOK_REPLAY_NEW_ROW"}
+ Refuse 'PAY3_SIGNED_JOURNAL_PAYLOAD_HASH_CONFLICT_DENIED' @'
+select public.qf_finance_v2_record_webhook_v1(
+ 'evt_integrated_12345','test','merchant_synthetic','payment.captured',
+ repeat('e',64),'order_12345','pay_12345',9999);
+'@
+ Refuse 'PAY3_SIGNED_JOURNAL_WRONG_AMOUNT_DENIED' @'
+select public.qf_finance_v2_record_webhook_v1(
+ 'evt_integrated_12346','test','merchant_synthetic','payment.captured',
+ repeat('d',64),'order_12345','pay_12345',10000);
+'@
+ Refuse 'PAY3_SIGNED_JOURNAL_WRONG_MODE_DENIED' @'
+select public.qf_finance_v2_record_webhook_v1(
+ 'evt_integrated_12347','live','merchant_synthetic','payment.captured',
+ repeat('d',64),'order_12345','pay_12345',9999);
+'@
+ $j=Need 'PAY3_SIGNED_JOURNAL_ENQUEUED_EXACTLY_ONCE' @'
+select count(*) from public.finance_event_inbox_jobs j
+join public.finance_provider_events e on e.id=j.provider_event_row_id
+where e.provider_event_id='evt_integrated_12345';
+'@
+ if($j -ne '1'){throw "PAY3_JOURNAL_JOB_NOT_UNIQUE $j"}
+ $journalPrivilege=Need 'PAY3_JOURNAL_RPC_NOT_BROWSER_ACCESSIBLE' @'
+select has_function_privilege('authenticated',
+'public.qf_finance_v2_record_webhook_v1(text,text,text,text,text,text,text,bigint)',
+'EXECUTE')::int;
+'@
+ if($journalPrivilege -ne '0'){throw 'PAY3_UNSAFE_JOURNAL_RPC'}
+
  Need 'PAY3_SIGNED_PROVIDER_EVENT_FIXTURE' @'
 insert into public.finance_provider_events
 (id,provider,provider_mode,merchant_account_id,provider_event_id,event_type,payload_sha256,signature_verified)
@@ -152,10 +223,9 @@ from public.qf_finance_v2_claim_inbox(1);
 '@
  $fields=$c.Split('|')
  if($fields.Length -ne 4 -or $fields[3] -ne '1'){throw "PAY3_BAD_LEASE $c"}
- $noSecond=Need 'PAY3_CONCURRENT_CLAIMER_CANNOT_LEASE_SAME_EVENT' @'
-select count(*) from public.qf_finance_v2_claim_inbox(1);
-'@
- if($noSecond -ne '0'){throw "PAY3_DOUBLE_CLAIM $noSecond"}
+ $noSecond=Need 'PAY3_CONCURRENT_CLAIMER_CANNOT_LEASE_SAME_EVENT' (
+  "select count(*) from public.qf_finance_v2_claim_inbox(1) where event_id='"+$fields[1]+"';")
+ if($noSecond -ne '0'){throw "PAY3_DOUBLE_CLAIM_SAME_EVENT $noSecond"}
  $wrong=Need 'PAY3_STALE_TOKEN_CANNOT_ACK' ("select public.qf_finance_v2_finish_inbox('"+$fields[0]+"','00000000-0000-4000-8000-000000000099','VERIFIED','PROVIDER_CHECKED');")
  if($wrong -ne 'f'){throw 'PAY3_WRONG_TOKEN_ACCEPTED'}
  $done=Need 'PAY3_EXACT_LEASE_ACK' ("select public.qf_finance_v2_finish_inbox('"+$fields[0]+"','"+$fields[2]+"','VERIFIED','PROVIDER_CHECKED');")

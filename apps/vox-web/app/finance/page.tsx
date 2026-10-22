@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {fetchOwnerFinanceHistory} from "../../lib/finance";
+import {FinanceTimeline} from "./FinanceTimeline";
 import "../operations/operations.css";
 export const dynamic="force-dynamic";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -16,7 +17,8 @@ export default async function Finance({searchParams}:{
    <h1>Trace every transaction,<br/><span>without moving money.</span></h1>
    <p>Search an exact local order UUID. This interface is unavailable until
     reviewed Finance V2 history tables, explicit feature flags and Owner MFA are certified.
-    Finance Staff authorization and refunds remain disabled.</p></div>
+    Finance Staff access requires current Core MFA, vendor scope, a separately approved
+    finance read grant and Staging feature gates. Refund execution remains disabled.</p></div>
   <section className="voxNotice"><b>Canonical order lookup</b>
    <form action="/finance" method="get" style={{display:"flex",flexWrap:"wrap",gap:12}}>
     <label htmlFor="finance-order-id">Order UUID</label>
@@ -37,14 +39,19 @@ export default async function Finance({searchParams}:{
    <section className="voxNotice"><b>Order {result.orderId}</b><span>
     Mode: {result.providerMode.toUpperCase()} · Provider: {result.providerStatus} ·
     Activation: {result.activationStatus} · NOT CERTIFIED · READ ONLY</span></section>
-   <section className="voxNotice"><b>Immutable transaction timeline</b>
-    {result.timeline.length===0?<p>No recorded events. Not proof of no payment.</p>:
-    <ol>{result.timeline.map((event,index)=><li key={event.reference+index}>
-     <strong>{event.kind.toUpperCase()}</strong> · {event.occurredAt} · {event.reference}
-     {event.amountSubunits!==null?<> · ₹{(event.amountSubunits/100).toFixed(2)}</>:null}
-    </li>)}</ol>}
-   </section>
+   <FinanceTimeline events={result.timeline} mode={result.providerMode}/>
   </div>:null}
+  <div className="voxWorkspace">
+    <section className="voxNotice"><b>Bank / UTR verification</b><span>
+     Bank transfer references require a verified matching bank statement and independent reviewer.
+     No manual Paid-state update is available in VOX during release HOLD.</span></section>
+    <section className="voxNotice"><b>Refund approvals</b><span>
+     Refunds require separate requester and approver, provider capture evidence, atomic
+     cumulative reservation and explicit consumed-credit policy. Provider refund execution is disabled.</span></section>
+    <section className="voxNotice"><b>Settlement reconciliation</b><span>
+     Provider settlement, signed financial lines and independent bank deposit must agree.
+     Arithmetic agreement alone is not accounting or GST certification.</span></section>
+  </div>
   <div className="voxNotice"><b>Financial separation</b><span>
    Captures, wallet credits, refunds, recognized revenue and bank settlement are separate.
    No financial action is available in this source-only candidate.</span></div>

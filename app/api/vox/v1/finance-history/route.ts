@@ -1,6 +1,8 @@
 import "server-only";
 import {adminClient} from "@/lib/supabase";
 import {verifyVoxOwnerBearer} from "@/services/vox/verifiedStaffBearer";
+import {getVerifiedScopedStaff} from "@/services/vox/verifiedScopedStaff";
+import {evaluateFinanceReadGrant} from "@/contracts/vox/financeReadGrant.mjs";
 import {financeTimeline,type Pay3Mode,type Pay3EventKind} from "@/lib/payments/financeV2Pay3.mjs";
 export const runtime="nodejs";export const dynamic="force-dynamic";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -10,6 +12,19 @@ const respond=(v:unknown,s:number)=>Response.json(v,{status:s,headers:{
 const validString=(v:unknown,max=180)=>typeof v==="string"&&v.length>0&&v.length<=max;
 const validDate=(v:unknown)=>typeof v==="string"&&Number.isFinite(Date.parse(v));
 const validAmount=(v:unknown)=>typeof v==="number"&&Number.isSafeInteger(v)&&v>=0;
+async function financeStaffAllowed(scope:NonNullable<Awaited<ReturnType<typeof getVerifiedScopedStaff>>>,vendorId:string){
+ if(process.env.FINANCE_V2_STAFF_READ_ENABLED!=="staging")return false;
+ const db=adminClient();
+ const grants=await db.from("finance_staff_read_grants")
+  .select("id,staff_user_id,team_id,city_id,vendor_id,requested_by,approved_by,approval_reference,expires_at")
+  .eq("staff_user_id",scope.userId).eq("vendor_id",vendorId).limit(2);
+ if(grants.error||!grants.data||grants.data.length!==1)return false;
+ const revoked=await db.from("finance_staff_read_revocations")
+  .select("id").eq("grant_id",grants.data[0].id).limit(1);
+ if(revoked.error||!revoked.data)return false;
+ return evaluateFinanceReadGrant({scope,grant:grants.data[0],vendorId,
+  revoked:revoked.data.length!==0});
+}
 export async function GET(request:Request){
  if(process.env.FINANCE_V2_PAY3_READ_ENABLED!=="staging"||
     process.env.VOX_STAFF_PORTAL_ENABLED!=="staging")
@@ -19,16 +34,22 @@ export async function GET(request:Request){
  if(keys.length!==1||keys[0]!=="orderId"||!id||!UUID.test(id)||url.hash)
    return respond({ok:false,error:"ORDER_ID_INVALID"},400);
  try{
-  // No Finance Staff privileges before explicit department capability certification.
-  const owner=await verifyVoxOwnerBearer(request.headers.get("authorization"));
-  if(!owner)return respond({ok:false,error:"OWNER_AAL2_REQUIRED"},403);
+  // Either real Core Superadmin AAL2 or genuine Core Staff MFA + finance AND vendor grants.
+  const bearer=request.headers.get("authorization");
+  const owner=await verifyVoxOwnerBearer(bearer);
+  const staff=!owner&&process.env.FINANCE_V2_STAFF_READ_ENABLED==="staging"
+   ?await getVerifiedScopedStaff(bearer):null;
+  if(!owner&&!staff)return respond({ok:false,error:"FINANCE_AAL2_REQUIRED"},403);
   const db=adminClient();
   const order=await db.from("vendor_package_orders")
-   .select("id,payment_provider,provider_mode,provider_status,activation_status")
+   .select("id,vendor_id,payment_provider,provider_mode,provider_status,activation_status")
    .eq("id",id).maybeSingle();
   if(order.error||!order.data||order.data.payment_provider!=="razorpay"||
      !["test","live"].includes(order.data.provider_mode))
    return respond({ok:false,error:"ORDER_UNAVAILABLE_OR_UNCLASSIFIED"},503);
+  if(staff&&(!UUID.test(order.data.vendor_id)||
+     !(await financeStaffAllowed(staff,order.data.vendor_id))))
+    return respond({ok:false,error:"FINANCE_SCOPE_DENIED"},403);
   const mode=order.data.provider_mode as Pay3Mode;
   const [attempts,events,audit]=await Promise.all([
    db.from("finance_payment_attempts")
@@ -71,8 +92,16 @@ export async function GET(request:Request){
    if(row.related_order_id!==id)throw Error("AUDIT_ORDER_MISMATCH");
    append("audit",row.id,row.occurred_at,null,mode);
   }
-  if(await verifyVoxOwnerBearer(request.headers.get("authorization"))!==owner)
-   return respond({ok:false,error:"OWNER_AUTH_REVOKED_DURING_FINANCE_READ"},403);
+  // Reauthorize after DB reads: revocation or lost AAL2 cannot leak stale data.
+  if(owner){
+   if(await verifyVoxOwnerBearer(bearer)!==owner)
+    return respond({ok:false,error:"OWNER_AUTH_REVOKED_DURING_FINANCE_READ"},403);
+  }else{
+   const refreshed=await getVerifiedScopedStaff(bearer);
+   if(!staff||!refreshed||refreshed.userId!==staff.userId||
+      !(await financeStaffAllowed(refreshed,order.data.vendor_id)))
+    return respond({ok:false,error:"FINANCE_STAFF_AUTH_REVOKED_DURING_READ"},403);
+  }
   return respond({ok:true,schema:"qf.vox.finance.history.v1",mode:"READ_ONLY",actionsEnabled:false,
    certification:"NOT_CERTIFIED",orderId:id,providerMode:mode,
    providerStatus:validString(order.data.provider_status,30)?order.data.provider_status:"UNKNOWN",

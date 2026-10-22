@@ -1,0 +1,57 @@
+{
+  "schema": "qf.finance.pay4c3.live-readonly-observation.v1",
+  "observedDate": "2026-10-22",
+  "source": "first-party Supabase read-only pg_catalog, auth count and linter inspections",
+  "staleAfterEnvironmentChange": true,
+  "managedWritesPerformed": false,
+  "environments": [
+    {
+      "name": "QuickFurno Staging",
+      "authUsers": 1,
+      "verifiedMfa": 0,
+      "financeTables": 0,
+      "voxTables": 0,
+      "installedFinanceMigrations": 0,
+      "installedLegacyVoxMigration": false,
+      "findingNames": [
+        "security_definer_view",
+        "authenticated_security_definer_function_executable",
+        "rls_enabled_no_policy"
+      ]
+    },
+    {
+      "name": "QuickFurno Production",
+      "authUsers": 10,
+      "verifiedMfa": 0,
+      "financeTables": 0,
+      "voxTables": 0,
+      "installedFinanceMigrations": 0,
+      "installedLegacyVoxMigration": false,
+      "findingNames": [
+        "security_definer_view",
+        "authenticated_security_definer_function_executable",
+        "rls_enabled_no_policy"
+      ]
+    }
+  ],
+  "coreRlsObservations": {
+    "view": "public.vendor_public_v",
+    "viewSecurityInvokerExplicit": false,
+    "publicReadRequiredForVendorDiscovery": true,
+    "securityDefinerFunctionNames": [
+      "is_admin",
+      "owns_vendor"
+    ],
+    "authenticatedExec": true,
+    "anonFunctionExec": false,
+    "authenticatedCanDirectlyUpdateProfilesRole": false,
+    "authenticatedCanDirectlyUpdateProfilesIsActive": false
+  },
+  "observationsDoNotConferDbAccess": true,
+  "actualApprovedStagingAuthSessions": 0,
+  "independentDbaApproved": false,
+  "independentAppsecApproved": false,
+  "actualProviderTestCertified": false,
+  "ownerGoNoGo": "NO_GO",
+  "financialReleaseStatus": "HOLD"
+}

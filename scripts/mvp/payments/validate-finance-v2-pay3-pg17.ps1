@@ -510,6 +510,34 @@ where attempt_id='20000000-0000-4000-8000-000000000070';
 '@
  if($reserved -ne '1|7000'){throw "PAY4C1_REFUND_CAP_RACE_FAILURE $reserved"}
 
+ Need 'PAY4C3_SECOND_INBOX_EVENT_FOR_PARALLEL_CLAIM' @'
+insert into public.finance_provider_events
+(id,provider,provider_mode,merchant_account_id,provider_event_id,event_type,payload_sha256,signature_verified)
+values('30000000-0000-4000-8000-000000000092','razorpay','test','synthetic-merchant',
+'evt_test_parallel_claim','payment.captured',repeat('b',64),true);
+select public.qf_finance_v2_enqueue_verified_event('30000000-0000-4000-8000-000000000092');
+'@ | Out-Null
+ $claimSh=[IO.File]::ReadAllText((Join-Path $root 'scripts/mvp/payments/finance-pay4c3-two-inbox-claimants.sh')).Replace("`r","")
+ $tempSh=Join-Path ([IO.Path]::GetTempPath()) 'qf-finance-pay4c3-claimants.sh'
+ try{
+  [IO.File]::WriteAllText($tempSh,$claimSh,[Text.UTF8Encoding]::new($false))
+  docker cp $tempSh ($name+':/tmp/pay4c3-claimants.sh') *> $null
+  if($LASTEXITCODE -ne 0){throw 'PAY4C3_SHELL_COPY_FAILED'}
+  $claimResults=(docker exec $name sh /tmp/pay4c3-claimants.sh 2>&1 | Out-String)
+  $claimStatus=$LASTEXITCODE
+ }finally{Remove-Item $tempSh -ErrorAction SilentlyContinue}
+ if($claimStatus -ne 0 -or $claimResults -notmatch 'PAY4C3_TWO_PG_CLIENT_CLAIMS_EXACTLY_ONE_PASS'){
+  throw "PAY4C3_CONCURRENT_INBOX_LEASE_UNSAFE $claimResults"
+ }
+ Write-Host 'PASS PAY4C3_REAL_TWO_CLIENT_INBOX_EXCLUSIVE_LEASE'
+ $claimed=Need 'PAY4C3_EXACTLY_ONE_LEASE_ATTEMPT' @'
+select count(*)::text||'|'||max(attempts)::text
+from public.finance_event_inbox_jobs
+where provider_event_row_id='30000000-0000-4000-8000-000000000092'
+ and state='LEASED';
+'@
+ if($claimed -ne '1|1'){throw "PAY4C3_INBOX_CLAIM_UNSAFE $claimed"}
+
  docker exec $name dropdb -U postgres --force postgres *> $null
  if($LASTEXITCODE -ne 0){throw 'PAY3_DROP_FAILED'}
  docker exec $name createdb -U postgres postgres *> $null

@@ -7,7 +7,7 @@ import "./vox-workspace.css";
 type NavKey =
   | "mission" | "work" | "attention" | "notices" | "staff"
   | "clients" | "vendors" | "acquisition" | "desk" | "reports"
-  | "approvals" | "studio" | "intelligence";
+  | "approvals" | "studio" | "intelligence" | "finance";
 
 type NavigationItem = {id: NavKey; label: string; symbol: string; href: string; adminOnly?: boolean};
 const navigation: {heading: string; items: NavigationItem[]}[] = [
@@ -19,6 +19,7 @@ const navigation: {heading: string; items: NavigationItem[]}[] = [
   ]},
   {heading: "OPERATIONS", items: [
     {id: "staff", label: "Team Management", symbol: "▣", href: "/team/admin/staff", adminOnly: true},
+    {id: "finance", label: "Finance 360 (HOLD)", symbol: "₹", href: "/finance", adminOnly: true},
     {id: "clients", label: "Client CRM & Riya", symbol: "◇", href: "/team/client-cases"},
     {id: "vendors", label: "Vendor 360 & Anisha", symbol: "▤", href: "/vendor360"},
     {id: "acquisition", label: "Aarohi Acquisition", symbol: "◎", href: "/acquisition"},

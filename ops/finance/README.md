@@ -4,6 +4,7 @@ This directory is deliberately **outside** `supabase/migrations`. The existing c
 **DO NOT APPLY / DO NOT AUTORUN.** Current candidates:
 - `sql-candidates/20261022090100_finance_v2_pay1_integrity_candidate.sql` — normalized manual UTR index, service-only LIVE-vs-TEST collection view.
 - `sql-candidates/20261022090200_finance_v2_pay2_history_candidate.sql` — four append-only finance event/attempt/refund/audit candidate tables and immutable-history guard.
+- `sql-candidates/20261022120100_finance_v2_pay3_evidence_candidate.sql` — four additional immutable settlement, settlement-line, manual bank-receipt and event-processing evidence tables; NOT a runnable refund/worker.
 
 Only network-isolated local PostgreSQL17 rehearsal uses them. Before any managed installation independent DBA must:
 1. Reconcile real Staging and production migration histories, existing data and all pending changed SQL.

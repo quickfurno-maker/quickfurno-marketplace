@@ -1,0 +1,47 @@
+name: Finance V2 PAY-1 PAY-2 source/PG17 release HOLD
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/finance-v2-pay1-pay2-hold.yml"
+      - "supabase/migrations/20261022090100_finance_v2_pay1_integrity_candidate.sql"
+      - "supabase/migrations/20261022090200_finance_v2_pay2_history_candidate.sql"
+      - "services/packageService.ts"
+      - "services/adminSectionService.ts"
+      - "components/admin/sections/PaymentsSection.tsx"
+      - "lib/payments/financeV2*"
+      - "scripts/mvp/payments/validate-finance-v2-*"
+      - "docs/finance/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  finance-source-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install locked source dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Existing Razorpay captured-payment source validator
+        run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
+      - name: PAY-1/PAY-2 focused money-history safeguards
+        run: node --test scripts/mvp/payments/validate-finance-v2-pay*.test.mjs
+      - name: TypeScript contracts
+        run: npm run typecheck
+      - name: Next.js source build without deployment
+        run: npm run build
+  finance-offline-pg17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Isolated network-none PostgreSQL17, duplicate UTR/events, RLS, restore
+        shell: pwsh
+        run: ./scripts/mvp/payments/validate-finance-v2-pg17.ps1

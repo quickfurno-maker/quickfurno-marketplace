@@ -1,7 +1,7 @@
 import test from "node:test";import assert from "node:assert/strict";
 import {createHmac,createHash} from "node:crypto";
 import {prepareVerifiedRazorpayFinanceEvent as prep}
- from "../../../lib/payments/financeV2ProviderEvent.ts";
+ from "../../../lib/payments/financeV2ProviderEvent.mjs";
 const secret="sandbox-only-never-real";
 const raw=JSON.stringify({event:"payment.captured",payload:{payment:{entity:{id:"pay_x",order_id:"order_x"}}}});
 const signed=createHmac("sha256",secret).update(raw).digest("hex");

@@ -2,6 +2,7 @@ import Link from "next/link";
 import {fetchOwnerFinanceHistory} from "../../lib/finance";
 import {FinanceTimeline} from "./FinanceTimeline";
 import {FinanceCaseDesk} from "./FinanceCaseDesk";
+import {FinanceOrderSearch} from "./FinanceOrderSearch";
 import "../operations/operations.css";
 export const dynamic="force-dynamic";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -42,6 +43,7 @@ export default async function Finance({searchParams}:{
     Activation: {result.activationStatus} · NOT CERTIFIED · READ ONLY</span></section>
    <FinanceTimeline events={result.timeline} mode={result.providerMode}/>
   </div>:null}
+  <FinanceOrderSearch enabled={process.env.VOX_FINANCE_PAY4B_SEARCH_UI_ENABLED==="staging"&&process.env.VOX_STAFF_PORTAL_ENABLED==="staging"}/>
   <FinanceCaseDesk enabled={process.env.VOX_FINANCE_PAY4A_CASE_UI_ENABLED==="staging"&&process.env.VOX_STAFF_PORTAL_ENABLED==="staging"}/>
   <div className="voxWorkspace">
     <section className="voxNotice"><b>Bank / UTR verification</b><span>

@@ -30,7 +30,7 @@ import { Strong } from "./shared";
 
 export type AdminPaymentsPageData = {
   result: { rows: Payment[]; page: number; pageSize: number; total: number };
-  totals: { totalRevenue: number; revenueThisMonth: number; paidCount: number; pendingCount: number; expiredVendors: number };
+  totals: { totalRevenue: number | null; revenueThisMonth: number | null; paidCount: number; pendingCount: number; expiredVendors: number; financeReconciliation?: "not_certified" | "razorpay_live_captured" };
   vendors: Vendor[];
   packages: PackageRow[];
 };
@@ -74,8 +74,8 @@ export function PaymentsPage({ data }: { data: AdminPaymentsPageData | null }) {
   return (
     <div className="space-y-5" aria-busy={isPending}>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Revenue" value={formatINR(totals.totalRevenue)} helper={`${formatNumber(totals.paidCount)} paid payments (live)`} icon="payments" />
-        <StatCard label="Monthly Revenue" value={formatINR(totals.revenueThisMonth)} helper="This month (live aggregate)" icon="reports" tone="emerald" />
+        <StatCard label="Razorpay LIVE Captures" value={totals.financeReconciliation === "razorpay_live_captured" && totals.totalRevenue !== null ? formatINR(totals.totalRevenue) : "Not certified"} helper="Only verified captured LIVE gateway payments; not accounting revenue" icon="payments" />
+        <StatCard label="Monthly LIVE Captures" value={totals.financeReconciliation === "razorpay_live_captured" && totals.revenueThisMonth !== null ? formatINR(totals.revenueThisMonth) : "Not certified"} helper="IST calendar month; requires reviewed Finance V2 reporting view" icon="reports" tone="emerald" />
         <StatCard label="Pending Collections" value={formatNumber(totals.pendingCount)} helper="Needs follow-up (live count)" icon="notifications" tone="amber" />
         <StatCard label="Renewal Risk" value={formatNumber(totals.expiredVendors)} helper="Expired vendors (live count)" icon="subscriptions" tone="rose" />
       </section>

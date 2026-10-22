@@ -1,0 +1,9 @@
+# QuickFurno Finance V2 PAY-1 — Source-only integrity and collection truth
+**No managed DB migration, payment processing, deployment or credit mutation authorized.**
+- Additive migration `20261022090100_finance_v2_pay1_integrity_candidate.sql`: conservative global normalized manual UTR uniqueness, null/blank legacy refs not validated as paid; migration fails if historic duplicate manual UTRs exist, no blind backfill. An eventual account-scoped index requires approved verified receiver-bank-account identity.
+- New `qf_finance_v2_collection_summary_v`: security-invoker/service_role-only join by existing payments.id = vendor_package_orders.id. Only CAPTURED/ACTIVATED LIVE Razorpay counts as captured collections; TEST and recorded unverified manual paid amounts are separate. Month uses Asia/Kolkata. Not revenue recognition or bank settlement.
+- Source guard `FINANCE_V2_MANUAL_REFERENCE_GUARD=true` validates submitted manual rails (UPI, bank, NEFT, IMPS, RTGS) and UTR only after separate approval/index deployment. **Default OFF**. Never claims statement confirmation.
+- `FINANCE_V2_COLLECTIONS_ENABLED=true` makes Admin Payments cards use the new projection; missing view errors fail closed. With flag OFF cards read *Not certified*, preventing false mixed TEST/manual revenue assertions. The earlier custom totals remain only as unrelated reports elsewhere to audit.
+- Existing manual Admin mark-Paid/package-grant path still requires bank evidence and independently governed approvals; transaction ID uniqueness alone is not bank proof. Existing financial FK ON DELETE CASCADE cannot be quietly removed; plan audited preservation migration.
+- Required DBA/AppSec review: full current/production duplicate and data integrity preflight, access grants, account-scoping, source/managed migration reconciliation, forward+rollback, production mode controls, real provider TEST E2E, manual bank verification workflow.
+**SOURCE STATUS HOLD.**

@@ -70,7 +70,7 @@ export async function getAdminPaymentsPage(query: AdminPaymentsQuery): Promise<R
     const page = boundPage(query.page);
     const { from, to } = pageRange(page);
 
-    const [rowsRes, filteredCount, paidCount, pendingCount, expiredVendors, paidAgg, packages] = await Promise.all([
+    const [rowsRes, filteredCount, paidCount, pendingCount, expiredVendors, packages] = await Promise.all([
       applyPaymentFilters(db.from("payments").select("*"), query)
         .order("created_at", { ascending: false })
         .order("id", { ascending: true })
@@ -79,25 +79,38 @@ export async function getAdminPaymentsPage(query: AdminPaymentsQuery): Promise<R
       safeCount("payments.paid", head(db.from("payments")).eq("payment_status", "Paid")),
       safeCount("payments.pending", head(db.from("payments")).eq("payment_status", "Pending")),
       safeCount("vendors.expired", head(db.from("vendors")).or("status.eq.Suspended,remaining_credits.lte.0")),
-      // Accurate revenue: column-only projection over ALL paid payments.
-      safeAggregateRows("payments.paidAgg", db.from("payments").select("amount, created_at").eq("payment_status", "Paid")),
       safeAggregateRows("packages.all", db.from("packages").select("id, name")),
     ]);
     if (rowsRes.error) throw rowsRes.error;
 
     const rows = rowsRes.data ?? [];
-    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const totalRevenue = paidAgg.reduce((sum, r) => sum + Number(r.amount ?? 0), 0);
-    const revenueThisMonth = paidAgg
-      .filter((r) => { const d = new Date(r.created_at ?? 0); return !Number.isNaN(d.getTime()) && d >= monthStart; })
-      .reduce((sum, r) => sum + Number(r.amount ?? 0), 0);
+    // Legacy paid entries mix manual, Razorpay TEST and LIVE modes. Do NOT
+    // present them as certified revenue. Source-only V2 UI becomes accurate
+    // only after independent install of the service-role reporting view.
+    let totalRevenue: number | null = null;
+    let revenueThisMonth: number | null = null;
+    let financeReconciliation: "not_certified" | "razorpay_live_captured" = "not_certified";
+    if (process.env.FINANCE_V2_COLLECTIONS_ENABLED === "true") {
+      const summary = await db
+        .from("qf_finance_v2_collection_summary_v")
+        .select("razorpay_live_captured_inr,razorpay_live_captured_this_month_inr")
+        .single();
+      // Missing/unreviewed migration or privilege NEVER falls back to
+      // counting TEST transactions as business revenue.
+      if (summary.error || !summary.data) throw new Error("FINANCE_V2_COLLECTION_REPORT_UNAVAILABLE");
+      totalRevenue = Number(summary.data.razorpay_live_captured_inr);
+      revenueThisMonth = Number(summary.data.razorpay_live_captured_this_month_inr);
+      if (!Number.isFinite(totalRevenue) || !Number.isFinite(revenueThisMonth))
+        throw new Error("FINANCE_V2_COLLECTION_REPORT_INVALID");
+      financeReconciliation = "razorpay_live_captured";
+    }
 
     const result: DirectoryPage<Row> = { rows, page, pageSize: ADMIN_DIRECTORY_PAGE_SIZE, total: filteredCount };
     const vendors = await vendorIdentities(db, rows.map((r: Row) => String(r.vendor_id ?? "")));
 
     return ok({
       result,
-      totals: { totalRevenue, revenueThisMonth, paidCount, pendingCount, expiredVendors },
+      totals: { totalRevenue, revenueThisMonth, paidCount, pendingCount, expiredVendors, financeReconciliation },
       vendors,
       packages,
     });

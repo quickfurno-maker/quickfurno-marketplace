@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -49,12 +49,24 @@ export function validateCurrentMigrationTree() {
   check("all migration versions are unique", new Set(allVersions).size === allVersions.length);
   check("canonical and excluded sets do not overlap",
     !canonical.some((c) => excluded.some((e) => e.filename === c.filename || e.version === c.version)));
+  // Quarantined SQL is never treated as an installed migration. Report missing
+  // canonical files as explicit failures instead of crashing with ENOENT.
   for (const record of canonical) {
-    const bytes = readFileSync(path.join(MIGRATIONS_DIR, record.filename));
+    const file = path.join(MIGRATIONS_DIR, record.filename);
+    if (!existsSync(file)) {
+      check(`canonical source present ${record.version}`, false, record.filename);
+      continue;
+    }
+    const bytes = readFileSync(file);
     check(`canonical source hash ${record.version}`, sha256(canonicalBytes(bytes)) === record.sha256, record.filename);
   }
   for (const record of POST_G1_EXTENSION_RECORDS) {
-    const bytes = readFileSync(path.join(MIGRATIONS_DIR, record.filename));
+    const file = path.join(MIGRATIONS_DIR, record.filename);
+    if (!existsSync(file)) {
+      check(`post-G1 source present ${record.version}`, false, record.filename);
+      continue;
+    }
+    const bytes = readFileSync(file);
     check(`post-G1 source hash ${record.version}`,
       sha256(canonicalBytes(bytes)) === record.canonicalSha256, record.filename);
   }

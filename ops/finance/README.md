@@ -9,6 +9,8 @@ This directory is deliberately **outside** `supabase/migrations`. The existing c
 - `sql-candidates/20261022134000_finance_v2_pay3_refund_reservation_candidate.sql` — captured payment evidence + transactionally serialized, immutable partial refund reservations; no Razorpay refund execution.
 - `sql-candidates/20261022135000_finance_v2_pay3_staff_read_candidate.sql` — granular vendor-scoped Finance Staff read grants and immutable revocations; requires genuine Core AAL2 and separate certified bootstrap.
 - `sql-candidates/20261022140000_finance_v2_pay3_settlement_projection_candidate.sql` — security-invoker provider-settlement versus ledger-line comparison; never claims verified bank deposit or taxable revenue.
+- `sql-candidates/20261022141000_finance_v2_pay3_webhook_receipt_candidate.sql` — atomic immutable signed-event/payment link + idempotent durable inbox receipt, without an alternative wallet-credit authority.
+- `sql-candidates/20261022142000_finance_v2_pay3_bank_proof_candidate.sql` — independent immutable bank settlement evidence and service-only three-way reconciliation view; no real bank import or tax certification.
 
 Only network-isolated local PostgreSQL17 rehearsal uses them. Before any managed installation independent DBA must:
 1. Reconcile real Staging and production migration histories, existing data and all pending changed SQL.

@@ -7,10 +7,14 @@ on:
       - "app/api/vox/v1/finance-history/**"
       - "apps/vox-web/app/finance/**"
       - "apps/vox-web/lib/finance.ts"
+      - "app/api/webhooks/razorpay/vendor-package/route.ts"
+      - "services/financeV2WebhookJournal.ts"
+      - "services/financeV2InboxWorker.ts"
+      - "lib/payments/financeV2Casework.mjs"
       - "apps/vox-web/app/components/VoxWorkspaceNav.tsx"
       - "ops/finance/sql-candidates/*finance_v2_pay3*"
       - "scripts/mvp/payments/validate-finance-v2-pay3*"
-      - "docs/finance/FINANCE-V2-PAY3-*"
+      - "docs/finance/**"
   workflow_dispatch:
 permissions:
   contents: read

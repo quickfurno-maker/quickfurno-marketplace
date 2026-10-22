@@ -58,12 +58,14 @@ insert into public.vendor_package_orders values ('10000000-0000-4000-8000-000000
  'ops\finance\sql-candidates\20261022135000_finance_v2_pay3_staff_read_candidate.sql',
  'ops\finance\sql-candidates\20261022140000_finance_v2_pay3_settlement_projection_candidate.sql',
  'ops\finance\sql-candidates\20261022141000_finance_v2_pay3_webhook_receipt_candidate.sql',
- 'ops\finance\sql-candidates\20261022142000_finance_v2_pay3_bank_proof_candidate.sql')){
+ 'ops\finance\sql-candidates\20261022142000_finance_v2_pay3_bank_proof_candidate.sql',
+ 'ops\finance\sql-candidates\20261022143000_finance_v2_pay4a_refund_release_candidate.sql',
+ 'ops\finance\sql-candidates\20261022144000_finance_v2_pay4a_vox_cases_candidate.sql')){
   $r=Sql ([IO.File]::ReadAllText((Join-Path $root $file)))
   if($r.code -ne 0){throw "PAY3_SQL_FAILED $file $($r.text)"}
   Write-Host "PASS PAY3_OFFLINE_SQL_APPLIED $file"
  }
- $a=Need 'PAY3_FIFTEEN_FORCE_RLS_TABLES_WITH_BANK_AND_EVENT_LINK' @'
+ $a=Need 'PAY4A_EIGHTEEN_FORCE_RLS_FINANCE_CASE_TABLES' @'
 select count(*)||'|'||
  count(*) filter(where relrowsecurity and relforcerowsecurity)||'|'||
  count(*) filter(where has_table_privilege('anon',oid,'SELECT')
@@ -72,7 +74,7 @@ select count(*)||'|'||
  where relnamespace='public'::regnamespace and relkind='r'
  and relname like 'finance_%';
 '@
- if($a -ne '15|15|0'){throw "PAY3_RLS_MISMATCH $a"}
+ if($a -ne '18|18|0'){throw "PAY3_RLS_MISMATCH $a"}
  Need 'PAY3_SYNTHETIC_APPROVED_BANK_EVIDENCE' @'
 insert into public.finance_manual_receipt_evidence
 (payment_id,receiving_account_ref,normalized_utr,bank_statement_sha256,
@@ -313,6 +315,59 @@ select has_function_privilege('authenticated',
 '@
  if($fperm -ne '0'){throw 'PAY3_UNSAFE_REFUND_RPC_GRANTS'}
 
+ $releaseSql="select public.qf_finance_v2_release_unsubmitted_refund('"+$res1+
+ "','00000000-0000-4000-8000-000000000011','00000000-0000-4000-8000-000000000012',"+
+ "'00000000-0000-4000-8000-000000000041',repeat('e',64),'CANCELLED_BEFORE_GATEWAY');"
+ $rel=Need 'PAY4A_REFUND_RELEASE_APPEND_ONLY' $releaseSql
+ $relRetry=Need 'PAY4A_REFUND_RELEASE_REPLAY_IDEMPOTENT' $releaseSql
+ if($rel -ne $relRetry){throw 'PAY4A_RELEASE_REPLAY_CHANGED_ID'}
+ Refuse 'PAY4A_RELEASE_SELF_APPROVAL_DENIED' (
+ "select public.qf_finance_v2_release_unsubmitted_refund('"+$res2+
+ "','00000000-0000-4000-8000-000000000011','00000000-0000-4000-8000-000000000011',"+
+ "'00000000-0000-4000-8000-000000000043',repeat('e',64),'CANCELLED_BEFORE_GATEWAY');")
+ Refuse 'PAY4A_RELEASED_APPROVAL_REUSE_DENIED' @'
+select public.qf_finance_v2_reserve_refund(
+ '20000000-0000-4000-8000-000000000005',6000,
+ '00000000-0000-4000-8000-000000000011',
+ '00000000-0000-4000-8000-000000000012',
+ '00000000-0000-4000-8000-000000000031');
+'@
+ $reallocated=Need 'PAY4A_RELEASED_FUNDS_REUSABLE_WITH_NEW_APPROVAL' @'
+select public.qf_finance_v2_reserve_refund(
+ '20000000-0000-4000-8000-000000000005',6000,
+ '00000000-0000-4000-8000-000000000011',
+ '00000000-0000-4000-8000-000000000012',
+ '00000000-0000-4000-8000-000000000044');
+'@
+ $active=Need 'PAY4A_ACTIVE_REFUND_CAP_NEVER_EXCEEDED' @'
+select sum(r.requested_subunits)
+from public.finance_refund_reservations r
+where not exists(select 1 from public.finance_refund_reservation_releases
+ where reservation_id=r.id);
+'@
+ if($active -ne '10000'){throw "PAY4A_ACTIVE_REFUND_OVER_CAP $active"}
+ Refuse 'PAY4A_RELEASE_EVENT_IMMUTABLE' @'
+update public.finance_refund_reservation_releases set reason_code='PROVIDER_NOT_SUBMITTED';
+'@
+ $releaseAccess=Need 'PAY4A_NO_BROWSER_REFUND_RELEASE_RPC' @'
+select has_function_privilege('authenticated',
+'public.qf_finance_v2_release_unsubmitted_refund(uuid,uuid,uuid,uuid,text,text)',
+'EXECUTE')::int;
+'@
+ if($releaseAccess -ne '0'){throw 'PAY4A_REFUND_RELEASE_RPC_LEAK'}
+
+ Need 'PAY4A_SYNTHETIC_GATEWAY_REFUND_JOURNAL' @'
+insert into public.finance_refunds
+(attempt_id,provider,provider_mode,merchant_account_id,
+requested_amount_subunits,request_reason_code)
+values('20000000-0000-4000-8000-000000000005','razorpay','test',
+'synthetic-merchant',1000,'PROVIDER_SUBMISSION_UNCERTAIN');
+'@ | Out-Null
+ Refuse 'PAY4A_REFUND_SUBMITTED_ATTEMPT_RELEASE_BLOCKED' (
+ "select public.qf_finance_v2_release_unsubmitted_refund('"+$res2+
+ "','00000000-0000-4000-8000-000000000011','00000000-0000-4000-8000-000000000012',"+
+ "'00000000-0000-4000-8000-000000000045',repeat('f',64),'PROVIDER_NOT_SUBMITTED');")
+
  Need 'PAY3_VENDOR_SCOPED_FINANCE_STAFF_GRANT_FIXTURE' @'
 insert into public.finance_staff_read_grants
 (id,staff_user_id,team_id,city_id,vendor_id,requested_by,approved_by,approval_reference,expires_at)
@@ -345,6 +400,63 @@ values('30000000-0000-4000-8000-000000000050',
 delete from public.finance_staff_read_grants
 where id='30000000-0000-4000-8000-000000000050';
 '@
+
+ Need 'PAY4A_FINANCE_STAFF_CASE_REQUEST' @'
+insert into public.finance_staff_case_requests
+(id,client_request_id,order_id,vendor_id,requested_by,case_kind,
+requested_amount_subunits,evidence_sha256)
+values('30000000-0000-4000-8000-000000000091',
+'30000000-0000-4000-8000-000000000092',
+'10000000-0000-4000-8000-000000000001',
+'10000000-0000-4000-8000-000000000007',
+'00000000-0000-4000-8000-000000000013',
+'MANUAL_RECEIPT_REVIEW',1000,repeat('b',64));
+'@ | Out-Null
+ Refuse 'PAY4A_FINANCE_STAFF_CASE_DUPLICATE_REQUEST' @'
+insert into public.finance_staff_case_requests
+(client_request_id,order_id,vendor_id,requested_by,case_kind,
+requested_amount_subunits,evidence_sha256)
+values('30000000-0000-4000-8000-000000000092',
+'10000000-0000-4000-8000-000000000001',
+'10000000-0000-4000-8000-000000000007',
+'00000000-0000-4000-8000-000000000013',
+'MANUAL_RECEIPT_REVIEW',1000,repeat('b',64));
+'@
+ Refuse 'PAY4A_REVIEW_REQUESTER_PROVENANCE_MISMATCH' @'
+insert into public.finance_staff_case_reviews
+(case_id,reviewer_id,case_requester_id,decision,review_reference,reason_code)
+values('30000000-0000-4000-8000-000000000091',
+'00000000-0000-4000-8000-000000000012',
+'00000000-0000-4000-8000-000000000055',
+'APPROVED_FOR_FURTHER_CHECKS',
+'30000000-0000-4000-8000-000000000093','FURTHER_CHECKS_REQUIRED');
+'@
+ Refuse 'PAY4A_SELF_REVIEW_REJECTED' @'
+insert into public.finance_staff_case_reviews
+(case_id,reviewer_id,case_requester_id,decision,review_reference,reason_code)
+values('30000000-0000-4000-8000-000000000091',
+'00000000-0000-4000-8000-000000000013',
+'00000000-0000-4000-8000-000000000013',
+'APPROVED_FOR_FURTHER_CHECKS',
+'30000000-0000-4000-8000-000000000094','FURTHER_CHECKS_REQUIRED');
+'@
+ Need 'PAY4A_INDEPENDENT_REVIEW_EVIDENCE_ONLY' @'
+insert into public.finance_staff_case_reviews
+(case_id,reviewer_id,case_requester_id,decision,review_reference,reason_code)
+values('30000000-0000-4000-8000-000000000091',
+'00000000-0000-4000-8000-000000000012',
+'00000000-0000-4000-8000-000000000013',
+'APPROVED_FOR_FURTHER_CHECKS',
+'30000000-0000-4000-8000-000000000095','FURTHER_CHECKS_REQUIRED');
+'@ | Out-Null
+ Refuse 'PAY4A_REVIEW_IMMUTABLE' @'
+update public.finance_staff_case_reviews set decision='REJECTED';
+'@
+ $casePriv=Need 'PAY4A_FINANCE_CASE_NO_AUTHENTICATED_DML' @'
+select has_table_privilege('authenticated','public.finance_staff_case_requests','INSERT')::int
+||'|'||has_table_privilege('authenticated','public.finance_staff_case_reviews','SELECT')::int;
+'@
+ if($casePriv -ne '0|0'){throw "PAY4A_CASE_PRIVILEGES_LEAK $casePriv"}
 
  docker exec $name dropdb -U postgres --force postgres *> $null
  if($LASTEXITCODE -ne 0){throw 'PAY3_DROP_FAILED'}

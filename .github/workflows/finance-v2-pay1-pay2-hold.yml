@@ -4,8 +4,8 @@ on:
   pull_request:
     paths:
       - ".github/workflows/finance-v2-pay1-pay2-hold.yml"
-      - "supabase/migrations/20261022090100_finance_v2_pay1_integrity_candidate.sql"
-      - "supabase/migrations/20261022090200_finance_v2_pay2_history_candidate.sql"
+      - "ops/finance/sql-candidates/20261022090100_finance_v2_pay1_integrity_candidate.sql"
+      - "ops/finance/sql-candidates/20261022090200_finance_v2_pay2_history_candidate.sql"
       - "services/packageService.ts"
       - "services/adminSectionService.ts"
       - "components/admin/sections/PaymentsSection.tsx"

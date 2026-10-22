@@ -28,8 +28,13 @@ try{
  if($LASTEXITCODE -ne 0){throw 'OFFLINE_DOCKER_BOOT_FAILURE'}
  $ready=$false
  for($i=0;$i -lt 100;$i++){
-  docker exec $name pg_isready -U postgres -d postgres *> $null
-  if($LASTEXITCODE -eq 0){$ready=$true;break}
+  $old=$ErrorActionPreference;$ErrorActionPreference='Continue'
+  try{$log=(docker logs $name 2>&1 | Out-String)}
+  finally{$ErrorActionPreference=$old}
+  if($log -match 'PostgreSQL init process complete'){
+   docker exec $name pg_isready -U postgres -d postgres *> $null
+   if($LASTEXITCODE -eq 0){$ready=$true;break}
+  }
   Start-Sleep -Milliseconds 200
  }
  if(!$ready){throw 'POSTGRES17_START_TIMEOUT'}
@@ -64,8 +69,8 @@ insert into public.payments (id,vendor_id,package_id,amount,payment_method,payme
  docker exec $name pg_dump -Fc -U postgres -d postgres -f /tmp/finance_v2_pre.dump *> $null
  if($LASTEXITCODE -ne 0){throw 'PAY1_PAY2_DISPOSABLE_BACKUP_FAILED'}
  foreach($f in @(
-  'supabase\migrations\20261022090100_finance_v2_pay1_integrity_candidate.sql',
-  'supabase\migrations\20261022090200_finance_v2_pay2_history_candidate.sql'
+  'ops\finance\sql-candidates\20261022090100_finance_v2_pay1_integrity_candidate.sql',
+  'ops\finance\sql-candidates\20261022090200_finance_v2_pay2_history_candidate.sql'
  )){
   $r=Sql ([IO.File]::ReadAllText((Join-Path $root $f)))
   if($r.code -ne 0){throw "FINANCE_V2_SQL_INVALID $f $($r.text)"}

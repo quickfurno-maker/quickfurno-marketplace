@@ -2,7 +2,7 @@ import "server-only";
 import {adminClient} from "@/lib/supabase";
 import {verifyVoxOwnerBearer} from "@/services/vox/verifiedStaffBearer";
 import {getVerifiedScopedStaff} from "@/services/vox/verifiedScopedStaff";
-import {evaluateFinanceReadGrant} from "@/contracts/vox/financeReadGrant.mjs";
+import {financeStaffAllowed} from "@/services/financeV2Scope";
 import {financeTimeline,type Pay3Mode,type Pay3EventKind} from "@/lib/payments/financeV2Pay3.mjs";
 export const runtime="nodejs";export const dynamic="force-dynamic";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -12,19 +12,6 @@ const respond=(v:unknown,s:number)=>Response.json(v,{status:s,headers:{
 const validString=(v:unknown,max=180)=>typeof v==="string"&&v.length>0&&v.length<=max;
 const validDate=(v:unknown)=>typeof v==="string"&&Number.isFinite(Date.parse(v));
 const validAmount=(v:unknown)=>typeof v==="number"&&Number.isSafeInteger(v)&&v>=0;
-async function financeStaffAllowed(scope:NonNullable<Awaited<ReturnType<typeof getVerifiedScopedStaff>>>,vendorId:string){
- if(process.env.FINANCE_V2_STAFF_READ_ENABLED!=="staging")return false;
- const db=adminClient();
- const grants=await db.from("finance_staff_read_grants")
-  .select("id,staff_user_id,team_id,city_id,vendor_id,requested_by,approved_by,approval_reference,expires_at")
-  .eq("staff_user_id",scope.userId).eq("vendor_id",vendorId).limit(2);
- if(grants.error||!grants.data||grants.data.length!==1)return false;
- const revoked=await db.from("finance_staff_read_revocations")
-  .select("id").eq("grant_id",grants.data[0].id).limit(1);
- if(revoked.error||!revoked.data)return false;
- return evaluateFinanceReadGrant({scope,grant:grants.data[0],vendorId,
-  revoked:revoked.data.length!==0});
-}
 export async function GET(request:Request){
  if(process.env.FINANCE_V2_PAY3_READ_ENABLED!=="staging"||
     process.env.VOX_STAFF_PORTAL_ENABLED!=="staging")

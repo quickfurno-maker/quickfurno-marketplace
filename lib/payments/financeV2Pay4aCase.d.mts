@@ -1,0 +1,2 @@
+export function validateFinanceCaseRequest(x:any):Readonly<{orderId:string;clientRequestId:string;caseKind:"MANUAL_RECEIPT_REVIEW"|"REFUND_POLICY_REVIEW";requestedAmountSubunits:number;evidenceSha256:string;financialExecutionAllowed:false}>;
+export function validateFinanceCaseDecision(x:any):Readonly<{caseId:string;reviewReference:string;decision:"APPROVED_FOR_FURTHER_CHECKS"|"REJECTED";reasonCode:string;financialExecutionAllowed:false}>;

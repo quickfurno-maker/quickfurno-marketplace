@@ -11,6 +11,10 @@ This directory is deliberately **outside** `supabase/migrations`. The existing c
 - `sql-candidates/20261022140000_finance_v2_pay3_settlement_projection_candidate.sql` — security-invoker provider-settlement versus ledger-line comparison; never claims verified bank deposit or taxable revenue.
 - `sql-candidates/20261022141000_finance_v2_pay3_webhook_receipt_candidate.sql` — atomic immutable signed-event/payment link + idempotent durable inbox receipt, without an alternative wallet-credit authority.
 - `sql-candidates/20261022142000_finance_v2_pay3_bank_proof_candidate.sql` — independent immutable bank settlement evidence and service-only three-way reconciliation view; no real bank import or tax certification.
+- `sql-candidates/20261022143000_finance_v2_pay4a_refund_release_candidate.sql` — immutable independently reviewed reservation release, conservative gateway-execution block and advisory-locked remaining refund cap; uninstalled and not provider-certified.
+- `sql-candidates/20261022144000_finance_v2_pay4a_vox_cases_candidate.sql` — immutable Staff Finance case requests and independent Owner review provenance; approval is evidence-only, not a financial action.
+
+PAY-4A source/rollback/security status: `docs/finance/PAY4A-INTERNAL-READINESS-20261022.md`. All PAY-4A RPCs and UI/workers OFF by default.
 
 Only network-isolated local PostgreSQL17 rehearsal uses them. Before any managed installation independent DBA must:
 1. Reconcile real Staging and production migration histories, existing data and all pending changed SQL.

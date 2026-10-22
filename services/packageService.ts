@@ -5,6 +5,7 @@
 import { adminClient, publicClient } from "../lib/supabase";
 import { appError, type Result, ok, fail } from "../lib/errors";
 import { logSupabaseInsertError } from "../lib/supabaseLogging";
+import { normalizeManualBankReference } from "../lib/payments/financeV2ManualReference.mjs";
 
 export async function listPackages(): Promise<Result<unknown[]>> {
   try {
@@ -22,11 +23,19 @@ export async function createManualPayment(
   vendorId: string, packageId: string, amount: number, method: string, transactionId?: string
 ): Promise<Result<{ id: string }>> {
   try {
+    // PAY-1 source-only: do not change deployed financial business behavior
+    // until independent DBA reviews/installs normalized UTR unique index.
+    // When enabled this validates the rail/UTR BEFORE the server-side insert;
+    // it does not assert bank settlement or mark any payment as paid.
+    const reference = process.env.FINANCE_V2_MANUAL_REFERENCE_GUARD === "true"
+      ? normalizeManualBankReference(method, transactionId)
+      : null;
     const { data, error } = await adminClient()
       .from("payments")
       .insert({
         vendor_id: vendorId, package_id: packageId, amount,
-        payment_method: method, transaction_id: transactionId ?? null,
+        payment_method: reference?.method ?? method,
+        transaction_id: reference?.reference ?? transactionId ?? null,
         payment_status: "Pending",
       })
       .select("id")

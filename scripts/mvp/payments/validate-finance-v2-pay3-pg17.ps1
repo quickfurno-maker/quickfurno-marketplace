@@ -483,6 +483,33 @@ select has_function_privilege('authenticated',
 '@
  if($workerPerm -ne '0'){throw "PAY4B2_RPC_LEAK"}
 
+ Need 'PAY4C1_REFUND_RACE_SYNTHETIC_FIXTURE' @'
+insert into public.finance_payment_attempts
+(id,order_id,provider,provider_mode,merchant_account_id,
+ provider_payment_id,expected_amount_subunits,initiated_source)
+values('20000000-0000-4000-8000-000000000070',
+'10000000-0000-4000-8000-000000000001',
+'razorpay','test','synthetic-merchant','pay_parallel_ref',10000,'checkout');
+insert into public.finance_capture_confirmations
+(attempt_id,confirmed_subunits,provider_payment_id,provider_mode,
+ merchant_account_id,provider_fetch_sha256)
+values('20000000-0000-4000-8000-000000000070',
+10000,'pay_parallel_ref','test','synthetic-merchant',repeat('f',64));
+'@ | Out-Null
+ $raceScript=[IO.File]::ReadAllText((Join-Path $root 'scripts/mvp/payments/finance-pay4c1-two-clients.sh'))
+ $raceResult=($raceScript | docker exec -i $name sh 2>&1 | Out-String)
+ $raceExit=$LASTEXITCODE
+ if($raceExit -ne 0 -or $raceResult -notmatch 'PAY4C1_TWO_PG_CLIENTS_EXACTLY_ONE_PASS'){
+  throw "PAY4C1_PARALLEL_PG_RACE_FAILED $raceResult"
+ }
+ Write-Host 'PASS PAY4C1_TWO_INDEPENDENT_POSTGRES_CLIENTS_EXACTLY_ONE_APPROVED'
+ $reserved=Need 'PAY4C1_REFUND_CAP_AFTER_REAL_CONCURRENCY' @'
+select count(*)::text||'|'||coalesce(sum(requested_subunits),0)::text
+from public.finance_refund_reservations
+where attempt_id='20000000-0000-4000-8000-000000000070';
+'@
+ if($reserved -ne '1|7000'){throw "PAY4C1_REFUND_CAP_RACE_FAILURE $reserved"}
+
  docker exec $name dropdb -U postgres --force postgres *> $null
  if($LASTEXITCODE -ne 0){throw 'PAY3_DROP_FAILED'}
  docker exec $name createdb -U postgres postgres *> $null

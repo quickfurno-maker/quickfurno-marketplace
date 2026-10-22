@@ -38,9 +38,11 @@ try {
 create role anon nologin;
 create role authenticated nologin;
 create role service_role nologin bypassrls;
+create table public.vendors(id uuid primary key);
 create table public.payments(id uuid primary key);
 create table public.vendor_package_orders(id uuid primary key);
 grant usage on schema public to service_role,anon,authenticated;
+insert into public.vendors values ('10000000-0000-4000-8000-000000000007');
 insert into public.payments values ('10000000-0000-4000-8000-000000000001');
 insert into public.vendor_package_orders values ('10000000-0000-4000-8000-000000000001');
 '@ | Out-Null
@@ -48,12 +50,16 @@ insert into public.vendor_package_orders values ('10000000-0000-4000-8000-000000
  if($LASTEXITCODE -ne 0){throw 'PAY3_BACKUP_FAILED'}
  foreach($file in @(
  'ops\finance\sql-candidates\20261022090200_finance_v2_pay2_history_candidate.sql',
- 'ops\finance\sql-candidates\20261022120100_finance_v2_pay3_evidence_candidate.sql')){
+ 'ops\finance\sql-candidates\20261022120100_finance_v2_pay3_evidence_candidate.sql',
+ 'ops\finance\sql-candidates\20261022133000_finance_v2_pay3_inbox_candidate.sql',
+ 'ops\finance\sql-candidates\20261022134000_finance_v2_pay3_refund_reservation_candidate.sql',
+ 'ops\finance\sql-candidates\20261022135000_finance_v2_pay3_staff_read_candidate.sql',
+ 'ops\finance\sql-candidates\20261022140000_finance_v2_pay3_settlement_projection_candidate.sql')){
   $r=Sql ([IO.File]::ReadAllText((Join-Path $root $file)))
   if($r.code -ne 0){throw "PAY3_SQL_FAILED $file $($r.text)"}
   Write-Host "PASS PAY3_OFFLINE_SQL_APPLIED $file"
  }
- $a=Need 'PAY3_EIGHT_IMMUTABLE_FORCE_RLS_TABLES' @'
+ $a=Need 'PAY3_THIRTEEN_FORCE_RLS_TABLES_WITH_STAFF_GRANTS' @'
 select count(*)||'|'||
  count(*) filter(where relrowsecurity and relforcerowsecurity)||'|'||
  count(*) filter(where has_table_privilege('anon',oid,'SELECT')
@@ -62,7 +68,7 @@ select count(*)||'|'||
  where relnamespace='public'::regnamespace and relkind='r'
  and relname like 'finance_%';
 '@
- if($a -ne '8|8|0'){throw "PAY3_RLS_MISMATCH $a"}
+ if($a -ne '13|13|0'){throw "PAY3_RLS_MISMATCH $a"}
  Need 'PAY3_SYNTHETIC_APPROVED_BANK_EVIDENCE' @'
 insert into public.finance_manual_receipt_evidence
 (payment_id,receiving_account_ref,normalized_utr,bank_statement_sha256,
@@ -102,6 +108,174 @@ insert into public.finance_settlements
  declared_net_subunits,provider_report_sha256)
 values('razorpay','test','sandbox-merchant','setl_synthetic',10000,repeat('b',64));
 '@
+ Need 'PAY3_SETTLEMENT_LINES_SOURCE_ONLY' @'
+insert into public.finance_settlement_lines
+(settlement_id,line_kind,amount_signed_subunits,source_reference,source_sha256)
+select id,'capture',12000,'capture_test',repeat('a',64)
+from public.finance_settlements where provider_settlement_id='setl_synthetic';
+insert into public.finance_settlement_lines
+(settlement_id,line_kind,amount_signed_subunits,source_reference,source_sha256)
+select id,'fee',-2000,'fee_test',repeat('b',64)
+from public.finance_settlements where provider_settlement_id='setl_synthetic';
+'@ | Out-Null
+ $projection=Need 'PAY3_SETTLEMENT_PROVIDER_LEDGER_PROJECTION' @'
+select declared_net_subunits||'|'||calculated_net_subunits||'|'||
+ discrepancy_subunits||'|'||reconciliation_state
+ from public.qf_finance_v2_settlement_projection_v
+ where provider_settlement_id='setl_synthetic';
+'@
+ if($projection -ne '10000|10000|0|AMOUNT_MATCH_ONLY'){
+  throw "PAY3_PROJECTION_MISMATCH $projection"
+ }
+ $viewAccess=Need 'PAY3_SETTLEMENT_VIEW_NO_BROWSER_PRIVILEGE' @'
+select has_table_privilege('authenticated',
+ 'public.qf_finance_v2_settlement_projection_v','SELECT')::int;
+'@
+ if($viewAccess -ne '0'){throw 'PAY3_SETTLEMENT_VIEW_UNSAFE'}
+
+ Need 'PAY3_SIGNED_PROVIDER_EVENT_FIXTURE' @'
+insert into public.finance_provider_events
+(id,provider,provider_mode,merchant_account_id,provider_event_id,event_type,payload_sha256,signature_verified)
+values ('30000000-0000-4000-8000-000000000005','razorpay','test','synthetic-merchant',
+ 'evt_test_source','payment.captured',repeat('a',64),true);
+'@ | Out-Null
+ $first=Need 'PAY3_IDEMPOTENT_DURABLE_INBOX_RECEIPT' @'
+select public.qf_finance_v2_enqueue_verified_event('30000000-0000-4000-8000-000000000005');
+'@
+ $again=Need 'PAY3_REPLAY_RETURNS_SAME_INBOX' @'
+select public.qf_finance_v2_enqueue_verified_event('30000000-0000-4000-8000-000000000005');
+'@
+ if($first -ne $again){throw 'PAY3_INBOX_REPLAY_DUPLICATED'}
+ $c=Need 'PAY3_CLAIM_LEASE' @'
+select job_id||'|'||event_id||'|'||token||'|'||attempt_num
+from public.qf_finance_v2_claim_inbox(1);
+'@
+ $fields=$c.Split('|')
+ if($fields.Length -ne 4 -or $fields[3] -ne '1'){throw "PAY3_BAD_LEASE $c"}
+ $noSecond=Need 'PAY3_CONCURRENT_CLAIMER_CANNOT_LEASE_SAME_EVENT' @'
+select count(*) from public.qf_finance_v2_claim_inbox(1);
+'@
+ if($noSecond -ne '0'){throw "PAY3_DOUBLE_CLAIM $noSecond"}
+ $wrong=Need 'PAY3_STALE_TOKEN_CANNOT_ACK' ("select public.qf_finance_v2_finish_inbox('"+$fields[0]+"','00000000-0000-4000-8000-000000000099','VERIFIED','PROVIDER_CHECKED');")
+ if($wrong -ne 'f'){throw 'PAY3_WRONG_TOKEN_ACCEPTED'}
+ $done=Need 'PAY3_EXACT_LEASE_ACK' ("select public.qf_finance_v2_finish_inbox('"+$fields[0]+"','"+$fields[2]+"','VERIFIED','PROVIDER_CHECKED');")
+ if($done -ne 't'){throw 'PAY3_EXACT_LEASE_ACK_FAILED'}
+ $replayed=Need 'PAY3_REPLAYED_ACK_REJECTED' ("select public.qf_finance_v2_finish_inbox('"+$fields[0]+"','"+$fields[2]+"','VERIFIED','PROVIDER_CHECKED');")
+ if($replayed -ne 'f'){throw 'PAY3_DUPLICATE_ACK_ACCEPTED'}
+ $state=Need 'PAY3_APPEND_ONLY_COMPLETION_EVIDENCE' @'
+select j.state||'|'||count(e.id) from public.finance_event_inbox_jobs j
+join public.finance_event_processing_evidence e on e.provider_event_row_id=j.provider_event_row_id
+group by j.state;
+'@
+ if($state -ne 'VERIFIED|1'){throw "PAY3_COMPLETION_EVIDENCE_INVALID $state"}
+ $permissions=Need 'PAY3_NO_BROWSER_INBOX_OR_RPC_PRIVILEGES' @'
+select has_table_privilege('authenticated','public.finance_event_inbox_jobs','SELECT')::int||'|'||
+ has_function_privilege('authenticated','public.qf_finance_v2_claim_inbox(integer)','EXECUTE')::int;
+'@
+ if($permissions -ne '0|0'){throw "PAY3_UNSAFE_PRIVILEGES $permissions"}
+
+ Need 'PAY3_SYNTHETIC_CAPTURE_CONFIRMATION' @'
+insert into public.finance_payment_attempts
+(id,order_id,provider,provider_mode,merchant_account_id,provider_payment_id,
+ expected_amount_subunits,initiated_source)
+values('20000000-0000-4000-8000-000000000005',
+'10000000-0000-4000-8000-000000000001','razorpay','test',
+'synthetic-merchant','pay_synthetic_source',10000,'checkout');
+insert into public.finance_capture_confirmations
+(attempt_id,confirmed_subunits,provider_payment_id,provider_mode,
+merchant_account_id,provider_fetch_sha256)
+values('20000000-0000-4000-8000-000000000005',10000,
+'pay_synthetic_source','test','synthetic-merchant',repeat('c',64));
+'@ | Out-Null
+ $res1=Need 'PAY3_ATOMIC_RESERVATION_1' @'
+select public.qf_finance_v2_reserve_refund(
+ '20000000-0000-4000-8000-000000000005',6000,
+ '00000000-0000-4000-8000-000000000011',
+ '00000000-0000-4000-8000-000000000012',
+ '00000000-0000-4000-8000-000000000031');
+'@
+ $res1Again=Need 'PAY3_REFUND_RESERVATION_IDEMPOTENT' @'
+select public.qf_finance_v2_reserve_refund(
+ '20000000-0000-4000-8000-000000000005',6000,
+ '00000000-0000-4000-8000-000000000011',
+ '00000000-0000-4000-8000-000000000012',
+ '00000000-0000-4000-8000-000000000031');
+'@
+ if($res1 -ne $res1Again){throw 'PAY3_RESERVATION_REPLAY_CREATED_NEW_ID'}
+ Refuse 'PAY3_NO_SELF_APPROVED_REFUND_RESERVATION' @'
+select public.qf_finance_v2_reserve_refund(
+ '20000000-0000-4000-8000-000000000005',1000,
+ '00000000-0000-4000-8000-000000000011',
+ '00000000-0000-4000-8000-000000000011',
+ '00000000-0000-4000-8000-000000000032');
+'@
+ Refuse 'PAY3_REFUND_TOTAL_EXCEEDS_CAPTURE_REJECTED' @'
+select public.qf_finance_v2_reserve_refund(
+ '20000000-0000-4000-8000-000000000005',5000,
+ '00000000-0000-4000-8000-000000000011',
+ '00000000-0000-4000-8000-000000000012',
+ '00000000-0000-4000-8000-000000000033');
+'@
+ Refuse 'PAY3_APPROVAL_IDEMPOTENCY_CONFLICT' @'
+select public.qf_finance_v2_reserve_refund(
+ '20000000-0000-4000-8000-000000000005',3000,
+ '00000000-0000-4000-8000-000000000011',
+ '00000000-0000-4000-8000-000000000012',
+ '00000000-0000-4000-8000-000000000031');
+'@
+ $res2=Need 'PAY3_SECOND_PARTIAL_REFUND_AT_CAP' @'
+select public.qf_finance_v2_reserve_refund(
+ '20000000-0000-4000-8000-000000000005',4000,
+ '00000000-0000-4000-8000-000000000011',
+ '00000000-0000-4000-8000-000000000012',
+ '00000000-0000-4000-8000-000000000034');
+'@
+ $total=Need 'PAY3_REFUND_TOTAL_LIMIT_EXACTLY_CAPTURED' @'
+select sum(requested_subunits) from public.finance_refund_reservations;
+'@
+ if($total -ne '10000'){throw "PAY3_REFUND_CAP_SUM_BAD $total"}
+ Refuse 'PAY3_REFUND_HISTORY_IMMUTABLE' @'
+update public.finance_refund_reservations set requested_subunits=100;
+'@
+ $fperm=Need 'PAY3_NO_BROWSER_REFUND_RPC' @'
+select has_function_privilege('authenticated',
+'public.qf_finance_v2_reserve_refund(uuid,bigint,uuid,uuid,uuid)','EXECUTE')::int;
+'@
+ if($fperm -ne '0'){throw 'PAY3_UNSAFE_REFUND_RPC_GRANTS'}
+
+ Need 'PAY3_VENDOR_SCOPED_FINANCE_STAFF_GRANT_FIXTURE' @'
+insert into public.finance_staff_read_grants
+(id,staff_user_id,team_id,city_id,vendor_id,requested_by,approved_by,approval_reference,expires_at)
+values('30000000-0000-4000-8000-000000000050',
+'00000000-0000-4000-8000-000000000013',
+'00000000-0000-4000-8000-000000000014',
+'00000000-0000-4000-8000-000000000015',
+'10000000-0000-4000-8000-000000000007',
+'00000000-0000-4000-8000-000000000011',
+'00000000-0000-4000-8000-000000000012',
+'00000000-0000-4000-8000-000000000016',now()+interval '1 day');
+'@ | Out-Null
+ Refuse 'PAY3_NO_STAFF_SELF_APPROVAL' @'
+insert into public.finance_staff_read_grants
+(staff_user_id,team_id,city_id,vendor_id,requested_by,approved_by,approval_reference,expires_at)
+values('00000000-0000-4000-8000-000000000013',
+'00000000-0000-4000-8000-000000000014',
+'00000000-0000-4000-8000-000000000015',
+'10000000-0000-4000-8000-000000000007',
+'00000000-0000-4000-8000-000000000013',
+'00000000-0000-4000-8000-000000000012',
+'00000000-0000-4000-8000-000000000018',now()+interval '1 day');
+'@
+ Need 'PAY3_STAFF_REVOCATION_EVENT' @'
+insert into public.finance_staff_read_revocations(grant_id,revoked_by,reason_code)
+values('30000000-0000-4000-8000-000000000050',
+'00000000-0000-4000-8000-000000000011','REVIEW_REVOKED');
+'@ | Out-Null
+ Refuse 'PAY3_STAFF_GRANT_HISTORY_IMMUTABLE' @'
+delete from public.finance_staff_read_grants
+where id='30000000-0000-4000-8000-000000000050';
+'@
+
  docker exec $name dropdb -U postgres --force postgres *> $null
  if($LASTEXITCODE -ne 0){throw 'PAY3_DROP_FAILED'}
  docker exec $name createdb -U postgres postgres *> $null

@@ -8,7 +8,7 @@ on:
       - "apps/vox-web/app/finance/**"
       - "apps/vox-web/lib/finance.ts"
       - "apps/vox-web/app/components/VoxWorkspaceNav.tsx"
-      - "ops/finance/sql-candidates/20261022120100_finance_v2_pay3_evidence_candidate.sql"
+      - "ops/finance/sql-candidates/*finance_v2_pay3*"
       - "scripts/mvp/payments/validate-finance-v2-pay3*"
       - "docs/finance/FINANCE-V2-PAY3-*"
   workflow_dispatch:

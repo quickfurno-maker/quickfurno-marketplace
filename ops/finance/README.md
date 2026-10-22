@@ -4,7 +4,11 @@ This directory is deliberately **outside** `supabase/migrations`. The existing c
 **DO NOT APPLY / DO NOT AUTORUN.** Current candidates:
 - `sql-candidates/20261022090100_finance_v2_pay1_integrity_candidate.sql` — normalized manual UTR index, service-only LIVE-vs-TEST collection view.
 - `sql-candidates/20261022090200_finance_v2_pay2_history_candidate.sql` — four append-only finance event/attempt/refund/audit candidate tables and immutable-history guard.
-- `sql-candidates/20261022120100_finance_v2_pay3_evidence_candidate.sql` — four additional immutable settlement, settlement-line, manual bank-receipt and event-processing evidence tables; NOT a runnable refund/worker.
+- `sql-candidates/20261022120100_finance_v2_pay3_evidence_candidate.sql` — four additional immutable settlement, settlement-line, manual bank-receipt and event-processing evidence tables.
+- `sql-candidates/20261022133000_finance_v2_pay3_inbox_candidate.sql` — mutable leased inbox queue with signed receipt references, bounded retries, fencing token, append-only completion evidence and dead-letter visibility; no live webhook wiring.
+- `sql-candidates/20261022134000_finance_v2_pay3_refund_reservation_candidate.sql` — captured payment evidence + transactionally serialized, immutable partial refund reservations; no Razorpay refund execution.
+- `sql-candidates/20261022135000_finance_v2_pay3_staff_read_candidate.sql` — granular vendor-scoped Finance Staff read grants and immutable revocations; requires genuine Core AAL2 and separate certified bootstrap.
+- `sql-candidates/20261022140000_finance_v2_pay3_settlement_projection_candidate.sql` — security-invoker provider-settlement versus ledger-line comparison; never claims verified bank deposit or taxable revenue.
 
 Only network-isolated local PostgreSQL17 rehearsal uses them. Before any managed installation independent DBA must:
 1. Reconcile real Staging and production migration histories, existing data and all pending changed SQL.

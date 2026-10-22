@@ -60,7 +60,8 @@ insert into public.vendor_package_orders values ('10000000-0000-4000-8000-000000
  'ops\finance\sql-candidates\20261022141000_finance_v2_pay3_webhook_receipt_candidate.sql',
  'ops\finance\sql-candidates\20261022142000_finance_v2_pay3_bank_proof_candidate.sql',
  'ops\finance\sql-candidates\20261022143000_finance_v2_pay4a_refund_release_candidate.sql',
- 'ops\finance\sql-candidates\20261022144000_finance_v2_pay4a_vox_cases_candidate.sql')){
+ 'ops\finance\sql-candidates\20261022144000_finance_v2_pay4a_vox_cases_candidate.sql',
+ 'ops\finance\sql-candidates\20261022145000_finance_v2_pay4b_inbox_recovery_candidate.sql')){
   $r=Sql ([IO.File]::ReadAllText((Join-Path $root $file)))
   if($r.code -ne 0){throw "PAY3_SQL_FAILED $file $($r.text)"}
   Write-Host "PASS PAY3_OFFLINE_SQL_APPLIED $file"
@@ -457,6 +458,30 @@ select has_table_privilege('authenticated','public.finance_staff_case_requests',
 ||'|'||has_table_privilege('authenticated','public.finance_staff_case_reviews','SELECT')::int;
 '@
  if($casePriv -ne '0|0'){throw "PAY4A_CASE_PRIVILEGES_LEAK $casePriv"}
+
+ Need 'PAY4B2_SYNTHETIC_EXHAUSTED_LEASE' @'
+update public.finance_event_inbox_jobs set
+ state='LEASED',attempts=5,lease_token='30000000-0000-4000-8000-000000000077',
+ lease_until=now()-interval '2 minutes'
+ where provider_event_row_id='30000000-0000-4000-8000-000000000005';
+'@ | Out-Null
+ $closed=Need 'PAY4B2_EXPIRED_MAX_ATTEMPTS_TO_DEAD_LETTER' @'
+select public.qf_finance_v2_expire_exhausted_inbox(10);
+'@
+ if($closed -ne '1'){throw "PAY4B2_EXPIRATION_MISSED $closed"}
+ $closedAgain=Need 'PAY4B2_DEAD_LETTER_REPLAY_SAFE' @'
+select public.qf_finance_v2_expire_exhausted_inbox(10);
+'@
+ if($closedAgain -ne '0'){throw "PAY4B2_DEAD_LETTER_DUPLICATE $closedAgain"}
+ $health=Need 'PAY4B2_AGGREGATE_AUDIT_HEALTH' @'
+select dead_letter||'|'||expired from public.qf_finance_v2_inbox_health_v;
+'@
+ if($health -ne '1|0'){throw "PAY4B2_INVALID_HEALTH $health"}
+ $workerPerm=Need 'PAY4B2_NO_BROWSER_RECOVERY_RPC_ACCESS' @'
+select has_function_privilege('authenticated',
+'public.qf_finance_v2_expire_exhausted_inbox(integer)','EXECUTE')::int;
+'@
+ if($workerPerm -ne '0'){throw "PAY4B2_RPC_LEAK"}
 
  docker exec $name dropdb -U postgres --force postgres *> $null
  if($LASTEXITCODE -ne 0){throw 'PAY3_DROP_FAILED'}

@@ -16,6 +16,9 @@ export async function runFinanceV2StagingInboxCanary(){
  if(!config.enabled||config.mode!=="test"||!key||!secret||!merchant)
   throw Error("FINANCE_INBOX_CONFIG_INVALID");
  const db=adminClient();
+ // Terminalize bounded exhausted leases before claiming new work; never credit/refund.
+ const expired=await db.rpc("qf_finance_v2_expire_exhausted_inbox",{p_limit:10});
+ if(expired.error||typeof expired.data!=="number")throw Error("FINANCE_RECOVERY_UNAVAILABLE");
  const result=await processFinanceInboxBatch({
   max:5,
   claim:async limit=>{
@@ -67,6 +70,15 @@ export async function runFinanceV2StagingInboxCanary(){
    return r.data===true;
   }
  });
+ const health=await db.from("qf_finance_v2_inbox_health_v")
+  .select("total,ready,retry,active,expired,dead_letter,verified").single();
+ if(health.error||!health.data)throw Error("FINANCE_INBOX_HEALTH_UNAVAILABLE");
+ const snapshot=health.data;
+ const metrics=["total","ready","retry","active","expired","dead_letter","verified"] as const;
+ for(const n of metrics){
+  if(!Number.isSafeInteger(snapshot[n])||snapshot[n]<0)throw Error("FINANCE_HEALTH_INVALID");
+ }
  return {ok:true,mode:"AUDIT_ONLY",creditWrites:0,processed:result.length,
-  acknowledged:result.filter((r:{accepted:boolean})=>r.accepted).length};
+  acknowledged:result.filter((r:{accepted:boolean})=>r.accepted).length,
+  exhaustedDeadLetters:expired.data,health:snapshot};
 }

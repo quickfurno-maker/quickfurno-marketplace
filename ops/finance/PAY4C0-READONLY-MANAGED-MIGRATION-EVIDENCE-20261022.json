@@ -1,0 +1,33 @@
+{
+  "schema": "qf.finance.pay4c0.managed-history-observation.v1",
+  "observedDate": "2026-10-22",
+  "source": "Connected Supabase list_migrations read-only",
+  "environmentRows": [
+    {
+      "environment": "QuickFurno Staging",
+      "migrationCount": 86,
+      "firstVersion": "20260722000100",
+      "lastVersion": "20261013144901",
+      "quarantinedVoxMigrationPresent": false,
+      "financeV2MigrationPresent": false
+    },
+    {
+      "environment": "QuickFurno Production",
+      "migrationCount": 86,
+      "firstVersion": "20260624095535",
+      "lastVersion": "20261012181000",
+      "quarantinedVoxMigrationPresent": false,
+      "financeV2MigrationPresent": false
+    }
+  ],
+  "limitations": [
+    "Read-only list_migrations shows installed versions, not table grants or RLS SQL definitions",
+    "No SHA-256 validation of remote applied migrations possible via this list",
+    "Not independently DBA attested or signed",
+    "Does not authorize Staging or production schema changes"
+  ],
+  "managedWritesPerformed": false,
+  "independentDbaApproved": false,
+  "managedMigrationAuthorized": false,
+  "ownerGo": false
+}

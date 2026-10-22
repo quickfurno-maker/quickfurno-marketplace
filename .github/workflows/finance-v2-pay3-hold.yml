@@ -28,6 +28,12 @@ on:
       - "scripts/mvp/payments/validate-finance-v2-pay4a*"
       - "scripts/mvp/payments/validate-finance-v2-pay4b*"
       - "scripts/mvp/payments/financePay4b*"
+      - "scripts/mvp/payments/financePay4c0*"
+      - "scripts/mvp/payments/validate-finance-v2-pay4c0*"
+      - "lib/payments/financePay4c0*"
+      - "contracts/vox/financePay4c0*"
+      - "ops/finance/PAY4C0-*"
+
       - "scripts/mvp/payments/audit-finance-pay4a-migration.mjs"
       - "docs/finance/**"
   workflow_dispatch:

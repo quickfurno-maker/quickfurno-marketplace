@@ -538,6 +538,52 @@ where provider_event_row_id='30000000-0000-4000-8000-000000000092'
 '@
  if($claimed -ne '1|1'){throw "PAY4C3_INBOX_CLAIM_UNSAFE $claimed"}
 
+ Need 'PAY4C4_ISOLATED_PUBLIC_VENDOR_VIEW_FIXTURE' @'
+create table public.pay4c4_vendor_visibility_fixture(
+ id integer primary key, status text not null, active boolean not null,
+ visible boolean not null, credits integer not null);
+insert into public.pay4c4_vendor_visibility_fixture values
+ (1,'Approved',true,true,2),(2,'Pending',true,true,5),
+ (3,'Approved',true,false,2),(4,'Approved',true,true,0);
+alter table public.pay4c4_vendor_visibility_fixture enable row level security;
+alter table public.pay4c4_vendor_visibility_fixture force row level security;
+grant select on public.pay4c4_vendor_visibility_fixture to anon,authenticated;
+create view public.pay4c4_vendor_public_invoker_v
+ with (security_invoker=true) as
+ select id from public.pay4c4_vendor_visibility_fixture
+ where status='Approved' and active and visible and credits>0;
+grant select on public.pay4c4_vendor_public_invoker_v to anon,authenticated;
+'@ | Out-Null
+ $deny=Need 'PAY4C4_PUBLIC_VIEW_WITHOUT_POLICY_FAILS_CLOSED' @'
+set role anon;
+select count(*)::text from public.pay4c4_vendor_public_invoker_v;
+reset role;
+'@
+ if($deny -ne '0'){throw "PAY4C4_VIEW_RLS_PREPOLICY_BYPASS $deny"}
+ Need 'PAY4C4_PUBLIC_VENDOR_POLICY_TEST_FIXTURE' @'
+create policy pay4c4_public_eligible_read
+ on public.pay4c4_vendor_visibility_fixture
+ for select to anon,authenticated
+ using(status='Approved' and active and visible and credits>0);
+'@ | Out-Null
+ $publicCount=Need 'PAY4C4_PUBLIC_VIEW_WITH_RLS_POLICY' @'
+set role anon;
+select count(*)::text from public.pay4c4_vendor_public_invoker_v;
+reset role;
+'@
+ if($publicCount -ne '1'){throw "PAY4C4_PUBLIC_VENDOR_REGRESSION $publicCount"}
+ $staffCount=Need 'PAY4C4_SIGNED_IN_VIEW_WITH_RLS_POLICY' @'
+set role authenticated;
+select count(*)::text from public.pay4c4_vendor_public_invoker_v;
+reset role;
+'@
+ if($staffCount -ne '1'){throw "PAY4C4_SIGNED_VENDOR_REGRESSION $staffCount"}
+ $noMutation=Need 'PAY4C4_NO_PUBLIC_VENDOR_WRITE' @'
+select has_table_privilege('anon','public.pay4c4_vendor_visibility_fixture','UPDATE')::int
+ ||'|'||has_table_privilege('authenticated','public.pay4c4_vendor_visibility_fixture','UPDATE')::int;
+'@
+ if($noMutation -ne '0|0'){throw "PAY4C4_VENDOR_MUTATION_EXPOSED $noMutation"}
+
  docker exec $name dropdb -U postgres --force postgres *> $null
  if($LASTEXITCODE -ne 0){throw 'PAY3_DROP_FAILED'}
  docker exec $name createdb -U postgres postgres *> $null

@@ -22,6 +22,11 @@ import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+// 3B-5 SAFETY INTERLOCK: Historical utility can grant Auth claims before durable authority.
+// The writes cross Auth Admin API and database and are not atomic.
+// NEVER remove this block without separately approved owner-bootstrap replacement.
+throw new Error("LEGACY_SUPERADMIN_GRANT_DISABLED_PENDING_APPROVED_OWNER_BOOTSTRAP");
+
 const envPath = resolve(process.cwd(), ".env.local");
 if (existsSync(envPath)) {
   for (const line of readFileSync(envPath, "utf8").split(/\r?\n/)) {

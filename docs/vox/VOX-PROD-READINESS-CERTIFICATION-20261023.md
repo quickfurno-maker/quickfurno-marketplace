@@ -7,6 +7,18 @@
 
 ---
 
+## Phase 3B-8 independent recheck — qualifications and release HOLD
+
+**NO exact-head GitHub CI** was available for the original Antigravity local documentation-only commit `30319c2e0a465ffd33a48aba073215df9af370c9` when independently reviewed. This report is **not** a signed DBA/AppSec certificate. Green source/CI evidence for the older RC3 commit `12eb177f` is not exact-head CI for 30319 or its successor.
+
+**NOT independently certified for no data loss:** 104 staging/production migration-version differences remain individually UNREVIEWED; a four-schema isolated PG17 restore is not full production rollback, global role/ACL/PITR or physical storage proof.
+
+**Source contract testing is NOT live managed integration certification:** Jarvis, Riya, Aarohi, Anisha, AOS, AGNI, Finance and Staff auth have source-level and some existing service evidence, but no genuine VOX authenticated integrated Staging certification. The last deployed Core VOX overview probe returned HTTP 404; public VOX sign-in remains disabled and Staging has zero verified Owner MFA factors.
+
+**Web UI test count:** the `apps/vox-web npm test` command has multiple separately reported guard/check suites; the headline 148/148 is not an independently verified global sum of every emitted PASS label. Report command-level exit code and distinct test summaries separately.
+
+**Release status:** managed Staging migration, public DNS, actual Owner/Staff privileged Auth, Razorpay provider operations, Production GO = **HOLD** until qualified independent DBA/AppSec, full rollback, explicit Owner authorization and genuine staging E2E.
+
 ## 1. Subsystem Verified Status Matrix
 
 | Subsystem | Verified Operational State | Source Tests | Staging Runtime Status | Public Deployment | Outstanding Blockers |
@@ -112,7 +124,7 @@ The live Supabase database ledgers reflect historical schema evolutions across e
 - **Total Ledger Divergence Records:** **104 rows** (Registered in `ops/vox/certification/STEP3B6-DIVERGENCE-20261023.json`)
 
 ### Architectural Reconciliation Finding:
-1. **No Data Loss or Breaking Collision:** The 52/52 divergence represents environment-isolated operational patches applied during separate pre-release testing cycles.
+1. **No-loss / semantic-equivalence claim is NOT VERIFIED:** The 52/52 difference contains environment-specific migration histories; each of the 104 version differences must be independently assessed for semantic equivalence, roles/ACL/data dependencies and full recovery risk.
 2. **Local PostgreSQL 17 Replay Proof:** Rehearsed on disposable container `public.ecr.aws/supabase/postgres:17.6.1.147` using exact 22-Oct Staging dump (`staging-public-auth-storage-migrationhistory-step3b2-20261022.dump`, SHA256 `E303BC25D904899459C56493F7D67B1960056DA4F4EAF78905B4F2F50AF75753`).
 3. **Phase22 Migration Status:** `supabase/migrations/20261006113720_phase22_identity_portability.sql` applied cleanly with exit 0; idempotent re-apply exit 0.
 4. **Rollback Certification:** Rollback-by-restore cleanly restored to 86 baseline migrations and 0 Phase22 tables.
@@ -150,7 +162,7 @@ Cataloged in `ops/vox/certification/STEP3B7-POLICY-DECISION-MATRIX-20261023.json
    - Staff have a single login with multi-department scoped permissions (`operations`, `acquisition`, `vendor_support`, `finance`).
    - All access decisions require fresh AAL2 session verification and valid department grant membership.
 3. **Session Revocation & Fail-Closed Guards:**
-   - Inactive profile, revoked grant, or changed team city immediately revokes workstation access.
+   - Synthetic/source tests reject inactive profiles, revoked grants and changed team-city scopes. Actual managed JWT/session invalidation timing and effective RLS revocation remain to be certified in protected Staging.
    - `scripts/grant-superadmin.mjs` remains intentionally disabled (`LEGACY_SUPERADMIN_GRANT_DISABLED_PENDING_APPROVED_OWNER_BOOTSTRAP`) to prevent out-of-band privilege escalation.
 
 ---
@@ -201,7 +213,7 @@ The release process is strictly gated. Autonomous AI execution ends at internal 
   - Runtime User: `quickfurno:quickfurno` (UID/GID 10001)
   - Next.js Standalone Bundle with read-only root filesystem and `cap_drop: ALL`
 - **Rollback Target:**
-  - If migration issues occur: Re-apply pre-migration database dump `staging-public-auth-storage-migrationhistory-step3b2-20261022.dump`.
+  - If migration issues occur: STOP. Do not automatically restore the four-schema archive; it cannot by itself restore global roles, grants/ACL, object-storage binaries, external Auth session state or PITR. Use only independently reviewed, complete DBA backup and recovery instructions.
   - If application container issues occur: Roll back container image to previous Staging release and re-engage profile `vox-stage-disabled`.
 - **Outstanding Blockers for Production:**
   1. Independent DBA signoff on 104 migration divergence items.

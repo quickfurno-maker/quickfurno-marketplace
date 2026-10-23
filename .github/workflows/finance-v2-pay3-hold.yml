@@ -44,6 +44,10 @@ on:
       - "scripts/mvp/payments/step3b6-*.test.mjs"
       - "ops/vox/certification/STEP3B6-*"
       - "ops/vox/certification/STEP3B7-*"
+      - "ops/vox/certification/STEP3B8-*"
+      - "scripts/scale/*step3b8*"
+      - "docs/vox/*STEP3B8*"
+      - "docs/vox/VOX-PROD-READINESS-CERTIFICATION-20261023.md"
       - "scripts/scale/*step3b7*"
       - "scripts/mvp/vox/step3b7-*"
       - "scripts/mvp/payments/step3b7-*"
@@ -111,6 +115,11 @@ jobs:
           node scripts/scale/step3b7-source-manifest.mjs
           node scripts/scale/validate-step3b7-source-hold.mjs
           node --test scripts/scale/step3b7-*.test.mjs scripts/mvp/vox/step3b7-integrated-boundaries.test.mjs scripts/mvp/payments/step3b7-finance-history.test.mjs
+      - name: Step 3B-8 final source approval/HOLD review package
+        run: |
+          node scripts/scale/step3b8-review-package.mjs
+          node scripts/scale/validate-step3b8-release-hold.mjs
+          node --test scripts/scale/step3b8-review-queue.test.mjs
       - name: Existing Razorpay source validation
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: PAY1 PAY2 PAY3 focused deterministic policies

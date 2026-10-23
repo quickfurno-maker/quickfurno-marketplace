@@ -49,6 +49,8 @@ on:
       - "scripts/scale/*step3b9[d-f]*"
       - "scripts/scale/*step3b9def*"
       - "docs/vox/*STEP3B9[D-F]*"
+      - "docs/vox/*STEP3B10*"
+      - "scripts/scale/*step3b10*"
       - "scripts/scale/*step3b9*"
       - "docs/vox/*STEP3B9*"
       - "scripts/scale/*step3b8*"
@@ -138,6 +140,8 @@ jobs:
           node scripts/scale/step3b9f-release-preflight.mjs
           node --test scripts/scale/step3b9def-release.test.mjs
           node scripts/scale/validate-step3b9def-hold.mjs
+      - name: Step 3B-10 Gemini second-pass findings and Finance VOX CI guard
+        run: node --test scripts/scale/step3b10-gemini-reaudit.test.mjs
       - name: Existing Razorpay source validation
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: PAY1 PAY2 PAY3 focused deterministic policies
@@ -157,6 +161,9 @@ jobs:
           cache: npm
           cache-dependency-path: apps/vox-web/package-lock.json
       - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: apps/vox-web
+      - name: VOX Web regression/security suite (not a substitute for live Stage E2E)
+        run: npm test
         working-directory: apps/vox-web
       - name: VOX Web TS contracts
         run: npm run typecheck

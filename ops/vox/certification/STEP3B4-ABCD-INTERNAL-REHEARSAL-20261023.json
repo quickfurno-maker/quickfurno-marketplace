@@ -1,0 +1,101 @@
+{
+  "schema": "qf.step3b4abcd.internal-prelaunch-rehearsal.v1",
+  "date": "2026-10-23",
+  "environment": {
+    "managedStaging": "uckafzuochmbvtiodmcl",
+    "cloneSourceArchive": "staging-public-auth-storage-migrationhistory-step3b2-20261022.dump",
+    "cloneSourceSha256": "E303BC25D904899459C56493F7D67B1960056DA4F4EAF78905B4F2F50AF75753",
+    "cloneDockerImage": "public.ecr.aws/supabase/postgres:17.6.1.147",
+    "offlineNetworkMode": "none",
+    "publishedPorts": 0
+  },
+  "trackA": {
+    "sourceMigrationVersion": "20261006113720",
+    "sourceMigrationSha256": "6F53E1781E4D2BD277645ED17B2EB635BE70F1D2C4DF7525CD176DFB0C2F28BA",
+    "fromActualStagingRestore": true,
+    "baseline": {
+      "authUsers": 2,
+      "profiles": 2,
+      "migrationHistory": 86,
+      "identityPrincipalsPresent": false
+    },
+    "migrationAppliedToDisposableClone": true,
+    "firstApplyExitCode": 0,
+    "reapplyExitCode": 0,
+    "post": {
+      "authUsers": 2,
+      "profiles": 2,
+      "principals": 2,
+      "providerIdentities": 2,
+      "businessBindings": 2,
+      "legacySuperadminRoles": 1,
+      "rlsEnabledIdentityTables": 4,
+      "anonDirectSelectGrants": 0,
+      "authenticatedDirectSelectGrants": 0,
+      "serviceRoleSelectGrants": 4,
+      "handleNewUserAuthenticatedExecute": false,
+      "existingPoliciesDefinitionMd5": "c9f988a3a64b83fb11d745f80333af88"
+    },
+    "untrustedRoleDirectReadsDenied": true,
+    "rollbackRehearsal": {
+      "method": "restore exact original archive into separately initialized disposable database",
+      "authUsers": 2,
+      "profiles": 2,
+      "migrationHistory": 86,
+      "identityTablesAbsent": true
+    },
+    "limitations": [
+      "No migration ledgers modified even in clone: SQL applied via psql, so cannot claim managed migration version committed",
+      "Restore used --no-owner/--no-acl, so local role/permission behavior cannot substitute for managed role/ACL test",
+      "No real staging smoke auth or user-session continuity",
+      "Image tag not pinned digest"
+    ],
+    "managedStagingWrites": 0
+  },
+  "trackB": {
+    "readonlyPreflightModule": "scripts/owner-superadmin-bootstrap-preflight.mjs",
+    "tests": "scripts/owner-superadmin-bootstrap-preflight.test.mjs",
+    "focusedMockTestsPassed": 10,
+    "executionWiredToLegacyGrantScript": false,
+    "legacyGrantScriptStillUnsafe": true,
+    "bootstrapActualApplied": false,
+    "legacySuperadminTransitionIndependentlyApproved": false,
+    "independentApproverVerified": false,
+    "reason": "Old script writes app_metadata and profile before durable Core identity role; cannot silently grant real Owner with cross-service partial write risk"
+  },
+  "trackC": {
+    "internalReviewOnly": true,
+    "independentReviewCertified": false,
+    "liveRlsPoliciesReferencingIsAdmin": 59,
+    "liveRlsPoliciesReferencingOwnsVendor": 22,
+    "isAdminDefinitionRequiresActiveProfile": false,
+    "offlineCloneInactiveAdminStillPassesIsAdmin": true,
+    "offlineRollbackRevertedDisabling": true,
+    "liveInactiveAdmins": 0,
+    "ownsVendorDefinitionRequiresActiveVendor": false,
+    "existingSecurityDefinerView": "public.vendor_public_v",
+    "viewSelectableByAnonAndAuthenticated": true,
+    "appsecRemediationOpen": true
+  },
+  "trackD": {
+    "phase22StaticChecks": "19/19 PASS",
+    "migrationLedgerValidator": "PASS",
+    "recoveryStaticEvidence": "12/12 PASS",
+    "ownerPreflightMockTests": "10/10 PASS",
+    "financeFocusedTests": "79/79 PASS",
+    "coreTypecheck": "PASS",
+    "voxTypecheck": "PASS",
+    "gitWorkflowCi": "PENDING_NOT_EVIDENCE_OF_DEPLOYMENT"
+  },
+  "hardHolds": {
+    "independentDba": false,
+    "independentAppsec": false,
+    "managedSchemaMigrationApproval": false,
+    "stagingIdentityApplied": false,
+    "legacyAdminRetirement": false,
+    "realOwnerGranted": false,
+    "ownerAal2": false,
+    "financeProductionPromotion": false
+  },
+  "releaseAuthorized": false
+}

@@ -45,6 +45,9 @@ on:
       - "ops/vox/certification/STEP3B6-*"
       - "ops/vox/certification/STEP3B7-*"
       - "ops/vox/certification/STEP3B8-*"
+      - "ops/vox/certification/STEP3B9-*"
+      - "scripts/scale/*step3b9*"
+      - "docs/vox/*STEP3B9*"
       - "scripts/scale/*step3b8*"
       - "docs/vox/*STEP3B8*"
       - "docs/vox/VOX-PROD-READINESS-CERTIFICATION-20261023.md"
@@ -120,6 +123,11 @@ jobs:
           node scripts/scale/step3b8-review-package.mjs
           node scripts/scale/validate-step3b8-release-hold.mjs
           node --test scripts/scale/step3b8-review-queue.test.mjs
+      - name: Step 3B-9 independent DBA AppSec and Owner approval HOLD
+        run: |
+          node scripts/scale/step3b9-review-handoff.mjs
+          node --test scripts/scale/step3b9-independent-review.test.mjs
+          node scripts/scale/validate-step3b9-approval-gates.mjs
       - name: Existing Razorpay source validation
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: PAY1 PAY2 PAY3 focused deterministic policies

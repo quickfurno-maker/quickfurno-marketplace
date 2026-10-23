@@ -39,6 +39,11 @@ on:
       - "scripts/scale/validate-vox-migration-reconciliation-step3b1.mjs"
       - "scripts/scale/validate-step3b2-3b3-restore-evidence.mjs"
       - "scripts/scale/validate-step3b4-internal-evidence.mjs"
+      - "scripts/scale/validate-step3b5-internal-rc.mjs"
+      - "scripts/scale/fixtures/step3b5-*"
+      - "scripts/owner-superadmin-transition-plan*.mjs"
+      - "scripts/grant-superadmin.mjs"
+      - "ops/vox/certification/STEP3B5-INTERNAL-RC-20261023.json"
       - "scripts/owner-superadmin-bootstrap-preflight*.mjs"
       - "ops/vox/certification/STEP3B4-ABCD-INTERNAL-REHEARSAL-20261023.json"
       - "ops/vox/certification/STEP3B2-3B3-FRESH-RESTORE-SECURITY-EVIDENCE-20261023.json"
@@ -81,6 +86,10 @@ jobs:
         run: |
           node scripts/scale/validate-step3b4-internal-evidence.mjs
           node --test scripts/owner-superadmin-bootstrap-preflight.test.mjs
+      - name: Step 3B-5 internal RC, Owner transition and legacy bootstrap fail-closed checks
+        run: |
+          node scripts/scale/validate-step3b5-internal-rc.mjs
+          node --test scripts/owner-superadmin-transition-plan.test.mjs
       - name: Existing Razorpay source validation
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: PAY1 PAY2 PAY3 focused deterministic policies

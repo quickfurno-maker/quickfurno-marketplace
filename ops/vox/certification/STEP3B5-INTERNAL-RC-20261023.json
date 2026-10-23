@@ -1,0 +1,116 @@
+{
+  "schema": "qf.finance.vox.phase3b5.internal_rc.v1",
+  "date": "2026-10-23",
+  "sourceBranch": "test/step3b5-ae-internal-rc-20261023",
+  "baseBranch": "test/step3b4abcd-prelaunch-rehearsal-20261023",
+  "baseCommit": "fe447eb9d4b5a34cee8c83700e806da7df6ff9ef",
+  "environment": {
+    "target": "Staging ONLY",
+    "projectId": "uckafzuochmbvtiodmcl",
+    "actualManagedDbWrites": 0,
+    "actualAuthMutations": 0,
+    "actualRazorpayMoneyActions": 0,
+    "productionRelease": "HOLD",
+    "stagingRelease": "HOLD"
+  },
+  "source": {
+    "phase22Migration": "20261006113720_phase22_identity_portability.sql",
+    "phase22Sha256": "6F53E1781E4D2BD277645ED17B2EB635BE70F1D2C4DF7525CD176DFB0C2F28BA",
+    "stagingArchiveSha256": "E303BC25D904899459C56493F7D67B1960056DA4F4EAF78905B4F2F50AF75753",
+    "archiveBytes": 2010560,
+    "quarantinedVoxSql": 7,
+    "canonicalVoxCandidates": 23,
+    "stagingMigrations": 86,
+    "productionMigrations": 86,
+    "sharedHistory": 34,
+    "stagingUnique": 52,
+    "productionUnique": 52
+  },
+  "A": {
+    "liveRlsIsAdmin": 59,
+    "liveRlsOwnsVendor": 22,
+    "isAdminByCmd": {
+      "all": 28,
+      "insert": 1,
+      "select": 27,
+      "update": 3
+    },
+    "ownsVendorByCmd": {
+      "all": 1,
+      "insert": 5,
+      "select": 14,
+      "update": 2
+    },
+    "adminStatusTermsInPolicy": 3,
+    "vendorStatusTermsInPolicy": 0,
+    "adminLiveRisk": "inactive admin still passes baseline helper on restored Staging fixture",
+    "vendorLiveRisk": "inactive and suspended owned vendor still passes ownership helper on restored Staging fixture",
+    "adminReviewSqlSha256": "DD7D093C66EA89EF60A5D0F7EF410F323A586B1616D978128E753E559F06DA47",
+    "vendorReviewSqlSha256": "6BEB061B6C7D7C2DD46240E4664FB42ED2609AD1E57B1F845D82AA50A3F50809",
+    "adminCloneFixtureBaselinePass": true,
+    "adminCloneFixtureCandidatePass": true,
+    "vendorCloneFixtureBaselinePass": true,
+    "vendorCloneFixtureCandidatePass": true,
+    "reviewersMustDecideHistoricalReadAccess": true,
+    "managedSqlRemediationInstalled": false
+  },
+  "B": {
+    "previousOwnerBootstrapPreflightTests": 10,
+    "newOwnerTransitionPlannerTests": 17,
+    "dryRunDoesNotMutate": true,
+    "actualOwnerGranted": false,
+    "legacyGrantEntrypointDisabled": true,
+    "legacyGrantDryRunRefusalConfirmed": true,
+    "crossSystemAtomicityClaimed": false,
+    "independentHumanApprovalConfirmed": false,
+    "realAal2": false
+  },
+  "C": {
+    "migrationSqlUnchanged": true,
+    "oldVoxPinsUnchanged": true,
+    "extraSqlUnderPinnedCandidateDirectory": false,
+    "catalogReadOnlyPrepostSqlPrepared": true,
+    "backupFourSchemaRestoreProven": true,
+    "globalRoleAclRestorationProven": false,
+    "fullPitrProven": false,
+    "legacyPlaceholderTransitionApproved": false,
+    "rollbackSignoff": false
+  },
+  "D": {
+    "testEnvironment": "network-isolated disposable PG17 restored actual 22-Oct Staging archive + Phase22",
+    "networkDisabled": true,
+    "publishedPorts": 0,
+    "syntheticAdminActiveAllow": true,
+    "syntheticAdminInactiveBaselineDenied": false,
+    "syntheticAdminInactiveCandidateDenied": true,
+    "syntheticVendorActiveAllow": true,
+    "syntheticVendorInactiveBaselineDenied": false,
+    "syntheticVendorInactiveCandidateDenied": true,
+    "syntheticVendorSuspendedBaselineDenied": false,
+    "syntheticVendorSuspendedCandidateDenied": true,
+    "syntheticForgedSubjectDenied": true,
+    "fixtureUsesTransactionsRolledBack": true,
+    "businessDataInStagingAltered": false
+  },
+  "E": {
+    "ownerPreflightAndTransitionTests": "27/27 PASS",
+    "voxTests": "507/507 PASS",
+    "phase22Contract": "19/19 PASS",
+    "stageMigrationLedgerReconciliation": "PASS",
+    "fixtureValidation": "offline clone PASS",
+    "internalSourceGate": "11/11 PASS",
+    "financeTests": "79/79 PASS",
+    "coreTypecheck": "PASS",
+    "voxTypecheck": "PASS",
+    "exactHeadGithub": "PENDING_VERIFY"
+  },
+  "F": {
+    "independentDbaSigned": false,
+    "independentAppsecSigned": false,
+    "legacyPlaceholderSunsetSigned": false,
+    "vendorHistoricalAccessDecisionSigned": false,
+    "exactShaOwnerStagingAuthorization": false,
+    "managedRoleAclPitrRecoveryApproved": false
+  },
+  "releaseAuthorized": false
+}

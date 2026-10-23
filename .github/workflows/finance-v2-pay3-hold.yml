@@ -37,6 +37,8 @@ on:
       - "lib/payments/financePay4c4*"
       - "scripts/mvp/migration/currentMigrationTruth.mjs"
       - "scripts/scale/validate-vox-migration-reconciliation-step3b1.mjs"
+      - "scripts/scale/validate-step3b2-3b3-restore-evidence.mjs"
+      - "ops/vox/certification/STEP3B2-3B3-FRESH-RESTORE-SECURITY-EVIDENCE-20261023.json"
       - "ops/vox/certification/STEP3B1-LIVE-MIGRATION-LEDGER-20261022.json"
       - "scripts/mvp/payments/validate-finance-v2-pay4c3*"
       - "scripts/mvp/payments/finance-pay4c3-*"
@@ -70,6 +72,8 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Step 3B-1 read-only VOX migration ledger integrity
         run: node scripts/scale/validate-vox-migration-reconciliation-step3b1.mjs
+      - name: Step 3B-2 and 3B-3 frozen offline recovery evidence (release HOLD)
+        run: node scripts/scale/validate-step3b2-3b3-restore-evidence.mjs
       - name: Existing Razorpay source validation
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: PAY1 PAY2 PAY3 focused deterministic policies

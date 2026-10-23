@@ -1,0 +1,6 @@
+# Step 3B-6E — Continuous quality gate and evidence capture
+Run deterministic local/source tests whenever A/B/C/D/F files change; run full Core/VOX suites and Github exact-head checks on integrated candidate. Record commands, exit codes, numerical pass counts, duration, commit SHA, and tests that were skipped.
+Focused gates: Step3B1 source+history verifier; 3B2/3B3 backup evidence; 3B4 rehearsal guard; 3B5 internal RC guard; 3B6 immutable-source guard; Owner preflight + transition tests; PAY4C4 provider dry-run suite; VOX 507 baseline suite; Finance 79 baseline suite; Phase22 19; Core/VOX typecheck; production builds if available.
+Every gate must reject runnable RLS proposals in SQL directories, altered 30-file VOX inventory, fabricated reviewer signatures/Owner approval, released legacy grant script, real payments/outbound assertions, mismatched file digest and attempted automatic ledger fixes.
+All source QA is local/CI. It does not assert managed authorization, genuine authentication, independent review, recovery completeness, Razorpay TEST provider network certification or production readiness.
+For this batch, signoffs DBA/AppSec/Owner and deployment = PENDING; releaseStatus=HOLD regardless of pass counts.

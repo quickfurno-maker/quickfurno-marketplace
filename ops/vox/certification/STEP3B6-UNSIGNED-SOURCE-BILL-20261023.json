@@ -1,0 +1,92 @@
+{
+  "schema": "qf.step3b6.unsigned.source-bill.v1",
+  "baseCommit": "06267c094e9aad9d55bbeef80ac955968c5b75be",
+  "files": [
+    {
+      "path": "docs/finance/STEP3B6-A-DBA-MIGRATION-DECISIONS-20261023.md",
+      "sha256": "C3E7E527326D1AA459E99A568CB61C3D60762AAF153AC0820E7E377C67DB803F",
+      "sizeBytes": 1478
+    },
+    {
+      "path": "docs/finance/STEP3B6-B-APPSEC-RLS-DECISION-MATRIX-20261023.md",
+      "sha256": "189CEF02FC4B1A4F5B545D6B3E2E76825FB382CEF48C6A90D5AA3D7212E007D5",
+      "sizeBytes": 2469
+    },
+    {
+      "path": "docs/finance/STEP3B6-C-OWNER-IDENTITY-ACCEPTANCE-20261023.md",
+      "sha256": "ADACC24A44DCD7A4F01F391883491EE9A5967A1BEC9A10149F4C712CF279732A",
+      "sizeBytes": 1678
+    },
+    {
+      "path": "docs/finance/STEP3B6-D-RELEASE-ROLLBACK-PACKAGE-20261023.md",
+      "sha256": "5319EB4685C6E92924D3983DA80FA9F6B0C97C53E3C2181A32BF6B2BA5CA1664",
+      "sizeBytes": 1813
+    },
+    {
+      "path": "docs/finance/STEP3B6-E-CONTINUOUS-QA-20261023.md",
+      "sha256": "76371A64019CD9CAFC63252CA873C726AFEEDBAC4B820C0DA8A97CD716B44563",
+      "sizeBytes": 1231
+    },
+    {
+      "path": "docs/finance/STEP3B6-F-PAYMENTS-TEST-ACCEPTANCE-20261023.md",
+      "sha256": "04AC3D7A44E0267E0E28EEC7F931EC2BF75375FBA47B2DAE761F480942CFD135",
+      "sizeBytes": 2127
+    },
+    {
+      "path": "docs/finance/sql-review/STEP3B6-POLICY-MATRIX-READONLY.sql",
+      "sha256": "3934FBE71B1BD41158DFF32182120E900A9707B929B8A10F73A82736D3E64C30",
+      "sizeBytes": 915
+    },
+    {
+      "path": "ops/vox/certification/STEP3B6-DIVERGENCE-20261023.json",
+      "sha256": "2E3F175331A4A3B25B4CC77E5C72485D37D7102FE0395DCCC0B37AE49FCE8F59",
+      "sizeBytes": 28650
+    },
+    {
+      "path": "scripts/scale/step3b6-ledger-register.mjs",
+      "sha256": "E1730181683351363E0CC59EACBA9D3AA3729D8004B1B3EB0D852FAFD1282AAD",
+      "sizeBytes": 2832
+    },
+    {
+      "path": "scripts/scale/validate-step3b6-source-gates.mjs",
+      "sha256": "F432101698C325B3E0C0145909DEB74133EADB851BA6EDC302984D4E00EC5BCC",
+      "sizeBytes": 4406
+    },
+    {
+      "path": "scripts/scale/step3b6-source-gates.test.mjs",
+      "sha256": "03487C51B2E09670AE5A9A16A533DE11CD6330E778CC20FDD079195589D5A3A0",
+      "sizeBytes": 2928
+    },
+    {
+      "path": "scripts/mvp/payments/step3b6-offline-finance.test.mjs",
+      "sha256": "776537DDBAC175D7C106A4E84FF931C4962FA0FD2926735656EC68F19B858EA1",
+      "sizeBytes": 1513
+    },
+    {
+      "path": "supabase/migrations/20261006113720_phase22_identity_portability.sql",
+      "sha256": "6F53E1781E4D2BD277645ED17B2EB635BE70F1D2C4DF7525CD176DFB0C2F28BA",
+      "sizeBytes": 13536
+    },
+    {
+      "path": "scripts/owner-superadmin-transition-plan.mjs",
+      "sha256": "BD56D916F6DABADFB285501A01365D9DA58FE27A4ECD7BC66FA388BB9399DFAE",
+      "sizeBytes": 4695
+    },
+    {
+      "path": "scripts/grant-superadmin.mjs",
+      "sha256": "76EDDD0A25757A38DA52A449168387DE2EAA1575470BB7939EFA48B991BA5FBF",
+      "sizeBytes": 6564
+    }
+  ],
+  "sourceDigest": "C9CF38AA7F12F8D65F8BDBF5A3EB65B61039297F4F090AFE2D46D2D2E4132218",
+  "signatureValid": false,
+  "trustedReleaseKeyPinned": false,
+  "actualHeadCommitVerified": false,
+  "independentDbaApproved": false,
+  "independentAppsecApproved": false,
+  "ownerAuthorizedStaging": false,
+  "managedMigrationAuthorized": false,
+  "privilegedAuthAuthorized": false,
+  "paymentsAuthorized": false,
+  "releaseStatus": "HOLD"
+}

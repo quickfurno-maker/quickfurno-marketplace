@@ -1,0 +1,80 @@
+{
+  "schema": "qf.step3b2.step3b3.offline-recovery-security-evidence.v1",
+  "date": "2026-10-23",
+  "env": "QuickFurno Staging",
+  "data_source": "Owner-upload-free local archive on JARVIS plus live first-party SELECT-only Supabase catalog",
+  "archive": {
+    "file": "staging-public-auth-storage-migrationhistory-step3b2-20261022.dump",
+    "bytes": 2010560,
+    "sha256": "E303BC25D904899459C56493F7D67B1960056DA4F4EAF78905B4F2F50AF75753",
+    "scope": [
+      "public",
+      "auth",
+      "storage",
+      "supabase_migrations"
+    ],
+    "fullClusterBackup": false,
+    "includedProviderSecrets": false,
+    "restoreTestResult": "PASS",
+    "restoreDate": "2026-10-23"
+  },
+  "restore": {
+    "image": "public.ecr.aws/supabase/postgres:17.6.1.147",
+    "imageDigestPinned": false,
+    "networkMode": "none",
+    "publishedPorts": 0,
+    "restoreExitCode": 0,
+    "disposableContainerStopped": true,
+    "schemaScopeVerified": true,
+    "roleAclReplayVerified": false,
+    "objectStorageBinaryRecoveryVerified": false,
+    "fullClusterPitrCertified": false,
+    "independentDbaApproved": false
+  },
+  "inventory": {
+    "migrations": 86,
+    "authUsers": 2,
+    "profiles": 2,
+    "vendors": 27,
+    "leads": 7,
+    "tables": 178,
+    "rlsEnabled": 166,
+    "policies": 74,
+    "functions": 212,
+    "triggers": 75,
+    "foreignKeys": 272,
+    "unvalidatedForeignKeys": 0,
+    "phase22TablesInstalled": false
+  },
+  "fingerprints": {
+    "migrationHistoryMd5": "16f601bdd81762584c541b707c9446ef",
+    "migrationDistinctNames": 84,
+    "policiesMd5": "c9f988a3a64b83fb11d745f80333af88",
+    "triggerBindingsMd5": "b0ba2c6649e816f917e7827717c327f9",
+    "foreignKeyDefinitionsMd5": "d1e326e7468b80e11203b05159062dc4"
+  },
+  "verifiedAgainstLiveStagingReadOnly": true,
+  "fullRowByRowComparisonPerformed": false,
+  "actualManagedSqlWrites": 0,
+  "stagingMigrationApplied": false,
+  "ownerSuperadminGranted": false,
+  "mfaVerified": false,
+  "releaseAuthorized": false,
+  "securityFindings": {
+    "existingSecurityDefinerViews": 1,
+    "authenticatedExecutableSecurityDefinerFunctions": 2,
+    "rlsEnabledNoPolicyAdvisories": 102,
+    "privilegedLegacySuperadminBackfillCandidates": 1,
+    "publicView": "public.vendor_public_v",
+    "publicViewAnonSelect": true,
+    "publicViewAuthenticatedSelect": true,
+    "publicViewProjectionRequiresAppSecReview": true,
+    "selectedExistingFunctionNames": [
+      "is_admin",
+      "owns_vendor"
+    ],
+    "appsecIndependentSignoff": false,
+    "dbIndependentSignoff": false
+  },
+  "status": "BOUNDED_FOUR_SCHEMA_OFFLINE_RESTORE_PASS__MANAGED_RELEASE_HOLD"
+}

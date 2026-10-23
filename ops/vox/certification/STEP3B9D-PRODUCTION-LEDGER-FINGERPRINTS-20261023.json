@@ -1,0 +1,698 @@
+{
+  "schema": "qf.vox.step3b9d.managed-ledger-sha256-metadata.v1",
+  "environment": "PRODUCTION",
+  "projectId": "yqpgcsduqbxulrlzwzap",
+  "observedDate": "2026-10-23",
+  "source": "SELECT-only Supabase schema_migrations metadata; SQL statement content NOT exported",
+  "fingerprintSeparator": "\\n-- LEDGER STATEMENT BOUNDARY --\\n",
+  "rows": [
+    {
+      "version": "20260624095535",
+      "name": "sync_vendor_onboarding_fields",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 1223,
+      "sql_ledger_sha256": "d0dce29adaa7548b4ce1471fcbdd6381a8591a1dfaa9ce892d83fb40b717b893"
+    },
+    {
+      "version": "20260713000100",
+      "name": "communication_consent_ack_intents",
+      "statement_count": 42,
+      "rollback_count": 0,
+      "sql_byte_count": 27872,
+      "sql_ledger_sha256": "f58b589f419dfd6eca7bd19182c62ec1e1e7882c5cecec0b7f3aaa5a2d83acfe"
+    },
+    {
+      "version": "20260716000100",
+      "name": "communication_provider_account_binding",
+      "statement_count": 24,
+      "rollback_count": 0,
+      "sql_byte_count": 11604,
+      "sql_ledger_sha256": "e7cbae248e6a4fac2a29fb2f8574908fc4e095971e3ae7178bad8e504362d867"
+    },
+    {
+      "version": "20260720000100",
+      "name": "communication_delivery_event_provider_account_required",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 5790,
+      "sql_ledger_sha256": "156c6e3e5ec8cc54b445243689188d89389ba9d7303fdbf5c3c06f92f1693cb4"
+    },
+    {
+      "version": "20260801085625",
+      "name": "communication_consent_ack_intent_provider_account_required",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 291,
+      "sql_ledger_sha256": "4c3a6c017f86bd59dcab863de007dd511855b70f8f2aa56a30f20e6806ebc1d3"
+    },
+    {
+      "version": "20260801090009",
+      "name": "qf_prod_baseline_marketplace_authority_foundation",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 23453,
+      "sql_ledger_sha256": "2107e637d609b78773c9651565ff236f3d731c3646d3736acecba390062ea501"
+    },
+    {
+      "version": "20260801090125",
+      "name": "qf_prod_baseline_assignment_lineage_backfill",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 6904,
+      "sql_ledger_sha256": "bf91742ef579814cd4b43ef2cb0b31ef60b90dca89b67f9c9f1ce3d5fb91b12b"
+    },
+    {
+      "version": "20260801090406",
+      "name": "qf_prod_baseline_canonical_assignment_authority",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 25591,
+      "sql_ledger_sha256": "c53c7c884c6faae96b5a2c3c91581d1cf7d3722ab61b5f0d9b6691417e555b95"
+    },
+    {
+      "version": "20260801090504",
+      "name": "qf_prod_baseline_lineage_append_only_grants",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 2473,
+      "sql_ledger_sha256": "b1d2e4bc6c609a04e0e4452b37e357b54709a6a68d132fd3f36f953eae3e81f9"
+    },
+    {
+      "version": "20260801100000",
+      "name": "qf_prod_baseline_b2_c_d_atomic_reconciliation",
+      "statement_count": 46,
+      "rollback_count": 0,
+      "sql_byte_count": 74238,
+      "sql_ledger_sha256": "c480b76aab0ff615b92213b1a330658a89254ce759fea46db426c1e1b241141d"
+    },
+    {
+      "version": "20260801100100",
+      "name": "qf_prod_baseline_legacy_assignment_rpc_execute_revocation",
+      "statement_count": 13,
+      "rollback_count": 0,
+      "sql_byte_count": 16386,
+      "sql_ledger_sha256": "a03c3348e6722d33e5009ca0778eeedd6c7f9a65e56bca03b2b2bcbdd4c0bc88"
+    },
+    {
+      "version": "20260801100200",
+      "name": "qf_prod_baseline_credit_ledger_reconciliation_exception_register",
+      "statement_count": 17,
+      "rollback_count": 0,
+      "sql_byte_count": 24032,
+      "sql_ledger_sha256": "5a58550d6211be826962b3f3be9bf759df45537ec66d1ef0a7e76891988898b4"
+    },
+    {
+      "version": "20260801100300",
+      "name": "qf_prod_baseline_profiles_privilege_admin_role_cleanup",
+      "statement_count": 9,
+      "rollback_count": 0,
+      "sql_byte_count": 13061,
+      "sql_ledger_sha256": "7728e31ee115f721c61bb53a80ea46ce3d807651df35913db64ed9108a09ae2b"
+    },
+    {
+      "version": "20260801100400",
+      "name": "qf_prod_baseline_vendor_crm_foundation",
+      "statement_count": 79,
+      "rollback_count": 0,
+      "sql_byte_count": 40441,
+      "sql_ledger_sha256": "27e35d13886669acff243d866e4a56238911ddaa8a2979e6de9c3190d181d0b9"
+    },
+    {
+      "version": "20260801100500",
+      "name": "qf_prod_baseline_vendor_segment_foundation",
+      "statement_count": 15,
+      "rollback_count": 0,
+      "sql_byte_count": 16721,
+      "sql_ledger_sha256": "39952505833685737ad3bc9c669feb37ad13e130c4cb04cd85afbb73777ae884"
+    },
+    {
+      "version": "20260801100600",
+      "name": "qf_prod_baseline_vendor_campaign_foundation",
+      "statement_count": 60,
+      "rollback_count": 0,
+      "sql_byte_count": 52370,
+      "sql_ledger_sha256": "f4ab770595b706ea0e5c34e8a2f3f7bd43cf5d848c177c6e7fc2533f1685d677"
+    },
+    {
+      "version": "20260801100700",
+      "name": "qf_prod_baseline_vendor_campaign_evidence_hardening",
+      "statement_count": 24,
+      "rollback_count": 0,
+      "sql_byte_count": 58303,
+      "sql_ledger_sha256": "91430e0a4fd426b7423c955a7271cbdc86f25fd386dda49efefe9cad95a2023b"
+    },
+    {
+      "version": "20260801100800",
+      "name": "qf_prod_baseline_vendor_campaign_execution_handoff_foundation",
+      "statement_count": 28,
+      "rollback_count": 0,
+      "sql_byte_count": 34118,
+      "sql_ledger_sha256": "c6fecb33d7e90ab4853d282ed6d3683b6a28eb041e15c0b080bdeab990038a5e"
+    },
+    {
+      "version": "20260801100900",
+      "name": "qf_prod_baseline_frequency_policy_history_hardening",
+      "statement_count": 20,
+      "rollback_count": 0,
+      "sql_byte_count": 12825,
+      "sql_ledger_sha256": "8657f051be8ddf99095e87c9e5ccdcc97cf8effc16314a5f383e290fcd9ca323"
+    },
+    {
+      "version": "20260801110000",
+      "name": "qf_mvp_automation_action_persistence",
+      "statement_count": 79,
+      "rollback_count": 0,
+      "sql_byte_count": 54933,
+      "sql_ledger_sha256": "2ce4d52505db0eb1bcef7b673faa39bb976729140bd0768dca755b9888c202c2"
+    },
+    {
+      "version": "20260801152049",
+      "name": "qf_mvp_automation_transport_replay_guard",
+      "statement_count": 27,
+      "rollback_count": 0,
+      "sql_byte_count": 18344,
+      "sql_ledger_sha256": "6f4b16c75939dda215780fb5c713106b7dcf20cf157941598068cc056d0ffe96"
+    },
+    {
+      "version": "20260803000000",
+      "name": "qf_mvp_50_2c_lead_communication_recipient",
+      "statement_count": 4,
+      "rollback_count": 0,
+      "sql_byte_count": 7321,
+      "sql_ledger_sha256": "365bcd6b5af775b248e96eed90a263be646240e96a4bbb7141624cebd1abb927"
+    },
+    {
+      "version": "20260804000000",
+      "name": "qf_mvp_50_2d_automation_transport_completion_route",
+      "statement_count": 22,
+      "rollback_count": 0,
+      "sql_byte_count": 23843,
+      "sql_ledger_sha256": "345eb28f3242a0d3caa2a1f32b507a92a4b976eee3c6746d731175bbf61a9987"
+    },
+    {
+      "version": "20260805000000",
+      "name": "qf_mvp_50_2e_automation_transport_client_execution_route",
+      "statement_count": 20,
+      "rollback_count": 0,
+      "sql_byte_count": 26631,
+      "sql_ledger_sha256": "969ccca5b7352f6769fd02f74567cd134a82955d5ed3ae9384f02d0137b84820"
+    },
+    {
+      "version": "20260806000000",
+      "name": "qf_mvp_50_2_atomic_client_automation_producer",
+      "statement_count": 20,
+      "rollback_count": 0,
+      "sql_byte_count": 21058,
+      "sql_ledger_sha256": "f7f7a0eb597b497ce01a687f9975a10c9a5a1e8c18e585f7694bd6351fa6bffe"
+    },
+    {
+      "version": "20260807000000",
+      "name": "qf_mvp_50_2_execute_v1_reservation_ambiguity_repair",
+      "statement_count": 6,
+      "rollback_count": 0,
+      "sql_byte_count": 15859,
+      "sql_ledger_sha256": "3f8890a6b05165e52af2af2973e7239dbf958c377355c819e94208f25a23f40d"
+    },
+    {
+      "version": "20260808000000",
+      "name": "qf_mvp_50_2_fresh_claim_retry_wedge_repair",
+      "statement_count": 6,
+      "rollback_count": 0,
+      "sql_byte_count": 12972,
+      "sql_ledger_sha256": "49e51c66f17924e0bf8d869cbd71db9fa5c335b9cf5dafced133d703344d1866"
+    },
+    {
+      "version": "20260808500000",
+      "name": "qf_mvp_50_3_automation_policy_config_foundation_bridge",
+      "statement_count": 2,
+      "rollback_count": 0,
+      "sql_byte_count": 18927,
+      "sql_ledger_sha256": "2a1954043530e7dc4791d104a3bf3ee65d25d1364848fb56a8c444a3f71d0dc9"
+    },
+    {
+      "version": "20260809000000",
+      "name": "qf_mvp_50_3_vendor_automation_producer",
+      "statement_count": 23,
+      "rollback_count": 0,
+      "sql_byte_count": 23802,
+      "sql_ledger_sha256": "9d22a6ddbd24c706cbe7585272520d3129d99089a6e9b287029fed3afafd1935"
+    },
+    {
+      "version": "20260810000000",
+      "name": "qf_mvp_50_4_campaign_recipient_automation",
+      "statement_count": 9,
+      "rollback_count": 0,
+      "sql_byte_count": 13275,
+      "sql_ledger_sha256": "6923370da10d2692e115895a7d1cc6d2fc719f7f7e4405a9373a9dc879921af2"
+    },
+    {
+      "version": "20260811000000",
+      "name": "qf_mvp_50_3_50_4_family_aware_claim_routing",
+      "statement_count": 18,
+      "rollback_count": 0,
+      "sql_byte_count": 25510,
+      "sql_ledger_sha256": "2e38bac67ed242f5cc7fc3df0adbfc7b2154f72776014d4b34b5821ea5c40fdf"
+    },
+    {
+      "version": "20260812000000",
+      "name": "qf_mvp_50_5_automation_recovery_reconciliation",
+      "statement_count": 31,
+      "rollback_count": 0,
+      "sql_byte_count": 60458,
+      "sql_ledger_sha256": "d7da9b7c38a905d410de1977f26f376d318e23ce2e1dccfaa55dfbfc4f7da9f9"
+    },
+    {
+      "version": "20260813000000",
+      "name": "qf_mvp_40_13b_canary_activation_authority",
+      "statement_count": 20,
+      "rollback_count": 0,
+      "sql_byte_count": 33909,
+      "sql_ledger_sha256": "1403ae0ce95577bd6654def015675a7be663e32aa6a2738ea242ce585a23b029"
+    },
+    {
+      "version": "20260814000000",
+      "name": "qf_mvp_40_marketing_consent_writer",
+      "statement_count": 6,
+      "rollback_count": 0,
+      "sql_byte_count": 9315,
+      "sql_ledger_sha256": "f2ea76c330f1867a555608942728b25e090b1968c1a6ce40bc010be424ae5a3f"
+    },
+    {
+      "version": "20260815000000",
+      "name": "qf_mvp_75_01_matchcore_binding_rank_order",
+      "statement_count": 5,
+      "rollback_count": 0,
+      "sql_byte_count": 36759,
+      "sql_ledger_sha256": "c8f47a9fd869d50230d6a43335ee61c38f65e66dc00dacb0e9256fb29fae59b7"
+    },
+    {
+      "version": "20260816000000",
+      "name": "qf_mvp_75_02_geo_postgis_shortlist",
+      "statement_count": 12,
+      "rollback_count": 0,
+      "sql_byte_count": 21694,
+      "sql_ledger_sha256": "de8d977ae4c10c01dbf5ebffae33524b04206de20ab72e678cbe1ca2306e10eb"
+    },
+    {
+      "version": "20260817000000",
+      "name": "qf_mvp_80_03_audit_logs_forward_repair",
+      "statement_count": 0,
+      "rollback_count": 0,
+      "sql_byte_count": 0,
+      "sql_ledger_sha256": null
+    },
+    {
+      "version": "20260903040000",
+      "name": "qf_mvp_80_14a_meta_lead_assignment_production_activation",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 35778,
+      "sql_ledger_sha256": "b3bd351c61c81b02aced5257507412d45ad2d77075265f644633c699384d42e2"
+    },
+    {
+      "version": "20260904000000",
+      "name": "qf_mvp_82a_r0_whatsapp_inbox_realtime_publication",
+      "statement_count": 3,
+      "rollback_count": 0,
+      "sql_byte_count": 7040,
+      "sql_ledger_sha256": "de0aee6d6767396b145a2b62cf765e7c5159a9c65427798287fcff28a3c50b6f"
+    },
+    {
+      "version": "20260905000000",
+      "name": "qf_mvp_50_6_automation_orphan_cancellation",
+      "statement_count": 23,
+      "rollback_count": 0,
+      "sql_byte_count": 27722,
+      "sql_ledger_sha256": "708a1bcefdcb4af9d31f1374d8ab1dc23b3dafa65e5f37e96d70d6dc4ceb3587"
+    },
+    {
+      "version": "20260906000000",
+      "name": "qf_mvp_50_7_automation_stale_business_cancellation",
+      "statement_count": 25,
+      "rollback_count": 0,
+      "sql_byte_count": 43945,
+      "sql_ledger_sha256": "8b2743b8eb8256843f5f1244fb3ab94d7c79a318bcb0ec5faefd1d6311c0fd4d"
+    },
+    {
+      "version": "20260910060000",
+      "name": "qf_mvp_40_canary_quiesce_transition",
+      "statement_count": 8,
+      "rollback_count": 0,
+      "sql_byte_count": 17205,
+      "sql_ledger_sha256": "33a8f4c44740563d33a7bb22605a3aba415f94a8cb6237d7c3faaed7717d2516"
+    },
+    {
+      "version": "20260911000000",
+      "name": "qf_launch_security_closeout",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 11237,
+      "sql_ledger_sha256": "6ba0f2cda2f13ce84513531a119d272b57f1ec6f217917cfbe2f2ee7af73a36a"
+    },
+    {
+      "version": "20260912000000",
+      "name": "qf_mvp_40_14_meta_transactional_mapping_authority",
+      "statement_count": 11,
+      "rollback_count": 0,
+      "sql_byte_count": 58334,
+      "sql_ledger_sha256": "85f82371557aa8100487960567cf492fb1bb190bdf983db9f1279be0621e2af0"
+    },
+    {
+      "version": "20260912021527",
+      "name": "qf_launch_pune_only_city_activation",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 706,
+      "sql_ledger_sha256": "4484aa2cc17d120d4a4cb862562ae9df1160363bed629249d439d0d231ec7ca8"
+    },
+    {
+      "version": "20260912024734",
+      "name": "qf_active_city_authority_hardening",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 11021,
+      "sql_ledger_sha256": "e463a91bfd2a97d2d0c66b1656c3c6261fc6ecdc1fa39946d1fd7fe816c0ebbc"
+    },
+    {
+      "version": "20260912040000",
+      "name": "qf_aos_v2_intelligence",
+      "statement_count": 48,
+      "rollback_count": 0,
+      "sql_byte_count": 13371,
+      "sql_ledger_sha256": "e739222d27e74cba2552d75f4eab4e55e95c9ab58d440e8359eb1546f33c5988"
+    },
+    {
+      "version": "20260912050000",
+      "name": "qf_lead_generation_scope_lock",
+      "statement_count": 33,
+      "rollback_count": 0,
+      "sql_byte_count": 22980,
+      "sql_ledger_sha256": "ae154a593ac940d9ed19a428817c6cba4239fc00ea33ee0be518c38c9940082b"
+    },
+    {
+      "version": "20260917000000",
+      "name": "aarohi_acquisition_crm_foundation",
+      "statement_count": 42,
+      "rollback_count": 0,
+      "sql_byte_count": 22993,
+      "sql_ledger_sha256": "7babb34a4e3059b8026781296191ca7c6eb9996a79fef0516a8096d94055277d"
+    },
+    {
+      "version": "20260918093000",
+      "name": "aarohi_anisha_vendor_crm_handoff",
+      "statement_count": 15,
+      "rollback_count": 0,
+      "sql_byte_count": 10882,
+      "sql_ledger_sha256": "07153c96838b30cfb3e39dfc4cda433ba6eeff423b7dc457e6bc0665d842c048"
+    },
+    {
+      "version": "20260918120000",
+      "name": "whatsapp_conversational_jarvis_foundation",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 10323,
+      "sql_ledger_sha256": "4d33c0f1fc490b6ca3ba254aea6d5e4ee816bb31292ff3651aaf8f99d075f9f7"
+    },
+    {
+      "version": "20260918180500",
+      "name": "jarvis_whatsapp_callback_replay_receipts",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 1936,
+      "sql_ledger_sha256": "7575e85cfbb67e170b7781717e3e81dd8ff2c4dd1567d6d927c1c85729dc4176"
+    },
+    {
+      "version": "20260919010000",
+      "name": "vendor_review_system",
+      "statement_count": 12,
+      "rollback_count": 0,
+      "sql_byte_count": 3100,
+      "sql_ledger_sha256": "581f54253817030775ee371d131436046b08c037adcaf83e1ad934ca1ade69b4"
+    },
+    {
+      "version": "20260921054654",
+      "name": "qf_audit_security_hardening",
+      "statement_count": 18,
+      "rollback_count": 0,
+      "sql_byte_count": 4571,
+      "sql_ledger_sha256": "8df38118c94584b2ddfde572464bf84f98b52297c4b5c997cd1584a2ba014a7c"
+    },
+    {
+      "version": "20260921055639",
+      "name": "qf_audit_rpc_surface_hardening",
+      "statement_count": 4,
+      "rollback_count": 0,
+      "sql_byte_count": 1652,
+      "sql_ledger_sha256": "4ffa870f389fb4328e186c723e0552f3e7c9adfac0b48183633eeafe5c21c5a9"
+    },
+    {
+      "version": "20260922120000",
+      "name": "false_ceiling_category",
+      "statement_count": 10,
+      "rollback_count": 0,
+      "sql_byte_count": 9823,
+      "sql_ledger_sha256": "846d3d130738a13f9d748bbe45e82e8e62f728a54586db35790a5c322cbc0718"
+    },
+    {
+      "version": "20260923170217",
+      "name": "vendor_media_bucket",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 1364,
+      "sql_ledger_sha256": "a7ad6e6e1291bee712c51e248a6a1d38872ae13e63b3e51b17885b118123ddb9"
+    },
+    {
+      "version": "20260924183000",
+      "name": "jarvis_os_operator_command_receipts",
+      "statement_count": 5,
+      "rollback_count": 0,
+      "sql_byte_count": 1779,
+      "sql_ledger_sha256": "19ce2bfc196b15462691b8b7b88481fbcd8d1b78706395ec3776778cf8833f2a"
+    },
+    {
+      "version": "20260926035801",
+      "name": "qf_jarvis_service_availability_deploy",
+      "statement_count": 20,
+      "rollback_count": 0,
+      "sql_byte_count": 3909,
+      "sql_ledger_sha256": "b6f18153da44217d61223d36ec6dba164b25398fcf6783f8073378c1dd6d5046"
+    },
+    {
+      "version": "20260926035856",
+      "name": "qf_lead_drafts_deploy",
+      "statement_count": 8,
+      "rollback_count": 0,
+      "sql_byte_count": 2200,
+      "sql_ledger_sha256": "3f0cd262f5ccca402b717d843338b7a95058b07f943fea2b9aa3cbcdd67cf256"
+    },
+    {
+      "version": "20260927090616",
+      "name": "qf_client_journey_phase1_foundation",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 7141,
+      "sql_ledger_sha256": "c45a87270f13a0866531fbd16b92a5d68396d7c9d27520fa61458bc8280d2d2b"
+    },
+    {
+      "version": "20260927090636",
+      "name": "qf_client_journey_phase1_meta_qualification",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 12475,
+      "sql_ledger_sha256": "eba294188b6951878264fed988df19432dcac3812680d4631b1d2dadff20eeb9"
+    },
+    {
+      "version": "20260929094500",
+      "name": "qf_riya_qualification_worker_lane",
+      "statement_count": 14,
+      "rollback_count": 0,
+      "sql_byte_count": 3556,
+      "sql_ledger_sha256": "6b3fa75727dcecf37bb1627fcdbed470bf199fffed426d41414f922da0a3ebc8"
+    },
+    {
+      "version": "20260929161730",
+      "name": "shared_single_number_jarvis_access",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 410,
+      "sql_ledger_sha256": "9bec859cd31c85b4455e749c071c4d7b77103b275ab0fd1ba884b4c7f9460c8c"
+    },
+    {
+      "version": "20261001160619",
+      "name": "qf_verified_location_geofence_straight_line",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 13035,
+      "sql_ledger_sha256": "fb0c2f46dc1f20fccdde618835bc792dc23c8ed80f9149403853da3195045e85"
+    },
+    {
+      "version": "20261001160623",
+      "name": "qf_multi_city_service_zone_authority",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 23142,
+      "sql_ledger_sha256": "2d95925bb63b45098f8bf003e65e8c69760baccd3d39b99a162c1fcabc33dc51"
+    },
+    {
+      "version": "20261001160628",
+      "name": "qf_city_market_runtime_controls",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 17540,
+      "sql_ledger_sha256": "3109c7a620a7f28587f0ae44d66d18cf687e053db6b520ada685f1f68a828acb"
+    },
+    {
+      "version": "20261001165959",
+      "name": "qf_admin_service_zone_boundary_control",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 7228,
+      "sql_ledger_sha256": "72764ed46f507ff56011335f820b985d1e3e0b3cedec28aabeba402d5576bade"
+    },
+    {
+      "version": "20261002051159",
+      "name": "vendor_v2_commercial_activation",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 25374,
+      "sql_ledger_sha256": "99f36775b35bceb82f451c7c702c0a88efd93678990ce89c1ccd02d83b2f8a36"
+    },
+    {
+      "version": "20261002051212",
+      "name": "vendor_v3_v5_operating_flow",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 23357,
+      "sql_ledger_sha256": "df3fa9df99b01610bfd1ce89700c41f45102da7b10c24b5ed857dc908eb398ac"
+    },
+    {
+      "version": "20261002051224",
+      "name": "vendor_v3_connection_delivery_gate",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 4366,
+      "sql_ledger_sha256": "9aeb1d9f37c6c6c239db482a3531b0d54bab16a6ea909b23ba3f8c92ca91a834"
+    },
+    {
+      "version": "20261002051237",
+      "name": "vendor_v3_v5_fk_indexes",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 622,
+      "sql_ledger_sha256": "767d9a145f3e7b5267da4f8791d70268f4ced612edb598c7eea8c78b632bbed0"
+    },
+    {
+      "version": "20261002052453",
+      "name": "vendor_v3_db_delivery_projection",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 2235,
+      "sql_ledger_sha256": "58c0b9221edf2cbb63166c5dae3c67fe471e9522cbdb8ddb1d7d6cbc32d131b5"
+    },
+    {
+      "version": "20261002102901",
+      "name": "vendor_fair_opportunity_distribution",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 30631,
+      "sql_ledger_sha256": "ce402a5911df3b875ac5b2f497b39e28993ea3f91281fc20ef9c67dd2ca9a7ae"
+    },
+    {
+      "version": "20261002102915",
+      "name": "vendor_fair_opportunity_group_reconcile",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 28389,
+      "sql_ledger_sha256": "fb8a1402f125b1032585859c4b24b9f812637ca9817a39d7e71224a98246180b"
+    },
+    {
+      "version": "20261002102931",
+      "name": "vendor_fair_opportunity_fk_indexes",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 395,
+      "sql_ledger_sha256": "bcbe9c4ce7b34baf4678e90532ecb341c18702af5ddcc8ccb0750d8795524ad7"
+    },
+    {
+      "version": "20261003093614",
+      "name": "aarohi_phase1_omnichannel_activation",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 22014,
+      "sql_ledger_sha256": "205ee8994485d2b29fa66964708e79d26ae692edcc897b4ad0a95d727f9f3217"
+    },
+    {
+      "version": "20261003093620",
+      "name": "aarohi_phase1_fk_indexes",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 711,
+      "sql_ledger_sha256": "2826eb9bba7df984f929bb3405c3003a87f1d3200d8e5f5650c29bb3a1c07873"
+    },
+    {
+      "version": "20261003093626",
+      "name": "aarohi_phase2_autonomous_acquisition",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 18362,
+      "sql_ledger_sha256": "053d0835687c9c5282f6eddc6d4eeee0fd23ed42f2b4b34dbdd739736d802033"
+    },
+    {
+      "version": "20261003093630",
+      "name": "aarohi_full_fk_index_closeout",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 2065,
+      "sql_ledger_sha256": "f4249c4582498ac3ef59d0374ccfdc343facde338c5cd62535614104dc21192e"
+    },
+    {
+      "version": "20261003093637",
+      "name": "aarohi_phase2_scale_governance",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 20739,
+      "sql_ledger_sha256": "8de819e5f708bcc99fcde86d1c2b752cd2f79018d0cb1a571825f537f2c402d4"
+    },
+    {
+      "version": "20261003093643",
+      "name": "aarohi_phase2_ops_control_analytics",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 7232,
+      "sql_ledger_sha256": "a2e9eade298ee5639938d211d16e990d07628e13c4c5f042ec2b4b2a3d22c49b"
+    },
+    {
+      "version": "20261003093648",
+      "name": "aarohi_phase2_ops_fk_indexes",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 515,
+      "sql_ledger_sha256": "8d4b34d0c17742172d0f9c2e8ce98f8ffbd5b707263417e51e2c14c70972791a"
+    },
+    {
+      "version": "20261008174333",
+      "name": "scale_phase12_horizontal_worker_claims",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 5080,
+      "sql_ledger_sha256": "cf0e2ff207a15af2cab7ac6ea02680c3d9bb42da3f8509b45d4bf8d57a8877ad"
+    },
+    {
+      "version": "20261008174802",
+      "name": "scale_phase07_durable_jobs_hardening",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 13366,
+      "sql_ledger_sha256": "3843eb15aebcbce6a6fb30cac3f8d8a6e32cf16c5b8c37446084f6bc3cbaf3be"
+    },
+    {
+      "version": "20261012181000",
+      "name": "qf_vl01_vendor_assignment_update_authority_closeout_production",
+      "statement_count": 1,
+      "rollback_count": 0,
+      "sql_byte_count": 1789,
+      "sql_ledger_sha256": "7cf72f08c39ef88cea33b998e6ca090e6b0a9fd3a61e5068b14cef6b3fa028e4"
+    }
+  ]
+}

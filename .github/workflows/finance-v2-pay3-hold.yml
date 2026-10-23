@@ -46,6 +46,9 @@ on:
       - "ops/vox/certification/STEP3B7-*"
       - "ops/vox/certification/STEP3B8-*"
       - "ops/vox/certification/STEP3B9-*"
+      - "scripts/scale/*step3b9[d-f]*"
+      - "scripts/scale/*step3b9def*"
+      - "docs/vox/*STEP3B9[D-F]*"
       - "scripts/scale/*step3b9*"
       - "docs/vox/*STEP3B9*"
       - "scripts/scale/*step3b8*"
@@ -128,6 +131,13 @@ jobs:
           node scripts/scale/step3b9-review-handoff.mjs
           node --test scripts/scale/step3b9-independent-review.test.mjs
           node scripts/scale/validate-step3b9-approval-gates.mjs
+      - name: Step 3B-9D/E/F source ledgers RLS and unsigned release HOLD
+        run: |
+          node scripts/scale/step3b9d-ledger-reconciliation.mjs
+          node scripts/scale/step3b9e-effective-rls-plan.mjs
+          node scripts/scale/step3b9f-release-preflight.mjs
+          node --test scripts/scale/step3b9def-release.test.mjs
+          node scripts/scale/validate-step3b9def-hold.mjs
       - name: Existing Razorpay source validation
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: PAY1 PAY2 PAY3 focused deterministic policies

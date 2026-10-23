@@ -38,6 +38,9 @@ on:
       - "scripts/mvp/migration/currentMigrationTruth.mjs"
       - "scripts/scale/validate-vox-migration-reconciliation-step3b1.mjs"
       - "scripts/scale/validate-step3b2-3b3-restore-evidence.mjs"
+      - "scripts/scale/validate-step3b4-internal-evidence.mjs"
+      - "scripts/owner-superadmin-bootstrap-preflight*.mjs"
+      - "ops/vox/certification/STEP3B4-ABCD-INTERNAL-REHEARSAL-20261023.json"
       - "ops/vox/certification/STEP3B2-3B3-FRESH-RESTORE-SECURITY-EVIDENCE-20261023.json"
       - "ops/vox/certification/STEP3B1-LIVE-MIGRATION-LEDGER-20261022.json"
       - "scripts/mvp/payments/validate-finance-v2-pay4c3*"
@@ -74,6 +77,10 @@ jobs:
         run: node scripts/scale/validate-vox-migration-reconciliation-step3b1.mjs
       - name: Step 3B-2 and 3B-3 frozen offline recovery evidence (release HOLD)
         run: node scripts/scale/validate-step3b2-3b3-restore-evidence.mjs
+      - name: Step 3B-4 A-D source-only rehearsal and Owner bootstrap deny-by-default QA
+        run: |
+          node scripts/scale/validate-step3b4-internal-evidence.mjs
+          node --test scripts/owner-superadmin-bootstrap-preflight.test.mjs
       - name: Existing Razorpay source validation
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: PAY1 PAY2 PAY3 focused deterministic policies

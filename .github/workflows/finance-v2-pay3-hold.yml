@@ -43,6 +43,12 @@ on:
       - "scripts/scale/*step3b6*"
       - "scripts/mvp/payments/step3b6-*.test.mjs"
       - "ops/vox/certification/STEP3B6-*"
+      - "ops/vox/certification/STEP3B7-*"
+      - "scripts/scale/*step3b7*"
+      - "scripts/mvp/vox/step3b7-*"
+      - "scripts/mvp/payments/step3b7-*"
+      - "contracts/vox/step3b7*"
+      - "lib/payments/step3b7*"
       - "scripts/scale/fixtures/step3b5-*"
       - "scripts/owner-superadmin-transition-plan*.mjs"
       - "scripts/grant-superadmin.mjs"
@@ -99,6 +105,12 @@ jobs:
           node scripts/scale/step3b6-release-bill.mjs
           node scripts/scale/validate-step3b6-source-gates.mjs
           node --test scripts/scale/step3b6-source-gates.test.mjs scripts/mvp/payments/step3b6-offline-finance.test.mjs
+      - name: Step 3B-7 source policy, Staff Agent, Owner and Finance history HOLD
+        run: |
+          node scripts/scale/step3b7-policy-inventory-audit.mjs
+          node scripts/scale/step3b7-source-manifest.mjs
+          node scripts/scale/validate-step3b7-source-hold.mjs
+          node --test scripts/scale/step3b7-*.test.mjs scripts/mvp/vox/step3b7-integrated-boundaries.test.mjs scripts/mvp/payments/step3b7-finance-history.test.mjs
       - name: Existing Razorpay source validation
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: PAY1 PAY2 PAY3 focused deterministic policies

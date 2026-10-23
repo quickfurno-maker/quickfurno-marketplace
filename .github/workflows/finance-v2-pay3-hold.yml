@@ -40,6 +40,9 @@ on:
       - "scripts/scale/validate-step3b2-3b3-restore-evidence.mjs"
       - "scripts/scale/validate-step3b4-internal-evidence.mjs"
       - "scripts/scale/validate-step3b5-internal-rc.mjs"
+      - "scripts/scale/*step3b6*"
+      - "scripts/mvp/payments/step3b6-*.test.mjs"
+      - "ops/vox/certification/STEP3B6-*"
       - "scripts/scale/fixtures/step3b5-*"
       - "scripts/owner-superadmin-transition-plan*.mjs"
       - "scripts/grant-superadmin.mjs"
@@ -90,6 +93,12 @@ jobs:
         run: |
           node scripts/scale/validate-step3b5-internal-rc.mjs
           node --test scripts/owner-superadmin-transition-plan.test.mjs
+      - name: Step 3B-6 A-F ledger, RLS/Owner HOLD and offline payments acceptance
+        run: |
+          node scripts/scale/step3b6-ledger-register.mjs
+          node scripts/scale/step3b6-release-bill.mjs
+          node scripts/scale/validate-step3b6-source-gates.mjs
+          node --test scripts/scale/step3b6-source-gates.test.mjs scripts/mvp/payments/step3b6-offline-finance.test.mjs
       - name: Existing Razorpay source validation
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: PAY1 PAY2 PAY3 focused deterministic policies

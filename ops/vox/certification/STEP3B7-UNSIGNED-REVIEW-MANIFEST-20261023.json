@@ -1,0 +1,83 @@
+{
+  "schema": "qf.vox.finance.step3b7.unsigned-review-manifest.v1",
+  "baseCommit": "034305988bff6409e8c6d4aedd83624002f3cd4b",
+  "files": [
+    {
+      "path": "contracts/vox/step3b7PolicyReview.mjs",
+      "bytes": 2626,
+      "sha256": "F79F8A4B7D705E987217202894CC32128256F48F1FC854B519E4C21F0795F0E6"
+    },
+    {
+      "path": "lib/payments/step3b7FinanceHistoryPreview.mjs",
+      "bytes": 1954,
+      "sha256": "6A2CF718CABA1CD5E3634DD44F852A7C162C0249D89099CAE96743360676255F"
+    },
+    {
+      "path": "scripts/scale/step3b7-policy-negative.test.mjs",
+      "bytes": 2897,
+      "sha256": "F37995D94DE1FFF71D5CCB6612759A5DC4F83C538F48CFC403803872A7FD0573"
+    },
+    {
+      "path": "scripts/scale/step3b7-policy-inventory-audit.mjs",
+      "bytes": 3063,
+      "sha256": "D38639DD314F98B08E6CF0DE992292139D9E3F3B906CB89ED3C04B13E92CF3E1"
+    },
+    {
+      "path": "scripts/scale/step3b7-policy-inventory.test.mjs",
+      "bytes": 2169,
+      "sha256": "C28699459FFAE8A6BF1942F46CBAFC130AE383861D8F724BA8061803034F7BD5"
+    },
+    {
+      "path": "scripts/scale/step3b7-owner-faults.test.mjs",
+      "bytes": 3411,
+      "sha256": "9E52F866737D6C99252BD3F963BC48AF6D1865750EBC4ADAA78D84BDB3D529CC"
+    },
+    {
+      "path": "scripts/scale/validate-step3b7-source-hold.mjs",
+      "bytes": 4393,
+      "sha256": "6042D327A49315FBE24D98831EC67B52DDDC0FC22AA2B21543676A032BBAF222"
+    },
+    {
+      "path": "scripts/mvp/payments/step3b7-finance-history.test.mjs",
+      "bytes": 3534,
+      "sha256": "58DE09DFE2FC438DE5E0552B61480E41884A3D2621C912DEF62B24EB20C7CEAF"
+    },
+    {
+      "path": "scripts/mvp/vox/step3b7-integrated-boundaries.test.mjs",
+      "bytes": 5613,
+      "sha256": "D6549994C55E724B9821AEC3205128DBAB7D968BB3460829B6C747E7F351D3D6"
+    },
+    {
+      "path": "docs/finance/STEP3B7-INTERNAL-FINALIZATION-REVIEW-HANDOFF-20261023.md",
+      "bytes": 3699,
+      "sha256": "64273D57933CCD5D88E9F0760B091BEBEF3FE55FE65A54EDB65CE2BE416FA26A"
+    },
+    {
+      "path": "ops/vox/certification/STEP3B7-STAGING-RLS-READONLY-20261023.json",
+      "bytes": 37195,
+      "sha256": "39AB07FB84BCE75FAA84B472D608FEAB262F43F05FD27AF60FEE6EE12A5CE5FC"
+    },
+    {
+      "path": "ops/vox/certification/STEP3B7-POLICY-DECISION-MATRIX-20261023.json",
+      "bytes": 40686,
+      "sha256": "ECF8233D1D672C612B18BA1EDC98F45DDBC36D4ECF0B0382EC73BE8C6D027CFC"
+    },
+    {
+      "path": "supabase/migrations/20261006113720_phase22_identity_portability.sql",
+      "bytes": 13536,
+      "sha256": "6F53E1781E4D2BD277645ED17B2EB635BE70F1D2C4DF7525CD176DFB0C2F28BA"
+    }
+  ],
+  "fileSetSha256": "BB4E1CBAE602585D73B6AD56ADCFF9D5FC0B752D729DDDAF6AC8C60248DDD7D1",
+  "policyInventorySha256": "39AB07FB84BCE75FAA84B472D608FEAB262F43F05FD27AF60FEE6EE12A5CE5FC",
+  "independentDbaSigned": false,
+  "independentAppsecSigned": false,
+  "ownerApprovedManagedStaging": false,
+  "realAal2Certified": false,
+  "razorpayProviderTestCertified": false,
+  "releaseSignatureValid": false,
+  "stagingExecutionAuthorized": false,
+  "productionExecutionAuthorized": false,
+  "providerMoneyExecutionAuthorized": false,
+  "status": "HOLD"
+}

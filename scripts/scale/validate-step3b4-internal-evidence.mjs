@@ -4,7 +4,7 @@ import {resolve,dirname} from "node:path";
 import {fileURLToPath} from "node:url";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../..");
 const evidence=JSON.parse(readFileSync(resolve(root,"ops/vox/certification/STEP3B4-ABCD-INTERNAL-REHEARSAL-20261023.json"),"utf8"));
-const candidate=readFileSync(resolve(root,"ops/vox/sql-candidates/20261023010000_step3b4_is_admin_active_guard_REVIEW_ONLY.sql"),"utf8");
+const candidate=readFileSync(resolve(root,"docs/finance/sql-review/20261023010000_step3b4_is_admin_active_guard_REVIEW_ONLY.sql"),"utf8");
 const guarded=readFileSync(resolve(root,"scripts/owner-superadmin-bootstrap-preflight.mjs"),"utf8");
 const legacy=readFileSync(resolve(root,"scripts/grant-superadmin.mjs"),"utf8");
 const checks=[

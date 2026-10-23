@@ -41,7 +41,6 @@ on:
       - "scripts/scale/validate-step3b4-internal-evidence.mjs"
       - "scripts/owner-superadmin-bootstrap-preflight*.mjs"
       - "ops/vox/certification/STEP3B4-ABCD-INTERNAL-REHEARSAL-20261023.json"
-      - "ops/vox/sql-candidates/*step3b4*"
       - "ops/vox/certification/STEP3B2-3B3-FRESH-RESTORE-SECURITY-EVIDENCE-20261023.json"
       - "ops/vox/certification/STEP3B1-LIVE-MIGRATION-LEDGER-20261022.json"
       - "scripts/mvp/payments/validate-finance-v2-pay4c3*"

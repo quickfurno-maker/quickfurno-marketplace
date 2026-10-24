@@ -1,0 +1,62 @@
+{
+  "schema": "qf.phase3b13.production-readonly-marketplace-pulse.v1",
+  "observedDate": "2026-10-24",
+  "readMethod": "Supabase SELECT-only aggregate SQL; no vendor identities or lead PII retrieved",
+  "environment": "PRODUCTION",
+  "projectLabel": "QuickFurno",
+  "notSignedCertification": true,
+  "corePublicSite": "https://quickfurno.in/",
+  "publicSiteAdvertises": "Up to 3 Verified Local Teams; Pune and Mumbai",
+  "vendors": {
+    "total": 29,
+    "approved": 14,
+    "approvedActive": 0,
+    "approvedPublic": 0,
+    "approvedWithCredits": 14,
+    "approvedVerified": 10,
+    "approvedLocationVerified": 0,
+    "fullyPublicEligible": 0,
+    "disabledOrHiddenApproved": 14
+  },
+  "marketplace": {
+    "existingLeadRecords": 74,
+    "existingAssignmentRecords": 71,
+    "configuredCityRows": 6,
+    "serviceCategories": 16,
+    "autoAssignmentMode": "auto_suggest",
+    "maxVendorsPerLead": 3,
+    "trialVendorsAllowed": true
+  },
+  "cityBreakdown": [
+    {
+      "city": "Pune",
+      "totalVendors": 27,
+      "approved": 13,
+      "approvedVerified": 10,
+      "publicEligible": 0
+    },
+    {
+      "city": "Mumbai",
+      "totalVendors": 2,
+      "approved": 1,
+      "approvedVerified": 0,
+      "publicEligible": 0
+    }
+  ],
+  "underlyingApprovedLocationStates": "all unverified",
+  "deferredActions": [
+    "No vendor activation",
+    "No status/visibility/credits change",
+    "No production lead injection",
+    "No paid marketing activation",
+    "No public release enabling VOX/Finance"
+  ],
+  "releaseDecisions": {
+    "broadCustomerCampaign": "HOLD",
+    "vendorSupplyActivation": "OWNER_MANUAL_GOVERNED_ACTION_REQUIRED",
+    "limitedPrivatePreview": "ISOLATED_ONLY",
+    "protectedVoxAndFinance": "HOLD",
+    "productionSchemaChanges": "HOLD"
+  },
+  "limitations": "Counts prove no vendors satisfy this public-listing condition at observation; do not infer all marketplace matching SQL requires identical eligibility or that old assignments represent current fill performance."
+}

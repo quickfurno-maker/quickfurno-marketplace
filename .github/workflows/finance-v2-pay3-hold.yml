@@ -52,6 +52,9 @@ on:
       - "docs/vox/*STEP3B10*"
       - "scripts/scale/*step3b10*"
       - "scripts/scale/*step3b11*"
+      - "scripts/scale/*step3b13*"
+      - "docs/vox/*STEP3B13*"
+      - "ops/vox/certification/STEP3B13*"
       - "docs/vox/*STEP3B11*"
       - "ops/vox/certification/STEP3B11*"
       - "ops/vox/sql-review/STEP3B11*"
@@ -150,6 +153,8 @@ jobs:
         run: |
           node scripts/scale/step3b11a-conflict-triage.mjs
           node --test scripts/scale/step3b11-a-b-c-source.test.mjs
+      - name: Step 3B-13 isolated launch-readiness and supply HOLD source gates
+        run: node --test scripts/scale/step3b13-launch-readiness.test.mjs
       - name: Existing Razorpay source validation
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: PAY1 PAY2 PAY3 focused deterministic policies
@@ -178,6 +183,9 @@ jobs:
         working-directory: apps/vox-web
       - name: VOX Web production build, no deployment
         run: npm run build
+        working-directory: apps/vox-web
+      - name: Step 3B-13 real localhost HTTP E2E with all sensitive flags disabled
+        run: node ../../scripts/scale/step3b13-vox-loopback-e2e.mjs
         working-directory: apps/vox-web
   pay3-offline-pg17:
     runs-on: ubuntu-latest

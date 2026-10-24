@@ -54,6 +54,10 @@ on:
       - "scripts/scale/*step3b11*"
       - "scripts/scale/*step3b13*"
       - "scripts/scale/*step3b14*"
+      - "scripts/scale/*step3b15*"
+      - "docs/vox/*STEP3B15*"
+      - "lib/launch/marketplaceBetaEvidence.ts"
+      - "ops/vox/sql-review/STEP3B15*"
       - "docs/vox/*STEP3B14*"
       - "lib/vendors/betaVendorReadinessEvidence.ts"
       - "docs/vox/*STEP3B13*"
@@ -163,6 +167,8 @@ jobs:
           node --test scripts/scale/step3b14-b-e-contract.test.mjs
           node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs --test scripts/scale/step3b14d-vendor-readiness.test.mjs
           node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/matching/validate-qf-mvp-80-01.mjs
+      - name: Step 3B-15 A-E offline launch evidence and hold gates
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs --test scripts/scale/step3b15*.test.mjs
       - name: Existing Razorpay source validation
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: PAY1 PAY2 PAY3 focused deterministic policies

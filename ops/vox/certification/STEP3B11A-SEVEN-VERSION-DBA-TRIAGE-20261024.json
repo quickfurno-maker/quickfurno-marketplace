@@ -1,0 +1,240 @@
+{
+  "schema": "qf.vox.step3b11a.conflict-triage.v1",
+  "sourceBaseline": "593b9dc17970a44ca987108997ae6ab0544dede2",
+  "issues": [
+    {
+      "version": "20260801152049",
+      "migrationName": "qf_mvp_automation_transport_replay_guard",
+      "priority": "P0_SEMANTIC_RECONCILIATION",
+      "staging": {
+        "statementCount": 1,
+        "bytes": 17078,
+        "rollbackEntries": 0,
+        "sha256": "ea335b61d814c63793d815cf56f5768d24d542c4965fa7efca31b11eafda44b3"
+      },
+      "production": {
+        "statementCount": 27,
+        "bytes": 18344,
+        "rollbackEntries": 0,
+        "sha256": "6f4b16c75939dda215780fb5c713106b7dcf20cf157941598068cc056d0ffe96"
+      },
+      "equalStatementCount": false,
+      "equalByteLength": false,
+      "reviewCheckpoints": [
+        "trusted original SQL bodies (confidential)",
+        "per-statement semantic diff and DDL/DML provenance",
+        "role grants and SECURITY DEFINER side effects",
+        "triggers, policy dependencies and data migrations",
+        "target live schema consistency",
+        "complete recovery including global roles/ACL/PITR and storage"
+      ],
+      "recoveredSqlBodies": false,
+      "bodyContentsPublished": false,
+      "reviewer": null,
+      "semanticEquivalence": "UNREVIEWED",
+      "approvedForManagedChange": false
+    },
+    {
+      "version": "20260905000000",
+      "migrationName": "qf_mvp_50_6_automation_orphan_cancellation",
+      "priority": "P0_SEMANTIC_RECONCILIATION",
+      "staging": {
+        "statementCount": 1,
+        "bytes": 27061,
+        "rollbackEntries": 0,
+        "sha256": "07cab7d17940be3c4ad47eae01b02d6bd9409bc1a8e215b171bea086578e6e63"
+      },
+      "production": {
+        "statementCount": 23,
+        "bytes": 27722,
+        "rollbackEntries": 0,
+        "sha256": "708a1bcefdcb4af9d31f1374d8ab1dc23b3dafa65e5f37e96d70d6dc4ceb3587"
+      },
+      "equalStatementCount": false,
+      "equalByteLength": false,
+      "reviewCheckpoints": [
+        "trusted original SQL bodies (confidential)",
+        "per-statement semantic diff and DDL/DML provenance",
+        "role grants and SECURITY DEFINER side effects",
+        "triggers, policy dependencies and data migrations",
+        "target live schema consistency",
+        "complete recovery including global roles/ACL/PITR and storage"
+      ],
+      "recoveredSqlBodies": false,
+      "bodyContentsPublished": false,
+      "reviewer": null,
+      "semanticEquivalence": "UNREVIEWED",
+      "approvedForManagedChange": false
+    },
+    {
+      "version": "20260906000000",
+      "migrationName": "qf_mvp_50_7_automation_stale_business_cancellation",
+      "priority": "P0_SEMANTIC_RECONCILIATION",
+      "staging": {
+        "statementCount": 1,
+        "bytes": 43223,
+        "rollbackEntries": 0,
+        "sha256": "e71e8739a5d776c75edcb0ae10470d7d9589eb7949326411ea26540de1baa809"
+      },
+      "production": {
+        "statementCount": 25,
+        "bytes": 43945,
+        "rollbackEntries": 0,
+        "sha256": "8b2743b8eb8256843f5f1244fb3ab94d7c79a318bcb0ec5faefd1d6311c0fd4d"
+      },
+      "equalStatementCount": false,
+      "equalByteLength": false,
+      "reviewCheckpoints": [
+        "trusted original SQL bodies (confidential)",
+        "per-statement semantic diff and DDL/DML provenance",
+        "role grants and SECURITY DEFINER side effects",
+        "triggers, policy dependencies and data migrations",
+        "target live schema consistency",
+        "complete recovery including global roles/ACL/PITR and storage"
+      ],
+      "recoveredSqlBodies": false,
+      "bodyContentsPublished": false,
+      "reviewer": null,
+      "semanticEquivalence": "UNREVIEWED",
+      "approvedForManagedChange": false
+    },
+    {
+      "version": "20260910060000",
+      "migrationName": "qf_mvp_40_canary_quiesce_transition",
+      "priority": "P0_SEMANTIC_RECONCILIATION",
+      "staging": {
+        "statementCount": 1,
+        "bytes": 10140,
+        "rollbackEntries": 0,
+        "sha256": "c27b1f31a7d0d7ff53a1ce41dd41880b11581d0462a01c1d09d1332853b3e659"
+      },
+      "production": {
+        "statementCount": 8,
+        "bytes": 17205,
+        "rollbackEntries": 0,
+        "sha256": "33a8f4c44740563d33a7bb22605a3aba415f94a8cb6237d7c3faaed7717d2516"
+      },
+      "equalStatementCount": false,
+      "equalByteLength": false,
+      "reviewCheckpoints": [
+        "trusted original SQL bodies (confidential)",
+        "per-statement semantic diff and DDL/DML provenance",
+        "role grants and SECURITY DEFINER side effects",
+        "triggers, policy dependencies and data migrations",
+        "target live schema consistency",
+        "complete recovery including global roles/ACL/PITR and storage"
+      ],
+      "recoveredSqlBodies": false,
+      "bodyContentsPublished": false,
+      "reviewer": null,
+      "semanticEquivalence": "UNREVIEWED",
+      "approvedForManagedChange": false
+    },
+    {
+      "version": "20260918120000",
+      "migrationName": "whatsapp_conversational_jarvis_foundation",
+      "priority": "P0_SEMANTIC_RECONCILIATION",
+      "staging": {
+        "statementCount": 1,
+        "bytes": 10322,
+        "rollbackEntries": 0,
+        "sha256": "a24b649030313cc38fd9844d840de9be05dac8f59bcd0caca8dd2b8656da4146"
+      },
+      "production": {
+        "statementCount": 1,
+        "bytes": 10323,
+        "rollbackEntries": 0,
+        "sha256": "4d33c0f1fc490b6ca3ba254aea6d5e4ee816bb31292ff3651aaf8f99d075f9f7"
+      },
+      "equalStatementCount": true,
+      "equalByteLength": false,
+      "reviewCheckpoints": [
+        "trusted original SQL bodies (confidential)",
+        "per-statement semantic diff and DDL/DML provenance",
+        "role grants and SECURITY DEFINER side effects",
+        "triggers, policy dependencies and data migrations",
+        "target live schema consistency",
+        "complete recovery including global roles/ACL/PITR and storage"
+      ],
+      "recoveredSqlBodies": false,
+      "bodyContentsPublished": false,
+      "reviewer": null,
+      "semanticEquivalence": "UNREVIEWED",
+      "approvedForManagedChange": false
+    },
+    {
+      "version": "20260921054654",
+      "migrationName": "qf_audit_security_hardening",
+      "priority": "P0_SEMANTIC_RECONCILIATION",
+      "staging": {
+        "statementCount": 1,
+        "bytes": 4053,
+        "rollbackEntries": 0,
+        "sha256": "6ea97fae1e77fad162816fa82caa38b660dde82c70c2e195b97b48a6fc94f662"
+      },
+      "production": {
+        "statementCount": 18,
+        "bytes": 4571,
+        "rollbackEntries": 0,
+        "sha256": "8df38118c94584b2ddfde572464bf84f98b52297c4b5c997cd1584a2ba014a7c"
+      },
+      "equalStatementCount": false,
+      "equalByteLength": false,
+      "reviewCheckpoints": [
+        "trusted original SQL bodies (confidential)",
+        "per-statement semantic diff and DDL/DML provenance",
+        "role grants and SECURITY DEFINER side effects",
+        "triggers, policy dependencies and data migrations",
+        "target live schema consistency",
+        "complete recovery including global roles/ACL/PITR and storage"
+      ],
+      "recoveredSqlBodies": false,
+      "bodyContentsPublished": false,
+      "reviewer": null,
+      "semanticEquivalence": "UNREVIEWED",
+      "approvedForManagedChange": false
+    },
+    {
+      "version": "20260921055639",
+      "migrationName": "qf_audit_rpc_surface_hardening",
+      "priority": "P0_SEMANTIC_RECONCILIATION",
+      "staging": {
+        "statementCount": 1,
+        "bytes": 1404,
+        "rollbackEntries": 0,
+        "sha256": "72c1bb2b5cf52c3043729565f77fee21ba7cceac55685f06faa00e44e442d344"
+      },
+      "production": {
+        "statementCount": 4,
+        "bytes": 1652,
+        "rollbackEntries": 0,
+        "sha256": "4ffa870f389fb4328e186c723e0552f3e7c9adfac0b48183633eeafe5c21c5a9"
+      },
+      "equalStatementCount": false,
+      "equalByteLength": false,
+      "reviewCheckpoints": [
+        "trusted original SQL bodies (confidential)",
+        "per-statement semantic diff and DDL/DML provenance",
+        "role grants and SECURITY DEFINER side effects",
+        "triggers, policy dependencies and data migrations",
+        "target live schema consistency",
+        "complete recovery including global roles/ACL/PITR and storage"
+      ],
+      "recoveredSqlBodies": false,
+      "bodyContentsPublished": false,
+      "reviewer": null,
+      "semanticEquivalence": "UNREVIEWED",
+      "approvedForManagedChange": false
+    }
+  ],
+  "sharedEmptyStatementVersion": "20260817000000",
+  "divergentLedgerOccurrences": 104,
+  "noCurrentGitSourceButManagedLedgerStatements": 72,
+  "recoverableBodiesNeverExported": true,
+  "allMigrationSemanticsPending": true,
+  "independentDbaApproval": false,
+  "managedStagingDdlAuthorized": false,
+  "productionChangeAuthorized": false,
+  "releaseStatus": "HOLD",
+  "limitation": "Statement counts/byte lengths and matching SHA do not prove semantics; original SQL requires confidential qualified independent DBA custody."
+}

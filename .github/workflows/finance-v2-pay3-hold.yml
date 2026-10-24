@@ -51,6 +51,10 @@ on:
       - "docs/vox/*STEP3B9[D-F]*"
       - "docs/vox/*STEP3B10*"
       - "scripts/scale/*step3b10*"
+      - "scripts/scale/*step3b11*"
+      - "docs/vox/*STEP3B11*"
+      - "ops/vox/certification/STEP3B11*"
+      - "ops/vox/sql-review/STEP3B11*"
       - "scripts/scale/*step3b9*"
       - "docs/vox/*STEP3B9*"
       - "scripts/scale/*step3b8*"
@@ -142,6 +146,10 @@ jobs:
           node scripts/scale/validate-step3b9def-hold.mjs
       - name: Step 3B-10 Gemini second-pass findings and Finance VOX CI guard
         run: node --test scripts/scale/step3b10-gemini-reaudit.test.mjs
+      - name: Step 3B-11 source-only conflict/authorization/release HOLD gates
+        run: |
+          node scripts/scale/step3b11a-conflict-triage.mjs
+          node --test scripts/scale/step3b11-a-b-c-source.test.mjs
       - name: Existing Razorpay source validation
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: PAY1 PAY2 PAY3 focused deterministic policies

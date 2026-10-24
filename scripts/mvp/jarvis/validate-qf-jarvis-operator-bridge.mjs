@@ -73,4 +73,10 @@ ok(service.includes("authorizeAutomationActionRequest"),"approval uses Core auth
 ok(service.includes("releaseHumanConversationToAi"),"resume uses governed conversation release service");
 ok(!service.includes("metaWhatsAppOutbound"),"operator command service does not call provider delivery");
 
+const snapshotService=fs.readFileSync("services/jarvisOperatorSnapshotService.ts","utf8");
+ok(snapshotService.includes('openConversationValue'),"operator snapshot opens the sealed destination only at the authenticated read boundary");
+ok(snapshotService.includes('sealed_destination_ciphertext'),"operator snapshot reads the encrypted destination envelope");
+ok(snapshotService.includes('subject: fullConversationDestination(row)'),"Jarvis conversation control receives the full destination");
+ok(!snapshotService.includes('subject: safeLabel(row.destination_masked'),"Jarvis conversation control does not publish the masked destination");
+
 console.log("JARVIS_OPERATOR_BRIDGE_TESTS=PASS count="+passed);

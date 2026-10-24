@@ -38,13 +38,13 @@
 //   This file READS state and NAMES the canonical surface. It copies no
 //   mutation, adds no server action, and exposes no second write path.
 //
-// FAIL CLOSED. The canonical readers deliberately fail OPEN — they answer with
-// a safe default when their source cannot be read, which is right for the
-// runtime (a lead must never be blocked by an unreadable settings table) and
-// wrong for a console (an unreadable switch would render as a confident state
-// nobody proved). Every control below therefore proves its source is readable
-// with its own bounded read FIRST, and reports UNAVAILABLE when that fails —
-// whatever default a canonical reader may have returned.
+// FAIL CLOSED AND STATE-ACCURATE. The canonical matching runtime now defaults
+// auto_assignment_mode to "off" when its settings cannot be read; it must
+// never spend credits on an unknown setting. That safe fallback does NOT mean
+// the Owner console can claim it observed a verified "off" state. Every
+// control below reads its actual source independently and reports UNAVAILABLE
+// if unreadable, rather than mistaking a default for evidence of a stored
+// mode. An explicitly stored "auto_suggest" or "preview" remains mutating.
 // ============================================================================
 
 import "server-only";

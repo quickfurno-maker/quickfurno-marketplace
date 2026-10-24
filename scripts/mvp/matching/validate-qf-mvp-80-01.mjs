@@ -40,6 +40,7 @@
 // Run: npm run test:mvp:80-01
 // ============================================================================
 import { readFileSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -408,10 +409,26 @@ section('G. MVP INVARIANTS UNCHANGED [pure] [static]');
     && /const MAX_ASSIGNMENT_CANDIDATE_POOL = MAX_CANONICAL_CANDIDATE_POOL;/.test(MATCHER)
     && /const MAX_VENDOR_MATCHES = 3;/.test(MATCHER));
 
-  // Migration governance is centralized in the explicit live-ledger helper.
-  // This remains exact equality: an unpinned migration still fails the guard.
-  check(`G05 the local migration set matches the governed live ledger (${EXPECTED_LIVE_MIGRATION_COUNT})`,
-    readdirSync(path.join(ROOT, 'supabase', 'migrations')).filter((f) => f.endsWith('.sql')).length === EXPECTED_LIVE_MIGRATION_COUNT);
+  // Seven legacy VOX migrations were intentionally quarantined and removed
+  // from auto-discovered SQL. Verify their pinned contents, NOT just a count.
+  // This must never copy quarantined migrations into the runnable tree.
+  const runnableSql = readdirSync(path.join(ROOT, 'supabase', 'migrations'))
+    .filter((f) => f.endsWith('.sql'));
+  const archive = JSON.parse(read('docs/vox/VOX-AB7K-REVIEWED-SOURCE-FINGERPRINT.json'));
+  const held = archive.files.filter((f) => f.stage === 'QUARANTINED_FOUNDATION');
+  const verifiedQuarantine = archive.quarantinedFoundationCount === 7
+    && archive.canApply === false && archive.releaseReady === false
+    && archive.installedInStaging === false
+    && held.length === 7 && held.every((f) => {
+      if (!f.path.startsWith('ops/vox/quarantined-migrations/legacy-20261014/')) return false;
+      if (f.managedInstalled !== false || runnableSql.includes(path.basename(f.path))) return false;
+      const bytes = readFileSync(path.join(ROOT, f.path));
+      return bytes.length === f.bytes
+        && createHash('sha256').update(bytes).digest('hex') === f.sha256;
+    });
+  check(`G05 runnable SQL + SHA-pinned quarantined VOX sources cover historical ledger (${EXPECTED_LIVE_MIGRATION_COUNT})`,
+    runnableSql.length === EXPECTED_LIVE_MIGRATION_COUNT - held.length
+    && verifiedQuarantine);
 
   check('G06 the three migrations this phase rehearses exist on disk, unrenamed',
     ['20260814000000_qf_mvp_40_marketing_consent_writer.sql',

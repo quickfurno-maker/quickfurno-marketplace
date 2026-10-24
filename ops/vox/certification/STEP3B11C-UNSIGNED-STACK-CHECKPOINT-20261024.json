@@ -1,0 +1,52 @@
+{
+  "schema": "qf.vox.step3b11c.stack.v1",
+  "pinnedSourceBase": "593b9dc17970a44ca987108997ae6ab0544dede2",
+  "draftStack": [
+    {
+      "pr": 402,
+      "sha": "12eb177f18794384075805898fb42a02e7943bc5",
+      "baseSha": "034305988bff6409e8c6d4aedd83624002f3cd4b"
+    },
+    {
+      "pr": 403,
+      "sha": "e52a30553225628a0f611933a313ab0337f92f62",
+      "baseSha": "12eb177f18794384075805898fb42a02e7943bc5"
+    },
+    {
+      "pr": 404,
+      "sha": "0b17ec8d432d641fcf6a5d04f5abc867fa770044",
+      "baseSha": "e52a30553225628a0f611933a313ab0337f92f62"
+    },
+    {
+      "pr": 405,
+      "sha": "3bf66045bf1a519804a5f2e06e7aea30c927a692",
+      "baseSha": "0b17ec8d432d641fcf6a5d04f5abc867fa770044"
+    },
+    {
+      "pr": 406,
+      "sha": "593b9dc17970a44ca987108997ae6ab0544dede2",
+      "baseSha": "3bf66045bf1a519804a5f2e06e7aea30c927a692"
+    }
+  ],
+  "newCandidateGitHead": null,
+  "exactNewHeadCiVerified": false,
+  "previousFiveExactHeadWorkflowsGreen": true,
+  "runtimeCodeChangedInCurrentBatch": false,
+  "finalSignedImageDigests": null,
+  "finalSqlHashesApproved": false,
+  "independentDbaSigned": false,
+  "independentAppsecSigned": false,
+  "ownerApprovedStaging": false,
+  "verifiedOwnerMfa": false,
+  "teamLeaderBootstrapApproved": false,
+  "stagingSchemasDeployed": false,
+  "realIntegratedStagingCertified": false,
+  "realRazorpayTestCertified": false,
+  "productionGo": false,
+  "managedStagingAllowed": false,
+  "publicIngressAllowed": false,
+  "realMoneyAllowed": false,
+  "outboundMessagesAllowed": false,
+  "releaseStatus": "HOLD",
+  "note": "Source-only PR stack lineage and gate inventory. No operational release certification or authorization."
+}

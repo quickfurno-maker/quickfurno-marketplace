@@ -53,6 +53,9 @@ on:
       - "scripts/scale/*step3b10*"
       - "scripts/scale/*step3b11*"
       - "scripts/scale/*step3b13*"
+      - "scripts/scale/*step3b14*"
+      - "docs/vox/*STEP3B14*"
+      - "lib/vendors/betaVendorReadinessEvidence.ts"
       - "docs/vox/*STEP3B13*"
       - "ops/vox/certification/STEP3B13*"
       - "docs/vox/*STEP3B11*"
@@ -155,6 +158,10 @@ jobs:
           node --test scripts/scale/step3b11-a-b-c-source.test.mjs
       - name: Step 3B-13 isolated launch-readiness and supply HOLD source gates
         run: node --test scripts/scale/step3b13-launch-readiness.test.mjs
+      - name: Step 3B-14 B-E Core launch, guarded vendor advisory and read-only web contracts
+        run: |
+          node --test scripts/scale/step3b14-b-e-contract.test.mjs
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs --test scripts/scale/step3b14d-vendor-readiness.test.mjs
       - name: Existing Razorpay source validation
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: PAY1 PAY2 PAY3 focused deterministic policies
@@ -195,3 +202,6 @@ jobs:
       - name: Native network-isolated PostgreSQL 17 and restore rehearsal
         shell: pwsh
         run: ./scripts/mvp/payments/validate-finance-v2-pay3-pg17.ps1
+      - name: Step 3B-14A exact-count offline PostgreSQL 17 test-data purge rehearsal
+        shell: bash
+        run: bash scripts/scale/step3b14a-offline-ci.sh

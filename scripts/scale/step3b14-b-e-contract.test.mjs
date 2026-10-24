@@ -103,4 +103,8 @@ test("E3 migration count drift is disclosed, not silently fixed to pass",()=>{
  // The independent historical QF-MVP-80.01 strict G05 drift is a known FAIL.
  // Not an authorization to change historical SQL, reduce thresholds or deploy.
  assert.equal(m,162);
+ const matcher=read("scripts/mvp/matching/validate-qf-mvp-80-01.mjs");
+ assert.match(matcher,/QUARANTINED_FOUNDATION/);
+ assert.match(matcher,/createHash\('sha256'\)/);
+ assert.match(matcher,/verifiedQuarantine/);
 });

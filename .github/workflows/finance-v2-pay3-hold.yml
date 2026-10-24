@@ -162,6 +162,7 @@ jobs:
         run: |
           node --test scripts/scale/step3b14-b-e-contract.test.mjs
           node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs --test scripts/scale/step3b14d-vendor-readiness.test.mjs
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs scripts/mvp/matching/validate-qf-mvp-80-01.mjs
       - name: Existing Razorpay source validation
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: PAY1 PAY2 PAY3 focused deterministic policies

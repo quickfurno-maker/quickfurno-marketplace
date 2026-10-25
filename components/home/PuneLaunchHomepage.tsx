@@ -330,7 +330,7 @@ function Hero() {
         <div className="qfp-hero-copy">
           <span className="qfp-hero-kicker">
             <i aria-hidden="true" />
-            Trusted home professionals in Pune
+            Home-service enquiries for Pune
           </span>
           {/* The {" "} are load-bearing: JSX drops the whitespace before a
               <br/> on its own line, and the phone rules hide those breaks, so
@@ -343,8 +343,8 @@ function Hero() {
             <span>Faster.</span>
           </h1>
           <p className="qfp-hero-lede">
-            Tell us what you need. Get matched with up to 3 verified Pune professionals, compare
-            profiles and quotes, and choose with confidence.
+            Tell us what you need. QuickFurno checks for eligible local professionals. If suitable Teams
+            are available, you may be introduced to up to 3 and can compare their quotes.
           </p>
           <ul className="qfp-hero-points" aria-label="Why QuickFurno">
             {HERO_POINTS.map((point) => (
@@ -377,7 +377,7 @@ function Hero() {
               />
             </label>
             <EnquiryModalTrigger className="qfp-btn qfp-btn--primary qfp-quote-btn" source="Homepage hero quote bar">
-              Get up to 3 matches <ArrowIcon size={16} stroke="#fff" />
+              Check local availability <ArrowIcon size={16} stroke="#fff" />
             </EnquiryModalTrigger>
           </div>
 
@@ -537,7 +537,7 @@ function Tick({ size = 13 }: { size?: number }) {
 const WHY_POINTS: { glyph: GlyphKey; title: string; body: string }[] = [
   { glyph: "shield", title: "Reviewed profiles", body: "Every public profile is reviewed and approved before it is listed." },
   { glyph: "doc", title: "Clear information", body: "Services, coverage and contact details are checked before a profile goes live." },
-  { glyph: "people", title: "Compare with confidence", body: "Get up to 3 matches, compare profiles and quotes, then choose what suits you best." },
+  { glyph: "people", title: "Compare with confidence", body: "When eligible Teams are available, compare their profiles and quotes before choosing." },
   { glyph: "rupee", title: "No obligation to hire", body: "Explore, compare and connect for free. You stay in control at every step." },
 ];
 
@@ -598,7 +598,7 @@ function NotSureCard() {
         <span className="qfp-notsure-kicker">LET&apos;S BUILD TOGETHER <i aria-hidden="true" /></span>
         <span className="qfp-notsure-title">Not sure where to start?</span>
         <span className="qfp-notsure-desc">Tell us about your home — we&apos;ll route you to the right verified experts.</span>
-        <span className="qfp-notsure-btn">Get Matched <ArrowIcon stroke="currentColor" /></span>
+        <span className="qfp-notsure-btn">Check Availability <ArrowIcon stroke="currentColor" /></span>
       </span>
       <span className="qfp-notsure-media" aria-hidden="true">
         <Image src={`${LAUNCH_IMG}/notsure-plant.jpg`} alt="" fill sizes="(max-width: 760px) 170px, 420px" quality={90} />
@@ -652,7 +652,7 @@ const HOW_IT_WORKS: { icon: ReactNode; title: string; body: string; visual: "req
   {
     icon: <G name="people" size={26} stroke="#fff" width={2} />,
     title: "Get matched with eligible Teams",
-    body: "We shortlist up to 3 active Teams by service, location and eligibility.",
+    body: "If available, we shortlist up to 3 active Teams by service, location and eligibility.",
     visual: "matches",
   },
   {

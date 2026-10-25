@@ -1519,7 +1519,7 @@ export function EnquiryModalProvider({ children }: { children: ReactNode }) {
                   disabled={submitting}
                   onClick={handleSubmit}
                 >
-                  {submitting ? "Submitting…" : "Get up to 3 matches"}
+                  {submitting ? "Submitting…" : "Submit enquiry"}
                 </button>
                 <p className="qf-sf-trust">Verified &amp; trusted pros · Up to 3 relevant matches · Your details are secure</p>
               </footer>

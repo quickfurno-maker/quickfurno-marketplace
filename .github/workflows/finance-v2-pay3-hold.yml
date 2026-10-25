@@ -57,6 +57,9 @@ on:
       - "scripts/scale/*step3b15*"
       - "scripts/scale/*step3b16*"
       - "scripts/scale/*step3b17*"
+      - "scripts/scale/*step3b18*"
+      - "docs/vox/*STEP3B18*"
+      - "ops/vox/sql-review/STEP3B18*"
       - "docs/vox/*STEP3B17*"
       - "docs/vox/*STEP3B16*"
       - "docs/vox/*STEP3B15*"
@@ -177,6 +180,8 @@ jobs:
         run: node --test scripts/scale/step3b16-purge-governance.test.mjs
       - name: Step 3B-17 immutable ledger negative source contracts
         run: node --test scripts/scale/step3b17-immutable-negative.test.mjs
+      - name: Step 3B-18 A-E advisory cleanup evidence and contracts
+        run: node --test scripts/scale/step3b18*.test.mjs
       - name: Existing Razorpay source validation
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: PAY1 PAY2 PAY3 focused deterministic policies
@@ -223,3 +228,6 @@ jobs:
       - name: Step 3B-17 actual-migration PG17 immutable-history refusal rehearsal
         shell: bash
         run: bash scripts/scale/step3b17-immutable-negative-ci.sh
+      - name: Step 3B-18 child-first refusal rehearsal on network-none PostgreSQL17
+        shell: bash
+        run: bash scripts/scale/step3b18-childfirst-negative-ci.sh

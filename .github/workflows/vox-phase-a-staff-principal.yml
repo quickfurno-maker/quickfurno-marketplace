@@ -1,0 +1,27 @@
+name: VOX Phase A Neutral Staff Boundary
+on:
+  pull_request:
+    paths:
+      - 'contracts/vox/neutralStaffPrincipal.*'
+      - 'services/vox/verifiedScopedStaff.ts'
+      - 'app/api/vox/v1/staff-grants/route.ts'
+      - 'ops/vox/quarantined-migrations/legacy-20261014/202610140*vox*.sql'
+      - 'apps/vox-web/app/api/auth/mfa/**'
+      - 'apps/vox-web/.env.example'
+      - 'apps/vox-web/scripts/validate-auth-gates.mjs'
+      - 'scripts/mvp/vox/validate-vox-phase-a-neutral-staff.mjs'
+      - '.github/workflows/vox-phase-a-staff-principal.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  neutral-staff-negative-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24.18.0'
+      - run: node scripts/mvp/vox/validate-vox-phase-a-neutral-staff.mjs
+      - run: echo 'SOURCE_ONLY_STAFF_ROLE_BOUNDARY; NO_DATABASE_MIGRATION_OR_STAFF_PROVISIONING'

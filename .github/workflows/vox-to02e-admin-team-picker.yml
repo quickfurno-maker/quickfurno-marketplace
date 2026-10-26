@@ -1,0 +1,36 @@
+name: VOX TO-02E Admin Team Picker Private Preview
+on:
+  pull_request:
+    paths:
+      - 'app/api/vox/v1/staff-team-options/**'
+      - 'apps/vox-web/app/team/admin/staff/**'
+      - 'apps/vox-web/lib/core.ts'
+      - 'apps/vox-web/.env.example'
+      - 'scripts/mvp/vox/validate-to02e-admin-team-picker.mjs'
+      - '.github/workflows/vox-to02e-admin-team-picker.yml'
+permissions:
+  contents: read
+jobs:
+  admin-core-web-private-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - name: Source boundary and disabled UI
+        run: node scripts/mvp/vox/validate-to02e-admin-team-picker.mjs
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Core TypeScript
+        run: npm run typecheck
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: apps/vox-web
+      - name: Reuse previous VOX Web guards, full typecheck and production build
+        working-directory: apps/vox-web
+        run: |
+          npm test
+          npm run typecheck
+          npm run build

@@ -1,0 +1,43 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {resolve} from "node:path";
+import {projectStaffServiceDesk,proposeCaseAssignment} from "../../../contracts/vox/serviceDesk.mjs";
+const root=resolve(import.meta.dirname,"../../..");
+const doc=p=>readFileSync(resolve(root,p),"utf8");
+const id=(n)=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
+const now=Date.now(), vendor=id(1),thread=id(2),conversation=id(3),prospect=id(4);
+const context={supportThreadIds:[thread],conversationIds:[conversation],canReadContent:true,canMutate:false};
+let n=0;function test(name,f){f();console.log("PASS "+name);n++;}
+const input={context,verifiedVendorIds:[vendor],verifiedProspectIds:[prospect],now,
+threads:[{id:thread,vendor_id:vendor,status:"open",priority:"high",subject:"private 9876543210",created_at:new Date(now-3600000).toISOString(),updated_at:new Date(now).toISOString()}],
+conversations:[{id:conversation,subject_type:"vendor",subject_id:vendor,state:"HUMAN",human_takeover:true,revision:9,service_window_expires_at:new Date(now+90000).toISOString(),sealed_destination_ciphertext:"SECRET"}]};
+test("explicit grant returns one support case",()=>assert.equal(projectStaffServiceDesk(input).support.length,1));
+test("message and subject text withheld",()=>assert.doesNotMatch(JSON.stringify(projectStaffServiceDesk(input)),/PRIVATE|9876543210|SECRET/));
+test("no direct case controls",()=>assert.equal(projectStaffServiceDesk(input).support[0].canClose,false));
+test("SLA not falsely certified",()=>assert.equal(projectStaffServiceDesk(input).support[0].slaStatus,"NOT_CONFIGURED"));
+test("case age is observation not SLA",()=>assert.equal(projectStaffServiceDesk(input).support[0].ageBand,"UNDER_24H"));
+test("wrong vendor case denied",()=>assert.equal(projectStaffServiceDesk({...input,verifiedVendorIds:[prospect]}).support.length,0));
+test("unassigned case denied",()=>assert.equal(projectStaffServiceDesk({...input,context:{...context,supportThreadIds:[]}}).support.length,0));
+test("revoked session scope denied",()=>assert.throws(()=>projectStaffServiceDesk({...input,context:null}),/SCOPE_REQUIRED/));
+test("nonread context denied",()=>assert.throws(()=>projectStaffServiceDesk({...input,context:{...context,canReadContent:false}}),/SCOPE_REQUIRED/));
+test("human Anisha projected",()=>assert.equal(projectStaffServiceDesk(input).humanInbox[0].lane,"ANISHA"));
+test("conversation no direct outbound",()=>assert.equal(projectStaffServiceDesk(input).humanInbox[0].canReply,false));
+test("unassigned conversation denied",()=>assert.equal(projectStaffServiceDesk({...input,context:{...context,conversationIds:[]}}).humanInbox.length,0));
+test("AI-owned conversation denied",()=>assert.equal(projectStaffServiceDesk({...input,conversations:[{...input.conversations[0],state:"AI"}]}).humanInbox.length,0));
+test("wrong vendor conversation denied",()=>assert.equal(projectStaffServiceDesk({...input,verifiedVendorIds:[]}).humanInbox.length,0));
+test("client/Riya conversation withheld",()=>assert.equal(projectStaffServiceDesk({...input,conversations:[{...input.conversations[0],subject_type:"client"}]}).humanInbox.length,0));
+test("Aarohi prospect conversation allowed with grant",()=>assert.equal(projectStaffServiceDesk({...input,conversations:[{...input.conversations[0],subject_type:"prospect",subject_id:prospect}]}).humanInbox[0].lane,"AAROHI"));
+test("Aarohi wrong prospect denied",()=>assert.equal(projectStaffServiceDesk({...input,conversations:[{...input.conversations[0],subject_type:"prospect",subject_id:vendor}]}).humanInbox.length,0));
+test("expired service window disclosed closed only",()=>assert.equal(projectStaffServiceDesk({...input,conversations:[{...input.conversations[0],service_window_expires_at:new Date(now-1000).toISOString()}]}).humanInbox[0].serviceWindow,"CLOSED_OR_UNKNOWN"));
+test("case assignment is held for Core approval",()=>assert.equal(proposeCaseAssignment(thread,vendor,0).reason,"CORE_ATOMIC_APPROVAL_NOT_CONNECTED"));
+test("bad case assignment rejected",()=>assert.equal(proposeCaseAssignment("bad",vendor,0).reason,"INVALID_REQUEST"));
+test("no direct Meta sender reference",()=>assert.doesNotMatch(doc("contracts/vox/serviceDesk.mjs"),/fetch\(|axios|sendMessage\(/));
+const route=doc("app/api/vox/v1/desk/route.ts");
+test("endpoint requires verified Core staff",()=>assert.match(route,/getVerifiedScopedStaff\(request\.headers\.get\("authorization"\)\)/));
+test("no delegated auditor conversation content",()=>assert.match(route,/!scope\.canReadContent/));
+test("vendor zone intersects staff city",()=>assert.match(route,/\.eq\("city_id",scope\.cityId\)\.eq\("is_active",true\)/));
+test("prospect city exact",()=>assert.match(route,/\.eq\("city_id",scope\.cityId\)/));
+test("case requires both support thread and vendor",()=>assert.match(route,/\.in\("id",\[\.\.\.scope\.supportThreadIds\]\)\.in\("vendor_id",verifiedVendors\)/));
+test("human inbox requires HUMANN state and takeover",()=>assert.match(route,/\.eq\("state","HUMAN"\)\.eq\("human_takeover",true\)/));
+test("mutation methods denied",()=>assert.equal((route.match(/CORE_APPROVAL_REQUIRED"\},405/g)||[]).length,4));
+console.log("VOX_04_DESK_PROJECTION_PASS "+n+"/28");

@@ -1,0 +1,31 @@
+{
+  "schema": "qf.vox.security.exception-evidence.v1",
+  "stagingProjectRef": "uckafzuochmbvtiodmcl",
+  "observedAt": "2026-10-14",
+  "source": "first-party Supabase read-only catalog and verified checked-in migration SQL",
+  "realStagingMigrationCount": 86,
+  "realStagingVoxApplied": 0,
+  "allowedPublicColumns": 21,
+  "checked": {
+    "anonVendorBaseSelect": false,
+    "anonPublicVendorViewSelect": true,
+    "anonPublicVendorViewUpdate": false,
+    "anonSchemaCreate": false,
+    "authenticatedSchemaCreate": false,
+    "anonIsAdminExecute": false,
+    "anonOwnsVendorExecute": false,
+    "authenticatedIsAdminExecute": true,
+    "authenticatedOwnsVendorExecute": true,
+    "publicVendorViewIsOwnerRights": true,
+    "publicVendorViewFilterApprovedActiveVisibleCredited": true
+  },
+  "advisories": {
+    "securityDefinerView": 1,
+    "authCallableSecurityDefinerFunctions": 2,
+    "leakedPasswordProtectionDisabled": 1,
+    "rlsNoPolicyInfo": 102
+  },
+  "advisorWarningsRemainOpen": true,
+  "ownerRiskAcceptanceGranted": false,
+  "releaseHold": true
+}

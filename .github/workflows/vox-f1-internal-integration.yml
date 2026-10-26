@@ -1,0 +1,45 @@
+name: VOX-F1 Unified Internal Integration Source QA (Release HOLD)
+on:
+  pull_request:
+    paths:
+      - 'contracts/vox/l9FourSourceEodEvidence.mjs'
+      - 'worker/voxInternalNotificationCycle.mjs'
+      - 'scripts/mvp/vox/validate-voxL9-four-source-eod.test.mjs'
+      - 'scripts/mvp/vox/validate-to08t-worker-gated-cycle.test.mjs'
+      - 'docs/vox/VOX-F1-INTERNAL-INTEGRATION-STATUS.md'
+      - '.github/workflows/vox-f1-internal-integration.yml'
+permissions:
+  contents: read
+jobs:
+  core-source-and-transport-no-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node --test scripts/mvp/vox/*.test.mjs
+      - run: node --experimental-vm-modules --test scripts/mvp/vox/validate-voxL3-private-metrics-http.spec.mjs scripts/mvp/vox/validate-voxL6-core-eod-riya-http.spec.mjs
+      - run: npm run typecheck
+  staff-web-no-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: apps/vox-web
+      - run: npm test
+        working-directory: apps/vox-web
+      - run: npm run typecheck
+        working-directory: apps/vox-web
+      - run: npm run build
+        working-directory: apps/vox-web

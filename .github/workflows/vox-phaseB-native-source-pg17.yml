@@ -1,0 +1,31 @@
+name: VOX Phase B Native Source Contracts and PG17 - Release HOLD
+on:
+  pull_request:
+    paths:
+      - 'contracts/vox/phaseB*'
+      - 'scripts/mvp/vox/validate-voxPhaseB*'
+      - 'ops/vox/sql-candidates/20261017020000_vox_phaseb_nonce_ledger_candidate.sql'
+      - '.github/workflows/vox-phaseB-native-source-pg17.yml'
+permissions:
+  contents: read
+jobs:
+  source-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: node --test scripts/mvp/vox/*.test.mjs
+  disposable-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Disposable PostgreSQL 17 network-none nonce/replay/RLS test
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxPhaseB-nonce-pg17.ps1

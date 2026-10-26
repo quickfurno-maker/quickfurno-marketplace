@@ -1,0 +1,33 @@
+name: VOX Source Gates
+on:
+  pull_request:
+    paths:
+      - 'apps/vox-web/**'
+      - 'contracts/vox/**'
+      - 'scripts/mvp/vox/**'
+      - 'docs/vox/**'
+      - '.github/workflows/vox-source-gates.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  vox-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - name: Guard source-only Core contracts
+        run: |
+          if test -f scripts/mvp/vox/validate-vox-00-source-map.mjs; then node scripts/mvp/vox/validate-vox-00-source-map.mjs; fi
+          if test -f scripts/mvp/vox/validate-vox-00-adapters.mjs; then node scripts/mvp/vox/validate-vox-00-adapters.mjs; fi
+      - name: VOX independently deployable shell gates
+        if: hashFiles('apps/vox-web/package-lock.json') != ''
+        working-directory: apps/vox-web
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          npm run typecheck
+          npm run build

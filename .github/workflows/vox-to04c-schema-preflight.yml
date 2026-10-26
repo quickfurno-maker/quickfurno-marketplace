@@ -1,0 +1,29 @@
+name: VOX TO-04C Real Schema Preflight - Mandatory HOLD
+on:
+  pull_request:
+    paths:
+      - 'ops/vox/certification/TO04C-LIVE-SCHEMA-EVIDENCE.json'
+      - 'scripts/mvp/vox/*to04c-schema*'
+      - '.github/workflows/vox-to04c-schema-preflight.yml'
+permissions:
+  contents: read
+jobs:
+  metadata-only-release-denial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: node --test scripts/mvp/vox/validate-to04c-schema-readiness.test.mjs
+      - name: Proof that release check fails with specific HOLD code
+        shell: bash
+        run: |
+          set +e
+          node scripts/mvp/vox/check-to04c-schema-readiness.mjs --release-check
+          CODE=$?
+          set -e
+          test "$CODE" -eq 42

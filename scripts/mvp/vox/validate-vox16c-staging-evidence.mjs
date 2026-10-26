@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';import {readFileSync,existsSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
@@ -7,7 +7,10 @@ const ledger=JSON.parse(readFileSync(resolve(root,'supabase/staging-history/qf-p
 const rows=ledger.records.filter(r=>String(r.version).startsWith('20261014')&&String(r.name).startsWith('vox_'));
 assert.equal(rows.length,7);
 for(const r of rows){
- const bytes=readFileSync(resolve(root,r.path)).toString('utf8').replace(/\r\n?/g,'\n');
+ assert.match(r.path,/^supabase\/migrations\/20261014\d{6}_vox.*\.sql$/);
+ assert.equal(existsSync(resolve(root,r.path)),false,'quarantined SQL must never re-enter managed migration discovery');
+ const sourcePath='ops/vox/quarantined-migrations/legacy-20261014/'+r.path.split('/').at(-1);
+ const bytes=readFileSync(resolve(root,sourcePath)).toString('utf8').replace(/\r\n?/g,'\n');
  const sum=createHash('sha256').update(bytes).digest('hex');
  assert.equal(sum,r.canonicalSha256);
  assert.equal(r.exactVersionPresence?.staging,false);

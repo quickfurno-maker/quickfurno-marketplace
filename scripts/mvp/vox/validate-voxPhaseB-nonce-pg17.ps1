@@ -24,9 +24,19 @@ try{
  $container=docker run --rm --network none -d --name $name -e POSTGRES_PASSWORD=synthetic_only postgres:17-alpine
  if($LASTEXITCODE -ne 0){throw 'DISPOSABLE_PG_NOT_STARTED'}
  $ready=$false
- for($i=0;$i -lt 35;$i++){
-  docker exec $name pg_isready -U postgres -d postgres *> $null
-  if($LASTEXITCODE -eq 0){$ready=$true;break}
+ # Postgres Docker runs a TEMP bootstrap server that can briefly answer
+ # pg_isready before it shuts down. Only probe final SQL after init completes.
+ for($i=0;$i -lt 55;$i++){
+  $oldPreference=$ErrorActionPreference
+  $ErrorActionPreference='Continue'
+  try{$logs=(docker logs $name 2>&1 | Out-String)}finally{$ErrorActionPreference=$oldPreference}
+  if($logs -match 'PostgreSQL init process complete; ready for start up.'){
+   docker exec $name pg_isready -U postgres -d postgres *> $null
+   if($LASTEXITCODE -eq 0){
+    $probe=((docker exec $name psql -X -A -t -q -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'SELECT 1;' 2>$null)|Out-String).Trim()
+    if($LASTEXITCODE -eq 0 -and $probe -eq '1'){$ready=$true;break}
+   }
+  }
   Start-Sleep -Milliseconds 350
  }
  if(!$ready){throw 'DISPOSABLE_PG_NOT_READY'}

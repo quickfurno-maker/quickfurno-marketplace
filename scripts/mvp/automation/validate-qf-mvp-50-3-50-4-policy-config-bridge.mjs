@@ -132,6 +132,25 @@ const producerSql = stripSql(read(`supabase/migrations/${FROZEN[0][0]}`));
 const manifest = JSON.parse(read("supabase/staging-history/qf-mvp-staging-history-manifest.json"));
 const migrationFiles = readdirSync(path.join(ROOT, "supabase/migrations"))
   .filter((f) => f.endsWith(".sql")).sort();
+// The historical 169 pinned SQL sources contain seven earlier VOX migrations
+// now required to stay QUARANTINED; only 162 SQL files remain deploy-discoverable.
+// Preserve exact set membership, chronological order, and every old Git blob SHA.
+const quarantineManifest = JSON.parse(read("ops/vox/certification/VOX-PR300-MANAGED-SQL-RELEASE-HOLD.json"));
+const quarantinedRows = quarantineManifest.legacyManagedMigrations ?? [];
+const quarantineVerified =
+  quarantineManifest.schema === "qf.vox.release.migration.quarantine.v2" &&
+  quarantinedRows.length === 7 &&
+  quarantinedRows.every((row) => {
+    if (!/^ops\/vox\/quarantined-migrations\/legacy-20261014\/20261014\d{6}_vox.*\.sql$/.test(row.path))
+      return false;
+    const fileName = path.basename(row.path);
+    if (migrationFiles.includes(fileName)) return false;
+    const bytes = readFileSync(path.join(ROOT, row.path));
+    const gitBlob = createHash("sha1").update("blob " + bytes.length + " ").update(bytes).digest("hex");
+    return gitBlob === row.gitBlobSha;
+  });
+const completePinnedSourceFiles = [...migrationFiles, ...quarantinedRows.map((row) => path.basename(row.path))].sort();
+const uniquePinnedSourceFiles = new Set(completePinnedSourceFiles).size === completePinnedSourceFiles.length;
 const g1Source = read("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
 const pkg = JSON.parse(read("package.json"));
 const ciWorkflow = read(".github/workflows/qf-mvp-50-quality-gate.yml");
@@ -174,10 +193,10 @@ const expectedMigrationTail = extendLegacyFilenames(
    FALSE_CEILING_NAME,
    "20260924183000_jarvis_os_operator_command_receipts.sql"],
 );
-record("V07a the governed migration tail is in exact chronological order",
-  same(migrationFiles.slice(-expectedMigrationTail.length), expectedMigrationTail));
-record(`V07 the local migration set is exactly ${EXPECTED_LIVE_MIGRATION_COUNT}`,
-  migrationFiles.length === EXPECTED_LIVE_MIGRATION_COUNT);
+record("V07a complete governed source tail chronological with seven quarantined SQL files",
+  quarantineVerified && uniquePinnedSourceFiles && same(completePinnedSourceFiles.slice(-expectedMigrationTail.length), expectedMigrationTail));
+record(`V07 complete pinned source inventory exact including 7 quarantined ${EXPECTED_LIVE_MIGRATION_COUNT}`,
+  quarantineVerified && uniquePinnedSourceFiles && completePinnedSourceFiles.length === EXPECTED_LIVE_MIGRATION_COUNT && migrationFiles.length === EXPECTED_LIVE_MIGRATION_COUNT - quarantinedRows.length);
 
 // ---------------------------------------------------------------------------
 // I. IMMUTABILITY — nothing historical or already-merged may move

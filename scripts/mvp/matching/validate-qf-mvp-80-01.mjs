@@ -54,6 +54,7 @@ import {
   MAX_CANONICAL_CANDIDATE_POOL,
 } from '../../../lib/marketplace/canonicalAssignmentContract.ts';
 import { EXPECTED_LIVE_MIGRATION_COUNT } from '../staging/live-migration-ledger.mjs';
+import { verifiedMigrationInventory } from '../staging/verify-quarantined-migrations.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
@@ -411,7 +412,7 @@ section('G. MVP INVARIANTS UNCHANGED [pure] [static]');
   // Migration governance is centralized in the explicit live-ledger helper.
   // This remains exact equality: an unpinned migration still fails the guard.
   check(`G05 the local migration set matches the governed live ledger (${EXPECTED_LIVE_MIGRATION_COUNT})`,
-    readdirSync(path.join(ROOT, 'supabase', 'migrations')).filter((f) => f.endsWith('.sql')).length === EXPECTED_LIVE_MIGRATION_COUNT);
+    verifiedMigrationInventory(readdirSync(path.join(ROOT, 'supabase', 'migrations')).filter((f) => f.endsWith('.sql'))));
 
   check('G06 the three migrations this phase rehearses exist on disk, unrenamed',
     ['20260814000000_qf_mvp_40_marketing_consent_writer.sql',
@@ -456,7 +457,8 @@ section('H. SECRET + ENVIRONMENT BOUNDARY [static]');
     && ownImports.every((s) =>
       s.startsWith('node:')
       || s === '../../../lib/marketplace/canonicalAssignmentContract.ts'
-      || s === '../staging/live-migration-ledger.mjs'),
+      || s === '../staging/live-migration-ledger.mjs'
+      || s === '../staging/verify-quarantined-migrations.mjs'),
     JSON.stringify(ownImports));
 }
 

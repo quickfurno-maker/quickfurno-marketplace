@@ -14,13 +14,19 @@ try{
   if($LASTEXITCODE -ne 0){throw "CANNOT_CREATE_DISPOSABLE_CONTAINER"}
  }
  foreach($n in @($a,$b)){
+  # postgres:17-alpine starts a TEMPORARY init server that can answer pg_isready,
+  # then stops it before PID 1 execs the final postgres process. Do not seed
+  # during that transient ready window (socket disappears at the restart).
   $ready=$false
-  for($i=0;$i -lt 50;$i++){
-   docker exec $n pg_isready -q -U postgres -d postgres 2>$null
-   if($LASTEXITCODE -eq 0){$ready=$true;break}
+  for($i=0;$i -lt 80;$i++){
+   $pidOne=([string](docker exec $n sh -c 'cat /proc/1/comm' 2>$null | Out-String)).Trim()
+   if($LASTEXITCODE -eq 0 -and $pidOne -eq 'postgres'){
+    $probe=([string](docker exec $n psql -X -q -tA -v ON_ERROR_STOP=1 -U postgres -d postgres -c 'select 1;' 2>$null | Out-String)).Trim()
+    if($LASTEXITCODE -eq 0 -and $probe -eq '1'){$ready=$true;break}
+   }
    Start-Sleep -Milliseconds 250
   }
-  if(-not $ready){throw "SYNTHETIC_DB_UNAVAILABLE"}
+  if(-not $ready){throw "SYNTHETIC_FINAL_POSTMASTER_UNAVAILABLE"}
  }
  @'
 create table public.vox16d_synthetic_restore_case(id int primary key,city_id int not null);

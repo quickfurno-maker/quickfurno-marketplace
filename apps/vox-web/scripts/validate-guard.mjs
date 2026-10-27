@@ -15,6 +15,6 @@ check("compose bind loopback",()=>assert.match(read("compose.stage.yml"),/127\.0
 check("staging compose explicitly disabled",()=>assert.match(read("compose.stage.yml"),/profiles:\s*\["vox-stage-disabled"\]/));
 check("compose memory limited",()=>assert.match(read("compose.stage.yml"),/mem_limit:\s*768m/));
 check("compose no privilege escalation",()=>assert.match(read("compose.stage.yml"),/no-new-privileges:true/));
-check("production user non-root",()=>assert.match(read("Dockerfile"),/USER 10001/));
+check("production user non-root",()=>assert.match(read("Dockerfile"),/USER 65532/));
 check("no demo fixture records",()=>assert.doesNotMatch(read("app/page.tsx"),/mobileNumber|wa_id|access_token|service_role|realLeadId/));
 console.log("VOX_01_SOURCE_SHELL_GUARD_PASS "+n+"/12");

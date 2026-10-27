@@ -11,12 +11,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY apps/vox-web ./
 RUN npm run build
-FROM ${NODE_IMAGE} AS runtime
+FROM gcr.io/distroless/nodejs24-debian13@sha256:cb606325b7ec4af55462cb0b424a53b452a5b4a894ffe841fcf1048d216fb9f8 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000 VOX_DEMO_PREVIEW=disabled
-RUN groupadd -g 10001 vox && useradd -u 10001 -g 10001 -M vox
-COPY --from=build --chown=10001:10001 /app/.next/standalone ./
-COPY --from=build --chown=10001:10001 /app/.next/static ./.next/static
-USER 10001
+# Runtime contains Node.js only, without npm, perl, apt or a shell; nonroot UID/GID 65532.
+COPY --from=build --chown=65532:65532 /app/.next/standalone ./
+COPY --from=build --chown=65532:65532 /app/.next/static ./.next/static
+USER 65532
 EXPOSE 3000
-CMD ["node","server.js"]
+CMD ["server.js"]

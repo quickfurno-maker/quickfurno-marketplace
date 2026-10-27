@@ -32,6 +32,7 @@ import { createRequire } from "node:module";
 import path, { resolve } from "node:path";
 import crypto from "node:crypto";
 import { EXPECTED_LIVE_MIGRATION_COUNT } from "./mvp/staging/live-migration-ledger.mjs";
+import { verifiedMigrationInventory } from "./mvp/staging/verify-quarantined-migrations.mjs";
 
 const outDir = resolve(".qf-80-03-audit-build");
 rmSync(outDir, { recursive: true, force: true });
@@ -639,7 +640,7 @@ check("39 [static] no historical backfill and no new migration", () => {
   // fail-closed post-G1 ledger; the old G1 constant remains a historical pin only.
   const migrations = readdirSync(path.join(process.cwd(), "supabase", "migrations")).filter((f) => f.endsWith(".sql"));
   assert(
-    migrations.length === EXPECTED_LIVE_MIGRATION_COUNT,
+    verifiedMigrationInventory(migrations),
     `tree has ${migrations.length} migrations but the explicit live ledger pins ${EXPECTED_LIVE_MIGRATION_COUNT}`
   );
 });

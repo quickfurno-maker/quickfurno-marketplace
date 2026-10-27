@@ -35,7 +35,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
           test "$(wc -c <<< "$EXPECTED_SHA" | tr -d ' ')" -eq 41
-          grep -Fq 'USER 10001' apps/vox-web/Dockerfile
+          grep -Fq 'USER 65532' apps/vox-web/Dockerfile
           grep -Fq 'VOX_DEMO_PREVIEW=disabled' apps/vox-web/Dockerfile
           grep -Fq 'node@sha256:' apps/vox-web/Dockerfile
           test ! -e apps/vox-web/.env.production
@@ -47,7 +47,7 @@ jobs:
           set -euo pipefail
           docker build --pull             --file apps/vox-web/Dockerfile             --tag "vox-certification:$SOURCE_SHA" .
           docker image inspect "vox-certification:$SOURCE_SHA" --format '{{.Id}}' > vox-local-image-id.txt
-          docker image inspect "vox-certification:$SOURCE_SHA" --format '{{.Config.User}}' | grep -Fx 10001
+          docker image inspect "vox-certification:$SOURCE_SHA" --format '{{.Config.User}}' | grep -Fx 65532
 
       - name: Scan known high/critical fixable image vulnerabilities
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0

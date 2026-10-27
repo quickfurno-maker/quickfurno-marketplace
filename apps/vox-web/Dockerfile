@@ -1,5 +1,6 @@
 # Source-only independent VOX image. Public routing forbidden until staff IAM.
-ARG NODE_IMAGE=node@sha256:3d0f05455dea2c82e2f76e7e2543964c30f6b7d673fc1a83286736d44fe4c41c
+# Pin Node 24: Supabase Storage requires Node >=22; verified in isolated build.
+ARG NODE_IMAGE=node@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d
 FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 COPY apps/vox-web/package.json apps/vox-web/package-lock.json ./

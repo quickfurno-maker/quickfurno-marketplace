@@ -16,6 +16,7 @@ const hashes = Object.freeze({
   "20261014060000_vox_operational_intent_review.sql": "6484c66d9eec6ca699414ec97fc50962e22b685949d280ce3c2d2aeb21fa8dfb",
   "20261014070000_vox_approved_followup_executor.sql": "454fb0c07ca7589962eddaffa0001a9a2a7562a3304d70da8e091a0499918f01"
 });
+export const QUARANTINED_MIGRATION_COUNT = Object.keys(hashes).length;
 export function verifiedMigrationInventory(deployableFiles) {
   const files = [...deployableFiles].filter((s) => s.endsWith(".sql")).sort();
   const q = readdirSync(quarantine).filter((s) => s.endsWith(".sql")).sort();

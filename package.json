@@ -267,14 +267,14 @@
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
     "dotenv": "^16.6.1",
-    "next": "16.3.8",
+    "next": "16.4.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "redis": "6.3.0",
     "sharp": "0.35.5",
     "standardwebhooks": "^1.0.0",
     "ws": "^8.21.3",
-    "zod": "4.4.3"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@opentelemetry/sdk-trace-base": "2.11.0",

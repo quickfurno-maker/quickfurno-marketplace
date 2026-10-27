@@ -28,6 +28,7 @@ import {
   POST_G1_EXTENSION_RECORDS,
   SUPERSEDED_LEGACY_VERSIONS,
 } from "../staging/live-migration-ledger.mjs";
+import { verifiedMigrationInventory, QUARANTINED_MIGRATION_COUNT } from "../staging/verify-quarantined-migrations.mjs";
 
 // QF-MVP-50.7 RE-PIN: 105 -> 106, adding ONLY the SOURCE-PENDING stale-business
 // terminalization authority (20260906000000). No existing migration was changed,
@@ -227,7 +228,7 @@ check("11 no application, UI or inbox source file is part of this phase", () => 
 // ---- 12-14. the count truth ------------------------------------------------
 
 check(`12-13 R0 grew the tree by exactly one, from 103 to 104; the live tree is ${EXPECTED_LIVE_MIGRATION_COUNT}`, () => {
-  eq(MIGRATIONS.length, EXPECTED_LIVE_MIGRATION_COUNT, "the live tree matches the explicit ledger");
+  eq(verifiedMigrationInventory(MIGRATIONS) ? MIGRATIONS.length + QUARANTINED_MIGRATION_COUNT : -1, EXPECTED_LIVE_MIGRATION_COUNT, "the live tree matches the explicit ledger");
   // Equivalent offline proof of R0's own contribution: remove this phase's single
   // migration AND every migration added after it, and what remains is exactly the 103
   // that were on main when R0 was written.
@@ -249,7 +250,7 @@ check("14 the frozen reconciliation plus explicit extension accounts for the cur
     "the 80.05 reconciliation count stays 102 — it records what THAT phase looked at");
   eq(MANIFEST.historyReconciliation.migrationCount, 102,
     "and the manifest's historical record is likewise unchanged");
-  eq(MIGRATIONS.length - MANIFEST.historyReconciliation.migrationCount,
+  eq(MIGRATIONS.length + QUARANTINED_MIGRATION_COUNT - MANIFEST.historyReconciliation.migrationCount,
     EXPECTED_POST_RECONCILIATION_ADDITIONS,
     "the live-minus-reconciliation delta matches the explicit ledger");
   eq(EXPECTED_POST_RECONCILIATION_ADDITIONS,
@@ -369,10 +370,12 @@ check("25 nothing here reads a database, a network or a credential", () => {
   // available to it at all.
   const self = rawOf("scripts/mvp/admin/validate-qf-mvp-82a-r0-realtime-publication.mjs");
   const imports = [...self.matchAll(/^import\s[\s\S]*?from\s+"([^"]+)";/gm)].map((m) => m[1]);
-  eq(imports.length, 4, `exactly four imports (${imports.join(", ")})`);
-  const localImports = imports.filter((spec) => !spec.startsWith("node:"));
-  eq(localImports.length, 1, "exactly one local helper import");
-  eq(localImports[0], "../staging/live-migration-ledger.mjs", "the only local import is the fail-closed migration ledger");
+  eq(imports.length, 5, `exactly five approved imports (${imports.join(", ")})`);
+  const localImports = imports.filter((spec) => !spec.startsWith("node:")).sort();
+  eq(localImports.length, 2, "exactly two pinned source-only ledger helpers");
+  eq(JSON.stringify(localImports), JSON.stringify(["../staging/live-migration-ledger.mjs", "../staging/verify-quarantined-migrations.mjs"]), "only two approved offline-only local helpers");
+  const helperSource = rawOf("scripts/mvp/staging/verify-quarantined-migrations.mjs");
+  assert(!/node:(?:net|http|https|dns|child_process)|(?:fetch|connect|execSync)\s*\(/.test(helperSource), "inventory helper does not reach network or child processes");
   for (const spec of imports.filter((entry) => entry.startsWith("node:"))) {
     assert(["node:fs", "node:crypto", "node:path"].includes(spec), `${spec} is an approved Node builtin`);
   }

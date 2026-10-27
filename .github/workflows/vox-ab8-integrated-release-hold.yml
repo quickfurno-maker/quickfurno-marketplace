@@ -1,0 +1,138 @@
+name: VOX AB8 Integrated Five-Track Release-Hold QA
+on:
+  pull_request:
+    paths:
+      - 'contracts/vox/ab7*.mjs'
+      - 'scripts/mvp/vox/validate-voxAB7-*'
+      - 'ops/vox/sql-candidates/20261018020000*'
+      - 'ops/vox/sql-candidates/20261018030000*'
+      - 'ops/vox/sql-candidates/20261018040000*'
+      - 'ops/vox/sql-candidates/20261018050000*'
+      - 'ops/vox/sql-candidates/20261018070000*'
+      - 'ops/vox/sql-candidates/20261018080000*'
+      - 'ops/vox/sql-candidates/20261018090000*'
+      - 'scripts/mvp/vox/validate-voxAB7F-*'
+      - 'scripts/mvp/vox/validate-voxAB7G-*'
+      - 'ops/vox/sql-candidates/20261018100000*'
+      - 'ops/vox/sql-candidates/20261018110000*'
+      - 'services/jarvisOperatorCommandService.ts'
+      - 'scripts/mvp/vox/validate-voxAB7H-*'
+      - 'scripts/mvp/vox/validate-voxAB7I-*'
+      - 'scripts/mvp/vox/validate-voxAB7J-*'
+      - 'scripts/mvp/vox/validate-voxAB7K-*'
+      - 'scripts/mvp/vox/validate-voxAB7L-*'
+      - 'scripts/mvp/vox/validate-voxAB7M-*'
+      - 'scripts/mvp/vox/validate-voxAB7N-*'
+      - 'scripts/mvp/vox/validate-voxRC1-*'
+      - 'contracts/vox/voxRC1ReleaseCandidate.mjs'
+      - 'contracts/vox/rc1CurrentStaffScope.mjs'
+      - 'contracts/vox/rc1CurrentStaffScope.d.mts'
+      - 'app/api/vox/v1/staff-directory/route.ts'
+      - 'app/api/vox/v1/work-queue/route.ts'
+      - 'app/api/vox/v1/staff-notifications/route.ts'
+      - 'contracts/vox/ab7n*.mjs'
+      - 'worker/voxAb7jSignedInternalOnce.mjs'
+      - 'app/api/vox/v1/riya-client-cases/route.ts'
+      - 'app/api/vox/v1/staff-chat/route.ts'
+      - 'contracts/vox/ab7m*.mjs'
+      - 'contracts/vox/ab7k*.mjs'
+      - 'docs/vox/VOX-AB7K-REVIEWED-SOURCE-FINGERPRINT.json'
+      - 'ops/vox/quarantined-migrations/legacy-20261014/*.sql'
+      - 'ops/vox/sql-candidates/*.sql'
+      - 'contracts/vox/ab7j*.mjs'
+      - 'worker/voxAb7jSignedInternalOnce.mjs'
+      - 'ops/vox/sql-candidates/20261018120000*'
+      - 'contracts/vox/ab7i*.mjs'
+      - 'app/api/vox/v1/official-eod-publish/**'
+      - 'worker/voxAb7fIntegratedInternalWorker.mjs'
+      - 'app/api/vox/v1/support-task/**'
+      - 'app/api/vox/v1/aarohi-task/**'
+      - 'scripts/mvp/vox/validate-voxAB7B-support-atomic*'
+      - 'scripts/mvp/vox/validate-voxAB7B-aarohi-atomic*'
+      - 'apps/vox-web/**'
+      - '.github/workflows/vox-ab8-integrated-release-hold.yml'
+permissions:
+  contents: read
+jobs:
+  core-source-typecheck-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: AB7 final four-track focused security contracts
+        run: node --test scripts/mvp/vox/validate-voxAB7-final-*.test.mjs
+      - name: AB7F genuine Core atomic adapter contracts
+        run: node --test scripts/mvp/vox/validate-voxAB7F-*.test.mjs
+      - name: AB7G independent reviewer signature and EOD gates
+        run: node --test scripts/mvp/vox/validate-voxAB7G-*.test.mjs
+      - name: AB7H signed Jarvis operator native atomic cutover source regression
+        run: node --test scripts/mvp/vox/validate-voxAB7H-*.test.mjs
+      - name: AB7I exact staged schema, reviewed Staff revocation, and internal worker preflight
+        run: node --test scripts/mvp/vox/validate-voxAB7I-*.test.mjs
+      - name: AB7J native review, signed operator retry and worker one-shot
+        run: node --test scripts/mvp/vox/validate-voxAB7J-*.test.mjs
+      - name: AB7K full 30-file source manifest with explicit release HOLD
+        run: node --test scripts/mvp/vox/validate-voxAB7K-*.test.mjs
+      - name: AB7L archived real Staging schema-only regression source gates (no private archive in CI)
+        run: node --test scripts/mvp/vox/validate-voxAB7L-*.test.mjs
+      - name: AB7M three-track real Staging/identity/cross-service release hold
+        run: node --test scripts/mvp/vox/validate-voxAB7M-*.test.mjs
+      - name: AB7N regression checks
+        run: node --test scripts/mvp/vox/validate-voxAB7N-*.test.mjs
+      - name: VOX RC1 full final internal package and scope-revocation tests
+        run: node --test scripts/mvp/vox/validate-voxRC1-*.test.mjs
+      - run: node --test scripts/mvp/vox/*.test.mjs
+      - run: npm run typecheck
+      - run: npm run build
+  offline-postgres17-provenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 32
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: AB3 independent Staff review candidate
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB3-staff-pg17.ps1
+      - name: AB3 signed source SQL checkpoint candidate
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB3-eod-pg17.ps1
+      - name: AB4 native Core Work event candidate
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB4-native-work-pg17.ps1
+      - name: AB7B all three synthetic original source writers
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7B-nonwork-pg17.ps1
+      - name: AB7A independently reviewed pending Staff lifecycle
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7A-staff-pg17.ps1
+      - name: AB7B source F1 atomic grant and consent replay re-audit
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7B-native-pg17.ps1
+      - name: AB7B actual Support Desk original task, immutable Staff F1 and nonce
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7B-support-atomic-pg17.ps1
+      - name: AB7B actual Aarohi task and CRM event, immutable Staff F1 and nonce
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7B-aarohi-atomic-pg17.ps1
+      - name: AB7F atomic source PostgreSQL17 candidate verification
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7F-native-writers-pg17.ps1
+      - name: AB7K full 7 foundation and 23 VOX candidates in isolated PostgreSQL17
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7K-full-schema-pg17.ps1
+  web-locked-state-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: apps/vox-web
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node scripts/validate-ab3-domain.mjs
+      - run: node scripts/validate-ab5-eod-sources.mjs
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build

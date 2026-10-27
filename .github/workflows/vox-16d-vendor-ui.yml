@@ -1,0 +1,22 @@
+name: VOX-16D vendor profile review web
+on:
+  pull_request:
+    paths:
+      - 'apps/vox-web/**'
+      - 'scripts/mvp/vox/validate-vox16d-profile-ui.mjs'
+      - '.github/workflows/vox-16d-vendor-ui.yml'
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  scoped-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with: {node-version: '20.20.2'}
+      - run: node scripts/mvp/vox/validate-vox16d-profile-ui.mjs
+      - run: |
+          cd apps/vox-web
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx tsc --noEmit

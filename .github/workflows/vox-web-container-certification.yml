@@ -1,0 +1,87 @@
+name: VOX Web Container Certification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/vox-web/**"
+      - ".github/workflows/vox-web-container-certification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vox-web-certification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify:
+    name: Build, scan, and verify isolated VOX image (NO publish)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Verify immutable source and restrictive runtime
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test "$(wc -c <<< "$EXPECTED_SHA" | tr -d ' ')" -eq 41
+          grep -Fq 'USER 65532' apps/vox-web/Dockerfile
+          grep -Fq 'VOX_DEMO_PREVIEW=disabled' apps/vox-web/Dockerfile
+          grep -Fq 'node@sha256:' apps/vox-web/Dockerfile
+          test ! -e apps/vox-web/.env.production
+          echo "SOURCE_SHA=$EXPECTED_SHA" >> "$GITHUB_ENV"
+
+      - name: Build exact VOX Web application image locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --pull             --file apps/vox-web/Dockerfile             --tag "vox-certification:$SOURCE_SHA" .
+          docker image inspect "vox-certification:$SOURCE_SHA" --format '{{.Id}}' > vox-local-image-id.txt
+          docker image inspect "vox-certification:$SOURCE_SHA" --format '{{.Config.User}}' | grep -Fx 65532
+
+      - name: Scan known high/critical fixable image vulnerabilities
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: vox-certification:${{ env.SOURCE_SHA }}
+          scan-type: image
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+
+      - name: Generate SPDX SBOM for this exact local image
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: vox-certification:${{ env.SOURCE_SHA }}
+          scan-type: image
+          format: spdx-json
+          output: vox-web-sbom.spdx.json
+          exit-code: "1"
+
+      - name: Verify content and record evidence (no registry publish)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s vox-web-sbom.spdx.json
+          test -s vox-local-image-id.txt
+          sha256sum vox-local-image-id.txt vox-web-sbom.spdx.json > vox-candidate-hashes.sha256
+          sha256sum -c vox-candidate-hashes.sha256
+          {
+            echo "### VOX Web isolated container certification"
+            echo "Source: \`$SOURCE_SHA\`"
+            echo "Local image ID: \`$(cat vox-local-image-id.txt)\`"
+            echo "Registry publication: **disabled**"
+            echo "Production deployment: **disabled**"
+            echo "Requires independent DBA/AppSec, real Owner MFA, signed image, and Stage GO."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,9 @@
+# VOX-09C — Approval-ready operational action intents, not execution
+
+**Core source-only / unapplied SQL**. New `vox_operational_intents_v1` plus immutable `vox_operational_intent_audit_v1` tables, two FORCE-RLS private tables with no public/authenticated direct access; unique requester+nonce prevents duplicate proposals. Narrow request kinds: existing **Aarohi follow-up**, Vendor profile change and native Service Desk support reply. No WhatsApp send or vendor KYC mutation is supported. The proposal includes **NO message, provider payload, phone, wallet, KYC, profile values or memory**—only exact ID, team, city, purpose and rationale.
+
+The VOX Core `POST /api/vox/v1/action-intents` requires a fresh verified active scoped staff AAL2 identity and an existing exact prospect/vendor/support-thread object grant, then rechecks current canonical city and (for support) the associated vendor's active zone. `propose` can create a PENDING proposal only under disabled-by-default `VOX_OPERATIONAL_INTENTS_ENABLED=staging`. No built-in automatic approval or execution.
+
+An independently authenticated active Superadmin can `review` using security-definer `qf_vox_decide_operational_intent_v1`: row-level lock, revision fence, 24h expiry, requester cannot review own intent, action+immutable audit inserted in **one transaction**. Wrong owner/self/replay rejected. Review response always `execution=NOT_AUTHORIZED`; APPROVED means *permission to design a separately governed execution*, never provider send / immediate changes. This is the necessary approval infrastructure for later full actions, **not** a completed WhatsApp/CRM mutator.
+
+A network-disabled disposable PostgreSQL17 fixture validates request approval/rejection/replay, audit rows, force RLS and absence of browser RPC grants. No real Staging account or DB changes. Runtime executor, action-specific payload validation, editor UI and final live role/IDOR/approval testing remain P0.

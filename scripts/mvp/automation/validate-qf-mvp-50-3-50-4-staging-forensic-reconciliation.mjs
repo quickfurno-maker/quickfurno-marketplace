@@ -29,6 +29,17 @@ const canonicalSha256 = (buffer) => sha256(Buffer.from(
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 const clone = (value) => structuredClone(value);
 
+const QUARANTINED_DIR = 'ops/vox/quarantined-migrations/legacy-20261014';
+const QUARANTINED_SHA = Object.freeze({
+  "20261014010000_vox_v1_scoped_staff_authority.sql": "a5d0da20590b178b5e0aaff5045fe9957e367f9396baea4e86222bcc7d076c4c",
+  "20261014020000_vox_v1_staff_review_workflow.sql": "4f7bb561c4aa7203e11a69672017fe97447a95a6c59ada5c8cfe24ffdd1ad166",
+  "20261014030000_vox_v1_approved_grant_finalizer.sql": "1a556c638b9dfe038bdb9cf951e4ee4689c362e5632789c1b97edcd86439184a",
+  "20261014040000_vox_v1_staff_emergency_revocation.sql": "fb68eec0f7a7ee2ea097461522aba7fbe3d239c112fc3ccffedbfbb68659934e",
+  "20261014050000_vox_v1_team_leader_review_policy.sql": "b1423c1135891610ee6e55709fc088598678f8ee59a58fd9d80f732f481fe7e9",
+  "20261014060000_vox_operational_intent_review.sql": "6484c66d9eec6ca699414ec97fc50962e22b685949d280ce3c2d2aeb21fa8dfb",
+  "20261014070000_vox_approved_followup_executor.sql": "454fb0c07ca7589962eddaffa0001a9a2a7562a3304d70da8e091a0499918f01",
+});
+
 const MANIFEST_PATH = "supabase/staging-history/qf-mvp-staging-history-manifest.json";
 const EVIDENCE_PATH = "docs/QF-MVP-50-3-50-4-STAGING-FORENSIC-RECONCILIATION.md";
 const VENDOR_DOC_PATH = "docs/QF-MVP-50-3-VENDOR-WORKFLOWS.md";
@@ -141,6 +152,9 @@ function loadState() {
   const migrationFiles = readdirSync(path.join(ROOT, "supabase/migrations"))
     .filter((filename) => filename.endsWith(".sql"))
     .sort();
+  const quarantinedFiles = readdirSync(path.join(ROOT, QUARANTINED_DIR))
+    .filter((filename) => filename.endsWith(".sql"))
+    .sort();
   return {
     manifest: JSON.parse(read(MANIFEST_PATH)),
     evidenceExists: existsSync(path.join(ROOT, EVIDENCE_PATH)),
@@ -150,6 +164,10 @@ function loadState() {
     ci: read(CI_PATH),
     pkg: JSON.parse(read("package.json")),
     migrationFiles,
+    quarantinedFiles,
+    quarantinedHashes: Object.fromEntries(quarantinedFiles.map((f) => [
+      f, canonicalSha256(readFileSync(path.join(ROOT, QUARANTINED_DIR, f))),
+    ])),
     sourceHashes: Object.fromEntries(FORENSIC_MIGRATIONS.map((migration) => [
       migration.version,
       canonicalSha256(readFileSync(path.join(ROOT, migration.path))),
@@ -175,8 +193,16 @@ function validateState(state) {
     ? manifest.reconciledPostAnchorMigrations
     : null;
 
-  check(`migration count is exactly ${EXPECTED_LIVE_MIGRATION_COUNT}`,
-    state.migrationFiles.length === EXPECTED_LIVE_MIGRATION_COUNT);
+  // V07 retains all 169 explicitly pinned files, but quarantines seven reviewed
+  // 2026-10-14 legacy VOX migrations OUTSIDE the deployable directory.
+  // Fail closed on missing, modified, additional or reintroduced SQL.
+  const approvedQuarantine = same(state.quarantinedFiles, Object.keys(QUARANTINED_SHA).sort()) &&
+    state.quarantinedFiles.every((f) => state.quarantinedHashes[f] === QUARANTINED_SHA[f]) &&
+    state.quarantinedFiles.every((f) => !state.migrationFiles.includes(f));
+  const completeMigrationFiles = [...state.migrationFiles, ...state.quarantinedFiles].sort();
+  check(`migration count is exactly ${EXPECTED_LIVE_MIGRATION_COUNT} including seven quarantined`,
+    approvedQuarantine && completeMigrationFiles.length === EXPECTED_LIVE_MIGRATION_COUNT &&
+    state.migrationFiles.length === EXPECTED_LIVE_MIGRATION_COUNT - state.quarantinedFiles.length);
   const expectedMigrationTail = extendLegacyFilenames(
     [...FORENSIC_MIGRATIONS.map((migration) => migration.filename), RECOVERY_FILENAME,
      CANARY_AUTHORITY_FILENAME, MARKETING_CONSENT_FILENAME, MATCHCORE_RANK_ORDER_FILENAME,
@@ -200,7 +226,7 @@ function validateState(state) {
   );
   check("the forensic migration tail plus the explicit post-G1 extension is exact",
     same(
-      state.migrationFiles.slice(-expectedMigrationTail.length),
+      completeMigrationFiles.slice(-expectedMigrationTail.length),
       expectedMigrationTail,
     ));
   check("all four accepted source hashes are exact",

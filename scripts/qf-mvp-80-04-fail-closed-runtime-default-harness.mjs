@@ -31,6 +31,7 @@ import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "no
 import { createRequire } from "node:module";
 import path, { resolve } from "node:path";
 import { EXPECTED_LIVE_MIGRATION_COUNT } from "./mvp/staging/live-migration-ledger.mjs";
+import { verifiedMigrationInventory } from "./mvp/staging/verify-quarantined-migrations.mjs";
 
 const outDir = resolve(".qf-80-04-build");
 rmSync(outDir, { recursive: true, force: true });
@@ -270,7 +271,7 @@ check("22 [static] this slice adds no migration and no seed", () => {
     `QF-MVP-80.04 must add no migration; found ${migrations.filter((f) => /80_04/.test(f)).join(", ")}`
   );
   assert(
-    migrations.length === EXPECTED_LIVE_MIGRATION_COUNT,
+    verifiedMigrationInventory(migrations),
     `tree has ${migrations.length} migrations but the explicit live ledger pins ${EXPECTED_LIVE_MIGRATION_COUNT}`
   );
 

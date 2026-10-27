@@ -30,6 +30,7 @@ import {
   POST_G1_EXTENSION_RECORDS,
   SUPERSEDED_LEGACY_VERSIONS,
 } from "../staging/live-migration-ledger.mjs";
+import { verifiedMigrationInventory, QUARANTINED_MIGRATION_COUNT } from "../staging/verify-quarantined-migrations.mjs";
 
 // QF-MVP-50.7 RE-PIN: 105 -> 106, adding ONLY the SOURCE-PENDING stale-business
 // terminalization authority (20260906000000). No existing migration was changed,
@@ -269,7 +270,7 @@ check("17-18 no application or inbox source belongs to this phase", () => {
 });
 
 check("19-20 S1 changed no migration and added none", () => {
-  eq(MIGRATIONS.length, EXPECTED_LIVE_MIGRATION_COUNT, "the tree matches the explicit live ledger");
+  eq(verifiedMigrationInventory(MIGRATIONS) ? MIGRATIONS.length + QUARANTINED_MIGRATION_COUNT : -1, EXPECTED_LIVE_MIGRATION_COUNT, "the tree matches the explicit live ledger");
   eq(canonicalSha256(R0_PATH), R0_SHA, "R0 is byte-identical");
   // Exactly one R0 migration, and no S1 migration at all — which is the whole point
   // of this check: S1 was a certification phase and contributed no SQL of its own.
@@ -285,7 +286,7 @@ check("19-20 S1 changed no migration and added none", () => {
 // ---- 21-22. the two counts -------------------------------------------------
 
 check(`21 the live source migration count is ${EXPECTED_LIVE_MIGRATION_COUNT}`, () => {
-  eq(MIGRATIONS.length, EXPECTED_LIVE_MIGRATION_COUNT, "tree");
+  eq(verifiedMigrationInventory(MIGRATIONS) ? MIGRATIONS.length + QUARANTINED_MIGRATION_COUNT : -1, EXPECTED_LIVE_MIGRATION_COUNT, "tree");
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
   assert(/const MIGRATION_COUNT = 119;/.test(g1), "G1 preserves its historical legacy pin");
 });
@@ -296,7 +297,7 @@ check("22 the frozen 80.05 reconciliation count is still 102", () => {
   const g1 = rawOf("scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs");
   assert(/const RECONCILIATION_MIGRATION_COUNT = 102;/.test(g1), "G1 agrees");
   // The accounting still balances after explicit post-G1 pins and one superseded legacy identity.
-  eq(MIGRATIONS.length - MANIFEST.historyReconciliation.migrationCount,
+  eq(MIGRATIONS.length + QUARANTINED_MIGRATION_COUNT - MANIFEST.historyReconciliation.migrationCount,
     EXPECTED_POST_RECONCILIATION_ADDITIONS,
     "live-minus-reconciliation delta matches the explicit ledger");
   eq(EXPECTED_POST_RECONCILIATION_ADDITIONS,

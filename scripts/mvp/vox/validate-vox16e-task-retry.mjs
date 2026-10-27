@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {resolve} from 'node:path';
+const root=resolve(import.meta.dirname,'../../..'),read=f=>readFileSync(resolve(root,f),'utf8');
+const vendor=read('apps/vox-web/app/vendor360/components/TaskCreator.tsx');
+const support=read('apps/vox-web/app/service-desk/components/SupportFollowup.tsx');
+const server=read('services/vendorCrmService.ts');
+const route=read('apps/vox-web/app/api/vendor-task/route.ts');
+let n=0;function check(title,fn){fn();console.log('PASS',title);n++}
+check('vendor stores nonce across ambiguous outcomes',()=>assert.match(vendor,/nonceRef=useRef<string\|null>\(null\)/));
+check('reuses existing vendor nonce after timeout',()=>assert.match(vendor,/nonceRef\.current\?\?crypto.randomUUID\(\)/));
+check('sends existing nonce, not fresh per attempt',()=>assert.match(vendor,/nonce:requestNonce/));
+check('same-origin no-store private request',()=>assert.match(vendor,/credentials:"same-origin",cache:"no-store"/));
+check('does not reset nonce on unknown network outcome',()=>assert.doesNotMatch(vendor.slice(vendor.indexOf('}catch{'),vendor.indexOf('finally{')),/nonceRef\.current=null/));
+check('clears nonce on confirmed success',()=>assert.match(vendor,/nonceRef\.current=null;setTitle\(""/));
+check('resets nonce for every changed field',()=>assert.equal((vendor.match(/nonceRef\.current=null/g)||[]).length,6));
+check('disables input edits midflight',()=>assert.equal((vendor.match(/disabled=\{busy\}/g)||[]).length,5));
+check('does not send vendor-facing message',()=>assert.doesNotMatch(vendor,/sendWhatsApp|provider\.send|wallet\.credit/));
+check('SupportFollowup reuses a reserved nonce without React state lag',()=>assert.match(support,/nonceRef\.current\?\?crypto.randomUUID\(\)/));
+check('native Core writer checks DB unique conflict',()=>assert.match(server,/error\.code === "23505"/));
+check('native Core writer compares immutable action payload',()=>assert.match(server,/sameVendorTaskCreate\(/));
+check('BFF origin bound',()=>assert.match(route,/allowedOrigin\(request\)/));
+check('no direct client RPC to public DB',()=>assert.doesNotMatch(vendor,/supabase\.from|fetch\("https:\/\/|\.rpc\(/));
+check('immediate synchronous in-flight latch',()=>assert.match(vendor,/if\(busyRef\.current\)return;\s*busyRef\.current=true/));
+check('ref latch cleared after settlement',()=>assert.match(vendor,/finally\{busyRef\.current=false;setBusy\(false\);\}/));
+check('nonce assigned synchronously before any await',()=>assert.match(vendor,/const requestNonce=nonceRef\.current\?\?crypto\.randomUUID\(\);\s*nonceRef\.current=requestNonce;\s*const r=await fetch/));
+console.log('VOX18_STAFF_TASK_DOUBLE_SUBMIT_LOCK_PASS '+n+'/'+n);

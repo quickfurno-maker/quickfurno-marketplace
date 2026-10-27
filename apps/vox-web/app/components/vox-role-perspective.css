@@ -1,0 +1,23 @@
+.voxPerspective{margin:25px 0 28px;border:1px solid #31584a;border-radius:13px;padding:clamp(17px,2.4vw,25px);background:linear-gradient(145deg,#112e2b,#0c1d23 65%)}
+.voxPerspectiveHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.voxPerspectiveHeader h2{font-size:20px;letter-spacing:-.025em;margin:0;color:#eff9f2}
+.voxPerspectivePreviewLabel{border:1px solid #666245;color:#ddc995;font-size:9px;letter-spacing:.08em;padding:7px;border-radius:5px;white-space:nowrap}
+.voxPerspectiveRolePicker{display:flex;flex-wrap:wrap;gap:7px;margin:23px 0}
+.voxPerspectiveRolePicker button{font:inherit;font-size:12px;font-weight:700;border:1px solid #3e6555;border-radius:8px;background:#0c2526;color:#a4c9b7;padding:11px 13px;cursor:pointer;min-height:43px}
+.voxPerspectiveRolePicker button:hover{border-color:#68b18b;color:#e5faeb}
+.voxPerspectiveRolePicker button[aria-pressed="true"]{background:#285f48;color:#e8fff1;border-color:#80dcaa}
+.voxPerspectiveBody{display:grid;grid-template-columns:minmax(0,.75fr) minmax(0,1.25fr);gap:21px}
+.voxPerspectiveText{padding:20px 19px;background:#0c2426;border-radius:11px;border:1px solid #2d5246}
+.voxPerspectiveText h3{font-size:clamp(19px,2vw,25px);letter-spacing:-.03em;margin:0 0 12px}
+.voxPerspectiveText>p:not(.voxWorkspaceEyebrow){color:#a3c5b2;font-size:12px;line-height:1.75}
+.voxPerspectiveBoundary{display:flex;gap:10px;padding-top:16px;margin-top:18px;border-top:1px solid #315546;color:#b8d4ac;font-size:11px;line-height:1.65}
+.voxPerspectiveBoundary span{color:#78dca5;font-size:14px}
+.voxPerspectiveTasks{display:grid;gap:9px}
+.voxPerspectiveTasks article{min-width:0;border:1px solid #315344;border-radius:10px;padding:12px 15px;background:#0c2429}
+.voxPerspectiveTasks article>div{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:9px}
+.voxPerspectiveTasks article>div span:first-child{color:#7bdbb3;font-size:9px;letter-spacing:.1em;font-weight:800}
+.voxPerspectiveInactive{color:#ddc38d;font-size:9px;letter-spacing:.035em}
+.voxPerspectiveTasks article strong{font-size:13px;color:#f0faf1}
+.voxPerspectiveTasks article p{font-size:11px;color:#94b6a7;margin:5px 0 0;line-height:1.5}
+@media(max-width:920px){.voxPerspectiveBody{grid-template-columns:1fr}.voxPerspectiveTasks{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:650px){.voxPerspectiveHeader{flex-direction:column}.voxPerspectiveTasks{grid-template-columns:1fr}.voxPerspectiveRolePicker button{flex:1 1 auto}.voxPerspectiveText{padding:16px}}

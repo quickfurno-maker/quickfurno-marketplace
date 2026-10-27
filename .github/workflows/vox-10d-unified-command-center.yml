@@ -1,0 +1,32 @@
+name: VOX-10D Unified Staff Command Center (Release HOLD)
+on:
+  pull_request:
+    paths:
+      - 'apps/vox-web/app/team/command-center/**'
+      - 'apps/vox-web/app/team/page.tsx'
+      - 'apps/vox-web/scripts/validate-vox10d-*'
+      - 'docs/vox/VOX-10D-*'
+      - '.github/workflows/vox-10d-unified-command-center.yml'
+permissions:
+  contents: read
+jobs:
+  bounded-staff-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: apps/vox-web
+      - run: node --test scripts/validate-vox10d-command-center.spec.mjs
+        working-directory: apps/vox-web
+      - run: npm test
+        working-directory: apps/vox-web
+      - run: npm run typecheck
+        working-directory: apps/vox-web
+      - run: npm run build
+        working-directory: apps/vox-web

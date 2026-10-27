@@ -28,6 +28,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { EXPECTED_LIVE_MIGRATION_COUNT } from '../staging/live-migration-ledger.mjs';
+import { verifiedMigrationInventory } from '../staging/verify-quarantined-migrations.mjs';
 
 import {
   GEO_CONTRACT_VERSION,
@@ -795,7 +796,7 @@ section('J. MIGRATION GOVERNANCE [static]');
 // activation authority (20260903040000). No existing migration was changed, renamed,
 // deleted or reordered. Still exact equality.
   check(`J01 the local migration set matches the explicit live ledger (${EXPECTED_LIVE_MIGRATION_COUNT})`,
-    migrations.length === EXPECTED_LIVE_MIGRATION_COUNT,
+    verifiedMigrationInventory(migrations),
     `found ${migrations.length}`);
   // QF-MVP-80.03: the geo migration is no longer the TAIL of the set — the
   // audit_logs forward repair (20260817000000) was added after it. What 75.02

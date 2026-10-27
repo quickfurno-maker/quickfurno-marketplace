@@ -1,0 +1,7 @@
+# VOX AB-4 Core Work native activity writer — CANDIDATE / RELEASE HOLD
+
+New uninstalled SQL trigger `20261018010000_vox_ab4_native_work_source_writer_candidate.sql` attaches to the existing **Core Work** `vox_work_events_candidate_v1` insertion path. When protected, the existing genuine `qf_vox_work_transition_candidate_v1` RPC transitions work in a PostgreSQL transaction, a new trigger inserts immutable F1 canonical `CORE_WORK_LEDGER` Staff source event and one-use nonce within that **SAME** transaction. It independently rechecks exact original work item state/revision/assignee/team/city, current neutral Staff membership, exact source-object scope, and support thread's dual vendor grant. Existing Core RPC still supplies remote AAL2, approved department, source city/zone verification.
+
+New disposable offline PostgreSQL17 tests apply F1, nonce and AB4 SQL to synthetic tables and demonstrate one native event -> exactly one F1+nonce append, replay/forged actor/ungranted object rejection, and rollback across all 3 event tables after nonce collision. No external sends or historical backfill.
+
+**Only the CORE_WORK_LEDGER lane is wired as a candidate**. CRM_AAROHI, SUPPORT_DESK and CORE_CONVERSATION native transaction writers remain incomplete; source-level signatures/grants for those cannot be inferred from a work event. Candidate is NOT a managed migration, and requires independent DBA/AppSec review, genuine Staff AAL2, migration reconciliation, proper signed Core deployment and Owner GO. Do not install it on staging or production now.

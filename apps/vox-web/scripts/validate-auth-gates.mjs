@@ -31,3 +31,18 @@ check("TOTP factor owned and unverified",()=>assert.match(read("app/api/auth/mfa
 check("TOTP confirmation requires actual challenge",()=>assert.match(read("app/api/auth/mfa/confirm/route.ts"),/challengeAndVerify/));
 check("enrollment secret only through owner UI",()=>assert.doesNotMatch(read("app/mfa/enroll/form.tsx"),/localStorage|sessionStorage|console\.log/));
 console.log("VOX_02_SECURE_BFF_GUARDS_PASS "+n+"/26");
+
+const mfaPage=read("app/mfa/page.tsx");
+const enrollPage=read("app/mfa/enroll/page.tsx");
+const mfaForm=read("app/mfa/form.tsx");
+const enrollForm=read("app/mfa/enroll/form.tsx");
+const shell=read("app/password/AuthFlowShell.tsx");
+check("MFA screens reuse premium shared shell",()=>{assert.match(mfaPage,/AuthFlowShell/);assert.match(enrollPage,/AuthFlowShell/);});
+check("MFA no longer uses unstyled hold container",()=>assert.doesNotMatch(mfaPage+enrollPage,/className="hold"/));
+check("MFA screens select secure brand styling",()=>assert.match(shell,/mode="recovery"/));
+check("MFA code supports accessible numeric input",()=>{assert.match(mfaForm,/inputMode="numeric"/);assert.match(mfaForm,/aria-describedby/);});
+check("MFA verifies through protected endpoint only",()=>assert.match(mfaForm,/fetch\("\/api\/auth\/mfa"/));
+check("MFA enrollment QR only after allowed response",()=>assert.match(enrollForm,/if\(!response\.ok\)/));
+check("MFA manual key is hidden until explicitly revealed",()=>assert.match(enrollForm,/showSecret\?/));
+check("MFA enrollment secrets are not persisted or logged",()=>assert.doesNotMatch(enrollForm,/localStorage|sessionStorage|console\.log/));
+console.log("VOX_MFA_PREMIUM_UI_GUARDS_PASS 8/8");

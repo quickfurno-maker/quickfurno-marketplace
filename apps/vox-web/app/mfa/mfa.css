@@ -1,0 +1,37 @@
+.voxMfaInput {
+  font-size: 23px !important;
+  font-weight: 750 !important;
+  letter-spacing: .42em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  padding-left: 23px !important;
+}
+.voxMfaQrWrap {
+  display: grid; justify-items: center; gap: 12px; padding: 18px;
+  border-radius: 12px; border: 1px solid rgba(115,204,164,.25);
+  background: rgba(45,92,85,.14);
+}
+.voxMfaQrWrap img {
+  width: 192px; height: 192px; max-width: 100%;
+  background: white; padding: 10px; border-radius: 10px;
+}
+.voxMfaSecret {
+  width: 100%; overflow-wrap: anywhere; text-align: center;
+  padding: 12px; border-radius: 8px; color: #c0f9e2;
+  background: #08171c; border: 1px solid #39524f;
+  font-size: 12px; letter-spacing: .05em;
+}
+.voxMfaSecondary {
+  border: 1px solid #41675d; border-radius: 9px;
+  background: #142c2c; color: #bcf0d7;
+  padding: 10px 15px; font: inherit; font-size: 12px;
+  cursor: pointer;
+}
+.voxMfaSecondary:focus-visible {
+  outline: 2px solid #8df3c6; outline-offset: 3px;
+}
+.voxMfaSetupStack { display: grid; gap: 17px; }
+.voxMfaGuide { color: #bad1cb; font-size: 12px; line-height: 1.75; margin: 0; }
+@media(max-width:450px) {
+  .voxMfaInput { font-size: 20px !important; letter-spacing: .3em; }
+}

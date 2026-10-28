@@ -1,7 +1,21 @@
 import {PasswordResetForm} from "./form";
 import {recoveryEnabled} from "../../../lib/recoveryStage";
-export const dynamic="force-dynamic";
-export default function ResetPassword(){
- if(!recoveryEnabled())return <main className="hold"><section className="holdCard"><h1>Recovery unavailable</h1></section></main>;
- return <main className="hold"><section className="holdCard"><p className="kicker">VOX / ACCOUNT RECOVERY</p><h1>Choose a new password</h1><p>Use a new strong password. Your one-time recovery session will be signed out after changing it.</p><PasswordResetForm/></section></main>;
+import {AuthFlowShell} from "../AuthFlowShell";
+
+export const dynamic = "force-dynamic";
+
+export default function ResetPassword() {
+  const enabled = recoveryEnabled();
+  return (
+    <AuthFlowShell
+      title={enabled ? "Choose a new password" : "Recovery unavailable"}
+      subtitle={enabled
+        ? "Create a strong password for your VOX account. You'll sign in again after this step."
+        : "Password changes are temporarily unavailable. Please contact your authorized VOX administrator."}
+      step="PASSWORD RESET"
+    >
+      {enabled ? <PasswordResetForm /> : null}
+      <p className="voxAuthReturn"><a href="/login">← Back to sign in</a></p>
+    </AuthFlowShell>
+  );
 }

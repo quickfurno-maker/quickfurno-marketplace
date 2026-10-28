@@ -1,7 +1,21 @@
 import {RecoveryRequestForm} from "./form";
 import {recoveryEnabled} from "../../../lib/recoveryStage";
-export const dynamic="force-dynamic";
-export default function Recover(){
- if(!recoveryEnabled())return <main className="hold"><section className="holdCard"><h1>Recovery unavailable</h1><p>Contact your authorized VOX administrator.</p></section></main>;
- return <main className="hold"><section className="holdCard"><p className="kicker">VOX / PRIVATE STAFF</p><h1>Account recovery</h1><p>Use your enrolled work email. If the account is eligible, a time-limited recovery message will be sent.</p><RecoveryRequestForm/></section></main>;
+import {AuthFlowShell} from "../AuthFlowShell";
+
+export const dynamic = "force-dynamic";
+
+export default function Recover() {
+  const enabled = recoveryEnabled();
+  return (
+    <AuthFlowShell
+      title={enabled ? "Recover account access" : "Recovery unavailable"}
+      subtitle={enabled
+        ? "Enter your enrolled work email. If eligible, you'll receive a secure, time-limited recovery link."
+        : "Account recovery is temporarily unavailable. Please contact your authorized VOX administrator."}
+      step="ACCOUNT RECOVERY"
+    >
+      {enabled ? <RecoveryRequestForm /> : null}
+      <p className="voxAuthReturn"><a href="/login">← Back to sign in</a></p>
+    </AuthFlowShell>
+  );
 }

@@ -28,7 +28,11 @@ assert.equal(await check(await make({aud:"b".repeat(64)})),false,"wrong applicat
 assert.equal(await check(await make({iss:"https://other.cloudflareaccess.com"})),false,"wrong team issuer rejected");
 assert.equal(await check(await make({exp:Math.floor(Date.now()/1000)-120})),false,"expired JWT rejected");
 assert.equal(await check("a.b.c"),false,"malformed JWT rejected");
-assert.equal(await check(good.slice(0,-1)+"0"),false,"tampered signature rejected");
+const parts=good.split(".");
+const sig=parts[2];
+const middle=Math.floor(sig.length/2);
+parts[2]=sig.slice(0,middle)+(sig[middle]==="A"?"B":"A")+sig.slice(middle+1);
+assert.equal(await check(parts.join(".")),false,"tampered signature bytes rejected");
 assert.equal(await check(good,null),false,"missing settings rejected");
 assert.equal(await check(null),false,"missing Access header rejected");
 assert.equal(cloudflareAccessSettings({}),null,"default fails closed");

@@ -1,3 +1,15 @@
 import {MfaForm} from "./form";
-export const dynamic="force-dynamic";
-export default function Mfa(){return <main className="hold"><section className="holdCard"><p className="kicker">VOX / SECOND FACTOR</p><h1>Verify your authenticator</h1><p>Enter the six-digit code from your enrolled staff authenticator. VOX does not accept password-only sessions.</p><MfaForm/><p><a href="/mfa/enroll">First time? Enroll your authenticator</a></p></section></main>;}
+import {AuthFlowShell} from "../password/AuthFlowShell";
+import "./mfa.css";
+export const dynamic = "force-dynamic";
+export default function Mfa() {
+  return <AuthFlowShell mode="mfa" step="SECOND FACTOR" title="Verify it's you"
+    subtitle="Enter the six-digit code from your enrolled authenticator app to continue.">
+    <MfaForm/>
+    <div className="voxAuthFlowNote">
+      <span className="voxAuthFlowNoteMark" aria-hidden="true">i</span>
+      <span>Only verified authenticator codes work. Never share your code with anyone, including support.</span>
+    </div>
+    <p className="voxAuthReturn"><a href="/mfa/enroll">First time? Set up your authenticator</a></p>
+  </AuthFlowShell>;
+}

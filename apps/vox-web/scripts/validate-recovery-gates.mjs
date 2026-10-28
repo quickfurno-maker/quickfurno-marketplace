@@ -50,3 +50,27 @@ assert.match(auth,/-code-verifier"\)\?"lax":"strict"/);
 assert.match(pages,/recoveryEnabled\(\)/);
 assert.match(read(".env.example"),/VOX_PASSWORD_RECOVERY_ENABLED=disabled/);
 console.log("VOX_PASSWORD_RECOVERY_GATES_PASS functional_ticket_positive=2 functional_ticket_negative=10 route_guards=19 default_off=true");
+
+// Visual and accessibility regression: recovery screens use the branded
+// responsive login system, never the legacy unstyled hold container.
+const shell=read("app/password/AuthFlowShell.tsx");
+const styles=read("app/password/auth-flow.css");
+const recoverPage=read("app/password/recover/page.tsx");
+const resetPage=read("app/password/reset/page.tsx");
+const recoverForm=read("app/password/recover/form.tsx");
+const resetForm=read("app/password/reset/form.tsx");
+assert.match(shell,/\.\.\/login\/login\.css/);
+assert.match(shell,/voxAuthPage voxRecoveryPage/);
+assert.match(shell,/voxAuthCard/);
+assert.match(shell,/aria-labelledby="vox-flow-heading"/);
+assert.match(styles,/voxAuthFlowMessage/);
+assert.match(recoverPage,/AuthFlowShell/);
+assert.match(resetPage,/AuthFlowShell/);
+assert.doesNotMatch(recoverPage+resetPage,/className="hold"/);
+assert.match(recoverForm,/className="voxAuthField"/);
+assert.match(recoverForm,/className="voxAuthSubmit"/);
+assert.match(recoverForm,/If this account is eligible/);
+assert.match(recoverForm,/if \(busy \|\| sent\) return/);
+assert.match(resetForm,/autoComplete="new-password"/);
+assert.match(resetForm,/formElement\.reset\(\)/);
+console.log("VOX_RECOVERY_BRANDED_UI_REGRESSION_PASS 14/14");

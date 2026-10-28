@@ -1,0 +1,35 @@
+.voxRecoveryPage .voxAuthCard { width: 100%; }
+.voxRecoveryPage .voxAuthCardIntro p { margin-bottom: 25px; }
+.voxRecoveryPage .voxAuthForm { gap: 17px; }
+.voxAuthFlowHint { color: #86a8a0; font-size: 11px; line-height: 1.6; margin: -6px 0 0; }
+.voxAuthFlowMessage {
+  margin: 4px 0 0; padding: 14px 15px; border-radius: 10px;
+  color: #d1ebdf; background: rgba(76, 161, 124, .12);
+  border: 1px solid rgba(105, 227, 177, .32);
+  font-size: 12px; line-height: 1.65;
+}
+.voxAuthFlowMessage[data-error="true"] {
+  color: #ffd0c7; background: rgba(179, 77, 65, .13);
+  border-color: rgba(240, 148, 133, .3);
+}
+.voxAuthFlowMessage strong { display: block; font-size: 13px; margin-bottom: 4px; }
+.voxAuthFlowNote {
+  display: flex; align-items: flex-start; gap: 11px;
+  margin-top: 20px; padding: 14px 15px;
+  border: 1px solid rgba(117, 182, 161, .2);
+  border-radius: 10px; background: rgba(47, 99, 90, .13);
+  color: #a9c8bf; font-size: 11px; line-height: 1.7;
+}
+.voxAuthFlowNoteMark {
+  display: grid; place-items: center; flex: 0 0 18px; width: 18px; height: 18px;
+  border: 1px solid #7fcbb0; color: #8de7c2; border-radius: 50%;
+  font-size: 11px; font-weight: 800;
+}
+.voxAuthReturn { text-align: center; margin: 20px 0 0; }
+.voxAuthReturn a { color: #a5ecd0; text-decoration: none; font-size: 12px; font-weight: 650; }
+.voxAuthReturn a:hover { text-decoration: underline; }
+.voxAuthReturn a:focus-visible { outline: 2px solid #8df3c6; outline-offset: 4px; border-radius: 3px; }
+@media (max-width: 450px) {
+  .voxRecoveryPage .voxAuthCardIntro p { margin-bottom: 20px; }
+  .voxAuthFlowNote { padding: 12px; }
+}

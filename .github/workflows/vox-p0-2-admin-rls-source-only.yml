@@ -4,6 +4,11 @@ on:
   pull_request:
     paths:
       - 'ops/security/sql-candidates/vox_p0_2_is_admin_active_candidate.sql'
+      - 'ops/security/sql-candidates/vox_p0_5_is_admin_rollback_candidate.sql'
+      - 'ops/security/sql-candidates/vox_p0_6_is_admin_staging_preflight_readonly.sql'
+      - 'ops/security/sql-candidates/vox_p0_6_is_admin_staging_migration_candidate.sql'
+      - 'ops/security/sql-candidates/vox_p0_6_is_admin_staging_postflight_readonly.sql'
+      - 'ops/security/sql-candidates/vox_p0_6_is_admin_staging_rollback_migration_candidate.sql'
       - 'ops/security/tests/**'
       - '.github/workflows/vox-p0-2-admin-rls-source-only.yml'
 
@@ -59,6 +64,14 @@ jobs:
           echo "Running RLS source-only test (P0-4 session-transition + representative-policy extension)..."
           docker exec "${CONTAINER_NAME}" psql -v ON_ERROR_STOP=1 -U postgres -d qa \
             -f /qa/ops/security/tests/vox_p0_4_admin_rls_session_transitions_pg17.sql
+
+          echo "Running P0-5 exact forward/rollback proof (6 cases)..."
+          docker exec "${CONTAINER_NAME}" psql -v ON_ERROR_STOP=1 -U postgres -d qa \
+            -f /qa/ops/security/tests/vox_p0_5_is_admin_forward_rollback_pg17.sql
+
+          echo "Running P0-6 exact Staging migration-candidate + rollback proof..."
+          docker exec "${CONTAINER_NAME}" psql -v ON_ERROR_STOP=1 -U postgres -d qa \
+            -f /qa/ops/security/tests/vox_p0_6_staging_migration_candidate_pg17.sql
 
       - name: Result summary
         if: always()

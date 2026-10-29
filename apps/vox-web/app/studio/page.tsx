@@ -1,18 +1,18 @@
 import Link from "next/link";
-import {fetchScopedStudioSimulation} from "../../lib/core";
+import {fetchScopedStudioSimulation,fetchOwnerStudioSimulation} from "../../lib/core";
 import "../operations/operations.css";
 export const dynamic="force-dynamic";
 const keys=["vendor_journey","client_journey","campaigns","recovery","orphan_cleanup","stale_cleanup"];
 export default async function Studio({searchParams}:{searchParams:Promise<{workflowKey?:string}>}){
  const params=await searchParams;
  const key=typeof params.workflowKey==="string"?params.workflowKey:"vendor_journey";
- const r=await fetchScopedStudioSimulation(key);
+ const r=process.env.VOX_STAFF_VIEW_MODE==="owner"?await fetchOwnerStudioSimulation(key):await fetchScopedStudioSimulation(key);
  if(!r.ok)return <main className="hold"><section className="holdCard">
   <p className="kicker">VOX / AUTOMATION WORKSHOP</p><h1>Simulation unavailable</h1>
   <p>Staff AAL2 authorization, the exact Core workflow role, and approved private Staging are required. No simulations or live actions have run here.</p>
   <Link href="/operations">Mission Control</Link></section></main>;
  return <main className="voxOps"><header className="voxTop"><div className="voxLogo">V</div><div>
-  <b>VOX / NATIVE AUTOMATION STUDIO</b><small>Existing Core simulator · Read only</small></div>
+  <b>VOX / NATIVE AUTOMATION STUDIO</b><small>{process.env.VOX_STAFF_VIEW_MODE==="owner"?"Owner native workflow defaults · Read only":"Existing Core simulator · Read only"}</small></div>
   <div className="voxSession">DRY RUN · AAL2</div></header>
   <div className="voxHero"><p className="kicker">AUTOMATION WORKSHOP / SOURCE DEFAULT</p>
   <h1>Simulate safely.<br/><span>Never publish accidentally.</span></h1>

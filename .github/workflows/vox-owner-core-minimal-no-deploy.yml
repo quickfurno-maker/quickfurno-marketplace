@@ -9,6 +9,9 @@ on:
       - "services/vox/overviewProjection.d.mts"
       - "lib/supabase.ts"
       - "scripts/mvp/vox/validate-vox-02-overview.mjs"
+      - "scripts/mvp/vox/validate-vox-02b-overview-schema-contract.mjs"
+      - "scripts/mvp/vox/validate-vox-02c-owner-auth200.harness.mjs"
+      - "scripts/mvp/vox/fixtures/**"
       - "scripts/mvp/vox/smoke-vox-owner-offline.mjs"
       - ".github/workflows/vox-owner-core-minimal-no-deploy.yml"
   workflow_dispatch:
@@ -39,6 +42,10 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Run exact Owner-only Core contract
         run: node scripts/mvp/vox/validate-vox-02-overview.mjs
+      - name: Run Owner overview schema-contract (priority exists, topic does not)
+        run: node scripts/mvp/vox/validate-vox-02b-overview-schema-contract.mjs
+      - name: Run synthetic authenticated Owner 200 + negatives (no deploy, no credentials)
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/vox/validate-vox-02c-owner-auth200.harness.mjs
       - name: Typecheck full Core
         run: npm run typecheck
       - name: Check production dependency security

@@ -19,11 +19,14 @@ try {
   $started=$true
   $ready=$false
   for($i=1;$i -le 60;$i++){
-    & docker exec $ContainerName pg_isready -U postgres | Out-Null
-    if($LASTEXITCODE -eq 0){ $ready=$true; break }
+    $initComplete = ((& cmd.exe /d /s /c "docker logs $ContainerName 2>&1") | Select-String -SimpleMatch 'PostgreSQL init process complete; ready for start up.')
+    if($initComplete){
+      $probe = (& docker exec $ContainerName psql -U postgres -d postgres -Atqc 'select 1' 2>$null | Out-String).Trim()
+      if($LASTEXITCODE -eq 0 -and $probe -eq '1'){ $ready=$true; break }
+    }
     Start-Sleep -Seconds 1
   }
-  if(-not $ready){ throw 'Postgres readiness failed' }
+  if(-not $ready){ & cmd.exe /d /s /c "docker logs $ContainerName 2>&1"; throw 'Final initialized Postgres readiness failed' }
   & docker exec $ContainerName psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f "/qa/$SqlRelativePath"
   if($LASTEXITCODE -ne 0){ throw 'P0-6 migration-candidate SQL failed' }
   Write-Host 'P0-6 migration-candidate SQL completed successfully.'

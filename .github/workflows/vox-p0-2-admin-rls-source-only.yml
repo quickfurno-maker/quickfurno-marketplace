@@ -44,14 +44,17 @@ jobs:
             -v "${GITHUB_WORKSPACE}:/qa:ro" \
             postgres:17-alpine
 
-          echo "Waiting for postgres to become ready..."
+          echo "Waiting for final initialized Postgres server..."
           for i in $(seq 1 60); do
-            if docker exec "${CONTAINER_NAME}" pg_isready -U postgres -d qa >/dev/null 2>&1; then
-              echo "Postgres is ready."
-              break
+            if docker logs "${CONTAINER_NAME}" 2>&1 | grep -q "PostgreSQL init process complete; ready for start up."; then
+              if [ "$(docker exec "${CONTAINER_NAME}" psql -U postgres -d qa -Atqc 'select 1' 2>/dev/null || true)" = "1" ]; then
+                echo "Final Postgres server is ready."
+                break
+              fi
             fi
             if [ "$i" -eq 60 ]; then
-              echo "Postgres did not become ready in time." >&2
+              echo "Final initialized Postgres server did not become ready in time." >&2
+              docker logs "${CONTAINER_NAME}" >&2 || true
               exit 1
             fi
             sleep 1

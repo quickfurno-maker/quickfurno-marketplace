@@ -52,9 +52,13 @@ jobs:
             sleep 1
           done
 
-          echo "Running RLS source-only test..."
+          echo "Running RLS source-only test (P0-2 baseline, 9 cases)..."
           docker exec "${CONTAINER_NAME}" psql -v ON_ERROR_STOP=1 -U postgres -d qa \
             -f /qa/ops/security/tests/vox_p0_2_admin_rls_pg17.sql
+
+          echo "Running RLS source-only test (P0-4 session-transition + representative-policy extension)..."
+          docker exec "${CONTAINER_NAME}" psql -v ON_ERROR_STOP=1 -U postgres -d qa \
+            -f /qa/ops/security/tests/vox_p0_4_admin_rls_session_transitions_pg17.sql
 
       - name: Result summary
         if: always()

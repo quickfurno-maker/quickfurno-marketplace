@@ -74,7 +74,7 @@ function Rail(){
   <div className="opsBrand"><span>V</span><div><b>VOX</b><small>QuickFurno Operations</small></div></div>
   <p className="opsRailLabel">WORKSPACES</p>
   <nav>{nav.map(item=>{
-   const locked=owner&&!["/operations","/acquisition","/vendor360","/service-desk"].includes(item.href);
+   const locked=owner&&!["/operations","/acquisition","/vendor360","/service-desk"].includes(item.href)&&!(item.href==="/intelligence"&&process.env.VOX_INTELLIGENCE_VIEW_ENABLED==="staging");
    return locked?<span className="opsNavLocked" key={item.href} title="Pending Core certification and governed activation"><small>{item.code}</small><span>{item.label}</span><b>LOCKED</b></span>:
    <Link className={item.href==="/operations"?"active":""} href={item.href} key={item.href}><small>{item.code}</small><span>{item.label}{owner&&item.href!=="/operations"?" · Preview":""}</span></Link>;
   })}</nav>
@@ -144,6 +144,7 @@ export default async function Operations(){
       <Link href="/vendor360">Vendor preview <span>›</span></Link>
       <Link href="/acquisition">Acquisition preview <span>›</span></Link>
       <Link href="/service-desk">Service preview <span>›</span></Link>
+      {process.env.VOX_INTELLIGENCE_VIEW_ENABLED==="staging"?<Link href="/intelligence">Owner Intelligence <span>›</span></Link>:null}
      </>:<>
       <Link href="/approvals">Owner Approvals <span>›</span></Link>
       <Link href="/intelligence">Intelligence <span>›</span></Link>

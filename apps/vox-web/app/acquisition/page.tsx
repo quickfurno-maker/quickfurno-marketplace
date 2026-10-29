@@ -5,8 +5,10 @@ import {StaffProposalForm} from "../components/StaffProposalForm";
 import {AarohiFollowupProposal} from "./components/AarohiFollowupProposal";
 import "../components/scoped-queue.css";
 import "../operations/operations.css";
+import {OwnerPreview} from "../components/OwnerPreview";
 export const dynamic="force-dynamic";
 export default async function Acquisition(){
+ if(process.env.VOX_STAFF_VIEW_MODE==="owner")return <OwnerPreview kind="acquisition"/>;
  const r=await fetchScopedCrm("acquisition");
  if(!r.ok||r.kind!=="acquisition")return <main className="hold"><section className="holdCard">
  <p className="kicker">STAFF CORE AUTHORIZATION</p><h1>Acquisition unavailable</h1>

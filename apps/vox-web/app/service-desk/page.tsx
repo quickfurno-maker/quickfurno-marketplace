@@ -5,8 +5,10 @@ import {StaffProposalForm} from "../components/StaffProposalForm";
 import {SupportFollowup} from "./components/SupportFollowup";
 import "../components/scoped-queue.css";
 import "../operations/operations.css";
+import {OwnerPreview} from "../components/OwnerPreview";
 export const dynamic="force-dynamic";
 export default async function ServiceDesk(){
+ if(process.env.VOX_STAFF_VIEW_MODE==="owner")return <OwnerPreview kind="service-desk"/>;
  const r=await fetchScopedServiceDesk();
  if(!r.ok)return <main className="hold"><section className="holdCard">
  <p className="kicker">VOX / HUMAN DESK</p><h1>Service Desk unavailable</h1>

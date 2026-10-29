@@ -35,6 +35,7 @@ check("Owner navigation locks uncertified modules",()=>{
  assert.match(operations,/const owner=process\.env\.VOX_STAFF_VIEW_MODE==="owner"/);
  assert.match(operations,/locked=owner&&/);
  assert.match(operations,/opsNavLocked/);
+ assert.match(operations,/VOX_INTELLIGENCE_VIEW_ENABLED==="staging"/);
  assert.match(operations,/LOCKED/);
 });
 check("Owner shortcuts point only to preview pages",()=>{
@@ -42,7 +43,8 @@ check("Owner shortcuts point only to preview pages",()=>{
  assert.match(block,/href="\/vendor360"/);
  assert.match(block,/href="\/acquisition"/);
  assert.match(block,/href="\/service-desk"/);
- assert.doesNotMatch(block,/href="\/(approvals|studio|staff-reviews|intelligence)"/);
+ assert.doesNotMatch(block,/href="\/(approvals|studio|staff-reviews)"/);
+ assert.match(block,/VOX_INTELLIGENCE_VIEW_ENABLED==="staging"\?<Link href="\/intelligence"/);
 });
 check("Staff-specific Core checks stay in original source",()=>{
  for(const page of ["acquisition","vendor360","service-desk"]){

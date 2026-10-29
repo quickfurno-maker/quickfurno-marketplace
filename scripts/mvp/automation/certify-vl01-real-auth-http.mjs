@@ -14,14 +14,30 @@ const require=createRequire(path.join(ROOT,"package.json"));
 const { Client }=require("pg");
 if(typeof globalThis.WebSocket === "undefined") globalThis.WebSocket=require("ws");
 const {createServerClient}=require("@supabase/ssr");
-// Official Supabase GHCR release, pinned to immutable multi-platform digest.
-// A public ECR mirror rate limit prevented genuine HTTP QA on CI. This only
-// changes the disposable test image source, never production configuration.
-// Release provenance: github.com/supabase/cli/pkgs/container/postgrest (v16.1).
-const POSTGREST_TEST_IMAGE="ghcr.io/supabase/postgrest:v16.1@sha256:5922bde07147b82b1c9d8f749e48c1e5b99ebb233f3888bb7ab65f07cf4ac82d";
+// Two official distribution hosts for the SAME immutable PostgREST v16.1 digest.
+// A CI registry rate limit must not turn a genuine auth test into a fake pass.
+const POSTGREST_DIGEST="sha256:5922bde07147b82b1c9d8f749e48c1e5b99ebb233f3888bb7ab65f07cf4ac82d";
+const POSTGREST_TEST_IMAGES=[
+ "ghcr.io/supabase/postgrest:v16.1@"+POSTGREST_DIGEST,
+ "public.ecr.aws/supabase/postgrest:v16.1@"+POSTGREST_DIGEST,
+];
 const suffix=String(process.pid), net="vl01-http-net-"+suffix, pgname="vl01-http-pg-"+suffix, gt="vl01-http-auth-"+suffix, rest="vl01-http-rest-"+suffix;
 const pass=randomBytes(22).toString("hex"), jwtSecret=randomBytes(32).toString("hex");
 const docker=(...args)=>execFileSync("docker",args,{encoding:"utf8",stdio:["ignore","pipe","pipe"]}).trim();
+const choosePinnedPostgrestImage=()=>{
+ for(const ref of POSTGREST_TEST_IMAGES){
+  try{
+   // Prefer an already verified local image; avoid unnecessary registry requests.
+   try{docker("image","inspect",ref);}catch{docker("pull",ref);}
+   const repoDigests=JSON.parse(docker("image","inspect","--format","{{json .RepoDigests}}",ref));
+   if(!Array.isArray(repoDigests)||!repoDigests.some(x=>typeof x==="string"&&x.endsWith("@"+POSTGREST_DIGEST)))
+    throw Error("POSTGREST_DIGEST_NOT_VERIFIED");
+   console.log("POSTGREST_PINNED_DIGEST_VERIFIED");
+   return ref;
+  }catch{/* Try second official host with the exact same digest; never skip HTTP QA. */}
+ }
+ throw Error("POSTGREST_PINNED_IMAGE_UNAVAILABLE");
+};
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const jwt=claims=>{const b=v=>Buffer.from(JSON.stringify(v)).toString("base64url");const head=b({alg:"HS256",typ:"JWT"});const payload=b(claims);const sig=createHmac("sha256",jwtSecret).update(head+"."+payload).digest("base64url");return head+"."+payload+"."+sig;};
 const uid="d71a2711-5cab-4c4e-9a4d-c8e6bac8f6dd",req="fd133c10-87dd-4b5e-9ed8-8d7a5a9fb113",job="6ea50c8c-32ce-4c1f-9569-cd679d843d5f",attempt="9b1bc810-4814-44a7-8955-50f0eb531d92",transport="b2d4a319-6450-4479-80e3-b898a28fd645";
@@ -72,7 +88,7 @@ try {
  docker("run","-d","--name",rest,"--network",net,"-p","127.0.0.1::3000",
  "-e","PGRST_DB_URI=postgres://authenticator:"+pass+"@"+pgname+":5432/vl01",
  "-e","PGRST_DB_SCHEMAS=public","-e","PGRST_DB_ANON_ROLE=anon","-e","PGRST_JWT_SECRET="+jwtSecret,
- "-e","PGRST_SERVER_PORT=3000",POSTGREST_TEST_IMAGE);dbs.push(rest);
+ "-e","PGRST_SERVER_PORT=3000",choosePinnedPostgrestImage());dbs.push(rest);
  const restPort=Number(docker("port",rest,"3000/tcp").match(/127\.0\.0\.1:(\d+)/)?.[1]);
  await ready("http://127.0.0.1:"+restPort+"/");
  const server=createServer((request,response)=>{

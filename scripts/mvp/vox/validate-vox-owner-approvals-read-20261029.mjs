@@ -29,4 +29,11 @@ check("private no-store and separated bearer",()=>{
  assert.match(code,/no-store/);
  assert.match(code,/vary":"Authorization"/);
 });
+const realAuth=readFileSync(resolve(import.meta.dirname,"../automation/certify-vl01-real-auth-http.mjs"),"utf8");
+check("real auth CI mirror same immutable digest",()=>{
+ assert.match(realAuth,/ghcr\.io\/supabase\/postgrest:v16\.1@"\+POSTGREST_DIGEST/);
+ assert.match(realAuth,/public\.ecr\.aws\/supabase\/postgrest:v16\.1@"\+POSTGREST_DIGEST/);
+ assert.match(realAuth,/POSTGREST_DIGEST_NOT_VERIFIED/);
+ assert.match(realAuth,/POSTGREST_PINNED_IMAGE_UNAVAILABLE/);
+});
 console.log("VOX_OWNER_APPROVALS_READ_CONTRACT_PASS "+ok+"/"+ok);

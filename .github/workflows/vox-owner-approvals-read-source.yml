@@ -4,6 +4,7 @@ on:
     paths:
       - 'app/api/vox/v1/owner-approval-queue/**'
       - 'scripts/mvp/vox/validate-vox-owner-approvals-read-20261029.mjs'
+      - 'scripts/mvp/automation/certify-vl01-real-auth-http.mjs'
       - '.github/workflows/vox-owner-approvals-read-source.yml'
   workflow_dispatch:
 permissions:

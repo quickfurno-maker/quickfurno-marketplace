@@ -1,0 +1,68 @@
+name: vox-p0-2-admin-rls-source-only
+
+on:
+  pull_request:
+    paths:
+      - 'ops/security/sql-candidates/vox_p0_2_is_admin_active_candidate.sql'
+      - 'ops/security/tests/**'
+      - '.github/workflows/vox-p0-2-admin-rls-source-only.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  source-only-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR SHA
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Run isolated postgres:17-alpine against candidate SQL and tests
+        run: |
+          set -euo pipefail
+
+          CONTAINER_NAME="vox-p0-2-admin-rls-$(date +%s)-${RANDOM}"
+
+          cleanup() {
+            docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker run -d \
+            --name "${CONTAINER_NAME}" \
+            --network none \
+            -e POSTGRES_HOST_AUTH_METHOD=trust \
+            -e POSTGRES_DB=qa \
+            -v "${GITHUB_WORKSPACE}:/qa:ro" \
+            postgres:17-alpine
+
+          echo "Waiting for postgres to become ready..."
+          for i in $(seq 1 60); do
+            if docker exec "${CONTAINER_NAME}" pg_isready -U postgres -d qa >/dev/null 2>&1; then
+              echo "Postgres is ready."
+              break
+            fi
+            if [ "$i" -eq 60 ]; then
+              echo "Postgres did not become ready in time." >&2
+              exit 1
+            fi
+            sleep 1
+          done
+
+          echo "Running RLS source-only test..."
+          docker exec "${CONTAINER_NAME}" psql -v ON_ERROR_STOP=1 -U postgres -d qa \
+            -f /qa/ops/security/tests/vox_p0_2_admin_rls_pg17.sql
+
+      - name: Result summary
+        if: always()
+        run: |
+          {
+            echo "## vox-p0-2-admin-rls-source-only"
+            echo ""
+            echo "**SOURCE ONLY — NOT DEPLOYED**"
+            echo ""
+            echo "This workflow validates the candidate SQL and RLS test in an isolated, network-less Docker container. It does not apply migrations, deploy, use secrets, or touch any environment."
+          } >> "${GITHUB_STEP_SUMMARY}"

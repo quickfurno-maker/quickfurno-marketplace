@@ -6,8 +6,10 @@ import {ProfileReviewQueue} from "./components/ProfileReviewQueue";
 import {StaffProposalForm} from "../components/StaffProposalForm";
 import "../components/scoped-queue.css";
 import "../operations/operations.css";
+import {OwnerPreview} from "../components/OwnerPreview";
 export const dynamic="force-dynamic";
 export default async function Vendor360(){
+ if(process.env.VOX_STAFF_VIEW_MODE==="owner")return <OwnerPreview kind="vendor360"/>;
  const r=await fetchScopedCrm("vendor360");
  if(!r.ok||r.kind!=="vendor360")return <main className="hold"><section className="holdCard">
  <p className="kicker">STAFF CORE AUTHORIZATION</p><h1>Vendor 360 unavailable</h1>

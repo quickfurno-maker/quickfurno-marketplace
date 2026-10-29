@@ -69,10 +69,15 @@ function Domain({rows,kind}:{rows:RecordValue[];kind:DomainKind}){
 }
 
 function Rail(){
+ const owner=process.env.VOX_STAFF_VIEW_MODE==="owner";
  return <aside className="opsRail">
   <div className="opsBrand"><span>V</span><div><b>VOX</b><small>QuickFurno Operations</small></div></div>
   <p className="opsRailLabel">WORKSPACES</p>
-  <nav>{nav.map(item=><Link className={item.href==="/operations"?"active":""} href={item.href} key={item.href}><small>{item.code}</small><span>{item.label}</span></Link>)}</nav>
+  <nav>{nav.map(item=>{
+   const locked=owner&&!["/operations","/acquisition","/vendor360","/service-desk"].includes(item.href);
+   return locked?<span className="opsNavLocked" key={item.href} title="Pending Core certification and governed activation"><small>{item.code}</small><span>{item.label}</span><b>LOCKED</b></span>:
+   <Link className={item.href==="/operations"?"active":""} href={item.href} key={item.href}><small>{item.code}</small><span>{item.label}{owner&&item.href!=="/operations"?" · Preview":""}</span></Link>;
+  })}</nav>
   <div className="opsTrust"><span className="opsTrustDot"/><div><b>AAL2 session</b><small>Core verified · read-only</small></div></div>
  </aside>;
 }
@@ -118,11 +123,11 @@ export default async function Operations(){
 
    <section className="opsHero">
     <div>
-     <p className="opsKicker">QUICKFURNO / LIVE OPERATIONAL VIEW</p>
+     <p className="opsKicker">QUICKFURNO / VERIFIED CORE OWNER PROJECTION</p>
      <h1>See the business clearly.<br/><em>Act only when authorized.</em></h1>
      <p className="opsLead">A clean owner view of acquisition, vendor relationships, service workload and governed human handovers. Every record is bounded by QuickFurno Core.</p>
     </div>
-    <div className="opsHeroBadge"><span>LIVE</span><strong>{String(total).padStart(2,"0")}</strong><small>bounded records</small></div>
+    <div className="opsHeroBadge"><span>CORE READ</span><strong>{String(total).padStart(2,"0")}</strong><small>recent bounded records</small></div>
    </section>
 
    <section className="opsMetrics" aria-label="Operational summary">
@@ -135,9 +140,16 @@ export default async function Operations(){
    <section className="opsQuick">
     <div><p className="opsKicker">OWNER SHORTCUTS</p><h2>Move directly to the workspace you need.</h2></div>
     <div className="opsQuickLinks">
-     <Link href="/approvals">Owner Approvals <span>↗</span></Link>
-     <Link href="/intelligence">Intelligence <span>↗</span></Link>
-     <Link href="/service-desk">Service Desk <span>↗</span></Link>`r`n     <Link href="/studio">Automation Studio <span>↗</span></Link>
+     {process.env.VOX_STAFF_VIEW_MODE==="owner"?<>
+      <Link href="/vendor360">Vendor preview <span>›</span></Link>
+      <Link href="/acquisition">Acquisition preview <span>›</span></Link>
+      <Link href="/service-desk">Service preview <span>›</span></Link>
+     </>:<>
+      <Link href="/approvals">Owner Approvals <span>›</span></Link>
+      <Link href="/intelligence">Intelligence <span>›</span></Link>
+      <Link href="/service-desk">Service Desk <span>›</span></Link>
+      <Link href="/studio">Automation Studio <span>›</span></Link>
+     </>}
     </div>
    </section>
 

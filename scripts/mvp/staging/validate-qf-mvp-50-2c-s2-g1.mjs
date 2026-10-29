@@ -670,7 +670,7 @@ function validateState(state) {
     extension?.evidenceProjects?.staging?.projectRef === "uckafzuochmbvtiodmcl" &&
     extension?.evidenceProjects?.production?.projectRef === "yqpgcsduqbxulrlzwzap");
   check("post-G1 extension records are unique, exact and hash-pinned",
-    extensionRecords.length === 44 &&
+    extensionRecords.length === 45 &&
     new Set(extensionRecords.map((record) => record.version)).size === extensionRecords.length &&
     extensionRecords.every((record) => {
       const local = localByVersion.get(record.version);
@@ -692,6 +692,7 @@ function validateState(state) {
         ["20261012080000", "SOURCE_PIN_CREATED_2026-10-12_ISOLATED_STAGE_ONLY_NO_PARENT_APPLY"],
         ["20261012100000", "SOURCE_PIN_CREATED_2026-10-12_ISOLATED_STAGE_ONLY_NO_PARENT_APPLY"],
         ["20261012213000", "SOURCE_PIN_CREATED_2026-10-12_DISPOSABLE_LOCAL_PG_CERTIFIED_6_OF_6_NO_REMOTE_APPLY"],
+        ["20261029160138", "SOURCE_PIN_CREATED_2026-10-29_P06_PG17_CANDIDATE_PASS_NO_REMOTE_APPLY"],
       ]);
       const allowedSourcePin = sourcePinnedEvidence.get(record.version);
       return local?.version === record.version &&

@@ -702,6 +702,18 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-10-12_DISPOSABLE_LOCAL_PG_CERTIFIED_6_OF_6_NO_REMOTE_APPLY"
+    },
+    {
+      "version": "20261029160138",
+      "name": "vox_p06_is_admin_active_status_hardening",
+      "filename": "20261029160138_vox_p06_is_admin_active_status_hardening.sql",
+      "path": "supabase/migrations/20261029160138_vox_p06_is_admin_active_status_hardening.sql",
+      "canonicalSha256": "a77179ee0f1026986c0048945bf821a34e4303c1d6364381312a9e6108933c1b",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-29_P06_PG17_CANDIDATE_PASS_NO_REMOTE_APPLY"
     }
   ],
   "supersededLegacyPins": [

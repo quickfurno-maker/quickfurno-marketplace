@@ -1,0 +1,83 @@
+name: VOX P0-3 real LOCAL GoTrue Owner Auth (NO DEPLOY)
+
+# Disposable loopback-only GoTrue + PostgREST + PostgreSQL on the runner's Docker.
+# No GitHub environment, no secrets, no deploy, no migrations, no publish.
+
+on:
+  pull_request:
+    paths:
+      - "scripts/mvp/vox/validate-vox-03-real-local-gotrue-auth.harness.mjs"
+      - "scripts/mvp/vox/fixtures/vox-real-source.loader.mjs"
+      - "scripts/mvp/vox/fixtures/totp.mjs"
+      - "docs/vox/VOX-P0-3-AUTH-QA-20261029.md"
+      - ".github/workflows/vox-p0-3-real-local-gotrue-no-deploy.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vox-p0-3-real-local-gotrue-no-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-local-gotrue-auth:
+    name: Real local GoTrue Owner AAL2 auth harness (NO DEPLOY)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact PR source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verify runner Docker and no managed Supabase env
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker version
+          docker info --format '{{.ServerVersion}}'
+          test -z "${SUPABASE_URL:-}"
+          test -z "${DATABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+      - name: Install pinned dependencies (no scripts)
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run real local GoTrue Owner auth harness (synthetic localhost only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="${RUNNER_TEMP}/vox03-harness-output.log"
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/vox/validate-vox-03-real-local-gotrue-auth.harness.mjs 2>&1 | tee "$log"
+          if grep -Fq 'BLOCKED' "$log"; then
+            echo 'VOX_03 FAIL: BLOCKED case(s) present; harness exit 0 is NOT full AAL2 certification' >&2
+            exit 1
+          fi
+          if ! grep -Fqx 'VOX_03_REAL_LOCAL_GOTRUE_OWNER_AUTH_PASS 8 passed, 0 blocked (not faked), 0 failed' "$log"; then
+            echo 'VOX_03 FAIL: exact final success marker missing' >&2
+            exit 1
+          fi
+          echo 'VOX_03_CI_GATE_FULL_PASS_VERIFIED'
+      - name: Verify synthetic containers removed
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          leftovers="$(docker ps -aq --filter 'name=vox03-gotrue-')"
+          if [ -n "$leftovers" ]; then
+            echo "Leftover vox03 containers found; removing" >&2
+            docker rm -f $leftovers
+            exit 1
+          fi
+          echo 'VOX_03_NO_LEFTOVER_CONTAINERS'
+      - name: Explicit release HOLD
+        if: always()
+        run: |
+          {
+            echo '## VOX P0-3 real LOCAL GoTrue auth (NO DEPLOY)'
+            echo 'Scope: disposable loopback-only GoTrue/PostgREST/Postgres with synthetic secrets.'
+            echo 'Live Staging/Production AAL2: **NOT CHECKED**. No environment, secrets, deploy, migrations or publish.'
+          } >> "$GITHUB_STEP_SUMMARY"

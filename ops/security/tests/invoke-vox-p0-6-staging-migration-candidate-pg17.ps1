@@ -27,8 +27,20 @@ try {
     Start-Sleep -Seconds 1
   }
   if(-not $ready){ & cmd.exe /d /s /c "docker logs $ContainerName 2>&1"; throw 'Final initialized Postgres readiness failed' }
-  & docker exec $ContainerName psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f "/qa/$SqlRelativePath"
-  if($LASTEXITCODE -ne 0){ throw 'P0-6 migration-candidate SQL failed' }
+  # PostgreSQL RAISE NOTICE writes to stderr. Windows PowerShell can classify that
+  # as a terminating NativeCommandError with ErrorActionPreference=Stop.
+  # Capture/log all output but evaluate the real psql process exit code.
+  $previousPreference=$ErrorActionPreference
+  $psqlExit=-1
+  try {
+    $ErrorActionPreference='Continue'
+    & docker exec $ContainerName psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f "/qa/$SqlRelativePath" 2>&1 |
+      ForEach-Object { Write-Host $_.ToString() }
+    $psqlExit=$LASTEXITCODE
+  } finally {
+    $ErrorActionPreference=$previousPreference
+  }
+  if($psqlExit -ne 0){ throw "P0-6 migration-candidate SQL failed (psql_exit=$psqlExit)" }
   Write-Host 'P0-6 migration-candidate SQL completed successfully.'
 } finally {
   if($started){ & docker stop $ContainerName | Out-Null; & docker rm $ContainerName | Out-Null }

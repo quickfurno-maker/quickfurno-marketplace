@@ -14,6 +14,11 @@ const require=createRequire(path.join(ROOT,"package.json"));
 const { Client }=require("pg");
 if(typeof globalThis.WebSocket === "undefined") globalThis.WebSocket=require("ws");
 const {createServerClient}=require("@supabase/ssr");
+// Official Supabase GHCR release, pinned to immutable multi-platform digest.
+// A public ECR mirror rate limit prevented genuine HTTP QA on CI. This only
+// changes the disposable test image source, never production configuration.
+// Release provenance: github.com/supabase/cli/pkgs/container/postgrest (v16.1).
+const POSTGREST_TEST_IMAGE="ghcr.io/supabase/postgrest:v16.1@sha256:5922bde07147b82b1c9d8f749e48c1e5b99ebb233f3888bb7ab65f07cf4ac82d";
 const suffix=String(process.pid), net="vl01-http-net-"+suffix, pgname="vl01-http-pg-"+suffix, gt="vl01-http-auth-"+suffix, rest="vl01-http-rest-"+suffix;
 const pass=randomBytes(22).toString("hex"), jwtSecret=randomBytes(32).toString("hex");
 const docker=(...args)=>execFileSync("docker",args,{encoding:"utf8",stdio:["ignore","pipe","pipe"]}).trim();
@@ -67,7 +72,7 @@ try {
  docker("run","-d","--name",rest,"--network",net,"-p","127.0.0.1::3000",
  "-e","PGRST_DB_URI=postgres://authenticator:"+pass+"@"+pgname+":5432/vl01",
  "-e","PGRST_DB_SCHEMAS=public","-e","PGRST_DB_ANON_ROLE=anon","-e","PGRST_JWT_SECRET="+jwtSecret,
- "-e","PGRST_SERVER_PORT=3000","public.ecr.aws/supabase/postgrest:v16.1");dbs.push(rest);
+ "-e","PGRST_SERVER_PORT=3000",POSTGREST_TEST_IMAGE);dbs.push(rest);
  const restPort=Number(docker("port",rest,"3000/tcp").match(/127\.0\.0\.1:(\d+)/)?.[1]);
  await ready("http://127.0.0.1:"+restPort+"/");
  const server=createServer((request,response)=>{

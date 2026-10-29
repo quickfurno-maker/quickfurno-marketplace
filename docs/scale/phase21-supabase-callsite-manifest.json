@@ -9,8 +9,8 @@
     "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
   },
   "totals": {
-    "files": 144,
-    "rpcNames": 88,
+    "files": 146,
+    "rpcNames": 90,
     "tableNames": 121,
     "storageBuckets": 0,
     "authFiles": 13,
@@ -52,6 +52,8 @@
     "qf_apply_vendor_credit_delta",
     "qf_apply_workflow_step",
     "qf_approve_vendor_campaign_v1",
+    "qf_approve_vendor_profile_update_v3",
+    "qf_approve_vendor_verified_coverage_v1",
     "qf_begin_idempotent_operation",
     "qf_bind_vendor_package_razorpay_order_v2",
     "qf_cancel_orphan_automation_job_v1",
@@ -2050,6 +2052,18 @@
       "realtime": false
     },
     {
+      "file": "services/vendorGovernedChangeIntakeService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "vendor_profile_change_requests",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
       "file": "services/vendorIntelligenceService.ts",
       "directImports": [],
       "rpc": [],
@@ -2147,7 +2161,9 @@
     {
       "file": "services/vendorProfileChangeService.ts",
       "directImports": [],
-      "rpc": [],
+      "rpc": [
+        "qf_approve_vendor_profile_update_v3"
+      ],
       "tables": [
         "vendor_profile_change_requests",
         "vendors"
@@ -2221,6 +2237,17 @@
         "vendor_dashboard_users",
         "vendors"
       ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorVerifiedCoverageApprovalService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_approve_vendor_verified_coverage_v1"
+      ],
+      "tables": [],
       "storageBuckets": [],
       "auth": false,
       "realtime": false

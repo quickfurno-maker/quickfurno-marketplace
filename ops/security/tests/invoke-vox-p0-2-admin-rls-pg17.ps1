@@ -48,20 +48,24 @@ try {
     }
     $containerStarted = $true
 
-    Write-Host 'Waiting for Postgres to become ready...'
+    Write-Host 'Waiting for final initialized Postgres server...'
     $maxAttempts = 60
     $ready = $false
     for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
-        & docker exec $ContainerName pg_isready -U postgres | Out-Null
-        if ($LASTEXITCODE -eq 0) {
-            $ready = $true
-            break
+        $initComplete = ((& cmd.exe /d /s /c "docker logs $ContainerName 2>&1") | Select-String -SimpleMatch 'PostgreSQL init process complete; ready for start up.')
+        if ($initComplete) {
+            $probe = (& docker exec $ContainerName psql -U postgres -d postgres -Atqc 'select 1' 2>$null | Out-String).Trim()
+            if ($LASTEXITCODE -eq 0 -and $probe -eq '1') {
+                $ready = $true
+                break
+            }
         }
         Start-Sleep -Seconds 1
     }
 
     if (-not $ready) {
-        throw "Postgres did not become ready in container '$ContainerName' after $maxAttempts seconds."
+        & cmd.exe /d /s /c "docker logs $ContainerName 2>&1"
+        throw "Final initialized Postgres server did not become ready in container '$ContainerName' after $maxAttempts seconds."
     }
 
     Write-Host "Running $SqlRelativePath ..."

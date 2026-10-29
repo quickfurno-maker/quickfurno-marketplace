@@ -271,6 +271,44 @@ export async function submitTeamLeaderReview(requestId:string,decision:"APPROVE"
 }
 
 const WORKFLOWS=["vendor_journey","client_journey","campaigns","recovery","orphan_cleanup","stale_cleanup"] as const;
+
+/** Owner-only native dry-run. Does not re-use any scoped Staff grant. */
+export async function fetchOwnerStudioSimulation(key:string){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_STAFF_VIEW_MODE!=="owner"||
+    process.env.VOX_OWNER_STUDIO_WEB_ENABLED!=="staging")
+  return {ok:false,status:503,error:"OWNER_STUDIO_DISABLED"} as const;
+ if(!WORKFLOWS.some(v=>v===key))
+  return {ok:false,status:400,error:"UNKNOWN_WORKFLOW"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();
+ if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const response=await fetch(base+"/api/vox/v1/owner-studio-simulate?workflowKey="+encodeURIComponent(key),{
+   headers:{authorization:"Bearer "+token,accept:"application/json"},
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)
+  });
+  if(!response.ok)return {ok:false,status:response.status===403?403:503,error:"OWNER_STUDIO_UNAVAILABLE"} as const;
+  const raw:unknown=await response.json();
+  if(!raw||typeof raw!=="object"||Array.isArray(raw))return {ok:false,status:503,error:"UNTRUSTED_STUDIO"} as const;
+  const body=raw as Record<string,unknown>;
+  if(body.ok!==true||body.schema!=="qf.vox.studio.simulation.v1"||
+     body.owner!=="quickfurno-core"||body.mode!=="DRY_RUN_ONLY"||
+     body.workflowKey!==key||body.canPublish!==false||body.canExecute!==false||
+     body.providerSends!==0||body.creditsChanged!==0||
+     !Array.isArray(body.visited)||body.visited.length>50)
+   return {ok:false,status:503,error:"UNTRUSTED_STUDIO"} as const;
+  const nodes=body.visited.map((item:unknown)=>{
+   const row=item&&typeof item==="object"&&!Array.isArray(item)?item as Record<string,unknown>:{};
+   return {label:safeLabel(row.label,80),kind:safeLabel(row.kind,40),
+    authority:safeLabel(row.authority,40)};
+  });
+  return {ok:true,status:200,view:{workflowKey:key,nodes,
+   source:"NATIVE_DEFAULT_DEFINITION" as const,runtime:"NOT_QUERIED" as const,
+   canPublish:false as const,canExecute:false as const}} as const;
+ }catch{return {ok:false,status:503,error:"OWNER_STUDIO_UNAVAILABLE"} as const;}
+}
 export async function fetchScopedStudioSimulation(key:string){
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||(process.env.VOX_STAFF_VIEW_MODE!=="scoped"&&process.env.VOX_STAFF_VIEW_MODE!=="dual")||
     process.env.VOX_STUDIO_WEB_ENABLED!=="staging")

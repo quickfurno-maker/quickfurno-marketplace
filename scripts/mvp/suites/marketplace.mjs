@@ -1140,7 +1140,8 @@ export const suite = {
       run: () => {
         // The shared components must still carry their homeowner behaviour.
         const header = readFileSync('components/Header.tsx', 'utf8');
-        assertTrue(header.includes('Get up to 3 matches'), 'public header keeps the approved matching CTA');
+        assertTrue(header.includes('Check availability') && header.includes('EnquiryModalTrigger'), 'public header keeps the working enquiry trigger with availability-aware CTA');
+        assertFalse(header.includes('Get up to 3 matches'), 'public header must not promise 3 matches without eligible supply');
         assertTrue(header.includes('Toggle navigation menu'), 'public header keeps its menu toggle');
         const footer = readFileSync('components/Footer.tsx', 'utf8');
         assertTrue(footer.includes('Approved active vendors · Up to 3 active matches · Free to enquire'), 'public footer keeps its truthful summary');
@@ -1308,7 +1309,8 @@ export const suite = {
       run: () => {
         // The phase is admin-only; these approved surfaces must be unchanged.
         const header = readFileSync('components/Header.tsx', 'utf8');
-        assertTrue(header.includes('Get up to 3 matches'), 'public header matching CTA intact');
+        assertTrue(header.includes('Check availability') && header.includes('EnquiryModalTrigger'), 'public header enquiry trigger stays intact with truthful copy');
+        assertFalse(header.includes('Get up to 3 matches'), 'old unconditional match promise must stay removed');
         const vHeader = readFileSync('components/vendor/VendorPortalHeader.tsx', 'utf8');
         assertTrue(vHeader.includes('Vendor Portal'), 'vendor chrome intact');
         assertFalse(vHeader.includes('qfa-'), 'admin tokens did not leak into vendor chrome');

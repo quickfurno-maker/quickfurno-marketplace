@@ -31,8 +31,8 @@ export default async function EnquiryPage({ searchParams }: { searchParams: Prom
             <span className="qf-enqpage-eyebrow">Free for homeowners</span>
             <h1 className="qf-enqpage-title">Tell us about your project</h1>
             <p className="qf-enqpage-lede">
-              Share your requirement once. QuickFurno matches you with up to 3 relevant eligible
-              vendors for your service and area.
+              Share your requirement once. QuickFurno checks local vendor availability and may
+              introduce you to up to 3 eligible professionals if suitable teams are available.
             </p>
           </div>
 

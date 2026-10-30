@@ -317,7 +317,8 @@ begin
   -- Provider capture does not revive a cancelled, expired or refunded order.
   -- Hold any refund-in-progress outcome for independent financial reconciliation.
   if v_order.order_status is distinct from 'created' or
-     v_order.payment_status in ('refunded','refund_pending') then
+     v_order.payment_status is null or
+     v_order.payment_status not in ('pending','failed') then
     raise exception 'PACKAGE_ORDER_LIFECYCLE_NOT_ACTIVATABLE' using errcode='P0001';
   end if;
 

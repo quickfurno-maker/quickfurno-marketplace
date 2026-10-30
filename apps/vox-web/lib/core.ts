@@ -46,6 +46,63 @@ export async function fetchScopedProfileReviews(vendorId:string){
  }catch{return {ok:false,status:503,error:"REVIEW_UNAVAILABLE"} as const;}
 }
 
+
+/** Finance preview BFF: Core-only read, Owner AAL2, never a payment authority. */
+export async function fetchOwnerFinancePreview(){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_FINANCE_READ_UI_ENABLED!=="staging")
+  return {ok:false,status:503,error:"FINANCE_UI_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const r=await fetch(base+"/api/vox/v1/finance",{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!r.ok)return {ok:false,status:r.status===403?403:503,error:"CORE_FINANCE_UNAVAILABLE"} as const;
+  const payload:unknown=await r.json();
+  if(!payload||typeof payload!=="object"||Array.isArray(payload))
+   return {ok:false,status:503,error:"UNTRUSTED_FINANCE_RESPONSE"} as const;
+  const v=payload as Record<string,unknown>;
+  if(v.ok!==true||v.schema!=="qf.vox.finance.order-preview.v1"||
+     v.mode!=="READ_ONLY"||v.source!=="vendor_package_orders"||
+     v.canRefund!==false||v.canReconcile!==false||
+     v.canActivatePayments!==false||v.hasProviderConfirmation!==false||
+     v.isCompleteHistory!==false||!Array.isArray(v.orders)||v.orders.length>20)
+   return {ok:false,status:503,error:"UNTRUSTED_FINANCE_RESPONSE"} as const;
+  const orders=[] as Array<{orderId:string;vendorRef:string;currency:"INR";
+   recordedOrderAmount:number|null;creditsIncluded:number|null;
+   orderStatus:string;paymentStatus:string;activationStatus:string;createdAt:string}>;
+  const status=new Set(["not_started","pending","paid","failed","refunded"]);
+  const activation=new Set(["not_activated","activated","failed"]);
+  const orderState=new Set(["created","completed","cancelled","expired"]);
+  for(const raw of v.orders){
+   if(!raw||typeof raw!=="object"||Array.isArray(raw))
+    return {ok:false,status:503,error:"UNTRUSTED_FINANCE_RESPONSE"} as const;
+   const row=raw as Record<string,unknown>;
+   if(typeof row.orderId!=="string"||!UUID.test(row.orderId)||
+      typeof row.vendorRef!=="string"||!/^VENDOR-[a-f0-9]{8}$/i.test(row.vendorRef)||
+      row.currency!=="INR"||!status.has(String(row.paymentStatus))||
+      !activation.has(String(row.activationStatus))||
+      !orderState.has(String(row.orderStatus))||
+      (row.recordedOrderAmount!==null&&
+        (typeof row.recordedOrderAmount!=="number"||!Number.isFinite(row.recordedOrderAmount)||
+         row.recordedOrderAmount<0||row.recordedOrderAmount>1e12))||
+      (row.creditsIncluded!==null&&
+        (!Number.isSafeInteger(row.creditsIncluded)||Number(row.creditsIncluded)<0))||
+      typeof row.createdAt!=="string"||!Number.isFinite(Date.parse(row.createdAt)))
+    return {ok:false,status:503,error:"UNTRUSTED_FINANCE_RESPONSE"} as const;
+   orders.push({orderId:row.orderId,vendorRef:row.vendorRef,currency:"INR",
+    recordedOrderAmount:row.recordedOrderAmount as number|null,
+    creditsIncluded:row.creditsIncluded as number|null,
+    orderStatus:String(row.orderStatus),paymentStatus:String(row.paymentStatus),
+    activationStatus:String(row.activationStatus),createdAt:row.createdAt});
+  }
+  return {ok:true,status:200,orders,mode:"READ_ONLY" as const,
+   isCompleteHistory:false as const,providerReconciled:false as const} as const;
+ }catch{return {ok:false,status:503,error:"FINANCE_UNAVAILABLE"} as const;}
+}
+
 export async function fetchStaffOverview(){
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging")return {ok:false,status:503,error:"STAFF_GATE_DISABLED"} as const;
  const token=await verifiedMfaSession();

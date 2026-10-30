@@ -15,7 +15,7 @@ const spec=Object.freeze([
  ["Internal staff chat","staff-chat","apps/vox-web/app/team","scoped",true],
  ["Staff permissions","staff-grants","apps/vox-web/app/team","owner",true],
  ["Official EOD","official-eod-publish","apps/vox-web/app/operations","owner",true],
- ["VOX Finance","finance","apps/vox-web/app/finance","scoped",true]
+ ["VOX Finance","finance","apps/vox-web/app/finance","owner",false]
 ]);
 function makeRow([feature,route,ui,identity,mutates]){
  const api=resolve(root,"app/api/vox/v1",route,"route.ts");

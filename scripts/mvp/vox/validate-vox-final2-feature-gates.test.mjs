@@ -2,10 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {auditFinal2FeatureGates} from "./validate-vox-final2-feature-gates.mjs";
 const rows=auditFinal2FeatureGates();
-test("required features are inventoried explicitly, including unimplemented Finance",()=>{
+test("Finance source API and page exist but are not approved for activation",()=>{
  assert.equal(rows.length,11);
  assert.equal(new Set(rows.map(x=>x.feature)).size,11);
- assert.equal(rows.find(x=>x.feature==="VOX Finance")?.sourceStatus,"SOURCE_ROUTE_MISSING");
+ const finance=rows.find(x=>x.feature==="VOX Finance");
+ assert.equal(finance.sourceStatus,"SOURCE_PRESENT_NOT_MANAGED_ACCEPTED");
+ assert.equal(finance.managedStagingAccepted,false);
+ assert.equal(finance.productionReady,false);
+ assert.ok(finance.requiredFlags.includes("VOX_FINANCE_READ_ENABLED"));
 });
 test("every enumerated route with source uses verified auth and no-store",()=>{
  for(const r of rows.filter(x=>x.sourcePresent)){

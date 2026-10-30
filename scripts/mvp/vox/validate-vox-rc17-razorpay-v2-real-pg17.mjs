@@ -75,6 +75,7 @@ try{
  await bind(nullStateOrder,uuid(14),"test","order_nullstate");
  await pool.query("UPDATE public.payments SET payment_status=NULL WHERE id=$1",[nullStateOrder]);
  await reject(()=>bind(nullStateOrder,uuid(14),"test","order_nullstate"),"NULL_LEDGER_STATUS_DENIED");
+ await reject(()=>failed(nullStateOrder,"pay_nullledger","test"),"NULL_FAILED_LEDGER_DENIED");
  await pool.query("UPDATE public.payments SET payment_status='Paid' WHERE id=$1",[nullStateOrder]);
  await reject(()=>bind(nullStateOrder,uuid(14),"test","order_nullstate"),"PAID_UNACTIVATED_LEDGER_BIND_DENIED");
  await pool.query("UPDATE public.vendor_package_orders SET payment_provider=NULL WHERE id=$1",[nullProviderOrder]);
@@ -82,6 +83,7 @@ try{
  await claim(cancelledOrder,uuid(11),"test");
  await bind(cancelledOrder,uuid(11),"test","order_cancelled");
  await pool.query("UPDATE public.vendor_package_orders SET order_status='cancelled' WHERE id=$1",[cancelledOrder]);
+ await reject(()=>claim(cancelledOrder,uuid(15),"test"),"CLOSED_BOUND_ORDER_CLAIM_DENIED");
  await reject(()=>activate(cancelledOrder,"pay_cancelled","test"),"CANCELLED_ORDER_NO_CREDITS");
  check((await failed(cancelledOrder,"pay_cancelled","test")).status==="ignored_closed","CANCELLED_FAILURE_MUST_NOT_DOWNGRADE");
  await claim(refundOrder,uuid(12),"test");

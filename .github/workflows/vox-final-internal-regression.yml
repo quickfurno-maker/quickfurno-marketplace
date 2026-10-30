@@ -1,0 +1,34 @@
+name: VOX Final Internal Regression (source only)
+on:
+  pull_request:
+    paths:
+      - 'app/api/vox/**'
+      - 'lib/vox/**'
+      - 'ops/vox/tests/**'
+      - 'scripts/mvp/vox/**'
+      - '.github/workflows/vox-final-internal-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'app/api/vox/**'
+      - 'lib/vox/**'
+      - 'ops/vox/tests/**'
+      - 'scripts/mvp/vox/**'
+      - '.github/workflows/vox-final-internal-regression.yml'
+permissions:
+  contents: read
+jobs:
+  source-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify manifest and no-network regression runner
+        run: node scripts/mvp/vox/validate-vox-final-internal-gates-20261030.mjs --self-test
+      - name: Run default-deny and schema contract validation (no auth, network, DDL or runtime mutation)
+        run: node scripts/mvp/vox/validate-vox-final-internal-gates-20261030.mjs --source-only

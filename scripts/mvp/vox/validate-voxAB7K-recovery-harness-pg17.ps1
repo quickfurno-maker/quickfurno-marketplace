@@ -14,7 +14,8 @@ $ErrorActionPreference='Stop'
 $root=(Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 $cli=Join-Path $PSScriptRoot 'ab7k-readonly-evidence.mjs'
 $src='qf-ab7k-evid-src-pg17';$rst='qf-ab7k-evid-rst-pg17';$lossy='qf-ab7k-evid-lossy-pg17'
-$all=@($src,$rst,$lossy)
+# RC3 audit fix: only containers this run actually created may be removed (a CONTAINER_CONFLICT must never delete a foreign container).
+$created=New-Object System.Collections.Generic.List[string]
 $utf8=New-Object Text.UTF8Encoding($false)
 
 function Native([scriptblock]$b){
@@ -22,6 +23,17 @@ function Native([scriptblock]$b){
  try{$out=(& $b 2>&1|Out-String);$code=$LASTEXITCODE}finally{$ErrorActionPreference=$old}
  return @{code=$code;text=$out.Trim()}
 }
+# RC3 audit fix: confine all local writes to a fresh directory under the OS temp dir; refuse non-local Docker and image pulls.
+function Refuse([string]$why){Write-Output "AB7K_SAFETY_REFUSAL $why";exit 7}
+if($OutDir -match '^(\\\\|//)'){Refuse 'OUTDIR_UNC'}
+if(($OutDir -split '[\\/]') -contains '..'){Refuse 'OUTDIR_TRAVERSAL'}
+$OutDir=[IO.Path]::GetFullPath($OutDir)
+$tmpRoot=[IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\','/')+[IO.Path]::DirectorySeparatorChar
+if(-not $OutDir.StartsWith($tmpRoot,[StringComparison]::OrdinalIgnoreCase)){Refuse 'OUTDIR_OUTSIDE_TEMP'}
+if(Test-Path -LiteralPath $OutDir){Refuse 'OUTDIR_ALREADY_EXISTS'}
+if($env:DOCKER_HOST -and $env:DOCKER_HOST -notmatch '^(npipe|unix)://'){Refuse 'DOCKER_HOST_NOT_LOCAL'}
+$null=Native {docker image inspect postgres:17-alpine --format '{{.Id}}'}
+if($LASTEXITCODE -ne 0){Refuse 'IMAGE_NOT_PRESENT_LOCALLY (this harness never pulls; pre-pull deliberately)'}
 function Psql([string]$c,[string]$db,[string]$sql){
  $r=Native {$sql|docker exec -i $c psql -X -q -A -t -U postgres -d $db -v ON_ERROR_STOP=1}
  if($r.code -ne 0){throw "PSQL_FAILED_$c`: $($r.text)"}
@@ -29,8 +41,11 @@ function Psql([string]$c,[string]$db,[string]$sql){
 }
 function Boot([string]$c){
  if((docker ps -aq --filter "name=^/$c$"|Out-String).Trim()){throw "CONTAINER_CONFLICT_$c"}
- docker run --rm --network none -d --name $c -e POSTGRES_PASSWORD=synthetic_offline_only postgres:17-alpine *> $null
+ $created.Add($c)
+ docker run --pull never --rm --network none -d --name $c -e POSTGRES_PASSWORD=synthetic_offline_only postgres:17-alpine *> $null
  if($LASTEXITCODE -ne 0){throw "PG17_BOOT_FAILED_$c"}
+ $net=Native {docker inspect -f '{{.HostConfig.NetworkMode}}' $c}
+ if($net.text -ne 'none'){throw "NETWORK_NOT_NONE_$c"}
  for($i=0;$i -lt 150;$i++){
   $log=(Native {docker logs $c}).text
   if($log -match 'PostgreSQL init process complete'){
@@ -158,6 +173,6 @@ $$;
  Write-Output "Artifacts: $OutDir"
  if(-not $fullOk){$exit=3}elseif($evCode -ne 0){$exit=2}
 }finally{
- foreach($c in $all){docker rm -f $c *> $null}
+ foreach($c in $created){docker rm -f -v $c *> $null}
 }
 exit $exit

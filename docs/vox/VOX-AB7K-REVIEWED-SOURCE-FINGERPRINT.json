@@ -6,7 +6,7 @@
   "quarantinedFoundationCount": 7,
   "uninstalledCandidateCount": 23,
   "totalFiles": 30,
-  "manifestDigest": "02a041d99b02ca7d638d2214cd52b142b426512ae714deb231c6f31b7d2b9388",
+  "manifestDigest": "3ae02af58c07e256507532b866594486d2785e768fd4092a1b1aa8db572f8f60",
   "files": [
     {
       "order": 1,
@@ -100,8 +100,8 @@
       "order": 12,
       "stage": "UNINSTALLED_CANDIDATE",
       "path": "ops/vox/sql-candidates/20261016020000_vox08j_staff_team_chat_candidate.sql",
-      "sha256": "b6587086fe1d60a2544bd511bf480c2c469475cf39b57339da26e546880e9734",
-      "bytes": 4469,
+      "sha256": "3ca101ae28efbfc90f5b91b900b78fa9562bd7293dd6bb3e3f055ec2658f5b5c",
+      "bytes": 4629,
       "managedInstalled": false
     },
     {

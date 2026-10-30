@@ -9,7 +9,9 @@ create table public.vox_staff_team_messages_candidate_v1 (
  team_id uuid not null references public.vox_staff_teams_v1(id) on delete restrict,
  city_id uuid not null references public.cities(id) on delete restrict,
  sender_id uuid not null references public.vox_staff_memberships_v1(auth_user_id) on delete restrict,
- body text not null check(length(body) between 1 and 500 and body=btrim(body) and body !~ '[[:cntrl:]]'),
+ -- Explicit comparisons preserve the same accepted body range while avoiding
+ -- PostgreSQL BETWEEN parse-tree normalization drift across dump/restore.
+ body text not null check(length(body)>=1 and length(body)<=500 and body=btrim(body) and body !~ '[[:cntrl:]]'),
  created_at timestamptz not null default clock_timestamp(),
  constraint vox_chat_no_external_delivery_v1 check(length(body)<=500)
 );

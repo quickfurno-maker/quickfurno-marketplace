@@ -21,6 +21,22 @@ try{
    Start-Sleep -Milliseconds 250
   }
   if(-not $ready){throw "SYNTHETIC_DB_UNAVAILABLE"}
+  # pg_isready may hit initdb's temporary postmaster. It exits before the
+  # final PostgreSQL server starts, so require final bootstrap + a SQL probe.
+  $finalReady=$false
+  for($i=0;$i -lt 80;$i++){
+   $oldPreference=$ErrorActionPreference
+   $ErrorActionPreference='Continue'
+   try{
+    $startupLog=(docker logs $n 2>&1 | Out-String)
+    if($startupLog.Contains('PostgreSQL init process complete; ready for start up.')){
+     $probe=(docker exec $n psql -X -A -t -v ON_ERROR_STOP=1 -U postgres -d postgres -c 'SELECT 1;' 2>&1 | Out-String).Trim()
+     if($LASTEXITCODE -eq 0 -and $probe -eq '1'){$finalReady=$true;break}
+    }
+   }finally{$ErrorActionPreference=$oldPreference}
+   Start-Sleep -Milliseconds 250
+  }
+  if(-not $finalReady){throw "SYNTHETIC_DB_FINAL_POSTMASTER_UNAVAILABLE"}
  }
  @'
 create table public.vox16d_synthetic_restore_case(id int primary key,city_id int not null);

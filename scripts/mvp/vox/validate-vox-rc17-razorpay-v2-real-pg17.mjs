@@ -10,7 +10,7 @@ const name="qf-vox-rc17-v2-pg17";
 const docker=args=>execFileSync("docker",args,{encoding:"utf8",timeout:20000,stdio:["ignore","pipe","ignore"]}).trim();
 const sleep=ms=>new Promise(done=>setTimeout(done,ms));
 const uuid=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
-const [vendor,pkg,testOrder,liveOrder,token,other,liveToken]=[1,2,3,4,5,6,7].map(uuid);
+const [vendor,pkg,testOrder,liveOrder,token,other,liveToken,nullProviderOrder]=[1,2,3,4,5,6,7,8].map(uuid);
 const check=(value,label)=>{if(!value)throw Error(label)};
 const reject=async(fn,label)=>{let denied=false;try{await fn()}catch{denied=true}check(denied,label+"_MUST_DENY")};
 const setup=[
@@ -49,7 +49,7 @@ try{
  await pool.query(setup);
  await pool.query("INSERT INTO public.vendors(id) VALUES($1)",[vendor]);
  await pool.query("INSERT INTO public.packages(id,name,lead_count,total_price,validity_days,is_active) VALUES($1,'Pune',10,790,30,true)",[pkg]);
- for(const orderId of [testOrder,liveOrder]){
+ for(const orderId of [testOrder,liveOrder,nullProviderOrder]){
   await pool.query("INSERT INTO public.vendor_package_orders(id,vendor_id,package_id,package_name,package_price,package_currency,credits_included,validity_days,order_status,payment_status,payment_provider,payment_method,activation_status) VALUES($1,$2,$3,'Pune',790,'INR',10,30,'created','not_started','not_connected','online_future','not_activated')",[orderId,vendor,pkg]);
  }
  const ddl=readFileSync(resolve(root,"ops/vox/rc17-review-candidates/20261031001000_rc17_razorpay_v2_authority_REVIEW_ONLY.sql"),"utf8");
@@ -60,6 +60,8 @@ try{
  const activate=(id,payment,mode)=>rpc("qf_activate_vendor_package_order_v2",[id,payment,mode]);
  const failed=(id,payment,mode)=>rpc("qf_mark_vendor_package_payment_failed_v2",[id,payment,mode]);
  const release=(id,t,mode)=>rpc("qf_release_vendor_package_razorpay_order_claim_v2",[id,t,mode]);
+ await pool.query("UPDATE public.vendor_package_orders SET payment_provider=NULL WHERE id=$1",[nullProviderOrder]);
+ await reject(()=>claim(nullProviderOrder,other,"test"),"NULL_PROVIDER_CANNOT_CLAIM");
  const c=await claim(testOrder,token,"test");
  check(c.status==="claimed"&&Number(c.amount_subunits)===79000,"CLAIM_INVALID");
  await reject(()=>claim(testOrder,other,"test"),"CONCURRENT_CLAIM");

@@ -229,6 +229,12 @@ export async function createVendorPackageRazorpayCheckout(
     if (order.activation_status === "activated") {
       throw paymentError("PACKAGE_ORDER_ALREADY_ACTIVATED", "This package order is already activated.");
     }
+    // A persisted provider order must not resurrect cancelled, completed,
+    // expired or refunded packages via the already-bound checkout fast path.
+    if (order.order_status !== "created" ||
+      !["not_started", "pending", "failed"].includes(order.payment_status ?? "")) {
+      throw paymentError("PACKAGE_ORDER_NOT_PAYABLE", "This order is not payable. Reconcile or create a fresh package order.");
+    }
 
     if (order.provider_order_id) {
       if (order.payment_provider !== RAZORPAY_PROVIDER) {

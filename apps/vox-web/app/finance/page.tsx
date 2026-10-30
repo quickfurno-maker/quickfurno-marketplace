@@ -6,12 +6,21 @@ const amount=(n:number|null)=>n===null?"Not recorded":
  new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(n);
 const when=(date:string)=>new Intl.DateTimeFormat("en-IN",{
  timeZone:"Asia/Kolkata",day:"2-digit",month:"short",year:"numeric"}).format(new Date(date));
-export default async function Finance(){
+type FinanceProps={searchParams:Promise<{state?:string|string[]}>};
+const STATES=["all","paid","pending","failed","refunded"] as const;
+type FinanceState=(typeof STATES)[number];
+export default async function Finance({searchParams}:FinanceProps){
+ const raw=(await searchParams).state;
+ const requested=typeof raw==="string"?raw.toLowerCase():"all";
+ const selected:FinanceState=STATES.includes(requested as FinanceState)
+  ?requested as FinanceState:"all";
  const result=await fetchOwnerFinancePreview();
  if(!result.ok)return <main className="hold"><section className="holdCard">
   <p className="kicker">VOX / FINANCE ACCESS</p><h1>Finance preview unavailable</h1>
   <p>Verified Owner MFA, an authorized Core order read, and separately reviewed Staging feature gates are required.</p>
   <Link href="/login">Owner sign-in</Link></section></main>;
+ const visible=result.orders.filter(o=>selected==="all"||
+  o.paymentStatus.toLowerCase()===selected);
  return <main className="voxOps">
   <header className="voxTop"><div className="voxLogo">V</div>
    <div><b>VOX / FINANCE</b><small>QuickFurno · vendor package order records</small></div>
@@ -24,14 +33,24 @@ export default async function Finance(){
   <div className="voxSectionTitle"><p className="kicker">RECENT CORE RECORDS</p><h2>Order preview</h2></div>
   <div className="voxWorkspace"><section className="voxUnit">
    <div className="voxUnitTop"><div><p>NON-EXHAUSTIVE</p><h2>Recent orders</h2></div>
-    <strong>{result.orders.length}<small> records</small></strong></div>
-   {result.orders.length===0?<div className="voxBlank">No order records returned by Core.</div>:
-    <div className="voxRows">{result.orders.map(o=><div className="voxRow" key={o.orderId}>
+    <strong>{visible.length}<small> of {result.orders.length} recent records</small></strong></div>
+   <nav aria-label="Filter recent payment records" style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16}}>
+    {STATES.map(state=><Link key={state} href={state==="all"?"/finance":"/finance?state="+state}
+     aria-current={selected===state?"page":undefined}
+     style={{padding:"7px 12px",borderRadius:8,border:"1px solid #516471",
+      color:selected===state?"#9decc8":"#d0d9e0",fontWeight:selected===state?700:500}}>
+     {state==="all"?"All recent":state.charAt(0).toUpperCase()+state.slice(1)}
+    </Link>)}
+   </nav>
+   {visible.length===0?<div className="voxBlank">
+    {result.orders.length===0?"No recent order records returned by Core.":"No "+selected+" records in this bounded Core preview."}
+   </div>:
+    <div className="voxRows">{visible.map(o=><div className="voxRow" key={o.orderId}>
       <div className="voxRowIcon">₹</div><div className="voxRowBody">
        <b><Link href={"/finance/"+o.orderId} style={{color:"#9decc8"}}>{amount(o.recordedOrderAmount)} · {o.vendorRef}</Link></b>
        <small>Order #{o.orderId.slice(0,8)} · {when(o.createdAt)} · {o.creditsIncluded??"—"} package credits recorded</small></div>
       <span className="voxState">{o.paymentStatus} / {o.activationStatus}</span></div>)}</div>}
-   <footer>Core order snapshot · Not a settlement ledger</footer>
+   <footer>Filters apply only to the bounded Core preview, not complete payment history. Recorded status is not independently verified settlement.</footer>
   </section></div>
   <div className="voxNotice"><b>Financial safety boundary</b>
    <span>Provider IDs, UTR, banking data and payment secrets are never exposed. This page cannot refund, capture, reconcile, grant credits or activate packages. Finance operations stay with QuickFurno Core and require an independent release review.</span></div>

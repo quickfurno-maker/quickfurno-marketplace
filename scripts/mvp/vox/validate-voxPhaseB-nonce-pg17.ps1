@@ -24,12 +24,22 @@ try{
  $container=docker run --rm --network none -d --name $name -e POSTGRES_PASSWORD=synthetic_only postgres:17-alpine
  if($LASTEXITCODE -ne 0){throw 'DISPOSABLE_PG_NOT_STARTED'}
  $ready=$false
- for($i=0;$i -lt 35;$i++){
-  docker exec $name pg_isready -U postgres -d postgres *> $null
-  if($LASTEXITCODE -eq 0){$ready=$true;break}
-  Start-Sleep -Milliseconds 350
+ # pg_isready may succeed against initdb's TEMPORARY PostgreSQL server,
+ # which is subsequently stopped and restarted. Never mistake that transient
+ # listener for final readiness; require the init-complete marker AND a query.
+ for($i=0;$i -lt 80;$i++){
+  $oldPreference=$ErrorActionPreference
+  $ErrorActionPreference='Continue'
+  try{$logs=(docker logs $name 2>&1 | Out-String)}finally{$ErrorActionPreference=$oldPreference}
+  if($logs.Contains('PostgreSQL init process complete; ready for start up.')){
+   $probe=ExecSql 'SELECT 1;'
+   # ExecSql uses normal psql table formatting (headers and a row-count).
+   # Require an actual SQL 1 row instead of incorrectly expecting raw output '1'.
+   if($probe.code -eq 0 -and $probe.output -match '(?m)^\s*1\s*$'){$ready=$true;break}
+  }
+  Start-Sleep -Milliseconds 250
  }
- if(!$ready){throw 'DISPOSABLE_PG_NOT_READY'}
+ if(!$ready){throw 'DISPOSABLE_PG_FINAL_SERVER_NOT_READY'}
  $init=@'
 CREATE ROLE anon NOLOGIN;
 CREATE ROLE authenticated NOLOGIN;

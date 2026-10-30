@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { inspectRazorpayActivationReceipt, inspectRazorpayFailureReceipt } from "../lib/payments/vendorPackagePaymentReceipts.mjs";
 import { inspectRazorpayOrderClaim, isDefiniteRazorpayOrderRejection, storedRazorpayOrderModeError } from "../lib/payments/vendorPackageOrderGuards.mjs";
 import { adminClient } from "../lib/supabase";
 import { AppError, fail, ok, type Result } from "../lib/errors";
@@ -347,7 +348,14 @@ async function activateCapturedPayment(
     p_provider_mode: cfg.mode,
   });
   if (error) throw error;
-  return data as { status?: string; credits_added?: number; expires_at?: string } | null;
+  const receiptState = inspectRazorpayActivationReceipt(data, {
+    orderId: order.id,
+    creditsIncluded: Number(order.credits_included),
+  });
+  if (receiptState === "invalid") {
+    throw paymentError("PAYMENT_ACTIVATION_RECEIPT_INVALID", "Verified payment did not receive a trustworthy database activation receipt. Reconcile the order before retrying.");
+  }
+  return receiptState;
 }
 
 export async function verifyVendorPackageRazorpayCheckout(
@@ -379,8 +387,8 @@ export async function verifyVendorPackageRazorpayCheckout(
       cfg,
       `/payments/${encodeURIComponent(response.razorpay_payment_id)}`,
     );
-    await activateCapturedPayment(order, payment, cfg);
-    return ok({ status: "activated" });
+    const activation = await activateCapturedPayment(order, payment, cfg);
+    return ok({ status: activation === "already_applied" ? "already_activated" : "activated" });
   } catch (error) {
     return fail(error);
   }
@@ -398,14 +406,19 @@ async function markPaymentFailed(
   order: PackageOrderRow,
   paymentId: string | null,
   cfg: RazorpayConfig,
-): Promise<void> {
+): Promise<"marked_failed" | "ignored"> {
   assertOrderMode(order, cfg);
-  const { error } = await adminClient().rpc("qf_mark_vendor_package_payment_failed_v2", {
+  const { data, error } = await adminClient().rpc("qf_mark_vendor_package_payment_failed_v2", {
     p_order_id: order.id,
     p_provider_payment_id: paymentId ?? "",
     p_provider_mode: cfg.mode,
   });
   if (error) throw error;
+  const result = inspectRazorpayFailureReceipt(data, order.id);
+  if (result === "invalid") {
+    throw paymentError("PAYMENT_FAILURE_RECEIPT_INVALID", "The database did not confirm the failure event status.");
+  }
+  return result;
 }
 
 export async function handleVendorPackageRazorpayWebhook(
@@ -439,13 +452,13 @@ export async function handleVendorPackageRazorpayWebhook(
         cfg,
         "/payments/" + encodeURIComponent(payment.id),
       );
-      await activateCapturedPayment(order, canonicalPayment, cfg);
-      return ok({ status: "activated" });
+      const activation = await activateCapturedPayment(order, canonicalPayment, cfg);
+      return ok({ status: activation === "already_applied" ? "already_activated" : "activated" });
     }
 
     if (event.event === "payment.failed") {
-      await markPaymentFailed(order, payment.id, cfg);
-      return ok({ status: "failed_recorded" });
+      const recorded = await markPaymentFailed(order, payment.id, cfg);
+      return ok({ status: recorded === "marked_failed" ? "failed_recorded" : "failure_ignored" });
     }
 
     return ok({ status: "ignored" });

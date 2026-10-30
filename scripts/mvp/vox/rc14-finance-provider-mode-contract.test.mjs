@@ -18,6 +18,21 @@ test("canonical legacy TEST and modern TEST/LIVE are distinct, with no inferred 
  assert.match(sql,/parent_order\.payment_provider='razorpay'\s+AND parent_order\.provider_mode='live'/);
  assert.doesNotMatch(sql,/payment_provider='razorpay_live'/);
 });
+test("PostgreSQL three-valued provider mode never treats UNKNOWN as authorized",()=>{
+ const triggerStart=sql.indexOf("CREATE OR REPLACE FUNCTION public.qf_vox_rc11_payment_attempt_append_guard_candidate_v1()");
+ const triggerEnd=sql.indexOf("CREATE TRIGGER vox_rc11_payment_attempt_append_guard",triggerStart);
+ assert.ok(triggerStart>=0&&triggerEnd>triggerStart);
+ const trigger=sql.slice(triggerStart,triggerEnd);
+ // SQL IF NOT (nullable predicate) silently skips the rejection for NULL.
+ assert.doesNotMatch(trigger,/IF NOT \(/);
+ assert.match(trigger,/\) IS DISTINCT FROM TRUE\s+THEN RAISE EXCEPTION 'RC11_PAYMENT_ATTEMPT_PROVIDER_MODE_MISMATCH'/);
+ assert.match(trigger,/parent_order\.provider_mode='live'/);
+ assert.match(trigger,/parent_order\.provider_mode='test'/);
+ for(const denied of ["MODERN_LIVE_WITHOUT_EXPLICIT_MODE_DENIED",
+  "LEGACY_TEST_WITH_CONTRADICTORY_LIVE_MODE_DENIED",
+  "MODERN_TEST_CANNOT_BECOME_LIVE"])
+  assert.ok(harness.includes(denied),denied);
+});
 test("genuine local PG harness denies mixed/missing-mode and replay cases",()=>{
  for(const marker of [
   "MODERN_LIVE_WITHOUT_EXPLICIT_MODE_DENIED",

@@ -37,6 +37,8 @@ export default async function Finance({searchParams}:FinanceProps){
  // reconciliation queue, settled revenue, or an authority to retry payments.
  const attention=result.orders.reduce((n,o)=>n+
   (["pending","failed"].includes(o.paymentStatus.toLowerCase())?1:0),0);
+ const pendingCount=result.orders.filter(o=>o.paymentStatus.toLowerCase()==="pending").length;
+ const failedCount=result.orders.filter(o=>o.paymentStatus.toLowerCase()==="failed").length;
  return <main className="voxOps">
   <header className="voxTop"><div className="voxLogo">V</div>
    <div><b>VOX / FINANCE</b><small>QuickFurno · vendor package order records</small></div>
@@ -50,6 +52,12 @@ export default async function Finance({searchParams}:FinanceProps){
    <p>{attention===0?"No pending or failed statuses in the returned snapshot.":
     attention+" of "+result.orders.length+" returned records have pending or failed status; reconciliation needs separate verified provider evidence."}</p>
   </div>
+  <nav aria-label="Recent payment attention shortcuts" style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:14}}>
+   <Link href={financeHref("pending",selectedMonth)} style={{color:"#eec78f"}}>
+    Pending in recent records: {pendingCount}</Link>
+   <Link href={financeHref("failed",selectedMonth)} style={{color:"#eec78f"}}>
+    Failed in recent records: {failedCount}</Link>
+  </nav>
   <div className="voxWorkspace"><section className="voxUnit">
    <div className="voxUnitTop"><div><p>NON-EXHAUSTIVE</p><h2>Recent orders</h2></div>
     <strong>{visible.length}<small> of {result.orders.length} recent records</small></strong></div>

@@ -72,7 +72,11 @@ try{
  check((await claim(testOrder,other,"test")).provider_order_id==="order_test","BOUND_READ_MISSING");
  await reject(()=>claim(testOrder,other,"live"),"BOUND_CROSS_MODE");
  await reject(()=>activate(testOrder,"pay_test","live"),"PAYMENT_CROSS_MODE");
- check((await activate(testOrder,"pay_test","test")).credits_added===10,"CREDIT_NOT_GRANTED");
+ const concurrent=await Promise.all([
+  activate(testOrder,"pay_test","test"),activate(testOrder,"pay_test","test")
+ ]);
+ const credited=concurrent.map(x=>x.credits_added).sort((a,b)=>a-b);
+ check(credited[0]===0&&credited[1]===10,"CONCURRENT_EXACT_ONCE_CREDIT");
  check((await activate(testOrder,"pay_test","test")).credits_added===0,"DUPLICATE_CREDIT");
  await reject(()=>activate(testOrder,"pay_other","test"),"PAYMENT_REPLAY_FORGED");
  check((await failed(testOrder,"pay_failed","test")).status==="ignored_activated","FAIL_AFTER_PAID");

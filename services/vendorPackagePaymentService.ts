@@ -334,6 +334,14 @@ async function activateCapturedPayment(
   if (!order.provider_order_id || order.payment_provider !== RAZORPAY_PROVIDER) {
     throw paymentError("PACKAGE_ORDER_NOT_BOUND", "Package order is not bound to Razorpay.");
   }
+  // Reconciliation cannot turn a refunded order back into a credit grant.
+  // Recheck inside the SQL transaction too: this is only the first fence.
+  if (order.payment_status === "refunded" || order.payment_status === "refund_pending") {
+    throw paymentError("PACKAGE_ORDER_REFUND_LOCKED", "Payment is in a refund lifecycle. Reconcile it independently.");
+  }
+  if (order.provider_payment_id && order.provider_payment_id !== payment.id) {
+    throw paymentError("PACKAGE_ORDER_PAYMENT_ID_DRIFT", "A different captured payment is already bound to the order.");
+  }
   const amount = Number(order.provider_amount_subunits ?? inrToSubunits(order.package_price));
   assertCapturedPayment(payment, {
     paymentId: payment.id,

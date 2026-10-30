@@ -49,8 +49,11 @@ try{
  "CREATE TABLE public.profiles(id uuid PRIMARY KEY,role text,is_active boolean)",
  "CREATE TABLE public.vox_staff_teams_v1(id uuid PRIMARY KEY,city_id uuid,is_active boolean)",
  "CREATE TABLE public.vox_staff_memberships_v1(auth_user_id uuid PRIMARY KEY,team_id uuid,staff_role text,is_active boolean,revoked_at timestamptz,expires_at timestamptz)",
- "CREATE TABLE public.vox_staff_department_capabilities_v1(auth_user_id uuid,team_id uuid,city_id uuid,department text,revoked_at timestamptz,expires_at timestamptz)",
- "CREATE TABLE public.vox_staff_object_scopes_v1(auth_user_id uuid,scope_kind text,object_id uuid,revoked_at timestamptz,expires_at timestamptz)",
+ "CREATE TABLE public.vox_staff_department_requests_v1(id uuid PRIMARY KEY,requested_by uuid,target_staff_id uuid,team_id uuid,city_id uuid,department text,decided_by uuid,decision_reference text,state text,revision integer,expires_at timestamptz)",
+ "CREATE TABLE public.vox_staff_department_decisions_v1(request_id uuid,reviewer_id uuid,decision text,decision_reference text)",
+ "CREATE TABLE public.vox_staff_department_capabilities_v1(id uuid PRIMARY KEY,request_id uuid,auth_user_id uuid,team_id uuid,city_id uuid,department text,granted_by uuid,revoked_at timestamptz,revision integer,expires_at timestamptz)",
+ "CREATE TABLE public.vox_staff_department_activations_v1(request_id uuid,capability_id uuid,activated_by uuid)",
+ "CREATE TABLE public.vox_staff_object_scopes_v1(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),auth_user_id uuid,scope_kind text,object_id uuid,revoked_at timestamptz,expires_at timestamptz)",
  "CREATE TABLE public.cities(id uuid PRIMARY KEY,name text NOT NULL,slug text UNIQUE,is_active boolean NOT NULL DEFAULT true)",
  "CREATE TABLE public.marketplace_service_zones(id uuid PRIMARY KEY,canonical_city text NOT NULL,is_active boolean NOT NULL,matching_enabled boolean NOT NULL)",
  "CREATE TABLE public.vendors(id uuid PRIMARY KEY,service_zone_id uuid)",
@@ -64,12 +67,22 @@ try{
  await pool.query("INSERT INTO auth.users VALUES($1,'{\"qf_principal\":\"vox_staff\"}')",[A]);
  await pool.query("INSERT INTO public.vox_staff_teams_v1 VALUES ($1,$2,true)",[TEAM,CITY]);
  await pool.query("INSERT INTO public.vox_staff_memberships_v1 VALUES ($1,$2,'operations_manager',true,NULL,clock_timestamp()+interval '30 days')",[A,TEAM]);
- await pool.query("INSERT INTO public.vox_staff_department_capabilities_v1 VALUES ($1,$2,$3,'client_success',NULL,clock_timestamp()+interval '30 days')",[A,TEAM,CITY]);
+ // Synthetic but schema-faithful independent reviewed department authority.
+ const TL=id(70),REQUESTER=id(71),REVIEW=id(72),CAP=id(73);
+ await pool.query("INSERT INTO public.profiles VALUES($1,NULL,true),($2,NULL,true)",[TL,REQUESTER]);
+ await pool.query("INSERT INTO auth.users VALUES($1,'{\"qf_principal\":\"vox_staff\",\"vox_role\":\"team_leader\"}')",[TL]);
+ await pool.query("INSERT INTO public.vox_staff_memberships_v1 VALUES($1,$2,'team_leader',true,NULL,clock_timestamp()+interval '30 days')",[TL,TEAM]);
+ await pool.query("INSERT INTO public.vox_staff_department_requests_v1 VALUES($1,$2,$3,$4,$5,'client_success',$6,'review-rc9-pass','APPROVED',1,clock_timestamp()+interval '30 days')",
+  [REVIEW,REQUESTER,A,TEAM,CITY,TL]);
+ await pool.query("INSERT INTO public.vox_staff_department_decisions_v1 VALUES($1,$2,'APPROVED','review-rc9-pass')",[REVIEW,TL]);
+ await pool.query("INSERT INTO public.vox_staff_department_capabilities_v1 VALUES($1,$2,$3,$4,$5,'client_success',$6,NULL,2,clock_timestamp()+interval '30 days')",
+  [CAP,REVIEW,A,TEAM,CITY,REQUESTER]);
+ await pool.query("INSERT INTO public.vox_staff_department_activations_v1 VALUES($1,$2,$3)",[REVIEW,CAP,REQUESTER]);
  await pool.query("INSERT INTO public.cities VALUES ($1,'Pune','pune',true)",[CITY]);
  await pool.query("INSERT INTO public.marketplace_service_zones VALUES ($1,'  PUNE ',true,true)",[ZONE]);
  await pool.query("INSERT INTO public.vendors VALUES ($1,$2)",[VENDOR,ZONE]);
  for(const id of [C1,C2,C3]){
-  await pool.query("INSERT INTO public.vox_staff_object_scopes_v1 VALUES($1,'conversation',$2,NULL,clock_timestamp()+interval '30 days')",[A,id]);
+  await pool.query("INSERT INTO public.vox_staff_object_scopes_v1(auth_user_id,scope_kind,object_id,revoked_at,expires_at) VALUES($1,'conversation',$2,NULL,clock_timestamp()+interval '30 days')",[A,id]);
   await pool.query("INSERT INTO public.communication_conversations VALUES ($1,'quickfurno','whatsapp',$2,'vendor',$3,'OPEN',0,'ANISHA',false,true,clock_timestamp())",
    [id,HASH,VENDOR]);
  }
@@ -109,6 +122,16 @@ try{
  await pool.query("INSERT INTO public.cities VALUES ($1,'pune','pune-duplicate',true)",[id(90)]);
  r=await run(make(C3,id(54)));eq(r.ok,false,"AMBIGUOUS_CANONICAL_CITY_DENIED");
  await pool.query("DELETE FROM public.cities WHERE id=$1",[id(90)]);
+ // A directly present capability cannot substitute for an independent review.
+ await pool.query("UPDATE public.vox_staff_department_decisions_v1 SET decision='REJECTED' WHERE request_id=$1",[REVIEW]);
+ r=await run(make(C3,id(56)));eq(r.reason,"DEPARTMENT_INDEPENDENT_REVIEW_REQUIRED","UNREVIEWED_CAPABILITY_DENIED");
+ await pool.query("UPDATE public.vox_staff_department_decisions_v1 SET decision='APPROVED' WHERE request_id=$1",[REVIEW]);
+ await pool.query("UPDATE auth.users SET raw_app_meta_data='{}' WHERE id=$1",[TL]);
+ r=await run(make(C3,id(58)));eq(r.reason,"DEPARTMENT_INDEPENDENT_REVIEW_REQUIRED","REVOKED_REVIEWER_ROLE_DENIED");
+ await pool.query("UPDATE auth.users SET raw_app_meta_data='{\"qf_principal\":\"vox_staff\",\"vox_role\":\"team_leader\"}' WHERE id=$1",[TL]);
+ await pool.query("UPDATE public.vox_staff_object_scopes_v1 SET revoked_at=clock_timestamp() WHERE object_id=$1",[C3]);
+ r=await run(make(C3,id(57)));eq(r.reason,"CONVERSATION_OBJECT_GRANT_REVOKED","REVOKED_EXACT_SCOPE_DENIED");
+ await pool.query("UPDATE public.vox_staff_object_scopes_v1 SET revoked_at=NULL WHERE object_id=$1",[C3]);
  await pool.query("UPDATE auth.users SET raw_app_meta_data='{}' WHERE id=$1",[A]);
  r=await run(make(C3,id(55)));eq(r.ok,false,"CURRENT_AUTH_METADATA_REVOKED");
  await pool.query("UPDATE auth.users SET raw_app_meta_data='{\"qf_principal\":\"vox_staff\"}' WHERE id=$1",[A]);

@@ -48,6 +48,74 @@ export async function fetchScopedProfileReviews(vendorId:string){
 
 
 /** Finance preview BFF: Core-only read, Owner AAL2, never a payment authority. */
+
+/** RC10 Finance: exact Owner-only order/ledger comparison, never provider reconciliation. */
+export async function fetchOwnerFinanceOrderDetail(orderId:string){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_FINANCE_READ_UI_ENABLED!=="staging"||
+    process.env.VOX_FINANCE_DETAIL_READ_UI_ENABLED!=="staging")
+  return {ok:false,status:503,error:"FINANCE_DETAIL_UI_DISABLED"} as const;
+ if(!UUID.test(orderId))return {ok:false,status:400,error:"INVALID_ORDER_ID"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const response=await fetch(base+"/api/vox/v1/finance/order/"+encodeURIComponent(orderId),{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!response.ok)return {ok:false,status:response.status===403?403:503,
+   error:"CORE_FINANCE_DETAIL_UNAVAILABLE"} as const;
+  const raw:unknown=await response.json();
+  if(!raw||typeof raw!=="object"||Array.isArray(raw))
+   return {ok:false,status:503,error:"FINANCE_DETAIL_UNTRUSTED"} as const;
+  const payload=raw as Record<string,unknown>;
+  if(payload.ok!==true||payload.schema!=="qf.vox.finance.order-detail.v1"||
+     payload.mode!=="READ_ONLY"||!payload.detail||
+     typeof payload.detail!=="object"||Array.isArray(payload.detail))
+   return {ok:false,status:503,error:"FINANCE_DETAIL_UNTRUSTED"} as const;
+  const detail=payload.detail as Record<string,unknown>;
+  if(detail.providerConfirmed!==false||detail.isAttemptHistoryComplete!==false||
+     detail.canRefund!==false||detail.canCapture!==false||detail.canGrantCredits!==false||
+     typeof detail.ledgerStatus!=="string"||
+     !["CORE_RECORDS_AGREE","NO_CORRELATED_PAYMENT_RECORD"].includes(detail.ledgerStatus)||
+     !detail.order||typeof detail.order!=="object"||Array.isArray(detail.order))
+   return {ok:false,status:503,error:"FINANCE_DETAIL_UNTRUSTED"} as const;
+  const order=detail.order as Record<string,unknown>;
+  if(order.orderId!==orderId||order.currency!=="INR"||
+     typeof order.vendorRef!=="string"||!/^VENDOR-[0-9a-f]{8}$/i.test(order.vendorRef)||
+     (order.recordedOrderAmount!==null&&
+      (typeof order.recordedOrderAmount!=="number"||
+       !Number.isFinite(order.recordedOrderAmount)||order.recordedOrderAmount<0))||
+     !["created","completed","cancelled","expired"].includes(String(order.orderStatus))||
+     !["not_started","pending","paid","failed","refunded"].includes(String(order.paymentStatus))||
+     !["not_activated","activated","failed"].includes(String(order.activationStatus))||
+     typeof order.createdAt!=="string"||!Number.isFinite(Date.parse(order.createdAt)))
+   return {ok:false,status:503,error:"FINANCE_DETAIL_UNTRUSTED"} as const;
+  let ledger:null|{recordedPaymentId:string;recordedAmount:number;
+   recordedStatus:string;recordedAt:string}=null;
+  if(detail.ledger!==null){
+   const entry=detail.ledger as Record<string,unknown>;
+   if(!entry||typeof entry!=="object"||Array.isArray(entry)||
+      entry.recordedPaymentId!==orderId||
+      typeof entry.recordedAmount!=="number"||!Number.isFinite(entry.recordedAmount)||
+      entry.recordedAmount<0||
+      !["Pending","Paid","Failed","Refunded"].includes(String(entry.recordedStatus))||
+      typeof entry.recordedAt!=="string"||!Number.isFinite(Date.parse(entry.recordedAt))||
+      detail.ledgerStatus!=="CORE_RECORDS_AGREE")
+    return {ok:false,status:503,error:"FINANCE_DETAIL_UNTRUSTED"} as const;
+   ledger={recordedPaymentId:orderId,recordedAmount:entry.recordedAmount as number,
+    recordedStatus:String(entry.recordedStatus),recordedAt:entry.recordedAt as string};
+  }else if(detail.ledgerStatus!=="NO_CORRELATED_PAYMENT_RECORD")
+   return {ok:false,status:503,error:"FINANCE_DETAIL_UNTRUSTED"} as const;
+  return {ok:true,status:200,order:{
+   orderId:orderId,vendorRef:order.vendorRef,
+   recordedOrderAmount:order.recordedOrderAmount as number|null,
+   orderStatus:String(order.orderStatus),paymentStatus:String(order.paymentStatus),
+   activationStatus:String(order.activationStatus),createdAt:order.createdAt as string
+  },ledger,ledgerStatus:detail.ledgerStatus} as const;
+ }catch{return {ok:false,status:503,error:"FINANCE_DETAIL_UNAVAILABLE"} as const;}
+}
+
 export async function fetchOwnerFinancePreview(){
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
     process.env.VOX_FINANCE_READ_UI_ENABLED!=="staging")

@@ -75,7 +75,7 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
    await db.query("ROLLBACK");settled=true;return closed("CURRENT_VENDOR_SCOPE_OR_STATE_DENIED");
   }
   const staff=await db.query(
-   "SELECT m.auth_user_id FROM public.vox_staff_memberships_v1 m "+
+   "SELECT m.auth_user_id,m.team_id FROM public.vox_staff_memberships_v1 m "+
    "JOIN public.vox_staff_teams_v1 t ON t.id=m.team_id "+
    "JOIN public.profiles p ON p.id=m.auth_user_id "+
    "JOIN auth.users u ON u.id=m.auth_user_id "+
@@ -85,17 +85,56 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
    "AND t.city_id=$2::uuid AND p.is_active=true AND p.role IS NULL "+
    "AND u.raw_app_meta_data->>'qf_principal'='vox_staff' "+
    "AND u.raw_app_meta_data->>'admin_role' IS NULL "+
-   "AND EXISTS(SELECT 1 FROM public.vox_staff_department_capabilities_v1 cap "+
-   "WHERE cap.auth_user_id=m.auth_user_id AND cap.team_id=m.team_id "+
-   "AND cap.city_id=t.city_id AND cap.department='client_success' "+
-   "AND cap.revoked_at IS NULL AND cap.expires_at>clock_timestamp()) "+
-   "AND EXISTS(SELECT 1 FROM public.vox_staff_object_scopes_v1 g "+
-   "WHERE g.auth_user_id=m.auth_user_id AND g.scope_kind='conversation' "+
-   "AND g.object_id=$3::uuid AND g.revoked_at IS NULL "+
-   "AND g.expires_at>clock_timestamp()) FOR SHARE OF m,t,p,u",
-   [input.verifiedStaff.userId,c.city_id,input.conversationId]);
+   "FOR SHARE OF m,t,p,u",
+   [input.verifiedStaff.userId,c.city_id]);
   if(staff.rowCount!==1||input.verifiedStaff.expiresAtMs<=Date.now()){
    await db.query("ROLLBACK");settled=true;return closed("CURRENT_STAFF_GRANT_OR_AAL2_DENIED");
+  }
+  // A capability row alone grants NOTHING. The original independent TL
+  // decision, request and activation must ALL remain current. Lock their
+  // rows so a concurrent revocation cannot commit before this writer.
+  const reviewed=await db.query(
+   "SELECT cap.id FROM public.vox_staff_department_capabilities_v1 cap "+
+   "JOIN public.vox_staff_department_requests_v1 req ON req.id=cap.request_id "+
+   "JOIN public.vox_staff_department_decisions_v1 d ON d.request_id=req.id "+
+   "JOIN public.vox_staff_department_activations_v1 x "+
+   "ON x.request_id=req.id AND x.capability_id=cap.id "+
+   "JOIN public.profiles reviewer ON reviewer.id=req.decided_by "+
+   "JOIN auth.users reviewer_auth ON reviewer_auth.id=reviewer.id "+
+   "JOIN public.vox_staff_memberships_v1 tl ON tl.auth_user_id=reviewer.id "+
+   "JOIN public.vox_staff_teams_v1 rt ON rt.id=tl.team_id "+
+   "WHERE cap.auth_user_id=$1::uuid AND cap.team_id=$2::uuid "+
+   "AND cap.city_id=$3::uuid AND cap.department='client_success' "+
+   "AND cap.revoked_at IS NULL AND cap.revision=2 "+
+   "AND cap.expires_at>clock_timestamp() "+
+   "AND req.state='APPROVED' AND req.revision=1 "+
+   "AND req.expires_at>clock_timestamp() AND req.target_staff_id=$1::uuid "+
+   "AND req.team_id=$2::uuid AND req.city_id=$3::uuid "+
+   "AND req.department='client_success' "+
+   "AND req.decided_by<>req.requested_by AND req.decided_by<>req.target_staff_id "+
+   "AND d.reviewer_id=req.decided_by AND d.decision='APPROVED' "+
+   "AND d.decision_reference=req.decision_reference "+
+   "AND x.activated_by=req.requested_by AND cap.granted_by=req.requested_by "+
+   "AND reviewer.role IS NULL AND reviewer.is_active=true "+
+   "AND reviewer_auth.raw_app_meta_data->>'qf_principal'='vox_staff' "+
+   "AND reviewer_auth.raw_app_meta_data->>'vox_role'='team_leader' "+
+   "AND reviewer_auth.raw_app_meta_data->>'admin_role' IS NULL "+
+   "AND tl.staff_role='team_leader' AND tl.is_active=true "+
+   "AND tl.revoked_at IS NULL AND tl.expires_at>clock_timestamp() "+
+   "AND rt.id=req.team_id AND rt.city_id=req.city_id AND rt.is_active=true "+
+   "FOR SHARE OF cap,req,d,x,reviewer,reviewer_auth,tl,rt",
+   [input.verifiedStaff.userId,staff.rows[0].team_id,c.city_id]);
+  if(reviewed.rowCount!==1){
+   await db.query("ROLLBACK");settled=true;return closed("DEPARTMENT_INDEPENDENT_REVIEW_REQUIRED");
+  }
+  const scope=await db.query(
+   "SELECT id FROM public.vox_staff_object_scopes_v1 "+
+   "WHERE auth_user_id=$1::uuid AND scope_kind='conversation' "+
+   "AND object_id=$2::uuid AND revoked_at IS NULL "+
+   "AND expires_at>clock_timestamp() FOR SHARE",
+   [input.verifiedStaff.userId,input.conversationId]);
+  if(scope.rowCount!==1){
+   await db.query("ROLLBACK");settled=true;return closed("CONVERSATION_OBJECT_GRANT_REVOKED");
   }
   const consent=await authorizeConversationalWhatsAppConsent({
    destinationHash:hash,subjectType:"vendor",subjectId:c.subject_id},{

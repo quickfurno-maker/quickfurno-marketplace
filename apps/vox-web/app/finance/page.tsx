@@ -28,7 +28,7 @@ export default async function Finance(){
    {result.orders.length===0?<div className="voxBlank">No order records returned by Core.</div>:
     <div className="voxRows">{result.orders.map(o=><div className="voxRow" key={o.orderId}>
       <div className="voxRowIcon">₹</div><div className="voxRowBody">
-       <b>{amount(o.recordedOrderAmount)} · {o.vendorRef}</b>
+       <b><Link href={"/finance/"+o.orderId} style={{color:"#9decc8"}}>{amount(o.recordedOrderAmount)} · {o.vendorRef}</Link></b>
        <small>Order #{o.orderId.slice(0,8)} · {when(o.createdAt)} · {o.creditsIncluded??"—"} package credits recorded</small></div>
       <span className="voxState">{o.paymentStatus} / {o.activationStatus}</span></div>)}</div>}
    <footer>Core order snapshot · Not a settlement ledger</footer>

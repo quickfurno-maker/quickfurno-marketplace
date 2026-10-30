@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { inspectRazorpayOrderClaim, storedRazorpayOrderModeError } from "../lib/payments/vendorPackageOrderGuards.mjs";
+import { inspectRazorpayOrderClaim, isDefiniteRazorpayOrderRejection, storedRazorpayOrderModeError } from "../lib/payments/vendorPackageOrderGuards.mjs";
 import { adminClient } from "../lib/supabase";
 import { AppError, fail, ok, type Result } from "../lib/errors";
 import { requireVendorAccess } from "./vendorAccessService";
@@ -140,7 +140,15 @@ async function razorpayFetch<T>(cfg: RazorpayConfig, path: string, init: Request
     signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) {
-    throw paymentError("RAZORPAY_HTTP_REJECTED", `Razorpay request failed with HTTP ${response.status}.`);
+    // Only a narrow set of POST /orders client errors proves no provider order
+    // was created. For 408/409/429/5xx keep the claim fenced for reconciliation.
+    const definitiveOrderRejection = path === "/orders"
+      && init.method?.toUpperCase() === "POST"
+      && isDefiniteRazorpayOrderRejection(response.status);
+    throw paymentError(
+      definitiveOrderRejection ? "RAZORPAY_HTTP_REJECTED" : "RAZORPAY_HTTP_UNCERTAIN",
+      `Razorpay request failed with HTTP ${response.status}.`,
+    );
   }
   return response.json() as Promise<T>;
 }

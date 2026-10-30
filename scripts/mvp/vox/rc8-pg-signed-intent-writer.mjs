@@ -50,6 +50,26 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
   if(owner.rowCount!==1||tl.rowCount!==1){
    await client.query("ROLLBACK");settled=true;return deny("CURRENT_ACTOR_REVOKED");
   }
+  // EOD signatures must bind to the CURRENT locked four-source report,
+  // not just a caller-supplied digest and UUID. Operator-command requests use
+  // their separate signed-operator source and never this EOD path.
+  if(request.type==="EOD_OFFICIAL_RELEASE"){
+   const report=await client.query(
+    "SELECT id,staff_id,team_id,city_id,reviewer_id,source_count,source_digest,"+
+    "state,published FROM public.vox_ab7f_four_source_eod_candidate_v1 "+
+    "WHERE id=$1::uuid FOR UPDATE",
+    [request.subjectId]);
+   const row=report.rows[0];
+   if(report.rowCount!==1||!row||row.team_id!==request.teamId||
+      row.city_id!==request.cityId||row.reviewer_id!==teamLeaderAuth?.userId||
+      row.staff_id===ownerAuth?.userId||row.staff_id===teamLeaderAuth?.userId||
+      Number(row.source_count)!==4||row.source_digest!==request.digest||
+      row.state!=="TL_ACKNOWLEDGED_AWAITING_OWNER_RELEASE"||
+      row.published!==false){
+    await client.query("ROLLBACK");settled=true;
+    return deny("EOD_CURRENT_FOUR_SOURCE_REVIEW_REQUIRED");
+   }
+  }
   const registryRows=await client.query(
    "SELECT key_id AS \"keyId\",signer_id::text AS \"signerId\", "+
    "signer_role AS \"signerRole\",public_key_pem AS \"publicKeyPem\", "+

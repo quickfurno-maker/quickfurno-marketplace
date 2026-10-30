@@ -1,0 +1,142 @@
+/** RC8 native Core vendor conversation operator: true PG READ WRITE transaction.
+ * REVIEW ONLY. No exported live route. HUMAN pause/takeover only (no sends).
+ * Cannot create canonical AB7B CORE_CONVERSATION source row until reviewed
+ * SQL CHECK/consent scope binding and actual Staff AAL2 integration are approved.
+ */
+import {decideCommunicationConsent} from "../communicationConsentDecisionService";
+import {authorizeConversationalWhatsAppConsent} from "../outboundConsentEnforcementService";
+export const RC8_CORE_WRITER_INSTALLED=false as const;
+export const RC8_CORE_RELEASE_GATE=Object.freeze({
+ ab7bBindingApproved:false,staffAal2AdapterInstalled:false,
+ allConsentMutationPathsSerialized:false,managedSchemaReviewed:false});
+type Db={query:(sql:string,values?:unknown[])=>Promise<{rows:any[];rowCount:number}>;
+ release:()=>void};
+type Input={conversationId:string;nonce:string;expectedRevision:number;
+ action:"PAUSE_AI"|"TAKEOVER";verifiedStaff:{
+ userId:string;aal:"aal2";expiresAtMs:number}};
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const closed=(reason:string)=>Object.freeze({ok:false,reason,committed:false,
+ canonicalAb7bSourceReady:false,providerMessagesSent:0});
+const timestamp=(column:string)=>"CASE WHEN "+column+" IS NULL THEN NULL ELSE "+
+ "to_char("+column+" AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') END";
+const suppressions="SELECT id::text AS id,scope,reason,policy_version,is_active,"+
+ timestamp("expires_at")+" AS expires_at,"+timestamp("deactivated_at")+
+ " AS deactivated_at FROM public.communication_suppressions "+
+ "WHERE destination_hash=$1 AND channel=$2 AND is_active=true AND scope=ANY($3::text[])";
+const preference="SELECT id::text AS id,state,policy_version,"+
+ timestamp("consented_at")+" AS consented_at,"+timestamp("withdrawn_at")+
+ " AS withdrawn_at FROM public.communication_preferences "+
+ "WHERE principal_type=$1 AND principal_id=$2::uuid AND channel=$3 AND scope=$4";
+export async function executeRc8PgVendorConversationOperator(input:Input,
+ acquireClient:()=>Promise<Db>){
+ if(!input||!UUID.test(input.conversationId??"")||!UUID.test(input.nonce??"")||
+    !Number.isSafeInteger(input.expectedRevision)||input.expectedRevision<0||
+    !["PAUSE_AI","TAKEOVER"].includes(input.action)||!input.verifiedStaff||
+    !UUID.test(input.verifiedStaff.userId??"")||input.verifiedStaff.aal!=="aal2"||
+    !Number.isSafeInteger(input.verifiedStaff.expiresAtMs)||
+    input.verifiedStaff.expiresAtMs<=Date.now()||
+    typeof acquireClient!=="function")return closed("INPUT_OR_AAL2_INVALID");
+ let db:Db|undefined,started=false,settled=false;
+ try{
+  db=await acquireClient();
+  if(!db||typeof db.query!=="function"||typeof db.release!=="function")
+   return closed("TRANSACTION_ADAPTER_INVALID");
+  await db.query("BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE");
+  started=true;
+  // Read destination first, lock it BEFORE any conversation row (D2-D order).
+  const pre=await db.query(
+   "SELECT destination_hash FROM public.communication_conversations WHERE id=$1::uuid",
+   [input.conversationId]);
+  const hash=pre.rows[0]?.destination_hash;
+  if(pre.rowCount!==1||typeof hash!=="string"||!/^[a-f0-9]{64}$/.test(hash)){
+   await db.query("ROLLBACK");settled=true;return closed("CONVERSATION_NOT_FOUND");
+  }
+  await db.query(
+   "SELECT pg_advisory_xact_lock(hashtextextended('dst|' || $1::text || '|whatsapp',0))",[hash]);
+  const conv=await db.query(
+   "SELECT c.id,c.tenant_id,c.channel,c.destination_hash,c.subject_type,c.subject_id,"+
+   "c.state,c.revision,c.assigned_actor,c.human_takeover, z.city_id,z.is_active AS zone_active "+
+   "FROM public.communication_conversations c "+
+   "JOIN public.vendors v ON c.subject_type='vendor' AND v.id=c.subject_id "+
+   "JOIN public.marketplace_service_zones z ON z.id=v.service_zone_id "+
+   "WHERE c.id=$1::uuid FOR UPDATE OF c",[input.conversationId]);
+  const c=conv.rows[0];
+  if(conv.rowCount!==1||c.tenant_id!=="quickfurno"||c.channel!=="whatsapp"||
+     c.destination_hash!==hash||c.subject_type!=="vendor"||c.zone_active!==true||
+     Number(c.revision)!==input.expectedRevision||c.human_takeover!==false||
+     !["ANISHA","AAROHI","RIYA"].includes(c.assigned_actor)||
+     (input.action==="PAUSE_AI"&&c.state!=="OPEN")||
+     (input.action==="TAKEOVER"&&!["OPEN","PAUSED"].includes(c.state))){
+   await db.query("ROLLBACK");settled=true;return closed("CURRENT_VENDOR_SCOPE_OR_STATE_DENIED");
+  }
+  const staff=await db.query(
+   "SELECT m.auth_user_id FROM public.vox_staff_memberships_v1 m "+
+   "JOIN public.vox_staff_teams_v1 t ON t.id=m.team_id "+
+   "JOIN public.profiles p ON p.id=m.auth_user_id "+
+   "WHERE m.auth_user_id=$1::uuid AND m.staff_role='operations_manager' "+
+   "AND m.is_active=true AND m.revoked_at IS NULL "+
+   "AND m.expires_at>clock_timestamp() AND t.is_active=true "+
+   "AND t.city_id=$2::uuid AND p.is_active=true AND p.role IS NULL "+
+   "AND EXISTS(SELECT 1 FROM public.vox_staff_department_capabilities_v1 cap "+
+   "WHERE cap.auth_user_id=m.auth_user_id AND cap.team_id=m.team_id "+
+   "AND cap.city_id=t.city_id AND cap.department='client_success' "+
+   "AND cap.revoked_at IS NULL AND cap.expires_at>clock_timestamp()) "+
+   "AND EXISTS(SELECT 1 FROM public.vox_staff_object_scopes_v1 g "+
+   "WHERE g.auth_user_id=m.auth_user_id AND g.scope_kind='conversation' "+
+   "AND g.object_id=$3::uuid AND g.revoked_at IS NULL "+
+   "AND g.expires_at>clock_timestamp()) FOR SHARE OF m,t,p",
+   [input.verifiedStaff.userId,c.city_id,input.conversationId]);
+  if(staff.rowCount!==1||input.verifiedStaff.expiresAtMs<=Date.now()){
+   await db.query("ROLLBACK");settled=true;return closed("CURRENT_STAFF_GRANT_OR_AAL2_DENIED");
+  }
+  const consent=await authorizeConversationalWhatsAppConsent({
+   destinationHash:hash,subjectType:"vendor",subjectId:c.subject_id},{
+   decide:decision=>decideCommunicationConsent(decision,{
+    now:()=>new Date(),
+    readSuppressions:async q=>(await db!.query(suppressions,
+     [q.destinationHash,q.channel,q.scopes])).rows,
+    readExactPreference:async q=>(await db!.query(preference,
+     [q.principalType,q.principalId,q.channel,q.scope])).rows
+   })
+  });
+  if(consent.kind!=="allow"||consent.scope!=="transactional"){
+   await db.query("ROLLBACK");settled=true;
+   return closed(consent.kind==="unavailable"?"CONSENT_AUTHORITY_UNAVAILABLE":"CONSENT_DENIED");
+  }
+  const next=input.expectedRevision+1;
+  const target=input.action==="TAKEOVER"?"HUMAN":"PAUSED";
+  const updated=await db.query(
+   "UPDATE public.communication_conversations SET state=$2,"+
+   "assigned_actor=CASE WHEN $3='TAKEOVER' THEN 'HUMAN' ELSE assigned_actor END,"+
+   "human_takeover=($3='TAKEOVER'),jarvis_enabled=false,revision=$4,"+
+   "updated_at=clock_timestamp() WHERE id=$1::uuid AND revision=$5 RETURNING id",
+   [input.conversationId,target,input.action,next,input.expectedRevision]);
+  if(updated.rowCount!==1)throw Error("REVISION_CHANGED");
+  const event=await db.query(
+   "INSERT INTO public.communication_conversation_events "+
+   "(conversation_id,event_type,actor_type,safe_summary,event_data) "+
+   "VALUES($1,$2,'HUMAN','Core consent-bound Staff control; no provider send',$3::jsonb) RETURNING id",
+   [input.conversationId,input.action==="TAKEOVER"?"human.takeover_started":"ai.paused_by_operator",
+    JSON.stringify({operatorUserId:input.verifiedStaff.userId,revision:next})]);
+  if(event.rowCount!==1||!UUID.test(event.rows[0]?.id))throw Error("NO_EVENT");
+  const receipt=await db.query(
+   "INSERT INTO public.vox_rc8_conversation_operator_receipts_candidate_v1 "+
+   "(nonce,conversation_id,actor_id,action,previous_revision,new_revision,event_id,consent_scope) "+
+   "VALUES($1,$2,$3,$4,$5,$6,$7,'transactional') RETURNING nonce",
+   [input.nonce,input.conversationId,input.verifiedStaff.userId,input.action,
+    input.expectedRevision,next,event.rows[0].id]);
+  if(receipt.rowCount!==1||receipt.rows[0]?.nonce!==input.nonce)throw Error("NO_RECEIPT");
+  settled=true;
+  try{await db.query("COMMIT");}catch{return closed("COMMIT_OUTCOME_UNKNOWN");}
+  return Object.freeze({ok:true,state:target,revision:next,
+   committed:true,canonicalAb7bSourceReady:false,providerMessagesSent:0});
+ }catch{
+  if(started&&!settled)try{await db!.query("ROLLBACK")}catch{}
+  return closed("PG_TRANSACTION_FAILED");
+ }finally{try{db?.release()}catch{}}
+}
+/** Live entry is permanently hard-off absent reviewed binding/migration.
+ * Test function above is NOT called by a route. */
+export async function executeRc8PgVendorConversationOperatorProduction(){
+ return closed("CORE_WRITER_RELEASE_GATE_CLOSED");
+}

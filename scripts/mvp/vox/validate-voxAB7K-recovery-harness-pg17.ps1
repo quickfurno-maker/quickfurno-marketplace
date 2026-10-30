@@ -164,11 +164,12 @@ $$;
   if(@(Compare-Object $difference $expected).Count -ne 0){
     throw 'ACL_PROBE_REFUSED_UNEXPECTED_CATALOG_DIFFERENCE'
   }
-  $aclSql=@'
-REVOKE ALL ON TABLE public.vox_ab7j_staff_suspend_intents_candidate_v1 FROM postgres;
-GRANT ALL ON TABLE public.vox_ab7j_staff_suspend_intents_candidate_v1 TO postgres;
-'@
-  $null=Psql $rst 'ab7k_restore' $aclSql
+  # Derive the exact OWNER-only repair from the immutable before/after
+  # snapshots. Unexpected ACL grantees, privileges, owners or extra diffs DENY.
+  $aclPlan=Join-Path $root 'scripts\mvp\vox\rc8-owner-acl-replay-plan.mjs'
+  $aclResult=Native {node $aclPlan (Join-Path $OutDir 'source.snapshot.json') (Join-Path $OutDir 'restored-full.snapshot.json') (Join-Path $OutDir 'compare-full-fidelity.json')}
+  if($aclResult.code -ne 0){throw "ACL_PROBE_PLAN_DENIED $($aclResult.text)"}
+  $null=Psql $rst 'ab7k_restore' $aclResult.text
   Snapshot $rst 'ab7k_restore' (Join-Path $OutDir 'restored-owner-acl-probe.snapshot.json')
   $reconcile=Native {node $cli compare --a (Join-Path $OutDir 'source.snapshot.json') --b (Join-Path $OutDir 'restored-owner-acl-probe.snapshot.json')}
   [IO.File]::WriteAllText((Join-Path $OutDir 'compare-owner-acl-probe.json'),$reconcile.text,$utf8)

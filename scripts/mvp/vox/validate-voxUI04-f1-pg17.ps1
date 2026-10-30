@@ -22,7 +22,7 @@ try{
   $finalReady=$false
   for($i=0;$i -lt 60;$i++){
     $startupLog=(docker logs $name 2>&1 | Out-String)
-    if($startupLog -match 'PostgreSQL init process complete; ready for start up\\.'){
+    if($startupLog -match 'PostgreSQL init process complete; ready for start up\.'){
       $probe=(docker exec $name psql -X -A -t -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'SELECT 1' 2>&1 | Out-String).Trim()
       if($LASTEXITCODE -eq 0 -and $probe -eq '1'){$finalReady=$true;break}
     }

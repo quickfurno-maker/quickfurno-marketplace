@@ -9,13 +9,14 @@ import {readFileSync} from "node:fs";
 import {deriveCanonicalCityVendorIds} from "../../../contracts/vox/canonicalZoneGate.mjs";
 import {projectActualStaffSourceStatus} from "../../../contracts/vox/actualEodSourceStatus.mjs";
 import {projectScopedClientCaseList} from "../../../contracts/vox/verifiedClientCasePreview.mjs";
+import {unchangedAuthorizedStaffScope} from "../../../contracts/vox/rc1CurrentStaffScope.mjs";
 const id=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 const state={flags:{},scope:null,rows:{},errors:{},queries:[],calls:0};
 const scope=()=>({userId:id(1),teamId:id(2),cityId:id(3),role:"support_agent",
  canReadContent:true,canMutate:false,verifiedDepartments:["client_success"],
  prospectIds:[],vendorIds:[],supportThreadIds:[],conversationIds:[]});
 function reset(){
- state.flags={VOX_STAFF_GRANTS_ENABLED:"staging",
+ state.flags={VOX_STAFF_READ_ENABLED:"staging",VOX_STAFF_GRANTS_ENABLED:"staging",
   VOX_DEPARTMENT_ENFORCEMENT_ENABLED:"staging",
   VOX_EOD_PREVIEW_ENABLED:"staging",
   VOX_EOD_SOURCE_READINESS_ENABLED:"staging",
@@ -60,7 +61,8 @@ async function route(path,exportName,moduleRef,projection){
   "@/services/vox/verifiedScopedStaff":{getVerifiedScopedStaff:async()=>{
    state.calls++;return state.scope;
   }},
-  [moduleRef]:{[exportName]:projection}
+  [moduleRef]:{[exportName]:projection},
+  "@/contracts/vox/rc1CurrentStaffScope.mjs":{unchangedAuthorizedStaffScope}
  };
  if(path.includes("eod-source-status"))mocks["@/contracts/vox/canonicalZoneGate.mjs"]=
   {deriveCanonicalCityVendorIds};

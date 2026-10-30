@@ -42,7 +42,12 @@ CREATE UNIQUE INDEX aarohi_events_idempotency_idx ON public.aarohi_events
 '@
  $native | docker exec -i $name psql -X -q -U postgres -d postgres -v ON_ERROR_STOP=1
  if($LASTEXITCODE -ne 0){throw 'AAROHI_NATIVE_DEPENDENCY_MISSING'}
- $sqls=Get-ChildItem (Join-Path $root 'supabase\migrations') -Filter '20261014*vox*.sql'|Sort-Object Name
+ # The seven originally active foundations were later quarantined.
+ # Rehearse their exact bytes from the quarantined path, NEVER reinstall them
+ # as managed supabase/migrations or rewrite managed migration history.
+ $active=@(Get-ChildItem (Join-Path $root 'supabase\migrations') -Filter '20261014*vox*.sql')
+ if($active.Count -ne 0){throw 'UNAPPROVED_ACTIVE_VOX_MIGRATIONS'}
+ $sqls=@(Get-ChildItem (Join-Path $root 'ops\vox\quarantined-migrations\legacy-20261014') -Filter '20261014*vox*.sql' | Sort-Object Name)
  if($sqls.Count -ne 7){throw 'MIGRATION_COUNT_MISMATCH'}
  foreach($sql in $sqls){
   (Get-Content $sql.FullName -Raw) | docker exec -i $name psql -X -q -U postgres -d postgres -v ON_ERROR_STOP=1

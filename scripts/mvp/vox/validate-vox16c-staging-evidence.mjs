@@ -7,7 +7,14 @@ const ledger=JSON.parse(readFileSync(resolve(root,'supabase/staging-history/qf-p
 const rows=ledger.records.filter(r=>String(r.version).startsWith('20261014')&&String(r.name).startsWith('vox_'));
 assert.equal(rows.length,7);
 for(const r of rows){
- const bytes=readFileSync(resolve(root,r.path)).toString('utf8').replace(/\r\n?/g,'\n');
+ // The captured 2026-09-29 evidence references the ORIGINAL migration paths.
+ // Those seven SQL sources were later QUARANTINED, never installed in managed
+ // Staging. Only the exact 7 reviewed filenames may be resolved to quarantine;
+ // never silently reinterpret arbitrary ledger paths or relax a source digest.
+ const original=`supabase/migrations/${r.version}_${r.name}.sql`;
+ assert.equal(r.path,original,'UNEXPECTED_CAPTURED_MIGRATION_PATH');
+ const quarantined=`ops/vox/quarantined-migrations/legacy-20261014/${r.version}_${r.name}.sql`;
+ const bytes=readFileSync(resolve(root,quarantined)).toString('utf8').replace(/\r\n?/g,'\n');
  const sum=createHash('sha256').update(bytes).digest('hex');
  assert.equal(sum,r.canonicalSha256);
  assert.equal(r.exactVersionPresence?.staging,false);

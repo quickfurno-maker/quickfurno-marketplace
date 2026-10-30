@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {readFileSync,readdirSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {resolve} from 'node:path';
 const root=resolve(import.meta.dirname,'../../..');
 const git=(...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8',timeout:12000}).trim();
@@ -14,13 +15,24 @@ for(const file of [
  '.github/workflows/vox-16e-rls-negative.yml',
  'docs/vox/VOX-16E-PG17-ROLE-NEGATIVE.md'
 ]){
- const expected=execFileSync('git',['show','2cd27c60ef06e5e95e857e1e5125d9dfd7defe17:'+file],{cwd:root,encoding:'utf8'});
- const actual=readFileSync(resolve(root,file),'utf8');
- assert.equal(actual.replace(/\r\n/g,'\n'),expected.replace(/\r\n/g,'\n'));count++;
+ const actual=readFileSync(resolve(root,file),'utf8').replace(/\r\n/g,'\n');
+ if(file.endsWith('validate-vox16-full-seven-pg17.ps1')){
+  // Reviewed migration-quarantine update: still pin exact current bytes AND
+  // require both no active Staff SQL and positive exact seven-path replay.
+  const sha=createHash('sha256').update(actual).digest('hex');
+  assert.equal(sha,'9e03ad82391ac2785c0661fe8df069390a202132028c6c671d81ffe422d9e26a');
+  assert.match(actual,/UNAPPROVED_ACTIVE_VOX_MIGRATIONS/);
+  assert.match(actual,/quarantined-migrations\\legacy-20261014/);
+ }else{
+  const expected=execFileSync('git',['show','2cd27c60ef06e5e95e857e1e5125d9dfd7defe17:'+file],{cwd:root,encoding:'utf8'});
+  assert.equal(actual,expected.replace(/\r\n/g,'\n'));
+ }
+ count++;
  console.log('PASS exact no-drop SQL security sibling '+file);
 }
 assert.match(readFileSync(resolve(root,'apps/vox-web/app/vendor360/components/TaskCreator.tsx'),'utf8'),/nonce:requestNonce/);count++;
-assert.equal(readdirSync(resolve(root,'supabase/migrations')).filter(x=>/^20261014\d{6}_vox.*\.sql$/.test(x)).length,7);count++;
+assert.equal(readdirSync(resolve(root,'supabase/migrations')).filter(x=>/^20261014\d{6}_vox.*\.sql$/.test(x)).length,0);
+assert.equal(readdirSync(resolve(root,'ops/vox/quarantined-migrations/legacy-20261014')).filter(x=>/^20261014\d{6}_vox.*\.sql$/.test(x)).length,7);count++;
 const docs=readFileSync(resolve(root,'docs/vox/VOX-16F-CONSOLIDATED-REVIEW.md'),'utf8');
 assert.match(docs,/RELEASE HOLD/);count++;
 assert.match(docs,/UNMERGED/);count++;

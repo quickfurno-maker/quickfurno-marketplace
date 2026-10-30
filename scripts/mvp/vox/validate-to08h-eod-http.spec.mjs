@@ -9,12 +9,14 @@ import {selectCurrentEodReferences,verifyCurrentEodCanonicalProof}
  from "../../../contracts/vox/currentEodCanonicalProof.mjs";
 import {projectCurrentCoreWorkEod}
  from "../../../contracts/vox/coreWorkEodPreview.mjs";
+import {unchangedAuthorizedStaffScope}
+ from "../../../contracts/vox/rc1CurrentStaffScope.mjs";
 const id=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 const SCOPE={userId:id(1),teamId:id(2),cityId:id(3),role:"support_agent",
  canReadContent:true,canMutate:false,prospectIds:[id(10)],vendorIds:[id(11)],
- supportThreadIds:[id(12)]};
+ supportThreadIds:[id(12)],verifiedDepartments:[],conversationIds:[]};
 const DAILY="2026-10-16";
-const FLAG_NAMES=["VOX_STAFF_GRANTS_ENABLED","VOX_DEPARTMENT_ENFORCEMENT_ENABLED",
+const FLAG_NAMES=["VOX_STAFF_READ_ENABLED","VOX_STAFF_GRANTS_ENABLED","VOX_DEPARTMENT_ENFORCEMENT_ENABLED",
  "VOX_WORK_QUEUE_READ_ENABLED","VOX_EOD_PREVIEW_ENABLED"];
 class FixedDate extends Date {
  constructor(...args){super(...(args.length?args:["2026-10-16T10:00:00.000Z"]));}
@@ -80,6 +82,7 @@ const exportsBySpecifier=new Map([
   }
  }],
  ["@/contracts/vox/coreWorkEodPreview.mjs",{projectCurrentCoreWorkEod}],
+ ["@/contracts/vox/rc1CurrentStaffScope.mjs",{unchangedAuthorizedStaffScope}],
  ["@/contracts/vox/currentEodCanonicalProof.mjs",{
   selectCurrentEodReferences,verifyCurrentEodCanonicalProof
  }]

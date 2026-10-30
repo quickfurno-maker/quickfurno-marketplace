@@ -1,0 +1,20 @@
+name: VOX Managed Staging Readiness Guards
+on:
+  pull_request:
+    paths:
+      - 'ops/vox/tests/vox_managed_staging_*20261030.sql'
+      - 'scripts/mvp/vox/validate-vox-managed-staging-readiness-20261030.mjs'
+      - '.github/workflows/vox-managed-staging-readiness.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  readonly-release-guards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - run: node scripts/mvp/vox/validate-vox-managed-staging-readiness-20261030.mjs

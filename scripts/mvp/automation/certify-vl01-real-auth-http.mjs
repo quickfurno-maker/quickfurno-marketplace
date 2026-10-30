@@ -14,9 +14,30 @@ const require=createRequire(path.join(ROOT,"package.json"));
 const { Client }=require("pg");
 if(typeof globalThis.WebSocket === "undefined") globalThis.WebSocket=require("ws");
 const {createServerClient}=require("@supabase/ssr");
+// Two official distribution hosts for the SAME immutable PostgREST v16.1 digest.
+// A CI registry rate limit must not turn a genuine auth test into a fake pass.
+const POSTGREST_DIGEST="sha256:5922bde07147b82b1c9d8f749e48c1e5b99ebb233f3888bb7ab65f07cf4ac82d";
+const POSTGREST_TEST_IMAGES=[
+ "ghcr.io/supabase/postgrest:v16.1@"+POSTGREST_DIGEST,
+ "public.ecr.aws/supabase/postgrest:v16.1@"+POSTGREST_DIGEST,
+];
 const suffix=String(process.pid), net="vl01-http-net-"+suffix, pgname="vl01-http-pg-"+suffix, gt="vl01-http-auth-"+suffix, rest="vl01-http-rest-"+suffix;
 const pass=randomBytes(22).toString("hex"), jwtSecret=randomBytes(32).toString("hex");
 const docker=(...args)=>execFileSync("docker",args,{encoding:"utf8",stdio:["ignore","pipe","pipe"]}).trim();
+const choosePinnedPostgrestImage=()=>{
+ for(const ref of POSTGREST_TEST_IMAGES){
+  try{
+   // Prefer an already verified local image; avoid unnecessary registry requests.
+   try{docker("image","inspect",ref);}catch{docker("pull",ref);}
+   const repoDigests=JSON.parse(docker("image","inspect","--format","{{json .RepoDigests}}",ref));
+   if(!Array.isArray(repoDigests)||!repoDigests.some(x=>typeof x==="string"&&x.endsWith("@"+POSTGREST_DIGEST)))
+    throw Error("POSTGREST_DIGEST_NOT_VERIFIED");
+   console.log("POSTGREST_PINNED_DIGEST_VERIFIED");
+   return ref;
+  }catch{/* Try second official host with the exact same digest; never skip HTTP QA. */}
+ }
+ throw Error("POSTGREST_PINNED_IMAGE_UNAVAILABLE");
+};
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const jwt=claims=>{const b=v=>Buffer.from(JSON.stringify(v)).toString("base64url");const head=b({alg:"HS256",typ:"JWT"});const payload=b(claims);const sig=createHmac("sha256",jwtSecret).update(head+"."+payload).digest("base64url");return head+"."+payload+"."+sig;};
 const uid="d71a2711-5cab-4c4e-9a4d-c8e6bac8f6dd",req="fd133c10-87dd-4b5e-9ed8-8d7a5a9fb113",job="6ea50c8c-32ce-4c1f-9569-cd679d843d5f",attempt="9b1bc810-4814-44a7-8955-50f0eb531d92",transport="b2d4a319-6450-4479-80e3-b898a28fd645";
@@ -40,7 +61,7 @@ try {
   CREATE ROLE authenticator LOGIN PASSWORD '${pass}' NOINHERIT;
   GRANT anon,authenticated,service_role TO authenticator;
   GRANT USAGE ON SCHEMA public TO anon,authenticated,service_role;
-  CREATE TABLE public.profiles(id uuid PRIMARY KEY,role text);
+  CREATE TABLE public.profiles(id uuid PRIMARY KEY,role text,is_active boolean DEFAULT true);
   CREATE TABLE public.automation_action_requests(id uuid PRIMARY KEY,action_type text,entity_type text,correlation_id text,decision_status text,decision_at timestamptz,decision_reason_code text,created_at timestamptz);
   CREATE TABLE public.automation_jobs(id uuid PRIMARY KEY,action_request_id uuid,status text,attempt_count int,available_at timestamptz,locked_at timestamptz,completed_at timestamptz,created_at timestamptz,updated_at timestamptz,last_safe_code text);
   CREATE TABLE public.automation_execution_attempts(id uuid PRIMARY KEY,job_id uuid,attempt_number int,status text,classification text,safe_code text,started_at timestamptz,finished_at timestamptz);
@@ -67,7 +88,7 @@ try {
  docker("run","-d","--name",rest,"--network",net,"-p","127.0.0.1::3000",
  "-e","PGRST_DB_URI=postgres://authenticator:"+pass+"@"+pgname+":5432/vl01",
  "-e","PGRST_DB_SCHEMAS=public","-e","PGRST_DB_ANON_ROLE=anon","-e","PGRST_JWT_SECRET="+jwtSecret,
- "-e","PGRST_SERVER_PORT=3000","ghcr.io/supabase/postgrest:v16.1@sha256:5922bde07147b82b1c9d8f749e48c1e5b99ebb233f3888bb7ab65f07cf4ac82d");dbs.push(rest);
+ "-e","PGRST_SERVER_PORT=3000",choosePinnedPostgrestImage());dbs.push(rest);
  const restPort=Number(docker("port",rest,"3000/tcp").match(/127\.0\.0\.1:(\d+)/)?.[1]);
  await ready("http://127.0.0.1:"+restPort+"/");
  const server=createServer((request,response)=>{
@@ -120,6 +141,14 @@ try {
  r=await post(cookieHeader());suite("real HTTP superadmin trace success",r.status===200&&r.data.ok===true);
  suite("real Core trace SQL evidence present",r.data.events?.some(e=>e.title?.includes("Attempt"))&&r.data.providerDeliveryVerified===false);
  suite("real HTTP cache control no-store",r.cache==="no-store");
+ // Genuine signed session: disabling the profile must revoke service-role-backed
+ // admin API access on the very next request without refreshing the JWT.
+ await pg.query("UPDATE public.profiles SET is_active=false WHERE id=$1",[signup.user.id]);
+ r=await post(cookieHeader());suite("real HTTP disabled superadmin rejected same session",r.status===401);
+ await pg.query("UPDATE public.profiles SET is_active=NULL WHERE id=$1",[signup.user.id]);
+ r=await post(cookieHeader());suite("real HTTP NULL-active superadmin rejected same session",r.status===401);
+ await pg.query("UPDATE public.profiles SET is_active=true WHERE id=$1",[signup.user.id]);
+ r=await post(cookieHeader());suite("real HTTP reactivated superadmin accepted same session",r.status===200&&r.data.ok===true);
  r=await post(cookieHeader(),{action:"trace",jobId:"bogus"});suite("real HTTP malformed id rejected",r.status===400);
  r=await post(cookieHeader(),{action:"trace",jobId:uid});suite("real HTTP missing job 404",r.status===404);
  const immutable=await pg.query("SELECT count(*)::int n FROM public.automation_jobs");suite("real SQL job count unchanged",immutable.rows[0].n===1);

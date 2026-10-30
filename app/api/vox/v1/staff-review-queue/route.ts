@@ -6,7 +6,9 @@ const send=(payload:unknown,status:number)=>Response.json(payload,{status,header
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const safeId=(v:unknown)=>typeof v==="string"&&UUID.test(v)?v:null;
 export async function GET(request:Request){
- if(process.env.VOX_STAFF_GRANTS_ENABLED!=="staging")
+ if(process.env.VOX_STAFF_READ_ENABLED!=="staging"||
+    process.env.VOX_STAFF_GRANTS_ENABLED!=="staging"||
+    process.env.VOX_STAFF_REVIEWS_READ_ENABLED!=="staging")
   return send({ok:false,error:"STAFF_REVIEW_DISABLED"},503);
  try{
   const actor=await getVerifiedScopedStaff(request.headers.get("authorization"));

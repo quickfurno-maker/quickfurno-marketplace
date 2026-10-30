@@ -1,4 +1,5 @@
 import "server-only";
+import {unchangedAuthorizedStaffScope} from "@/contracts/vox/rc1CurrentStaffScope.mjs";
 import {adminClient} from "@/lib/supabase";
 import {getVerifiedScopedStaff} from "@/services/vox/verifiedScopedStaff";
 import {projectCurrentCoreWorkEod} from "@/contracts/vox/coreWorkEodPreview.mjs";
@@ -16,7 +17,8 @@ const emptyRead={data:[],error:null};
  * No message, report submit, acknowledgement, mutation or export capability.
  */
 export async function GET(request:Request){
- if(process.env.VOX_STAFF_GRANTS_ENABLED!=="staging"||
+ if(process.env.VOX_STAFF_READ_ENABLED!=="staging"||
+    process.env.VOX_STAFF_GRANTS_ENABLED!=="staging"||
     process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED!=="staging"||
     process.env.VOX_WORK_QUEUE_READ_ENABLED!=="staging"||
     process.env.VOX_EOD_PREVIEW_ENABLED!=="staging")
@@ -77,6 +79,11 @@ export async function GET(request:Request){
    events:log.data,verifiedSourceIds:proof.verifiedSourceIds,businessDate});
   if(!report.ok)return send({ok:false,error:"EOD_EVENT_PROJECTION_DENIED"},503);
   // Never represent the partial Core work ledger as an audited 4-source total.
+  // Revalidate the current Auth+AAL2 membership and every object scope immediately
+  // before returning evidence; revoked grants cannot be served from a stale read.
+  const fresh=await getVerifiedScopedStaff(request.headers.get("authorization"));
+  if(!unchangedAuthorizedStaffScope(scope,fresh))
+   return send({ok:false,error:"STAFF_SCOPE_REVOKED"},403);
   return send(report,200);
  }catch{return send({ok:false,error:"EOD_PREVIEW_UNAVAILABLE"},503);}
 }

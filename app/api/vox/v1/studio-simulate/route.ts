@@ -9,6 +9,7 @@ const reply=(x:unknown,status:number)=>Response.json(x,{status,headers:{
 /** Dry-run simulation of an actual native Core workflow definition.
  * Never evaluates automation jobs, draft writes, provider sends or publish. */
 export async function GET(request:Request){
+ if(process.env.VOX_STAFF_READ_ENABLED!=="staging") return reply({ok:false,error:"STAFF_READ_DISABLED"},503);
  if(process.env.VOX_STUDIO_SIMULATION_ENABLED!=="staging")
   return reply({ok:false,error:"STUDIO_SIMULATION_DISABLED"},503);
  try{

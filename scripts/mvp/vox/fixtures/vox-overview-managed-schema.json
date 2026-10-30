@@ -1,0 +1,23 @@
+{
+  "schema": "qf.vox.overview.managed-schema-contract.v1",
+  "note": "Verified managed Staging columns (project uckafzuochmbvtiodmcl) for the four Owner-overview source tables. priority EXISTS on vendor_support_threads; topic does NOT. This fixture is the authority the contract test checks route.ts against. Do NOT 'fix' priority to topic.",
+  "capturedFromManagedCatalog": "2026-10-29",
+  "tables": {
+    "aarohi_prospects": ["id", "business_name", "prospect_stage", "priority_band", "last_activity_at", "city_id", "created_at", "updated_at"],
+    "vendor_crm_profiles": ["vendor_id", "onboarding_stage", "relationship_status", "next_follow_up_at", "updated_at", "created_at"],
+    "vendor_support_threads": ["id", "vendor_id", "subject", "status", "priority", "created_by_vendor", "created_at", "updated_at"],
+    "communication_conversations": ["id", "subject_type", "subject_id", "state", "human_takeover", "revision", "channel", "updated_at", "created_at"]
+  },
+  "mustExist": {
+    "vendor_support_threads": ["priority"]
+  },
+  "mustNotExist": {
+    "vendor_support_threads": ["topic"]
+  },
+  "expectedQueries": [
+    { "table": "aarohi_prospects",          "select": ["id", "business_name", "prospect_stage", "priority_band", "last_activity_at"], "order": { "column": "last_activity_at", "ascending": false }, "filters": [], "limit": 8 },
+    { "table": "vendor_crm_profiles",        "select": ["vendor_id", "onboarding_stage", "relationship_status", "next_follow_up_at"],   "order": { "column": "updated_at", "ascending": false }, "filters": [], "limit": 8 },
+    { "table": "vendor_support_threads",     "select": ["id", "vendor_id", "status", "priority", "updated_at"],                        "order": { "column": "updated_at", "ascending": false }, "filters": [], "limit": 8 },
+    { "table": "communication_conversations","select": ["id", "subject_type", "state", "human_takeover", "revision", "updated_at"],     "order": { "column": "updated_at", "ascending": false }, "filters": [ { "column": "state", "value": "HUMAN" }, { "column": "human_takeover", "value": true } ], "limit": 8 }
+  ]
+}

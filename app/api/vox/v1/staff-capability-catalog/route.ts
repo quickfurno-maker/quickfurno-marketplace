@@ -12,6 +12,7 @@ const send=(value:unknown,status:number)=>Response.json(value,{status,headers:{
  * issue invitations or expose unscoped employee records.
  */
 export async function GET(request:Request){
+ if(process.env.VOX_STAFF_READ_ENABLED!=="staging") return send({ok:false,error:"STAFF_READ_DISABLED"},503);
  if(process.env.VOX_STAFF_GRANTS_ENABLED!=="staging"||
     process.env.VOX_MULTI_DEPARTMENT_CATALOG_ENABLED!=="staging")
    return send({ok:false,error:"CAPABILITY_CATALOG_DISABLED"},503);

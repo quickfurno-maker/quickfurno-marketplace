@@ -1,4 +1,5 @@
 import { adminClient } from "@/lib/supabase";
+import {unchangedAuthorizedStaffScope} from "@/contracts/vox/rc1CurrentStaffScope.mjs";
 import { getVerifiedScopedStaff } from "@/services/vox/verifiedScopedStaff";
 import { deriveCanonicalCityVendorIds } from "@/contracts/vox/canonicalZoneGate.mjs";
 import { projectActualStaffSourceStatus } from "@/contracts/vox/actualEodSourceStatus.mjs";
@@ -15,7 +16,8 @@ const empty={data:[],error:null};
  * explicitly NOT PROVEN. No browser-supplied dates, team, city or subject IDs.
  */
 export async function GET(request:Request):Promise<Response>{
- if(process.env.VOX_STAFF_GRANTS_ENABLED!=="staging"||
+ if(process.env.VOX_STAFF_READ_ENABLED!=="staging"||
+    process.env.VOX_STAFF_GRANTS_ENABLED!=="staging"||
   process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED!=="staging"||
   process.env.VOX_EOD_PREVIEW_ENABLED!=="staging"||
   process.env.VOX_EOD_SOURCE_READINESS_ENABLED!=="staging")
@@ -89,6 +91,11 @@ export async function GET(request:Request):Promise<Response>{
      eventProvenance:"NOT_PROVEN"}
    ]});
   if(!result.ok)return send({ok:false,error:"SOURCE_READINESS_DENIED"},503);
+  // Revalidate the current Auth+AAL2 membership and every object scope immediately
+  // before returning evidence; revoked grants cannot be served from a stale read.
+  const fresh=await getVerifiedScopedStaff(request.headers.get("authorization"));
+  if(!unchangedAuthorizedStaffScope(scope,fresh))
+   return send({ok:false,error:"STAFF_SCOPE_REVOKED"},403);
   return send(result,200);
  }catch{return send({ok:false,error:"SOURCE_READINESS_UNAVAILABLE"},503);}
 }

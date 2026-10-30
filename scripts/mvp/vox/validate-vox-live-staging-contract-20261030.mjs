@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {resolve} from "node:path";
+const code=readFileSync(resolve(import.meta.dirname,"validate-vox-live-staging-unauthed-20261030.mjs"),"utf8");
+let n=0;const t=(name,f)=>{f();n++;console.log("PASS",name)};
+t("host pinned to Staging only",()=>assert.match(code,/ORIGIN="https:\/\/staging-core\.quickfurno\.in"/));
+t("only GET checks",()=>assert.match(code,/method:"GET"/));
+t("bounded requests",()=>assert.match(code,/AbortSignal\.timeout\(5500\)/));
+t("checks protected Owner and Staff routes",()=>{for(const x of ["overview","aos-health","studio-simulate","staff-directory","staff-review-queue","owner-approval-queue","work-queue"])assert.ok(code.includes(x));});
+t("checks malformed tokens",()=>assert.match(code,/Bearer malformed\.invalid\.jwt/));
+t("does not leak body or secrets in output",()=>{assert.match(code,/doesNotMatch\(text/);assert.doesNotMatch(code,/console\.log\(.*text/);});
+t("staging pre/post drift is explicit",()=>assert.match(code,/mode==="post"\?503:404/));
+const positive=readFileSync(resolve(import.meta.dirname,"validate-vox-three-real-aal2-staging-20261030.mjs"),"utf8");
+t("real AAL2 E2E refuses missing credentials",()=>assert.match(positive,/BLOCKED_MISSING_GENUINE_AAL2_SESSION/));
+t("E2E demands genuinely distinct AAL2 principals",()=>{assert.match(positive,/payload\?\.aal!=="aal2"/);assert.match(positive,/new Set\(actor\.map\(x=>x\.sub\)\)\.size,3/);});
+t("E2E uses only GET and never emits token strings",()=>{assert.match(positive,/method:"GET"/);assert.doesNotMatch(positive,/console\.log\([^\n]*tokens/);assert.doesNotMatch(positive,/method:"POST"|method:"PUT"|method:"PATCH"|method:"DELETE"/);});
+console.log("VOX_LIVE_NEGATIVE_MATRIX_CONTRACT_PASS "+n+"/"+n);

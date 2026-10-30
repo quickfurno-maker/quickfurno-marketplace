@@ -1,0 +1,87 @@
+<#
+.SYNOPSIS
+    Runs ops/security/tests/vox_p0_2_admin_rls_pg17.sql inside a disposable, network-isolated postgres:17-alpine container.
+
+.DESCRIPTION
+    Starts a unique container with --network none and no published ports, mounts the repository
+    root read-only at /qa, waits for Postgres readiness, executes the SQL test file via psql with
+    ON_ERROR_STOP=1, fails the script on any nonzero exit code, and always stops/removes the container.
+#>
+
+[CmdletBinding()]
+param()
+
+$ErrorActionPreference = 'Stop'
+
+$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
+$SqlRelativePath = 'ops/security/tests/vox_p0_2_admin_rls_pg17.sql'
+$SqlAbsolutePath = Join-Path $RepoRoot ($SqlRelativePath -replace '/', '\')
+
+if (-not (Test-Path -LiteralPath $SqlAbsolutePath)) {
+    throw "SQL test file not found: $SqlAbsolutePath"
+}
+
+$ContainerName = "vox-p0-2-admin-rls-pg17-$([guid]::NewGuid().ToString('N').Substring(0,12))"
+
+$existing = & docker ps -a --filter "name=^/$ContainerName`$" --format '{{.Names}}'
+if ($LASTEXITCODE -ne 0) {
+    throw "docker ps failed while checking for existing container '$ContainerName'."
+}
+if ($existing) {
+    throw "A container named '$ContainerName' already exists. Aborting to avoid collision."
+}
+
+$containerStarted = $false
+
+try {
+    Write-Host "Starting disposable container '$ContainerName' (network: none, repo mounted read-only at /qa)..."
+
+    & docker run -d `
+        --name $ContainerName `
+        --network none `
+        -e POSTGRES_HOST_AUTH_METHOD=trust `
+        -v "${RepoRoot}:/qa:ro" `
+        postgres:17-alpine | Out-Null
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "docker run failed to start container '$ContainerName'."
+    }
+    $containerStarted = $true
+
+    Write-Host 'Waiting for final initialized Postgres server...'
+    $maxAttempts = 60
+    $ready = $false
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        $initComplete = ((& cmd.exe /d /s /c "docker logs $ContainerName 2>&1") | Select-String -SimpleMatch 'PostgreSQL init process complete; ready for start up.')
+        if ($initComplete) {
+            $probe = (& docker exec $ContainerName psql -U postgres -d postgres -Atqc 'select 1' 2>$null | Out-String).Trim()
+            if ($LASTEXITCODE -eq 0 -and $probe -eq '1') {
+                $ready = $true
+                break
+            }
+        }
+        Start-Sleep -Seconds 1
+    }
+
+    if (-not $ready) {
+        & cmd.exe /d /s /c "docker logs $ContainerName 2>&1"
+        throw "Final initialized Postgres server did not become ready in container '$ContainerName' after $maxAttempts seconds."
+    }
+
+    Write-Host "Running $SqlRelativePath ..."
+    & docker exec $ContainerName psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f "/qa/$SqlRelativePath"
+    $sqlExitCode = $LASTEXITCODE
+
+    if ($sqlExitCode -ne 0) {
+        throw "SQL test file '$SqlRelativePath' failed with exit code $sqlExitCode."
+    }
+
+    Write-Host 'SQL test completed successfully.'
+}
+finally {
+    if ($containerStarted) {
+        Write-Host "Cleaning up container '$ContainerName'..."
+        & docker stop $ContainerName | Out-Null
+        & docker rm $ContainerName | Out-Null
+    }
+}

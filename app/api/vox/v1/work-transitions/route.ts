@@ -18,7 +18,8 @@ const send=(data:unknown,status:number)=>Response.json(data,{status,headers:{
  * SQL and all three explicitly activated staging feature flags.
  */
 export async function POST(request:Request){
- if(process.env.VOX_STAFF_GRANTS_ENABLED!=="staging"||
+ if(process.env.VOX_STAFF_READ_ENABLED!=="staging"||
+    process.env.VOX_STAFF_GRANTS_ENABLED!=="staging"||
     process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED!=="staging"||
     process.env.VOX_WORK_ACTIONS_ENABLED!=="staging")
   return send({ok:false,error:"VOX_WORK_WRITES_DISABLED"},503);

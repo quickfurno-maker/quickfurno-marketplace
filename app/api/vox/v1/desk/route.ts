@@ -9,6 +9,7 @@ function json(data:unknown,status:number){return new Response(JSON.stringify(dat
 /** Exact Core-authorized staff case and HUMAN agent metadata only.
  * No native support mutations, WhatsApp provider payload, AI resume or sends. */
 export async function GET(request:Request){
+ if(process.env.VOX_STAFF_READ_ENABLED!=="staging") return json({ok:false,error:"STAFF_READ_DISABLED"},503);
  try{
   const scope=await getVerifiedScopedStaff(request.headers.get("authorization"));
   if(!scope||!scope.canReadContent)return json({ok:false,error:"UNAUTHORIZED_OR_UNSCOPED"},403);

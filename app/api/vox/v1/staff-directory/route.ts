@@ -17,7 +17,8 @@ const validExpiry=(x:unknown)=>typeof x==="string"&&
  x.length<=40&&Number.isFinite(Date.parse(x));
 /** Owner-only bounded roster preview. No emails, phone, tokens or grants. */
 export async function GET(request:Request){
- if(process.env.VOX_STAFF_GRANTS_ENABLED!=="staging"||
+ if(process.env.VOX_STAFF_READ_ENABLED!=="staging"||
+    process.env.VOX_STAFF_GRANTS_ENABLED!=="staging"||
     process.env.VOX_STAFF_DIRECTORY_ENABLED!=="staging")
    return send({ok:false,error:"STAFF_DIRECTORY_DISABLED"},503);
  const url=new URL(request.url);
@@ -61,6 +62,11 @@ export async function GET(request:Request){
      expiresAt:m.expires_at
    });
   }
+  // RC1: Owner may be revoked or lose AAL2 while the roster is fetched.
+  // Do not return even masked Staff/team metadata on an old Owner scope.
+  const currentOwner=await verifyVoxOwnerBearer(request.headers.get("authorization"));
+  if(!currentOwner||currentOwner!==owner)
+   return send({ok:false,error:"OWNER_AUTH_REVOKED_DURING_DIRECTORY_READ"},403);
   return send({ok:true,schema:"qf.vox.staff.directory.preview.v1",
    source:"quickfurno-core",mode:"READ_ONLY",actionsEnabled:false,
    totalKnown:false,previewCount:members.length,members},200);

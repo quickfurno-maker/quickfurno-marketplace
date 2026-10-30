@@ -1,0 +1,120 @@
+name: VOX Owner-only Core minimal patch (NO DEPLOY)
+
+on:
+  pull_request:
+    paths:
+      - "app/api/vox/v1/overview/**"
+      - "services/vox/verifiedStaffBearer.ts"
+      - "services/vox/overviewProjection.mjs"
+      - "services/vox/overviewProjection.d.mts"
+      - "lib/supabase.ts"
+      - "scripts/mvp/vox/validate-vox-02-overview.mjs"
+      - "scripts/mvp/vox/validate-vox-02b-overview-schema-contract.mjs"
+      - "scripts/mvp/vox/validate-vox-02c-owner-auth200.harness.mjs"
+      - "scripts/mvp/vox/fixtures/**"
+      - "scripts/mvp/vox/smoke-vox-owner-offline.mjs"
+      - ".github/workflows/vox-owner-core-minimal-no-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vox-owner-only-core-no-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify-source:
+    name: No-side-effects Owner-only API source gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact PR source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+          cache: npm
+      - name: Install pinned dependencies (no scripts)
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run exact Owner-only Core contract
+        run: node scripts/mvp/vox/validate-vox-02-overview.mjs
+      - name: Run Owner overview schema-contract (priority exists, topic does not)
+        run: node scripts/mvp/vox/validate-vox-02b-overview-schema-contract.mjs
+      - name: Run synthetic authenticated Owner 200 + negatives (no deploy, no credentials)
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mvp/vox/validate-vox-02c-owner-auth200.harness.mjs
+      - name: Typecheck full Core
+        run: npm run typecheck
+      - name: Check production dependency security
+        run: npm audit --omit=dev --audit-level=high
+      - name: Enforce no deployment or managed SQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f app/api/vox/v1/overview/route.ts
+          test -f services/vox/verifiedStaffBearer.ts
+          test -f services/vox/overviewProjection.mjs
+          test -f scripts/mvp/vox/smoke-vox-owner-offline.mjs
+          echo 'VOX_OWNER_CORE_SOURCE_ONLY_HOLD_PASS'
+      - name: Record release hold
+        shell: bash
+        run: |
+          {
+            echo '## VOX Owner-only API source certification'
+            echo 'Scope: read-only Core overview, strong Owner AAL2 auth, four bounded data projections.'
+            echo 'Staging/Production deployments: **DISABLED**.'
+            echo 'VOX staff schema, payments, providers and message sending: **NOT INCLUDED**.'
+            echo 'Release still requires signed image, private staging runtime, genuine AAL2 positive read, rollback and authorized GO.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  smoke-container-offline:
+    name: Unsigned local image + offline HTTP negative smoke (NO DEPLOY)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact PR source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact SHA and offline harness syntax
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          node --check scripts/mvp/vox/smoke-vox-owner-offline.mjs
+      - name: Build local-only candidate WITHOUT runtime secrets
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          docker build --pull=false \
+            --build-arg "GIT_SHA=$SOURCE_SHA" \
+            --build-arg "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co" \
+            --build-arg "NEXT_PUBLIC_SUPABASE_ANON_KEY=ci-public-noncredential-placeholder" \
+            -t "vox-owner-offline:$SOURCE_SHA" .
+          docker image inspect "vox-owner-offline:$SOURCE_SHA" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' | grep -Fx "$SOURCE_SHA"
+          test "$(docker run --rm --network none --entrypoint /bin/sh "vox-owner-offline:$SOURCE_SHA" -c 'cat /app/.next/BUILD_ID')" = "$SOURCE_SHA"
+      - name: Offline HTTP checks, no credentials and NO networking
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --network none --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,size=32m \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --memory 768m --cpus 1 \
+            --mount "type=bind,source=$PWD/scripts/mvp/vox/smoke-vox-owner-offline.mjs,target=/tmp/vox-smoke.mjs,readonly" \
+            --entrypoint node "vox-owner-offline:$SOURCE_SHA" /tmp/vox-smoke.mjs
+      - name: Explicit release HOLD
+        run: |
+          echo "Source candidate only. No image publish, no environment secret, no live auth, no staging/production deploy." >> "$GITHUB_STEP_SUMMARY"

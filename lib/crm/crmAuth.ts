@@ -24,10 +24,18 @@ export async function requireCrmAdmin(): Promise<CrmAdminActor> {
   if (!user) throw appError("UNAUTHORIZED");
 
   // canonical role authority: read the server-owned profiles.role (never metadata).
-  const { data: profile } = await sb.from("profiles").select("role").eq("id", user.id).single();
+  const { data: profile, error: profileError } = await sb
+    .from("profiles")
+    .select("role, is_active")
+    .eq("id", user.id)
+    .single();
+  if (profileError) throw appError("UNAUTHORIZED");
   const role = (profile?.role ?? undefined) as string | undefined;
   const adminRole = (user.app_metadata?.admin_role as string | undefined) ?? null;
 
-  if (role !== "admin" || adminRole !== "Superadmin") throw appError("UNAUTHORIZED");
+  // Mirror SQL is_admin(): role='admin' AND is_active IS TRUE (NULL/false fail closed).
+  if (role !== "admin" || profile?.is_active !== true || adminRole !== "Superadmin") {
+    throw appError("UNAUTHORIZED");
+  }
   return { id: user.id, adminRole };
 }

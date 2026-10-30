@@ -41,8 +41,9 @@ try{
   try{
    const match=docker(["port",container,"5432/tcp"]).match(/^127\.0\.0\.1:(\d+)$/m);
    if(match)port=Number(match[1]);
-   ready=docker(["exec",container,"psql","-X","-A","-t","-U","postgres","-d","postgres","-c","SELECT 1;"])==="1"&&
-    docker(["logs",container]).includes("PostgreSQL init process complete; ready for start up.");
+   // A successful SQL query is authoritative readiness. Docker log output is
+   // stderr on many Linux runners and must never be a test-passing prerequisite.
+   ready=docker(["exec",container,"psql","-X","-A","-t","-U","postgres","-d","postgres","-c","SELECT 1;"])==="1";
   }catch{}
   if(port&&ready)break;await sleep(130);
  }

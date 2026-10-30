@@ -95,3 +95,34 @@ test("claim/bind NULL values and paid prior ledger entries never gain V2 authori
  "REFUNDED_FAILURE_MUST_NOT_DOWNGRADE","REFUNDED_STATE_OVERWRITTEN"])
   assert.ok(fixture.includes(marker),marker);
 });
+
+test("genuine PG17 runner uses host TCP readiness, not initdb temporary socket",()=>{
+ const run=read("scripts/mvp/vox/validate-vox-rc17-razorpay-v2-real-pg17.mjs");
+ assert.match(run,/const probe=new Pool\(\{host:"127\.0\.0\.1",port/);
+ assert.match(run,/await probe\.query\("SELECT 1 AS ready"\)/);
+ assert.match(run,/await pool\.query\("SELECT 1 AS ready"\)/);
+ assert.match(run,/PG17_HOST_TCP_NOT_READY/);
+ assert.match(run,/spawnSync\("docker",\["logs","--tail","35",name\]/);
+ assert.doesNotMatch(run,/ready=docker\(\["exec",name,"psql"/);
+});
+test("review-only Core bridge rejects caller actor claims and unverifiable Auth",()=>{
+ const source=read("services/vox/rc19VerifiedConversationWriter.ts");
+ assert.match(source,/Object\.keys\(value\)\.sort\(\)/);
+ assert.match(source,/COMMAND_KEYS=\["action","conversationId","expectedRevision","nonce"\]/);
+ assert.match(source,/if\(!validCommand\(command\)/);
+ assert.match(source,/RC19_COMMAND_INVALID/);
+ assert.match(source,/RC19_CURRENT_STAFF_AUTH_UNAVAILABLE/);
+ assert.match(source,/RC19_VERIFIED_CORE_WRITER_INSTALLED=false/);
+ assert.match(source,/verifyVoxOperationsStaffBearer\(authorization\)/);
+ assert.doesNotMatch(source,/process\.env\.|DISPOSABLE_RC12_AB7B_PROOF/);
+});
+test("signed EOD requires exact current Staff and report identities",()=>{
+ const source=read("scripts/mvp/vox/rc8-pg-signed-intent-writer.mjs");
+ assert.match(source,/!UUID\.test\(row\.id\?\?""\)/);
+ assert.match(source,/!UUID\.test\(row\.staff_id\?\?""\)/);
+ assert.match(source,/row\.id!==request\.subjectId/);
+ assert.match(source,/row\.reviewer_id!==teamLeaderAuth\?\.userId/);
+ assert.match(source,/Number\(row\.source_count\)!==4/);
+ assert.match(source,/row\.published!==false/);
+ assert.match(source,/RC8_APPROVAL_WRITER_INSTALLED=false/);
+});

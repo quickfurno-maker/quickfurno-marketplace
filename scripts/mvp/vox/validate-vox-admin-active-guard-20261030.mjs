@@ -7,7 +7,8 @@ import {resolve} from "node:path";
 // true/false/NULL/absent/error matrix; the replica is not the shipped code.
 const read=p=>readFileSync(resolve(import.meta.dirname,"../../../",p),"utf8");
 const actions=read("app/actions.ts"),crm=read("lib/crm/crmAuth.ts"),
- access=read("services/vendorAccessService.ts"),identity=read("services/identityDirectoryService.ts");
+ access=read("services/vendorAccessService.ts"),identity=read("services/identityDirectoryService.ts"),
+ login=read("services/vendorLoginActivationService.ts");
 let n=0;const check=(name,fn)=>{fn();n++;console.log("PASS",name)};
 
 check("app/actions currentUser selects is_active and gates admin on strict true",()=>{
@@ -33,6 +34,11 @@ check("crmAuth fails closed on read error and requires is_active === true",()=>{
 check("vendorAccessService.requireAdminSession requires is_active === true",()=>{
  assert.match(access,/\.select\("role, is_active"\)/);
  assert.match(access,/row\?\.role !== "admin" \|\| row\.is_active !== true/);
+});
+check("vendorLoginActivationService requires active Superadmin before creating Auth users",()=>{
+ assert.match(login,/\.select\("role, is_active"\)/);
+ assert.match(login,/row\?\.role !== "admin" \|\| row\.is_active !== true/);
+ assert.match(login,/adminRole !== SUPERADMIN_ADMIN_ROLE/);
 });
 check("identityDirectoryService denies non-true is_active and no longer treats NULL as active",()=>{
  assert.match(identity,/profile\.data\.role !== "admin" \|\| profile\.data\.is_active !== true/);

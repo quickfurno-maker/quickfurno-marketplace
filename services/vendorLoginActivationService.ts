@@ -217,12 +217,15 @@ async function requireSuperadminSession(): Promise<Result<string>> {
 
     const { data: profile, error: profileError } = await sb
       .from("profiles")
-      .select("role")
+      .select("role, is_active")
       .eq("id", data.user.id)
       .maybeSingle();
 
     if (profileError) return fail(appError("UNAUTHORIZED"));
-    if ((profile as { role?: string } | null)?.role !== "admin") return fail(appError("UNAUTHORIZED"));
+    // A disabled or NULL-active Superadmin must not provision vendor Auth users.
+    // Mirror public.is_admin(): both role and active status must be current.
+    const row = profile as { role?: string; is_active?: unknown } | null;
+    if (row?.role !== "admin" || row.is_active !== true) return fail(appError("UNAUTHORIZED"));
 
     const adminRole = (data.user.app_metadata as { admin_role?: unknown } | null | undefined)?.admin_role;
     if (adminRole !== SUPERADMIN_ADMIN_ROLE) return fail(appError("UNAUTHORIZED"));

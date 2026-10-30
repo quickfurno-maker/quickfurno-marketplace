@@ -35,17 +35,47 @@ try{
  docker(["run","-d","--rm","--pull","never","--name",name,
   "-p","127.0.0.1::5432","-e","POSTGRES_PASSWORD=synthetic_only","postgres:17-alpine"]);
  started=true;
- let port=0,ready=false;
- for(let i=0;i<125;i++){
+ // The initdb temporary server can answer a Docker-exec psql probe even
+ // while it is shutting down for the real TCP-listening postmaster. Require
+ // the **same host-mapped TCP endpoint** that node-postgres will subsequently
+ // use; do not infer host readiness from an internal Unix socket.
+ let port=0,ready=false,lastStartupError="";
+ for(let i=0;i<160;i++){
   try{
    const m=docker(["port",name,"5432/tcp"]).match(/^127\.0\.0\.1:(\d+)$/m);
    if(m)port=Number(m[1]);
-   ready=docker(["exec",name,"psql","-X","-A","-t","-U","postgres","-d","postgres","-c","SELECT 1;"])==="1";
-  }catch{}
-  if(port&&ready)break;await sleep(125);
+   if(port){
+    const probe=new Pool({host:"127.0.0.1",port,user:"postgres",
+     password:"synthetic_only",database:"postgres",max:1,
+     connectionTimeoutMillis:1200});
+    try{
+     const result=await probe.query("SELECT 1 AS ready");
+     ready=result.rows[0]?.ready===1;
+     if(ready){
+      // The temporary Postgres server should never satisfy a TCP probe.
+      pool=new Pool({host:"127.0.0.1",port,user:"postgres",
+       password:"synthetic_only",database:"postgres",max:4,
+       connectionTimeoutMillis:3000});
+      await pool.query("SELECT 1 AS ready");
+      break;
+     }
+    }finally{await probe.end()}
+   }
+  }catch(e){
+   ready=false;
+   lastStartupError=String(e?.code||e?.message||e).slice(0,160);
+   if(pool){try{await pool.end()}catch{}pool=undefined}
+  }
+  await sleep(150);
  }
- check(port&&ready,"PG17_NOT_READY");
- pool=new Pool({host:"127.0.0.1",port,user:"postgres",password:"synthetic_only",database:"postgres",max:4});
+ if(!port||!ready||!pool){
+  let lastLogs="";
+  try{lastLogs=docker(["logs","--tail","35",name])}catch{}
+  console.error("VOX_RC17_PG17_TCP_READINESS_DENIED "+JSON.stringify({
+   portDiscovered:Boolean(port),lastStartupError,
+   diagnosticContainerTail:lastLogs.slice(-2500)}));
+  throw Error("PG17_HOST_TCP_NOT_READY");
+ }
  await pool.query(setup);
  await pool.query("INSERT INTO public.vendors(id) VALUES($1)",[vendor]);
  await pool.query("INSERT INTO public.packages(id,name,lead_count,total_price,validity_days,is_active) VALUES($1,'Pune',10,790,30,true)",[pkg]);

@@ -35,7 +35,10 @@ BEGIN
  INTO parent_order FROM public.vendor_package_orders o
  WHERE o.id=NEW.order_id FOR SHARE OF o;
  IF NOT FOUND THEN RAISE EXCEPTION 'RC11_PAYMENT_ORDER_MISSING'; END IF;
- IF NOT (
+ -- PostgreSQL IF treats NULL as not-true. NOT (nullable predicate) also
+ -- yields NULL, so the old guard silently accepted modern orders with no
+ -- explicit mode. Require exactly TRUE; FALSE and UNKNOWN must both deny.
+ IF (
     (NEW.environment='TEST' AND (
       (parent_order.payment_provider='razorpay_test' AND
        (parent_order.provider_mode IS NULL OR parent_order.provider_mode='test')) OR
@@ -43,7 +46,7 @@ BEGIN
     )) OR
     (NEW.environment='LIVE' AND parent_order.payment_provider='razorpay'
      AND parent_order.provider_mode='live')
- )
+ ) IS DISTINCT FROM TRUE
  THEN RAISE EXCEPTION 'RC11_PAYMENT_ATTEMPT_PROVIDER_MODE_MISMATCH'; END IF;
  -- Legacy razorpay_test is TEST only; modern razorpay must have explicit provider_mode.
  -- NULL mode must NEVER authorize LIVE. A razorpay_live provider identity is unsupported.

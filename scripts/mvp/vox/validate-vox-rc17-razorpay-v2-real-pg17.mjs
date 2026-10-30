@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // RC17-A: disposable real PG17, no provider network or managed DB.
 import { Pool } from "pg";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -70,7 +70,11 @@ try{
  }
  if(!port||!ready||!pool){
   let lastLogs="";
-  try{lastLogs=docker(["logs","--tail","35",name])}catch{}
+  try{
+   const diagnostic=spawnSync("docker",["logs","--tail","35",name],
+    {encoding:"utf8",timeout:5000,windowsHide:true});
+   lastLogs=String(diagnostic.stderr||"")+String(diagnostic.stdout||"");
+  }catch{}
   console.error("VOX_RC17_PG17_TCP_READINESS_DENIED "+JSON.stringify({
    portDiscovered:Boolean(port),lastStartupError,
    diagnosticContainerTail:lastLogs.slice(-2500)}));

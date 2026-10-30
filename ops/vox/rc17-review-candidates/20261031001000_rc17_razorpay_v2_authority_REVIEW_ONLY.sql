@@ -304,6 +304,12 @@ begin
      or v_order.provider_amount_subunits is null then
     raise exception 'PACKAGE_ORDER_NOT_BOUND' using errcode = 'P0001';
   end if;
+  -- Provider capture does not revive a cancelled, expired or refunded order.
+  -- Hold any refund-in-progress outcome for independent financial reconciliation.
+  if v_order.order_status is distinct from 'created' or
+     v_order.payment_status in ('refunded','refund_pending') then
+    raise exception 'PACKAGE_ORDER_LIFECYCLE_NOT_ACTIVATABLE' using errcode='P0001';
+  end if;
   if v_order.activation_status = 'activated' then
     if v_order.provider_payment_id is distinct from p_provider_payment_id then
       raise exception 'PROVIDER_PAYMENT_ID_MISMATCH' using errcode = 'P0001';

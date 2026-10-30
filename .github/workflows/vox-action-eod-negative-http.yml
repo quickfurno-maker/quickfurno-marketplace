@@ -1,0 +1,19 @@
+name: VOX Action and EOD Negative HTTP (no automatic staging mutation)
+on:
+  pull_request:
+    paths:
+      - 'scripts/mvp/vox/validate-vox-action-eod-*-20261030.mjs'
+      - '.github/workflows/vox-action-eod-negative-http.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - run: node scripts/mvp/vox/validate-vox-action-eod-negative-contract-20261030.mjs

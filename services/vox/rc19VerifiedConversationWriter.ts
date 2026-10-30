@@ -13,6 +13,20 @@ export const RC19_CORE_RELEASE_APPROVALS=Object.freeze({
 });
 type NativeClient={query:(sql:string,values?:unknown[])=>Promise<{rows:any[];rowCount:number}>;release:()=>void};
 type Command={conversationId:string;nonce:string;expectedRevision:number;action:"PAUSE_AI"|"TAKEOVER"};
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const COMMAND_KEYS=["action","conversationId","expectedRevision","nonce"];
+const validCommand=(value:unknown):value is Command=>{
+ if(!value||typeof value!=="object"||Array.isArray(value))return false;
+ const actual=Object.keys(value).sort();
+ if(actual.length!==COMMAND_KEYS.length||
+    actual.some((k,i)=>k!==COMMAND_KEYS[i]))return false;
+ const c=value as Record<string,unknown>;
+ return typeof c.conversationId==="string"&&UUID.test(c.conversationId)&&
+  typeof c.nonce==="string"&&UUID.test(c.nonce)&&
+  Number.isSafeInteger(c.expectedRevision)&&
+  (c.expectedRevision as number)>=0&&
+  (c.action==="PAUSE_AI"||c.action==="TAKEOVER");
+};
 const blocked=(reason:string)=>Object.freeze({ok:false,reason,committed:false,providerMessagesSent:0,
  canonicalAb7bSourceReady:false});
 export async function executeRc19VerifiedCoreConversationCommand(
@@ -22,9 +36,13 @@ export async function executeRc19VerifiedCoreConversationCommand(
  // independently reviewed release after the real migration/recovery process.
  if(!RC19_VERIFIED_CORE_WRITER_INSTALLED)
   return blocked("RC19_VERIFIED_CORE_WRITER_RELEASE_HOLD");
- if(!command||typeof acquireClient!=="function")
+ if(!validCommand(command)||typeof acquireClient!=="function")
   return blocked("RC19_COMMAND_INVALID");
- const actor=await verifyVoxOperationsStaffBearer(authorization);
+ // Never pass caller-supplied role/team/actor/sourceProof fields into native
+ // Core; only the verified AAL2 server-side identity can become an actor.
+ let actor;
+ try{actor=await verifyVoxOperationsStaffBearer(authorization)}
+ catch{return blocked("RC19_CURRENT_STAFF_AUTH_UNAVAILABLE");}
  if(!actor)return blocked("RC19_CURRENT_STAFF_AAL2_REQUIRED");
  if(actor.expiresAtMs<=Date.now())
   return blocked("RC19_CURRENT_STAFF_AAL2_EXPIRED");

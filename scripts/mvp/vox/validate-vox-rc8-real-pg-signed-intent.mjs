@@ -88,10 +88,12 @@ try{
  for(let i=0;i<30;i++){try{await pool.query("SELECT 1");break}catch(e){
   if(i===29)throw e;await sleep(100);}}
  await pool.query("CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN");
+ await pool.query("CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY,raw_app_meta_data jsonb NOT NULL)");
  await pool.query("CREATE TABLE public.profiles(id uuid PRIMARY KEY,role text,is_active boolean NOT NULL)");
  await pool.query("CREATE TABLE public.vox_staff_teams_v1(id uuid PRIMARY KEY,city_id uuid,is_active boolean NOT NULL)");
  await pool.query("CREATE TABLE public.vox_staff_memberships_v1(auth_user_id uuid PRIMARY KEY,team_id uuid,staff_role text,is_active boolean,revoked_at timestamptz,expires_at timestamptz)");
  await pool.query("INSERT INTO public.profiles VALUES ($1,'admin',true),($2,NULL,true)",[OWNER,TL]);
+ await pool.query("INSERT INTO auth.users VALUES($1,'{\"admin_role\":\"Superadmin\"}'),($2,'{\"qf_principal\":\"vox_staff\",\"vox_role\":\"team_leader\"}')",[OWNER,TL]);
  await pool.query("INSERT INTO public.vox_staff_teams_v1 VALUES ($1,$2,true)",[TEAM,CITY]);
  await pool.query("INSERT INTO public.vox_staff_memberships_v1 VALUES ($1,$2,'team_leader',true,NULL,clock_timestamp()+interval '30 days')",[TL,TEAM]);
  const ddl=readFileSync(resolve(root,"ops/vox/rc7-review-candidates/20261030010000_vox_rc8_signed_intent_transaction_review_only.sql"),"utf8");
@@ -131,6 +133,14 @@ try{
  await pool.query("UPDATE public.vox_staff_memberships_v1 SET revoked_at=clock_timestamp() WHERE auth_user_id=$1",[TL]);
  r=await executeRc8PgPendingSignedIntent(args(request(15,16)),TEST_ONLY_GATE);
  eq(r.reason,"CURRENT_ACTOR_REVOKED","CURRENT_TL_REVOKED_DENIED");
+ await pool.query("UPDATE public.vox_staff_memberships_v1 SET revoked_at=NULL WHERE auth_user_id=$1",[TL]);
+ await pool.query("UPDATE auth.users SET raw_app_meta_data='{\"qf_principal\":\"vox_staff\"}' WHERE id=$1",[TL]);
+ r=await executeRc8PgPendingSignedIntent(args(request(17,18)),TEST_ONLY_GATE);
+ eq(r.reason,"CURRENT_ACTOR_REVOKED","CURRENT_TL_AUTH_METADATA_REVOKED_DENIED");
+ await pool.query("UPDATE auth.users SET raw_app_meta_data='{\"qf_principal\":\"vox_staff\",\"vox_role\":\"team_leader\"}' WHERE id=$1",[TL]);
+ await pool.query("UPDATE auth.users SET raw_app_meta_data='{}' WHERE id=$1",[OWNER]);
+ r=await executeRc8PgPendingSignedIntent(args(request(19,20)),TEST_ONLY_GATE);
+ eq(r.reason,"CURRENT_ACTOR_REVOKED","CURRENT_OWNER_AUTH_METADATA_REVOKED_DENIED");
  const finale=await counts();eq(finale.claims,3,"FINAL_CLAIMS");eq(finale.intents,1,"FINAL_INTENTS");
  console.log("VOX_RC8_REAL_PG17_SIGNED_INTENT_PASS two_real_keys=synthetic "+
  "real_sql_transaction=true claims=3 receipts=1 replay_and_tamper_denied=true "+

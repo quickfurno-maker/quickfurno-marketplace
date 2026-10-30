@@ -55,14 +55,19 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
    "SELECT pg_advisory_xact_lock(hashtextextended('dst|' || $1::text || '|whatsapp',0))",[hash]);
   const conv=await db.query(
    "SELECT c.id,c.tenant_id,c.channel,c.destination_hash,c.subject_type,c.subject_id,"+
-   "c.state,c.revision,c.assigned_actor,c.human_takeover, z.city_id,z.is_active AS zone_active "+
+   "c.state,c.revision,c.assigned_actor,c.human_takeover, "+
+   "geo_city.id AS city_id, geo_city.is_active AS city_active, "+
+   "z.is_active AS zone_active,z.matching_enabled AS zone_matching_enabled "+
    "FROM public.communication_conversations c "+
    "JOIN public.vendors v ON c.subject_type='vendor' AND v.id=c.subject_id "+
    "JOIN public.marketplace_service_zones z ON z.id=v.service_zone_id "+
+   "JOIN public.cities geo_city ON "+
+   "lower(btrim(geo_city.name))=lower(btrim(z.canonical_city)) "+
    "WHERE c.id=$1::uuid FOR UPDATE OF c",[input.conversationId]);
   const c=conv.rows[0];
   if(conv.rowCount!==1||c.tenant_id!=="quickfurno"||c.channel!=="whatsapp"||
      c.destination_hash!==hash||c.subject_type!=="vendor"||c.zone_active!==true||
+     c.zone_matching_enabled!==true||c.city_active!==true||
      Number(c.revision)!==input.expectedRevision||c.human_takeover!==false||
      !["ANISHA","AAROHI","RIYA"].includes(c.assigned_actor)||
      (input.action==="PAUSE_AI"&&c.state!=="OPEN")||
@@ -73,10 +78,13 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
    "SELECT m.auth_user_id FROM public.vox_staff_memberships_v1 m "+
    "JOIN public.vox_staff_teams_v1 t ON t.id=m.team_id "+
    "JOIN public.profiles p ON p.id=m.auth_user_id "+
+   "JOIN auth.users u ON u.id=m.auth_user_id "+
    "WHERE m.auth_user_id=$1::uuid AND m.staff_role='operations_manager' "+
    "AND m.is_active=true AND m.revoked_at IS NULL "+
    "AND m.expires_at>clock_timestamp() AND t.is_active=true "+
    "AND t.city_id=$2::uuid AND p.is_active=true AND p.role IS NULL "+
+   "AND u.raw_app_meta_data->>'qf_principal'='vox_staff' "+
+   "AND u.raw_app_meta_data->>'admin_role' IS NULL "+
    "AND EXISTS(SELECT 1 FROM public.vox_staff_department_capabilities_v1 cap "+
    "WHERE cap.auth_user_id=m.auth_user_id AND cap.team_id=m.team_id "+
    "AND cap.city_id=t.city_id AND cap.department='client_success' "+
@@ -84,7 +92,7 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
    "AND EXISTS(SELECT 1 FROM public.vox_staff_object_scopes_v1 g "+
    "WHERE g.auth_user_id=m.auth_user_id AND g.scope_kind='conversation' "+
    "AND g.object_id=$3::uuid AND g.revoked_at IS NULL "+
-   "AND g.expires_at>clock_timestamp()) FOR SHARE OF m,t,p",
+   "AND g.expires_at>clock_timestamp()) FOR SHARE OF m,t,p,u",
    [input.verifiedStaff.userId,c.city_id,input.conversationId]);
   if(staff.rowCount!==1||input.verifiedStaff.expiresAtMs<=Date.now()){
    await db.query("ROLLBACK");settled=true;return closed("CURRENT_STAFF_GRANT_OR_AAL2_DENIED");

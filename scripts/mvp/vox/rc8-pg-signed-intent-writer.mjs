@@ -27,18 +27,25 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
   await client.query("BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE");
   started=true;
   const owner=await client.query(
-   "SELECT id FROM public.profiles WHERE id=$1::uuid AND role='admin' AND is_active=true FOR SHARE",
+   "SELECT p.id FROM public.profiles p JOIN auth.users a ON a.id=p.id "+
+   "WHERE p.id=$1::uuid AND p.role='admin' AND p.is_active=true "+
+   "AND a.raw_app_meta_data->>'admin_role'='Superadmin' "+
+   "FOR SHARE OF p,a",
    [ownerAuth?.userId]);
   const tl=await client.query(
    "SELECT m.auth_user_id FROM public.vox_staff_memberships_v1 m "+
    "JOIN public.profiles p ON p.id=m.auth_user_id "+
+   "JOIN auth.users a ON a.id=m.auth_user_id "+
    "JOIN public.vox_staff_teams_v1 t ON t.id=m.team_id "+
    "WHERE m.auth_user_id=$1::uuid AND m.staff_role='team_leader' "+
    "AND m.team_id=$2::uuid AND t.city_id=$3::uuid "+
    "AND m.is_active=true AND m.revoked_at IS NULL "+
    "AND m.expires_at>clock_timestamp() AND t.is_active=true "+
    "AND p.is_active=true AND p.role IS NULL "+
-   "FOR SHARE OF m,p,t",
+   "AND a.raw_app_meta_data->>'qf_principal'='vox_staff' "+
+   "AND a.raw_app_meta_data->>'vox_role'='team_leader' "+
+   "AND a.raw_app_meta_data->>'admin_role' IS NULL "+
+   "FOR SHARE OF m,p,t,a",
    [teamLeaderAuth?.userId,request.teamId,request.cityId]);
   if(owner.rowCount!==1||tl.rowCount!==1){
    await client.query("ROLLBACK");settled=true;return deny("CURRENT_ACTOR_REVOKED");

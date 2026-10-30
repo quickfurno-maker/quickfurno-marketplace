@@ -45,12 +45,14 @@ try{
   if(i===29)throw e;await sleep(100);}}
  const fixture=[
  "CREATE ROLE anon NOLOGIN;CREATE ROLE authenticated NOLOGIN;CREATE ROLE service_role NOLOGIN;",
+ "CREATE SCHEMA auth;CREATE TABLE auth.users(id uuid PRIMARY KEY,raw_app_meta_data jsonb NOT NULL)",
  "CREATE TABLE public.profiles(id uuid PRIMARY KEY,role text,is_active boolean)",
  "CREATE TABLE public.vox_staff_teams_v1(id uuid PRIMARY KEY,city_id uuid,is_active boolean)",
  "CREATE TABLE public.vox_staff_memberships_v1(auth_user_id uuid PRIMARY KEY,team_id uuid,staff_role text,is_active boolean,revoked_at timestamptz,expires_at timestamptz)",
  "CREATE TABLE public.vox_staff_department_capabilities_v1(auth_user_id uuid,team_id uuid,city_id uuid,department text,revoked_at timestamptz,expires_at timestamptz)",
  "CREATE TABLE public.vox_staff_object_scopes_v1(auth_user_id uuid,scope_kind text,object_id uuid,revoked_at timestamptz,expires_at timestamptz)",
- "CREATE TABLE public.marketplace_service_zones(id uuid PRIMARY KEY,city_id uuid,is_active boolean)",
+ "CREATE TABLE public.cities(id uuid PRIMARY KEY,name text NOT NULL,slug text UNIQUE,is_active boolean NOT NULL DEFAULT true)",
+ "CREATE TABLE public.marketplace_service_zones(id uuid PRIMARY KEY,canonical_city text NOT NULL,is_active boolean NOT NULL,matching_enabled boolean NOT NULL)",
  "CREATE TABLE public.vendors(id uuid PRIMARY KEY,service_zone_id uuid)",
  "CREATE TABLE public.communication_conversations(id uuid PRIMARY KEY,tenant_id text,channel text,destination_hash text,subject_type text,subject_id uuid,state text,revision bigint,assigned_actor text,human_takeover boolean,jarvis_enabled boolean,updated_at timestamptz)",
  "CREATE TABLE public.communication_conversation_events(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),conversation_id uuid REFERENCES public.communication_conversations(id),event_type text,actor_type text,safe_summary text,event_data jsonb)",
@@ -59,10 +61,12 @@ try{
  ];
  for(const sql of fixture)await pool.query(sql);
  await pool.query("INSERT INTO public.profiles VALUES ($1,NULL,true)",[A]);
+ await pool.query("INSERT INTO auth.users VALUES($1,'{\"qf_principal\":\"vox_staff\"}')",[A]);
  await pool.query("INSERT INTO public.vox_staff_teams_v1 VALUES ($1,$2,true)",[TEAM,CITY]);
  await pool.query("INSERT INTO public.vox_staff_memberships_v1 VALUES ($1,$2,'operations_manager',true,NULL,clock_timestamp()+interval '30 days')",[A,TEAM]);
  await pool.query("INSERT INTO public.vox_staff_department_capabilities_v1 VALUES ($1,$2,$3,'client_success',NULL,clock_timestamp()+interval '30 days')",[A,TEAM,CITY]);
- await pool.query("INSERT INTO public.marketplace_service_zones VALUES ($1,$2,true)",[ZONE,CITY]);
+ await pool.query("INSERT INTO public.cities VALUES ($1,'Pune','pune',true)",[CITY]);
+ await pool.query("INSERT INTO public.marketplace_service_zones VALUES ($1,'  PUNE ',true,true)",[ZONE]);
  await pool.query("INSERT INTO public.vendors VALUES ($1,$2)",[VENDOR,ZONE]);
  for(const id of [C1,C2,C3]){
   await pool.query("INSERT INTO public.vox_staff_object_scopes_v1 VALUES($1,'conversation',$2,NULL,clock_timestamp()+interval '30 days')",[A,id]);
@@ -97,6 +101,17 @@ try{
  r=await run(make(C3,id(51)));eq(r.ok,false,"D2C_SUPPRESSION_DENIED");
  eq(await count("public.communication_conversation_events"),1,"CONSENT_NO_EVENT");
  await pool.query("DELETE FROM public.communication_suppressions");
+ // Real marketplace zone authority: inactive matching never grants a city.
+ await pool.query("UPDATE public.marketplace_service_zones SET matching_enabled=false WHERE id=$1",[ZONE]);
+ r=await run(make(C3,id(53)));eq(r.ok,false,"ZONE_DISABLED_DENIED");
+ await pool.query("UPDATE public.marketplace_service_zones SET matching_enabled=true WHERE id=$1",[ZONE]);
+ // cities.name is NOT UNIQUE. Duplicate canonical city names must fail closed.
+ await pool.query("INSERT INTO public.cities VALUES ($1,'pune','pune-duplicate',true)",[id(90)]);
+ r=await run(make(C3,id(54)));eq(r.ok,false,"AMBIGUOUS_CANONICAL_CITY_DENIED");
+ await pool.query("DELETE FROM public.cities WHERE id=$1",[id(90)]);
+ await pool.query("UPDATE auth.users SET raw_app_meta_data='{}' WHERE id=$1",[A]);
+ r=await run(make(C3,id(55)));eq(r.ok,false,"CURRENT_AUTH_METADATA_REVOKED");
+ await pool.query("UPDATE auth.users SET raw_app_meta_data='{\"qf_principal\":\"vox_staff\"}' WHERE id=$1",[A]);
  await pool.query("UPDATE public.vox_staff_memberships_v1 SET revoked_at=clock_timestamp() WHERE auth_user_id=$1",[A]);
  r=await run(make(C3,id(52)));eq(r.ok,false,"CURRENT_STAFF_REVOKED");
  eq(await count("public.vox_rc8_conversation_operator_receipts_candidate_v1"),1,"NO_UNAUTHORIZED_RECEIPT");

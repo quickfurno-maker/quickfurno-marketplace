@@ -128,6 +128,10 @@ try{
  r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
  eq(r.reason,"EOD_CURRENT_FOUR_SOURCE_REVIEW_REQUIRED","EOD_ALREADY_PUBLISHED_DENIED");
  await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET reviewer_id=$2,published=false WHERE id=$1",[SUB,TL]);
+ await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET staff_id=NULL WHERE id=$1",[SUB]);
+ r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
+ eq(r.reason,"EOD_CURRENT_FOUR_SOURCE_REVIEW_REQUIRED","EOD_MISSING_STAFF_ID_DENIED");
+ await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET staff_id=$2 WHERE id=$1",[SUB,id(90)]);
  eq(r.reason,"NATIVE_RELEASE_GATE_CLOSED","PRODUCTION_BLOCK");
  r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
  eq(r.ok,true,"NATIVE_REAL_PG_COMMIT");eq(r.approved,false,"NEVER_APPROVED");

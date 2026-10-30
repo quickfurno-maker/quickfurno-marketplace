@@ -490,6 +490,14 @@ begin
   if v_payment.payment_status = 'Refunded' then
     return jsonb_build_object('status','ignored_refunded','order_id',p_order_id);
   end if;
+  -- A missing or inconsistent financial status is not an ordinary failed
+  -- attempt. Escalate for reconciliation rather than overwriting evidence.
+  if v_order.payment_status is null or
+     v_order.payment_status not in ('pending','failed') or
+     v_payment.payment_status is null or
+     v_payment.payment_status not in ('Pending','Failed') then
+    raise exception 'PAYMENT_FAILURE_LEDGER_UNVERIFIED' using errcode='P0001';
+  end if;
 
   update public.payments set payment_status = 'Failed'
   where id = p_order_id and payment_status not in ('Paid','Refunded');

@@ -5,6 +5,7 @@ on:
       - 'ops/vox/rc17-review-candidates/**'
       - 'scripts/mvp/vox/rc17-*.test.mjs'
       - 'scripts/mvp/vox/rc18-*.test.mjs'
+      - 'scripts/mvp/vox/rc18-finance-release-recovery-preflight.mjs'
       - 'scripts/mvp/vox/validate-vox-rc17-*.mjs'
       - 'services/vendorPackagePaymentService.ts'
       - 'lib/payments/vendorPackagePaymentReceipts.*'

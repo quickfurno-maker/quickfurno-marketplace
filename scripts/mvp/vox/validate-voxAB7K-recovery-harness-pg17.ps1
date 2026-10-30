@@ -8,6 +8,7 @@
 param(
  [switch]$NoSupabaseDefaultPrivileges,
  [switch]$ApplyIdentityOverlay,
+ [switch]$ProbeOwnerAclReconciliation,
  [string]$OutDir=(Join-Path ([IO.Path]::GetTempPath()) ('ab7k-evidence-'+[guid]::NewGuid().ToString('N')))
 )
 $ErrorActionPreference='Stop'
@@ -148,6 +149,33 @@ $$;
  $cmp=Native {node $cli compare --a (Join-Path $OutDir 'source.snapshot.json') --b (Join-Path $OutDir 'restored-full.snapshot.json')}
  [IO.File]::WriteAllText((Join-Path $OutDir 'compare-full-fidelity.json'),$cmp.text,$utf8)
  $fullOk=($cmp.code -eq 0)
+ # FINAL-2: never alter the strict result. This opt-in probe is a *separate*
+ # LOCAL disposable-only replay of the missing explicit OWNER ACL. It shows
+ # whether the two observed catalog differences are entirely explained by
+ # PostgreSQL's default-ACL normalization on custom-format restore.
+ $reconciledOk=$false
+ if($ProbeOwnerAclReconciliation){
+  if($fullOk){throw 'ACL_PROBE_NOT_NEEDED_SOURCE_ALREADY_EQUAL'}
+  $original=ConvertFrom-Json ([IO.File]::ReadAllText((Join-Path $OutDir 'compare-full-fidelity.json')))
+  $expected=@('$.relations.vox_ab7j_staff_suspend_intents_candidate_v1.acl',
+              '$.relations.vox_ab7j_staff_suspend_intents_candidate_v1.acl_is_default')
+  $difference=@($original.differingPaths|Sort-Object)
+  $expected=@($expected|Sort-Object)
+  if(@(Compare-Object $difference $expected).Count -ne 0){
+    throw 'ACL_PROBE_REFUSED_UNEXPECTED_CATALOG_DIFFERENCE'
+  }
+  $aclSql=@'
+REVOKE ALL ON TABLE public.vox_ab7j_staff_suspend_intents_candidate_v1 FROM postgres;
+GRANT ALL ON TABLE public.vox_ab7j_staff_suspend_intents_candidate_v1 TO postgres;
+'@
+  $null=Psql $rst 'ab7k_restore' $aclSql
+  Snapshot $rst 'ab7k_restore' (Join-Path $OutDir 'restored-owner-acl-probe.snapshot.json')
+  $reconcile=Native {node $cli compare --a (Join-Path $OutDir 'source.snapshot.json') --b (Join-Path $OutDir 'restored-owner-acl-probe.snapshot.json')}
+  [IO.File]::WriteAllText((Join-Path $OutDir 'compare-owner-acl-probe.json'),$reconcile.text,$utf8)
+  $reconciledOk=($reconcile.code -eq 0)
+  Write-Output "AB7K_DISPOSABLE_OWNER_ACL_RECONCILIATION_PROBE_PARITY=$reconciledOk"
+  Write-Output 'AB7K_ORIGINAL_FULL_FIDELITY_RESTORE_PARITY_REMAINS_FALSE_NO_MANAGED_SIGNOFF'
+ }
 
  Boot $lossy
  $lr=Restore $lossy @('--no-owner','--no-acl')

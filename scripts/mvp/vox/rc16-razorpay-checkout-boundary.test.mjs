@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { storedRazorpayOrderModeError, inspectRazorpayOrderClaim } from "../../../lib/payments/vendorPackageOrderGuards.mjs";
+import { storedRazorpayOrderModeError, inspectRazorpayOrderClaim, isDefiniteRazorpayOrderRejection } from "../../../lib/payments/vendorPackageOrderGuards.mjs";
 
 test("historical Razorpay TEST is never accepted in LIVE", () => {
   for (const storedMode of [null, "test"]) {
@@ -46,4 +46,18 @@ test("actual payment service calls guards before provider order creation and che
   assert.match(service, /if \(claimStatus === "invalid"\)/);
   assert.match(service, /if \(releaseError\)/);
   assert.match(service, /PACKAGE_ORDER_CLAIM_RELEASE_FAILED/);
+});
+
+test("ambiguous provider HTTP never releases an order creation claim", () => {
+  for (const definite of [400, 401, 403, 404, 422])
+    assert.equal(isDefiniteRazorpayOrderRejection(definite), true);
+  for (const uncertain of [200, 408, 409, 429, 500, 502, 503, 504, 599])
+    assert.equal(isDefiniteRazorpayOrderRejection(uncertain), false);
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+  const service = readFileSync(resolve(root, "services/vendorPackagePaymentService.ts"), "utf8");
+  assert.match(service, /definitiveOrderRejection \? "RAZORPAY_HTTP_REJECTED" : "RAZORPAY_HTTP_UNCERTAIN"/);
+  assert.match(service, /path === "\/orders"/);
+  assert.match(service, /init\.method\?\.toUpperCase\(\) === "POST"/);
+  assert.match(service, /if \(error instanceof AppError && error\.code === "RAZORPAY_HTTP_REJECTED"\)/);
+  assert.match(service, /PACKAGE_ORDER_CREATION_UNCERTAIN/);
 });

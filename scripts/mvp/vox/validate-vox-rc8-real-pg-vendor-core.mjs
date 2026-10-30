@@ -66,7 +66,7 @@ try{
  ];
  for(const sql of fixture)await pool.query(sql);
  await pool.query("INSERT INTO public.profiles VALUES ($1,NULL,true)",[A]);
- await pool.query("INSERT INTO auth.users VALUES($1,'{\"qf_principal\":\"vox_staff\"}')",[A]);
+ await pool.query("INSERT INTO auth.users VALUES($1,'{\"qf_principal\":\"vox_staff\",\"vox_role\":\"operations_manager\"}')",[A]);
  await pool.query("INSERT INTO public.vox_staff_teams_v1 VALUES ($1,$2,true)",[TEAM,CITY]);
  await pool.query("INSERT INTO public.vox_staff_memberships_v1 VALUES ($1,$2,'operations_manager',true,NULL,clock_timestamp()+interval '30 days')",[A,TEAM]);
  // Synthetic but schema-faithful independent reviewed department authority.
@@ -147,7 +147,9 @@ try{
  await pool.query("UPDATE public.vox_staff_object_scopes_v1 SET revoked_at=NULL WHERE object_id=$1",[C3]);
  await pool.query("UPDATE auth.users SET raw_app_meta_data='{}' WHERE id=$1",[A]);
  r=await run(make(C3,id(55)));eq(r.ok,false,"CURRENT_AUTH_METADATA_REVOKED");
- await pool.query("UPDATE auth.users SET raw_app_meta_data='{\"qf_principal\":\"vox_staff\"}' WHERE id=$1",[A]);
+ await pool.query("UPDATE auth.users SET raw_app_meta_data='{\"qf_principal\":\"vox_staff\",\"vox_role\":\"team_leader\"}' WHERE id=$1",[A]);
+ r=await run(make(C3,id(59)));eq(r.reason,"CURRENT_STAFF_GRANT_OR_AAL2_DENIED","MISMATCHED_OPERATIONS_ROLE_DENIED");
+ await pool.query("UPDATE auth.users SET raw_app_meta_data='{\"qf_principal\":\"vox_staff\",\"vox_role\":\"operations_manager\"}' WHERE id=$1",[A]);
  await pool.query("UPDATE public.vox_staff_memberships_v1 SET revoked_at=clock_timestamp() WHERE auth_user_id=$1",[A]);
  r=await run(make(C3,id(52)));eq(r.ok,false,"CURRENT_STAFF_REVOKED");
  eq(await count("public.vox_rc8_conversation_operator_receipts_candidate_v1"),1,"NO_UNAUTHORIZED_RECEIPT");

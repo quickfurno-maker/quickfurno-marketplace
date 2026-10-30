@@ -9,11 +9,11 @@
     "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
   },
   "totals": {
-    "files": 146,
-    "rpcNames": 90,
-    "tableNames": 121,
+    "files": 159,
+    "rpcNames": 91,
+    "tableNames": 133,
     "storageBuckets": 0,
-    "authFiles": 13,
+    "authFiles": 15,
     "realtimeFiles": 0
   },
   "rpcNames": [
@@ -101,6 +101,7 @@
     "qf_set_vendor_anisha_memory_consent_v1",
     "qf_snapshot_vendor_fair_opportunity_v1",
     "qf_terminalize_consent_ack_intent",
+    "qf_vox_work_transition_candidate_v1",
     "update_vendor_visibility",
     "vendor_auth_claim_reset_grant",
     "vendor_auth_consume_reset_challenge_and_issue_grant",
@@ -225,7 +226,19 @@
     "vendor_segments",
     "vendor_support_messages",
     "vendor_support_threads",
+    "vendor_tasks",
     "vendors",
+    "vox_operational_intents_v1",
+    "vox_staff_access_requests_v1",
+    "vox_staff_department_activations_v1",
+    "vox_staff_department_capabilities_v1",
+    "vox_staff_department_decisions_v1",
+    "vox_staff_department_requests_v1",
+    "vox_staff_memberships_v1",
+    "vox_staff_object_scopes_v1",
+    "vox_staff_teams_v1",
+    "vox_work_events_candidate_v1",
+    "vox_work_items_candidate_v1",
     "workflow_failures",
     "workflow_instances",
     "workflow_tasks",
@@ -267,6 +280,143 @@
       ],
       "storageBuckets": [],
       "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vox/v1/desk/route.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aarohi_prospects",
+        "communication_conversations",
+        "marketplace_service_zones",
+        "vendor_support_threads",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vox/v1/eod-preview/route.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aarohi_prospects",
+        "marketplace_service_zones",
+        "vendor_support_threads",
+        "vendors",
+        "vox_work_events_candidate_v1",
+        "vox_work_items_candidate_v1"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vox/v1/eod-source-status/route.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aarohi_prospects",
+        "communication_conversations",
+        "marketplace_service_zones",
+        "vendor_support_threads",
+        "vendors",
+        "vox_work_events_candidate_v1"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vox/v1/my-work/route.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aarohi_prospects",
+        "communication_conversations",
+        "marketplace_service_zones",
+        "vendor_crm_profiles",
+        "vendor_support_threads",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vox/v1/overview/route.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aarohi_prospects",
+        "communication_conversations",
+        "vendor_crm_profiles",
+        "vendor_support_threads"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vox/v1/owner-approval-queue/route.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "vox_operational_intents_v1"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vox/v1/staff-directory/route.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "vox_staff_memberships_v1",
+        "vox_staff_teams_v1"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vox/v1/staff-review-queue/route.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "vox_staff_access_requests_v1"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vox/v1/work-queue/route.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aarohi_prospects",
+        "marketplace_service_zones",
+        "vendor_support_threads",
+        "vendors",
+        "vox_work_items_candidate_v1"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vox/v1/work-transitions/route.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_vox_work_transition_candidate_v1"
+      ],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": false,
       "realtime": false
     },
     {
@@ -581,7 +731,7 @@
       "rpc": [],
       "tables": [],
       "storageBuckets": [],
-      "auth": false,
+      "auth": true,
       "realtime": false
     },
     {
@@ -2248,6 +2398,53 @@
         "qf_approve_vendor_verified_coverage_v1"
       ],
       "tables": [],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vox/crmScopedReads.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "aarohi_prospects",
+        "aarohi_tasks",
+        "aarohi_vendor_conversion_links",
+        "marketplace_service_zones",
+        "vendor_crm_profiles",
+        "vendor_tasks",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vox/verifiedScopedStaff.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "cities",
+        "profiles",
+        "vox_staff_department_activations_v1",
+        "vox_staff_department_capabilities_v1",
+        "vox_staff_department_decisions_v1",
+        "vox_staff_department_requests_v1",
+        "vox_staff_memberships_v1",
+        "vox_staff_object_scopes_v1",
+        "vox_staff_teams_v1"
+      ],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "services/vox/verifiedStaffBearer.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "profiles"
+      ],
       "storageBuckets": [],
       "auth": false,
       "realtime": false

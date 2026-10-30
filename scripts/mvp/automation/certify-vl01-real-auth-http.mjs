@@ -61,7 +61,7 @@ try {
   CREATE ROLE authenticator LOGIN PASSWORD '${pass}' NOINHERIT;
   GRANT anon,authenticated,service_role TO authenticator;
   GRANT USAGE ON SCHEMA public TO anon,authenticated,service_role;
-  CREATE TABLE public.profiles(id uuid PRIMARY KEY,role text);
+  CREATE TABLE public.profiles(id uuid PRIMARY KEY,role text,is_active boolean DEFAULT true);
   CREATE TABLE public.automation_action_requests(id uuid PRIMARY KEY,action_type text,entity_type text,correlation_id text,decision_status text,decision_at timestamptz,decision_reason_code text,created_at timestamptz);
   CREATE TABLE public.automation_jobs(id uuid PRIMARY KEY,action_request_id uuid,status text,attempt_count int,available_at timestamptz,locked_at timestamptz,completed_at timestamptz,created_at timestamptz,updated_at timestamptz,last_safe_code text);
   CREATE TABLE public.automation_execution_attempts(id uuid PRIMARY KEY,job_id uuid,attempt_number int,status text,classification text,safe_code text,started_at timestamptz,finished_at timestamptz);
@@ -141,6 +141,14 @@ try {
  r=await post(cookieHeader());suite("real HTTP superadmin trace success",r.status===200&&r.data.ok===true);
  suite("real Core trace SQL evidence present",r.data.events?.some(e=>e.title?.includes("Attempt"))&&r.data.providerDeliveryVerified===false);
  suite("real HTTP cache control no-store",r.cache==="no-store");
+ // Genuine signed session: disabling the profile must revoke service-role-backed
+ // admin API access on the very next request without refreshing the JWT.
+ await pg.query("UPDATE public.profiles SET is_active=false WHERE id=$1",[signup.user.id]);
+ r=await post(cookieHeader());suite("real HTTP disabled superadmin rejected same session",r.status===401);
+ await pg.query("UPDATE public.profiles SET is_active=NULL WHERE id=$1",[signup.user.id]);
+ r=await post(cookieHeader());suite("real HTTP NULL-active superadmin rejected same session",r.status===401);
+ await pg.query("UPDATE public.profiles SET is_active=true WHERE id=$1",[signup.user.id]);
+ r=await post(cookieHeader());suite("real HTTP reactivated superadmin accepted same session",r.status===200&&r.data.ok===true);
  r=await post(cookieHeader(),{action:"trace",jobId:"bogus"});suite("real HTTP malformed id rejected",r.status===400);
  r=await post(cookieHeader(),{action:"trace",jobId:uid});suite("real HTTP missing job 404",r.status===404);
  const immutable=await pg.query("SELECT count(*)::int n FROM public.automation_jobs");suite("real SQL job count unchanged",immutable.rows[0].n===1);

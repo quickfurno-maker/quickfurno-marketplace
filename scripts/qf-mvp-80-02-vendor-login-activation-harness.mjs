@@ -194,14 +194,14 @@ function resetDb() {
   ];
 
   db.profiles = [
-    { id: SUPERADMIN, role: "admin" },
-    { id: PLAIN_ADMIN, role: "admin" },
+    { id: SUPERADMIN, role: "admin", is_active: true },
+    { id: PLAIN_ADMIN, role: "admin", is_active: true },
     { id: PLAIN_USER, role: null },
     { id: LINKED_VENDOR_USER, role: "vendor" },
     // The exact production shape after the first Gate-06 activation.
     { id: PARTIAL_USER, role: null },
     // A principal that must never be demoted or re-roled by this operation.
-    { id: ADMINROLE_USER, role: "admin" },
+    { id: ADMINROLE_USER, role: "admin", is_active: true },
   ];
 
   db.vendors = [
@@ -542,6 +542,24 @@ check("08 [exec] an approved vendor with no login is given one, in place", async
   assert(vendorRow(V_BLOCKED).user_id === result.data.authUserId, "vendors.user_id now points at the new principal");
   assert(vendorCount() === before.vendors, "NO vendor row may be created");
   assert(authCount() === before.auth + 1, "exactly one auth user created");
+});
+
+check("08A [exec] inactive, NULL and missing-active Superadmin cannot create vendor Auth access", async () => {
+  for (const value of [false, null, undefined]) {
+    const { result, before } = await activateAs(SUPERADMIN, V_BLOCKED, () => {
+      const profile = profileRow(SUPERADMIN);
+      if (value === undefined) delete profile.is_active;
+      else profile.is_active = value;
+    });
+    assert(!result.ok && result.code === "UNAUTHORIZED",
+      `disabled admin must be rejected for ${String(value)}, got ${JSON.stringify(result)}`);
+    assert(createUserCalls.length === 0 && generateLinkCalls.length === 0,
+      "denied Superadmin may not create an identity or recovery link");
+    assert(vendorRow(V_BLOCKED).user_id === null && mappings(V_BLOCKED).length === 0,
+      "denied Superadmin may not link a vendor");
+    assert(authCount() === before.auth && vendorCount() === before.vendors,
+      "denied Superadmin leaves all identity/business rows unchanged");
+  }
 });
 
 check("09 [exec] the SAME vendor id is kept — no duplicate business row anywhere", async () => {

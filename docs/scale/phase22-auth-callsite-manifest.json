@@ -15,7 +15,7 @@
     "userMetadata": "NEVER_AUTHORIZATION"
   },
   "totals": {
-    "getUser": 11,
+    "getUser": 12,
     "getSession": 0,
     "signInWithPassword": 2,
     "signInWithOtp": 1,
@@ -23,7 +23,7 @@
     "signOut": 3,
     "updateUser": 1,
     "resetPasswordForEmail": 0,
-    "admin": 11
+    "admin": 12
   },
   "files": [
     {
@@ -65,6 +65,14 @@
       "file": "lib/identity/sessionInvalidation.ts",
       "operations": {
         "signOut": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "lib/supabase.ts",
+      "operations": {
+        "getUser": 1
       },
       "usesAppMetadata": false,
       "usesUserMetadata": false
@@ -134,6 +142,20 @@
         "admin": 1
       },
       "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "services/vox/verifiedScopedStaff.ts",
+      "operations": {
+        "admin": 1
+      },
+      "usesAppMetadata": true,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "services/vox/verifiedStaffBearer.ts",
+      "operations": {},
+      "usesAppMetadata": true,
       "usesUserMetadata": false
     }
   ]

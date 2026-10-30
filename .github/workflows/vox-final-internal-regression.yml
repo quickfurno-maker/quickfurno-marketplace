@@ -3,6 +3,11 @@ on:
   pull_request:
     paths:
       - 'app/api/vox/**'
+      - 'app/actions.ts'
+      - 'lib/crm/crmAuth.ts'
+      - 'services/vendorAccessService.ts'
+      - 'services/vendorLoginActivationService.ts'
+      - 'services/identityDirectoryService.ts'
       - 'lib/vox/**'
       - 'ops/vox/tests/**'
       - 'scripts/mvp/vox/**'
@@ -11,6 +16,11 @@ on:
     branches: [main]
     paths:
       - 'app/api/vox/**'
+      - 'app/actions.ts'
+      - 'lib/crm/crmAuth.ts'
+      - 'services/vendorAccessService.ts'
+      - 'services/vendorLoginActivationService.ts'
+      - 'services/identityDirectoryService.ts'
       - 'lib/vox/**'
       - 'ops/vox/tests/**'
       - 'scripts/mvp/vox/**'
@@ -32,3 +42,5 @@ jobs:
         run: node scripts/mvp/vox/validate-vox-final-internal-gates-20261030.mjs --self-test
       - name: Run default-deny and schema contract validation (no auth, network, DDL or runtime mutation)
         run: node scripts/mvp/vox/validate-vox-final-internal-gates-20261030.mjs --source-only
+      - name: Ensure disabled and NULL-active admins cannot pass service-role authorization guards
+        run: node scripts/mvp/vox/validate-vox-admin-active-guard-20261030.mjs

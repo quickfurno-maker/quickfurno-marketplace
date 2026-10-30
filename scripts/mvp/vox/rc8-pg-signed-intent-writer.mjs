@@ -114,7 +114,9 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
    return deny(signed.reason||"SIGNATURE_OR_NONCE_DENIED");
   }
   if(!UUID.test(signed.ownerId)||!UUID.test(signed.teamLeaderId)||
-     signed.ownerId===signed.teamLeaderId){
+     signed.ownerId===signed.teamLeaderId||
+     signed.ownerId!==ownerAuth?.userId||
+     signed.teamLeaderId!==teamLeaderAuth?.userId){
    await client.query("ROLLBACK");settled=true;return deny("INVALID_SIGNER_BINDING");
   }
   const receipt=await client.query(

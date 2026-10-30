@@ -44,6 +44,10 @@ function world(over={}){
    lockConversationForUpdate:async()=>{log.order.push("conv");return Object.hasOwn(over,"lockedConv")?over.lockedConv:db.conv;},
    lockStaffForUpdate:async()=>{log.order.push("staff");return Object.hasOwn(over,"lockedStaff")?over.lockedStaff:db.staff;},
    readConsentFence:async()=>{const f={...db.fence};over.afterFenceRead?.(consentWriter);return f;},
+   authorizeConsentUnderLock:async()=>{
+    if(over.txConsentThrows)throw new Error("consent authority unavailable");
+    return Object.hasOwn(over,"txConsent")?over.txConsent:{kind:"allow",scope:"transactional"};
+   },
    consumeNonce:async n=>{if(db.nonces.has(n))return false;db.nonces.add(n);return true;},
    insertSourceRow:async r=>{if(over.insertThrows)throw new Error("x");db.rows.push(r);},
    commit:async()=>{if(over.commitThrows)throw new Error("net");done=true;db.lockedBy=null;log.commits++;},
@@ -116,6 +120,20 @@ test("actor boundary: role/department/AAL/revoked/expired/team/city/grant all de
   [{conv:{revision:4}},"CONVERSATION_STALE_OR_INELIGIBLE"],[{conv:{id:U(55)}},"CONVERSATION_NOT_FOUND_OR_FORGED"]];
  for(const [o,reason] of cases){const {w,p}=await decide(o);
   assert.equal(p.reason,reason,JSON.stringify(o));assert.equal(w.log.begun,0);}
+});
+test("RC5: fresh transaction-locked canonical consent denial never consumes a nonce",async()=>{
+ for(const txConsent of [{kind:"deny"}, {kind:"allow",scope:"marketing"},
+   {kind:"allow",scope:"transactional",source:"request"}, null, undefined]){
+  const {w,p}=await decide({txConsent});
+  const r=await commitConversationDecision(p.decision,w.begin,OPEN);
+  assert.equal(r.reason,"CONSENT_NOT_ALLOWED");
+  assert.equal(w.db.nonces.size,0);assert.equal(w.db.rows.length,0);
+  assert.equal(w.log.commits,0);assert.equal(w.log.rollbacks,1);
+ }
+ const {w,p}=await decide({txConsentThrows:true});
+ const r=await commitConversationDecision(p.decision,w.begin,OPEN);
+ assert.equal(r.reason,"TX_FAILED_ROLLED_BACK");
+ assert.equal(w.db.nonces.size,0);assert.equal(w.db.rows.length,0);
 });
 test("TOCTOU 1: consent event between phase 1 and the transaction denies and rolls back",async()=>{
  const {w,p}=await decide({});

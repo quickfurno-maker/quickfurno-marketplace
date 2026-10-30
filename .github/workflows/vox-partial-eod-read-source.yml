@@ -1,0 +1,22 @@
+name: VOX Partial EOD Read-only (No Deploy)
+on:
+  pull_request:
+    paths:
+      - 'app/api/vox/v1/eod-preview/**'
+      - 'app/api/vox/v1/eod-source-status/**'
+      - 'contracts/vox/*Eod*'
+      - 'scripts/mvp/vox/validate-vox-partial-eod-read-20261030.mjs'
+      - '.github/workflows/vox-partial-eod-read-source.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  eod-readonly-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - run: node scripts/mvp/vox/validate-vox-partial-eod-read-20261030.mjs

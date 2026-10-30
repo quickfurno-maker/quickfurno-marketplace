@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { inspectRazorpayOrderClaim, storedRazorpayOrderModeError } from "../lib/payments/vendorPackageOrderGuards.mjs";
 import { adminClient } from "../lib/supabase";
 import { AppError, fail, ok, type Result } from "../lib/errors";
 import { requireVendorAccess } from "./vendorAccessService";
@@ -179,10 +180,11 @@ async function loadCurrentPackage(packageId: string): Promise<PackageRow> {
 }
 
 function assertOrderMode(order: PackageOrderRow, cfg: RazorpayConfig): void {
-  if (order.provider_mode && order.provider_mode !== cfg.mode) {
+  const failure = storedRazorpayOrderModeError(order, cfg.mode);
+  if (failure) {
     throw paymentError(
-      "PACKAGE_ORDER_MODE_MISMATCH",
-      "This payment order was created in a different Razorpay environment. Create a new package order.",
+      failure,
+      "Payment provider identity or environment could not be verified. Create a new package order.",
     );
   }
 }
@@ -247,7 +249,13 @@ export async function createVendorPackageRazorpayCheckout(
       { p_order_id: order.id, p_request_token: requestToken, p_provider_mode: cfg.mode },
     );
     if (claimError) throw claimError;
-    if ((claim as { status?: string } | null)?.status === "already_bound") {
+    const claimStatus = inspectRazorpayOrderClaim(claim, {
+      orderId: order.id, amountSubunits: amount, receipt,
+    });
+    if (claimStatus === "invalid") {
+      throw paymentError("PACKAGE_ORDER_CLAIM_INVALID", "Database payment claim was not verified. No provider order was requested.");
+    }
+    if (claimStatus === "already_bound") {
       order = await loadOrder(order.id, access.data.vendorId);
       return ok(checkoutFromStoredOrder(order, cfg));
     }
@@ -265,11 +273,17 @@ export async function createVendorPackageRazorpayCheckout(
       });
     } catch (error) {
       if (error instanceof AppError && error.code === "RAZORPAY_HTTP_REJECTED") {
-        await adminClient().rpc("qf_release_vendor_package_razorpay_order_claim_v2", {
+        const { error: releaseError } = await adminClient().rpc("qf_release_vendor_package_razorpay_order_claim_v2", {
           p_order_id: order.id,
           p_request_token: requestToken,
           p_provider_mode: cfg.mode,
         });
+        if (releaseError) {
+          throw paymentError(
+            "PACKAGE_ORDER_CLAIM_RELEASE_FAILED",
+            "Payment request was rejected, but its database claim could not be safely released. Reconcile before retrying.",
+          );
+        }
         throw error;
       }
       throw paymentError(

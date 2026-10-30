@@ -92,10 +92,12 @@ try{
  await pool.query("CREATE TABLE public.profiles(id uuid PRIMARY KEY,role text,is_active boolean NOT NULL)");
  await pool.query("CREATE TABLE public.vox_staff_teams_v1(id uuid PRIMARY KEY,city_id uuid,is_active boolean NOT NULL)");
  await pool.query("CREATE TABLE public.vox_staff_memberships_v1(auth_user_id uuid PRIMARY KEY,team_id uuid,staff_role text,is_active boolean,revoked_at timestamptz,expires_at timestamptz)");
+ await pool.query("CREATE TABLE public.vox_ab7f_four_source_eod_candidate_v1(id uuid PRIMARY KEY,staff_id uuid,team_id uuid,city_id uuid,reviewer_id uuid,source_count integer,source_digest text,state text,published boolean)");
  await pool.query("INSERT INTO public.profiles VALUES ($1,'admin',true),($2,NULL,true)",[OWNER,TL]);
  await pool.query("INSERT INTO auth.users VALUES($1,'{\"admin_role\":\"Superadmin\"}'),($2,'{\"qf_principal\":\"vox_staff\",\"vox_role\":\"team_leader\"}')",[OWNER,TL]);
  await pool.query("INSERT INTO public.vox_staff_teams_v1 VALUES ($1,$2,true)",[TEAM,CITY]);
  await pool.query("INSERT INTO public.vox_staff_memberships_v1 VALUES ($1,$2,'team_leader',true,NULL,clock_timestamp()+interval '30 days')",[TL,TEAM]);
+ await pool.query("INSERT INTO public.vox_ab7f_four_source_eod_candidate_v1 VALUES($1,$2,$3,$4,$5,4,$6,'TL_ACKNOWLEDGED_AWAITING_OWNER_RELEASE',false)",[SUB,id(90),TEAM,CITY,TL,DIGEST]);
  const ddl=readFileSync(resolve(root,"ops/vox/rc7-review-candidates/20261030010000_vox_rc8_signed_intent_transaction_review_only.sql"),"utf8");
  await pool.query(ddl);
  const revocationDdl=readFileSync(resolve(root,"ops/vox/rc7-review-candidates/20261030030000_vox_rc11_signer_revocation_lock_review_only.sql"),"utf8");
@@ -112,6 +114,14 @@ try{
   ownerAuth,teamLeaderAuth,now,approvedRegistryFingerprints:[fingerprint]});
  eq(RC8_APPROVAL_WRITER_INSTALLED,false,"SOURCE_PRODUCTION_GATE");
  let r=await executeRc8PgPendingSignedIntentProduction(args());
+ // Signed bytes are insufficient without the current TL-reviewed EOD provenance.
+ await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET source_count=3 WHERE id=$1",[SUB]);
+ r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
+ eq(r.reason,"EOD_CURRENT_FOUR_SOURCE_REVIEW_REQUIRED","EOD_THREE_SOURCE_DENIED");
+ await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET source_count=4,reviewer_id=$2 WHERE id=$1",[SUB,OWNER]);
+ r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
+ eq(r.reason,"EOD_CURRENT_FOUR_SOURCE_REVIEW_REQUIRED","EOD_WRONG_TL_DENIED");
+ await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET reviewer_id=$2 WHERE id=$1",[SUB,TL]);
  eq(r.reason,"NATIVE_RELEASE_GATE_CLOSED","PRODUCTION_BLOCK");
  r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
  eq(r.ok,true,"NATIVE_REAL_PG_COMMIT");eq(r.approved,false,"NEVER_APPROVED");

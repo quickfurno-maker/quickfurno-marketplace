@@ -40,7 +40,7 @@ export async function executeRc19VerifiedCoreConversationCommand(
   return blocked("RC19_COMMAND_INVALID");
  // Never pass caller-supplied role/team/actor/sourceProof fields into native
  // Core; only the verified AAL2 server-side identity can become an actor.
- let actor;
+ let actor:Awaited<ReturnType<typeof verifyVoxOperationsStaffBearer>>;
  try{actor=await verifyVoxOperationsStaffBearer(authorization)}
  catch{return blocked("RC19_CURRENT_STAFF_AUTH_UNAVAILABLE");}
  if(!actor)return blocked("RC19_CURRENT_STAFF_AAL2_REQUIRED");

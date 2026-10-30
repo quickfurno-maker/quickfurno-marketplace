@@ -121,6 +121,7 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
    "AND m.expires_at>clock_timestamp() AND t.is_active=true "+
    "AND t.city_id=$2::uuid AND p.is_active=true AND p.role IS NULL "+
    "AND u.raw_app_meta_data->>'qf_principal'='vox_staff' "+
+   "AND u.raw_app_meta_data->>'vox_role'='operations_manager' "+
    "AND u.raw_app_meta_data->>'admin_role' IS NULL "+
    "FOR SHARE OF m,t,p,u",
    [input.verifiedStaff.userId,c.city_id]);

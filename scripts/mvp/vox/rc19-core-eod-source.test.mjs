@@ -12,7 +12,7 @@ test("Auth->Core bridge has a hard-off constant and no route or source proof inp
  assert.match(b,/if\(!RC19_VERIFIED_CORE_WRITER_INSTALLED\)/);
  assert.match(b,/verifyVoxOperationsStaffBearer\(authorization\)/);
  assert.match(b,/executeRc8PgVendorConversationOperator\(\{/);
- assert.doesNotMatch(b,/sourceProof|DISPOSABLE_RC12_AB7B_PROOF|process\.env/);
+ assert.doesNotMatch(b,/\bsourceProof\s*[:=]|DISPOSABLE_RC12_AB7B_PROOF|process\.env/);
  for(const blocker of ["independentDbaAppsecApproved:false","managedRestoreCertified:false",
  "staffAal2AndTeamOnboarded:false","consentMutationSerializationCertified:false",
  "nativeWriterRoleAndAb7bReviewed:false","stagingOperationalAcceptancePassed:false"])

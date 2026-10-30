@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {fetchOwnerFinancePreview} from "../../lib/core";
+import {indiaOrderMonth,selectBoundedFinanceMonth} from "../../lib/financeMonth.mjs";
 import "../operations/operations.css";
 export const dynamic="force-dynamic";
 const amount=(n:number|null)=>n===null?"Not recorded":
@@ -7,12 +8,6 @@ const amount=(n:number|null)=>n===null?"Not recorded":
 const when=(date:string)=>new Intl.DateTimeFormat("en-IN",{
  timeZone:"Asia/Kolkata",day:"2-digit",month:"short",year:"numeric"}).format(new Date(date));
 type FinanceProps={searchParams:Promise<{state?:string|string[];month?:string|string[]}>};
-const MONTH=/^20[0-9]{2}-(0[1-9]|1[0-2])$/;
-const istMonth=(iso:string)=>{
- const parts=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Kolkata",
-  year:"numeric",month:"2-digit"}).formatToParts(new Date(iso));
- return parts.find(p=>p.type==="year")?.value+"-"+parts.find(p=>p.type==="month")?.value;
-};
 const financeHref=(state:string,month:string|null)=>{
  const p=new URLSearchParams();
  if(state!=="all")p.set("state",state);
@@ -32,13 +27,12 @@ export default async function Finance({searchParams}:FinanceProps){
   <p className="kicker">VOX / FINANCE ACCESS</p><h1>Finance preview unavailable</h1>
   <p>Verified Owner MFA, an authorized Core order read, and separately reviewed Staging feature gates are required.</p>
   <Link href="/login">Owner sign-in</Link></section></main>;
- const months=[...new Set(result.orders.map(o=>istMonth(o.createdAt)))].filter(
-  (m):m is string=>typeof m==="string"&&MONTH.test(m)).sort().reverse().slice(0,12);
- const selectedMonth=typeof params.month==="string"&&MONTH.test(params.month)&&
-  months.includes(params.month)?params.month:null;
+ const months=[...new Set(result.orders.map(o=>indiaOrderMonth(o.createdAt)))].filter(
+  (m):m is string=>typeof m==="string").sort().reverse().slice(0,12);
+ const selectedMonth=selectBoundedFinanceMonth(params.month,months);
  const visible=result.orders.filter(o=>(selected==="all"||
   o.paymentStatus.toLowerCase()===selected)&&
-  (!selectedMonth||istMonth(o.createdAt)===selectedMonth));
+  (!selectedMonth||indiaOrderMonth(o.createdAt)===selectedMonth));
  // These counts describe the bounded Core snapshot only. They are not a
  // reconciliation queue, settled revenue, or an authority to retry payments.
  const attention=result.orders.reduce((n,o)=>n+

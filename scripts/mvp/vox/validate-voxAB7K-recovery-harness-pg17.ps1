@@ -7,6 +7,7 @@
 [CmdletBinding()]
 param(
  [switch]$NoSupabaseDefaultPrivileges,
+ [switch]$ApplyIdentityOverlay,
  [string]$OutDir=(Join-Path ([IO.Path]::GetTempPath()) ('ab7k-evidence-'+[guid]::NewGuid().ToString('N')))
 )
 $ErrorActionPreference='Stop'
@@ -89,6 +90,24 @@ try{
   $i++
   $null=Psql $src 'postgres' ([IO.File]::ReadAllText($f.FullName))
   Write-Output "PASS install_$i $($f.Name)"
+ }
+ if($ApplyIdentityOverlay){
+  # Only the disposable network-isolated cluster can receive this overlay.
+  $overlay=Join-Path $root 'ops\\vox\\identity-attestation-overlay\\20261030010000_vox_ab7k_identity_attestation_fail_closed_overlay.sql'
+  $verify=Join-Path $root 'ops\\vox\\identity-attestation-overlay\\verify_ab7k_identity_overlay_disposable_only.sql'
+  $authFixture=@'
+create schema if not exists auth;
+create or replace function auth.uid() returns uuid language sql stable as $$
+ select nullif(current_setting('request.jwt.claims',true)::jsonb->>'sub','')::uuid;
+$$;
+create or replace function auth.jwt() returns jsonb language sql stable as $$
+ select coalesce(nullif(current_setting('request.jwt.claims',true),'')::jsonb,'{}'::jsonb);
+$$;
+'@
+  $null=Psql $src 'postgres' $authFixture
+  $null=Psql $src 'postgres' ([IO.File]::ReadAllText($overlay))
+  $null=Psql $src 'postgres' ([IO.File]::ReadAllText($verify))
+  Write-Output 'AB7K_DISPOSABLE_IDENTITY_OVERLAY_SQL_VERIFIED'
  }
  Snapshot $src 'postgres' (Join-Path $OutDir 'source.snapshot.json')
 

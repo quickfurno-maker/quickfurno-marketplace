@@ -1,4 +1,5 @@
 import test from "node:test";import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
 import {dirname,resolve} from "node:path";import {fileURLToPath} from "node:url";
 import {
   AUTHORIZED_STAGING_REF,REQUIRED_CONSENT_RELATION,analyzeDependencies,catalogDigest,catalogSql,
@@ -40,9 +41,12 @@ test("staging-only ledger versions parse to exactly 31 unique IDs",()=>{
   assert.equal(v.length,31);assert.equal(new Set(v).size,31);
 });
 
-test("static scan reports the never-created consent relation and Core dependencies",()=>{
+test("static scan sees the removed fake-consent dependency while preserving Core dependencies",()=>{
   const d=analyzeDependencies(root);
-  assert.ok(d.missingVoxRelations.some(x=>x.name===REQUIRED_CONSENT_RELATION),"consent relation must be flagged");
+  // AB7B now explicitly BLOCKS CORE_CONVERSATION; it must not reference the fake table.
+  assert.equal(d.missingVoxRelations.some(x=>x.name===REQUIRED_CONSENT_RELATION),false);
+  const sql=readFileSync(resolve(root,"ops/vox/sql-candidates/20261018020000_vox_ab7b_nonwork_native_source_candidate.sql"),"utf8");
+  assert.match(sql,/constraint vox_ab7b_core_conversation_blocked check\(source<>'CORE_CONVERSATION'\)/);
   assert.ok(d.externalCoreRelations.includes("communication_conversations"));
   assert.equal(d.method,"REGEX_HEURISTIC_NOT_A_PARSER");
 });
@@ -68,11 +72,11 @@ function snap(over={}){
     default_acls:[],presence:{},relations,functions:{},...over};
 }
 
-test("evaluator never emits GO, flags the missing consent relation, and keeps restoration BLOCKED",()=>{
+test("evaluator never emits GO, keeps unverified consent and restoration BLOCKED",()=>{
   const r=evaluateEvidence({root,snapshot:snap(),target:"local-disposable",expect:"post-install"});
   assert.equal(r.goEligible,false);assert.notEqual(r.overall,"GO");
   assert.equal(r.overall,"HOLD");
-  assert.ok(r.checks.some(c=>c.id.startsWith("STATIC_VOX_RELATION_NEVER_CREATED")&&c.status==="BLOCKED"));
+  assert.equal(r.checks.some(c=>c.id.startsWith("STATIC_VOX_RELATION_NEVER_CREATED")&&c.status==="BLOCKED"),false);
   assert.ok(r.checks.some(c=>c.id==="CONSENT_RELATION_PRESENT_IN_TARGET"&&c.status==="BLOCKED"));
   assert.match(r.managedRestoration,/^BLOCKED/);
   assert.deepEqual(Object.values(r.attestations),Array(5).fill("NOT_PROVIDED"));

@@ -54,3 +54,14 @@ test("signed EOD current real Owner/TL identities match verified cryptographic r
   assert.ok(harness.includes(item),item);
  assert.match(core,/RC8_APPROVAL_WRITER_INSTALLED=false/);
 });
+
+test("VOX Finance attention only filters bounded Core records, never performs refunds",()=>{
+ const ui=read("apps/vox-web/app/finance/page.tsx");
+ assert.match(ui,/const pendingCount=result\.orders\.filter/);
+ assert.match(ui,/const failedCount=result\.orders\.filter/);
+ assert.match(ui,/Recent payment attention shortcuts/);
+ assert.match(ui,/financeHref\("pending",selectedMonth\)/);
+ assert.match(ui,/financeHref\("failed",selectedMonth\)/);
+ assert.match(ui,/Filters apply only to the bounded Core preview/);
+ assert.match(ui,/This page cannot refund, capture, reconcile, grant credits or activate packages/);
+});

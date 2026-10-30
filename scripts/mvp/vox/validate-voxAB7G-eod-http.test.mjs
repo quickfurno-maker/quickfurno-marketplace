@@ -3,8 +3,14 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import ts from "typescript";
 const code=readFileSync(new URL("../../../app/api/vox/v1/official-eod-publish/route.ts",import.meta.url),"utf8");
-const js=ts.transpileModule(code,{compilerOptions:{
+const compile=source=>ts.transpileModule(source,{compilerOptions:{
  target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+// AB7K: shipped route is hard-off. `js` patches ONLY the writer constant to
+// keep exercising the downstream gates; `shipped` is the unmodified route.
+const WRITER_OFF="const VERIFIED_APPROVAL_WRITER_INSTALLED=false as boolean;";
+assert.ok(code.includes(WRITER_OFF),"AB7K hard-off constant missing");
+const js=compile(code.replace(WRITER_OFF,WRITER_OFF.replace("=false","=true")));
+const shipped=compile(code);
 const id=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 const flags=["VOX_AB7G_EOD_PUBLISH_ENABLED",
  "VOX_AB7G_SIGNED_OWNER_PROOF_ENABLED",
@@ -15,10 +21,10 @@ test.after(()=>flags.forEach(k=>old[k]===undefined?
  delete process.env[k]:process.env[k]=old[k]));
 const input={reportId:id(1),teamLeaderId:id(2),nonce:id(3),
  sourceDigest:"a".repeat(64)};
-function h({owner=id(4),forged=false,dbError=false}={}){
+function h({owner=id(4),forged=false,dbError=false,source=js}={}){
  let reads=0,writes=0;
  const module={exports:{}};
- new Function("require","module","exports",js)(name=>{
+ new Function("require","module","exports",source)(name=>{
   if(name==="server-only")return {};
   if(name==="@/services/vox/verifiedStaffBearer")
    return {verifyVoxOwnerBearer:async()=>{reads++;return owner}};
@@ -37,7 +43,13 @@ function h({owner=id(4),forged=false,dbError=false}={}){
 const req=(body=input)=>new Request("https://core.quickfurno.invalid/api/vox/v1/official-eod-publish",{
  method:"POST",headers:{"content-type":"application/json",authorization:"Bearer synthetic"},
  body:JSON.stringify(body)});
-test("AB7G exact independently attested Core Owner publication route",async()=>{
+test("AB7K shipped AB7G route is hard-off even with every env flag set",async()=>{
+ const x=h({source:shipped}),r=await x.POST(req());
+ assert.equal(r.status,503);
+ assert.equal((await r.json()).error,"VERIFIED_APPROVAL_WRITER_NOT_INSTALLED");
+ assert.equal(x.reads,0);assert.equal(x.writes,0);
+});
+test("AB7G downstream gates (writer constant patched for test only)",async()=>{
  const x=h(),r=await x.POST(req());assert.equal(r.status,201);
  assert.equal(x.writes,1);assert.equal((await r.json()).externalMessagesSent,0);
 });

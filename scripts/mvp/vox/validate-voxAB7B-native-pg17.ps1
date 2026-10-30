@@ -50,8 +50,6 @@ CREATE TABLE public.vox_staff_object_scopes_v1(auth_user_id uuid,scope_kind text
  object_id uuid,revoked_at timestamptz,expires_at timestamptz);
 CREATE TABLE public.vox_staff_department_capabilities_v1(auth_user_id uuid,team_id uuid,
  city_id uuid,department text,revoked_at timestamptz,expires_at timestamptz);
-CREATE TABLE public.vox_ab7b_current_consent_candidate_v1(conversation_id uuid,
- status text,current_revision integer,revoked_at timestamptz);
 INSERT INTO public.profiles VALUES
 ('00000000-0000-4000-8000-000000000001',null,true),
 ('00000000-0000-4000-8000-000000000002',null,true),
@@ -63,7 +61,7 @@ INSERT INTO public.vox_staff_teams_v1 VALUES
 INSERT INTO public.vox_staff_memberships_v1 VALUES
 ('00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000005','acquisition_agent',true,null,now()+interval '1 day'),
 ('00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000005','support_agent',true,null,now()+interval '1 day'),
-('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000005','client_success_agent',true,null,now()+interval '1 day'),
+('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000005','operations_manager',true,null,now()+interval '1 day'),
 ('00000000-0000-4000-8000-000000000099','00000000-0000-4000-8000-000000000005','team_leader',true,null,now()+interval '1 day');
 INSERT INTO public.vox_staff_object_scopes_v1 VALUES
 ('00000000-0000-4000-8000-000000000001','prospect','00000000-0000-4000-8000-000000000011',null,now()+interval '1 day'),
@@ -73,16 +71,21 @@ INSERT INTO public.vox_staff_department_capabilities_v1 VALUES
 ('00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000005','00000000-0000-4000-8000-000000000004','acquisition',null,now()+interval '1 day'),
 ('00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000005','00000000-0000-4000-8000-000000000004','service_support',null,now()+interval '1 day'),
 ('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000005','00000000-0000-4000-8000-000000000004','client_success',null,now()+interval '1 day');
-INSERT INTO public.vox_ab7b_current_consent_candidate_v1 VALUES
-('00000000-0000-4000-8000-000000000013','ALLOWED',3,null);
 '@
  $r=Sql $fixture;if($r.exit -ne 0){throw "AB7B_FIXTURE_FAILED $($r.text)"}
  foreach($p in $files){$r=Sql (Get-Content $p -Raw);if($r.exit -ne 0){throw "AB7B_SQL_MIGRATION_FAILED $p $($r.text)"}}
  $sources=@(
  @('CRM_AAROHI','prospect','000000000001','000000000011','000000000021','000000000031'),
- @('SUPPORT_DESK','support_thread','000000000002','000000000012','000000000022','000000000032'),
- @('CORE_CONVERSATION','conversation','000000000003','000000000013','000000000023','000000000033')
+ @('SUPPORT_DESK','support_thread','000000000002','000000000012','000000000022','000000000032')
  )
+ $coreRow=@"
+INSERT INTO public.vox_ab7b_native_source_actions_candidate_v1
+(id,source,subject_kind,subject_id,actor_id,team_id,city_id,revision,event_kind,nonce)
+VALUES('00000000-0000-4000-8000-000000000023','CORE_CONVERSATION','conversation',
+'00000000-0000-4000-8000-000000000013','00000000-0000-4000-8000-000000000003',
+'00000000-0000-4000-8000-000000000005','00000000-0000-4000-8000-000000000004',
+1,'STAFF_ACTION','00000000-0000-4000-8000-000000000033');
+"@
  $commands=@()
  foreach($s in $sources){
   $row=@"
@@ -100,10 +103,21 @@ VALUES('00000000-0000-4000-8000-$($s[4])','$($s[0])','$($s[1])',
 SELECT (SELECT count(*) FROM public.vox_ab7b_native_source_actions_candidate_v1)::text||':'||
 (SELECT count(*) FROM public.vox_staff_source_events_candidate_v1)::text||':'||
 (SELECT count(*) FROM public.vox_staff_source_nonce_candidate_v1)::text;
-'@ '3:3:3'
- Ok 'exact three source categories' @'
+'@ '2:2:2'
+ Ok 'only CRM_AAROHI and SUPPORT_DESK are writable' @'
 SELECT string_agg(source,',' ORDER BY source) FROM public.vox_staff_source_events_candidate_v1;
-'@ 'CORE_CONVERSATION,CRM_AAROHI,SUPPORT_DESK'
+'@ 'CRM_AAROHI,SUPPORT_DESK'
+ Denied 'CORE_CONVERSATION blocked even with full role/object/capability fixture' $coreRow 'AB7B_CORE_CONVERSATION_BLOCKED'
+ Denied 'CORE_CONVERSATION blocked for a canonical conversation-scope role (acquisition_agent)' $coreRow.Replace('000000000003','000000000001') 'AB7B_CORE_CONVERSATION_BLOCKED'
+ Denied 'CORE_CONVERSATION blocked for nonexistent client_success_agent role' $coreRow.Replace('000000000003','000000000077') 'AB7B_CORE_CONVERSATION_BLOCKED'
+ Denied 'CORE_CONVERSATION blocked when trigger is bypassed (table CHECK)' "SET session_replication_role=replica; $coreRow" 'vox_ab7b_core_conversation_blocked'
+ Denied 'nonexistent consent relation must not exist' 'SELECT 1 FROM public.vox_ab7b_current_consent_candidate_v1;' 'does not exist'
+ Denied 'foreign city actor rejected' ($commands[0].Replace('000000000021','000000000061').Replace('000000000031','000000000071').Replace('000000000004','000000000088').Replace("1,'STAFF_ACTION'","2,'STAFF_ACTION'")) 'violates foreign key|AB7B_CURRENT_STAFF_REVOKED'
+ Denied 'foreign team actor rejected' ($commands[0].Replace('000000000021','000000000062').Replace('000000000031','000000000072').Replace('000000000005','000000000089').Replace("1,'STAFF_ACTION'","2,'STAFF_ACTION'")) 'violates foreign key|AB7B_CURRENT_STAFF_REVOKED'
+ Denied 'malformed source/subject pairing rejected' ($commands[0].Replace("'prospect'","'support_thread'").Replace('000000000021','000000000063').Replace('000000000031','000000000073').Replace("1,'STAFF_ACTION'","2,'STAFF_ACTION'")) 'vox_ab7b_strict_source_subject|AB7B_SOURCE_OBJECT_GRANT_REVOKED'
+ $r=Sql "UPDATE public.vox_staff_memberships_v1 SET revoked_at=now() WHERE auth_user_id='00000000-0000-4000-8000-000000000002';"
+ if($r.exit -ne 0){throw 'ROLE_REVOKE_FIXTURE_FAILED'}
+ Denied 'revoked support role rejected' ($commands[1].Replace('000000000022','000000000064').Replace('000000000032','000000000074').Replace("1,'STAFF_ACTION'","2,'STAFF_ACTION'")) 'AB7B_CURRENT_STAFF_REVOKED'
  Denied 'original nonce replay' $commands[0] 'duplicate key'
  $revoke=@'
 UPDATE public.vox_staff_object_scopes_v1 SET revoked_at=now()
@@ -112,14 +126,11 @@ WHERE scope_kind='prospect';
  $r=Sql $revoke;if($r.exit -ne 0){throw 'REVOKE_FIXTURE_FAILED'}
  Denied 'revoked original prospect grant' ($commands[0].Replace('000000000021','000000000041').Replace('000000000031','000000000051').Replace('revision,event_kind,nonce)', 'revision,event_kind,nonce)').Replace("1,'STAFF_ACTION'","2,'STAFF_ACTION'")) 'AB7B_SOURCE_OBJECT_GRANT_REVOKED'
  Denied 'forged owner actor in support' ($commands[1].Replace('000000000022','000000000042').Replace('000000000032','000000000052').Replace('000000000002','000000000099').Replace("1,'STAFF_ACTION'","2,'STAFF_ACTION'")) 'AB7B_CURRENT_STAFF_REVOKED'
- $r=Sql "UPDATE public.vox_ab7b_current_consent_candidate_v1 SET revoked_at=now() WHERE conversation_id='00000000-0000-4000-8000-000000000013';"
- if($r.exit -ne 0){throw 'CONSENT_FIXTURE_REVOKE_FAILED'}
- Denied 'revoked conversation consent' ($commands[2].Replace('000000000023','000000000043').Replace('000000000033','000000000053').Replace("1,'STAFF_ACTION'","2,'STAFF_ACTION'")) 'AB7B_CONVERSATION_CONSENT_REQUIRED'
- Ok 'rollback leaves exact first 3 triples' @'
+ Ok 'rollback leaves exact first 2 triples' @'
 SELECT (SELECT count(*) FROM public.vox_ab7b_native_source_actions_candidate_v1)::text||':'||
 (SELECT count(*) FROM public.vox_staff_source_events_candidate_v1)::text||':'||
 (SELECT count(*) FROM public.vox_staff_source_nonce_candidate_v1)::text;
-'@ '3:3:3'
+'@ '2:2:2'
  Denied 'anon direct insert forbidden' "SET ROLE anon; INSERT INTO public.vox_ab7b_native_source_actions_candidate_v1 DEFAULT VALUES;" 'permission denied'
  Denied 'original immutable UPDATE' "UPDATE public.vox_ab7b_native_source_actions_candidate_v1 SET revision=9;" 'VOX_F1_APPEND_ONLY'
  Ok 'forced row level security' @'

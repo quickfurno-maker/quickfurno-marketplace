@@ -49,7 +49,6 @@ CREATE TABLE public.vox_staff_teams_v1(id uuid PRIMARY KEY,city_id uuid,is_activ
 CREATE TABLE public.vox_staff_memberships_v1(auth_user_id uuid PRIMARY KEY,team_id uuid,staff_role text,is_active boolean,revoked_at timestamptz,expires_at timestamptz);
 CREATE TABLE public.vox_staff_object_scopes_v1(auth_user_id uuid,scope_kind text,object_id uuid,revoked_at timestamptz,expires_at timestamptz);
 CREATE TABLE public.vox_staff_department_capabilities_v1(auth_user_id uuid,team_id uuid,city_id uuid,department text,expires_at timestamptz,revoked_at timestamptz);
-CREATE TABLE public.vox_ab7b_current_consent_candidate_v1(conversation_id uuid PRIMARY KEY,status text,current_revision integer,revoked_at timestamptz);
 INSERT INTO public.profiles VALUES
 ('00000000-0000-4000-8000-000000000001',null,true),
 ('00000000-0000-4000-8000-000000000002',null,true),
@@ -59,7 +58,7 @@ INSERT INTO public.vox_staff_teams_v1 VALUES('00000000-0000-4000-8000-0000000000
 INSERT INTO public.vox_staff_memberships_v1 VALUES
 ('00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000005','acquisition_agent',true,null,now()+interval '1 day'),
 ('00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000005','support_agent',true,null,now()+interval '1 day'),
-('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000005','client_success_agent',true,null,now()+interval '1 day');
+('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000005','operations_manager',true,null,now()+interval '1 day');
 INSERT INTO public.vox_staff_object_scopes_v1 VALUES
 ('00000000-0000-4000-8000-000000000001','prospect','00000000-0000-4000-8000-000000000011',null,now()+interval '1 day'),
 ('00000000-0000-4000-8000-000000000002','support_thread','00000000-0000-4000-8000-000000000012',null,now()+interval '1 day'),
@@ -68,7 +67,6 @@ INSERT INTO public.vox_staff_department_capabilities_v1 VALUES
 ('00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000005','00000000-0000-4000-8000-000000000004','acquisition',now()+interval '1 day',null),
 ('00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000005','00000000-0000-4000-8000-000000000004','service_support',now()+interval '1 day',null),
 ('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000005','00000000-0000-4000-8000-000000000004','client_success',now()+interval '1 day',null);
-INSERT INTO public.vox_ab7b_current_consent_candidate_v1 VALUES ('00000000-0000-4000-8000-000000000013','ALLOWED',2,null);
 CREATE TABLE public.marketplace_service_zones(id uuid PRIMARY KEY,city_id uuid,is_active boolean);
 CREATE TABLE public.vendors(id uuid PRIMARY KEY,service_zone_id uuid);
 CREATE TABLE public.vendor_support_threads(id uuid PRIMARY KEY,vendor_id uuid,status text);
@@ -95,17 +93,16 @@ INSERT INTO public.vendor_support_threads VALUES
  }
  $events=@(
  (EventSql 21 1 11 'CRM_AAROHI' 'prospect' 41),
- (EventSql 22 2 12 'SUPPORT_DESK' 'support_thread' 42),
- (EventSql 23 3 13 'CORE_CONVERSATION' 'conversation' 43)
+ (EventSql 22 2 12 'SUPPORT_DESK' 'support_thread' 42)
  )
  foreach($e in $events){$res=Sql $e;if($res.code -ne 0){throw "AB7B_NATIVE_INSERT_FAILED $($res.text)"}}
- Pass 'all three original synthetic events and F1/nonce in one tx' @'
+ Pass 'two genuine-lane original synthetic events and F1/nonce in one tx' @'
 SELECT (SELECT count(*) FROM public.vox_ab7b_native_source_actions_candidate_v1)::text||':'||
  (SELECT count(*) FROM public.vox_staff_source_events_candidate_v1)::text||':'||
  (SELECT count(*) FROM public.vox_staff_source_nonce_candidate_v1)::text;
-'@ '3:3:3'
+'@ '2:2:2'
  Pass 'source actor, subject, nonce and revision are identical' @'
-SELECT CASE WHEN count(*)=3 THEN 'PASS' ELSE 'FAIL' END
+SELECT CASE WHEN count(*)=2 THEN 'PASS' ELSE 'FAIL' END
 FROM public.vox_ab7b_native_source_actions_candidate_v1 n
 JOIN public.vox_staff_source_events_candidate_v1 e ON e.source_event_id=n.id AND e.source=n.source
 JOIN public.vox_staff_source_nonce_candidate_v1 t ON t.source_event_id=n.id AND t.nonce=n.nonce
@@ -115,13 +112,12 @@ WHERE n.actor_id=e.actor_id AND n.subject_id=e.subject_id AND n.revision=e.revis
  Denied 'cross-source actor role spoof' (EventSql 24 2 11 'CRM_AAROHI' 'prospect' 44) 'AB7B_CURRENT_STAFF_REVOKED'
  Denied 'wrong source kind and Staff role' (EventSql 25 1 11 'SUPPORT_DESK' 'prospect' 45) 'AB7B_CURRENT_STAFF_REVOKED|check constraint'
  Denied 'ungranted object' (EventSql 26 1 77 'CRM_AAROHI' 'prospect' 46) 'AB7B_SOURCE_OBJECT_GRANT_REVOKED'
- $null=Sql "UPDATE public.vox_ab7b_current_consent_candidate_v1 SET status='REVOKED' WHERE conversation_id='00000000-0000-4000-8000-000000000013';"
- Denied 'consent revoked for conversation action' (EventSql 27 3 13 'CORE_CONVERSATION' 'conversation' 47) 'AB7B_CONVERSATION_CONSENT_REQUIRED'
+ Denied 'CORE_CONVERSATION blocked at writer (no canonical consent source or role)' (EventSql 27 3 13 'CORE_CONVERSATION' 'conversation' 47) 'AB7B_CORE_CONVERSATION_BLOCKED'
  Pass 'all denied writes rolled back together' @'
 SELECT (SELECT count(*) FROM public.vox_ab7b_native_source_actions_candidate_v1)::text||':'||
  (SELECT count(*) FROM public.vox_staff_source_events_candidate_v1)::text||':'||
  (SELECT count(*) FROM public.vox_staff_source_nonce_candidate_v1)::text;
-'@ '3:3:3'
+'@ '2:2:2'
  Denied 'anon read denied' 'SET ROLE anon; SELECT * FROM public.vox_ab7b_native_source_actions_candidate_v1;' 'permission denied'
  Denied 'immutable native row' "DELETE FROM public.vox_ab7b_native_source_actions_candidate_v1 WHERE id='00000000-0000-4000-8000-000000000021';" 'VOX_F1_APPEND_ONLY'
  Pass 'forced row security' "SELECT CASE WHEN relrowsecurity AND relforcerowsecurity THEN 'PASS' ELSE 'FAIL' END FROM pg_class WHERE relname='vox_ab7b_native_source_actions_candidate_v1';" 'PASS'
@@ -144,7 +140,7 @@ SELECT (SELECT count(*) FROM public.vendor_tasks)::text||':'||
  (SELECT count(*) FROM public.vox_ab7b_native_source_actions_candidate_v1)::text||':'||
  (SELECT count(*) FROM public.vox_staff_source_events_candidate_v1)::text||':'||
  (SELECT count(*) FROM public.vox_staff_source_nonce_candidate_v1)::text;
-'@ '1:4:4:4'
+'@ '1:3:3:3'
  Denied 'same task/nonce replay rejected' $okCall 'VOX_AB7B_TASK_REPLAY'
  $spoof=$okCall.Replace('000000000002','000000000001').Replace('000000000052','000000000054').Replace('vox-desk-aaaaaaaa','vox-desk-cccccccc')
  Denied 'acquisition Staff cannot impersonate Support agent' $spoof 'VOX_AB7B_STAFF_NOT_CURRENT'
@@ -159,8 +155,8 @@ SELECT (SELECT count(*) FROM public.vendor_tasks)::text||':'||
 SELECT (SELECT count(*) FROM public.vendor_tasks)::text||':'||
  (SELECT count(*) FROM public.vox_ab7b_native_source_actions_candidate_v1)::text||':'||
  (SELECT count(*) FROM public.vox_staff_source_nonce_candidate_v1)::text;
-'@ '1:4:4'
+'@ '1:3:3'
 
  $sha=(Get-FileHash $files[-1] -Algorithm SHA256).Hash.ToLowerInvariant()
- Write-Output "VOX_AB7B_SUPPORT_ATOMIC_PG17_PASS original_support_tasks=1 source_actions=4 sha256=$sha"
+ Write-Output "VOX_AB7B_SUPPORT_ATOMIC_PG17_PASS original_support_tasks=1 source_actions=3sha256=$sha"
 }finally{if($container){docker rm -f $name *> $null}}

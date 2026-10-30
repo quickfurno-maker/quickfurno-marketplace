@@ -22,18 +22,23 @@ create table public.vox_ab7b_native_source_actions_candidate_v1 (
   (source='SUPPORT_DESK' and subject_kind='support_thread') or
   (source='CORE_CONVERSATION' and subject_kind='conversation')),
  constraint vox_ab7b_one_source_revision unique
-  (source,subject_id,revision)
+  (source,subject_id,revision),
+ -- #444: CORE_CONVERSATION is BLOCKED at the writer. No canonical per-conversation
+ -- consent row exists (consent = D2-C over communication_suppressions/preferences by
+ -- channel+destination_hash+scope) and no canonical staff_role maps to it. Remove only
+ -- via a reviewed forward migration that binds both decisions.
+ constraint vox_ab7b_core_conversation_blocked check(source<>'CORE_CONVERSATION')
 );
 create or replace function public.qf_vox_ab7b_native_source_guard_candidate_v1()
 returns trigger language plpgsql security invoker set search_path='' as $$
 declare v_current record;v_department text;v_role text;
 begin
+ if new.source not in ('CRM_AAROHI','SUPPORT_DESK') then
+  raise exception 'AB7B_CORE_CONVERSATION_BLOCKED';end if;
  v_department:=case new.source when 'CRM_AAROHI' then 'acquisition'
- when 'SUPPORT_DESK' then 'service_support'
- when 'CORE_CONVERSATION' then 'client_success' end;
+ when 'SUPPORT_DESK' then 'service_support' end;
  v_role:=case new.source when 'CRM_AAROHI' then 'acquisition_agent'
- when 'SUPPORT_DESK' then 'support_agent'
- when 'CORE_CONVERSATION' then 'client_success_agent' end;
+ when 'SUPPORT_DESK' then 'support_agent' end;
  select m.auth_user_id,t.city_id,m.staff_role into v_current
  from public.vox_staff_memberships_v1 m
  join public.vox_staff_teams_v1 t on t.id=m.team_id
@@ -54,11 +59,6 @@ begin
   and c.city_id=new.city_id and c.department=v_department
   and c.expires_at>clock_timestamp() and c.revoked_at is null)
  then raise exception 'AB7B_DEPARTMENT_CAPABILITY_REVOKED';end if;
- if new.source='CORE_CONVERSATION' and not exists(
-  select 1 from public.vox_ab7b_current_consent_candidate_v1 z
-   where z.conversation_id=new.subject_id and z.status='ALLOWED'
-   and z.current_revision>=1 and z.revoked_at is null)
- then raise exception 'AB7B_CONVERSATION_CONSENT_REQUIRED';end if;
  return new;
 end;
 $$;

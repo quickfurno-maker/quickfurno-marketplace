@@ -57,7 +57,6 @@ CREATE TABLE public.vox_staff_teams_v1(id uuid PRIMARY KEY,city_id uuid,is_activ
 CREATE TABLE public.vox_staff_memberships_v1(auth_user_id uuid PRIMARY KEY,team_id uuid,staff_role text,is_active boolean,revoked_at timestamptz,expires_at timestamptz);
 CREATE TABLE public.vox_staff_object_scopes_v1(auth_user_id uuid,scope_kind text,object_id uuid,revoked_at timestamptz,expires_at timestamptz);
 CREATE TABLE public.vox_staff_department_capabilities_v1(auth_user_id uuid,team_id uuid,city_id uuid,department text,expires_at timestamptz,revoked_at timestamptz);
-CREATE TABLE public.vox_ab7b_current_consent_candidate_v1(conversation_id uuid PRIMARY KEY,status text,current_revision integer,revoked_at timestamptz);
 INSERT INTO public.profiles VALUES
 ('00000000-0000-4000-8000-000000000001',null,true),
 ('00000000-0000-4000-8000-000000000002',null,true),
@@ -67,7 +66,7 @@ INSERT INTO public.vox_staff_teams_v1 VALUES('00000000-0000-4000-8000-0000000000
 INSERT INTO public.vox_staff_memberships_v1 VALUES
 ('00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000005','acquisition_agent',true,null,now()+interval '1 day'),
 ('00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000005','support_agent',true,null,now()+interval '1 day'),
-('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000005','client_success_agent',true,null,now()+interval '1 day');
+('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000005','operations_manager',true,null,now()+interval '1 day');
 INSERT INTO public.vox_staff_object_scopes_v1 VALUES
 ('00000000-0000-4000-8000-000000000001','prospect','00000000-0000-4000-8000-000000000011',null,now()+interval '1 day');
 INSERT INTO public.vox_staff_department_capabilities_v1 VALUES

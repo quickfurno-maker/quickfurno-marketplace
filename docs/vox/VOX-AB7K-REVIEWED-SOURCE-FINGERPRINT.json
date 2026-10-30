@@ -6,7 +6,7 @@
   "quarantinedFoundationCount": 7,
   "uninstalledCandidateCount": 23,
   "totalFiles": 30,
-  "manifestDigest": "8e85cd5549969df17c0bf3465b0cb3c8d2985e238cb79b05f712b5eaaf1bacb7",
+  "manifestDigest": "02a041d99b02ca7d638d2214cd52b142b426512ae714deb231c6f31b7d2b9388",
   "files": [
     {
       "order": 1,
@@ -172,8 +172,8 @@
       "order": 21,
       "stage": "UNINSTALLED_CANDIDATE",
       "path": "ops/vox/sql-candidates/20261018020000_vox_ab7b_nonwork_native_source_candidate.sql",
-      "sha256": "4b0334875b9b0e33d92640132049b3baf06adfe1cb10cc187396d3eaac884d47",
-      "bytes": 5466,
+      "sha256": "4bca5d5e7f89c261d4a55558de766654c467612e6ca2b4002017869da56bd209",
+      "bytes": 5584,
       "managedInstalled": false
     },
     {

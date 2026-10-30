@@ -6,6 +6,10 @@ on:
       - 'ops/vox/rc7-review-candidates/20261030040000_vox_rc11_payment_attempt_audit_review_only.sql'
       - 'scripts/mvp/vox/validate-vox-rc11-real-pg-finance-attempts.mjs'
       - 'scripts/mvp/vox/rc14-finance-provider-mode-contract.test.mjs'
+      - 'scripts/mvp/vox/rc16-razorpay-checkout-boundary.test.mjs'
+      - 'lib/payments/vendorPackageOrderGuards.mjs'
+      - 'lib/payments/vendorPackageOrderGuards.d.mts'
+      - 'services/vendorPackagePaymentService.ts'
       - '.github/workflows/vox-rc14-finance-mode-pg17-hold.yml'
 permissions:
   contents: read
@@ -42,6 +46,8 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Verify source and protected environment-mode boundary
         run: node --test scripts/mvp/vox/rc14-finance-provider-mode-contract.test.mjs
+      - name: Validate real checkout mode + claim guards (no provider calls)
+        run: node --test scripts/mvp/vox/rc16-razorpay-checkout-boundary.test.mjs
       - name: Verify genuine local PostgreSQL 17 finance attempt evidence
         shell: bash
         run: |

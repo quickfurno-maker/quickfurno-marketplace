@@ -33,6 +33,14 @@ create table public.vox_rc4_key_revocations_v1(
  constraint rc4_revocation_target check(key_id is not null or signer_id is not null)
 );
 
+-- Defensive parity with Supabase's exposed public schema: even an accidental
+-- future table grant must not expose ledger/revocations through the Data API.
+-- The disposable PG17 superuser verification has no external application roles.
+alter table public.vox_rc4_approval_ledger_v1 enable row level security;
+alter table public.vox_rc4_approval_ledger_v1 force row level security;
+alter table public.vox_rc4_key_revocations_v1 enable row level security;
+alter table public.vox_rc4_key_revocations_v1 force row level security;
+
 create function public.qf_vox_rc4_append_only_v1()
 returns trigger language plpgsql set search_path='' as $$
 begin

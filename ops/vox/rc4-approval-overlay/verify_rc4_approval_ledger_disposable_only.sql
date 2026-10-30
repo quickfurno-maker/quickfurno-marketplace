@@ -2,6 +2,8 @@
 -- Run as the database owner after 20261030020000_vox_rc4_approval_nonce_ledger_disposable.sql.
 -- NEVER executed by the author. Rolls back everything it does.
 begin;
+-- This synthetic role exists only inside the rolled-back disposable verification.
+create role qf_rc4_untrusted_verify nologin;
 do $$
 declare a text:=repeat('a',64);b text:=repeat('b',64);c text:=repeat('c',64);
  d text:=repeat('d',64);e text:=repeat('e',64);ok boolean;
@@ -46,6 +48,17 @@ begin
   raise exception 'VERIFY_REVOCATION_NOT_VISIBLE';end if;
  if public.qf_vox_rc4_is_revoked_v1('other-key-01',null) then
   raise exception 'VERIFY_REVOCATION_OVERBROAD';end if;
+ -- Both security-sensitive public tables must enforce FORCE RLS even if a
+ -- future schema default grant accidentally exposes them to authenticated.
+ if (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='public' and c.relname in ('vox_rc4_approval_ledger_v1','vox_rc4_key_revocations_v1')
+    and c.relrowsecurity and c.relforcerowsecurity) <> 2 then
+  raise exception 'VERIFY_FORCE_RLS_MISSING';end if;
+ if has_table_privilege('qf_rc4_untrusted_verify','public.vox_rc4_approval_ledger_v1','SELECT')
+  or has_table_privilege('qf_rc4_untrusted_verify','public.vox_rc4_key_revocations_v1','INSERT')
+  or has_function_privilege('qf_rc4_untrusted_verify',
+   'public.qf_vox_rc4_claim_approval_keys_v1(text[],text,timestamptz)','EXECUTE') then
+  raise exception 'VERIFY_UNTRUSTED_ROLE_PRIVILEGE';end if;
  -- no non-owner role may execute or touch the ledger
  -- (grantee 0 = PUBLIC; a NULL ACL means default privileges, i.e. PUBLIC execute)
  if exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace

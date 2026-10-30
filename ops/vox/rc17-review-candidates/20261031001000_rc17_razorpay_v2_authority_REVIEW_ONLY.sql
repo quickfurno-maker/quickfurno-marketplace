@@ -256,7 +256,7 @@ begin
      or v_payment.amount is distinct from v_order.package_price
      or v_payment.payment_method is distinct from 'razorpay'
      or v_payment.payment_status is null
-     or v_payment.payment_status not in ('Pending', 'Failed', 'Paid') then
+     or v_payment.payment_status not in ('Pending', 'Failed') then
     raise exception 'PAYMENT_BIND_DRIFT' using errcode = 'P0001';
   end if;
 
@@ -471,6 +471,13 @@ begin
   end if;
   if v_order.activation_status = 'activated' then
     return jsonb_build_object('status','ignored_activated','order_id',p_order_id);
+  end if;
+  -- Late failure notifications must never downgrade a known refunded order.
+  if v_order.payment_status = 'refunded' then
+    return jsonb_build_object('status','ignored_refunded','order_id',p_order_id);
+  end if;
+  if v_order.order_status is distinct from 'created' then
+    return jsonb_build_object('status','ignored_closed','order_id',p_order_id);
   end if;
 
   select * into v_payment from public.payments where id = p_order_id for update;

@@ -23,11 +23,11 @@ const timestamp=(column:string)=>"CASE WHEN "+column+" IS NULL THEN NULL ELSE "+
 const suppressions="SELECT id::text AS id,scope,reason,policy_version,is_active,"+
  timestamp("expires_at")+" AS expires_at,"+timestamp("deactivated_at")+
  " AS deactivated_at FROM public.communication_suppressions "+
- "WHERE destination_hash=$1 AND channel=$2 AND is_active=true AND scope=ANY($3::text[])";
+ "WHERE destination_hash=$1 AND channel=$2 AND is_active=true AND scope=ANY($3::text[]) FOR SHARE";
 const preference="SELECT id::text AS id,state,policy_version,"+
  timestamp("consented_at")+" AS consented_at,"+timestamp("withdrawn_at")+
  " AS withdrawn_at FROM public.communication_preferences "+
- "WHERE principal_type=$1 AND principal_id=$2::uuid AND channel=$3 AND scope=$4";
+ "WHERE principal_type=$1 AND principal_id=$2::uuid AND channel=$3 AND scope=$4 FOR SHARE";
 export async function executeRc8PgVendorConversationOperator(input:Input,
  acquireClient:()=>Promise<Db>,
  sourceProof?:{mode:"DISPOSABLE_RC12_AB7B_PROOF"}){
@@ -173,6 +173,10 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
   if(scope.rowCount!==1){
    await db.query("ROLLBACK");settled=true;return closed("CONVERSATION_OBJECT_GRANT_REVOKED");
   }
+  // Lock existing suppression and preference rows through the same SERIALIZABLE
+  // connection. This prevents concurrent updates from overtaking the decision;
+  // absence of a row is NOT a gap lock. All consent insertion/deactivation
+  // writers must share D2-D destination serialization before production GO.
   const consent=await authorizeConversationalWhatsAppConsent({
    destinationHash:hash,subjectType:c.subject_type as "client"|"vendor",subjectId:c.subject_id},{
    decide:decision=>decideCommunicationConsent(decision,{

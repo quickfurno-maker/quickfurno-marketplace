@@ -15,6 +15,20 @@ try{
     Start-Sleep -Milliseconds 350
   }
   if(!$ready){throw 'PG17_NOT_READY'}
+  # pg_isready can briefly succeed on the official image's temporary bootstrap
+  # postmaster, which is shut down before the final server starts. Prove final
+  # initialization completed AND a real SQL query succeeds before applying DDL.
+  # Do not retry actual SQL assertions or relax any RLS/role/append-only checks.
+  $finalReady=$false
+  for($i=0;$i -lt 60;$i++){
+    $startupLog=(docker logs $name 2>&1 | Out-String)
+    if($startupLog -match 'PostgreSQL init process complete; ready for start up\\.'){
+      $probe=(docker exec $name psql -X -A -t -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'SELECT 1' 2>&1 | Out-String).Trim()
+      if($LASTEXITCODE -eq 0 -and $probe -eq '1'){$finalReady=$true;break}
+    }
+    Start-Sleep -Milliseconds 350
+  }
+  if(!$finalReady){throw 'PG17_FINAL_POSTMASTER_NOT_READY'}
   $fixture=@'
 CREATE ROLE anon NOLOGIN;
 CREATE ROLE authenticated NOLOGIN;

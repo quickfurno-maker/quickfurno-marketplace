@@ -18,4 +18,12 @@ check("MFA requires distinct verified user identities",()=>assert.match(pre,/cou
 check("postflight requires all 39 tables force RLS",()=>{assert.match(post,/vox_tables<>39/);assert.match(post,/forced_rls<>39/);});
 check("both browser roles have no direct table privileges",()=>{for(const role of ["anon","authenticated"])for(const op of ["SELECT","INSERT","UPDATE","DELETE"])assert.ok(post.includes("has_table_privilege('"+role+"',oid,'"+op+"')"));});
 check("no fabricated approval",()=>assert.match(pre,/REQUIRES_INDEPENDENT_DBA_APPSEC_REVIEW_AND_SIGNED_OWNER_RELEASE/));
+const acl=read("ops/vox/tests/vox_managed_staging_acl_inventory_20261030.sql");
+check("ACL review is read-only and targets Staging",()=>{
+ assert.match(acl,/uckafzuochmbvtiodmcl/);
+ assert.doesNotMatch(acl,/^\s*(alter|drop|create|update|delete|insert|grant|revoke)\b/im);
+});
+check("ACL review covers both data-role tables and privileged functions",()=>{
+ for(const x of ["anon_select","anon_insert","anon_update","anon_delete","auth_select","auth_insert","auth_update","auth_delete","rolbypassrls","prosecdef","anon_execute","authenticated_execute"])assert.ok(acl.includes(x));
+});
 console.log("VOX_STAGING_GUARDS_SOURCE_PASS "+count+"/"+count);

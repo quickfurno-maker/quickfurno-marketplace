@@ -65,3 +65,31 @@ test("VOX Finance attention only filters bounded Core records, never performs re
  assert.match(ui,/Filters apply only to the bounded Core preview/);
  assert.match(ui,/This page cannot refund, capture, reconcile, grant credits or activate packages/);
 });
+
+test("claim/bind NULL values and paid prior ledger entries never gain V2 authority",()=>{
+ const sql=read("ops/vox/rc17-review-candidates/20261031001000_rc17_razorpay_v2_authority_REVIEW_ONLY.sql");
+ const claim=sql.slice(sql.indexOf("create or replace function public.qf_claim_vendor_package_razorpay_order_v2("),
+  sql.indexOf("revoke all on function public.qf_claim_vendor_package_razorpay_order_v2("));
+ const bind=sql.slice(sql.indexOf("create or replace function public.qf_bind_vendor_package_razorpay_order_v2("),
+  sql.indexOf("revoke all on function public.qf_bind_vendor_package_razorpay_order_v2("));
+ const failed=sql.slice(sql.indexOf("create or replace function public.qf_mark_vendor_package_payment_failed_v2("),
+  sql.indexOf("revoke all on function public.qf_mark_vendor_package_payment_failed_v2("));
+ for(const part of [claim,bind]){
+  assert.match(part,/v_order\.order_status is distinct from 'created'/);
+  assert.match(part,/v_order\.activation_status is distinct from 'not_activated'/);
+  assert.match(part,/v_order\.payment_status is null/);
+ }
+ assert.match(bind,/v_payment\.payment_status is null/);
+ assert.match(bind,/v_payment\.payment_status not in \('Pending', 'Failed'\)/);
+ assert.doesNotMatch(bind,/v_payment\.payment_status not in \('Pending', 'Failed', 'Paid'\)/);
+ assert.match(failed,/v_order\.payment_status = 'refunded'/);
+ assert.match(failed,/status','ignored_refunded'/);
+ assert.match(failed,/v_order\.order_status is distinct from 'created'/);
+ assert.match(failed,/status','ignored_closed'/);
+ const fixture=read("scripts/mvp/vox/validate-vox-rc17-razorpay-v2-real-pg17.mjs");
+ for(const marker of ["NULL_ORDER_STATUS_DENIED","NULL_ACTIVATION_STATUS_DENIED",
+ "NULL_PAYMENT_STATUS_DENIED","NULL_BIND_PAYMENT_STATUS_DENIED","NULL_LEDGER_STATUS_DENIED",
+ "PAID_UNACTIVATED_LEDGER_BIND_DENIED","CANCELLED_FAILURE_MUST_NOT_DOWNGRADE",
+ "REFUNDED_FAILURE_MUST_NOT_DOWNGRADE","REFUNDED_STATE_OVERWRITTEN"])
+  assert.ok(fixture.includes(marker),marker);
+});

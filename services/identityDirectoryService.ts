@@ -295,7 +295,8 @@ export async function resolveStableAdminAccess(
         reason: StableBusinessAccessDenialReason.BUSINESS_RECORD_NOT_FOUND,
       };
     }
-    if (profile.data.role !== "admin") {
+    // Mirror SQL is_admin(): role='admin' AND is_active IS TRUE (NULL/false fail closed).
+    if (profile.data.role !== "admin" || profile.data.is_active !== true) {
       return {
         ok: false,
         reason: StableBusinessAccessDenialReason.BUSINESS_ACCESS_NOT_ACTIVE,
@@ -320,7 +321,7 @@ export async function resolveStableAdminAccess(
         principalId: principal.principalId,
         profileId: String(profile.data.id),
         role: "admin",
-        isActive: profile.data.is_active !== false,
+        isActive: true,
         adminRole: String(coreRole.data.admin_role),
       }),
     };

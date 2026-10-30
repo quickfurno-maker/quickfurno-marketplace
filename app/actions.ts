@@ -78,12 +78,21 @@ async function currentUser(): Promise<CurrentUser | null> {
   const sb = await serverClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return null;
-  const { data: profile } = await sb.from("profiles").select("role").eq("id", user.id).single();
+  const { data: profile, error: profileError } = await sb
+    .from("profiles")
+    .select("role, is_active")
+    .eq("id", user.id)
+    .single();
+  // Mirror SQL is_admin(): admin requires role='admin' AND is_active IS TRUE.
+  // Read error, missing profile, false/NULL/non-boolean is_active => no role at all.
+  const rawRole = profileError ? undefined : (profile?.role ?? undefined);
+  const role =
+    rawRole === "admin" && profile?.is_active !== true ? undefined : rawRole;
   return {
     id: user.id,
     // A NEUTRAL profile (unclassified principal) carries role NULL. Normalize it
     // to undefined so no consumer ever compares against a null role.
-    role: (profile?.role ?? undefined) as "admin" | "vendor" | undefined,
+    role: role as "admin" | "vendor" | undefined,
     adminRole: (user.app_metadata?.admin_role as AdminRoleName | undefined) ?? null,
   };
 }

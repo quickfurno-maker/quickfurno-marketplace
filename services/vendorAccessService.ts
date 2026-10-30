@@ -254,12 +254,14 @@ async function requireAdminSession(): Promise<Result<string>> {
 
     const { data: profile, error: profileError } = await sb
       .from("profiles")
-      .select("role")
+      .select("role, is_active")
       .eq("id", data.user.id)
       .maybeSingle();
 
     if (profileError) return fail(appError("UNAUTHORIZED"));
-    if ((profile as { role?: string } | null)?.role !== "admin") return fail(appError("UNAUTHORIZED"));
+    // Mirror SQL is_admin(): role='admin' AND is_active IS TRUE (NULL/false fail closed).
+    const row = profile as { role?: string; is_active?: unknown } | null;
+    if (row?.role !== "admin" || row.is_active !== true) return fail(appError("UNAUTHORIZED"));
     return ok(data.user.id);
   } catch {
     return fail(appError("UNAUTHORIZED"));

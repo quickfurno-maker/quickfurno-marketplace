@@ -159,6 +159,14 @@ export async function prepareRc4SignedApproval({request,ownerAuth,teamLeaderAuth
   blockers:Object.freeze(ledgerDurable?[...RC4_BLOCKERS]:[...RC4_BLOCKERS,"NONCE_LEDGER_NOT_DURABLE"])});
 }
 
+/** Only this entry may be used by a future server-side route. The testable
+ * preparation primitive accepts an injected allow-list for isolated key tests;
+ * a request/caller must never replace the human-reviewed source pin. No keys
+ * enrolled yet: production binding is intentionally fail-closed. */
+export const prepareRc4SignedApprovalProduction=(options={})=>
+ prepareRc4SignedApproval({...options,
+  approvedRegistryFingerprints:RC4_HUMAN_APPROVED_REGISTRY_FINGERPRINTS});
+
 /** Non-durable reference ledger for tests: all-or-nothing, synchronous check+set. */
 export function createRc4InMemoryNonceLedgerForTests({failWith=null}={}){
  const seen=new Set();let claimCalls=0;

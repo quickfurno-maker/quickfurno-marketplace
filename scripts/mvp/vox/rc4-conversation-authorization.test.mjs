@@ -204,6 +204,24 @@ test("forged, cloned, mutated or expired decisions are rejected before any tx",a
   ()=>d.body.issuedAtMs+RC4_DECISION_TTL_MS);
  assert.equal(late.reason,"DECISION_EXPIRED");assert.equal(w.log.begun,0);
 });
+test("malformed transaction adapter attempts rollback before reporting invalid interface",async()=>{
+ const {p}=await decide({});
+ let rolledBack=0,claimed=0;
+ const incomplete={rollback:async()=>{rolledBack++},commit:async()=>{claimed++}};
+ const r=await commitConversationDecision(p.decision,async()=>incomplete,OPEN);
+ assert.equal(r.reason,"TX_INTERFACE_INVALID");
+ assert.equal(rolledBack,1);
+ assert.equal(claimed,0);
+ const withoutRollback=await commitConversationDecision(p.decision,async()=>({}),OPEN);
+ assert.equal(withoutRollback.reason,"TX_INTERFACE_INVALID");
+});
+test("the D2-D consent RPC already serializes on the matching destination key",()=>{
+ const sql=readFileSync(resolve(root,"supabase/migrations/20260712000300_communication_consent_command_writer_rpc.sql"),"utf8");
+ assert.match(sql,/pg_advisory_xact_lock\(hashtextextended\('dst\|'\s*\|\|\s*p_destination_hash\s*\|\|\s*'\|'\s*\|\|\s*p_channel,\s*0\)\)/);
+ // This is only a D2-D source proof. Other suppression/preference mutation
+ // writers and the future VOX SQL transaction still need end-to-end verification.
+ assert.equal(RC4_CONVERSATION_GATE.consentWritersSerialized,false);
+});
 test("failure paths roll back exactly once: insert throws, commit throws, bad tx interface",async()=>{
  let {w,p}=await decide({insertThrows:true});
  let r=await commitConversationDecision(p.decision,w.begin,OPEN);

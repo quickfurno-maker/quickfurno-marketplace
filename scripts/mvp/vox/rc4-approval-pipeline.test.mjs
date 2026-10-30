@@ -8,7 +8,7 @@ import {canonicalAb7kApprovalBytes} from "../../../contracts/vox/ab7kSignedAppro
 import {
  RC4_HUMAN_APPROVED_REGISTRY_FINGERPRINTS,RC4_OFFICIAL_EOD_ENABLED,
  createRc4InMemoryNonceLedgerForTests,mintRc4VerifiedAuthContext,
- prepareRc4SignedApproval,rc4RegistryFingerprint,rc4ScopeTargetHash
+ prepareRc4SignedApproval,prepareRc4SignedApprovalProduction,rc4RegistryFingerprint,rc4ScopeTargetHash
 } from "../../../contracts/vox/rc4ApprovalPipeline.mjs";
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
@@ -78,6 +78,16 @@ test("positive: genuine pair prepares, but never approves, authorizes or enables
  assert.ok(r.blockers.includes("NONCE_LEDGER_NOT_DURABLE"));
  assert.ok(r.blockers.includes("HUMAN_OWNER_TL_ENROLMENT_CEREMONY"));
  assert.ok(Object.isFrozen(r));
+});
+
+test("production approval entry ignores an injected or forged registry allow-list",async()=>{
+ const ledger=createRc4InMemoryNonceLedgerForTests();
+ const r=await prepareRc4SignedApprovalProduction({request:requestFor(),
+  ownerAuth,teamLeaderAuth:tlAuth,registry,
+  approvedRegistryFingerprints:APPROVED,revocations:NO_REVOCATIONS,ledger,now:NOW});
+ assertDenied(r,"KEY_ENROLMENT_NOT_HUMAN_APPROVED_DENY");
+ assert.equal(ledger.claimCalls,0);
+ assert.deepEqual(RC4_HUMAN_APPROVED_REGISTRY_FINGERPRINTS,[]);
 });
 
 test("no human-approved keys in source: default pins are EMPTY => deny, nothing claimed",async()=>{

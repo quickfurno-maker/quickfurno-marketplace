@@ -149,7 +149,12 @@ export async function commitConversationDecision(decision,beginTransaction,
  let tx;
  try{
   tx=await beginTransaction();
-  if(!tx||TX_METHODS.some(k=>typeof tx[k]!=="function"))return deny("TX_INTERFACE_INVALID");
+  if(!tx||TX_METHODS.some(k=>typeof tx[k]!=="function")){
+    // A partially constructed adapter may already hold DB locks. Never leave its
+    // transaction open if a rollback method exists; deny without nonce/source writes.
+    try{if(typeof tx?.rollback==="function")await tx.rollback();}catch{}
+    return deny("TX_INTERFACE_INVALID");
+  }
  }catch{return deny("TX_FAILED_ROLLED_BACK");}
  let settled=false;
  const rollback=async reason=>{

@@ -121,7 +121,13 @@ try{
  await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET source_count=4,reviewer_id=$2 WHERE id=$1",[SUB,OWNER]);
  r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
  eq(r.reason,"EOD_CURRENT_FOUR_SOURCE_REVIEW_REQUIRED","EOD_WRONG_TL_DENIED");
- await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET reviewer_id=$2 WHERE id=$1",[SUB,TL]);
+ await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET reviewer_id=$2,source_digest=$3 WHERE id=$1",[SUB,TL,"c".repeat(64)]);
+ r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
+ eq(r.reason,"EOD_CURRENT_FOUR_SOURCE_REVIEW_REQUIRED","EOD_DIGEST_DRIFT_DENIED");
+ await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET source_digest=$2,published=true WHERE id=$1",[SUB,DIGEST]);
+ r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
+ eq(r.reason,"EOD_CURRENT_FOUR_SOURCE_REVIEW_REQUIRED","EOD_ALREADY_PUBLISHED_DENIED");
+ await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET reviewer_id=$2,published=false WHERE id=$1",[SUB,TL]);
  eq(r.reason,"NATIVE_RELEASE_GATE_CLOSED","PRODUCTION_BLOCK");
  r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
  eq(r.ok,true,"NATIVE_REAL_PG_COMMIT");eq(r.approved,false,"NEVER_APPROVED");

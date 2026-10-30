@@ -1,0 +1,69 @@
+name: VOX RC14 Finance mode parity - local PG17 HOLD
+# Disposable local-only CI. No managed DB, credentials, provider calls or deploy.
+on:
+  pull_request:
+    paths:
+      - 'ops/vox/rc7-review-candidates/20261030040000_vox_rc11_payment_attempt_audit_review_only.sql'
+      - 'scripts/mvp/vox/validate-vox-rc11-real-pg-finance-attempts.mjs'
+      - 'scripts/mvp/vox/rc14-finance-provider-mode-contract.test.mjs'
+      - '.github/workflows/vox-rc14-finance-mode-pg17-hold.yml'
+permissions:
+  contents: read
+concurrency:
+  group: vox-rc14-finance-pg17-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  local-finance-pg17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Node 24
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Refuse managed endpoints and inspect Docker
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${SUPABASE_URL:-}"
+          test -z "${DATABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${RAZORPAY_LIVE_KEY_SECRET:-}"
+          docker version
+      - name: Pull disposable PostgreSQL 17 runner image
+        run: docker pull postgres:17-alpine
+      - name: Install pinned dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify source and protected environment-mode boundary
+        run: node --test scripts/mvp/vox/rc14-finance-provider-mode-contract.test.mjs
+      - name: Verify genuine local PostgreSQL 17 finance attempt evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="${RUNNER_TEMP}/vox-rc14-finance-pg17.log"
+          node scripts/mvp/vox/validate-vox-rc11-real-pg-finance-attempts.mjs 2>&1 | tee "$log"
+          grep -Fq 'VOX_RC11_REAL_PG17_FINANCE_ATTEMPT_AUDIT_PASS events=4 attempts=3' "$log"
+      - name: Fail on abandoned disposable database container
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          orphan="$(docker ps -aq --filter 'name=^/qf-vox-rc11-finance-pg17$')"
+          if [ -n "$orphan" ]; then
+            docker rm -f -v "$orphan"
+            echo "FAIL: leftover disposable PostgreSQL container" >&2
+            exit 1
+          fi
+      - name: Explicit release HOLD
+        if: always()
+        shell: bash
+        run: |
+          echo '### VOX Finance review-only local PostgreSQL17 - RELEASE HOLD' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No managed schema, no payment/provider calls, no refunds, no credits, no production activation.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Independent DBA/AppSec, complete provider ingestion and managed recovery remain required.' >> "$GITHUB_STEP_SUMMARY"

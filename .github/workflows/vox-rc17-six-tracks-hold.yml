@@ -4,9 +4,12 @@ on:
     paths:
       - 'ops/vox/rc17-review-candidates/**'
       - 'scripts/mvp/vox/rc17-*.test.mjs'
+      - 'scripts/mvp/vox/rc18-*.test.mjs'
       - 'scripts/mvp/vox/validate-vox-rc17-*.mjs'
       - 'services/vendorPackagePaymentService.ts'
+      - 'lib/payments/vendorPackagePaymentReceipts.*'
       - 'services/vox/rc8PgVendorConversationOperator.ts'
+      - 'services/vox/verifiedStaffBearer.ts'
       - 'scripts/mvp/vox/rc8-pg-signed-intent-writer.mjs'
       - 'apps/vox-web/app/finance/**'
       - '.github/workflows/vox-rc17-six-tracks-hold.yml'
@@ -30,7 +33,7 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Run RC17 source boundary tests (no mocked green)
-        run: node --test scripts/mvp/vox/rc17-*.test.mjs
+        run: node --test scripts/mvp/vox/rc17-*.test.mjs scripts/mvp/vox/rc18-*.test.mjs
       - name: Typecheck Core real application
         run: npm run typecheck
       - name: Preserve release HOLD

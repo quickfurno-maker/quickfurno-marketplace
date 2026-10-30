@@ -6,11 +6,24 @@ const amount=(n:number|null)=>n===null?"Not recorded":
  new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(n);
 const when=(date:string)=>new Intl.DateTimeFormat("en-IN",{
  timeZone:"Asia/Kolkata",day:"2-digit",month:"short",year:"numeric"}).format(new Date(date));
-type FinanceProps={searchParams:Promise<{state?:string|string[]}>};
+type FinanceProps={searchParams:Promise<{state?:string|string[];month?:string|string[]}>};
+const MONTH=/^20[0-9]{2}-(0[1-9]|1[0-2])$/;
+const istMonth=(iso:string)=>{
+ const parts=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Kolkata",
+  year:"numeric",month:"2-digit"}).formatToParts(new Date(iso));
+ return parts.find(p=>p.type==="year")?.value+"-"+parts.find(p=>p.type==="month")?.value;
+};
+const financeHref=(state:string,month:string|null)=>{
+ const p=new URLSearchParams();
+ if(state!=="all")p.set("state",state);
+ if(month)p.set("month",month);
+ return "/finance"+(p.size?"?"+p.toString():"");
+};
 const STATES=["all","paid","pending","failed","refunded"] as const;
 type FinanceState=(typeof STATES)[number];
 export default async function Finance({searchParams}:FinanceProps){
- const raw=(await searchParams).state;
+ const params=await searchParams;
+ const raw=params.state;
  const requested=typeof raw==="string"?raw.toLowerCase():"all";
  const selected:FinanceState=STATES.includes(requested as FinanceState)
   ?requested as FinanceState:"all";
@@ -19,8 +32,13 @@ export default async function Finance({searchParams}:FinanceProps){
   <p className="kicker">VOX / FINANCE ACCESS</p><h1>Finance preview unavailable</h1>
   <p>Verified Owner MFA, an authorized Core order read, and separately reviewed Staging feature gates are required.</p>
   <Link href="/login">Owner sign-in</Link></section></main>;
- const visible=result.orders.filter(o=>selected==="all"||
-  o.paymentStatus.toLowerCase()===selected);
+ const months=[...new Set(result.orders.map(o=>istMonth(o.createdAt)))].filter(
+  (m):m is string=>typeof m==="string"&&MONTH.test(m)).sort().reverse().slice(0,12);
+ const selectedMonth=typeof params.month==="string"&&MONTH.test(params.month)&&
+  months.includes(params.month)?params.month:null;
+ const visible=result.orders.filter(o=>(selected==="all"||
+  o.paymentStatus.toLowerCase()===selected)&&
+  (!selectedMonth||istMonth(o.createdAt)===selectedMonth));
  // These counts describe the bounded Core snapshot only. They are not a
  // reconciliation queue, settled revenue, or an authority to retry payments.
  const attention=result.orders.reduce((n,o)=>n+
@@ -42,15 +60,22 @@ export default async function Finance({searchParams}:FinanceProps){
    <div className="voxUnitTop"><div><p>NON-EXHAUSTIVE</p><h2>Recent orders</h2></div>
     <strong>{visible.length}<small> of {result.orders.length} recent records</small></strong></div>
    <nav aria-label="Filter recent payment records" style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16}}>
-    {STATES.map(state=><Link key={state} href={state==="all"?"/finance":"/finance?state="+state}
+    {STATES.map(state=><Link key={state} href={financeHref(state,selectedMonth)}
      aria-current={selected===state?"page":undefined}
      style={{padding:"7px 12px",borderRadius:8,border:"1px solid #516471",
       color:selected===state?"#9decc8":"#d0d9e0",fontWeight:selected===state?700:500}}>
      {state==="all"?"All recent":state.charAt(0).toUpperCase()+state.slice(1)}
     </Link>)}
    </nav>
+   <nav aria-label="Filter recent records by India month" style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16}}>
+    <Link href={financeHref(selected,null)} aria-current={!selectedMonth?"page":undefined}
+     style={{color:!selectedMonth?"#9decc8":"#d0d9e0"}}>All returned months</Link>
+    {months.map(month=><Link key={month} href={financeHref(selected,month)}
+     aria-current={selectedMonth===month?"page":undefined}
+     style={{color:selectedMonth===month?"#9decc8":"#d0d9e0"}}>{month}</Link>)}
+   </nav>
    {visible.length===0?<div className="voxBlank">
-    {result.orders.length===0?"No recent order records returned by Core.":"No "+selected+" records in this bounded Core preview."}
+    {result.orders.length===0?"No recent order records returned by Core.":"No matching records in this bounded Core preview."}
    </div>:
     <div className="voxRows">{visible.map(o=><div className="voxRow" key={o.orderId}>
       <div className="voxRowIcon">₹</div><div className="voxRowBody">

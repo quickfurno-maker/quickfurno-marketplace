@@ -44,6 +44,8 @@ jobs:
         run: docker pull postgres:17-alpine
       - name: Install pinned dependencies without lifecycle scripts
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Typecheck payment service against its guard declarations
+        run: npm run typecheck
       - name: Verify source and protected environment-mode boundary
         run: node --test scripts/mvp/vox/rc14-finance-provider-mode-contract.test.mjs
       - name: Validate real checkout mode + claim guards (no provider calls)

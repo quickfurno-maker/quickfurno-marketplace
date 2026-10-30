@@ -50,7 +50,8 @@ test("signed EOD current real Owner/TL identities match verified cryptographic r
  assert.match(core,/EOD_CURRENT_FOUR_SOURCE_REVIEW_REQUIRED/);
  const harness=read("scripts/mvp/vox/validate-vox-rc8-real-pg-signed-intent.mjs");
  for(const item of ["EOD_THREE_SOURCE_DENIED","EOD_WRONG_TL_DENIED",
-  "EOD_DIGEST_DRIFT_DENIED","EOD_ALREADY_PUBLISHED_DENIED"])
+  "EOD_DIGEST_DRIFT_DENIED","EOD_ALREADY_PUBLISHED_DENIED",
+  "EOD_MISSING_STAFF_ID_DENIED"])
   assert.ok(harness.includes(item),item);
  assert.match(core,/RC8_APPROVAL_WRITER_INSTALLED=false/);
 });

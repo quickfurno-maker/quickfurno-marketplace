@@ -52,8 +52,11 @@ begin
   if v_order.provider_order_request_token is not null then
     raise exception 'PROVIDER_ORDER_CREATION_UNCERTAIN' using errcode='P0001';
   end if;
-  if v_order.payment_provider not in ('not_connected','razorpay') or
-     (v_order.payment_provider='razorpay' and v_order.provider_mode is distinct from p_provider_mode) then
+  -- Only a pristine not-connected order can start a new provider claim.
+  -- SQL NOT IN returns UNKNOWN for NULL; IS DISTINCT FROM also denies NULL.
+  -- Bound/uncertain 'razorpay' orders were already handled above.
+  if v_order.payment_provider is distinct from 'not_connected' or
+     v_order.provider_mode is not null then
     raise exception 'RAZORPAY_V2_PROVIDER_OR_MODE_MISMATCH' using errcode='P0001';
   end if;
   if v_order.order_status <> 'created' or v_order.activation_status = 'activated' then

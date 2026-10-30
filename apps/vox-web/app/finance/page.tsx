@@ -21,6 +21,10 @@ export default async function Finance({searchParams}:FinanceProps){
   <Link href="/login">Owner sign-in</Link></section></main>;
  const visible=result.orders.filter(o=>selected==="all"||
   o.paymentStatus.toLowerCase()===selected);
+ // These counts describe the bounded Core snapshot only. They are not a
+ // reconciliation queue, settled revenue, or an authority to retry payments.
+ const attention=result.orders.reduce((n,o)=>n+
+  (["pending","failed"].includes(o.paymentStatus.toLowerCase())?1:0),0);
  return <main className="voxOps">
   <header className="voxTop"><div className="voxLogo">V</div>
    <div><b>VOX / FINANCE</b><small>QuickFurno · vendor package order records</small></div>
@@ -30,7 +34,10 @@ export default async function Finance({searchParams}:FinanceProps){
    <p>A bounded preview of Core package orders. Recorded payment status is not independent confirmation of settlement, refund, credit issuance or reconciliation.</p>
    <nav aria-label="VOX staff workspaces"><Link href="/operations" style={{color:"#9decc8"}}>Mission Control</Link> · <Link href="/vendor360" style={{color:"#9decc8"}}>Vendor 360</Link> · <Link href="/approvals" style={{color:"#9decc8"}}>Owner Approvals</Link></nav>
   </div>
-  <div className="voxSectionTitle"><p className="kicker">RECENT CORE RECORDS</p><h2>Order preview</h2></div>
+  <div className="voxSectionTitle"><p className="kicker">RECENT CORE RECORDS</p><h2>Order preview</h2>
+   <p>{attention===0?"No pending or failed statuses in the returned snapshot.":
+    attention+" of "+result.orders.length+" returned records have pending or failed status; reconciliation needs separate verified provider evidence."}</p>
+  </div>
   <div className="voxWorkspace"><section className="voxUnit">
    <div className="voxUnitTop"><div><p>NON-EXHAUSTIVE</p><h2>Recent orders</h2></div>
     <strong>{visible.length}<small> of {result.orders.length} recent records</small></strong></div>

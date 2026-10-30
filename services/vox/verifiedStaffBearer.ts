@@ -75,3 +75,45 @@ export async function verifyVoxOperationsStaffBearer(
    teamId:m.team_id,cityId:team.data.city_id});
  }catch{return null;}
 }
+
+/** Review-only independent Team Leader session preflight for the RC8 signing
+ * ceremony. Does not mint a signature, approve an EOD or publish a report.
+ * Signing requires separate real human keys, two independent sessions and
+ * verified PostgreSQL intent/nonce binding in the same transaction. */
+export async function verifyVoxTeamLeaderBearer(
+ authorization:string|null
+):Promise<VoxVerifiedOperationsStaff|null>{
+ const token=headerBearer(authorization);
+ if(!token)return null;
+ const user=await verifySupabaseBearerUser(token);
+ if(!user||!aal2ClaimMatches(token,user.id)||
+    user.app_metadata?.qf_principal!=="vox_staff"||
+    user.app_metadata?.vox_role!=="team_leader"||
+    user.app_metadata?.admin_role!=null)return null;
+ try{
+  const claims=JSON.parse(Buffer.from(token.split(".")[1],"base64url").toString("utf8")) as {exp?:unknown};
+  if(typeof claims.exp!=="number"||!Number.isSafeInteger(claims.exp))return null;
+  const expiresAtMs=claims.exp*1000;
+  if(!Number.isSafeInteger(expiresAtMs)||expiresAtMs<=Date.now())return null;
+  const admin=adminClient();
+  const profile=await admin.from("profiles")
+   .select("role,is_active").eq("id",user.id).maybeSingle();
+  if(profile.error||!profile.data||profile.data.role!==null||
+     profile.data.is_active!==true)return null;
+  const membership=await admin.from("vox_staff_memberships_v1")
+   .select("auth_user_id,team_id,staff_role,is_active,revoked_at,expires_at")
+   .eq("auth_user_id",user.id).eq("staff_role","team_leader").maybeSingle();
+  const m=membership.data;
+  if(membership.error||!m||m.auth_user_id!==user.id||m.is_active!==true||
+     m.revoked_at!==null||!UUID.test(m.team_id||"")||
+     typeof m.expires_at!=="string"||!Number.isFinite(Date.parse(m.expires_at))||
+     Date.parse(m.expires_at)<=Date.now())return null;
+  const team=await admin.from("vox_staff_teams_v1")
+   .select("id,city_id,is_active").eq("id",m.team_id).maybeSingle();
+  if(team.error||!team.data||team.data.id!==m.team_id||
+     team.data.is_active!==true||!UUID.test(team.data.city_id||""))return null;
+  if(expiresAtMs<=Date.now()||Date.parse(m.expires_at)<=Date.now())return null;
+  return Object.freeze({userId:user.id,aal:"aal2",expiresAtMs,
+   teamId:m.team_id,cityId:team.data.city_id});
+ }catch{return null;}
+}

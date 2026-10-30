@@ -37,8 +37,12 @@ export default async function Finance({searchParams}:FinanceProps){
  // reconciliation queue, settled revenue, or an authority to retry payments.
  const attention=result.orders.reduce((n,o)=>n+
   (["pending","failed"].includes(o.paymentStatus.toLowerCase())?1:0),0);
- const pendingCount=result.orders.filter(o=>o.paymentStatus.toLowerCase()==="pending").length;
- const failedCount=result.orders.filter(o=>o.paymentStatus.toLowerCase()==="failed").length;
+ // Count only the month the shortcut will actually display. Numbers
+ // must never imply a complete accounting/reconciliation backlog.
+ const monthScoped=result.orders.filter(o=>!selectedMonth||
+  indiaOrderMonth(o.createdAt)===selectedMonth);
+ const pendingCount=monthScoped.filter(o=>o.paymentStatus.toLowerCase()==="pending").length;
+ const failedCount=monthScoped.filter(o=>o.paymentStatus.toLowerCase()==="failed").length;
  return <main className="voxOps">
   <header className="voxTop"><div className="voxLogo">V</div>
    <div><b>VOX / FINANCE</b><small>QuickFurno · vendor package order records</small></div>
@@ -54,9 +58,9 @@ export default async function Finance({searchParams}:FinanceProps){
   </div>
   <nav aria-label="Recent payment attention shortcuts" style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:14}}>
    <Link href={financeHref("pending",selectedMonth)} style={{color:"#eec78f"}}>
-    Pending in recent records: {pendingCount}</Link>
+    Pending in {selectedMonth??"returned months"}: {pendingCount}</Link>
    <Link href={financeHref("failed",selectedMonth)} style={{color:"#eec78f"}}>
-    Failed in recent records: {failedCount}</Link>
+    Failed in {selectedMonth??"returned months"}: {failedCount}</Link>
   </nav>
   <div className="voxWorkspace"><section className="voxUnit">
    <div className="voxUnitTop"><div><p>NON-EXHAUSTIVE</p><h2>Recent orders</h2></div>

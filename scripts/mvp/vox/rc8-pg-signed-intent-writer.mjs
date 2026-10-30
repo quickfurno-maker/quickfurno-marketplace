@@ -60,7 +60,9 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
     "WHERE id=$1::uuid FOR UPDATE",
     [request.subjectId]);
    const row=report.rows[0];
-   if(report.rowCount!==1||!row||row.team_id!==request.teamId||
+   if(report.rowCount!==1||!row||!UUID.test(row.id??"")||
+      !UUID.test(row.staff_id??"")||row.id!==request.subjectId||
+      row.team_id!==request.teamId||
       row.city_id!==request.cityId||row.reviewer_id!==teamLeaderAuth?.userId||
       row.staff_id===ownerAuth?.userId||row.staff_id===teamLeaderAuth?.userId||
       Number(row.source_count)!==4||row.source_digest!==request.digest||

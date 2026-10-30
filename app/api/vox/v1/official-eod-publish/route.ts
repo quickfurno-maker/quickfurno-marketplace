@@ -5,12 +5,17 @@ export const runtime="nodejs";
 export const dynamic="force-dynamic";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HEX=/^[a-f0-9]{64}$/;
+const VERIFIED_APPROVAL_WRITER_INSTALLED=false as boolean;
 const send=(body:unknown,status:number)=>Response.json(body,{status,headers:{
  "cache-control":"private, no-store, max-age=0",
  "vary":"Authorization","x-content-type-options":"nosniff"
 }});
 export async function POST(request:Request){
- // SQL not installed; independent pinned approval has separate custody.
+ // AB7K: no verified Owner/TL attestation writer or pinned Ed25519 verifier
+ // exists, and the publish RPC trusts a caller-supplied Owner UUID. Env flags
+ // alone must never enable this route; flip only with reviewed writer + signoff.
+ if(!VERIFIED_APPROVAL_WRITER_INSTALLED)
+  return send({ok:false,error:"VERIFIED_APPROVAL_WRITER_NOT_INSTALLED"},503);
  if(process.env.VOX_AB7G_EOD_PUBLISH_ENABLED!=="staging"||
     process.env.VOX_AB7G_SIGNED_OWNER_PROOF_ENABLED!=="staging"||
     process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED!=="staging")

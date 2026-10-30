@@ -10,4 +10,8 @@ t("checks protected Owner and Staff routes",()=>{for(const x of ["overview","aos
 t("checks malformed tokens",()=>assert.match(code,/Bearer malformed\.invalid\.jwt/));
 t("does not leak body or secrets in output",()=>{assert.match(code,/doesNotMatch\(text/);assert.doesNotMatch(code,/console\.log\(.*text/);});
 t("staging pre/post drift is explicit",()=>assert.match(code,/mode==="post"\?503:404/));
+const positive=readFileSync(resolve(import.meta.dirname,"validate-vox-three-real-aal2-staging-20261030.mjs"),"utf8");
+t("real AAL2 E2E refuses missing credentials",()=>assert.match(positive,/BLOCKED_MISSING_GENUINE_AAL2_SESSION/));
+t("E2E demands genuinely distinct AAL2 principals",()=>{assert.match(positive,/payload\?\.aal!=="aal2"/);assert.match(positive,/new Set\(actor\.map\(x=>x\.sub\)\)\.size,3/);});
+t("E2E uses only GET and never emits token strings",()=>{assert.match(positive,/method:"GET"/);assert.doesNotMatch(positive,/console\.log\([^\n]*tokens/);assert.doesNotMatch(positive,/method:"POST"|method:"PUT"|method:"PATCH"|method:"DELETE"/);});
 console.log("VOX_LIVE_NEGATIVE_MATRIX_CONTRACT_PASS "+n+"/"+n);

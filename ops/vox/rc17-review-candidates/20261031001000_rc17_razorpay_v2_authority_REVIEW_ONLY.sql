@@ -41,6 +41,13 @@ begin
   where id = p_order_id for update;
   if not found then raise exception 'PACKAGE_ORDER_NOT_FOUND' using errcode = 'P0002'; end if;
 
+  if v_order.order_status is distinct from 'created' or
+     v_order.activation_status is distinct from 'not_activated' or
+     v_order.payment_status is null or
+     v_order.payment_status not in ('not_started','pending','failed') then
+    raise exception 'PACKAGE_ORDER_NOT_PAYABLE' using errcode = 'P0001';
+  end if;
+
   if v_order.provider_order_id is not null then
     if v_order.payment_provider is distinct from 'razorpay' or
        v_order.provider_mode is distinct from p_provider_mode then
@@ -59,12 +66,7 @@ begin
      v_order.provider_mode is not null then
     raise exception 'RAZORPAY_V2_PROVIDER_OR_MODE_MISMATCH' using errcode='P0001';
   end if;
-  if v_order.order_status is distinct from 'created' or
-     v_order.activation_status is distinct from 'not_activated' or
-     v_order.payment_status is null or
-     v_order.payment_status not in ('not_started','pending','failed') then
-    raise exception 'PACKAGE_ORDER_NOT_PAYABLE' using errcode = 'P0001';
-  end if;
+
   if v_order.package_id is null or v_order.package_currency is distinct from 'INR' then
     raise exception 'PACKAGE_ORDER_SNAPSHOT_INVALID' using errcode = 'P0001';
   end if;

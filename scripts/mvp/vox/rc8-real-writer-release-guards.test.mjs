@@ -28,7 +28,10 @@ test("Core vendor write remains hard-off for production; provider operations abs
  assert.match(core,/decideCommunicationConsent/);
  assert.match(core,/BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE/);
  assert.match(core,/pg_advisory_xact_lock/);
- assert.match(core,/WHERE c.id=\$1::uuid FOR UPDATE OF c/);
+ assert.match(core,/WHERE c.id=\$1::uuid/);
+ assert.match(core,/FOR UPDATE OF c/);
+ assert.match(core,/FOR SHARE OF b,ca,l,z,geo_city,reviewer,reviewer_auth,review_m,review_t/);
+ assert.match(core,/DISPOSABLE_RC12_AB7B_PROOF/);
  assert.match(core,/UPDATE public.communication_conversations/);
  assert.match(core,/INSERT INTO public.communication_conversation_events/);
  assert.doesNotMatch(core,/\.send\(|providerFetch\(|sendWhatsApp/);

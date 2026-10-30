@@ -3,6 +3,7 @@
  * Cannot create canonical AB7B CORE_CONVERSATION source row until reviewed
  * SQL CHECK/consent scope binding and actual Staff AAL2 integration are approved.
  */
+import {randomUUID} from "node:crypto";
 import {decideCommunicationConsent} from "../communicationConsentDecisionService";
 import {authorizeConversationalWhatsAppConsent} from "../outboundConsentEnforcementService";
 export const RC8_CORE_WRITER_INSTALLED=false as const;
@@ -28,7 +29,9 @@ const preference="SELECT id::text AS id,state,policy_version,"+
  " AS withdrawn_at FROM public.communication_preferences "+
  "WHERE principal_type=$1 AND principal_id=$2::uuid AND channel=$3 AND scope=$4";
 export async function executeRc8PgVendorConversationOperator(input:Input,
- acquireClient:()=>Promise<Db>){
+ acquireClient:()=>Promise<Db>,
+ sourceProof?:{mode:"DISPOSABLE_RC12_AB7B_PROOF"}){
+ const proveSource=sourceProof?.mode==="DISPOSABLE_RC12_AB7B_PROOF";
  if(!input||!UUID.test(input.conversationId??"")||!UUID.test(input.nonce??"")||
     !Number.isSafeInteger(input.expectedRevision)||input.expectedRevision<0||
     !["PAUSE_AI","TAKEOVER"].includes(input.action)||!input.verifiedStaff||
@@ -45,7 +48,7 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
   started=true;
   // Read destination first, lock it BEFORE any conversation row (D2-D order).
   const pre=await db.query(
-   "SELECT destination_hash FROM public.communication_conversations WHERE id=$1::uuid",
+   "SELECT destination_hash,subject_type FROM public.communication_conversations WHERE id=$1::uuid",
    [input.conversationId]);
   const hash=pre.rows[0]?.destination_hash;
   if(pre.rowCount!==1||typeof hash!=="string"||!/^[a-f0-9]{64}$/.test(hash)){
@@ -53,26 +56,60 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
   }
   await db.query(
    "SELECT pg_advisory_xact_lock(hashtextextended('dst|' || $1::text || '|whatsapp',0))",[hash]);
-  const conv=await db.query(
+  const baseColumns=
    "SELECT c.id,c.tenant_id,c.channel,c.destination_hash,c.subject_type,c.subject_id,"+
    "c.state,c.revision,c.assigned_actor,c.human_takeover, "+
-   "geo_city.id AS city_id, geo_city.is_active AS city_active, "+
-   "z.is_active AS zone_active,z.matching_enabled AS zone_matching_enabled "+
+   "geo_city.id AS city_id,geo_city.is_active AS city_active,"+
+   "z.is_active AS zone_active,z.matching_enabled AS zone_matching_enabled ";
+  const cityJoin="JOIN public.cities geo_city ON "+
+   "lower(btrim(geo_city.name))=lower(btrim(z.canonical_city)) ";
+  const clientBinding=pre.rows[0].subject_type==="client";
+  const subjectJoin=clientBinding?
+   "FROM public.communication_conversations c "+
+   "JOIN public.vox_rc12_client_conversation_project_bindings_candidate_v1 b "+
+   "ON b.conversation_id=c.id AND b.client_account_id=c.subject_id "+
+   "AND b.review_state='APPROVED' AND b.expires_at>clock_timestamp() "+
+   "JOIN public.client_accounts ca ON ca.id=b.client_account_id AND ca.status='active' "+
+   "AND ca.user_id=b.owner_user_id "+
+   "JOIN public.leads l ON l.id=b.lead_id AND l.service_zone_id=b.service_zone_id "+
+   "AND l.location_verification_status='verified' "+
+   "JOIN public.marketplace_service_zones z ON z.id=b.service_zone_id "+
+   "JOIN public.profiles reviewer ON reviewer.id=b.reviewed_by "+
+   "AND reviewer.is_active=true AND reviewer.role IS NULL "+
+   "JOIN auth.users reviewer_auth ON reviewer_auth.id=b.reviewed_by "+
+   "AND reviewer_auth.raw_app_meta_data->>'qf_principal'='vox_staff' "+
+   "AND reviewer_auth.raw_app_meta_data->>'vox_role'='team_leader' "+
+   "AND reviewer_auth.raw_app_meta_data->>'admin_role' IS NULL "+
+   "JOIN public.vox_staff_memberships_v1 review_m ON review_m.auth_user_id=b.reviewed_by "+
+   "AND review_m.team_id=b.team_id AND review_m.staff_role='team_leader' "+
+   "AND review_m.is_active=true AND review_m.revoked_at IS NULL "+
+   "AND review_m.expires_at>clock_timestamp() "+
+   "JOIN public.vox_staff_teams_v1 review_t ON review_t.id=b.team_id "+
+   "AND review_t.city_id=b.approved_city_id AND review_t.is_active=true ":
    "FROM public.communication_conversations c "+
    "JOIN public.vendors v ON c.subject_type='vendor' AND v.id=c.subject_id "+
-   "JOIN public.marketplace_service_zones z ON z.id=v.service_zone_id "+
-   "JOIN public.cities geo_city ON "+
-   "lower(btrim(geo_city.name))=lower(btrim(z.canonical_city)) "+
-   "WHERE c.id=$1::uuid FOR UPDATE OF c",[input.conversationId]);
+   "JOIN public.marketplace_service_zones z ON z.id=v.service_zone_id ";
+  const clientChecks=clientBinding?
+   "AND geo_city.id=b.approved_city_id "+
+   "AND lower(btrim(l.city))=lower(btrim(z.canonical_city)) "+
+   "FOR UPDATE OF c FOR SHARE OF b,ca,l,z,geo_city,reviewer,reviewer_auth,review_m,review_t":
+   "FOR UPDATE OF c";
+  const conv=await db.query(baseColumns+subjectJoin+cityJoin+
+   "WHERE c.id=$1::uuid "+clientChecks,[input.conversationId]);
   const c=conv.rows[0];
   if(conv.rowCount!==1||c.tenant_id!=="quickfurno"||c.channel!=="whatsapp"||
-     c.destination_hash!==hash||c.subject_type!=="vendor"||c.zone_active!==true||
+     c.destination_hash!==hash||
+     !(c.subject_type==="vendor"||c.subject_type==="client")||
+     c.subject_type!==pre.rows[0].subject_type||
+     c.zone_active!==true||
      c.zone_matching_enabled!==true||c.city_active!==true||
      Number(c.revision)!==input.expectedRevision||c.human_takeover!==false||
-     !["ANISHA","AAROHI","RIYA"].includes(c.assigned_actor)||
+     !(c.subject_type==="client"?
+       c.assigned_actor==="RIYA":
+       ["ANISHA","AAROHI","RIYA"].includes(c.assigned_actor))||
      (input.action==="PAUSE_AI"&&c.state!=="OPEN")||
      (input.action==="TAKEOVER"&&!["OPEN","PAUSED"].includes(c.state))){
-   await db.query("ROLLBACK");settled=true;return closed("CURRENT_VENDOR_SCOPE_OR_STATE_DENIED");
+   await db.query("ROLLBACK");settled=true;return closed("CURRENT_SUBJECT_SCOPE_OR_STATE_DENIED");
   }
   const staff=await db.query(
    "SELECT m.auth_user_id,m.team_id FROM public.vox_staff_memberships_v1 m "+
@@ -137,7 +174,7 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
    await db.query("ROLLBACK");settled=true;return closed("CONVERSATION_OBJECT_GRANT_REVOKED");
   }
   const consent=await authorizeConversationalWhatsAppConsent({
-   destinationHash:hash,subjectType:"vendor",subjectId:c.subject_id},{
+   destinationHash:hash,subjectType:c.subject_type as "client"|"vendor",subjectId:c.subject_id},{
    decide:decision=>decideCommunicationConsent(decision,{
     now:()=>new Date(),
     readSuppressions:async q=>(await db!.query(suppressions,
@@ -173,10 +210,38 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
    [input.nonce,input.conversationId,input.verifiedStaff.userId,input.action,
     input.expectedRevision,next,event.rows[0].id]);
   if(receipt.rowCount!==1||receipt.rows[0]?.nonce!==input.nonce)throw Error("NO_RECEIPT");
+  // REVIEW-ONLY native original-source proof: the existing AB7B source
+  // restriction must be replaced by separately reviewed RC12 SQL on this
+  // disposable database. Production entry never permits this branch.
+  if(proveSource){
+   if(next>2147483647)throw Error("SOURCE_REVISION_OUT_OF_RANGE");
+   const sourceId=randomUUID();
+   const kind=input.action==="TAKEOVER"?"HUMAN_TAKEOVER":"AI_PAUSED";
+   const inserted=await db.query(
+    "INSERT INTO public.vox_ab7b_native_source_actions_candidate_v1 "+
+    "(id,source,subject_kind,subject_id,actor_id,team_id,city_id,revision,event_kind,nonce) "+
+    "VALUES($1,'CORE_CONVERSATION','conversation',$2,$3,$4,$5,$6,$7,$8) RETURNING id",
+    [sourceId,input.conversationId,input.verifiedStaff.userId,
+     staff.rows[0].team_id,c.city_id,next,kind,input.nonce]);
+   if(inserted.rowCount!==1||inserted.rows[0]?.id!==sourceId)
+    throw Error("AB7B_SOURCE_NOT_PERSISTED");
+   const provenance=await db.query(
+    "SELECT s.id FROM public.vox_ab7b_native_source_actions_candidate_v1 s "+
+    "JOIN public.vox_staff_source_events_candidate_v1 e ON e.source='CORE_CONVERSATION' "+
+    "AND e.source_event_id=s.id AND e.actor_id=s.actor_id "+
+    "AND e.team_id=s.team_id AND e.city_id=s.city_id "+
+    "AND e.subject_id=s.subject_id AND e.revision=s.revision "+
+    "JOIN public.vox_staff_source_nonce_candidate_v1 n "+
+    "ON n.source='CORE_CONVERSATION' AND n.source_event_id=s.id "+
+    "AND n.nonce=s.nonce AND n.actor_id=s.actor_id "+
+    "WHERE s.id=$1::uuid AND s.nonce=$2::uuid",
+    [sourceId,input.nonce]);
+   if(provenance.rowCount!==1)throw Error("F1_OR_NONCE_ATOMIC_PROOF_MISSING");
+  }
   settled=true;
   try{await db.query("COMMIT");}catch{return closed("COMMIT_OUTCOME_UNKNOWN");}
   return Object.freeze({ok:true,state:target,revision:next,
-   committed:true,canonicalAb7bSourceReady:false,providerMessagesSent:0});
+   committed:true,canonicalAb7bSourceReady:proveSource,providerMessagesSent:0});
  }catch{
   if(started&&!settled)try{await db!.query("ROLLBACK")}catch{}
   return closed("PG_TRANSACTION_FAILED");

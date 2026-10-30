@@ -98,6 +98,8 @@ try{
  await pool.query("INSERT INTO public.vox_staff_memberships_v1 VALUES ($1,$2,'team_leader',true,NULL,clock_timestamp()+interval '30 days')",[TL,TEAM]);
  const ddl=readFileSync(resolve(root,"ops/vox/rc7-review-candidates/20261030010000_vox_rc8_signed_intent_transaction_review_only.sql"),"utf8");
  await pool.query(ddl);
+ const revocationDdl=readFileSync(resolve(root,"ops/vox/rc7-review-candidates/20261030030000_vox_rc11_signer_revocation_lock_review_only.sql"),"utf8");
+ await pool.query(revocationDdl);
  // Synthetic local registry enrolment DOES NOT authorize any real human signer.
  for(const e of registry){
   await pool.query("INSERT INTO public.vox_rc8_human_signer_registry_candidate_v1 "+
@@ -126,8 +128,22 @@ try{
  const tampered=request(11,12);tampered.ownerEnvelope.signature="bogus";
  r=await executeRc8PgPendingSignedIntent(args(tampered),TEST_ONLY_GATE);
  eq(r.ok,false,"ED25519_TAMPER_DENIED");
- await pool.query("INSERT INTO public.vox_rc8_signer_revocations_candidate_v1 VALUES($1,clock_timestamp(),$2)",
-  [owner.entry.keyId,"f".repeat(64)]);
+ // Simulate an in-flight signed-intent key SHARE lock: revocation MUST wait.
+ const held=await pool.connect(),revokeClient=await pool.connect();
+ try{
+  await held.query("BEGIN");
+  await held.query("SELECT key_id FROM public.vox_rc8_human_signer_registry_candidate_v1 WHERE key_id=$1 FOR SHARE",[owner.entry.keyId]);
+  await revokeClient.query("SET lock_timeout='250ms'");
+  let lockDenied=false;
+  try{
+   await revokeClient.query("SELECT public.qf_vox_rc11_revoke_signed_human_key_candidate_v1($1,$2)",[owner.entry.keyId,"f".repeat(64)]);
+  }catch(e){lockDenied=e?.code==="55P03";}
+  eq(lockDenied,true,"REVOKER_CANNOT_PASS_SIGNER_SHARE_LOCK");
+  await held.query("ROLLBACK");
+  const revoke=await revokeClient.query("SELECT public.qf_vox_rc11_revoke_signed_human_key_candidate_v1($1,$2) AS revoked",[owner.entry.keyId,"f".repeat(64)]);
+  eq(revoke.rows[0].revoked,true,"NATIVE_KEY_REVOCATION_COMMITTED");
+ }finally{try{await held.query("ROLLBACK")}catch{}held.release();revokeClient.release();}
+
  r=await executeRc8PgPendingSignedIntent(args(request(13,14)),TEST_ONLY_GATE);
  eq(r.ok,false,"REVOKED_KEY_DENIED");
  await pool.query("UPDATE public.vox_staff_memberships_v1 SET revoked_at=clock_timestamp() WHERE auth_user_id=$1",[TL]);

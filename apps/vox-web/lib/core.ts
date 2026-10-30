@@ -50,6 +50,60 @@ export async function fetchScopedProfileReviews(vendorId:string){
 /** Finance preview BFF: Core-only read, Owner AAL2, never a payment authority. */
 
 /** RC10 Finance: exact Owner-only order/ledger comparison, never provider reconciliation. */
+/** RC11 read-only, audit-evidence-only attempt timeline. Not settlement. */
+export async function fetchOwnerFinanceAttemptEvidence(orderId:string){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_FINANCE_READ_UI_ENABLED!=="staging"||
+    process.env.VOX_FINANCE_DETAIL_READ_UI_ENABLED!=="staging"||
+    process.env.VOX_FINANCE_ATTEMPTS_READ_UI_ENABLED!=="staging")
+  return {ok:false,error:"ATTEMPT_TIMELINE_UI_DISABLED"} as const;
+ if(!UUID.test(orderId))return {ok:false,error:"ORDER_ID_INVALID"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,error:"OWNER_MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const response=await fetch(base+"/api/vox/v1/finance/order/"+
+   encodeURIComponent(orderId)+"/attempts",{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!response.ok)return {ok:false,error:"ATTEMPT_EVIDENCE_UNAVAILABLE"} as const;
+  const raw:unknown=await response.json();
+  if(!raw||typeof raw!=="object"||Array.isArray(raw))
+   return {ok:false,error:"ATTEMPT_EVIDENCE_UNTRUSTED"} as const;
+  const x=raw as Record<string,unknown>;
+  if(x.ok!==true||x.schema!=="qf.vox.finance.attempt-evidence.v1"||
+    x.readOnly!==true||x.isCompleteHistory!==false||
+    x.isProviderSettlementVerified!==false||x.canReconcile!==false||
+    x.canRefund!==false||x.canActivateCredits!==false||
+    !Array.isArray(x.events)||x.events.length>50||x.eventCount!==x.events.length)
+   return {ok:false,error:"ATTEMPT_EVIDENCE_UNTRUSTED"} as const;
+  const allowedKinds=["REQUESTED","PROVIDER_RESPONSE_RECEIVED","PROVIDER_ERROR",
+   "TIMEOUT_UNCERTAIN","RECONCILIATION_PENDING","RECONCILIATION_OBSERVED"];
+  const allowedOrigin=["CORE_CHECKOUT","WEBHOOK_RECOVERY",
+   "SCHEDULED_RECONCILIATION","AUTHORIZED_OPERATOR"];
+  const events=[] as Array<{attemptRef:string;sequence:number;environment:string;
+   eventKind:string;origin:string;observedAt:string;recordedAt:string}>;
+  for(const row of x.events){
+   if(!row||typeof row!=="object"||Array.isArray(row))
+    return {ok:false,error:"ATTEMPT_EVIDENCE_UNTRUSTED"} as const;
+   const e=row as Record<string,unknown>;
+   if(typeof e.attemptRef!=="string"||!/^ATTEMPT-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(e.attemptRef)||
+     !Number.isSafeInteger(e.sequence)||(e.sequence as number)<1||
+     (e.sequence as number)>1000||!["TEST","LIVE"].includes(String(e.environment))||
+     !allowedKinds.includes(String(e.eventKind))||
+     !allowedOrigin.includes(String(e.origin))||
+     typeof e.observedAt!=="string"||!Number.isFinite(Date.parse(e.observedAt))||
+     typeof e.recordedAt!=="string"||!Number.isFinite(Date.parse(e.recordedAt)))
+    return {ok:false,error:"ATTEMPT_EVIDENCE_UNTRUSTED"} as const;
+   events.push({attemptRef:e.attemptRef,sequence:e.sequence as number,
+    environment:String(e.environment),eventKind:String(e.eventKind),
+    origin:String(e.origin),observedAt:e.observedAt,recordedAt:e.recordedAt});
+  }
+  return {ok:true,events,eventCount:events.length,
+   providerConfirmed:false,isCompleteHistory:false} as const;
+ }catch{return {ok:false,error:"ATTEMPT_EVIDENCE_UNAVAILABLE"} as const;}
+}
+
 export async function fetchOwnerFinanceOrderDetail(orderId:string){
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
     process.env.VOX_FINANCE_READ_UI_ENABLED!=="staging"||

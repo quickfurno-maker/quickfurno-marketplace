@@ -16,3 +16,5 @@ export function inspectRazorpayOrderClaim(
   claim: unknown,
   expected: ExpectedRazorpayClaim
 ): "claimed" | "already_bound" | "invalid";
+
+export function isDefiniteRazorpayOrderRejection(status: number): boolean;

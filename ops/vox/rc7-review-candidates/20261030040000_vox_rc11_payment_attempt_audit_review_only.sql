@@ -31,12 +31,22 @@ CREATE OR REPLACE FUNCTION public.qf_vox_rc11_payment_attempt_append_guard_candi
  RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
 DECLARE prior record; parent_order record;
 BEGIN
- SELECT id,payment_provider INTO parent_order
- FROM public.vendor_package_orders WHERE id=NEW.order_id FOR SHARE;
+ SELECT o.id,o.payment_provider,to_jsonb(o)->>'provider_mode' AS provider_mode
+ INTO parent_order FROM public.vendor_package_orders o
+ WHERE o.id=NEW.order_id FOR SHARE OF o;
  IF NOT FOUND THEN RAISE EXCEPTION 'RC11_PAYMENT_ORDER_MISSING'; END IF;
- IF NOT ((NEW.environment='TEST' AND parent_order.payment_provider='razorpay_test')
-      OR (NEW.environment='LIVE' AND parent_order.payment_provider='razorpay_live'))
+ IF NOT (
+    (NEW.environment='TEST' AND (
+      (parent_order.payment_provider='razorpay_test' AND
+       (parent_order.provider_mode IS NULL OR parent_order.provider_mode='test')) OR
+      (parent_order.payment_provider='razorpay' AND parent_order.provider_mode='test')
+    )) OR
+    (NEW.environment='LIVE' AND parent_order.payment_provider='razorpay'
+     AND parent_order.provider_mode='live')
+ )
  THEN RAISE EXCEPTION 'RC11_PAYMENT_ATTEMPT_PROVIDER_MODE_MISMATCH'; END IF;
+ -- Legacy razorpay_test is TEST only; modern razorpay must have explicit provider_mode.
+ -- NULL mode must NEVER authorize LIVE. A razorpay_live provider identity is unsupported.
  -- Never associate one attempt with multiple orders/environments/tokens.
  SELECT order_id,environment,request_token_hash,attempt_sequence,recorded_at
  INTO prior

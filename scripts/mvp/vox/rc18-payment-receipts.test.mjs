@@ -18,7 +18,7 @@ test("activation proof binds order, amount, vendor package, expiry",()=>{
  assert.equal(inspectRazorpayActivationReceipt({status:"already_applied",order_id:orderId,credits_added:0},expected),"already_applied");
 });
 test("ignored callbacks cannot be reported as failed",()=>{
- for(const status of ["ignored_paid","ignored_refunded","ignored_activated"])
+ for(const status of ["ignored_paid","ignored_refunded","ignored_activated","ignored_closed"])
   assert.equal(inspectRazorpayFailureReceipt({status,order_id:orderId},orderId),"ignored");
  assert.equal(inspectRazorpayFailureReceipt({status:"marked_failed",order_id:orderId},orderId),"marked_failed");
  for(const bad of [null,{},[],{status:"marked_failed",order_id:id(12)},

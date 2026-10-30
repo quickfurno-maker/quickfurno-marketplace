@@ -135,7 +135,7 @@ export async function prepareConversationDecision(request,deps,binding=CORE_CONV
 }
 
 const TX_METHODS=["lockConsentDestination","lockConversationForUpdate","lockStaffForUpdate",
- "readConsentFence","consumeNonce","insertSourceRow","commit","rollback"];
+ "readConsentFence","authorizeConsentUnderLock","consumeNonce","insertSourceRow","commit","rollback"];
 
 /** PHASE 2. beginTransaction() -> tx. Gate is checked BEFORE any transaction is opened. */
 export async function commitConversationDecision(decision,beginTransaction,
@@ -172,6 +172,17 @@ export async function commitConversationDecision(decision,beginTransaction,
   const f=await tx.readConsentFence(b.destinationHash,b.channel);
   if(!fenceOk(f))return await rollback("CONSENT_FENCE_INVALID");
   if(!sameFence(f,b.consentFence))return await rollback("CONSENT_CHANGED_AFTER_DECISION");
+  // RC5: the fence only proves event-order stability, not that the Core authority
+  // still permits this exact transactional destination. A trusted D2-C decision
+  // MUST be repeated under the same serialized destination lock and transaction.
+  // No client-provided decision, pre-check, or version-only shortcut is accepted.
+  const consent=await tx.authorizeConsentUnderLock({
+   destinationHash:b.destinationHash,channel:b.channel,scope:b.scope,
+   subjectType:b.subjectType,subjectId:b.subjectId,conversationId:b.conversationId});
+  if(!consent||typeof consent!=="object"||Array.isArray(consent)||
+   Object.keys(consent).sort().join("|")!=="kind|scope"||
+   consent.kind!=="allow"||consent.scope!==binding.consentScope)
+   return await rollback("CONSENT_NOT_ALLOWED");
   if(await tx.consumeNonce(b.nonce,decision.digest)!==true)return await rollback("NONCE_REPLAY");
   await tx.insertSourceRow({source:"CORE_CONVERSATION",conversationId:b.conversationId,
    revision:b.revision,actorId:b.actor.userId,teamId:b.actor.teamId,cityId:b.actor.cityId,

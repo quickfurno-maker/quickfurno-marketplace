@@ -1,0 +1,19 @@
+name: VOX Unauthenticated Staging Matrix (Manual)
+on:
+  pull_request:
+    paths:
+      - 'scripts/mvp/vox/validate-vox-live-staging-*-20261030.mjs'
+      - '.github/workflows/vox-live-staging-negative-matrix.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-harness-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - run: node scripts/mvp/vox/validate-vox-live-staging-contract-20261030.mjs

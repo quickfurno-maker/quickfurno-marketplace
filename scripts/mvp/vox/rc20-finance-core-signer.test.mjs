@@ -57,8 +57,10 @@ test("signed EOD current real Owner/TL identities match verified cryptographic r
 
 test("VOX Finance attention only filters bounded Core records, never performs refunds",()=>{
  const ui=read("apps/vox-web/app/finance/page.tsx");
- assert.match(ui,/const pendingCount=result\.orders\.filter/);
- assert.match(ui,/const failedCount=result\.orders\.filter/);
+ assert.match(ui,/const monthScoped=result\.orders\.filter/);
+ assert.match(ui,/indiaOrderMonth\(o\.createdAt\)===selectedMonth/);
+ assert.match(ui,/const pendingCount=monthScoped\.filter/);
+ assert.match(ui,/const failedCount=monthScoped\.filter/);
  assert.match(ui,/Recent payment attention shortcuts/);
  assert.match(ui,/financeHref\("pending",selectedMonth\)/);
  assert.match(ui,/financeHref\("failed",selectedMonth\)/);

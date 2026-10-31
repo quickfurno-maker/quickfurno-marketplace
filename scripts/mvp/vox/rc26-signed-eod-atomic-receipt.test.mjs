@@ -59,13 +59,13 @@ function fakeDb({revoked=[],enrolmentEffective=true,registryRows=registry}={}){
  // stallCommit: the COMMIT response is lost BEFORE the server applies it; the
  // backend keeps its transaction (and lock) until db.landStalledCommit().
  const db={claims:new Map(),intents:new Map(),revoked:new Set(revoked),log:[],
-  dropCommitResponse:false,stallCommit:false,landStalledCommit:null,locks:new Set(),releases:0};
+  dropCommitResponse:false,stallCommit:false,landStalledCommit:null,locks:new Set(),releases:0,destroyedReleases:0};
  db.connect=async()=>{
   let pc=new Map(),pi=new Map(),held=new Set();
   const claims=()=>new Map([...db.claims,...pc]),intents=()=>new Map([...db.intents,...pi]);
   const rows=r=>({rows:r,rowCount:r.length});
   const end=()=>{for(const k of held)db.locks.delete(k);held=new Set();pc=new Map();pi=new Map();};
-  return {release(){db.releases++;},async query(sql,v=[]){
+  return {release(destroy=false){db.releases++;if(destroy)db.destroyedReleases++;},async query(sql,v=[]){
    db.log.push(sql);
    if(sql.startsWith("BEGIN")){end();return rows([]);}
    if(sql==="ROLLBACK"){end();return rows([]);}
@@ -158,6 +158,7 @@ test("atomic writer returns an auditable receipt recomputable from durable rows"
  assert.notEqual(rc8SignedIntentReceiptSha256({...stored,digest:"c".repeat(64)},storedClaims),r.receiptSha256);
  assert.equal(rc8SignedIntentReceiptSha256(stored,storedClaims.slice(0,2)),null);
  assert.equal(db.releases,1);
+ assert.equal(db.destroyedReleases,0);
 });
 
 test("revoked pinned signer key denies before any nonce claim",async()=>{
@@ -191,6 +192,7 @@ test("ambiguous COMMIT reconciles to the exact durable receipt, never re-claims"
  const db=fakeDb();db.dropCommitResponse=true;
  const r=await executeRc8PgPendingSignedIntent(args(db),TEST_ONLY_GATE);
  assert.equal(r.reason,"COMMIT_OUTCOME_UNKNOWN");
+ assert.equal(db.destroyedReleases,1,"unknown COMMIT discards backend");
  assert.equal(r.committed,null);assert.equal(r.requiresReconciliation,true);
  assert.match(r.receiptSha256,/^[a-f0-9]{64}$/);
  assert.equal(rc8SignedEodPublicationAuthorizationState(r).state,

@@ -88,7 +88,7 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
     !UUID.test(request.cityId??"")||
     typeof request.digest!=="string"||!/^[a-f0-9]{64}$/.test(request.digest))
   return deny("EOD_REQUEST_SCOPE_INVALID");
- let client,started=false,settled=false;
+ let client,started=false,settled=false,destroyConnection=false;
  try{
   client=await acquireClient();
   if(!client||typeof client.query!=="function"||typeof client.release!=="function")
@@ -314,6 +314,8 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
   try{await client.query("COMMIT");}
   catch{
    // A transport error after COMMIT can hide a genuine durable receipt.
+   // Never reuse the backend whose transaction outcome is unknown.
+   destroyConnection=true;
    // Require nonce/receipt reconciliation; never imply a known rollback.
    return result({ok:false,reason:"COMMIT_OUTCOME_UNKNOWN",
     intentId,subjectId:request.subjectId,receiptSha256,
@@ -331,9 +333,12 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
     claims:Object.freeze(durable.claims.map(c=>Object.freeze({...c}))),receiptSha256}),
    committed:true,approved:false,canAuthorize:false,officialEodEnabled:false});
  }catch{
-  if(started&&!settled){try{await client.query("ROLLBACK");}catch{}}
+  if(started&&!settled){
+   try{await client.query("ROLLBACK");}
+   catch{destroyConnection=true;}
+  }
   return deny("PG_TRANSACTION_FAILED");
- }finally{try{client?.release?.()}catch{}}
+ }finally{try{client?.release?.(destroyConnection)}catch{}}
 }
 /** Read-only reconciliation of a COMMIT_OUTCOME_UNKNOWN signed EOD intent.
  * Never writes, never re-claims nonces, never approves. Outcomes:

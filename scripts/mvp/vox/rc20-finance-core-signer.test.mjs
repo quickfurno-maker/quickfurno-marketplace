@@ -10,8 +10,11 @@ test("Core does not return Razorpay checkout or activate credits for unpayable l
  assert.match(service,/if \(order\.order_status !== "created" \|\|/);
  assert.match(service,/!\["not_started", "pending", "failed"\]\.includes\(order\.payment_status \?\? ""\)/);
  assert.match(service,/PACKAGE_ORDER_NOT_PAYABLE/);
- assert.match(service,/order\.payment_status === "refunded" \|\| order\.payment_status === "refund_pending"/);
- assert.match(service,/PACKAGE_ORDER_REFUND_LOCKED/);
+ // RC32: refund lock is now the shared allowlist guard, run on the stale row and
+ // again on a fresh re-read immediately before the activation RPC.
+ assert.match(service,/activationLifecycleError\(order, payment\.id\)/);
+ assert.match(service,/activationLifecycleError\(fresh, payment\.id\)/);
+ assert.match(read("lib/payments/vendorPackageOrderGuards.mjs"),/ps === "refunded" \|\| ps === "refund_pending"[\s\S]*PACKAGE_ORDER_REFUND_LOCKED/);
  assert.match(service,/order\.provider_payment_id !== payment\.id/);
  assert.match(service,/PACKAGE_ORDER_PAYMENT_ID_DRIFT/);
  assert.match(service,/assertCapturedPayment\(payment, \{/);

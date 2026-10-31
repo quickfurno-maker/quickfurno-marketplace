@@ -28,3 +28,8 @@ export interface PersistedRazorpayCheckoutLifecycle {
 export function storedRazorpayCheckoutLifecycleError(
   order: PersistedRazorpayCheckoutLifecycle | null
 ): "PACKAGE_ORDER_NOT_PAYABLE" | null;
+
+export function activationLifecycleError(
+  order: PersistedRazorpayCheckoutLifecycle | null,
+  paymentId: string
+): "PACKAGE_ORDER_REFUND_LOCKED" | "PACKAGE_ORDER_LIFECYCLE_NOT_ACTIVATABLE" | null;

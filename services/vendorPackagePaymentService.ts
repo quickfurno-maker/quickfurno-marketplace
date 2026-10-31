@@ -4,7 +4,7 @@ import { classifyVendorPackageWebhookEvent } from "../lib/payments/vendorPackage
 import { processVendorPackageProviderEvent, resolveVendorPackageEventLedgerGate } from "../lib/payments/vendorPackageProviderEventProcessing.mjs";
 import { buildRazorpayProviderEventEnvelope } from "../lib/payments/vendorPackageProviderEventLedger.mjs";
 import { RC28_PROVIDER_LEDGER_RUNTIME_INSTALLED, createRc28VendorPackageEventRepository } from "../lib/payments/vendorPackageProviderEventRepository.mjs";
-import { inspectRazorpayOrderClaim, isDefiniteRazorpayOrderRejection, storedRazorpayCheckoutLifecycleError, storedRazorpayOrderModeError } from "../lib/payments/vendorPackageOrderGuards.mjs";
+import { activationLifecycleError, inspectRazorpayOrderClaim, isDefiniteRazorpayOrderRejection, storedRazorpayCheckoutLifecycleError, storedRazorpayOrderModeError } from "../lib/payments/vendorPackageOrderGuards.mjs";
 import { adminClient } from "../lib/supabase";
 import { AppError, fail, ok, type Result } from "../lib/errors";
 import { requireVendorAccess } from "./vendorAccessService";
@@ -368,11 +368,12 @@ async function activateCapturedPayment(
   }
   // Reconciliation cannot turn a refunded order back into a credit grant.
   // Recheck inside the SQL transaction too: this is only the first fence.
-  if (order.payment_status === "refunded" || order.payment_status === "refund_pending") {
-    throw paymentError("PACKAGE_ORDER_REFUND_LOCKED", "Payment is in a refund lifecycle. Reconcile it independently.");
-  }
   if (order.provider_payment_id && order.provider_payment_id !== payment.id) {
     throw paymentError("PACKAGE_ORDER_PAYMENT_ID_DRIFT", "A different captured payment is already bound to the order.");
+  }
+  const lifecycle = activationLifecycleError(order, payment.id);
+  if (lifecycle) {
+    throw paymentError(lifecycle, "Order lifecycle does not permit activation. Reconcile it independently.");
   }
   const amount = Number(order.provider_amount_subunits ?? inrToSubunits(order.package_price));
   assertCapturedPayment(payment, {
@@ -382,6 +383,20 @@ async function activateCapturedPayment(
     currency: RAZORPAY_CURRENCY,
   });
 
+  // The caller's row predates the provider GET (up to 10s). Re-read so a
+  // refund/cancel that landed meanwhile is refused here, not only in SQL.
+  const fresh = await loadOrder(order.id);
+  assertOrderMode(fresh, cfg);
+  if (fresh.provider_order_id !== order.provider_order_id || fresh.payment_provider !== order.payment_provider) {
+    throw paymentError("PACKAGE_ORDER_NOT_BOUND", "Package order binding changed during payment verification.");
+  }
+  if (fresh.provider_payment_id && fresh.provider_payment_id !== payment.id) {
+    throw paymentError("PACKAGE_ORDER_PAYMENT_ID_DRIFT", "A different captured payment is already bound to the order.");
+  }
+  const freshLifecycle = activationLifecycleError(fresh, payment.id);
+  if (freshLifecycle) {
+    throw paymentError(freshLifecycle, "Order lifecycle does not permit activation. Reconcile it independently.");
+  }
   const { data, error } = await adminClient().rpc("qf_activate_vendor_package_order_v2", {
     p_order_id: order.id,
     p_provider_payment_id: payment.id,

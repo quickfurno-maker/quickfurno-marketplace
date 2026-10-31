@@ -116,8 +116,22 @@ try{
  const make=(conversationId,nonce)=>({conversationId,nonce,expectedRevision:0,
   action:"TAKEOVER",verifiedStaff:{userId:A,aal:"aal2",expiresAtMs:Date.now()+600000}});
  const run=input=>execute(input,()=>pool.connect());
- let r=await run(make(C1,id(50)));
- eq(r.ok,true,"VENDOR_CORE_REAL_PG_COMMIT");eq(r.canonicalAb7bSourceReady,false,"NO_FALSE_AB7B");
+ // Simulate losing the connection acknowledgement AFTER a successful real
+ // PostgreSQL COMMIT. Reconcile persisted state instead of claiming rollback.
+ let r=await execute(make(C1,id(50)),async()=>{
+  const raw=await pool.connect();
+  return {query:async(sql,values)=>{
+   const result=await raw.query(sql,values);
+   if(sql==="COMMIT")throw Error("SYNTHETIC_POST_COMMIT_TRANSPORT_DROP");
+   return result;
+  },release:()=>raw.release()};
+ });
+ eq(r.reason,"COMMIT_OUTCOME_UNKNOWN","CORE_POST_COMMIT_UNKNOWN");
+ eq(r.committed,null,"CORE_UNKNOWN_NOT_FALSE_ROLLBACK");
+ eq(r.requiresReconciliation,true,"CORE_UNKNOWN_NEEDS_RECONCILIATION");
+ eq(r.conversationId,C1,"CORE_UNKNOWN_EXACT_CONVERSATION");
+ eq(r.nonce,id(50),"CORE_UNKNOWN_EXACT_NONCE");
+ eq(r.canonicalAb7bSourceReady,false,"NO_FALSE_AB7B");
  let rows=await pool.query("SELECT state,assigned_actor,human_takeover,jarvis_enabled,revision FROM public.communication_conversations WHERE id=$1",[C1]);
  eq(rows.rows[0].state,"HUMAN","STATE_HUMAN");eq(rows.rows[0].revision,"1","REVISION_1");
  const count=async table=>Number((await pool.query("SELECT count(*)::int AS n FROM "+table)).rows[0].n);

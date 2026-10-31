@@ -220,7 +220,15 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
    return deny("SIGNED_EOD_AAL2_STALE_DURING_TRANSACTION");
   }
   settled=true;
-  try{await client.query("COMMIT");}catch{return deny("COMMIT_OUTCOME_UNKNOWN");}
+  try{await client.query("COMMIT");}
+  catch{
+   // A transport error after COMMIT can hide a genuine durable receipt.
+   // Require nonce/receipt reconciliation; never imply a known rollback.
+   return Object.freeze({ok:false,reason:"COMMIT_OUTCOME_UNKNOWN",
+    intentId,subjectId:request.subjectId,
+    committed:null,requiresReconciliation:true,approved:false,
+    canAuthorize:false,officialEodEnabled:false});
+  }
   return Object.freeze({ok:true,intentId,state:"AWAITING_EXTERNAL_REVIEW",
    committed:true,approved:false,canAuthorize:false,officialEodEnabled:false});
  }catch{

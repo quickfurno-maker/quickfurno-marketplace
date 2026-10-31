@@ -301,7 +301,15 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
    return closed("STAFF_AAL2_EXPIRED_DURING_TRANSACTION");
   }
   settled=true;
-  try{await db.query("COMMIT");}catch{return closed("COMMIT_OUTCOME_UNKNOWN");}
+  try{await db.query("COMMIT");}
+  catch{
+   // The database may have committed before the connection failed.
+   // Never report a proven rollback or blindly replay the nonce.
+   return Object.freeze({ok:false,reason:"COMMIT_OUTCOME_UNKNOWN",
+    conversationId:input.conversationId,nonce:input.nonce,
+    committed:null,requiresReconciliation:true,providerMessagesSent:0,
+    canonicalAb7bSourceReady:false});
+  }
   return Object.freeze({ok:true,state:target,revision:next,
    committed:true,canonicalAb7bSourceReady:proveSource,providerMessagesSent:0});
  }catch{

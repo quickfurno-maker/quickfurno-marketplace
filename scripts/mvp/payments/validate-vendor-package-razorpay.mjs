@@ -110,7 +110,14 @@ check("A02 service never accepts vendor id from checkout route", !/vendorId/.tes
 check("A03 client never supplies amount to checkout API", !/amount/.test(checkoutRoute));
 check("A04 checkout signature uses stored provider order", service.includes("storedOrderId: order.provider_order_id"));
 check("A05 canonical payment is fetched server-side", service.includes("/payments/"));
-check("A06 webhook uses raw body", webhookRoute.includes("await request.text()"));
+check("A06 webhook preserves bounded raw body before signature authority",
+ webhookRoute.includes("readBoundedRazorpayWebhookBody(request)") &&
+ webhookRoute.includes("handleVendorPackageRazorpayWebhook(bounded.rawBody, signature)") &&
+ webhookRoute.indexOf("readBoundedRazorpayWebhookBody(request)") <
+ webhookRoute.indexOf("handleVendorPackageRazorpayWebhook(bounded.rawBody, signature)") &&
+ !webhookRoute.includes("await request.text()") &&
+ webhookRoute.includes("WEBHOOK_BODY_TOO_LARGE") &&
+ service.includes("verifyWebhookSignature(rawBody, signature, cfg.webhookSecret)"));
 check("A07 webhook reads Razorpay signature header", webhookRoute.includes("x-razorpay-signature"));
 check("A08 runtime is explicit disabled/test/live", service.includes('RAZORPAY_VENDOR_PACKAGE_MODE ?? "disabled"'));
 check("A09 separate live and test key secrets", service.includes("RAZORPAY_LIVE_KEY_SECRET") && service.includes("RAZORPAY_TEST_KEY_SECRET"));

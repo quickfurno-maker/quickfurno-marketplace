@@ -238,8 +238,23 @@ try{
  await pool.query("UPDATE public.vox_staff_memberships_v1 "+
   "SET expires_at=clock_timestamp()+interval '30 days' "+
   "WHERE auth_user_id=$1",[TL]);
- r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
- eq(r.ok,true,"NATIVE_REAL_PG_COMMIT");eq(r.approved,false,"NEVER_APPROVED");
+ // A durable COMMIT can succeed while its response is lost. Never report
+ // a false rollback or re-issue the same signed nonces without reconciliation.
+ const uncertain={...args(),acquireClient:async()=>{
+  const raw=await pool.connect();
+  return {query:async(sql,values)=>{
+   const result=await raw.query(sql,values);
+   if(sql==="COMMIT")throw Error("SYNTHETIC_POST_COMMIT_TRANSPORT_DROP");
+   return result;
+  },release:()=>raw.release()};
+ }};
+ r=await executeRc8PgPendingSignedIntent(uncertain,TEST_ONLY_GATE);
+ eq(r.reason,"COMMIT_OUTCOME_UNKNOWN","EOD_POST_COMMIT_UNKNOWN");
+ eq(r.committed,null,"EOD_UNKNOWN_NOT_FALSE_ROLLBACK");
+ eq(r.requiresReconciliation,true,"EOD_UNKNOWN_NEEDS_RECONCILIATION");
+ eq(r.subjectId,SUB,"EOD_UNKNOWN_EXACT_SUBJECT");
+ eq(r.intentId===null,false,"EOD_UNKNOWN_HAS_INTENT_ID");
+ eq(r.approved,false,"NEVER_APPROVED");
  const counts=async()=>({
   claims:Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_approval_claims_candidate_v1")).rows[0].n),
   intents:Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_verified_intents_candidate_v1")).rows[0].n)});

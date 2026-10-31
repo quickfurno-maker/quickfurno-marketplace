@@ -116,7 +116,10 @@ test("atomic ON: an RPC error NEVER falls back to the weak CAS",async()=>{
   const s=setup();s.rpcResult=result;
   const r=await post();
   assert.ok([409,503].includes(r.status));
-  assert.equal(s.updates.length,0);assert.equal(s.reads.includes("vendor_tasks"),false);
+  assert.equal(s.rpcs.length,1);
+  assert.equal(s.updates.length,0);
+  for(const t of ["vendor_tasks","vendors","marketplace_service_zones"])
+   assert.equal(s.reads.includes(t),false,t);
   assert.equal(s.tables.vendor_tasks[0].status,"open");
  }
 });
@@ -133,19 +136,22 @@ test("atomic ON: malformed RPC rows fail closed",async()=>{
   assert.equal(s.updates.length,0);
  }
 });
-test("atomic gate default OFF keeps the legacy CAS path and never calls the RPC",async()=>{
+test("RC38: atomic gate absent/empty fails closed 503 - no legacy CAS, no RPC, no table access",async()=>{
  for(const v of [null,""]){
   const s=setup(v);
-  assert.equal((await post()).status,201);
-  assert.equal(s.rpcs.length,0);assert.equal(s.updates.length,1);
+  const r=await post();assert.equal(r.status,503,String(v));
+  assert.equal((await r.json()).error,"VENDOR_TASKS_DISABLED");
+  assert.equal(s.rpcs.length,0);assert.equal(s.updates.length,0);
+  assert.equal(s.reads.length,0);
+  assert.equal(s.tables.vendor_tasks[0].status,"open");
  }
 });
-test("atomic gate misconfiguration fails closed (no RPC, no CAS)",async()=>{
+test("atomic gate misconfiguration fails closed (no RPC, no CAS, no table access)",async()=>{
  for(const v of ["true","1","on","required","Staging"," staging"]){
   const s=setup(v);
   const r=await post();assert.equal(r.status,503,v);
   assert.equal(s.rpcs.length,0);assert.equal(s.updates.length,0);
-  assert.equal(s.reads.includes("vendor_tasks"),false);
+  assert.equal(s.reads.length,0);
  }
 });
 test("atomic ON does not bypass the base gates, AAL or role checks",async()=>{

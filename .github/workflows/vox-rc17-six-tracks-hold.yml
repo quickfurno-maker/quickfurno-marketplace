@@ -12,7 +12,9 @@ on:
       - 'scripts/mvp/vox/rc23-*.test.mjs'
       - 'scripts/mvp/vox/rc24-*.test.mjs'
       - 'scripts/mvp/vox/rc25-*.test.mjs'
+      - 'scripts/mvp/vox/rc26-*.test.mjs'
       - 'scripts/mvp/vox/rc23-migration-adjudication.mjs'
+      - 'scripts/mvp/vox/rc26-migration-release-plan.mjs'
       - 'scripts/mvp/vox/rc22-migration-release-packet.mjs'
       - 'scripts/mvp/vox/rc18-finance-release-recovery-preflight.mjs'
       - 'scripts/mvp/vox/validate-vox-rc17-*.mjs'
@@ -21,6 +23,7 @@ on:
       - 'lib/payments/vendorPackagePaymentReceipts.*'
       - 'lib/payments/vendorPackageRefundEvidence.*'
       - 'lib/payments/vendorPackageWebhookBoundary.*'
+      - 'lib/payments/vendorPackageProviderEventLedger.*'
       - 'lib/payments/vendorPackageRefundReconciliationReview.mjs'
       - 'lib/payments/readBoundedRazorpayWebhookBody.*'
       - 'app/api/webhooks/razorpay/vendor-package/route.ts'
@@ -28,6 +31,7 @@ on:
       - 'services/vox/rc8PgVendorConversationOperator.ts'
       - 'services/vox/verifiedStaffBearer.ts'
       - 'services/vox/rc19VerifiedConversationWriter.ts'
+      - 'services/vox/rc26CoreCommitReconciliation.ts'
       - 'apps/vox-web/lib/financeMonth.*'
       - 'scripts/mvp/vox/rc8-pg-signed-intent-writer.mjs'
       - 'scripts/mvp/vox/validate-vox-rc8-real-pg-signed-intent.mjs'
@@ -53,8 +57,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Run RC17-RC25 source boundary tests (no mocked green)
-        run: node --test scripts/mvp/vox/rc17-*.test.mjs scripts/mvp/vox/rc18-*.test.mjs scripts/mvp/vox/rc19-*.test.mjs scripts/mvp/vox/rc20-*.test.mjs scripts/mvp/vox/rc21-*.test.mjs scripts/mvp/vox/rc22-*.test.mjs scripts/mvp/vox/rc23-*.test.mjs scripts/mvp/vox/rc24-*.test.mjs scripts/mvp/vox/rc25-*.test.mjs
+      - name: Run RC17-RC26 source boundary tests (no mocked green)
+        run: node --test scripts/mvp/vox/rc17-*.test.mjs scripts/mvp/vox/rc18-*.test.mjs scripts/mvp/vox/rc19-*.test.mjs scripts/mvp/vox/rc20-*.test.mjs scripts/mvp/vox/rc21-*.test.mjs scripts/mvp/vox/rc22-*.test.mjs scripts/mvp/vox/rc23-*.test.mjs scripts/mvp/vox/rc24-*.test.mjs scripts/mvp/vox/rc25-*.test.mjs scripts/mvp/vox/rc26-*.test.mjs
       - name: Enforce QF MVP 50 Razorpay raw-body financial authority gate
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: Compute source migration and recovery HOLD evidence
@@ -67,6 +71,8 @@ jobs:
           grep -Fq 'VOX_RC22_MIGRATION_HANDOFF_HOLD ' "${RUNNER_TEMP}/vox-rc22-migration-handoff.log"
           node scripts/mvp/vox/rc23-migration-adjudication.mjs | tee "${RUNNER_TEMP}/vox-rc23-history-hold.log"
           grep -Fq 'VOX_RC23_MIGRATION_HISTORY_HOLD ' "${RUNNER_TEMP}/vox-rc23-history-hold.log"
+          node scripts/mvp/vox/rc26-migration-release-plan.mjs | tee "${RUNNER_TEMP}/vox-rc26-migration-hold.log"
+          grep -Fq 'VOX_RC26_MIGRATION_RELEASE_PLAN_HOLD ' "${RUNNER_TEMP}/vox-rc26-migration-hold.log"
       - name: Typecheck Core real application
         run: npm run typecheck
       - name: Preserve release HOLD

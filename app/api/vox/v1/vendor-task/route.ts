@@ -6,6 +6,7 @@ export const runtime="nodejs";export const dynamic="force-dynamic";
 const reply=(body:unknown,status:number)=>Response.json(body,{status,headers:{
  "cache-control":"private, no-store, max-age=0","vary":"Authorization","x-content-type-options":"nosniff"}});
 const RPC="qf_vox_core_vendor_task_atomic_candidate_v1";
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 // Default OFF. Only an explicit "staging" value after the reviewed SQL is
 // installed routes writes through the atomic RPC. No silent fallback either way.
 const atomicRpcOn=()=>process.env.VOX_VENDOR_TASK_ATOMIC_RPC_ENABLED==="staging";
@@ -42,8 +43,13 @@ export async function POST(request:Request){
     p_task_type:task.task_type,p_title:task.title,p_priority:task.priority,
     p_due:task.due_at,p_idempotency_key:task.idempotency_key});
    if(rpc.error)return rpcError(String(rpc.error.message??""));
+   // Exactly one receipt row with a canonical UUID and a real boolean; any
+   // other shape is a forged/faulty result and is never echoed to the caller.
+   if(Array.isArray(rpc.data)&&rpc.data.length!==1)
+    return reply({ok:false,error:"VENDOR_TASK_UNAVAILABLE"},503);
    const row=Array.isArray(rpc.data)?rpc.data[0]:rpc.data;
-   if(!row||typeof row.task_id!=="string"||typeof row.created!=="boolean")
+   if(!row||typeof row.task_id!=="string"||!UUID.test(row.task_id)||
+      typeof row.created!=="boolean")
     return reply({ok:false,error:"VENDOR_TASK_UNAVAILABLE"},503);
    return reply({ok:true,taskId:row.task_id,created:row.created,
     authority:"quickfurno-core-vendor-crm",scope:"ASSIGNED_VENDOR_ONLY"},row.created?201:200);
@@ -79,6 +85,8 @@ export async function POST(request:Request){
     return reply({ok:false,error:"IDEMPOTENCY_CONFLICT"},409);
    throw error;
   }
+  if(typeof result?.id!=="string"||!UUID.test(result.id))
+   return reply({ok:false,error:"VENDOR_TASK_UNAVAILABLE"},503);
   const created=result.idempotent!==true;
   // 201 = this request created the row; 200 = exact replay of an earlier one.
   return reply({ok:true,taskId:result.id,created,

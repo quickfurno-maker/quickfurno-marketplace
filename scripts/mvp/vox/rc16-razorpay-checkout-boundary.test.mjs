@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { storedRazorpayOrderModeError, inspectRazorpayOrderClaim, isDefiniteRazorpayOrderRejection } from "../../../lib/payments/vendorPackageOrderGuards.mjs";
+import { storedRazorpayOrderModeError, storedRazorpayCheckoutLifecycleError, inspectRazorpayOrderClaim, isDefiniteRazorpayOrderRejection } from "../../../lib/payments/vendorPackageOrderGuards.mjs";
 
 test("historical Razorpay TEST is never accepted in LIVE", () => {
   for (const storedMode of [null, "test"]) {
@@ -60,4 +60,40 @@ test("ambiguous provider HTTP never releases an order creation claim", () => {
   assert.match(service, /init\.method\?\.toUpperCase\(\) === "POST"/);
   assert.match(service, /if \(error instanceof AppError && error\.code === "RAZORPAY_HTTP_REJECTED"\)/);
   assert.match(service, /PACKAGE_ORDER_CREATION_UNCERTAIN/);
+});
+
+test("bound checkout never revives paid, refunded, cancelled or unknown lifecycle", () => {
+  const unpaid = {
+    order_status: "created", activation_status: "not_activated",
+    payment_status: "pending", provider_payment_id: null,
+  };
+  assert.equal(storedRazorpayCheckoutLifecycleError(unpaid), null);
+  assert.equal(storedRazorpayCheckoutLifecycleError({...unpaid, payment_status: "failed"}), null);
+  for (const changed of [
+    {order_status: "cancelled"}, {order_status: "expired"},
+    {order_status: "completed"}, {order_status: null},
+    {activation_status: "activated"}, {activation_status: null},
+    {payment_status: "paid"}, {payment_status: "refunded"},
+    {payment_status: "refund_pending"}, {payment_status: null},
+    {payment_status: "not_started"}, {provider_payment_id: "pay_captured"},
+  ]) {
+    assert.equal(storedRazorpayCheckoutLifecycleError({...unpaid,...changed}),
+      "PACKAGE_ORDER_NOT_PAYABLE", JSON.stringify(changed));
+  }
+  assert.equal(storedRazorpayCheckoutLifecycleError(null), "PACKAGE_ORDER_NOT_PAYABLE");
+  assert.equal(storedRazorpayCheckoutLifecycleError([]), "PACKAGE_ORDER_NOT_PAYABLE");
+});
+test("bound checkout revalidates actual ledger through read-only claim before returning details", () => {
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+  const service = readFileSync(resolve(root, "services/vendorPackagePaymentService.ts"), "utf8");
+  const boundStart = service.indexOf("if (order.provider_order_id) {");
+  const boundEnd = service.indexOf("let providerOrder:",boundStart);
+  assert.ok(boundStart>=0&&boundEnd>boundStart);
+  const bound = service.slice(boundStart,boundEnd);
+  assert.match(bound,/qf_claim_vendor_package_razorpay_order_v2/);
+  assert.match(bound,/inspectRazorpayOrderClaim\(boundClaim, \{/);
+  assert.match(bound,/!== "already_bound"/);
+  assert.match(bound,/order = await loadOrder\(order\.id, access\.data\.vendorId\)/);
+  assert.match(service,/storedRazorpayCheckoutLifecycleError\(order\)/);
+  assert.match(service,/order\.activation_status !== "not_activated"/);
 });

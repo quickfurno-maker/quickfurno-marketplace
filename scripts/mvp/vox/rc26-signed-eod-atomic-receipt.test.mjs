@@ -96,6 +96,9 @@ function fakeDb({revoked=[],enrolmentEffective=true,registryRows=registry}={}){
      reviewerId:r.reviewer_id,sourceCount:r.source_count,sourceDigest:r.source_digest,
      state:r.state,published:r.published}]);
     return rows([r]);}
+   if(sql.includes('AS "revoked"'))
+    return rows(registryRows.filter(r=>v.includes(r.signerId)).map(r=>({keyId:r.keyId,
+     signerId:r.signerId,signerRole:r.signerRole,revoked:db.revoked.has(r.keyId)})));
    if(sql.includes("human_signer_registry_candidate_v1"))
     return rows(registryRows.map(r=>({...r,notBeforeMs:String(r.notBeforeMs),
      notAfterMs:String(r.notAfterMs),enrolmentEffective})));
@@ -241,6 +244,24 @@ test("RC32: durable receipt is not COMMITTED once the four-source report drifted
   assert.equal(x.publicationAuthorized,false);
  }
  db.report={};
+ assert.equal((await rec()).outcome,"COMMITTED");
+});
+
+test("RC34: signer key revoked after COMMIT is not COMMITTED",async()=>{
+ const db=fakeDb();
+ const r=await executeRc8PgPendingSignedIntent(args(db),TEST_ONLY_GATE);
+ assert.equal(r.ok,true,r.reason);
+ const rec=()=>reconcileRc8PgSignedIntentOutcome({acquireClient:db.connect,
+  intentId:r.intentId,subjectId:SUB,expectedReceiptSha256:r.receiptSha256});
+ assert.equal((await rec()).outcome,"COMMITTED");
+ for(const key of [owner.entry.keyId,leader.entry.keyId]){
+  db.revoked.add(key);
+  const x=await rec();
+  assert.equal(x.outcome,"INCONSISTENT",key);
+  assert.equal(x.requiresIndependentReview,true);
+  assert.equal(x.publicationAuthorized,false);
+  db.revoked.delete(key);
+ }
  assert.equal((await rec()).outcome,"COMMITTED");
 });
 

@@ -381,7 +381,7 @@ export async function reconcileRc8PgSignedIntentOutcome({acquireClient,intentId,
   // The pending receipt is only meaningful while the CURRENT four-source report
   // still carries the exact digest/scope the two humans signed. Read it inside
   // the same read-only transaction (writer already finished, so it is stable).
-  let reportCurrent=false;
+  let reportCurrent=false,signerKeysCurrent=false;
   if(durable.intents.length===1){
    const rep=await client.query(
     "SELECT team_id::text AS \"teamId\",city_id::text AS \"cityId\","+
@@ -398,6 +398,24 @@ export async function reconcileRc8PgSignedIntentOutcome({acquireClient,intentId,
     r.staffId!==i.ownerId&&r.staffId!==i.teamLeaderId&&
     r.sourceDigest===i.digest&&
     r.state==="TL_ACKNOWLEDGED_AWAITING_OWNER_RELEASE"&&r.published===false;
+   // RC34: key revocation after COMMIT must invalidate the pending receipt. The
+   // writer only proves the keys were unrevoked at commit time; the receipt does
+   // not store key ids, so resolve the signers' enrolled keys by signer identity.
+   // Exactly one enrolled OWNER key and one TEAM_LEADER key, none revoked.
+   if(reportCurrent){
+    const keys=await client.query(
+     "SELECT r.key_id AS \"keyId\",r.signer_id::text AS \"signerId\","+
+     "r.signer_role AS \"signerRole\",(v.key_id IS NOT NULL) AS \"revoked\" "+
+     "FROM "+P+"human_signer_registry_candidate_v1 r "+
+     "LEFT JOIN "+P+"signer_revocations_candidate_v1 v ON v.key_id=r.key_id "+
+     "WHERE r.signer_id IN ($1::uuid,$2::uuid) AND r.human_enrolled=true",
+     [i.ownerId,i.teamLeaderId]);
+    const k=keys.rows??[];
+    const ownerKeys=k.filter(x=>x.signerId===i.ownerId&&x.signerRole==="OWNER");
+    const tlKeys=k.filter(x=>x.signerId===i.teamLeaderId&&x.signerRole==="TEAM_LEADER");
+    signerKeysCurrent=k.length===2&&ownerKeys.length===1&&tlKeys.length===1&&
+     k.every(x=>x.revoked===false);
+   }
   }
   await client.query("ROLLBACK");started=false;
   const otherIntent=(forSubject.rows??[]).some(r=>r.id!==intentId);
@@ -406,7 +424,7 @@ export async function reconcileRc8PgSignedIntentOutcome({acquireClient,intentId,
     subjectClaimedByOtherIntent:otherIntent,retryRequiresFreshSignedPair:true});
   const digest=durable.intents.length===1?
    rc8SignedIntentReceiptSha256(durable.intents[0],durable.claims):null;
-  if(digest&&digest===expectedReceiptSha256&&!otherIntent&&reportCurrent&&
+  if(digest&&digest===expectedReceiptSha256&&!otherIntent&&reportCurrent&&signerKeysCurrent&&
      durable.intents[0].subjectId===subjectId)
    return result({...base,ok:true,outcome:"COMMITTED",intentId,subjectId,
     receiptSha256:digest,state:"AWAITING_EXTERNAL_REVIEW",

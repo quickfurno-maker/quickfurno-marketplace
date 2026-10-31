@@ -255,6 +255,7 @@ try{
  eq(r.subjectId,SUB,"EOD_UNKNOWN_EXACT_SUBJECT");
  eq(r.intentId===null,false,"EOD_UNKNOWN_HAS_INTENT_ID");
  eq(r.approved,false,"NEVER_APPROVED");
+ const committedReceipt={intentId:r.intentId,receiptSha256:r.receiptSha256};
  const counts=async()=>({
   claims:Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_approval_claims_candidate_v1")).rows[0].n),
   intents:Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_verified_intents_candidate_v1")).rows[0].n)});
@@ -338,6 +339,13 @@ try{
   await held.query("ROLLBACK");
   const revoke=await revokeClient.query("SELECT public.qf_vox_rc11_revoke_signed_human_key_candidate_v1($1,$2) AS revoked",[owner.entry.keyId,"f".repeat(64)]);
   eq(revoke.rows[0].revoked,true,"NATIVE_KEY_REVOCATION_COMMITTED");
+  // RC34: the durable receipt written before this revocation must stop
+  // reconciling as COMMITTED once either pinned signer key is revoked.
+  const postRevoke=await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
+   intentId:committedReceipt.intentId,subjectId:SUB,
+   expectedReceiptSha256:committedReceipt.receiptSha256});
+  eq(postRevoke.outcome,"INCONSISTENT","RC34_REVOKED_SIGNER_KEY_NOT_COMMITTED");
+  eq(postRevoke.publicationAuthorized,false,"RC34_REVOKED_NOT_PUBLICATION");
  }finally{try{await held.query("ROLLBACK")}catch{}held.release();revokeClient.release();}
 
  r=await executeRc8PgPendingSignedIntent(args(request(13,14)),TEST_ONLY_GATE);

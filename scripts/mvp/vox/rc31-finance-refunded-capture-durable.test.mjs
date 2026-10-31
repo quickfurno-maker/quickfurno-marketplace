@@ -8,7 +8,18 @@ import {processVendorPackageProviderEvent as processEvent,providerEventHttpStatu
  from "../../../lib/payments/vendorPackageProviderEventProcessing.mjs";
 import {createRc28VendorPackageEventRepository as makeRepo,RC28_PROVIDER_LEDGER_RUNTIME_INSTALLED}
  from "../../../lib/payments/vendorPackageProviderEventRepository.mjs";
-import {assertCapturedPayment} from "../../../lib/payments/vendorPackageRazorpay.ts";
+import {build} from "esbuild";
+import {mkdirSync} from "node:fs";
+import {resolve,dirname} from "node:path";
+import {fileURLToPath,pathToFileURL} from "node:url";
+// Node 20 CI has no native .ts loader. Exercise the real payment authority
+// through an esbuild-compiled source module on both Node 20 and Node 24.
+const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
+const compiled=resolve(root,"test-results/rc31-finance-payment-authority.mjs");
+mkdirSync(resolve(root,"test-results"),{recursive:true});
+await build({entryPoints:[resolve(root,"lib/payments/vendorPackageRazorpay.ts")],
+ bundle:true,platform:"node",target:"node20",format:"esm",outfile:compiled,logLevel:"silent"});
+const {assertCapturedPayment}=await import(pathToFileURL(compiled).href);
 
 const realFetch=globalThis.fetch;let fetchCalls=0;
 test.before(()=>{globalThis.fetch=async()=>{fetchCalls++;throw Error("PROVIDER_CALL_FORBIDDEN")}});

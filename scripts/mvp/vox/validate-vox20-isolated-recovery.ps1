@@ -91,6 +91,11 @@ select json_build_object(
  'vox_rls',(select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
    where n.nspname='public' and c.relkind='r' and c.relname like 'vox_%'
    and c.relrowsecurity and c.relforcerowsecurity),
+ 'vox_policies',(select count(*) from pg_policies
+   where schemaname='public' and tablename like 'vox_%'),
+ 'vox_functions',(select count(*) from pg_proc p
+   join pg_namespace n on n.oid=p.pronamespace
+   where n.nspname='public' and p.proname like 'qf_vox_%'),
  'profiles',(select count(*) from public.profiles),
  'cities',(select count(*) from public.cities),
  'anon_denied',not has_table_privilege('anon','public.vox_staff_memberships_v1','SELECT'),
@@ -105,7 +110,12 @@ select json_build_object(
  if($LASTEXITCODE -ne 0){throw 'RESTORED_PARITY_QUERY_FAILED'}
  $a=$left|ConvertFrom-Json
  $b=$right|ConvertFrom-Json
+ Write-Output ('VOX_RESTORE_PROOF_COUNTS tables='+$a.vox_tables+' rls='+$a.vox_rls+
+  ' policies='+$a.vox_policies+' functions='+$a.vox_functions)
+ # Quarantined tables deliberately have zero policies: FORCE RLS defaults deny.
+ # A newly introduced policy requires a fresh independent security review.
  if($a.vox_tables -lt 8 -or $a.vox_rls -ne $a.vox_tables -or
+  $a.vox_policies -ne 0 -or $a.vox_functions -lt 1 -or
   $a.profiles -ne 2 -or $a.cities -ne 2 -or
   $a.anon_denied -ne $true -or $a.authenticated_denied -ne $true -or $a.rpc_denied -ne $true){
   throw 'SOURCE_VOX_SCHEMA_SECURITY_BASELINE_FAILED'
@@ -121,7 +131,8 @@ select json_build_object(
   throw 'RESTORED_ANON_ROLE_NOT_DENIED'
  }
  Write-Output ('VOX20_ISOLATED_PG17_SEVEN_MIGRATION_RESTORE_PASS migrations=7 vox_tables='+$a.vox_tables+
- ' rls_tables='+$a.vox_rls+' profiles=2 cities=2 sha256_verified=true privileges_preserved=true '+
+ ' rls_tables='+$a.vox_rls+' policies='+$a.vox_policies+
+ ' functions='+$a.vox_functions+' profiles=2 cities=2 sha256_verified=true privileges_preserved=true '+
  'restored_anon_denied=true live_staging_backup=false live_staging_modified=false')
 }finally{
  foreach($name in $containers){docker rm -f $name *> $null}

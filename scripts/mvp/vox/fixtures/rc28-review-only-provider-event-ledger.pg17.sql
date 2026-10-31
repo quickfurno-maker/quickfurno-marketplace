@@ -1,4 +1,4 @@
--- RC28 REVIEW-ONLY, NON-DEPLOYABLE SQL candidate.
+-- RC28 REVIEW-ONLY, NON-DEPLOYABLE disposable PostgreSQL fixture.
 -- Not a Supabase migration. The protected application continues ledger HARD-OFF.
 -- Apply exclusively to disposable PG17 for proof; DBA/AppSec must review grants,
 -- exact Razorpay event-id provenance, refund and consumed-credit policy.

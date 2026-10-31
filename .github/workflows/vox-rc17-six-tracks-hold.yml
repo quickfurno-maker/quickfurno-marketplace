@@ -14,6 +14,7 @@ on:
       - 'scripts/mvp/vox/rc25-*.test.mjs'
       - 'scripts/mvp/vox/rc26-*.test.mjs'
       - 'scripts/mvp/vox/rc27-*.test.mjs'
+      - 'scripts/mvp/vox/rc28-*.test.mjs'
       - 'scripts/mvp/vox/rc23-migration-adjudication.mjs'
       - 'scripts/mvp/vox/rc26-migration-release-plan.mjs'
       - 'scripts/mvp/vox/rc27-migration-handoff-validation.mjs'
@@ -26,6 +27,8 @@ on:
       - 'lib/payments/vendorPackageRefundEvidence.*'
       - 'lib/payments/vendorPackageWebhookBoundary.*'
       - 'lib/payments/vendorPackageProviderEventLedger.*'
+      - 'lib/payments/vendorPackageProviderEventRepository.*'
+      - 'scripts/mvp/vox/fixtures/rc28-review-only-provider-event-ledger.pg17.sql'
       - 'lib/payments/vendorPackageRefundReconciliationReview.mjs'
       - 'lib/payments/readBoundedRazorpayWebhookBody.*'
       - 'app/api/webhooks/razorpay/vendor-package/route.ts'
@@ -34,6 +37,8 @@ on:
       - 'services/vox/verifiedStaffBearer.ts'
       - 'services/vox/rc19VerifiedConversationWriter.ts'
       - 'services/vox/rc26CoreCommitReconciliation.ts'
+      - 'services/vox/rc28VerifiedCoreOutcomeReconciliation.ts'
+      - 'services/vox/rc28PendingSignedEodReview.ts'
       - 'apps/vox-web/lib/financeMonth.*'
       - 'scripts/mvp/vox/rc8-pg-signed-intent-writer.mjs'
       - 'scripts/mvp/vox/validate-vox-rc8-real-pg-signed-intent.mjs'
@@ -59,8 +64,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Run RC17-RC26 source boundary tests (no mocked green)
-        run: node --test scripts/mvp/vox/rc17-*.test.mjs scripts/mvp/vox/rc18-*.test.mjs scripts/mvp/vox/rc19-*.test.mjs scripts/mvp/vox/rc20-*.test.mjs scripts/mvp/vox/rc21-*.test.mjs scripts/mvp/vox/rc22-*.test.mjs scripts/mvp/vox/rc23-*.test.mjs scripts/mvp/vox/rc24-*.test.mjs scripts/mvp/vox/rc25-*.test.mjs scripts/mvp/vox/rc26-*.test.mjs scripts/mvp/vox/rc27-*.test.mjs
+      - name: Run RC17-RC28 source boundary tests (no mocked green)
+        run: node --test scripts/mvp/vox/rc17-*.test.mjs scripts/mvp/vox/rc18-*.test.mjs scripts/mvp/vox/rc19-*.test.mjs scripts/mvp/vox/rc20-*.test.mjs scripts/mvp/vox/rc21-*.test.mjs scripts/mvp/vox/rc22-*.test.mjs scripts/mvp/vox/rc23-*.test.mjs scripts/mvp/vox/rc24-*.test.mjs scripts/mvp/vox/rc25-*.test.mjs scripts/mvp/vox/rc26-*.test.mjs scripts/mvp/vox/rc27-*.test.mjs scripts/mvp/vox/rc28-*.test.mjs
       - name: Enforce QF MVP 50 Razorpay raw-body financial authority gate
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: Compute source migration and recovery HOLD evidence
@@ -127,6 +132,12 @@ jobs:
         run: |
           set -euo pipefail
           node --test scripts/mvp/vox/rc27-e-concurrency-pg17.mjs
+      - name: Verify RC28 persistent provider event ledger and repository against isolated PG17
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/mvp/vox/validate-vox-rc28-provider-event-ledger-pg17.mjs | tee "${RUNNER_TEMP}/rc28-event-ledger.log"
+          grep -Fq 'VOX_RC28_REAL_PG17_EVENT_LEDGER_PASS ' "${RUNNER_TEMP}/rc28-event-ledger.log"
       - name: No abandoned database
         if: always()
         shell: bash
@@ -142,6 +153,17 @@ jobs:
           if [ -n "$legacy" ]; then
             docker rm -f -v "$legacy"
             echo 'FAIL: left disposable V1 parser container behind' >&2
+            exit 1
+          fi
+      - name: Refuse abandoned RC28 finance disposable container
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          leftover="$(docker ps -aq --filter 'name=^/qf-vox-rc28-event-ledger-')"
+          if [ -n "$leftover" ]; then
+            docker rm -f -v $leftover
+            echo 'FAIL: leftover RC28 disposable PG17 ledger container' >&2
             exit 1
           fi
       - name: Explicit managed release HOLD

@@ -9,7 +9,7 @@ import {buildRazorpayProviderEventEnvelope} from "../../../lib/payments/vendorPa
 import {createRc28VendorPackageEventRepository} from "../../../lib/payments/vendorPackageProviderEventRepository.mjs";
 import {processVendorPackageProviderEvent} from "../../../lib/payments/vendorPackageProviderEventProcessing.mjs";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
-const file=resolve(root,"ops/vox/sql-candidates/20261031020000_vendor_package_provider_event_ledger_v2_candidate.sql");
+const file=resolve(root,"scripts/mvp/vox/fixtures/rc28-review-only-provider-event-ledger.pg17.sql");
 const sql=readFileSync(file,"utf8");
 for(const k of ["DATABASE_URL","SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY","RAZORPAY_LIVE_KEY_SECRET"])
  if(process.env[k])throw Error("RC28_MANAGED_CREDENTIAL_DENIED_"+k);

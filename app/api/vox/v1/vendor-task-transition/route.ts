@@ -33,7 +33,8 @@ export async function POST(request:Request){
   // Any other non-empty value is a misconfiguration and fails closed.
   const atomic=process.env.VOX_VENDOR_TASK_ATOMIC_RPC_ENABLED;
   if(atomic!==undefined&&atomic!==""){
-   if(atomic!=="staging")return reply({ok:false,error:"VENDOR_TASKS_DISABLED"},503);
+   if(process.env.VOX_VENDOR_TASK_ATOMIC_RPC_ENABLED!=="staging")
+    return reply({ok:false,error:"VENDOR_TASKS_DISABLED"},503);
    const rpc=await db.rpc(ATOMIC_RPC,{p_actor:scope.userId,p_team:scope.teamId,
     p_city:scope.cityId,p_role:scope.role,p_task:cmd.taskId,p_action:cmd.action,
     p_result:cmd.result});

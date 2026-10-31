@@ -3,7 +3,7 @@ $ErrorActionPreference='Stop'
 # Candidate SQL only; nothing here touches a managed database.
 $name='qf-vox-rc32-core-task-pg17'
 $root=(Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
-$file=Join-Path $root 'ops\vox\sql-candidates\20261031010000_vox_rc32_core_vendor_task_atomic_candidate.sql'
+$file=Join-Path $root 'ops\vox\rc32-review-candidates\20261031010000_vox_rc32_core_vendor_task_atomic_candidate.sql'
 if(docker ps -aq --filter "name=^/$name$"){throw 'RC32_CONTAINER_CONFLICT'}
 $container=$null
 function Sql([string]$sql){

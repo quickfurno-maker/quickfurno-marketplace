@@ -62,7 +62,7 @@ test("task-state filter failure does not return an empty directory as success",a
 });
 
 // Static contract of the uninstalled atomic writer (executed proof: the PG17 .ps1).
-const sql=readFileSync(resolve(root,"ops/vox/sql-candidates/20261031010000_vox_rc32_core_vendor_task_atomic_candidate.sql"),"utf8");
+const sql=readFileSync(resolve(root,"ops/vox/rc32-review-candidates/20261031010000_vox_rc32_core_vendor_task_atomic_candidate.sql"),"utf8");
 test("atomic writer SQL locks authority rows and gates replay",()=>{
  assert.match(sql,/security invoker set search_path=''/);
  for(const t of ["vox_staff_memberships_v1","vox_staff_teams_v1","vox_staff_object_scopes_v1","marketplace_service_zones"])

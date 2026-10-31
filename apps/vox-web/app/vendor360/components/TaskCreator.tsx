@@ -1,5 +1,7 @@
 "use client";
+import Link from "next/link";
 import {useRef,useState} from "react";
+import {withReturn} from "../../../lib/returnTo.mjs";
 export function TaskCreator({vendors}:{vendors:readonly {vendorId:string;businessName:string}[]}){
  const [vendorId,setVendorId]=useState(vendors[0]?.vendorId??"");
  const [title,setTitle]=useState("");
@@ -10,10 +12,11 @@ export function TaskCreator({vendors}:{vendors:readonly {vendorId:string;busines
  const busyRef=useRef(false);
  const [busy,setBusy]=useState(false);
  const [feedback,setFeedback]=useState("");
+ const [expired,setExpired]=useState(false);
  async function submit(){
   if(busyRef.current)return;
   busyRef.current=true;
-  setBusy(true);setFeedback("");
+  setBusy(true);setFeedback("");setExpired(false);
   try{
    // Preserve one idempotency nonce for an unchanged form after an ambiguous
    // network outcome. A new nonce is issued only when the draft changes or
@@ -25,6 +28,10 @@ export function TaskCreator({vendors}:{vendors:readonly {vendorId:string;busines
     body:JSON.stringify({vendorId,nonce:requestNonce,taskType,title,priority,
      dueAt:new Date(dueAt).toISOString()})});
    const body=await r.json();
+   if(r.status===401){
+    setExpired(true);
+    setFeedback("Your Staff session expired. Sign in again; no task was created.");return;
+   }
    if(r.status===409){
     // The request ID was already used for different details; it can never
     // succeed, so issue a fresh one for the next attempt.
@@ -59,5 +66,6 @@ export function TaskCreator({vendors}:{vendors:readonly {vendorId:string;busines
    <button type="button" disabled={busy||title.trim().length<8||!vendorId||!dueAt} onClick={submit}>
     {busy?"Submitting…":"Create internal task"}</button>
    <p role="status">{feedback}</p>
+   {expired?<Link href={withReturn("/login","/vendor360")}>Staff sign-in</Link>:null}
   </div><footer>Only internal, scoped Vendor CRM tasks · No wallet, KYC or WhatsApp actions</footer></section>;
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {fetchOwnerFinanceOrderDetail,fetchOwnerFinanceAttemptEvidence} from "../../../lib/core";
+import {withReturn} from "../../../lib/returnTo.mjs";
 import "../../operations/operations.css";
 export const dynamic="force-dynamic";
 const currency=(n:number|null)=>n===null?"Not recorded":
@@ -18,7 +19,7 @@ export default async function FinanceOrder({
   <p>{needsLogin
    ?"Sign in with verified Owner MFA to view this read-only order record. No financial action has been performed."
    :"Owner MFA, exact Core order ID and separately approved read-only Staging feature gates are required. No financial action has been performed."}</p>
-  {needsLogin&&<><Link href="/login">Owner sign-in</Link>{" · "}</>}
+  {needsLogin&&<><Link href={withReturn("/login","/finance/"+orderId)}>Owner sign-in</Link>{" · "}</>}
   <Link href="/finance">Return to Finance</Link></section></main>;
  }
  const {order,ledger}=response;

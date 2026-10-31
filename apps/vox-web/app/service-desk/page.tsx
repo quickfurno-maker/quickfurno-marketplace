@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {fetchScopedServiceDesk} from "../../lib/core";
+import {withReturn} from "../../lib/returnTo.mjs";
 import {ScopedQueue} from "../components/ScopedQueue";
 import {StaffProposalForm} from "../components/StaffProposalForm";
 import {SupportFollowup} from "./components/SupportFollowup";
@@ -10,7 +11,9 @@ export default async function ServiceDesk(){
  const r=await fetchScopedServiceDesk();
  if(!r.ok)return <main className="hold"><section className="holdCard">
  <p className="kicker">VOX / HUMAN DESK</p><h1>Service Desk unavailable</h1>
- <p>AAL2 staff sign-in, an assigned Core vendor/case, and a current conversation grant are required.</p><Link href="/login">Staff sign-in</Link></section></main>;
+ <p>AAL2 staff sign-in, an assigned Core vendor/case, and a current conversation grant are required.</p>
+ {r.status===401?<Link href={withReturn("/login","/service-desk")}>Staff sign-in</Link>:
+  <Link href="/operations">Back to Mission Control</Link>}</section></main>;
  const cases=r.view.support.map(c=>({id:c.threadId??"",title:"Case "+(c.threadId?.slice(0,8)??"unknown"),
   detail:"Priority "+c.priority+" · Age "+c.ageBand+" · SLA not configured",
   state:c.state,attention:["high","urgent"].includes(c.priority.toLowerCase())}));

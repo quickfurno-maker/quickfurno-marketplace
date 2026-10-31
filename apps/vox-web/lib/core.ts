@@ -117,8 +117,10 @@ export async function fetchOwnerFinanceOrderDetail(orderId:string){
   const response=await fetch(base+"/api/vox/v1/finance/order/"+encodeURIComponent(orderId),{
    method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
    cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
-  if(!response.ok)return {ok:false,status:response.status===403?403:503,
-   error:"CORE_FINANCE_DETAIL_UNAVAILABLE"} as const;
+  // Core 401 = Owner session/AAL2 rejected: recoverable by signing in again.
+  if(!response.ok)return response.status===401
+   ?{ok:false,status:401,error:"MFA_REQUIRED"} as const
+   :{ok:false,status:response.status===403?403:503,error:"CORE_FINANCE_DETAIL_UNAVAILABLE"} as const;
   const raw:unknown=await response.json();
   if(!raw||typeof raw!=="object"||Array.isArray(raw))
    return {ok:false,status:503,error:"FINANCE_DETAIL_UNTRUSTED"} as const;
@@ -181,7 +183,9 @@ export async function fetchOwnerFinancePreview(){
   const r=await fetch(base+"/api/vox/v1/finance",{
    method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
    cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
-  if(!r.ok)return {ok:false,status:r.status===403?403:503,error:"CORE_FINANCE_UNAVAILABLE"} as const;
+  if(!r.ok)return r.status===401
+   ?{ok:false,status:401,error:"MFA_REQUIRED"} as const
+   :{ok:false,status:r.status===403?403:503,error:"CORE_FINANCE_UNAVAILABLE"} as const;
   const payload:unknown=await r.json();
   if(!payload||typeof payload!=="object"||Array.isArray(payload))
    return {ok:false,status:503,error:"UNTRUSTED_FINANCE_RESPONSE"} as const;
@@ -281,7 +285,9 @@ export async function fetchScopedServiceDesk(){
    method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
    cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500),
   });
-  if(!r.ok)return {ok:false,status:r.status===403?403:503,error:"STAFF_DESK_UNAVAILABLE"} as const;
+  if(!r.ok)return r.status===401
+   ?{ok:false,status:401,error:"MFA_REQUIRED"} as const
+   :{ok:false,status:r.status===403?403:503,error:"STAFF_DESK_UNAVAILABLE"} as const;
   const body:unknown=await r.json();
   if(!body||typeof body!=="object"||!("ok" in body)||body.ok!==true||!("view" in body))
    return {ok:false,status:503,error:"UNTRUSTED_DESK_RESPONSE"} as const;
@@ -320,7 +326,9 @@ export async function fetchScopedCrm(kind:"acquisition"|"vendor360"){
   const r=await fetch(base+"/api/vox/v1/"+key,{
    method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
    cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
-  if(!r.ok)return {ok:false,status:r.status===403?403:503,error:"CORE_SCOPE_DENIED_OR_UNAVAILABLE"} as const;
+  if(!r.ok)return r.status===401
+   ?{ok:false,status:401,error:"MFA_REQUIRED"} as const
+   :{ok:false,status:r.status===403?403:503,error:"CORE_SCOPE_DENIED_OR_UNAVAILABLE"} as const;
   const payload:unknown=await r.json();
   if(!payload||typeof payload!=="object"||!("ok" in payload)||payload.ok!==true||!("view" in payload))
    return {ok:false,status:503,error:"INVALID_CORE_SCHEMA"} as const;
@@ -488,6 +496,7 @@ export async function submitScopedVendorTask(input:{vendorId:string;nonce:string
   const r=await fetch(base+"/api/vox/v1/vendor-task",{
    method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},
    body:JSON.stringify(input),cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(r.status===401)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
   if(!r.ok)return {ok:false,status:r.status===403?403:r.status===400?400:r.status===409?409:503,
    error:r.status===409?"CORE_TASK_IDEMPOTENCY_CONFLICT":"CORE_TASK_REJECTED"} as const;
   const data:unknown=await r.json();

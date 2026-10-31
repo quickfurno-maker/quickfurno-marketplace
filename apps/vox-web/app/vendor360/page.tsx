@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {fetchScopedCrm} from "../../lib/core";
+import {withReturn} from "../../lib/returnTo.mjs";
 import {ScopedQueue} from "../components/ScopedQueue";
 import {TaskCreator} from "./components/TaskCreator";
 import {ProfileReviewQueue} from "./components/ProfileReviewQueue";
@@ -14,7 +15,7 @@ export default async function Vendor360(){
  <p>{r.status===401?"Verified Staff MFA is required.":r.status===403?
  "Your current Staff assignment does not authorize this vendor workspace.":
  "The protected Vendor 360 Core projection is currently unavailable. No vendor state was modified."}</p>
- <Link href={r.status===401?"/login":"/operations"}>
+ <Link href={r.status===401?withReturn("/login","/vendor360"):"/operations"}>
  {r.status===401?"Staff sign-in":"Back to Mission Control"}</Link></section></main>;
  const vendors=r.view.vendors.map(v=>({id:v.vendorId??"",title:v.businessName,
   detail:"Core verification "+v.verificationStatus+" · Google location "+v.locationVerification,

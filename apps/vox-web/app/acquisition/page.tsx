@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {fetchScopedCrm} from "../../lib/core";
+import {withReturn} from "../../lib/returnTo.mjs";
 import {ScopedQueue} from "../components/ScopedQueue";
 import {StaffProposalForm} from "../components/StaffProposalForm";
 import {AarohiFollowupProposal} from "./components/AarohiFollowupProposal";
@@ -10,7 +11,9 @@ export default async function Acquisition(){
  const r=await fetchScopedCrm("acquisition");
  if(!r.ok||r.kind!=="acquisition")return <main className="hold"><section className="holdCard">
  <p className="kicker">STAFF CORE AUTHORIZATION</p><h1>Acquisition unavailable</h1>
- <p>Verified staff MFA and an explicit Core city/prospect assignment are required.</p><Link href="/login">Staff sign-in</Link></section></main>;
+ <p>Verified staff MFA and an explicit Core city/prospect assignment are required.</p>
+ {r.status===401?<Link href={withReturn("/login","/acquisition")}>Staff sign-in</Link>:
+  <Link href="/operations">Back to Mission Control</Link>}</section></main>;
  const prospects=r.view.prospects.map(p=>({id:p.id??"",title:p.businessName,
   detail:"Priority "+p.priority+" · Next "+p.nextAction,
   state:p.doNotContact?"DO NOT CONTACT":p.humanTakeover?"HUMAN":p.stage,

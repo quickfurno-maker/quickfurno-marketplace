@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {fetchOwnerFinancePreview} from "../../lib/core";
+import {withReturn} from "../../lib/returnTo.mjs";
 import {indiaOrderMonth,selectBoundedFinanceMonth} from "../../lib/financeMonth.mjs";
 import "../operations/operations.css";
 export const dynamic="force-dynamic";
@@ -31,7 +32,7 @@ export default async function Finance({searchParams}:FinanceProps){
    <p>{needsLogin
     ?"Sign in with verified Owner MFA to view your authorized, read-only financial records."
     :"The protected Core read or reviewed Staging feature is not available. No payment actions can be performed from this screen."}</p>
-   <Link href={needsLogin?"/login":"/operations"}>
+   <Link href={needsLogin?withReturn("/login","/finance"):"/operations"}>
     {needsLogin?"Owner sign-in":"Back to Mission Control"}
    </Link></section></main>;
  }

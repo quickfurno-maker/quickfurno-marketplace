@@ -356,7 +356,7 @@ export async function reconcileRc8PgSignedIntentOutcome({acquireClient,intentId,
     !LOWER_UUID.test(intentId)||typeof subjectId!=="string"||!LOWER_UUID.test(subjectId)||
     typeof expectedReceiptSha256!=="string"||!HEX64.test(expectedReceiptSha256))
   return result({...base,ok:false,reason:"RECONCILIATION_INPUT_INVALID",outcome:null});
- let client,started=false;
+ let client,started=false,destroyConnection=false;
  try{
   client=await acquireClient();
   if(!client||typeof client.query!=="function"||typeof client.release!=="function")
@@ -388,13 +388,18 @@ export async function reconcileRc8PgSignedIntentOutcome({acquireClient,intentId,
   if(digest&&digest===expectedReceiptSha256&&!otherIntent&&
      durable.intents[0].subjectId===subjectId)
    return result({...base,ok:true,outcome:"COMMITTED",intentId,subjectId,
-    receiptSha256:digest,state:"AWAITING_EXTERNAL_REVIEW"});
+    receiptSha256:digest,state:"AWAITING_EXTERNAL_REVIEW",
+    // Durable signer/scope identity so a reviewer can be bound to THIS receipt.
+    ownerId:durable.intents[0].ownerId,teamLeaderId:durable.intents[0].teamLeaderId,
+    teamId:durable.intents[0].teamId,cityId:durable.intents[0].cityId});
   return result({...base,ok:false,reason:"RECONCILIATION_INCONSISTENT",
    outcome:"INCONSISTENT",intentId,subjectId,requiresIndependentReview:true});
  }catch{
+  // Unknown backend state after a failed read: never return it to the pool.
+  destroyConnection=true;
   if(started){try{await client.query("ROLLBACK");}catch{}}
   return result({...base,ok:false,reason:"RECONCILIATION_UNAVAILABLE",outcome:null});
- }finally{try{client?.release?.()}catch{}}
+ }finally{try{client?.release?.(destroyConnection)}catch{}}
 }
 const PUBLICATION_BLOCKERS=Object.freeze(["RC8_APPROVAL_WRITER_NOT_INSTALLED",
  "NATIVE_APPROVAL_GATE_CLOSED","OFFICIAL_EOD_HARD_OFF",

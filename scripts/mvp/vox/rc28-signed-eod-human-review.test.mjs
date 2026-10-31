@@ -28,6 +28,9 @@ const {verifyRc28PendingEodForHumanReview:run,RC28_SIGNED_EOD_REVIEW_ROUTE_INSTA
 const id=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 const receipt="a".repeat(64);
 const pending=()=>({intentId:id(1),subjectId:id(2),expectedReceiptSha256:receipt});
+const committed=(o={})=>({outcome:"COMMITTED",ok:true,receiptSha256:receipt,
+ intentId:id(1),subjectId:id(2),ownerId:id(3),teamLeaderId:id(4),teamId:id(5),
+ cityId:id(6),...o});
 const acquire=async()=>{throw Error("MUST_NEVER_OPEN_DB_FROM_STUB")};
 test.beforeEach(()=>{
  globalThis.__eodOwner=id(3);
@@ -35,7 +38,7 @@ test.beforeEach(()=>{
   teamId:id(5),cityId:id(6)};
  globalThis.__eodRevokeOwner=false;globalThis.__eodRevokeLeader=false;
  globalThis.__eodOwnerCalls=0;globalThis.__eodLeaderCalls=0;
- globalThis.__eodProof={outcome:"COMMITTED",ok:true,receiptSha256:receipt};
+ globalThis.__eodProof=committed();
  globalThis.__eodPublish=false;globalThis.__eodThrow=false;globalThis.__eodCalls=[];
 });
 test("human EOD review route and publication always HARD OFF",()=>{
@@ -70,7 +73,7 @@ test("in-flight, conflict, forged publication and SQL outage never authorize EOD
   globalThis.__eodProof=proof;
   assert.equal((await run("owner","tl",pending(),acquire)).publicationAuthorized,false);
  }
- globalThis.__eodProof={outcome:"COMMITTED",ok:true,receiptSha256:receipt};
+ globalThis.__eodProof=committed();
  globalThis.__eodPublish=true;
  assert.equal((await run("owner","tl",pending(),acquire)).ok,false);
  globalThis.__eodPublish=false;globalThis.__eodThrow=true;
@@ -84,6 +87,18 @@ test("RC29 rechecks both human AAL2 authorities after durable DB reconciliation"
  assert.equal(result.publicationAuthorized,false);
  assert.equal(globalThis.__eodOwnerCalls,2);
  assert.equal(globalThis.__eodLeaderCalls,2);
+});
+test("EOD review is bound to the receipt's own signers and team/city scope",async()=>{
+ for(const proof of [committed({ownerId:id(9)}),committed({teamLeaderId:id(9)}),
+  committed({teamId:id(9)}),committed({cityId:id(9)}),committed({subjectId:id(9)}),
+  committed({intentId:id(9)}),committed({ownerId:undefined})]){
+  globalThis.__eodProof=proof;
+  const r=await run("owner","tl",pending(),acquire);
+  assert.equal(r.ok,false);assert.equal(r.reason,"REVIEWER_NOT_RECEIPT_SIGNER_SCOPE");
+  assert.equal(r.publicationAuthorized,false);
+ }
+ globalThis.__eodProof=committed();
+ assert.equal((await run("owner","tl",pending(),acquire)).ok,true);
 });
 test("RC29 revoked Owner or TL during slow reconciliation cannot produce a positive review",async()=>{
  globalThis.__eodRevokeOwner=true;

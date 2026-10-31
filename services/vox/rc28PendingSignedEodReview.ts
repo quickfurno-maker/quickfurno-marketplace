@@ -44,6 +44,13 @@ export async function verifyRc28PendingEodForHumanReview(
     proof.receiptSha256!==input.expectedReceiptSha256||
     state.publicationAuthorized!==false)
   return deny("SIGNED_INTENT_NOT_DURABLY_PENDING");
+ // The reviewers must be the CURRENT identities that signed this very receipt,
+ // in its exact team/city scope. A different valid Owner/TL pair, or a TL of
+ // another team or city, cannot clear someone else's pending receipt.
+ if(proof.ownerId!==owner||proof.teamLeaderId!==leader.userId||
+    proof.teamId!==leader.teamId||proof.cityId!==leader.cityId||
+    proof.subjectId!==input.subjectId||proof.intentId!==input.intentId)
+  return deny("REVIEWER_NOT_RECEIPT_SIGNER_SCOPE");
  // PostgreSQL reconciliation may wait on writer locks. Do not issue a
  // positive review after either human loses their current AAL2 authority
  // during that wait, even though publication remains strictly disabled.

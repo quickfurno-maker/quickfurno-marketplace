@@ -10,6 +10,14 @@ on:
       - 'lib/payments/vendorPackageOrderGuards.mjs'
       - 'lib/payments/vendorPackageOrderGuards.d.mts'
       - 'services/vendorPackagePaymentService.ts'
+      - 'lib/payments/vendorPackageRefundIntake*'
+      - 'lib/payments/vendorPackageProviderEventLedger.*'
+      - 'lib/payments/vendorPackageProviderEventProcessing.mjs'
+      - 'scripts/mvp/vox/rc36-finance-refund-intake-review.test.mjs'
+      - 'scripts/mvp/vox/rc33-finance-service-transport.test.mjs'
+      - 'scripts/mvp/vox/fixtures/rc28-review-only-provider-event-ledger.pg17.sql'
+      - 'scripts/mvp/vox/fixtures/rc35-review-only-refund-intake-review.pg17.sql'
+      - 'scripts/mvp/vox/validate-vox-rc28-provider-event-ledger-pg17.mjs'
       - '.github/workflows/vox-rc14-finance-mode-pg17-hold.yml'
 permissions:
   contents: read
@@ -57,6 +65,14 @@ jobs:
           log="${RUNNER_TEMP}/vox-rc14-finance-pg17.log"
           node scripts/mvp/vox/validate-vox-rc11-real-pg-finance-attempts.mjs 2>&1 | tee "$log"
           grep -Fq 'VOX_RC11_REAL_PG17_FINANCE_ATTEMPT_AUDIT_PASS events=4 attempts=3' "$log"
+      - name: Verify signed refund intake and immutable reviewer contracts
+        run: node --test scripts/mvp/vox/rc33-finance-service-transport.test.mjs scripts/mvp/vox/rc36-finance-refund-intake-review.test.mjs
+      - name: Verify genuine PG17 refund quarantine, replay and reviewer policy HOLD
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/mvp/vox/validate-vox-rc28-provider-event-ledger-pg17.mjs | tee "${RUNNER_TEMP}/vox-rc36-refund-review-pg17.log"
+          grep -Fq 'VOX_RC28_REAL_PG17_EVENT_LEDGER_PASS' "${RUNNER_TEMP}/vox-rc36-refund-review-pg17.log"
       - name: Fail on abandoned disposable database container
         if: always()
         shell: bash

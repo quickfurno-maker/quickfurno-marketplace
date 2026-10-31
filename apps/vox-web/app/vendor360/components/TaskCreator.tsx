@@ -25,8 +25,17 @@ export function TaskCreator({vendors}:{vendors:readonly {vendorId:string;busines
     body:JSON.stringify({vendorId,nonce:requestNonce,taskType,title,priority,
      dueAt:new Date(dueAt).toISOString()})});
    const body=await r.json();
+   if(r.status===409){
+    // The request ID was already used for different details; it can never
+    // succeed, so issue a fresh one for the next attempt.
+    nonceRef.current=null;
+    setFeedback("This request ID was already used for a different task. Review the details and submit again.");return;
+   }
    if(!r.ok||body?.ok!==true){setFeedback("Task was not accepted. Check your Core permissions and task details.");return;}
-   nonceRef.current=null;setTitle("");setDueAt("");setFeedback("Core confirmed internal Vendor CRM task. No provider message was sent.");
+   const replay=body?.created===false;
+   nonceRef.current=null;setTitle("");setDueAt("");
+   setFeedback(replay?"Core already had this exact internal Vendor CRM task. No duplicate was created."
+    :"Core confirmed internal Vendor CRM task. No provider message was sent.");
   }catch{setFeedback("Task outcome unknown. Retry this unchanged form to reuse the same request ID.");}
   finally{busyRef.current=false;setBusy(false);}
  }

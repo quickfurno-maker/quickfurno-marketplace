@@ -488,11 +488,15 @@ export async function submitScopedVendorTask(input:{vendorId:string;nonce:string
   const r=await fetch(base+"/api/vox/v1/vendor-task",{
    method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},
    body:JSON.stringify(input),cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
-  if(!r.ok)return {ok:false,status:r.status===403?403:r.status===400?400:503,error:"CORE_TASK_REJECTED"} as const;
+  if(!r.ok)return {ok:false,status:r.status===403?403:r.status===400?400:r.status===409?409:503,
+   error:r.status===409?"CORE_TASK_IDEMPOTENCY_CONFLICT":"CORE_TASK_REJECTED"} as const;
   const data:unknown=await r.json();
   if(!data||typeof data!=="object"||!("ok" in data)||data.ok!==true||
      !("taskId" in data)||!uid(data.taskId))return {ok:false,status:503,error:"UNTRUSTED_TASK_RESPONSE"} as const;
-  return {ok:true,status:201,taskId:data.taskId,approval:"INTERNAL_TASK_ONLY" as const} as const;
+  // Core: 201 created, 200 exact replay. Only those two are valid receipts.
+  if(r.status!==200&&r.status!==201)return {ok:false,status:503,error:"UNTRUSTED_TASK_RESPONSE"} as const;
+  return {ok:true,status:r.status,taskId:data.taskId,created:r.status===201,
+   approval:"INTERNAL_TASK_ONLY" as const} as const;
  }catch{return {ok:false,status:503,error:"CORE_TASK_UNAVAILABLE"} as const;}
 }
 

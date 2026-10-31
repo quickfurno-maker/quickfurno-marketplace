@@ -30,12 +30,32 @@ export async function POST(request:Request){
     .eq("id",vendor.data.service_zone_id).maybeSingle();
   if(zone.error||zone.data?.city_id!==scope.cityId||zone.data?.is_active!==true)
    return reply({ok:false,error:"VENDOR_CITY_DENIED"},403);
-  const result=await createVendorTask(task.vendorId,{
-   task_type:task.task_type,title:task.title,priority:task.priority,
-   due_at:task.due_at,idempotency_key:task.idempotency_key,
-  },scope.userId);
-  return reply({ok:true,taskId:result.id,created:result.idempotent!==true,
-   authority:"quickfurno-core-vendor-crm",scope:"ASSIGNED_VENDOR_ONLY"},201);
+  // Staff grant/team/city/role may be revoked between the initial check and
+  // here. Re-read full Core staff authority after the last vendor lookup and
+  // immediately before the CRM write; require the same actor/role/team/city
+  // and a still-assigned vendor. This also gates idempotent replays, so a
+  // revoked actor cannot read back an existing task id.
+  const fresh=await getVerifiedScopedStaff(request.headers.get("authorization"));
+  if(!fresh||fresh.userId!==scope.userId||fresh.cityId!==scope.cityId||
+     fresh.teamId!==scope.teamId||fresh.role!==scope.role||
+     !fresh.vendorIds.includes(task.vendorId))
+   return reply({ok:false,error:"SCOPE_DENIED"},403);
+  let result;
+  try{
+   result=await createVendorTask(task.vendorId,{
+    task_type:task.task_type,title:task.title,priority:task.priority,
+    due_at:task.due_at,idempotency_key:task.idempotency_key,
+   },scope.userId);
+  }catch(error){
+   // Same key with a different payload is a client conflict, not an outage.
+   if(error instanceof Error&&error.message==="VENDOR_TASK_IDEMPOTENCY_CONFLICT")
+    return reply({ok:false,error:"IDEMPOTENCY_CONFLICT"},409);
+   throw error;
+  }
+  const created=result.idempotent!==true;
+  // 201 = this request created the row; 200 = exact replay of an earlier one.
+  return reply({ok:true,taskId:result.id,created,
+   authority:"quickfurno-core-vendor-crm",scope:"ASSIGNED_VENDOR_ONLY"},created?201:200);
  }catch{return reply({ok:false,error:"VENDOR_TASK_UNAVAILABLE"},503);}
 }
 export function GET(){return reply({ok:false,error:"METHOD_NOT_ALLOWED"},405);}

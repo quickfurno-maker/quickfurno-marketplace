@@ -168,3 +168,28 @@ test("Core and EOD disposable PG17 suites verify actual mapped TCP endpoint",()=
   assert.doesNotMatch(script,/ready=docker\(\["exec"/);
  }
 });
+
+test("V2 release only resets a pristine pending claim, and bound checkout checks financial truth",()=>{
+ const sql=read("ops/vox/rc17-review-candidates/20261031001000_rc17_razorpay_v2_authority_REVIEW_ONLY.sql");
+ const release=sql.slice(sql.indexOf("create or replace function public.qf_release_vendor_package_razorpay_order_claim_v2("),
+  sql.indexOf("revoke all on function public.qf_release_vendor_package_razorpay_order_claim_v2("));
+ const claim=sql.slice(sql.indexOf("create or replace function public.qf_claim_vendor_package_razorpay_order_v2("),
+  sql.indexOf("revoke all on function public.qf_claim_vendor_package_razorpay_order_v2("));
+ const bind=sql.slice(sql.indexOf("create or replace function public.qf_bind_vendor_package_razorpay_order_v2("),
+  sql.indexOf("revoke all on function public.qf_bind_vendor_package_razorpay_order_v2("));
+ for(const field of ["order_status='created'","activation_status='not_activated'",
+    "payment_status='pending'","provider_order_request_token = p_request_token"])
+   assert.ok(release.includes(field),field);
+ assert.match(claim,/RAZORPAY_V2_BOUND_LEDGER_UNVERIFIED/);
+ assert.match(claim,/v_payment\.transaction_id is not null/);
+ assert.match(claim,/for share/);
+ assert.match(bind,/v_payment\.transaction_id is not null/);
+ const pg=read("scripts/mvp/vox/validate-vox-rc17-razorpay-v2-real-pg17.mjs");
+ for(const marker of ["CANCELLED_CLAIM_RELEASE_DENIED","REFUNDED_CLAIM_RELEASE_DENIED",
+  "NULL_ACTIVATION_CLAIM_RELEASE_DENIED","CAPTURED_TXID_BOUND_CHECKOUT_DENIED",
+  "CAPTURED_TXID_BIND_DENIED","PAID_BOUND_CHECKOUT_DENIED"])
+   assert.ok(pg.includes(marker),marker);
+ const core=read("services/vendorPackagePaymentService.ts");
+ assert.match(core,/inspectRazorpayOrderClaim\(boundClaim, \{/);
+ assert.match(core,/storedRazorpayCheckoutLifecycleError\(order\)/);
+});

@@ -84,6 +84,15 @@ begin
     raise exception 'RAZORPAY_V2_PROVIDER_OR_MODE_MISMATCH' using errcode='P0001';
   end if;
 
+  -- A pristine provider claim must not be created over historical payment
+  -- evidence. A previous manual/Paid/Refunded/uncertain ledger row means that
+  -- retrying a provider POST could double-charge or issue conflicting credit.
+  -- The bound-order branch above separately validates its existing ledger.
+  select * into v_payment from public.payments where id=p_order_id for share;
+  if found then
+    raise exception 'RAZORPAY_V2_UNBOUND_LEDGER_RECONCILIATION_REQUIRED' using errcode='P0001';
+  end if;
+
   if v_order.package_id is null or v_order.package_currency is distinct from 'INR' then
     raise exception 'PACKAGE_ORDER_SNAPSHOT_INVALID' using errcode = 'P0001';
   end if;

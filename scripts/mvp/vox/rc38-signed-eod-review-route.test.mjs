@@ -48,7 +48,8 @@ test.beforeEach(()=>{
 });
 const body=async r=>({status:r.status,json:await r.json()});
 test("route is read-only GET, default OFF, never publishes or writes",()=>{
- assert.match(route,/export function GET/);
+ assert.match(route,/export async function GET/);
+ assert.match(route,/verifyVoxOwnerBearer\(request.headers.get\("authorization"\)\)/);
  assert.match(route,/VOX_RC38_SIGNED_EOD_REVIEW_ENABLED==="staging"/);
  for(const m of ["POST","PUT","PATCH","DELETE"])assert.match(route,new RegExp("export const "+m+"=deny"));
  for(const s of [route,handlerSrc,dbSrc])
@@ -63,11 +64,11 @@ test("disabled by default and when DB source missing: 503 before any auth or DB"
  r=await body(await handle(req(),deps()));
  assert.equal(r.status,503);assert.equal(r.json.error,"SIGNED_EOD_REVIEW_DB_SOURCE_UNAVAILABLE");
  assert.equal(globalThis.__rec.length,0);
- delete process.env.VOX_RC38_SIGNED_EOD_REVIEW_READER_DATABASE_URL;
+ delete process.env.RC38_SIGNED_EOD_REVIEW_READER_DATABASE_URL;
  assert.equal(dbSource(),null);
- process.env.VOX_RC38_SIGNED_EOD_REVIEW_READER_DATABASE_URL="http://not-postgres";
+ process.env.RC38_SIGNED_EOD_REVIEW_READER_DATABASE_URL="http://not-postgres";
  assert.equal(dbSource(),null);
- delete process.env.VOX_RC38_SIGNED_EOD_REVIEW_READER_DATABASE_URL;
+ delete process.env.RC38_SIGNED_EOD_REVIEW_READER_DATABASE_URL;
 });
 test("strict query: exact three params, no extras, duplicates or caller identity",async()=>{
  for(const qs of ["",q({extra:"1"}),q({ownerId:id(3)}),q({publicationAuthorized:"true"}),

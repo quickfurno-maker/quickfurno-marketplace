@@ -7,7 +7,7 @@ import "server-only";
 type Db={query:(sql:string,values?:unknown[])=>Promise<{rows:any[];rowCount:number}>;release:(destroy?:boolean)=>void};
 let pool:{connect:()=>Promise<Db>}|null=null;
 export function rc38SignedEodReviewDbSource():(()=>Promise<Db>)|null{
- const url=process.env.VOX_RC38_SIGNED_EOD_REVIEW_READER_DATABASE_URL;
+ const url=process.env.RC38_SIGNED_EOD_REVIEW_READER_DATABASE_URL;
  if(typeof url!=="string"||!/^postgres(ql)?:\/\//.test(url))return null;
  return async()=>{
   if(!pool){

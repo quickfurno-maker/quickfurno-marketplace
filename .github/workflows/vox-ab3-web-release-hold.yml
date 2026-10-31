@@ -13,6 +13,8 @@ on:
       - 'apps/vox-web/app/vendor360/**'
       - 'apps/vox-web/app/finance/**'
       - 'apps/vox-web/scripts/validate-rc37-navigation-401.spec.mjs'
+      - 'apps/vox-web/scripts/validate-rc38-refund-review-readonly.spec.mjs'
+      - 'apps/vox-web/app/finance/refund-review/**'
       - 'apps/vox-web/scripts/validate-staff-session-recovery-rc35.spec.mjs'
       - 'apps/vox-web/app/team/work-queue/page.tsx'
       - 'apps/vox-web/scripts/validate-ab3-domain.mjs'
@@ -40,5 +42,7 @@ jobs:
       - run: npm run build
       - name: Verify RC37 compiled Finance/CRM/Staff 401 navigation
         run: node --test scripts/validate-rc37-navigation-401.spec.mjs
+      - name: Verify RC38 compiled refund review is read only
+        run: node --test scripts/validate-rc38-refund-review-readonly.spec.mjs
       - name: Verify compiled Staff session recovery and safe return paths
         run: node --test scripts/validate-staff-session-recovery-rc35.spec.mjs

@@ -28,16 +28,17 @@ try{
  created=true;
  let ready=false;
  for(let i=0;i<65;i++){
-  if(spawnSync("docker",["exec",name,"pg_isready","-q","-U","postgres","-d","postgres"],
+  if(spawnSync("docker",["exec",name,"pg_isready","-q","-h","127.0.0.1","-U","postgres","-d","postgres"],
    {encoding:"utf8",timeout:3000}).status===0){ready=true;break}
   await new Promise(r=>setTimeout(r,150));
  }
  if(!ready)throw Error("DISPOSABLE_PG17_UNAVAILABLE");
  const execute=sql=>spawnSync("docker",
-  ["exec","-i",name,"psql","-X","-q","-A","-t","-U","postgres","-d","postgres",
+  ["exec","-i","-e","PGPASSWORD=synthetic_only",name,"psql","-h","127.0.0.1","-X","-q","-A","-t","-U","postgres","-d","postgres",
    "-v","ON_ERROR_STOP=1"],{input:sql,encoding:"utf8",timeout:10000});
- // Initdb uses a temporary postmaster which can answer pg_isready just
- // before shutting down. Require a successful SQL query on the final server.
+ // Initdb uses a temporary Unix-socket-only postmaster which can answer pg_isready just
+ // before shutting down. TCP loopback tests only the final server, never the
+ // temporary initdb Unix socket.
  let healthy=execute("SELECT 1 AS postgres_ready;");
  for(let i=0;i<55&&(healthy.status!==0||healthy.stdout.trim()!=="1");i++){
   await new Promise(r=>setTimeout(r,150));

@@ -265,6 +265,18 @@ try{
  eq(rec.outcome,"COMMITTED","EOD_UNKNOWN_RECONCILED_COMMITTED");
  eq(rec.receiptSha256,r.receiptSha256,"EOD_RECONCILED_RECEIPT_DIGEST");
  eq(rec.publicationAuthorized,false,"RECONCILED_NOT_PUBLICATION");
+ // RC33: the report stays mutable after COMMIT. If its Staff subject is later
+ // rewritten to a signer, the receipt must stop reconciling as COMMITTED.
+ for(const signerId of [TL,OWNER]){
+  await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET staff_id=$2 WHERE id=$1",[SUB,signerId]);
+  const drift=await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
+   intentId:r.intentId,subjectId:SUB,expectedReceiptSha256:r.receiptSha256});
+  eq(drift.outcome,"INCONSISTENT","RC33_STAFF_SUBJECT_BECAME_SIGNER_NOT_COMMITTED");
+ }
+ await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET staff_id=$2 WHERE id=$1",[SUB,id(90)]);
+ eq((await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
+  intentId:r.intentId,subjectId:SUB,expectedReceiptSha256:r.receiptSha256})).outcome,
+  "COMMITTED","RC33_STAFF_RESTORED_COMMITTED");
  const absent=await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
   intentId:id(999),subjectId:SUB,expectedReceiptSha256:r.receiptSha256});
  eq(absent.outcome,"NOT_COMMITTED","RECONCILE_ABSENT_NOT_COMMITTED");

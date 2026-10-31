@@ -92,7 +92,7 @@ function fakeDb({revoked=[],enrolmentEffective=true,registryRows=registry}={}){
      state:"TL_ACKNOWLEDGED_AWAITING_OWNER_RELEASE",published:false,...db.report};
     if(db.report===null)return rows([]);
     // Reconciler's read-only report query uses camelCase aliases.
-    if(sql.includes('AS "sourceDigest"'))return rows([{teamId:r.team_id,cityId:r.city_id,
+    if(sql.includes('AS "sourceDigest"'))return rows([{teamId:r.team_id,cityId:r.city_id,staffId:r.staff_id,
      reviewerId:r.reviewer_id,sourceCount:r.source_count,sourceDigest:r.source_digest,
      state:r.state,published:r.published}]);
     return rows([r]);}
@@ -232,7 +232,8 @@ test("RC32: durable receipt is not COMMITTED once the four-source report drifted
   intentId:r.intentId,subjectId:SUB,expectedReceiptSha256:r.receiptSha256});
  assert.equal((await rec()).outcome,"COMMITTED");
  for(const drift of [{source_digest:"c".repeat(64)},{published:true},{source_count:3},
-  {reviewer_id:OWNER},{team_id:id(99)},{city_id:id(99)},{state:"OWNER_RELEASED"},null]){
+  {reviewer_id:OWNER},{staff_id:TL},{staff_id:OWNER},{staff_id:null},{staff_id:"not-a-uuid"},
+  {team_id:id(99)},{city_id:id(99)},{state:"OWNER_RELEASED"},null]){
   db.report=drift;
   const x=await rec();
   assert.equal(x.outcome,"INCONSISTENT",JSON.stringify(drift));

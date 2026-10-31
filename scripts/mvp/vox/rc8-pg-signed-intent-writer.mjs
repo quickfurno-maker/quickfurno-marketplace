@@ -385,12 +385,17 @@ export async function reconcileRc8PgSignedIntentOutcome({acquireClient,intentId,
   if(durable.intents.length===1){
    const rep=await client.query(
     "SELECT team_id::text AS \"teamId\",city_id::text AS \"cityId\","+
-    "reviewer_id::text AS \"reviewerId\",source_count AS \"sourceCount\","+
+    "staff_id::text AS \"staffId\",reviewer_id::text AS \"reviewerId\",source_count AS \"sourceCount\","+
     "source_digest AS \"sourceDigest\",state,published "+
     "FROM public.vox_ab7f_four_source_eod_candidate_v1 WHERE id=$1::uuid",[subjectId]);
    const r=rep.rows?.[0],i=durable.intents[0];
    reportCurrent=rep.rows?.length===1&&r.teamId===i.teamId&&r.cityId===i.cityId&&
     r.reviewerId===i.teamLeaderId&&Number(r.sourceCount)===4&&
+    // The receipt does not store the report's Staff subject, and the report
+    // stays mutable after COMMIT. Re-assert the writer's independence rule:
+    // the submitting Staff may never become the Owner or Team Leader signer.
+    typeof r.staffId==="string"&&LOWER_UUID.test(r.staffId)&&
+    r.staffId!==i.ownerId&&r.staffId!==i.teamLeaderId&&
     r.sourceDigest===i.digest&&
     r.state==="TL_ACKNOWLEDGED_AWAITING_OWNER_RELEASE"&&r.published===false;
   }

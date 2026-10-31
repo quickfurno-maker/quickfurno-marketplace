@@ -40,8 +40,13 @@ export const PENDING_SQL_PATTERNS=Object.freeze([
 const normPending=p=>String(p).replace(/\/+/g,"/").split("/").filter(s=>s!=="."&&s!=="").join("/").toLowerCase();
 export const pendingClass=p=>{const n=normPending(p);for(const [re,c] of PENDING_SQL_PATTERNS)if(re.test(n))return c;return null};
 
-export const safeRel=p=>typeof p==="string"&&p.length>0&&!p.includes("..")&&!p.includes("\\")&&
- !p.startsWith("/")&&!/^[a-z]:/i.test(p)&&!p.includes("\0");
+// Canonical repo-relative POSIX path only. Empty/"."/".." segments, "//", backslashes, drive
+// letters, control characters and "|" are refused: they let two spellings of one file dodge the
+// duplicate/dependency checks and make the "order|path|sha" pin preimage ambiguous (a path
+// containing "\n2|..." could forge a second pin row).
+export const safeRel=p=>typeof p==="string"&&p.length>0&&p.length<=512&&
+ !/[\\\x00-\x1f\x7f|:]/.test(p)&&!p.startsWith("/")&&
+ p.split("/").every(s=>s!==""&&s!=="."&&s!==".."&&s===s.trim());
 
 export const computeOrderedPin=sources=>
  sha(Buffer.from(sources.map((s,i)=>`${i+1}|${s.path}|${s.sha256}`).join("\n")));
@@ -70,9 +75,11 @@ export function evaluateReleasePreflight({inventory,readBytes,localVersions}){
   if(!s||!safeRel(path)){add("SOURCE_PATH_INVALID","BLOCK",`source #${i+1} has an unsafe or missing path`);return}
   const name=path.split("/").at(-1),m=MIG_NAME.exec(name);
   if(!m){add("SOURCE_NAME_INVALID","BLOCK","file name must be <14-digit version>_<name>.sql",path);return}
-  if(seenPath.has(path))add("DUPLICATE_PATH","BLOCK","path appears twice",path);
+  // Case-fold: case-insensitive filesystems resolve differently cased paths to one file.
+  const folded=path.toLowerCase();
+  if(seenPath.has(folded))add("DUPLICATE_PATH","BLOCK","path appears twice (case-insensitive)",path);
   if(seenVersion.has(m[1]))add("DUPLICATE_VERSION","BLOCK","version appears twice",path);
-  seenPath.add(path);seenVersion.add(m[1]);
+  seenPath.add(folded);seenVersion.add(m[1]);
   const row={order:i+1,path,version:m[1],pinnedSha256:HEX64.test(s.sha256)?s.sha256:null,
    observedSha256:null,bytes:null,dependsOn:Array.isArray(s.dependsOn)?s.dependsOn:[],
    pending:pendingClass(path)};
@@ -111,8 +118,8 @@ export function evaluateReleasePreflight({inventory,readBytes,localVersions}){
  }
  for(const r of rows){
   for(const d of r.dependsOn){
-   const at=orderOf.get(d);
-   if(at===undefined)add("MISSING_DEPENDENCY","BLOCK",`dependsOn ${String(d)} is not in the ordered plan`,r.path);
+   const at=typeof d==="string"?orderOf.get(d):undefined;
+   if(at===undefined)add("MISSING_DEPENDENCY","BLOCK","dependsOn entry is not an exact canonical path in the ordered plan",r.path);
    else if(at>=r.order)add("DEPENDENCY_ORDER_VIOLATION","BLOCK",`dependsOn ${d} is not earlier in the plan`,r.path);
   }
   const sc=scans.get(r.path);if(!sc)continue;

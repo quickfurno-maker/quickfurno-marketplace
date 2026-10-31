@@ -18,6 +18,10 @@ export const FORWARD=CAND+"vox_p0_6_is_admin_staging_migration_candidate.sql";
 export const ROLLBACK=CAND+"vox_p0_6_is_admin_staging_rollback_migration_candidate.sql";
 const BASELINE=CAND+"vox_p0_5_is_admin_rollback_candidate.sql";
 export const IMAGE="postgres:17-alpine";
+// status: FAIL = an assertion failed (exit 1); HOLD = proven in the disposable DB but the
+// decision stays HOLD (exit 0). There is no PASS/GO: this tool never authorizes staging.
+export const REPORT_SCHEMA="qf.vox.d-db.p0-6-pg17-rehearsal.v1";
+export const COMMAND="node scripts/mvp/vox/d-db-p0-6-pg17-rehearsal.mjs";
 
 const BOOTSTRAP=`
 create schema if not exists auth;
@@ -88,6 +92,14 @@ export function assessRehearsal({baseline,forward,rolledBack,restoredForward,res
  need(same(restoredForward,forward),"restore: pg_dump/pg_restore of forward state differs");
  need(same(restoredBaseline,baseline),"restore: pg_dump/pg_restore of baseline state differs");
  need(same(restoredRolledBack,baseline),"restore: forward-restored then rolled back is not baseline");
+ // Every state (incl. restored ones) must keep EXECUTE away from PUBLIC/anon and keep a non-NULL ACL:
+ // a NULL proacl means the implicit default (PUBLIC EXECUTE), which a drop/create or restore can reintroduce.
+ const states={baseline,forward,rolledBack,restoredForward,restoredBaseline,restoredRolledBack};
+ for(const [n,s] of Object.entries(states)){
+  need(typeof s.acl==="string"&&s.acl.length>0,`${n}: proacl is NULL (default PUBLIC EXECUTE)`);
+  need(!(s.grantees||[]).some(g=>g.startsWith("PUBLIC:")||g.startsWith("anon:")),`${n}: PUBLIC/anon holds EXECUTE`);
+  need((s.grantees||[]).includes("authenticated:EXECUTE"),`${n}: authenticated lost EXECUTE`);
+ }
  return f;
 }
 
@@ -100,6 +112,10 @@ export function rehearse(sh){
   return o;
  };
  sh.createDb("src");
+ const serverVersionNum=sh.sql("src","select current_setting('server_version_num');").trim();
+ if(!/^17\d{4}$/.test(serverVersionNum))
+  return {schema:REPORT_SCHEMA,status:"FAIL",proven:false,failures:[`server is not PostgreSQL 17 (server_version_num=${serverVersionNum})`],
+   decision:"HOLD",candidatePromoted:false,managedCalls:false,serverVersionNum,command:COMMAND};
  sh.sql("src",BOOTSTRAP);
  sh.file("src",BASELINE);
  sh.sql("src",POST_BASELINE);
@@ -114,8 +130,8 @@ export function rehearse(sh){
  sh.createDb("rf");sh.restore("rf",fwdDump);const restoredForward=snap("rf");
  sh.file("rf",ROLLBACK);const restoredRolledBack=snap("rf");
  const failures=assessRehearsal({baseline,forward,rolledBack,restoredForward,restoredBaseline,restoredRolledBack});
- return {schema:"qf.vox.d-db.p0-6-pg17-rehearsal.v1",proven:failures.length===0,failures,
-  decision:"HOLD",candidatePromoted:false,managedCalls:false,
+ return {schema:REPORT_SCHEMA,status:failures.length?"FAIL":"HOLD",proven:failures.length===0,failures,
+  decision:"HOLD",candidatePromoted:false,managedCalls:false,serverVersionNum,command:COMMAND,
   baselineGrantees:baseline.grantees,forwardSrcMd5:forward.srcmd5,baselineSrcMd5:baseline.srcmd5};
 }
 

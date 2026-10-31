@@ -213,3 +213,28 @@ test("CLI end to end: GO exit 0, HOLD exit 2, --out refuses ops/ and overwrite",
   assert.equal(p.status,64);assert.ok(!existsSync(repoOps));
  }finally{rmSync(dir,{recursive:true,force:true})}
 });
+
+test("non-canonical paths are refused: dot/double-slash/backslash/drive/control/pipe spellings",()=>{
+ for(const bad of ["./db/20270101000100_vox_a.sql","db//20270101000100_vox_a.sql","db/./20270101000100_vox_a.sql",
+  "db\\20270101000100_vox_a.sql","C:db/20270101000100_vox_a.sql","db/x\n2|y/20270101000100_vox_a.sql","db/a|b/20270101000100_vox_a.sql","db/ /20270101000100_vox_a.sql","db/"]){
+  const w=world();w.inv.sources[0].path=bad;
+  assert.ok(codes(evalW(w)).includes("SOURCE_PATH_INVALID"),JSON.stringify(bad));
+ }
+});
+
+test("pin preimage cannot be forged by a path carrying a fake second row",()=>{
+ const w=world();
+ const fake=`db/20270101000100_vox_a.sql|${w.inv.sources[0].sha256}\n2|${B}`;
+ const forged={...w.inv.sources[0],path:fake+"/20270101000100_vox_a.sql"};
+ const r=evalW({...w,inv:{...w.inv,sources:[forged]}});
+ assert.ok(codes(r).includes("SOURCE_PATH_INVALID"));assert.equal(r.decision,"HOLD");assert.equal(r.orderedPlan,null);
+});
+
+test("case-variant duplicate path blocks; non-canonical or non-string dependsOn never satisfies a dependency",()=>{
+ let w=world();w.inv.sources.push({...w.inv.sources[0],path:"DB/20270101000100_vox_a.sql"});
+ assert.ok(codes(evalW(w)).includes("DUPLICATE_PATH"));
+ w=world((x,ph)=>{if(ph==="post")x.inv.sources[1].dependsOn=[{toString:()=>A}]});
+ assert.ok(codes(evalW(w)).includes("MISSING_DEPENDENCY"));
+ w=world((x,ph)=>{if(ph==="post")x.inv.sources[1].dependsOn=["./"+A]});
+ assert.ok(codes(evalW(w)).includes("MISSING_DEPENDENCY"));
+});

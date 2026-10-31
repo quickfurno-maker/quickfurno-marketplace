@@ -55,6 +55,15 @@ test("preflight pending classification survives case, slash and dot-segment evas
  assert.equal(pendingClass("db/20270101000000_vox_a.sql"),null);
 });
 
+test("assessRehearsal: NULL proacl or PUBLIC/anon EXECUTE on any restored state fails",()=>{
+ for(const name of ["restoredBaseline","restoredForward","restoredRolledBack","rolledBack"]){
+  let g=good();g[name].acl=null;
+  assert.ok(assessRehearsal(g).some(m=>m.startsWith(name+": proacl is NULL")),name);
+  g=good();g[name].grantees=[...g[name].grantees,"PUBLIC:EXECUTE"];
+  assert.ok(assessRehearsal(g).some(m=>m.startsWith(name+": PUBLIC/anon")),name);
+ }
+});
+
 // Real Docker PG17 run; skipped when Docker is not available or the daemon is down.
 const dockerUp=spawnSync("docker",["info"],{stdio:"ignore"}).status===0;
 test("real PG17: forward/rollback/ACL/dump-restore rehearsal is proven",{skip:!dockerUp&&"docker daemon unavailable",timeout:240000},()=>{
@@ -63,4 +72,5 @@ test("real PG17: forward/rollback/ACL/dump-restore rehearsal is proven",{skip:!d
  const rep=JSON.parse(r.stdout);
  assert.deepEqual(rep.failures,[]);assert.equal(r.code,0);
  assert.equal(rep.decision,"HOLD");assert.equal(rep.candidatePromoted,false);
+ assert.equal(rep.status,"HOLD");assert.match(rep.serverVersionNum,/^17\d{4}$/);
 });

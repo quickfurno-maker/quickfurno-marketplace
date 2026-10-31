@@ -70,23 +70,28 @@ try{
   "--name",container,"-p","127.0.0.1::5432","-e","POSTGRES_PASSWORD=synthetic_only",
   image]);
  created=true;
- let port;
- for(let i=0;i<110;i++){
-  const mapped=docker(["port",container,"5432/tcp"]);
-  const match=mapped.match(/^127\.0\.0\.1:(\d+)$/m);
-  if(match)port=Number(match[1]);
-  let ready=false;
-  try{ready=docker(["exec",container,"psql","-A","-t","-U","postgres",
-   "-d","postgres","-c","SELECT 1;"])==="1"&&
-   docker(["logs",container]).includes("PostgreSQL init process complete; ready for start up.");}catch{}
-  if(port&&ready)break;
+ // Never treat initdb's temporary Docker-internal socket as host readiness.
+ // Cryptographic intent tests must execute against the real TCP postmaster.
+ let port=0,ready=false,lastError="";
+ for(let i=0;i<160;i++){
+  try{
+   const mapped=docker(["port",container,"5432/tcp"]);
+   const match=mapped.match(/^127\.0\.0\.1:(\d+)$/m);
+   if(match)port=Number(match[1]);
+   if(port){
+    const probe=new Pool({host:"127.0.0.1",port,user:"postgres",
+     password:"synthetic_only",database:"postgres",max:1,connectionTimeoutMillis:1200});
+    try{ready=(await probe.query("SELECT 1 AS ready")).rows[0]?.ready===1}
+    finally{await probe.end()}
+   }
+  }catch(e){ready=false;lastError=String(e?.code||e?.message||e).slice(0,160)}
+  if(ready)break;
   await sleep(200);
  }
- if(!port)throw Error("NO_LOOPBACK_PORT");
+ if(!port||!ready)throw Error("SIGNER_PG17_HOST_TCP_NOT_READY "+lastError);
  pool=new Pool({host:"127.0.0.1",port,user:"postgres",password:"synthetic_only",
   database:"postgres",max:5,connectionTimeoutMillis:5000});
- for(let i=0;i<30;i++){try{await pool.query("SELECT 1");break}catch(e){
-  if(i===29)throw e;await sleep(100);}}
+ await pool.query("SELECT 1 AS ready");
  await pool.query("CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN");
  await pool.query("CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY,raw_app_meta_data jsonb NOT NULL)");
  await pool.query("CREATE TABLE public.profiles(id uuid PRIMARY KEY,role text,is_active boolean NOT NULL)");

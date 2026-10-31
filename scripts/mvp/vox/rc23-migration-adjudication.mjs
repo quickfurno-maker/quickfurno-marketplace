@@ -1,6 +1,6 @@
 // Deterministic DBA classification of previously captured READ-ONLY history.
 // No Supabase network access, credentials, SQL execution, or deployment.
-import {readFileSync} from "node:fs";
+import {readFileSync,readdirSync} from "node:fs";
 import {resolve,dirname} from "node:path";
 import {fileURLToPath} from "node:url";
 import {createHash} from "node:crypto";
@@ -59,10 +59,33 @@ export function analyzeStagingMigrationDrift(snapshot,source){
   ])
  });
 }
+// A snapshot is evidence, not authority. Pin the exact observed read-only
+// capture and reconcile its full filename set against current SHA-pinned SQL.
+export const RC24_MANAGED_SNAPSHOT_SHA256=
+ "c43c8f0d36889cf94881ffb279e2ece8653f392103b6d07741388c229509723e";
+export function verifyRc24CapturedSource(snapshot,localNames){
+ const fail=()=>{throw Error("RC24_CAPTURE_OR_LOCAL_SOURCE_DRIFT")};
+ if(!snapshot||!Array.isArray(localNames)||localNames.length!==162)return fail();
+ const listed=[
+  ...snapshot.source_only,
+  ...snapshot.common_versions.map(e=>e.source_filename)
+ ].sort();
+ const actual=localNames.slice().sort();
+ if(listed.length!==actual.length||listed.some((v,i)=>v!==actual[i]))return fail();
+ if(new Set(actual.map(n=>n.slice(0,14))).size!==162)return fail();
+ return true;
+}
 export function buildRc23HistoryPacket(){
- const snapshot=JSON.parse(readFileSync(resolve(root,
- "docs/vox/VOX-MANAGED-STAGING-MIGRATION-DRIFT-READONLY-20261031.json"),"utf8"));
- return analyzeStagingMigrationDrift(snapshot,buildRc22MigrationPacket());
+ const raw=readFileSync(resolve(root,
+  "docs/vox/VOX-MANAGED-STAGING-MIGRATION-DRIFT-READONLY-20261031.json"));
+ if(createHash("sha256").update(raw).digest("hex")!==RC24_MANAGED_SNAPSHOT_SHA256)
+  throw Error("RC24_MANAGED_STAGING_CAPTURE_SHA256_DRIFT");
+ const snapshot=JSON.parse(raw.toString("utf8"));
+ const source=buildRc22MigrationPacket();
+ const localNames=readdirSync(resolve(root,"supabase/migrations"))
+  .filter(n=>/^\d{14}_.+\.sql$/.test(n));
+ verifyRc24CapturedSource(snapshot,localNames);
+ return analyzeStagingMigrationDrift(snapshot,source);
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))
  console.log("VOX_RC23_MIGRATION_HISTORY_HOLD "+JSON.stringify(buildRc23HistoryPacket()));

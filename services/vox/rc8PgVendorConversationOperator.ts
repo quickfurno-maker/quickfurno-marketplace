@@ -34,6 +34,7 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
  const proveSource=sourceProof?.mode==="DISPOSABLE_RC12_AB7B_PROOF";
  if(!input||!UUID.test(input.conversationId??"")||!UUID.test(input.nonce??"")||
     !Number.isSafeInteger(input.expectedRevision)||input.expectedRevision<0||
+    input.expectedRevision>2147483646||
     !["PAUSE_AI","TAKEOVER"].includes(input.action)||!input.verifiedStaff||
     !UUID.test(input.verifiedStaff.userId??"")||input.verifiedStaff.aal!=="aal2"||
     !Number.isSafeInteger(input.verifiedStaff.expiresAtMs)||

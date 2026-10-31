@@ -24,7 +24,7 @@ const validCommand=(value:unknown):value is Command=>{
  return typeof c.conversationId==="string"&&UUID.test(c.conversationId)&&
   typeof c.nonce==="string"&&UUID.test(c.nonce)&&
   Number.isSafeInteger(c.expectedRevision)&&
-  (c.expectedRevision as number)>=0&&
+  (c.expectedRevision as number)>=0&&(c.expectedRevision as number)<=2147483646&&
   (c.action==="PAUSE_AI"||c.action==="TAKEOVER");
 };
 const blocked=(reason:string)=>Object.freeze({ok:false,reason,committed:false,providerMessagesSent:0,

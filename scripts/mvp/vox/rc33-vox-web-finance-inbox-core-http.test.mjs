@@ -213,7 +213,7 @@ test("finance list: cross-role/no-session denial shows sign-in, not provider dat
  for(const auth of [{aal:"aal1"},{user:false}]){
   const s=setup({auth,core:financeCore(owner(preview()))});
   const html=await financePage({searchParams:Promise.resolve({})});
-  assert.match(html,/Verified Owner session required/);assert.match(html,/href="\/login"/);
+  assert.match(html,/Verified Owner session required/);assert.match(html,/href="\/login\?next=%2Ffinance"/);
   assert.equal(html.includes("VENDOR-0123abcd"),false);assert.equal(s.requests.length,0);
  }
  // Core 403 (a scoped, non-Owner staff role) must not reveal any record
@@ -271,13 +271,13 @@ test("finance detail: UX - missing MFA offers sign-in instead of a dead end",asy
   const s=setup({auth,core:financeCore(detailTable(detail()))});
   const html=await orderPage({params:Promise.resolve({orderId:ORDER})});
   assert.match(html,/Verified Owner session required/);
-  assert.match(html,/href="\/login"/);assert.match(html,/href="\/finance"/);
+  assert.ok(html.includes('href="/login?next=%2Ffinance%2F'+ORDER+'"'));assert.match(html,/href="\/finance"/);
   assert.equal(s.requests.length,0);
  }
  // other failures keep the neutral card and do NOT claim a sign-in problem
  setup({core:financeCore(detailTable(Response.json({},{status:403})))});
  const html=await orderPage({params:Promise.resolve({orderId:ORDER})});
- assert.match(html,/Order details unavailable/);assert.equal(html.includes('href="/login"'),false);
+ assert.match(html,/Order details unavailable/);assert.doesNotMatch(html,/href="\/login(?:\?|\")/);
 });
 test("finance detail: bad Core responses are rejected whole",async()=>{
  for(const bad of [detail({providerConfirmed:true}),detail({canRefund:true}),detail({canCapture:true}),

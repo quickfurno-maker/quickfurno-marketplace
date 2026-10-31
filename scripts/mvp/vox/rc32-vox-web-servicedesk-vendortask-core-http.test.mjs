@@ -94,12 +94,13 @@ test("service desk: aal1, no user, or mismatched session never reach Core",async
   assert.equal(s.requests.length,0);
  }
 });
-test("service desk: Core 403 preserved, other failures collapse to 503",async()=>{
- for(const [status,want] of [[403,403],[500,503],[401,503]]){
+test("service desk: Core 401 requests MFA, 403 preserves denial, 500 is 503",async()=>{
+ for(const [status,want,error] of [[403,403,"STAFF_DESK_UNAVAILABLE"],
+  [500,503,"STAFF_DESK_UNAVAILABLE"],[401,401,"MFA_REQUIRED"]]){
   setup({core:async()=>Response.json({secret:"core-body"},{status})});
   const r=await desk.GET();assert.equal(r.status,want);
   const t=await r.text();assert.equal(t.includes("core-body"),false);
-  assert.equal(JSON.parse(t).error,"STAFF_DESK_UNAVAILABLE");
+  assert.equal(JSON.parse(t).error,error);
  }
 });
 test("service desk: timeout/abort and network errors become 503",async()=>{

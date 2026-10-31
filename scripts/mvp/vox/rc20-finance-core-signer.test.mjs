@@ -222,7 +222,7 @@ test("EOD approvals require exact named independent gates, not four arbitrary tr
 test("Finance UI directs unavailable Core to operations, MFA failure to actual login",()=>{
  const ui=read("apps/vox-web/app/finance/page.tsx");
  assert.match(ui,/needsLogin=result\.error==="MFA_REQUIRED"/);
- assert.match(ui,/needsLogin\?"\/login":"\/operations"/);
+ assert.match(ui,/needsLogin\?withReturn\("\/login","\/finance"\):"\/operations"/);
  assert.match(ui,/No payment actions can be performed from this screen/);
 });
 

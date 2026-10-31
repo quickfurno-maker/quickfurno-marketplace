@@ -8,6 +8,11 @@ on:
       - 'apps/vox-web/app/team/command-center/page.tsx'
       - 'apps/vox-web/lib/core.ts'
       - 'apps/vox-web/lib/returnTo.*'
+      - 'apps/vox-web/app/acquisition/page.tsx'
+      - 'apps/vox-web/app/service-desk/page.tsx'
+      - 'apps/vox-web/app/vendor360/**'
+      - 'apps/vox-web/app/finance/**'
+      - 'apps/vox-web/scripts/validate-rc37-navigation-401.spec.mjs'
       - 'apps/vox-web/scripts/validate-staff-session-recovery-rc35.spec.mjs'
       - 'apps/vox-web/app/team/work-queue/page.tsx'
       - 'apps/vox-web/scripts/validate-ab3-domain.mjs'
@@ -33,5 +38,7 @@ jobs:
       - run: npm test
       - run: npm run typecheck
       - run: npm run build
+      - name: Verify RC37 compiled Finance/CRM/Staff 401 navigation
+        run: node --test scripts/validate-rc37-navigation-401.spec.mjs
       - name: Verify compiled Staff session recovery and safe return paths
         run: node --test scripts/validate-staff-session-recovery-rc35.spec.mjs

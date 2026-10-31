@@ -8,7 +8,7 @@ const read=p=>readFileSync(resolve(root,p),"utf8");
 test("unavailable Vendor 360 routes real MFA failure to login, Core denial to operations",()=>{
  const page=read("apps/vox-web/app/vendor360/page.tsx");
  assert.match(page,/fetchScopedCrm\("vendor360"\)/);
- assert.match(page,/r\.status===401\?"\/login":"\/operations"/);
+ assert.match(page,/r\.status===401\?withReturn\("\/login","\/vendor360"\):"\/operations"/);
  assert.match(page,/r\.status===403/);
  assert.match(page,/No vendor state was modified/);
  assert.doesNotMatch(page,/adminClient|\.rpc\(/);

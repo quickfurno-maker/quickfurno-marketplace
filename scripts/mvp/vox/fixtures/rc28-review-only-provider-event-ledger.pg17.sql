@@ -63,12 +63,15 @@ BEGIN
  THEN RETURN jsonb_build_object('event_id',p_event_id,'provider_mode',p_provider_mode,
   'status','in_flight'); END IF;
  IF r.attempt_count>=25 THEN
+  -- Unresolved provider settlement cannot be acknowledged automatically.
+  -- Retain a manual-reconciliation record without creating new Core leases.
   UPDATE public.qf_vendor_package_provider_events_candidate_v2
-   SET status='quarantined',outcome=NULL,error_code='PROVIDER_EVENT_ATTEMPTS_EXHAUSTED',
+   SET status='retryable',claimed_at=NULL,outcome=NULL,
+       error_code='PROVIDER_EVENT_ATTEMPTS_EXHAUSTED',
        updated_at=clock_timestamp()
    WHERE provider_mode=p_provider_mode AND event_id=p_event_id;
   RETURN jsonb_build_object('event_id',p_event_id,'provider_mode',p_provider_mode,
-   'status','quarantined','last_error_code','PROVIDER_EVENT_ATTEMPTS_EXHAUSTED');
+   'status','needs_reconciliation','last_error_code','PROVIDER_EVENT_ATTEMPTS_EXHAUSTED');
  END IF;
  UPDATE public.qf_vendor_package_provider_events_candidate_v2
   SET status='claimed',attempt_count=r.attempt_count+1,claimed_at=clock_timestamp(),

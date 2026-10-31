@@ -79,6 +79,26 @@ try{
  expect(parse(query(finish(id,"live",h,2,"quarantined",null,"PROVIDER_EVENT_FAILED"))).status===
   "quarantined","QUARANTINE_RECEIPT");
  expect(parse(query(fn(id,"live",h))).status==="quarantined","QUARANTINE_REPLAY");
+ // A genuine unknown provider settlement cannot be marked completed or
+ // acknowledged merely because the bounded automatic attempt budget ended.
+ const exhaustedId="evt_RC30UNKNOWN25";
+ const firstUnknown=parse(query(fn(exhaustedId,"test",h)));
+ expect(firstUnknown.status==="claimed","UNKNOWN_INITIAL_CLAIM");
+ query("UPDATE public.qf_vendor_package_provider_events_candidate_v2 "+
+  "SET status='retryable',claimed_at=NULL,attempt_count=25,"+
+  "error_code='PROVIDER_EVENT_HTTP_UNCERTAIN' WHERE event_id='"+
+  exhaustedId+"' AND provider_mode='test';");
+ const exhausted=parse(query(fn(exhaustedId,"test",h)));
+ expect(exhausted.status==="needs_reconciliation"&&
+  exhausted.last_error_code==="PROVIDER_EVENT_ATTEMPTS_EXHAUSTED",
+  "EXHAUSTED_UNCERTAIN_NEVER_ACK");
+ const exhaustedAgain=parse(query(fn(exhaustedId,"test",h)));
+ expect(exhaustedAgain.status==="needs_reconciliation","EXHAUSTION_NO_NEW_CLAIM");
+ const persisted=query("SELECT status||'|'||attempt_count||'|'||error_code "+
+  "FROM public.qf_vendor_package_provider_events_candidate_v2 "+
+  "WHERE event_id='"+exhaustedId+"' AND provider_mode='test';");
+ expect(persisted.stdout.trim()==="retryable|25|PROVIDER_EVENT_ATTEMPTS_EXHAUSTED",
+  "UNRESOLVED_PAYMENT_PERSISTED_NO_ACK");
  // Full integration proof: the SAME repository implementation and orchestration
  // used by source contracts now call actual isolated PostgreSQL RPCs.
  const allowed={

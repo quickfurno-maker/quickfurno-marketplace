@@ -169,6 +169,21 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
     request.cityId,signed.ownerId,signed.teamLeaderId]);
   if(receipt.rowCount!==1||receipt.rows[0]?.id!==intentId)
    throw Error("INTENT_RECEIPT_UNVERIFIED");
+  // DB locks, nonce claims and report writes can outlive the initial AAL2
+  // check. Never commit a pending receipt after either real verified session
+  // or either signed envelope has expired while the transaction was open.
+  const atCommit=Date.now();
+  if(!Number.isSafeInteger(signed.signatureExpiresAtMs)||
+     signed.signatureExpiresAtMs<=atCommit||
+     !Number.isSafeInteger(ownerAuth?.sessionExpiresAtMs)||
+     ownerAuth.sessionExpiresAtMs<=atCommit||
+     !Number.isSafeInteger(teamLeaderAuth?.sessionExpiresAtMs)||
+     teamLeaderAuth.sessionExpiresAtMs<=atCommit||
+     !Number.isSafeInteger(teamLeaderAuth?.membershipExpiresAtMs)||
+     teamLeaderAuth.membershipExpiresAtMs<=atCommit){
+   await client.query("ROLLBACK");settled=true;
+   return deny("SIGNED_EOD_IDENTITY_OR_ENVELOPE_EXPIRED_DURING_TRANSACTION");
+  }
   settled=true;
   try{await client.query("COMMIT");}catch{return deny("COMMIT_OUTCOME_UNKNOWN");}
   return Object.freeze({ok:true,intentId,state:"AWAITING_EXTERNAL_REVIEW",

@@ -156,6 +156,9 @@ export async function prepareRc4SignedApproval({request,ownerAuth,teamLeaderAuth
  return Object.freeze({ok:true,preparationVerified:true,signatureVerified:true,
   approved:false,canAuthorize:false,officialEodEnabled:false,type,subjectId,
   ownerId:v.ownerId,teamLeaderId:v.teamLeaderId,ledgerDurable,
+  // The transaction writer must recheck this envelope expiry immediately
+  // before commit, not just at the earlier verification instant.
+  signatureExpiresAtMs:expiresAtMs,
   blockers:Object.freeze(ledgerDurable?[...RC4_BLOCKERS]:[...RC4_BLOCKERS,"NONCE_LEDGER_NOT_DURABLE"])});
 }
 

@@ -7,6 +7,7 @@ const reply=(body:unknown,status:number)=>Response.json(body,{status,headers:{
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ACTIVE=["open","in_progress","blocked"];
 const SELECT="id,vendor_id,status,completion_result,updated_by";
+const ATOMIC_RPC="qf_vox_core_vendor_task_transition_atomic_candidate_v1";
 // Native Vendor CRM task lifecycle (complete/cancel). Writes only vendor_tasks
 // status columns through service_role after Core authority is re-read; never
 // vendors, consent, WhatsApp, credits or conversations.
@@ -27,6 +28,36 @@ export async function POST(request:Request){
   const cmd=normalizeVendorTaskTransition(JSON.parse(raw),scope);
   if(!cmd)return reply({ok:false,error:"INVALID_TRANSITION"},400);
   const db=adminClient();
+  // Additional default-OFF gate. When atomic is required ("staging") the DB
+  // transaction is the ONLY writer: no fallback to the weak CAS below, ever.
+  // Any other non-empty value is a misconfiguration and fails closed.
+  const atomic=process.env.VOX_VENDOR_TASK_ATOMIC_RPC_ENABLED;
+  if(atomic!==undefined&&atomic!==""){
+   if(atomic!=="staging")return reply({ok:false,error:"VENDOR_TASKS_DISABLED"},503);
+   const rpc=await db.rpc(ATOMIC_RPC,{p_actor:scope.userId,p_team:scope.teamId,
+    p_city:scope.cityId,p_role:scope.role,p_task:cmd.taskId,p_action:cmd.action,
+    p_result:cmd.result});
+   if(rpc.error){
+    const m=String(rpc.error.message??"");
+    if(/VOX_CORE_TASK_(STAFF|TEAM_OR_CITY|VENDOR_GRANT)_NOT_CURRENT/.test(m))
+     return reply({ok:false,error:"SCOPE_DENIED"},403);
+    if(/VOX_CORE_TASK_VENDOR_CITY_DENIED/.test(m))
+     return reply({ok:false,error:"VENDOR_CITY_DENIED"},403);
+    if(/VOX_VENDOR_TASK_STATE_CONFLICT/.test(m))
+     return reply({ok:false,error:"TASK_STATE_CONFLICT"},409);
+    if(/VOX_CORE_TASK_TRANSITION_INPUT_DENIED/.test(m))
+     return reply({ok:false,error:"INVALID_TRANSITION"},400);
+    return reply({ok:false,error:"VENDOR_TASK_UNAVAILABLE"},503);
+   }
+   const row=Array.isArray(rpc.data)?(rpc.data.length===1?rpc.data[0]:null):rpc.data;
+   if(!row||row.task_id!==cmd.taskId||row.task_status!==cmd.status||
+      typeof row.replayed!=="boolean"||typeof row.receipt!=="string"||
+      !/^[0-9a-f]{64}$/.test(row.receipt))
+    return reply({ok:false,error:"VENDOR_TASK_UNAVAILABLE"},503);
+   return reply({ok:true,taskId:cmd.taskId,status:cmd.status,replayed:row.replayed,
+    receipt:row.receipt,authority:"quickfurno-core-vendor-crm",
+    scope:"ASSIGNED_VENDOR_ONLY"},row.replayed?200:201);
+  }
   const read=await db.from("vendor_tasks").select(SELECT).eq("id",cmd.taskId).maybeSingle();
   if(read.error)return reply({ok:false,error:"VENDOR_TASK_UNAVAILABLE"},503);
   // Unknown task and out-of-grant task are indistinguishable to the caller.

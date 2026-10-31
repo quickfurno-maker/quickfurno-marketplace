@@ -170,6 +170,9 @@ test("store failure fails closed with no provider detail",async()=>{
 test("static boundary: route/contract never touch consent, conversation, WhatsApp or credits",()=>{
  const src=["app/api/vox/v1/vendor-task-transition/route.ts","contracts/vox/vendorTaskTransitionInput.mjs"]
   .map(p=>readFileSync(resolve(root,p),"utf8").replace(/^\s*\/\/.*$/gm,"")).join("\n");
- assert.equal(/CORE_CONVERSATION|consent|whatsapp|vendor_credits|\.rpc\(|\.insert\(|\.delete\(/i.test(src),false);
+ assert.equal(/CORE_CONVERSATION|consent|whatsapp|vendor_credits|\.insert\(|\.delete\(/i.test(src),false);
+ // RC37: the ONLY permitted RPC is the default-OFF reviewed atomic transition.
+ assert.deepEqual(src.match(/\.rpc\([^,]*/g)??[],src.includes(".rpc(")?[".rpc(ATOMIC_RPC"]:[]);
+ assert.match(src,/const ATOMIC_RPC="qf_vox_core_vendor_task_transition_atomic_candidate_v1"/);
  assert.equal(/from\("(?!vendor_tasks|vendors|marketplace_service_zones)/.test(src),false);
 });

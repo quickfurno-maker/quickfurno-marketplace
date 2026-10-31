@@ -35,12 +35,12 @@ export default async function Finance({searchParams}:FinanceProps){
   (!selectedMonth||indiaOrderMonth(o.createdAt)===selectedMonth));
  // These counts describe the bounded Core snapshot only. They are not a
  // reconciliation queue, settled revenue, or an authority to retry payments.
- const attention=result.orders.reduce((n,o)=>n+
-  (["pending","failed"].includes(o.paymentStatus.toLowerCase())?1:0),0);
- // Count only the month the shortcut will actually display. Numbers
- // must never imply a complete accounting/reconciliation backlog.
+ // Count only the month these filters and shortcuts display. Values
+ // remain bounded Core preview counts, not settlement or complete history.
  const monthScoped=result.orders.filter(o=>!selectedMonth||
   indiaOrderMonth(o.createdAt)===selectedMonth);
+ const attention=monthScoped.reduce((n,o)=>n+
+  (["pending","failed"].includes(o.paymentStatus.toLowerCase())?1:0),0);
  const pendingCount=monthScoped.filter(o=>o.paymentStatus.toLowerCase()==="pending").length;
  const failedCount=monthScoped.filter(o=>o.paymentStatus.toLowerCase()==="failed").length;
  return <main className="voxOps">
@@ -54,7 +54,7 @@ export default async function Finance({searchParams}:FinanceProps){
   </div>
   <div className="voxSectionTitle"><p className="kicker">RECENT CORE RECORDS</p><h2>Order preview</h2>
    <p>{attention===0?"No pending or failed statuses in the returned snapshot.":
-    attention+" of "+result.orders.length+" returned records have pending or failed status; reconciliation needs separate verified provider evidence."}</p>
+    attention+" of "+monthScoped.length+" records in "+(selectedMonth??"the returned snapshot")+" have pending or failed status; reconciliation needs separate verified provider evidence."}</p>
   </div>
   <nav aria-label="Recent payment attention shortcuts" style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:14}}>
    <Link href={financeHref("pending",selectedMonth)} style={{color:"#eec78f"}}>

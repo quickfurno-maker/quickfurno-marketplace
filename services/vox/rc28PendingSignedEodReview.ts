@@ -44,6 +44,20 @@ export async function verifyRc28PendingEodForHumanReview(
     proof.receiptSha256!==input.expectedReceiptSha256||
     state.publicationAuthorized!==false)
   return deny("SIGNED_INTENT_NOT_DURABLY_PENDING");
+ // PostgreSQL reconciliation may wait on writer locks. Do not issue a
+ // positive review after either human loses their current AAL2 authority
+ // during that wait, even though publication remains strictly disabled.
+ let currentOwner:string|null,currentLeader:Awaited<ReturnType<typeof verifyVoxTeamLeaderBearer>>;
+ try{
+  [currentOwner,currentLeader]=await Promise.all([
+   verifyVoxOwnerBearer(ownerAuthorization),verifyVoxTeamLeaderBearer(leaderAuthorization)
+  ]);
+ }catch{return deny("HUMAN_AAL2_RECHECK_UNAVAILABLE")}
+ if(currentOwner!==owner||!currentOwner||!currentLeader||
+    currentLeader.userId!==leader.userId||currentOwner===currentLeader.userId||
+    currentLeader.teamId!==leader.teamId||currentLeader.cityId!==leader.cityId||
+    currentLeader.aal!=="aal2"||currentLeader.expiresAtMs<=Date.now())
+  return deny("HUMAN_AAL2_REVOKED_DURING_RECONCILIATION");
  return Object.freeze({ok:true,state:"PENDING_RECEIPT_AWAITING_EXTERNAL_REVIEW",
   receiptSha256:proof.receiptSha256,approved:false,
   publicationAuthorized:false,providerMessagesSent:0,requiresIndependentReview:true});

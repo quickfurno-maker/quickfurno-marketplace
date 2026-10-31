@@ -16,8 +16,8 @@ await build({entryPoints:[resolve(root,"services/vox/rc28PendingSignedEodReview.
  b.onResolve({filter:/verifiedStaffBearer$/},()=>({namespace:"stub",path:"auth"}));
  b.onResolve({filter:/rc8-pg-signed-intent-writer\.mjs$/},()=>({namespace:"stub",path:"pg"}));
  b.onLoad({filter:/.*/,namespace:"stub"},({path})=>({loader:"js",contents:
-  path==="auth"?"export async function verifyVoxOwnerBearer(){return globalThis.__eodOwner}"+
-   "export async function verifyVoxTeamLeaderBearer(){return globalThis.__eodLeader}":
+  path==="auth"?"export async function verifyVoxOwnerBearer(){globalThis.__eodOwnerCalls++;return globalThis.__eodOwnerCalls>1&&globalThis.__eodRevokeOwner?null:globalThis.__eodOwner}"+
+   "export async function verifyVoxTeamLeaderBearer(){globalThis.__eodLeaderCalls++;return globalThis.__eodLeaderCalls>1&&globalThis.__eodRevokeLeader?null:globalThis.__eodLeader}":
   path==="pg"?"export async function reconcileRc8PgSignedIntentOutcome(x){globalThis.__eodCalls.push(x);"+
    "if(globalThis.__eodThrow)throw Error('synthetic DB down');return globalThis.__eodProof}"+
    "export function rc8SignedEodPublicationAuthorizationState(){return {publicationAuthorized:globalThis.__eodPublish}}":
@@ -31,7 +31,10 @@ const pending=()=>({intentId:id(1),subjectId:id(2),expectedReceiptSha256:receipt
 const acquire=async()=>{throw Error("MUST_NEVER_OPEN_DB_FROM_STUB")};
 test.beforeEach(()=>{
  globalThis.__eodOwner=id(3);
- globalThis.__eodLeader={userId:id(4),aal:"aal2",expiresAtMs:Date.now()+60000};
+ globalThis.__eodLeader={userId:id(4),aal:"aal2",expiresAtMs:Date.now()+60000,
+  teamId:id(5),cityId:id(6)};
+ globalThis.__eodRevokeOwner=false;globalThis.__eodRevokeLeader=false;
+ globalThis.__eodOwnerCalls=0;globalThis.__eodLeaderCalls=0;
  globalThis.__eodProof={outcome:"COMMITTED",ok:true,receiptSha256:receipt};
  globalThis.__eodPublish=false;globalThis.__eodThrow=false;globalThis.__eodCalls=[];
 });
@@ -73,4 +76,25 @@ test("in-flight, conflict, forged publication and SQL outage never authorize EOD
  globalThis.__eodPublish=false;globalThis.__eodThrow=true;
  assert.equal((await run("owner","tl",pending(),acquire)).reason,
   "SIGNER_RECEIPT_RECONCILIATION_UNAVAILABLE");
+});
+
+test("RC29 rechecks both human AAL2 authorities after durable DB reconciliation",async()=>{
+ const result=await run("owner","tl",pending(),acquire);
+ assert.equal(result.ok,true);
+ assert.equal(result.publicationAuthorized,false);
+ assert.equal(globalThis.__eodOwnerCalls,2);
+ assert.equal(globalThis.__eodLeaderCalls,2);
+});
+test("RC29 revoked Owner or TL during slow reconciliation cannot produce a positive review",async()=>{
+ globalThis.__eodRevokeOwner=true;
+ let result=await run("owner","tl",pending(),acquire);
+ assert.equal(result.ok,false);
+ assert.equal(result.reason,"HUMAN_AAL2_REVOKED_DURING_RECONCILIATION");
+ assert.equal(result.publicationAuthorized,false);
+ globalThis.__eodOwnerCalls=0;globalThis.__eodLeaderCalls=0;
+ globalThis.__eodRevokeOwner=false;globalThis.__eodRevokeLeader=true;
+ result=await run("owner","tl",pending(),acquire);
+ assert.equal(result.ok,false);
+ assert.equal(result.reason,"HUMAN_AAL2_REVOKED_DURING_RECONCILIATION");
+ assert.equal(result.publicationAuthorized,false);
 });

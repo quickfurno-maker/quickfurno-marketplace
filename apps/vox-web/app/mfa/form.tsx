@@ -1,6 +1,7 @@
 "use client";
 import {useState} from "react";
-export function MfaForm(){
+import {safeReturnPath} from "../../lib/returnTo.mjs";
+export function MfaForm({next=null}:{next?:string|null}){
  const [error,setError]=useState("");
  const [busy,setBusy]=useState(false);
  return <form style={{display:"grid",gap:12}} onSubmit={async e=>{
@@ -8,7 +9,7 @@ export function MfaForm(){
   const code=String(new FormData(e.currentTarget).get("code")||"");
   try{
    const r=await fetch("/api/auth/mfa",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({code})});
-   if(r.ok)window.location.assign("/operations");
+   if(r.ok)window.location.assign(safeReturnPath(next)??"/operations");
    else setError("Verification denied. Confirm your authenticator is enrolled.");
   }catch{setError("Authenticator unavailable.");}finally{setBusy(false);}
  }}>

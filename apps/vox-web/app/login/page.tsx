@@ -1,9 +1,11 @@
 import {LoginForm} from "./form";
+import {safeReturnPath} from "../../lib/returnTo.mjs";
 import "./login.css";
 
 export const dynamic = "force-dynamic";
 
-export default function Login() {
+export default async function Login({searchParams}: {searchParams: Promise<{next?: string | string[]}>}) {
+  const next = safeReturnPath((await searchParams).next);
   const loginEnabled = process.env.VOX_STAFF_PORTAL_ENABLED === "staging";
   const recoveryEnabled = process.env.VOX_PASSWORD_RECOVERY_ENABLED === "staging";
 
@@ -55,7 +57,7 @@ export default function Login() {
             </div>
           ) : null}
 
-          <LoginForm disabled={!loginEnabled} />
+          <LoginForm disabled={!loginEnabled} next={next} />
 
           {recoveryEnabled ? <p className="voxAuthRecovery"><a href="/password/recover">Recover account access</a></p> : null}
 

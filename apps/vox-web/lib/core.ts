@@ -872,8 +872,11 @@ export async function fetchStaffWorkQueuePreview(){
   const response=await fetch(base+"/api/vox/v1/work-queue",{
    method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
    redirect:"error",cache:"no-store",signal:AbortSignal.timeout(3500)});
-  if(!response.ok)return {ok:false,status:response.status===403?403:503,
-   error:"CORE_STAFF_SCOPE_DENIED_OR_UNAVAILABLE"} as const;
+  // Core 401 = Staff session/AAL2 rejected: surface 401 (no body forwarded)
+  // so the UI offers sign-in instead of a dead-end 503.
+  if(!response.ok)return {ok:false,
+   status:response.status===401?401:response.status===403?403:503,
+   error:response.status===401?"MFA_REQUIRED":"CORE_STAFF_SCOPE_DENIED_OR_UNAVAILABLE"} as const;
   const data:unknown=await response.json();
   if(!data||typeof data!=="object"||Array.isArray(data))
    return {ok:false,status:503,error:"INVALID_QUEUE_SCHEMA"} as const;

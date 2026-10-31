@@ -1,7 +1,8 @@
 "use client";
 import {useState} from "react";
+import {withReturn} from "../../lib/returnTo.mjs";
 
-export function LoginForm({disabled = false}: {disabled?: boolean}) {
+export function LoginForm({disabled = false, next = null}: {disabled?: boolean; next?: string | null}) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -20,7 +21,7 @@ export function LoginForm({disabled = false}: {disabled?: boolean}) {
             headers: {"content-type": "application/json"},
             body: JSON.stringify({email: form.get("email"), password: form.get("password")})
           });
-          if (r.ok) window.location.assign("/mfa");
+          if (r.ok) window.location.assign(withReturn("/mfa", next));
           else setError("Sign-in could not be verified.");
         } catch {
           setError("Sign-in unavailable.");

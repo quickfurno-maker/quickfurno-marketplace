@@ -5,6 +5,7 @@ import {deriveBoundedAttention} from "../../../lib/ab2Attention";
 import {fetchStaffNotifications} from "../../../lib/staffNotifications";
 import {fetchStaffEodPreview} from "../../../lib/eod";
 import {fetchScopedRiyaClientCases,fetchStaffSourceReadiness} from "../../../lib/clientSourceStatus";
+import {withReturn} from "../../../lib/returnTo.mjs";
 import "../workflow.css";
 import "./command-center.css";
 export const dynamic="force-dynamic";
@@ -29,6 +30,8 @@ export default async function StaffCommandCenter(){
  ]);
  const available=work.ok||notifications.ok||eod.ok||clientCases.ok||sourceReadiness.ok||unified.ok;
  const attention=deriveBoundedAttention(unified);
+ const needsSignIn=work.status===401||unified.status===401;
+ const signInHref=withReturn("/login","/team/command-center");
  return <main className="voxFlow voxCommandCenter">
   <nav className="voxFlowNav" aria-label="Breadcrumb">
    <Link href="/team">Team Operations</Link><span>/</span><span>Command Center</span>
@@ -42,6 +45,12 @@ export default async function StaffCommandCenter(){
     {available?"Bounded, partial Core source views":"Protected Staff workspace locked"}
    </span>
   </header>
+  {needsSignIn?<section className="voxFlowCard" role="status" aria-labelledby="signin-title">
+   <h2 id="signin-title">Sign in again to continue</h2>
+   <p>Your Staff session or authenticator verification is missing or expired.
+    Sign in and verify MFA; you will return here. This link grants no access.</p>
+   <Link href={signInHref}>Sign in with MFA <span aria-hidden="true">→</span></Link>
+  </section>:null}
   {!available?<section className="voxFlowCard" role="status">
    <h2>Operations data is locked</h2>
    <p>Use verified Staff MFA with approved Core team, city and subject grants.

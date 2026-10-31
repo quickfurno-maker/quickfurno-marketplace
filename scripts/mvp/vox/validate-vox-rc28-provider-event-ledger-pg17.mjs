@@ -55,6 +55,7 @@ try{
  const refundReviewSql=readFileSync(resolve(root,
   "scripts/mvp/vox/fixtures/rc35-review-only-refund-intake-review.pg17.sql"),"utf8");
  query(refundReviewSql);
+ query(readFileSync(resolve(root,"scripts/mvp/vox/fixtures/rc37-review-only-refund-id-bound-review.pg17.sql"),"utf8"));
  const refundEvent="evt_RC36REFUND1234",refundHash="d".repeat(64);
  const refundClaim=parse(query(fn(refundEvent,"test",refundHash,"refund.processed")));
  expect(refundClaim.status==="claimed"&&refundClaim.attempt_count===1,"REFUND_CLAIMED");
@@ -85,6 +86,28 @@ try{
   "'"+refundEvent+"','test','"+refundHash+"','"+reviewer+
   "','escalated_for_policy_decision',NULL);",true);
  expect(reviewAnon.status!==0,"REFUND_ANON_DENIED");
+ // RC37 v3: two signed refund events for the SAME refund id may produce
+ // only one immutable reviewer decision. No live provider or wallet mutation.
+ const v3RefundId="rfnd_RC37ABC123";
+ const v3SecondEvent="evt_RC37REFUNDABC";
+ const v3Review=(event,hash,who,decision)=>
+  "SET ROLE service_role;SELECT public.qf_review_vendor_package_refund_intake_v3("+
+  ["'"+event+"'","'test'","'"+hash+"'","'"+who+"'","'"+decision+"'",
+   "NULL","'"+v3RefundId+"'","'pay_ABC12345'"].join(",")+")::text;";
+ expect(parse(query(v3Review(refundEvent,refundHash,reviewer,"escalated_for_policy_decision"))).status==="reviewed",
+  "RC37_REFUND_FIRST_IMMUTABLE_REVIEW");
+ expect(parse(query(v3Review(refundEvent,refundHash,reviewer,"escalated_for_policy_decision"))).status==="reviewed",
+  "RC37_REFUND_EXACT_REPLAY");
+ const other=parse(query(fn(v3SecondEvent,"test",refundHash,"refund.failed")));
+ expect(other.status==="claimed","RC37_REFUND_SECOND_EVENT_CLAIM");
+ expect(parse(query(finish(v3SecondEvent,"test",refundHash,1,"quarantined",null,"REFUND_REVIEW_REQUIRED"))).status===
+  "quarantined","RC37_REFUND_SECOND_EVENT_QUARANTINE");
+ expect(parse(query(v3Review(v3SecondEvent,refundHash,reviewer,"escalated_for_policy_decision"))).status===
+  "review_conflict","RC37_REFUND_SECOND_EVENT_CANNOT_REVIEW_AGAIN");
+ expect(parse(query(v3Review(refundEvent,refundHash,otherReviewer,"escalated_for_policy_decision"))).status===
+  "review_conflict","RC37_REFUND_REVIEWER_SWAP_DENIED");
+ expect(query(v3Review(refundEvent,"f".repeat(64),reviewer,"escalated_for_policy_decision"),true).status!==0,
+  "RC37_REFUND_BAD_HASH_DENIED");
  const a=parse(query(fn(id,"test",h)));
  expect(a.status==="claimed"&&a.attempt_count===1,"FIRST_CLAIM");
  expect(parse(query(fn(id,"test",h))).status==="in_flight","ACTIVE_LEASE");

@@ -126,7 +126,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          RC27_NATIVE_PG17=1 node --test scripts/mvp/vox/rc27-e-concurrency-fail-closed-qa.test.mjs
+          node --test scripts/mvp/vox/rc27-e-concurrency-pg17.mjs
       - name: No abandoned database
         if: always()
         shell: bash

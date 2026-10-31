@@ -70,6 +70,12 @@ export async function verifyVoxOperationsStaffBearer(
    .select("id,city_id,is_active").eq("id",m.team_id).maybeSingle();
   if(team.error||!team.data||team.data.id!==m.team_id||
      team.data.is_active!==true||!UUID.test(team.data.city_id||""))return null;
+  // A disabled city revokes live operations and Team Leader authority even
+  // while a previously issued AAL2 JWT and team membership are still valid.
+  const city=await admin.from("cities").select("id,is_active")
+   .eq("id",team.data.city_id).maybeSingle();
+  if(city.error||city.data?.id!==team.data.city_id||
+     city.data?.is_active!==true)return null;
   if(expiresAtMs<=Date.now()||Date.parse(m.expires_at)<=Date.now())return null;
   return Object.freeze({userId:user.id,aal:"aal2",expiresAtMs,
    teamId:m.team_id,cityId:team.data.city_id});
@@ -112,6 +118,12 @@ export async function verifyVoxTeamLeaderBearer(
    .select("id,city_id,is_active").eq("id",m.team_id).maybeSingle();
   if(team.error||!team.data||team.data.id!==m.team_id||
      team.data.is_active!==true||!UUID.test(team.data.city_id||""))return null;
+  // A disabled city revokes live operations and Team Leader authority even
+  // while a previously issued AAL2 JWT and team membership are still valid.
+  const city=await admin.from("cities").select("id,is_active")
+   .eq("id",team.data.city_id).maybeSingle();
+  if(city.error||city.data?.id!==team.data.city_id||
+     city.data?.is_active!==true)return null;
   if(expiresAtMs<=Date.now()||Date.parse(m.expires_at)<=Date.now())return null;
   return Object.freeze({userId:user.id,aal:"aal2",expiresAtMs,
    teamId:m.team_id,cityId:team.data.city_id});

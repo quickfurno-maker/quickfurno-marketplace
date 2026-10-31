@@ -13,6 +13,11 @@ const uuid=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 const [vendor,pkg,testOrder,liveOrder,token,other,liveToken,nullProviderOrder,cancelledOrder,refundOrder,nullStateOrder]=[1,2,3,4,5,6,7,8,9,10,13].map(uuid);
 const check=(value,label)=>{if(!value)throw Error(label)};
 const reject=async(fn,label)=>{let denied=false;try{await fn()}catch{denied=true}check(denied,label+"_MUST_DENY")};
+const rejectReason=async(fn,label,reason)=>{
+ let actual="";
+ try{await fn()}catch(e){actual=String(e?.message||e)}
+ check(actual.includes(reason),label+"_EXPECTED_"+reason+"_GOT_"+actual.slice(0,120));
+};
 const setup=[
  "CREATE ROLE anon NOLOGIN;CREATE ROLE authenticated NOLOGIN;CREATE ROLE service_role NOLOGIN",
  "CREATE TABLE public.vendors (id uuid PRIMARY KEY,package_expires_at timestamptz,package_name text,package_status text,paid_status text,credits integer DEFAULT 0)",
@@ -110,9 +115,9 @@ try{
  await pool.query("UPDATE public.payments SET payment_status=NULL WHERE id=$1",[nullStateOrder]);
  await reject(()=>bind(nullStateOrder,uuid(14),"test","order_nullstate"),"NULL_LEDGER_STATUS_DENIED");
  await reject(()=>failed(nullStateOrder,"pay_nullledger","test"),"NULL_FAILED_LEDGER_DENIED");
- await pool.query("UPDATE public.payments SET payment_status='Paid' WHERE id=$1",[nullStateOrder]);
- await reject(()=>bind(nullStateOrder,uuid(14),"test","order_nullstate"),"PAID_UNACTIVATED_LEDGER_BIND_DENIED");
- await reject(()=>activate(nullStateOrder,"pay_existing_unactivated","test"),"PAID_LEDGER_CANNOT_MINT_CREDITS");
+ await pool.query("UPDATE public.payments SET payment_status='Paid',transaction_id='pay_existing_unactivated' WHERE id=$1",[nullStateOrder]);
+ await rejectReason(()=>bind(nullStateOrder,uuid(14),"test","order_nullstate"),"PAID_UNACTIVATED_LEDGER_BIND_DENIED","PAYMENT_BIND_DRIFT");
+ await rejectReason(()=>activate(nullStateOrder,"pay_existing_unactivated","test"),"PAID_LEDGER_CANNOT_MINT_CREDITS","PACKAGE_PAYMENT_LEDGER_NOT_ACTIVATABLE");
  await pool.query("UPDATE public.vendor_package_orders SET payment_provider=NULL WHERE id=$1",[nullProviderOrder]);
  await reject(()=>claim(nullProviderOrder,other,"test"),"NULL_PROVIDER_CANNOT_CLAIM");
  await claim(cancelledOrder,uuid(11),"test");
@@ -124,7 +129,7 @@ try{
  await claim(refundOrder,uuid(12),"test");
  await bind(refundOrder,uuid(12),"test","order_refund");
  await pool.query("UPDATE public.vendor_package_orders SET activation_status=NULL WHERE id=$1",[refundOrder]);
- await reject(()=>activate(refundOrder,"pay_unknown_activation","test"),"NULL_ACTIVATION_MUST_DENY_CREDIT");
+ await rejectReason(()=>activate(refundOrder,"pay_unknown_activation","test"),"NULL_ACTIVATION_MUST_DENY_CREDIT","PACKAGE_ORDER_LIFECYCLE_NOT_ACTIVATABLE");
  await pool.query("UPDATE public.vendor_package_orders SET activation_status='not_activated' WHERE id=$1",[refundOrder]);
  await pool.query("UPDATE public.vendor_package_orders SET payment_status='refunded' WHERE id=$1",[refundOrder]);
  await reject(()=>activate(refundOrder,"pay_refunded","test"),"REFUNDED_ORDER_NO_CREDITS");

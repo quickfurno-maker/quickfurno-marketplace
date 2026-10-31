@@ -131,6 +131,27 @@ try{
  r=await run(make(C3,id(51)));eq(r.ok,false,"D2C_SUPPRESSION_DENIED");
  eq(await count("public.communication_conversation_events"),1,"CONSENT_NO_EVENT");
  await pool.query("DELETE FROM public.communication_suppressions");
+ // Deterministically expire AAL2 after the write is staged but before COMMIT.
+ // The entire transaction, including conversation/event/nonce, must roll back.
+ const expiring=make(C3,id(66));
+ r=await execute(expiring,async()=>{
+  const raw=await pool.connect();
+  return {
+   query:async(sql,values)=>{
+    const result=await raw.query(sql,values);
+    if(sql.includes("INSERT INTO public.vox_rc8_conversation_operator_receipts_candidate_v1"))
+     expiring.verifiedStaff.expiresAtMs=Date.now()-1;
+    return result;
+   },
+   release:()=>raw.release()
+  };
+ });
+ eq(r.reason,"STAFF_AAL2_EXPIRED_DURING_TRANSACTION","IN_FLIGHT_AAL2_EXPIRY_DENIED");
+ eq(await count("public.communication_conversation_events"),1,"EXPIRED_AAL2_NO_EVENT");
+ eq(await count("public.vox_rc8_conversation_operator_receipts_candidate_v1"),1,"EXPIRED_AAL2_NO_RECEIPT");
+ const expiredState=await pool.query("SELECT state,revision FROM public.communication_conversations WHERE id=$1",[C3]);
+ eq(expiredState.rows[0].state,"OPEN","EXPIRED_AAL2_NO_TAKEOVER");
+ eq(Number(expiredState.rows[0].revision),0,"EXPIRED_AAL2_NO_REVISION");
  // A concurrent zone disable must serialize with the vendor Core writer.
  // Lock the same zone, start the operator, then revoke before releasing it.
  // An old snapshot must not commit a takeover after eligibility disappears.

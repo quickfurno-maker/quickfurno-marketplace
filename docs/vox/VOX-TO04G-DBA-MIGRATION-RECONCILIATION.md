@@ -48,3 +48,27 @@ node scripts/mvp/vox/rc35-migration-inventory-reconcile.mjs \
 - On the captured metadata the report carries `DIGEST_UNAVAILABLE`, `DUPLICATE_MANAGED_NAME`, `MANAGED_ONLY_NO_SOURCE_SQL`, `BASELINE_CONTENT_UNPROVEN` and historical-gap blockers. The DBA clears them only by supplying managed statement digests.
 
 Test: `node --test scripts/mvp/vox/rc35-migration-inventory-reconcile.test.mjs`
+
+## RC37 deterministic evidence package (offline, read-only)
+
+`scripts/mvp/vox/rc37-migration-evidence-package.mjs` builds on RC35. It never connects to a managed database, executes SQL or writes a ledger. `releaseGo` is always `false` and `goStatus` is `NO_GO_EVIDENCE_ONLY`; even a complete package only feeds the independent DBA decision.
+
+```
+node scripts/mvp/vox/rc37-migration-evidence-package.mjs \
+  --managed <ledger-export.json> --source-dir supabase/migrations \
+  [--aliases <aliases.json>] --out rc37-evidence-package.json
+# later, prove the stored package still matches the same inputs:
+node scripts/mvp/vox/rc37-migration-evidence-package.mjs \
+  --managed <ledger-export.json> --source-dir supabase/migrations \
+  [--aliases <aliases.json>] --verify rc37-evidence-package.json
+```
+
+- **Managed import:** a local JSON file exported out-of-band by the DBA (read-only `list_migrations`/`schema_migrations`): `[{version,name,statements:[sql...]}]`. The digest is `canonicalStatementsDigest`: each statement is trimmed, terminated with one `;`, joined by newlines, then hashed as in `canonicalSqlDigest`. Rows with only a declared `statementsSha256` are recorded as `DECLARED_DIGEST`; rows with names only are `NONE`. Either keeps `evidenceComplete=false` (`MANAGED_SQL_NOT_IMPORTED`). Exports containing connection strings, JWTs or `service_role` are refused (`RC37_SECRET_IN_INPUT`).
+- **Source digests:** computed from the real files in `--source-dir` (canonical SHA-256, CRLF/trailing-whitespace tolerant). No files (`SOURCE_SQL_ABSENT`) or an empty file (`SOURCE_SQL_EMPTY`) aborts with exit `1`. A source file matches a ledger row only when its canonical text equals the normalised statement script, so files carrying comments or different formatting report `DIGEST_MISMATCH` rather than a silent pass.
+- **Aliases:** `{aliases:[{managedVersion,sourceFile,managedSha256,sourceSha256,verifiedBy,basis}]}`. Honoured only when `verifiedBy`/`basis` are non-empty and both recorded digests equal the recomputed managed and source digests (and each other); otherwise the run aborts (`ALIAS_DIGEST_UNVERIFIED` etc.). A verified alias still goes through the RC35 digest comparison (`VERIFIED_ALIAS`).
+- **Package:** schema `qf.vox.rc37.migration-evidence-package.v1` with managed/source digests, aliases, the embedded RC35 reconciliation, `evidenceBlockers`, and `packageSha256` over the body. No timestamps; ledger row order and CRLF checkouts do not change the hash. `--verify` fails on a forged `releaseGo`, a tampered body (`PACKAGE_TAMPERED`) or changed inputs (`PACKAGE_STALE_VS_INPUTS`).
+- **Exit codes:** `0` evidence complete (still not a GO); `2` incomplete/blocked; `1` bad input, missing SQL or failed verification.
+- **Not covered:** the 55/31/107 captured metadata carries no statements, so against the real checkout the package is incomplete by design (no managed SQL, digests unavailable). It becomes complete only after the DBA supplies ledger statements and the remaining managed-only, baseline and historical-gap rows are individually proven.
+- **Fixtures:** `scripts/mvp/vox/fixtures/rc37-migration-evidence/` (synthetic managed ledger, 4 SQL files, one verified alias).
+
+Test: `node --test scripts/mvp/vox/rc37-migration-evidence-package.test.mjs`

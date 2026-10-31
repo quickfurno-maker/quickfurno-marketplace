@@ -1,0 +1,12 @@
+{
+  "aliases": [
+    {
+      "managedVersion": "20261101999999",
+      "sourceFile": "20261101000003_fix_gamma_index.sql",
+      "managedSha256": "b2762e7578979b5a518e3f143798a738404bd0cc59ee8d3451c4482d5845bc89",
+      "sourceSha256": "b2762e7578979b5a518e3f143798a738404bd0cc59ee8d3451c4482d5845bc89",
+      "verifiedBy": "fixture-dba",
+      "basis": "synthetic fixture: identical statement text, re-timestamped ledger row"
+    }
+  ]
+}

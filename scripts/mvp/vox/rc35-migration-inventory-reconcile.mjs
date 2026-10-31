@@ -79,7 +79,9 @@ export function normaliseSourceInventory(input){
  return out.sort((a,b)=>cmp(a.file,b.file));
 }
 
-export function reconcileInventories(managedInput,sourceInput){
+// `verifiedAliases` (optional): Map<managedVersion, sourceFile> pre-validated by the
+// caller (RC37). It only supplies the candidate; digest equality is still required.
+export function reconcileInventories(managedInput,sourceInput,verifiedAliases=new Map()){
  const managed=normaliseManagedInventory(managedInput);
  const source=normaliseSourceInventory(sourceInput);
  const blockers=[];
@@ -100,7 +102,11 @@ export function reconcileInventories(managedInput,sourceInput){
  const entries=managed.map(m=>{
   let cls,candidates=[];
   const same=byVersion.get(m.version);
-  if(same&&same.name===m.name){cls="EXACT_VERSION_AND_NAME";candidates=[same];}
+  const aliasFile=verifiedAliases.get(m.version);
+  const aliasSrc=aliasFile&&source.find(s=>s.file===aliasFile);
+  if(aliasFile&&!aliasSrc)bad("VERIFIED_ALIAS_SOURCE_MISSING");
+  if(aliasSrc){cls="VERIFIED_ALIAS";candidates=[aliasSrc];}
+  else if(same&&same.name===m.name){cls="EXACT_VERSION_AND_NAME";candidates=[same];}
   else if(same){cls="SAME_VERSION_DIFFERENT_NAME";candidates=[same];}
   else if(BASELINE_NAME.test(m.name)){cls="MANAGED_BASELINE_SQUASH";}
   else{
@@ -127,10 +133,10 @@ export function reconcileInventories(managedInput,sourceInput){
   if(cls==="AMBIGUOUS_ALIAS")block("AMBIGUOUS_ALIAS",subject,candidates.map(c=>c.file).join(","));
   if(cls==="MANAGED_ONLY_NO_SOURCE")block("MANAGED_ONLY_NO_SOURCE_SQL",subject,"recover statements from ledger");
   if(cls==="MANAGED_BASELINE_SQUASH")block("BASELINE_CONTENT_UNPROVEN",subject,"catalog diff required");
-  if(nameCount.get(m.name)>1)block("DUPLICATE_MANAGED_NAME",subject,nameCount.get(m.name)+" ledger rows");
+  if(nameCount.get(m.name)>1&&cls!=="VERIFIED_ALIAS")block("DUPLICATE_MANAGED_NAME",subject,nameCount.get(m.name)+" ledger rows");
   if(digestStatus==="DIGEST_UNAVAILABLE")block("DIGEST_UNAVAILABLE",subject,"supply statements digest on both sides");
   if(digestStatus==="DIGEST_MISMATCH")block("DIGEST_MISMATCH",subject,"source "+candidates[0].file);
-  const accepted=digestStatus==="DIGEST_MATCH"&&nameCount.get(m.name)===1;
+  const accepted=digestStatus==="DIGEST_MATCH"&&(nameCount.get(m.name)===1||cls==="VERIFIED_ALIAS");
   return {version:m.version,name:m.name,class:cls,digestStatus,accepted,
    sourceCandidates:candidates.map(c=>c.file)};
  });

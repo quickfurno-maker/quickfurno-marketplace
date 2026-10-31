@@ -222,3 +222,29 @@ test("Finance UI directs unavailable Core to operations, MFA failure to actual l
  assert.match(ui,/needsLogin\?"\/login":"\/operations"/);
  assert.match(ui,/No payment actions can be performed from this screen/);
 });
+
+test("initial Razorpay provider claim rejects unbound historical payment ledger before POST",()=>{
+ const sql=read("ops/vox/rc17-review-candidates/20261031001000_rc17_razorpay_v2_authority_REVIEW_ONLY.sql");
+ const start=sql.indexOf("create or replace function public.qf_claim_vendor_package_razorpay_order_v2(");
+ const end=sql.indexOf("revoke all on function public.qf_claim_vendor_package_razorpay_order_v2(",start);
+ assert.ok(start>=0&&end>start);
+ const claim=sql.slice(start,end);
+ const alreadyBound=claim.indexOf("RAZORPAY_V2_BOUND_LEDGER_UNVERIFIED");
+ const virgin=claim.indexOf("RAZORPAY_V2_UNBOUND_LEDGER_RECONCILIATION_REQUIRED");
+ const insert=claim.indexOf("set provider_order_request_token = p_request_token");
+ assert.ok(alreadyBound>=0&&virgin>alreadyBound&&insert>virgin,
+  "historical ledger must block the first provider claim before any persisted token");
+ assert.match(claim,/public\.payments where id=p_order_id for share/);
+ const pg=read("scripts/mvp/vox/validate-vox-rc17-razorpay-v2-real-pg17.mjs");
+ assert.match(pg,/UNBOUND_PAID_LEDGER_CANNOT_START_PROVIDER_ORDER/);
+ assert.match(pg,/pay_orphan_history/);
+});
+test("authenticated staging mission has verified AAL2 entry and fail-closed splash",()=>{
+ const page=read("apps/vox-web/app/page.tsx");
+ assert.match(page,/process\.env\.VOX_STAFF_PORTAL_ENABLED==="staging"/);
+ assert.match(page,/await verifiedMfaSession\(\)/);
+ assert.match(page,/if\(accessToken\)redirect\("\/operations"\)/);
+ assert.match(page,/<Link href="\/login">Verified Staff sign-in<\/Link>/);
+ assert.match(page,/return <Locked\/>/);
+ assert.doesNotMatch(page,/adminClient\(|RAZORPAY_LIVE_KEY_SECRET/);
+});

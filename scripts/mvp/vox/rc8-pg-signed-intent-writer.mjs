@@ -378,6 +378,22 @@ export async function reconcileRc8PgSignedIntentOutcome({acquireClient,intentId,
   const forSubject=await client.query(
    "SELECT id::text AS id FROM "+P+"verified_intents_candidate_v1 "+
    "WHERE type='EOD_OFFICIAL_RELEASE' AND subject_id=$1::uuid",[subjectId]);
+  // The pending receipt is only meaningful while the CURRENT four-source report
+  // still carries the exact digest/scope the two humans signed. Read it inside
+  // the same read-only transaction (writer already finished, so it is stable).
+  let reportCurrent=false;
+  if(durable.intents.length===1){
+   const rep=await client.query(
+    "SELECT team_id::text AS \"teamId\",city_id::text AS \"cityId\","+
+    "reviewer_id::text AS \"reviewerId\",source_count AS \"sourceCount\","+
+    "source_digest AS \"sourceDigest\",state,published "+
+    "FROM public.vox_ab7f_four_source_eod_candidate_v1 WHERE id=$1::uuid",[subjectId]);
+   const r=rep.rows?.[0],i=durable.intents[0];
+   reportCurrent=rep.rows?.length===1&&r.teamId===i.teamId&&r.cityId===i.cityId&&
+    r.reviewerId===i.teamLeaderId&&Number(r.sourceCount)===4&&
+    r.sourceDigest===i.digest&&
+    r.state==="TL_ACKNOWLEDGED_AWAITING_OWNER_RELEASE"&&r.published===false;
+  }
   await client.query("ROLLBACK");started=false;
   const otherIntent=(forSubject.rows??[]).some(r=>r.id!==intentId);
   if(durable.intents.length===0&&durable.claims.length===0)
@@ -385,7 +401,7 @@ export async function reconcileRc8PgSignedIntentOutcome({acquireClient,intentId,
     subjectClaimedByOtherIntent:otherIntent,retryRequiresFreshSignedPair:true});
   const digest=durable.intents.length===1?
    rc8SignedIntentReceiptSha256(durable.intents[0],durable.claims):null;
-  if(digest&&digest===expectedReceiptSha256&&!otherIntent&&
+  if(digest&&digest===expectedReceiptSha256&&!otherIntent&&reportCurrent&&
      durable.intents[0].subjectId===subjectId)
    return result({...base,ok:true,outcome:"COMMITTED",intentId,subjectId,
     receiptSha256:digest,state:"AWAITING_EXTERNAL_REVIEW",

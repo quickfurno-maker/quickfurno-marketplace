@@ -58,7 +58,7 @@ function fakeDb({revoked=[],enrolmentEffective=true,registryRows=registry}={}){
  // locks: intent advisory locks held by open writer transactions.
  // stallCommit: the COMMIT response is lost BEFORE the server applies it; the
  // backend keeps its transaction (and lock) until db.landStalledCommit().
- const db={claims:new Map(),intents:new Map(),revoked:new Set(revoked),log:[],
+ const db={report:{},claims:new Map(),intents:new Map(),revoked:new Set(revoked),log:[],
   dropCommitResponse:false,stallCommit:false,landStalledCommit:null,locks:new Set(),releases:0,destroyedReleases:0};
  db.connect=async()=>{
   let pc=new Map(),pi=new Map(),held=new Set();
@@ -86,9 +86,16 @@ function fakeDb({revoked=[],enrolmentEffective=true,registryRows=registry}={}){
    if(sql.includes("FROM public.profiles p JOIN auth.users"))return rows(v[0]===OWNER?[{id:OWNER}]:[]);
    if(sql.includes("FOR SHARE OF m,p,t,a"))return rows(v[0]===TL?[{auth_user_id:TL}]:[]);
    if(sql.includes("FOR SHARE OF m,t,p,a"))return rows(v[0]===STAFF?[{auth_user_id:STAFF}]:[]);
-   if(sql.includes("vox_ab7f_four_source_eod_candidate_v1"))return rows([{id:SUB,staff_id:STAFF,
-    team_id:TEAM,city_id:CITY,reviewer_id:TL,source_count:4,source_digest:DIGEST,
-    state:"TL_ACKNOWLEDGED_AWAITING_OWNER_RELEASE",published:false}]);
+   if(sql.includes("vox_ab7f_four_source_eod_candidate_v1")){
+    const r={id:SUB,staff_id:STAFF,team_id:TEAM,city_id:CITY,reviewer_id:TL,
+     source_count:4,source_digest:DIGEST,
+     state:"TL_ACKNOWLEDGED_AWAITING_OWNER_RELEASE",published:false,...db.report};
+    if(db.report===null)return rows([]);
+    // Reconciler's read-only report query uses camelCase aliases.
+    if(sql.includes('AS "sourceDigest"'))return rows([{teamId:r.team_id,cityId:r.city_id,
+     reviewerId:r.reviewer_id,sourceCount:r.source_count,sourceDigest:r.source_digest,
+     state:r.state,published:r.published}]);
+    return rows([r]);}
    if(sql.includes("human_signer_registry_candidate_v1"))
     return rows(registryRows.map(r=>({...r,notBeforeMs:String(r.notBeforeMs),
      notAfterMs:String(r.notAfterMs),enrolmentEffective})));
@@ -215,6 +222,25 @@ test("ambiguous COMMIT reconciles to the exact durable receipt, never re-claims"
  // Replay of the same signed pair after reconciliation is still denied.
  const replay=await executeRc8PgPendingSignedIntent(args(db),TEST_ONLY_GATE);
  assert.equal(replay.ok,false);assert.equal(db.claims.size,3);assert.equal(db.intents.size,1);
+});
+
+test("RC32: durable receipt is not COMMITTED once the four-source report drifted",async()=>{
+ const db=fakeDb();
+ const r=await executeRc8PgPendingSignedIntent(args(db),TEST_ONLY_GATE);
+ assert.equal(r.ok,true,r.reason);
+ const rec=()=>reconcileRc8PgSignedIntentOutcome({acquireClient:db.connect,
+  intentId:r.intentId,subjectId:SUB,expectedReceiptSha256:r.receiptSha256});
+ assert.equal((await rec()).outcome,"COMMITTED");
+ for(const drift of [{source_digest:"c".repeat(64)},{published:true},{source_count:3},
+  {reviewer_id:OWNER},{team_id:id(99)},{city_id:id(99)},{state:"OWNER_RELEASED"},null]){
+  db.report=drift;
+  const x=await rec();
+  assert.equal(x.outcome,"INCONSISTENT",JSON.stringify(drift));
+  assert.equal(x.requiresIndependentReview,true);
+  assert.equal(x.publicationAuthorized,false);
+ }
+ db.report={};
+ assert.equal((await rec()).outcome,"COMMITTED");
 });
 
 test("RC27: in-flight writer after lost COMMIT is never reconciled as NOT_COMMITTED",async()=>{

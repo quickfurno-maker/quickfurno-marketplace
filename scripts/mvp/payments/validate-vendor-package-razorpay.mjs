@@ -112,9 +112,10 @@ check("A04 checkout signature uses stored provider order", service.includes("sto
 check("A05 canonical payment is fetched server-side", service.includes("/payments/"));
 check("A06 webhook preserves bounded raw body before signature authority",
  webhookRoute.includes("readBoundedRazorpayWebhookBody(request)") &&
- webhookRoute.includes("handleVendorPackageRazorpayWebhook(bounded.rawBody, signature)") &&
+ webhookRoute.includes("handleVendorPackageRazorpayWebhook(bounded.rawBody, signature, eventId ?? undefined)") &&
+  webhookRoute.includes('request.headers.get("x-razorpay-event-id")') &&
  webhookRoute.indexOf("readBoundedRazorpayWebhookBody(request)") <
- webhookRoute.indexOf("handleVendorPackageRazorpayWebhook(bounded.rawBody, signature)") &&
+ webhookRoute.indexOf("handleVendorPackageRazorpayWebhook(bounded.rawBody, signature, eventId ?? undefined)") &&
  !webhookRoute.includes("await request.text()") &&
  webhookRoute.includes("WEBHOOK_BODY_TOO_LARGE") &&
  service.includes("verifyWebhookSignature(rawBody, signature, cfg.webhookSecret)"));

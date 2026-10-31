@@ -1,14 +1,19 @@
 /** RC8 PostgreSQL transaction writer for a PENDING signed-intent receipt.
  * No production route, human key enrolment, official EOD or operator release.
  */
-import {randomUUID} from "node:crypto";
+import {createHash,randomUUID} from "node:crypto";
 import {prepareRc4SignedApproval,rc4RegistryFingerprint,
- checkRc4ApproversAtCommit,RC4_HUMAN_APPROVED_REGISTRY_FINGERPRINTS} from "../../../contracts/vox/rc4ApprovalPipeline.mjs";
+ checkRc4ApproversAtCommit,RC4_HUMAN_APPROVED_REGISTRY_FINGERPRINTS,
+ RC4_OFFICIAL_EOD_ENABLED} from "../../../contracts/vox/rc4ApprovalPipeline.mjs";
 export const RC8_APPROVAL_WRITER_INSTALLED=false;
 export const RC8_NATIVE_APPROVAL_GATE=Object.freeze({
  humanKeyCeremonyComplete:false,independentDbaAppsecApproved:false,
  dedicatedWriterRoleReviewed:false,managedRestoreCertified:false});
-const deny=reason=>Object.freeze({ok:false,reason,committed:false,
+// Only objects returned by this module can describe a writer/reconciliation
+// outcome; caller-shaped JSON never reaches a publication state.
+const RESULTS=new WeakSet();
+const result=o=>{const f=Object.freeze(o);RESULTS.add(f);return f;};
+const deny=reason=>result({ok:false,reason,committed:false,
  officialEodEnabled:false,approved:false,canAuthorize:false});
 // No positional or caller-invented approval flags: only these independent
 // review decisions can satisfy the synthetic transaction gate. Production
@@ -25,7 +30,45 @@ const gateOK=g=>{
   APPROVAL_KEYS.every(k=>g[k]===true);
 };
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
+const LOWER_UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
+const HEX64=/^[a-f0-9]{64}$/;
 const P="public.vox_rc8_";
+const RECEIPT_KINDS=Object.freeze(["OWNER_NONCE","SUBJECT","TL_NONCE"]);
+const RECEIPT_FIELDS=Object.freeze(["id","type","subjectId","digest","teamId",
+ "cityId","ownerId","teamLeaderId"]);
+/** Deterministic digest of a durable pending receipt, computed ONLY from
+ * values PostgreSQL stores (intent row + its three claims). The writer and
+ * the read-only reconciler derive it identically, so an ambiguous COMMIT can
+ * be matched to exactly one durable receipt. null for any malformed input. */
+export function rc8SignedIntentReceiptSha256(intent,claims){
+ if(!intent||typeof intent!=="object"||intent.type!=="EOD_OFFICIAL_RELEASE"||
+    intent.verifiedSignaturePair!==true||intent.state!=="AWAITING_EXTERNAL_REVIEW"||
+    !["id","subjectId","teamId","cityId","ownerId","teamLeaderId"]
+     .every(k=>typeof intent[k]==="string"&&LOWER_UUID.test(intent[k]))||
+    intent.ownerId===intent.teamLeaderId||
+    typeof intent.digest!=="string"||!HEX64.test(intent.digest)||
+    !Array.isArray(claims)||claims.length!==RECEIPT_KINDS.length)return null;
+ const sorted=[...claims].sort((a,b)=>String(a?.claimKind).localeCompare(String(b?.claimKind)));
+ if(sorted.some((c,i)=>c?.claimKind!==RECEIPT_KINDS[i]||
+    typeof c.claimKey!=="string"||!HEX64.test(c.claimKey))||
+    new Set(sorted.map(c=>c.claimKey)).size!==RECEIPT_KINDS.length)return null;
+ const body=RECEIPT_FIELDS.map(k=>`${k}=${intent[k]}\n`).join("")+
+  sorted.map(c=>`claim=${c.claimKind}:${c.claimKey}\n`).join("");
+ return createHash("sha256").update("qf.vox.rc8.signed-intent-receipt/v1\n"+body,"utf8").digest("hex");
+}
+async function readDurableReceipt(client,intentId){
+ const intents=await client.query(
+  "SELECT id::text AS id,type,subject_id::text AS \"subjectId\",digest,"+
+  "team_id::text AS \"teamId\",city_id::text AS \"cityId\","+
+  "owner_id::text AS \"ownerId\",team_leader_id::text AS \"teamLeaderId\","+
+  "verified_signature_pair AS \"verifiedSignaturePair\",state "+
+  "FROM "+P+"verified_intents_candidate_v1 WHERE id=$1::uuid",[intentId]);
+ const claims=await client.query(
+  "SELECT claim_key AS \"claimKey\",claim_kind AS \"claimKind\" "+
+  "FROM "+P+"approval_claims_candidate_v1 WHERE intent_id=$1::uuid "+
+  "ORDER BY claim_kind",[intentId]);
+ return {intents:intents.rows??[],claims:claims.rows??[]};
+}
 export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE_APPROVAL_GATE){
  if(!gateOK(gate))return deny("NATIVE_RELEASE_GATE_CLOSED");
  const {acquireClient,request,ownerAuth,teamLeaderAuth,now=Date.now(),
@@ -46,6 +89,12 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
    return deny("PG_CLIENT_INVALID");
   await client.query("BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE");
   started=true;
+  // Key revocation is a plain INSERT whose FK check only takes KEY SHARE on
+  // the registry row, which does not conflict with the FOR SHARE below. Block
+  // every revocation INSERT for the whole writer window. This MUST precede the
+  // first SELECT: a SERIALIZABLE snapshot taken earlier could miss a
+  // revocation committed before the lock was granted.
+  await client.query("LOCK TABLE "+P+"signer_revocations_candidate_v1 IN SHARE MODE");
   const owner=await client.query(
    "SELECT p.id FROM public.profiles p JOIN auth.users a ON a.id=p.id "+
    "WHERE p.id=$1::uuid AND p.role='admin' AND p.is_active=true "+
@@ -118,19 +167,39 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
    "SELECT key_id AS \"keyId\",signer_id::text AS \"signerId\", "+
    "signer_role AS \"signerRole\",public_key_pem AS \"publicKeyPem\", "+
    "public_key_fingerprint AS \"publicKeyFingerprint\", "+
-   "not_before_ms AS \"notBeforeMs\",not_after_ms AS \"notAfterMs\" "+
+   "not_before_ms AS \"notBeforeMs\",not_after_ms AS \"notAfterMs\", "+
+   "(enrolled_at IS NOT NULL AND enrolled_at<=clock_timestamp()) AS \"enrolmentEffective\" "+
    "FROM "+P+"human_signer_registry_candidate_v1 "+
    "WHERE human_enrolled=true ORDER BY key_id FOR SHARE");
-  const registry=registryRows.rows.map(r=>({...r,
+  if(registryRows.rows.some(r=>r.enrolmentEffective!==true)){
+   // A future-dated or unstamped enrolment is not a completed registration.
+   await client.query("ROLLBACK");settled=true;return deny("SIGNER_KEY_REGISTRATION_NOT_EFFECTIVE");
+  }
+  const registry=registryRows.rows.map(({enrolmentEffective,...r})=>({...r,
    notBeforeMs:Number(r.notBeforeMs),notAfterMs:Number(r.notAfterMs)}));
   if(registry.length!==2||!Array.isArray(approvedRegistryFingerprints)||
      !approvedRegistryFingerprints.includes(rc4RegistryFingerprint(registry))){
    await client.query("ROLLBACK");settled=true;return deny("HUMAN_SIGNER_REGISTRY_UNAPPROVED");
   }
+  // The pinned pair must be exactly the current Owner's and current Team
+  // Leader's keys, checked against the locked DB actors before any nonce work.
+  const ownerKeys=registry.filter(k=>k.signerRole==="OWNER");
+  const tlKeys=registry.filter(k=>k.signerRole==="TEAM_LEADER");
+  if(ownerKeys.length!==1||tlKeys.length!==1||
+     ownerKeys[0].signerId!==ownerAuth?.userId||
+     tlKeys[0].signerId!==teamLeaderAuth?.userId){
+   await client.query("ROLLBACK");settled=true;return deny("SIGNER_REGISTRY_ACTOR_BINDING_DENIED");
+  }
+  // Revocation table is SHARE-locked (above), so this read is final for the
+  // transaction. A pinned pair with ANY revoked member is invalid as a whole.
   const revoked=await client.query(
    "SELECT key_id FROM "+P+"signer_revocations_candidate_v1 FOR SHARE");
   const revocations={keyIds:revoked.rows.map(r=>r.key_id),signerIds:[]};
+  if(registry.some(k=>revocations.keyIds.includes(k.keyId))){
+   await client.query("ROLLBACK");settled=true;return deny("SIGNER_KEY_REVOKED");
+  }
   const intentId=randomUUID();
+  const claimed=[];
   const ledger={
    durable:true,
    claimAll:async({nonceKeys,subjectKey,expiresAtMs})=>{
@@ -147,6 +216,7 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
       "ON CONFLICT DO NOTHING RETURNING claim_key",
       [key,kind,intentId,expiresAtMs]);
      if(written.rowCount!==1)return false;
+     claimed.push({claimKey:key,claimKind:kind});
     }
     return true;
    }
@@ -171,6 +241,17 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
     request.cityId,signed.ownerId,signed.teamLeaderId]);
   if(receipt.rowCount!==1||receipt.rows[0]?.id!==intentId)
    throw Error("INTENT_RECEIPT_UNVERIFIED");
+  // Atomic readback: the exact three claims written by THIS transaction and
+  // the receipt row must be what PostgreSQL holds for intentId, and yield the
+  // digest later used to reconcile an ambiguous COMMIT.
+  const durable=await readDurableReceipt(client,intentId);
+  const receiptSha256=durable.intents.length===1?
+   rc8SignedIntentReceiptSha256(durable.intents[0],durable.claims):null;
+  const sameClaims=claimed.length===3&&durable.claims.length===3&&
+   claimed.every(c=>durable.claims.some(d=>d.claimKey===c.claimKey&&d.claimKind===c.claimKind));
+  if(!receiptSha256||!sameClaims||durable.intents[0].subjectId!==request.subjectId||
+     durable.intents[0].digest!==request.digest)
+   throw Error("DURABLE_RECEIPT_READBACK_MISMATCH");
   // DB locks, nonce claims and report writes can outlive the initial AAL2
   // check. Never commit a pending receipt after either real verified session
   // or either signed envelope has expired while the transaction was open.
@@ -224,17 +305,97 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
   catch{
    // A transport error after COMMIT can hide a genuine durable receipt.
    // Require nonce/receipt reconciliation; never imply a known rollback.
-   return Object.freeze({ok:false,reason:"COMMIT_OUTCOME_UNKNOWN",
-    intentId,subjectId:request.subjectId,
+   return result({ok:false,reason:"COMMIT_OUTCOME_UNKNOWN",
+    intentId,subjectId:request.subjectId,receiptSha256,
     committed:null,requiresReconciliation:true,approved:false,
     canAuthorize:false,officialEodEnabled:false});
   }
-  return Object.freeze({ok:true,intentId,state:"AWAITING_EXTERNAL_REVIEW",
+  // Auditable receipt: receiptSha256 is recomputable from the DB alone; the
+  // key ids and registry pin are evidence the review-only DDL does not store.
+  return result({ok:true,intentId,state:"AWAITING_EXTERNAL_REVIEW",
+   receiptSha256,receipt:Object.freeze({schema:"qf.vox.rc8.signed-intent-receipt/v1",
+    intentId,type:request.type,subjectId:request.subjectId,digest:request.digest,
+    teamId:request.teamId,cityId:request.cityId,ownerId:signed.ownerId,
+    teamLeaderId:signed.teamLeaderId,ownerKeyId:ownerKeys[0].keyId,
+    teamLeaderKeyId:tlKeys[0].keyId,registryFingerprint:rc4RegistryFingerprint(registry),
+    claims:Object.freeze(durable.claims.map(c=>Object.freeze({...c}))),receiptSha256}),
    committed:true,approved:false,canAuthorize:false,officialEodEnabled:false});
  }catch{
   if(started&&!settled){try{await client.query("ROLLBACK");}catch{}}
   return deny("PG_TRANSACTION_FAILED");
  }finally{try{client?.release?.()}catch{}}
+}
+/** Read-only reconciliation of a COMMIT_OUTCOME_UNKNOWN signed EOD intent.
+ * Never writes, never re-claims nonces, never approves. Outcomes:
+ *  COMMITTED      exact durable receipt with the expected digest exists;
+ *  NOT_COMMITTED  no receipt and no claims for intentId (nonces were never
+ *                 consumed; a fresh signed pair is still required);
+ *  INCONSISTENT   anything else: HOLD for independent DBA/AppSec review. */
+export async function reconcileRc8PgSignedIntentOutcome({acquireClient,intentId,
+ subjectId,expectedReceiptSha256}={}){
+ const base={approved:false,canAuthorize:false,officialEodEnabled:false,
+  publicationAuthorized:false};
+ if(typeof acquireClient!=="function"||typeof intentId!=="string"||
+    !LOWER_UUID.test(intentId)||typeof subjectId!=="string"||!LOWER_UUID.test(subjectId)||
+    typeof expectedReceiptSha256!=="string"||!HEX64.test(expectedReceiptSha256))
+  return result({...base,ok:false,reason:"RECONCILIATION_INPUT_INVALID",outcome:null});
+ let client,started=false;
+ try{
+  client=await acquireClient();
+  if(!client||typeof client.query!=="function"||typeof client.release!=="function")
+   return result({...base,ok:false,reason:"PG_CLIENT_INVALID",outcome:null});
+  await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
+  started=true;
+  const durable=await readDurableReceipt(client,intentId);
+  const forSubject=await client.query(
+   "SELECT id::text AS id FROM "+P+"verified_intents_candidate_v1 "+
+   "WHERE type='EOD_OFFICIAL_RELEASE' AND subject_id=$1::uuid",[subjectId]);
+  await client.query("ROLLBACK");started=false;
+  const otherIntent=(forSubject.rows??[]).some(r=>r.id!==intentId);
+  if(durable.intents.length===0&&durable.claims.length===0)
+   return result({...base,ok:true,outcome:"NOT_COMMITTED",intentId,subjectId,
+    subjectClaimedByOtherIntent:otherIntent,retryRequiresFreshSignedPair:true});
+  const digest=durable.intents.length===1?
+   rc8SignedIntentReceiptSha256(durable.intents[0],durable.claims):null;
+  if(digest&&digest===expectedReceiptSha256&&!otherIntent&&
+     durable.intents[0].subjectId===subjectId)
+   return result({...base,ok:true,outcome:"COMMITTED",intentId,subjectId,
+    receiptSha256:digest,state:"AWAITING_EXTERNAL_REVIEW"});
+  return result({...base,ok:false,reason:"RECONCILIATION_INCONSISTENT",
+   outcome:"INCONSISTENT",intentId,subjectId,requiresIndependentReview:true});
+ }catch{
+  if(started){try{await client.query("ROLLBACK");}catch{}}
+  return result({...base,ok:false,reason:"RECONCILIATION_UNAVAILABLE",outcome:null});
+ }finally{try{client?.release?.()}catch{}}
+}
+const PUBLICATION_BLOCKERS=Object.freeze(["RC8_APPROVAL_WRITER_NOT_INSTALLED",
+ "NATIVE_APPROVAL_GATE_CLOSED","OFFICIAL_EOD_HARD_OFF",
+ "NO_HUMAN_APPROVED_SIGNER_REGISTRY","EXTERNAL_REVIEW_OF_PENDING_RECEIPT_ABSENT",
+ "DB_STORED_SIGNER_KEY_EVIDENCE_ABSENT"]);
+/** Publication authorization STATE for a writer or reconciliation result.
+ * Accepts no flags: authority comes only from source constants, all of which
+ * are closed, so publicationAuthorized is false for every input today. */
+export function rc8SignedEodPublicationAuthorizationState(outcome){
+ const closed=(state,extra={})=>Object.freeze({state,publicationAuthorized:false,
+  canPublish:false,approved:false,officialEodEnabled:false,
+  blockers:PUBLICATION_BLOCKERS,...extra});
+ if(!outcome||typeof outcome!=="object"||!RESULTS.has(outcome))
+  return closed("UNVERIFIED_OUTCOME_DENIED");
+ let state;
+ if(outcome.ok===true&&outcome.committed===true&&HEX64.test(outcome.receiptSha256??""))
+  state="PENDING_RECEIPT_AWAITING_EXTERNAL_REVIEW";
+ else if(outcome.outcome==="COMMITTED")state="PENDING_RECEIPT_AWAITING_EXTERNAL_REVIEW";
+ else if(outcome.reason==="COMMIT_OUTCOME_UNKNOWN")state="COMMIT_OUTCOME_UNKNOWN_RECONCILE_REQUIRED";
+ else if(outcome.outcome==="NOT_COMMITTED")state="NOT_COMMITTED_FRESH_SIGNED_PAIR_REQUIRED";
+ else if(outcome.outcome==="INCONSISTENT")state="RECONCILIATION_INCONSISTENT_HOLD";
+ else state="DENIED";
+ // Reported only. Every source gate is false today, and publicationAuthorized
+ // stays hard false here: actual publication needs its own reviewed writer.
+ const sourceAuthorized=RC8_APPROVAL_WRITER_INSTALLED===true&&RC4_OFFICIAL_EOD_ENABLED===true&&
+  Object.values(RC8_NATIVE_APPROVAL_GATE).every(v=>v===true)&&
+  RC4_HUMAN_APPROVED_REGISTRY_FINGERPRINTS.length>0;
+ return closed(state,{sourceAuthorized,
+  receiptSha256:HEX64.test(outcome.receiptSha256??"")?outcome.receiptSha256:null});
 }
 export function executeRc8PgPendingSignedIntentProduction(options){
  return executeRc8PgPendingSignedIntent({...options,

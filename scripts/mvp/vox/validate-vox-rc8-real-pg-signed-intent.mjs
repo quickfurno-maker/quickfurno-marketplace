@@ -12,7 +12,7 @@ import {mintRc4VerifiedAuthContext,rc4RegistryFingerprint,rc4ScopeTargetHash}
  from "../../../contracts/vox/rc4ApprovalPipeline.mjs";
 import {canonicalAb7kApprovalBytes}
  from "../../../contracts/vox/ab7kSignedApprovalVerifier.mjs";
-import {executeRc8PgPendingSignedIntent,
+import {executeRc8PgPendingSignedIntent,reconcileRc8PgSignedIntentOutcome,
  executeRc8PgPendingSignedIntentProduction,RC8_APPROVAL_WRITER_INSTALLED}
  from "./rc8-pg-signed-intent-writer.mjs";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
@@ -259,6 +259,40 @@ try{
   claims:Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_approval_claims_candidate_v1")).rows[0].n),
   intents:Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_verified_intents_candidate_v1")).rows[0].n)});
  let c=await counts();eq(c.claims,3,"THREE_CLAIMS");eq(c.intents,1,"ONE_INTENT");
+ // Read-only reconciliation must match the exact durable receipt digest.
+ const rec=await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
+  intentId:r.intentId,subjectId:SUB,expectedReceiptSha256:r.receiptSha256});
+ eq(rec.outcome,"COMMITTED","EOD_UNKNOWN_RECONCILED_COMMITTED");
+ eq(rec.receiptSha256,r.receiptSha256,"EOD_RECONCILED_RECEIPT_DIGEST");
+ eq(rec.publicationAuthorized,false,"RECONCILED_NOT_PUBLICATION");
+ const absent=await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
+  intentId:id(999),subjectId:SUB,expectedReceiptSha256:r.receiptSha256});
+ eq(absent.outcome,"NOT_COMMITTED","RECONCILE_ABSENT_NOT_COMMITTED");
+ eq(absent.subjectClaimedByOtherIntent,true,"RECONCILE_ABSENT_SUBJECT_HELD");
+ // A direct revocation INSERT (FK only takes KEY SHARE) must still wait for
+ // an in-flight writer: the writer SHARE-locks the revocation table.
+ let directRevokeCode=null;
+ const lockProbe={...args(request(41,42)),acquireClient:async()=>{
+  const raw=await pool.connect();
+  return {query:async(sql,values)=>{
+   const out=await raw.query(sql,values);
+   if(sql.includes("human_signer_registry_candidate_v1")){
+    const other=await pool.connect();
+    try{
+     await other.query("BEGIN");
+     await other.query("SET LOCAL lock_timeout='250ms'");
+     await other.query("INSERT INTO public.vox_rc8_signer_revocations_candidate_v1 "+
+      "(key_id,review_evidence_sha256) VALUES ($1,$2)",[leader.entry.keyId,"e".repeat(64)]);
+    }catch(e){directRevokeCode=e?.code??"ERR";}
+    finally{try{await other.query("ROLLBACK")}catch{}other.release();}
+   }
+   return out;
+  },release:()=>raw.release()};
+ }};
+ r=await executeRc8PgPendingSignedIntent(lockProbe,TEST_ONLY_GATE);
+ eq(directRevokeCode,"55P03","DIRECT_REVOCATION_INSERT_BLOCKED_DURING_WRITER");
+ eq(r.ok,false,"LOCK_PROBE_SUBJECT_ALREADY_HELD");
+ c=await counts();eq(c.claims,3,"LOCK_PROBE_NO_CLAIM");eq(c.intents,1,"LOCK_PROBE_NO_INTENT");
  r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
  eq(r.ok,false,"NONCE_REPLAY_DENIED");
  r=await executeRc8PgPendingSignedIntent(args(request(9,10)),TEST_ONLY_GATE);
@@ -286,6 +320,7 @@ try{
 
  r=await executeRc8PgPendingSignedIntent(args(request(13,14)),TEST_ONLY_GATE);
  eq(r.ok,false,"REVOKED_KEY_DENIED");
+ eq(r.reason,"SIGNER_KEY_REVOKED","SIGNER_KEY_REVOKED_DENIED");
  await pool.query("UPDATE public.vox_staff_memberships_v1 SET revoked_at=clock_timestamp() WHERE auth_user_id=$1",[TL]);
  r=await executeRc8PgPendingSignedIntent(args(request(15,16)),TEST_ONLY_GATE);
  eq(r.reason,"CURRENT_ACTOR_REVOKED","CURRENT_TL_REVOKED_DENIED");

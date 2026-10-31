@@ -26,6 +26,7 @@ export type ProviderEventClaim =
   | Readonly<{ state: "claimed"; attempt: number }>
   | Readonly<{ state: "replay"; outcome: string }>
   | Readonly<{ state: "quarantined"; code: string }>
+  | Readonly<{ state: "needs_reconciliation"; code: string }>
   | Readonly<{ state: "in_flight" | "conflict" | "invalid" }>;
 export function inspectProviderEventClaim(receipt: unknown, envelope: RazorpayProviderEventEnvelope): ProviderEventClaim;
 export type ProviderEventCompletion =

@@ -141,11 +141,14 @@ test("retry classification: transport/unknown retry, deterministic finance codes
  assert.equal(bad.code,"PROVIDER_EVENT_OUTCOME_INVALID");assert.equal(bad.retry,true);
 });
 
-test("attempt budget exhaustion quarantines; in-flight claims ask provider to retry",async()=>{
+test("uncertain attempt exhaustion never acknowledges payment and in-flight claims retry",async()=>{
  const raw=body();const {envelope}=pipeline(raw,sign(raw));
  const repo=memoryRepository({startAttempt:PROVIDER_EVENT_MAX_ATTEMPTS-1});
  const r=await processEvent({envelope,repository:repo,handle:handler(Error("boom"))});
- assert.equal(r.status,"quarantined");assert.equal(r.code,"PROVIDER_EVENT_ATTEMPTS_EXHAUSTED");
+ assert.equal(r.status,"retry");assert.equal(r.code,"PROVIDER_EVENT_ATTEMPTS_EXHAUSTED");
+ assert.equal(r.ack,false);assert.equal(r.retry,true);assert.equal(httpStatus(r),503);
+ assert.equal(repo.rows.get("test:"+envelope.eventId).state,"open");
+ assert.equal(repo.rows.get("test:"+envelope.eventId).attempts,PROVIDER_EVENT_MAX_ATTEMPTS);
  const inflight=memoryRepository();const h=handler("activated");
  inflight.rows.set("test:"+envelope.eventId,{hash:envelope.bodySha256,state:"claimed",attempts:1});
  const busy=await processEvent({envelope,repository:inflight,handle:h});

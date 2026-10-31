@@ -87,6 +87,8 @@ test("exact-once: only a valid 'claimed' receipt for THIS event proceeds; replay
   assert.equal(claimOf(receipt(e,{status:"claimed",attempt_count}),e).state,"invalid");
  for(const outcome of ["activated","already_activated"])
   assert.deepEqual({...claimOf(receipt(e,{status:"replay",outcome}),e)},{state:"replay",outcome});
+ assert.equal(claimOf(receipt(e,{status:"needs_reconciliation",last_error_code:"PROVIDER_EVENT_ATTEMPTS_EXHAUSTED"}),e).state,"needs_reconciliation");
+ assert.equal(claimOf(receipt(e,{status:"needs_reconciliation",last_error_code:"bad"}),e).state,"invalid");
  assert.equal(claimOf(receipt(e,{status:"in_flight"}),e).state,"in_flight");
  assert.equal(claimOf(receipt(e,{status:"conflict"}),e).state,"conflict");
  assert.deepEqual({...claimOf(receipt(e,{status:"quarantined",last_error_code:"PACKAGE_ORDER_NOT_FOUND"}),e)},

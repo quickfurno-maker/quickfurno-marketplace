@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { inspectRazorpayActivationReceipt, inspectRazorpayFailureReceipt } from "../lib/payments/vendorPackagePaymentReceipts.mjs";
-import { inspectRazorpayOrderClaim, isDefiniteRazorpayOrderRejection, storedRazorpayOrderModeError } from "../lib/payments/vendorPackageOrderGuards.mjs";
+import { inspectRazorpayOrderClaim, isDefiniteRazorpayOrderRejection, storedRazorpayCheckoutLifecycleError, storedRazorpayOrderModeError } from "../lib/payments/vendorPackageOrderGuards.mjs";
 import { adminClient } from "../lib/supabase";
 import { AppError, fail, ok, type Result } from "../lib/errors";
 import { requireVendorAccess } from "./vendorAccessService";
@@ -203,8 +203,14 @@ function checkoutFromStoredOrder(
   cfg: RazorpayConfig,
 ): VendorPackageCheckout {
   assertOrderMode(order, cfg);
-  if (!order.provider_order_id || !order.provider_amount_subunits || order.package_currency !== RAZORPAY_CURRENCY) {
-    throw paymentError("PACKAGE_ORDER_NOT_BOUND", "Package order is not ready for payment.");
+  if (storedRazorpayCheckoutLifecycleError(order)) {
+    throw paymentError("PACKAGE_ORDER_NOT_PAYABLE", "This package order is not payable. Reconcile or create a new order.");
+  }
+  if (!order.provider_order_id || !order.provider_amount_subunits ||
+      order.package_currency !== RAZORPAY_CURRENCY || order.package_price === null ||
+      Number(order.provider_amount_subunits) !== inrToSubunits(order.package_price) ||
+      order.provider_receipt !== packageOrderReceipt(order.id)) {
+    throw paymentError("PACKAGE_ORDER_NOT_BOUND", "The saved payment order or amount is not verified.");
   }
   return {
     localOrderId: order.id,
@@ -229,6 +235,9 @@ export async function createVendorPackageRazorpayCheckout(
     if (order.activation_status === "activated") {
       throw paymentError("PACKAGE_ORDER_ALREADY_ACTIVATED", "This package order is already activated.");
     }
+    if (order.activation_status !== "not_activated") {
+      throw paymentError("PACKAGE_ORDER_NOT_PAYABLE", "Package activation state is unknown. Reconcile before payment.");
+    }
     // A persisted provider order must not resurrect cancelled, completed,
     // expired or refunded packages via the already-bound checkout fast path.
     if (order.order_status !== "created" ||
@@ -245,6 +254,19 @@ export async function createVendorPackageRazorpayCheckout(
       if (Number(order.provider_amount_subunits) !== expected) {
         throw paymentError("PACKAGE_ORDER_AMOUNT_DRIFT", "Stored payment amount does not match the package snapshot.");
       }
+      // Load-time checks alone race a payment/credit/refund mutation. The
+      // no-write RPC locks the current order and unpaid financial ledger.
+      const { data: boundClaim, error: boundError } = await adminClient().rpc(
+        "qf_claim_vendor_package_razorpay_order_v2",
+        { p_order_id: order.id, p_request_token: randomUUID(), p_provider_mode: cfg.mode },
+      );
+      if (boundError) throw boundError;
+      if (inspectRazorpayOrderClaim(boundClaim, {
+        orderId: order.id, amountSubunits: expected, receipt: packageOrderReceipt(order.id),
+      }) !== "already_bound" || boundClaim?.provider_order_id !== order.provider_order_id) {
+        throw paymentError("PACKAGE_ORDER_CLAIM_INVALID", "Stored payment order could not be revalidated.");
+      }
+      order = await loadOrder(order.id, access.data.vendorId);
       return ok(checkoutFromStoredOrder(order, cfg));
     }
 

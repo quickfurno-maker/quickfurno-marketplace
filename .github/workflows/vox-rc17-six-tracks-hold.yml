@@ -15,6 +15,7 @@ on:
       - 'scripts/mvp/vox/rc26-*.test.mjs'
       - 'scripts/mvp/vox/rc27-*.test.mjs'
       - 'scripts/mvp/vox/rc28-*.test.mjs'
+      - 'scripts/mvp/vox/rc29-*.test.mjs'
       - 'scripts/mvp/vox/rc23-migration-adjudication.mjs'
       - 'scripts/mvp/vox/rc26-migration-release-plan.mjs'
       - 'scripts/mvp/vox/rc27-migration-handoff-validation.mjs'
@@ -64,8 +65,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Run RC17-RC28 source boundary tests (no mocked green)
-        run: node --test scripts/mvp/vox/rc17-*.test.mjs scripts/mvp/vox/rc18-*.test.mjs scripts/mvp/vox/rc19-*.test.mjs scripts/mvp/vox/rc20-*.test.mjs scripts/mvp/vox/rc21-*.test.mjs scripts/mvp/vox/rc22-*.test.mjs scripts/mvp/vox/rc23-*.test.mjs scripts/mvp/vox/rc24-*.test.mjs scripts/mvp/vox/rc25-*.test.mjs scripts/mvp/vox/rc26-*.test.mjs scripts/mvp/vox/rc27-*.test.mjs scripts/mvp/vox/rc28-*.test.mjs
+      - name: Run RC17-RC29 source boundary and operational regression tests
+        run: node --test scripts/mvp/vox/rc17-*.test.mjs scripts/mvp/vox/rc18-*.test.mjs scripts/mvp/vox/rc19-*.test.mjs scripts/mvp/vox/rc20-*.test.mjs scripts/mvp/vox/rc21-*.test.mjs scripts/mvp/vox/rc22-*.test.mjs scripts/mvp/vox/rc23-*.test.mjs scripts/mvp/vox/rc24-*.test.mjs scripts/mvp/vox/rc25-*.test.mjs scripts/mvp/vox/rc26-*.test.mjs scripts/mvp/vox/rc27-*.test.mjs scripts/mvp/vox/rc28-*.test.mjs scripts/mvp/vox/rc29-*.test.mjs
       - name: Enforce QF MVP 50 Razorpay raw-body financial authority gate
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: Compute source migration and recovery HOLD evidence

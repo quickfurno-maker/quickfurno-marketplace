@@ -326,6 +326,7 @@ begin
   -- Provider capture does not revive a cancelled, expired or refunded order.
   -- Hold any refund-in-progress outcome for independent financial reconciliation.
   if v_order.order_status is distinct from 'created' or
+     v_order.activation_status is distinct from 'not_activated' or
      v_order.payment_status is null or
      v_order.payment_status not in ('pending','failed') then
     raise exception 'PACKAGE_ORDER_LIFECYCLE_NOT_ACTIVATABLE' using errcode='P0001';
@@ -366,6 +367,14 @@ begin
   end if;
   if v_payment.payment_status = 'Refunded' then
     raise exception 'PAYMENT_REFUNDED' using errcode = 'P0001';
+  end if;
+  -- A legacy/manual Paid row (even for the same payment ID) does not prove
+  -- this Core transaction already granted package credits. Reconcile it
+  -- independently; do not turn unknown ledger state into a second credit grant.
+  if v_payment.payment_status is null or
+     v_payment.payment_status not in ('Pending','Failed') or
+     v_payment.transaction_id is not null then
+    raise exception 'PACKAGE_PAYMENT_LEDGER_NOT_ACTIVATABLE' using errcode='P0001';
   end if;
 
   if exists (

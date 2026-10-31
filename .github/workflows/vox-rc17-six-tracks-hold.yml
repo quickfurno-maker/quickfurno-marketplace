@@ -9,6 +9,7 @@ on:
       - 'scripts/mvp/vox/rc20-*.test.mjs'
       - 'scripts/mvp/vox/rc18-finance-release-recovery-preflight.mjs'
       - 'scripts/mvp/vox/validate-vox-rc17-*.mjs'
+      - 'scripts/mvp/vox/validate-vox-rc21-legacy-v1-parser-pg17.mjs'
       - 'services/vendorPackagePaymentService.ts'
       - 'lib/payments/vendorPackagePaymentReceipts.*'
       - 'lib/payments/vendorPackageRefundEvidence.*'
@@ -81,6 +82,12 @@ jobs:
           set -euo pipefail
           node scripts/mvp/vox/validate-vox-rc17-razorpay-v2-real-pg17.mjs | tee "${RUNNER_TEMP}/rc17-finance.log"
           grep -Fq 'VOX_RC17_REAL_PG17_RAZORPAY_V2_PASS funcs=5' "${RUNNER_TEMP}/rc17-finance.log"
+      - name: Prove immutable V1 parser and first-claim blockers on isolated PG17
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/mvp/vox/validate-vox-rc21-legacy-v1-parser-pg17.mjs | tee "${RUNNER_TEMP}/rc21-legacy-v1.log"
+          grep -Fq 'VOX_RC21_LEGACY_V1_PG17_PARSER_BLOCKERS_CONFIRMED' "${RUNNER_TEMP}/rc21-legacy-v1.log"
       - name: No abandoned database
         if: always()
         shell: bash
@@ -90,6 +97,12 @@ jobs:
           if [ -n "$leftover" ]; then
             docker rm -f -v "$leftover"
             echo 'FAIL: left disposable PG container behind' >&2
+            exit 1
+          fi
+          legacy="$(docker ps -aq --filter 'name=^/qf-vox-rc21-v1-parser-pg17$')"
+          if [ -n "$legacy" ]; then
+            docker rm -f -v "$legacy"
+            echo 'FAIL: left disposable V1 parser container behind' >&2
             exit 1
           fi
       - name: Explicit managed release HOLD

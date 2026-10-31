@@ -248,3 +248,18 @@ test("authenticated staging mission has verified AAL2 entry and fail-closed spla
  assert.match(page,/return <Locked\/>/);
  assert.doesNotMatch(page,/adminClient\(|RAZORPAY_LIVE_KEY_SECRET/);
 });
+
+test("legacy V1 parser and first-claim defects are proven only in isolated PG17",()=>{
+ const harness=read("scripts/mvp/vox/validate-vox-rc21-legacy-v1-parser-pg17.mjs");
+ const workflow=read(".github/workflows/vox-rc17-six-tracks-hold.yml");
+ assert.match(harness,/LEGACY_V1_SOURCE_CHANGED_REVIEW_REQUIRED/);
+ assert.match(harness,/MANAGED_OR_PROVIDER_CREDENTIAL_DENIED_/);
+ assert.match(harness,/"--network","none"/);
+ assert.match(harness,/qf_claim_vendor_package_razorpay_order_v1/);
+ assert.match(harness,/LEGACY_V1_PARSER_EXPECTED_DENIAL_NOT_OBSERVED/);
+ assert.match(harness,/IS DISTINCT FROM/);
+ assert.match(harness,/VOX_RC21_LEGACY_V1_PG17_PARSER_BLOCKERS_CONFIRMED/);
+ assert.match(workflow,/Prove immutable V1 parser and first-claim blockers on isolated PG17/);
+ assert.match(workflow,/qf-vox-rc21-v1-parser-pg17/);
+ assert.match(workflow,/Explicit managed release HOLD/);
+});

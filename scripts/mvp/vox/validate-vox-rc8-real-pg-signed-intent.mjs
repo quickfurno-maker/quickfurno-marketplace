@@ -172,6 +172,20 @@ try{
  // negative result was an intentionally revoked subject, not a gate result.
  r=await executeRc8PgPendingSignedIntentProduction(args());
  eq(r.reason,"NATIVE_RELEASE_GATE_CLOSED","PRODUCTION_BLOCK");
+ // The signatures are valid when verified, but transaction work may outlive
+ // their expiry. Force the final wall-clock forward only in this disposable
+ // suite and require a full rollback of receipt and all three nonce claims.
+ const wallNow=Date.now;
+ try{
+  Date.now=()=>now+600001;
+  r=await executeRc8PgPendingSignedIntent(args(request(31,32)),TEST_ONLY_GATE);
+ }finally{Date.now=wallNow;}
+ eq(r.reason,"SIGNED_EOD_IDENTITY_OR_ENVELOPE_EXPIRED_DURING_TRANSACTION",
+  "IN_FLIGHT_SIGNED_EOD_EXPIRY_DENIED");
+ const rolledClaims=await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_approval_claims_candidate_v1");
+ const rolledIntents=await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_verified_intents_candidate_v1");
+ eq(Number(rolledClaims.rows[0].n),0,"EXPIRED_EOD_NO_NONCE_CLAIMS");
+ eq(Number(rolledIntents.rows[0].n),0,"EXPIRED_EOD_NO_RECEIPT");
  r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
  eq(r.ok,true,"NATIVE_REAL_PG_COMMIT");eq(r.approved,false,"NEVER_APPROVED");
  const counts=async()=>({

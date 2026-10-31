@@ -118,6 +118,15 @@ try{
  const args=(req=request())=>({acquireClient:()=>pool.connect(),request:req,
   ownerAuth,teamLeaderAuth,now,approvedRegistryFingerprints:[fingerprint]});
  eq(RC8_APPROVAL_WRITER_INSTALLED,false,"SOURCE_PRODUCTION_GATE");
+ // Invalid/mixed command domains must be denied before opening a database
+ // transaction, even if a caller supplies syntactically signed envelopes.
+ const forNonEod={...request(),type:"CORE_OPERATOR_ACTION"};
+ let invalid=await executeRc8PgPendingSignedIntent(args(forNonEod),TEST_ONLY_GATE);
+ eq(invalid.reason,"EOD_REQUEST_SCOPE_INVALID","NON_EOD_SCOPE_DENIED");
+ invalid=await executeRc8PgPendingSignedIntent(args({...request(),subjectId:"not-a-uuid"}),TEST_ONLY_GATE);
+ eq(invalid.reason,"EOD_REQUEST_SCOPE_INVALID","INVALID_EOD_SUBJECT_DENIED");
+ invalid=await executeRc8PgPendingSignedIntent(args({...request(),digest:"bad"}),TEST_ONLY_GATE);
+ eq(invalid.reason,"EOD_REQUEST_SCOPE_INVALID","INVALID_EOD_DIGEST_DENIED");
  let r=await executeRc8PgPendingSignedIntentProduction(args());
  // Signed bytes are insufficient without the current TL-reviewed EOD provenance.
  await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET source_count=3 WHERE id=$1",[SUB]);

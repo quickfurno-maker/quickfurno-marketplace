@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { inspectRazorpayActivationReceipt, inspectRazorpayFailureReceipt } from "../lib/payments/vendorPackagePaymentReceipts.mjs";
 import { classifyVendorPackageWebhookEvent } from "../lib/payments/vendorPackageWebhookBoundary.mjs";
 import { processVendorPackageProviderEvent, resolveVendorPackageEventLedgerGate } from "../lib/payments/vendorPackageProviderEventProcessing.mjs";
-import { buildRazorpayProviderEventEnvelope } from "../lib/payments/vendorPackageProviderEventLedger.mjs";
+import { buildRazorpayProviderEventEnvelope, financeErrorCode } from "../lib/payments/vendorPackageProviderEventLedger.mjs";
 import { RC28_PROVIDER_LEDGER_RUNTIME_INSTALLED, createRc28VendorPackageEventRepository } from "../lib/payments/vendorPackageProviderEventRepository.mjs";
 import { activationLifecycleError, inspectRazorpayOrderClaim, isDefiniteRazorpayOrderRejection, storedRazorpayCheckoutLifecycleError, storedRazorpayOrderModeError } from "../lib/payments/vendorPackageOrderGuards.mjs";
 import { adminClient } from "../lib/supabase";
@@ -562,6 +562,13 @@ export async function handleVendorPackageRazorpayWebhook(
     // OFF. LIVE cannot reach this path (resolveVendorPackageEventLedgerGate).
     return ok({ status: await processSignedCandidate() });
   } catch (error) {
+    // Deterministic finance codes (PAYMENT_REFUNDED, PAYMENT_NOT_CAPTURED, SQL
+    // P0001 messages) must reach the non-2xx response for reconciliation
+    // instead of collapsing to a generic UNKNOWN. Still never acknowledged.
+    if (!(error instanceof AppError)) {
+      const code = financeErrorCode(error);
+      if (code !== "UNKNOWN") return fail(new AppError(code, "Webhook processing needs reconciliation."));
+    }
     return fail(error);
   }
 }

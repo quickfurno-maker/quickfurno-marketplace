@@ -19,6 +19,8 @@ on:
       - 'scripts/mvp/vox/rc31-*.test.mjs'
       - 'scripts/mvp/vox/rc32-*.test.mjs'
       - 'scripts/mvp/vox/rc33-*.test.mjs'
+      - 'scripts/mvp/vox/rc34-*.test.mjs'
+      - 'scripts/mvp/vox/d-db-sql-acl-lint*.mjs'
       - 'scripts/mvp/vox/d-db-p0-6-pg17-rehearsal*.mjs'
       - 'scripts/mvp/vox/validate-vox-rc32-core-vendor-task-atomic-pg17.ps1'
       - 'ops/vox/rc32-review-candidates/20261031010000_vox_rc32_core_vendor_task_atomic_candidate.sql'
@@ -31,6 +33,8 @@ on:
       - 'scripts/mvp/vox/validate-vox-rc17-*.mjs'
       - 'scripts/mvp/vox/validate-vox-rc21-legacy-v1-parser-pg17.mjs'
       - 'services/vendorPackagePaymentService.ts'
+      - 'lib/payments/vendorPackageRazorpay.ts'
+      - 'apps/vox-web/app/team/**'
       - 'services/vendorCrmService.ts'
       - 'app/api/vox/v1/vendor-task/route.ts'
       - 'apps/vox-web/app/finance/[orderId]/page.tsx'
@@ -76,8 +80,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Run RC17-RC33 source, operational and database preflight regressions
-        run: node --test scripts/mvp/vox/rc17-*.test.mjs scripts/mvp/vox/rc18-*.test.mjs scripts/mvp/vox/rc19-*.test.mjs scripts/mvp/vox/rc20-*.test.mjs scripts/mvp/vox/rc21-*.test.mjs scripts/mvp/vox/rc22-*.test.mjs scripts/mvp/vox/rc23-*.test.mjs scripts/mvp/vox/rc24-*.test.mjs scripts/mvp/vox/rc25-*.test.mjs scripts/mvp/vox/rc26-*.test.mjs scripts/mvp/vox/rc27-*.test.mjs scripts/mvp/vox/rc28-*.test.mjs scripts/mvp/vox/rc29-*.test.mjs scripts/mvp/vox/rc31-*.test.mjs scripts/mvp/vox/rc32-*.test.mjs scripts/mvp/vox/rc33-*.test.mjs scripts/mvp/vox/d-db-release-preflight.test.mjs scripts/mvp/vox/d-db-p0-6-pg17-rehearsal.test.mjs
+      - name: Run RC17-RC34 source, operational and database preflight regressions
+        run: node --test scripts/mvp/vox/rc17-*.test.mjs scripts/mvp/vox/rc18-*.test.mjs scripts/mvp/vox/rc19-*.test.mjs scripts/mvp/vox/rc20-*.test.mjs scripts/mvp/vox/rc21-*.test.mjs scripts/mvp/vox/rc22-*.test.mjs scripts/mvp/vox/rc23-*.test.mjs scripts/mvp/vox/rc24-*.test.mjs scripts/mvp/vox/rc25-*.test.mjs scripts/mvp/vox/rc26-*.test.mjs scripts/mvp/vox/rc27-*.test.mjs scripts/mvp/vox/rc28-*.test.mjs scripts/mvp/vox/rc29-*.test.mjs scripts/mvp/vox/rc31-*.test.mjs scripts/mvp/vox/rc32-*.test.mjs scripts/mvp/vox/rc33-*.test.mjs scripts/mvp/vox/rc34-*.test.mjs scripts/mvp/vox/d-db-release-preflight.test.mjs scripts/mvp/vox/d-db-sql-acl-lint.test.mjs scripts/mvp/vox/d-db-p0-6-pg17-rehearsal.test.mjs
       - name: Enforce QF MVP 50 Razorpay raw-body financial authority gate
         run: node scripts/mvp/payments/validate-vendor-package-razorpay.mjs
       - name: Compute source migration and recovery HOLD evidence

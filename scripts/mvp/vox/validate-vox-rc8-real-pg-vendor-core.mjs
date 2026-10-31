@@ -26,23 +26,27 @@ try{
  docker(["run","-d","--rm","--pull","never","--name",name,
   "-p","127.0.0.1::5432","-e","POSTGRES_PASSWORD=synthetic_only","postgres:17-alpine"]);
  created=true;
- let port;
- for(let i=0;i<110;i++){
-  let ready=false;
+ // Docker-exec psql can hit initdb's short-lived Unix socket. The actual
+ // Core path uses host TCP, so require that same mapped endpoint to accept SQL.
+ let port=0,ready=false,lastError="";
+ for(let i=0;i<160;i++){
   try{
-   const ports=docker(["port",name,"5432/tcp"]);
-   const found=ports.match(/^127\.0\.0\.1:(\d+)$/m);
+   const found=docker(["port",name,"5432/tcp"]).match(/^127\.0\.0\.1:(\d+)$/m);
    if(found)port=Number(found[1]);
-   ready=docker(["exec",name,"psql","-X","-A","-t","-U","postgres","-d","postgres","-c","SELECT 1;"])==="1"&&
-    docker(["logs",name]).includes("PostgreSQL init process complete; ready for start up.");
-  }catch{}
-  if(ready&&port)break;await sleep(160);
+   if(port){
+    const client=new Pool({host:"127.0.0.1",port,user:"postgres",
+     password:"synthetic_only",database:"postgres",max:1,connectionTimeoutMillis:1200});
+    try{ready=(await client.query("SELECT 1 AS ready")).rows[0]?.ready===1}
+    finally{await client.end()}
+   }
+  }catch(e){ready=false;lastError=String(e?.code||e?.message||e).slice(0,160)}
+  if(ready)break;
+  await sleep(160);
  }
- if(!port)throw Error("NO_LOOPBACK_PORT");
+ if(!port||!ready)throw Error("CORE_PG17_HOST_TCP_NOT_READY "+lastError);
  pool=new Pool({host:"127.0.0.1",port,user:"postgres",password:"synthetic_only",
   database:"postgres",max:4,connectionTimeoutMillis:5000});
- for(let i=0;i<30;i++){try{await pool.query("SELECT 1");break}catch(e){
-  if(i===29)throw e;await sleep(100);}}
+ await pool.query("SELECT 1 AS ready");
  const fixture=[
  "CREATE ROLE anon NOLOGIN;CREATE ROLE authenticated NOLOGIN;CREATE ROLE service_role NOLOGIN;",
  "CREATE SCHEMA auth;CREATE TABLE auth.users(id uuid PRIMARY KEY,raw_app_meta_data jsonb NOT NULL)",

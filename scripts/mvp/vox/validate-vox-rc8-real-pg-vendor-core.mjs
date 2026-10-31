@@ -152,6 +152,30 @@ try{
  const expiredState=await pool.query("SELECT state,revision FROM public.communication_conversations WHERE id=$1",[C3]);
  eq(expiredState.rows[0].state,"OPEN","EXPIRED_AAL2_NO_TAKEOVER");
  eq(Number(expiredState.rows[0].revision),0,"EXPIRED_AAL2_NO_REVISION");
+ // A grant can expire after the original FOR SHARE check but before COMMIT.
+ // Expire the scope inside the disposable transaction *after* staging receipt
+ // and require the recheck to roll back the entire operator mutation.
+ r=await execute(make(C3,id(67)),async()=>{
+  const raw=await pool.connect();
+  return {
+   query:async(sql,values)=>{
+    const result=await raw.query(sql,values);
+    if(sql.includes("INSERT INTO public.vox_rc8_conversation_operator_receipts_candidate_v1"))
+     await raw.query("UPDATE public.vox_staff_object_scopes_v1 "+
+      "SET expires_at=clock_timestamp()-interval '1 second' "+
+      "WHERE auth_user_id=$1 AND object_id=$2",[A,C3]);
+    return result;
+   },
+   release:()=>raw.release()
+  };
+ });
+ eq(r.reason,"CORE_GRANT_EXPIRED_DURING_TRANSACTION","IN_FLIGHT_SCOPE_EXPIRY_DENIED");
+ eq(await count("public.communication_conversation_events"),1,"EXPIRED_SCOPE_NO_EVENT");
+ eq(await count("public.vox_rc8_conversation_operator_receipts_candidate_v1"),1,
+  "EXPIRED_SCOPE_NO_RECEIPT");
+ const postExpiry=await pool.query("SELECT state,revision FROM public.communication_conversations WHERE id=$1",[C3]);
+ eq(postExpiry.rows[0].state,"OPEN","EXPIRED_SCOPE_NO_TAKEOVER");
+ eq(Number(postExpiry.rows[0].revision),0,"EXPIRED_SCOPE_NO_REVISION");
  // A concurrent zone disable must serialize with the vendor Core writer.
  // Lock the same zone, start the operator, then revoke before releasing it.
  // An old snapshot must not commit a takeover after eligibility disappears.

@@ -244,6 +244,42 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
     [sourceId,input.nonce]);
    if(provenance.rowCount!==1)throw Error("F1_OR_NONCE_ATOMIC_PROOF_MISSING");
   }
+  // PostgreSQL clock advances while we hold the earlier SHARE locks: a
+  // membership, object scope or reviewed capability may cross its expiration
+  // boundary without a concurrent UPDATE. Refresh every time-limited grant
+  // using clock_timestamp(), still inside the same serializable transaction.
+  const currentGrants=await db.query(
+   "SELECT os.id FROM public.vox_staff_object_scopes_v1 os "+
+   "JOIN public.vox_staff_memberships_v1 m ON m.auth_user_id=os.auth_user_id "+
+   "JOIN public.vox_staff_department_capabilities_v1 cap "+
+   "ON cap.auth_user_id=m.auth_user_id AND cap.team_id=m.team_id "+
+   "JOIN public.vox_staff_department_requests_v1 req ON req.id=cap.request_id "+
+   "JOIN public.vox_staff_memberships_v1 tl ON tl.auth_user_id=req.decided_by "+
+   "WHERE m.auth_user_id=$1::uuid AND os.object_id=$2::uuid "+
+   "AND m.team_id=$3::uuid AND cap.city_id=$4::uuid "+
+   "AND os.scope_kind='conversation' AND os.revoked_at IS NULL "+
+   "AND os.expires_at>clock_timestamp() "+
+   "AND m.is_active=true AND m.revoked_at IS NULL AND m.expires_at>clock_timestamp() "+
+   "AND cap.department='client_success' AND cap.revoked_at IS NULL "+
+   "AND cap.expires_at>clock_timestamp() AND req.state='APPROVED' "+
+   "AND req.expires_at>clock_timestamp() AND tl.staff_role='team_leader' "+
+   "AND tl.is_active=true AND tl.revoked_at IS NULL "+
+   "AND tl.expires_at>clock_timestamp()",
+   [input.verifiedStaff.userId,input.conversationId,staff.rows[0].team_id,c.city_id]);
+  if(currentGrants.rowCount!==1){
+   await db.query("ROLLBACK");settled=true;
+   return closed("CORE_GRANT_EXPIRED_DURING_TRANSACTION");
+  }
+  if(clientBinding){
+   const currentProject=await db.query(
+    "SELECT conversation_id FROM public.vox_rc12_client_conversation_project_bindings_candidate_v1 "+
+    "WHERE conversation_id=$1::uuid AND review_state='APPROVED' "+
+    "AND expires_at>clock_timestamp()",[input.conversationId]);
+   if(currentProject.rowCount!==1){
+    await db.query("ROLLBACK");settled=true;
+    return closed("CLIENT_PROJECT_BINDING_EXPIRED_DURING_TRANSACTION");
+   }
+  }
   // The verified AAL2 session may expire while this transaction waits on
   // a destination advisory lock or consent reads. Reject before commit.
   if(input.verifiedStaff.expiresAtMs<=Date.now()){

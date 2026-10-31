@@ -19,6 +19,13 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
   approvedRegistryFingerprints=RC4_HUMAN_APPROVED_REGISTRY_FINGERPRINTS}=options;
  if(typeof acquireClient!=="function"||!request||typeof request!=="object")
   return deny("TRANSACTION_CLIENT_REQUIRED");
+ // This pending-receipt writer is restricted to the reviewed four-source EOD
+ // lane. Other signed commands require their own independent source/authority.
+ if(request.type!=="EOD_OFFICIAL_RELEASE"||
+    !UUID.test(request.subjectId??"")||!UUID.test(request.teamId??"")||
+    !UUID.test(request.cityId??"")||
+    typeof request.digest!=="string"||!/^[a-f0-9]{64}$/.test(request.digest))
+  return deny("EOD_REQUEST_SCOPE_INVALID");
  let client,started=false,settled=false;
  try{
   client=await acquireClient();

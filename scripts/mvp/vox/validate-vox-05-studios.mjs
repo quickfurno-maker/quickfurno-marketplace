@@ -1,0 +1,20 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {resolve} from "node:path";
+const root=resolve(import.meta.dirname,"../../..");
+const read=p=>readFileSync(resolve(root,p),"utf8");
+const route=read("app/api/vox/v1/studio-catalog/route.ts");
+let n=0;function t(name,fn){fn();console.log("PASS "+name);n++;}
+t("uses actual existing Core Studio definitions",()=>assert.match(route,/import \{AUTOMATION_STUDIO_WORKFLOWS\} from "@\/lib\/automation\/studioContract"/));
+t("requires verified scoped staff",()=>assert.match(route,/getVerifiedScopedStaff\(request\.headers\.get\("authorization"\)\)/));
+t("role denied without management or audit grant",()=>assert.match(route,/operations_manager","auditor/));
+t("claims read only",()=>assert.match(route,/mode:"READ_ONLY"/));
+t("never enables Core publication",()=>assert.match(route,/canPublish:false,canExecute:false/));
+t("does not claim live runtime status",()=>assert.match(route,/runtimeStatus:"NOT_QUERIED"/));
+t("Jarvis flows not claimed connected",()=>assert.match(route,/status:"NOT_CONNECTED",canEdit:false/));
+t("AOS status not fabricated",()=>assert.match(route,/engine:"AOS",status:"NOT_CONNECTED"/));
+t("AGNI status not fabricated",()=>assert.match(route,/engine:"AGNI",status:"NOT_CONNECTED"/));
+t("does not call unscoped admin Studio API",()=>assert.doesNotMatch(route,/getAutomationStudioOverview|saveAutomationStudioDraft|publishAutomationStudioDraft|axios|fetch\(/));
+t("sensitive mutation methods denied",()=>assert.equal((route.match(/CORE_APPROVAL_REQUIRED/g)||[]).length,3));
+t("only source static engine definitions",()=>assert.match(route,/AUTOMATION_STUDIO_WORKFLOWS\.map\(/));
+console.log("VOX_05_STUDIO_REUSE_PASS "+n+"/12");

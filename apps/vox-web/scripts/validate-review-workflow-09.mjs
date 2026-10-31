@@ -1,0 +1,26 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {resolve} from "node:path";
+const root=resolve(import.meta.dirname,".."),read=p=>readFileSync(resolve(root,p),"utf8");
+const core=read("lib/core.ts"),api=read("app/api/staff-reviews/route.ts"),
+ page=read("app/staff-reviews/page.tsx"),ui=read("app/staff-reviews/ReviewConsole.tsx");
+let n=0;const t=(title,f)=>{f();n++;console.log("PASS "+title)};
+t("review web path independently disabled",()=>assert.match(core,/VOX_STAFF_REVIEW_WEB_ENABLED!=="staging"/));
+t("only delegated-scoped mode",()=>assert.match(core,/VOX_STAFF_VIEW_MODE!=="scoped"/));
+t("Core bearer fetched after actual AAL2 MFA",()=>assert.match(core,/fetchTeamLeaderReviewQueue[\s\S]*verifiedMfaSession/));
+t("Team leader reads only canonical Core queue",()=>assert.match(core,/\/api\/vox\/v1\/staff-review-queue/));
+t("review response exact schema",()=>assert.match(core,/qf\.vox\.staff\.review\.queue\.v1/));
+t("review response bounded",()=>assert.match(core,/payload\.pending\.length>16/));
+t("server binds strict same Origin",()=>assert.match(api,/allowedOrigin\(request\)/));
+t("JSON request size bounded",()=>assert.match(api,/body\.length>256/));
+t("review optimistic revision zero",()=>assert.match(api,/x\.expectedRevision!==0/));
+t("server creates its own audit correlation",()=>assert.match(api,/randomUUID\(\)/));
+t("cannot choose reviewer ID in payload",()=>assert.doesNotMatch(api,/x\.reviewerId|x\.ownerId|x\.actorId/));
+t("browser communicates with BFF, not Core",()=>{assert.match(ui,/fetch\("\/api\/staff-reviews"/);assert.doesNotMatch(ui,/staging-core|Authorization:|service_role/);});
+t("explicit second click confirmation",()=>assert.match(ui,/Confirm decision/));
+t("review cannot directly activate",()=>assert.doesNotMatch(ui+api,/action:"activate"|qf_vox_activate_reviewed_access_v1/));
+t("page always gets verified read queue",()=>assert.match(page,/await fetchTeamLeaderReviewQueue\(\)/));
+t("stage disabled gives a hold page",()=>assert.match(page,/Review queue unavailable/));
+t("unsupported methods denied",()=>assert.equal((api.match(/METHOD_NOT_ALLOWED/g)||[]).length,2));
+t("Core response is checked against reviewed state",()=>assert.ok(core.includes('data.state!==(decision==="APPROVE"?"APPROVED":"REJECTED")')));
+console.log("VOX09_STAFF_REVIEW_WEB_GUARDS_PASS "+n+"/18");

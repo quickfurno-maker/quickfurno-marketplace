@@ -1,0 +1,17 @@
+.voxReport{min-height:100vh;background:#08161d;color:#e8f5f0;max-width:1120px;margin:0 auto;padding:clamp(18px,4vw,48px)}
+.voxReport a{color:#9be4cb}.voxReportBreadcrumb{display:flex;gap:12px;font-size:13px;margin-bottom:25px;align-items:center}
+.voxReportHero{border:1px solid #37645a;border-radius:18px;background:linear-gradient(110deg,#102b2e,#0c1822);padding:clamp(22px,4vw,40px);margin-bottom:24px}
+.voxReportEyebrow{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:#8cdbc1}
+.voxReportHero h1{font-size:clamp(28px,5vw,45px);margin:8px 0 12px}.voxReportHero p{max-width:740px;color:#bad1cd;line-height:1.7}
+.voxReportBadge,.voxReportTag{display:inline-flex;border:1px solid #8bc5ae;color:#d0f7e8;border-radius:999px;padding:6px 11px;font-size:12px}
+.voxReportCard{background:#11262c;border:1px solid #365a56;border-radius:17px;padding:clamp(20px,3vw,32px);margin-bottom:18px}
+.voxReportHeading{display:flex;gap:15px;align-items:center;justify-content:space-between;flex-wrap:wrap}.voxReportHeading h2{font-size:23px;margin:0}
+.voxReportWarning{border-left:3px solid #f2cf82;padding-left:16px;color:#eee1b6;line-height:1.6;font-size:14px}
+.voxReportGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:20px 0}
+.voxReportMetric{border:1px solid #3c635c;border-radius:13px;background:#152f33;padding:17px;display:flex;flex-direction:column;gap:13px}
+.voxReportMetricName{font-size:13px;color:#c0d8d1}.voxReportMetric strong{font-size:clamp(25px,4vw,38px);font-variant-numeric:tabular-nums}
+.voxReportSummary,.voxReportRestriction,.voxReportCard>p{font-size:14px;line-height:1.65;color:#c5d2ce}
+.voxReportLinks{display:flex;flex-wrap:wrap;gap:18px;padding-top:10px}
+.voxReport a:focus-visible{outline:3px solid #ffe293;outline-offset:4px}
+@media(max-width:800px){.voxReportGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:440px){.voxReportGrid{grid-template-columns:1fr 1fr}.voxReportMetric{padding:13px}}

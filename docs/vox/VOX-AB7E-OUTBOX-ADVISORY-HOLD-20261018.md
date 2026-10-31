@@ -1,0 +1,5 @@
+# VOX AB7E In-app outbox advisory — 18 October 2026
+
+AB-7E SOURCE-ONLY / RELEASE HOLD. Adds `ab7InAppOutboxAdvisory.mjs`, default-disabled review-only Core Owner AAL2 authenticated source callback, <=500 exact in-app outbox metadata rows, detects due jobs/expired leases/retry exhaustion/DEAD_LETTER and refuses duplicate, forged payloads, source revocation and unverified Owner. Focused 4/4 Node tests PASS. Output always `runAuthorized:false`, `autonomousRemediation:false`, `providerMessagesSent:0`. It is **not** a live worker, scheduler, notification provider, real AGNI action, WhatsApp or customer outbound transport. The prior 08N in-app RPC worker candidate remains uninstalled. Protected staging identity, DB AppSec review, metrics and full worker recovery certification pending.
+
+**All preceding PRs remain draft/unmerged. Cursor review deferred. Independent DBA/AppSec, approved first Team Leader, Staff MFA, migration reconciliation, protected staging tests, signed artifacts and Owner GO remain P0. DO NOT DEPLOY.**

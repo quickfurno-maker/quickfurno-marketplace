@@ -1,0 +1,29 @@
+name: VOX TO-04I Real RLS and Vendor Public Contract HOLD
+on:
+  pull_request:
+    paths:
+      - 'ops/vox/certification/TO04I-LIVE-RLS-BOUNDARY.json'
+      - 'scripts/mvp/vox/*to04i-rls*'
+      - '.github/workflows/vox-to04i-rls-boundary.yml'
+permissions:
+  contents: read
+jobs:
+  vendor-rls-schema-and-public-view:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: node --test scripts/mvp/vox/validate-to04i-rls-boundary.test.mjs
+      - name: Missing independent review must refuse release
+        shell: bash
+        run: |
+          set +e
+          node scripts/mvp/vox/check-to04i-rls-boundary.mjs --release-check
+          STATUS=$?
+          set -e
+          test "$STATUS" -eq 42

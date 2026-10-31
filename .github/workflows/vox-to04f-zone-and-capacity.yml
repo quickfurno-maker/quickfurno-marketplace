@@ -1,0 +1,26 @@
+name: VOX TO-04F Scoped Service Zones and Capacity Source
+on:
+  pull_request:
+    paths:
+      - 'contracts/vox/canonicalZoneGate*'
+      - 'app/api/vox/v1/work-queue/route.ts'
+      - 'scripts/mvp/vox/validate-to04f-zone-scope.test.mjs'
+      - 'scripts/mvp/vox/fixtures/vox-to04f-50-distinct-capacity.sh'
+      - 'scripts/mvp/vox/fixtures/vox-to04f-capacity-denial-assertions.sql'
+      - '.github/workflows/vox-to04f-zone-and-capacity.yml'
+permissions:
+  contents: read
+jobs:
+  canonical-grant-zone-and-ts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: node --test scripts/mvp/vox/validate-to04f-zone-scope.test.mjs scripts/mvp/vox/validate-to02g-work-queue.test.mjs
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck

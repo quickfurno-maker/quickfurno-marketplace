@@ -1,0 +1,30 @@
+name: VOX Phase A Core Auth and Queue Cursor - Release HOLD
+on:
+  pull_request:
+    paths:
+      - 'app/api/vox/v1/staff-chat/**'
+      - 'app/api/vox/v1/ui04-workspace/**'
+      - 'contracts/vox/teamChatEligibility*'
+      - 'contracts/vox/ui04RouteFusion.mjs'
+      - 'contracts/vox/phaseAScopedQueueCursor.mjs'
+      - 'scripts/mvp/vox/validate-voxPhaseA-*'
+      - 'scripts/mvp/vox/validate-voxUI04-route-fusion.test.mjs'
+      - '.github/workflows/vox-phaseA-core-security.yml'
+permissions:
+  contents: read
+jobs:
+  source-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node --test scripts/mvp/vox/*.test.mjs
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run build

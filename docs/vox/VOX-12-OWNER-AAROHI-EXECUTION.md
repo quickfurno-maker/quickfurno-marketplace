@@ -1,0 +1,7 @@
+# VOX-12 owner-only native Aarohi follow-up execution workbench
+
+Source-only. New /api/approved-followups server-only BFF and conditional component on the existing /approvals Owner UI. Separate VOX_APPROVED_FOLLOWUP_WEB_ENABLED=disabled flag, requires portal staging, owner mode and Supabase verified MFA session. Only existing pinned HTTPS private Core /api/vox/v1/execute-followup is called, never a browser Core bearer. Strict output schema and explicit zero provider sends/credits, no direct CRM database access.
+
+GET lists up to 16 previously owner-reviewed, approved and not yet executed prospect follow-up intents. A second confirmation sends only intentId and optimistic revision 1. Core atomic PostgreSQL RPC locks the reviewed intent, rechecks owner and current requester/grant/city, inserts one canonical Aarohi CRM FOLLOW_UP task, one Aarohi event, and a unique execution receipt in one transaction. Duplicate clicks return the same task, never a duplicate provider send.
+
+This is not full Aarohi CRM editor, Anisha/Jarvis, support reply, Meta WhatsApp, vendor profile/KYC or AGNI action. Staging real AAL2, backup and rollback, rate control and load remain pending. Default flag OFF, no live credentials/users.

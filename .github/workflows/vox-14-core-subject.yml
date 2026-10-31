@@ -1,0 +1,25 @@
+name: VOX-14 Core subject authorization
+on:
+  pull_request:
+    paths:
+      - 'contracts/vox/agentSubjectAccess.*'
+      - 'app/api/vox/v1/agent-subject-access/**'
+      - 'scripts/mvp/vox/validate-vox14-core-subject.mjs'
+      - '.github/workflows/vox-14-core-subject.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  scoped-core-authorization:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with: { node-version: '20.20.2' }
+      - run: |
+          node scripts/mvp/vox/validate-vox14-core-subject.mjs
+          node scripts/mvp/vox/validate-vox-11-qa.mjs
+      - run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck

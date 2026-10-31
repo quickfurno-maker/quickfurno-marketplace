@@ -1,0 +1,526 @@
+{
+  "schema": "qf.vox.staging-migration-drift/read-only-v1",
+  "observation_date": "2026-10-31",
+  "source": "QuickFurno Staging Supabase connector read-only list_migrations + exact JARVIS PR450 worktree",
+  "production_touched": false,
+  "managed_writes": false,
+  "not_a_deploy_plan": true,
+  "staging_count": 86,
+  "source_sql_count": 162,
+  "common_version_count": 55,
+  "staging_only_count": 31,
+  "source_only_count": 107,
+  "staging_only": [
+    {
+      "version": "20260722000100",
+      "name": "qf_mvp_staging_baseline_269c9265"
+    },
+    {
+      "version": "20260926045741",
+      "name": "qf_launch_pune_only_city_activation"
+    },
+    {
+      "version": "20260926045744",
+      "name": "qf_active_city_authority_hardening"
+    },
+    {
+      "version": "20260926045753",
+      "name": "qf_aos_v2_intelligence"
+    },
+    {
+      "version": "20260926045756",
+      "name": "qf_lead_generation_scope_lock"
+    },
+    {
+      "version": "20260926045759",
+      "name": "vendor_media_bucket"
+    },
+    {
+      "version": "20260926045802",
+      "name": "jarvis_os_operator_command_receipts"
+    },
+    {
+      "version": "20260926050242",
+      "name": "qf_phase2_staging_rls_initplan_parity"
+    },
+    {
+      "version": "20260927072347",
+      "name": "qf_client_journey_phase1_foundation"
+    },
+    {
+      "version": "20260927090306",
+      "name": "qf_client_journey_phase1_meta_qualification"
+    },
+    {
+      "version": "20260929161707",
+      "name": "shared_single_number_jarvis_access"
+    },
+    {
+      "version": "20261001151402",
+      "name": "qf_verified_location_geofence_straight_line"
+    },
+    {
+      "version": "20261001153730",
+      "name": "qf_multi_city_service_zone_authority"
+    },
+    {
+      "version": "20261001154754",
+      "name": "qf_city_market_runtime_controls"
+    },
+    {
+      "version": "20261001165444",
+      "name": "qf_admin_service_zone_boundary_control"
+    },
+    {
+      "version": "20261002080447",
+      "name": "vendor_fair_opportunity_distribution"
+    },
+    {
+      "version": "20261002083321",
+      "name": "vendor_fair_opportunity_group_reconcile"
+    },
+    {
+      "version": "20261002083346",
+      "name": "vendor_fair_opportunity_group_reconcile"
+    },
+    {
+      "version": "20261002083936",
+      "name": "vendor_fair_opportunity_fk_indexes"
+    },
+    {
+      "version": "20261002085216",
+      "name": "vendor_fair_opportunity_fk_indexes"
+    },
+    {
+      "version": "20261003034807",
+      "name": "aarohi_phase1_omnichannel_activation"
+    },
+    {
+      "version": "20261003040425",
+      "name": "aarohi_phase1_fk_indexes"
+    },
+    {
+      "version": "20261003072042",
+      "name": "aarohi_phase2_autonomous_acquisition"
+    },
+    {
+      "version": "20261003072049",
+      "name": "aarohi_phase2_scale_governance"
+    },
+    {
+      "version": "20261003072056",
+      "name": "aarohi_phase2_ops_control_analytics"
+    },
+    {
+      "version": "20261003072655",
+      "name": "aarohi_phase2_ops_fk_indexes"
+    },
+    {
+      "version": "20261003081215",
+      "name": "aarohi_full_fk_index_closeout"
+    },
+    {
+      "version": "20261012180214",
+      "name": "qf_vl01_vendor_assignment_update_authority_closeout_staging"
+    },
+    {
+      "version": "20261013053930",
+      "name": "vl05_scale_phase07_durable_jobs_hardening_staging"
+    },
+    {
+      "version": "20261013053959",
+      "name": "vl05_scale_phase12_horizontal_worker_claims_staging"
+    },
+    {
+      "version": "20261013144901",
+      "name": "vendor_profile_approval_atomic_v3_staging_20261013"
+    }
+  ],
+  "source_only": [
+    "20260620000001_create_tables.sql",
+    "20260620000002_rls_policies.sql",
+    "20260620000003_functions.sql",
+    "20260620000004_seed_data.sql",
+    "20260620000005_homepage_alignment.sql",
+    "20260621000006_superadmin_foundation.sql",
+    "20260622000007_vendor_location.sql",
+    "20260624000008_lead_capture_consent.sql",
+    "20260624000009_vendor_onboarding.sql",
+    "20260624000010_vendor_exact_columns.sql",
+    "20260624000011_vendor_office_address.sql",
+    "20260627000012_aos_management_foundation.sql",
+    "20260627000013_crm_analytics_foundation.sql",
+    "20260628000014_aos_control_center_foundation.sql",
+    "20260628000015_crm_analytics_foundation_safe_placeholders.sql",
+    "20260630000016_aos_runtime_settings.sql",
+    "20260630000017_lead_assignment_approvals.sql",
+    "20260630000018_vendor_actions_credits_package_sync.sql",
+    "20260630000019_assignment_ledger_snapshots.sql",
+    "20260630000020_align_active_cities.sql",
+    "20260630000021_category_governance.sql",
+    "20260701000022_phase_25a_paid_only_auto_match_free_vendor_interest.sql",
+    "20260701000023_vendor_package_orders.sql",
+    "20260701000024_vendor_profile_change_requests.sql",
+    "20260701000025_vendor_notifications_support.sql",
+    "20260701000026_bad_lead_report_safety_fields.sql",
+    "20260701000027_phase26a_auto_lead_matching_foundation.sql",
+    "20260701000028_phase26a_live_schema_repair.sql",
+    "20260701000029_phase26a2_admin_audit_hardening.sql",
+    "20260701000030_phase26a2c_smart_override_assignment.sql",
+    "20260701000031_phase26a2c_recovery_fallback_reporting.sql",
+    "20260701000032_phase26a2d_client_requirement_groups.sql",
+    "20260701000033_phase26a2e_preferred_vendor_recharge_window.sql",
+    "20260702000034_fix_auto_match_category_mapping.sql",
+    "20260702000035_preferred_vendor_lead_intent.sql",
+    "20260702000037_fix_preferred_vendor_credit_direct_assignment.sql",
+    "20260702000038_lead_quality_engine_phase1.sql",
+    "20260702000039_b_lead_clarification_flow.sql",
+    "20260704000040_google_area_location_foundation.sql",
+    "20260704000100_align_lead_quality_status_constraints.sql",
+    "20260704000110_lead_scores_security_hardening.sql",
+    "20260705000130_distance_category_matching_rpc.sql",
+    "20260706000140_vendor_accepting_leads.sql",
+    "20260706000141_vendor_credit_wallet_rpc.sql",
+    "20260706000142_credit_wallet_assignment_rpc.sql",
+    "20260706000143_preferred_assignment_accepting_leads.sql",
+    "20260706000144_manual_assignment_accepting_leads.sql",
+    "20260706000145_package_purchase_idempotent_grant.sql",
+    "20260706000146_create_qf_workflow_kernel_foundation.sql",
+    "20260706000147_workflow_kernel_atomic_step.sql",
+    "20260706000148_workflow_kernel_safety_hardening.sql",
+    "20260706000149_workflow_kernel_retry_consistency.sql",
+    "20260706000150_automation_policy_config_foundation.sql",
+    "20260708000160_identity_security_foundation.sql",
+    "20260708000170_unified_communication_core.sql",
+    "20260708000180_vendor_authentication_foundation.sql",
+    "20260708000190_client_whatsapp_otp_login_readiness.sql",
+    "20260708000200_vendor_whatsapp_verification_password_reset.sql",
+    "20260709000100_messaging_channel_provider_foundation.sql",
+    "20260709000200_whatsapp_cloud_api_runtime_control.sql",
+    "20260710000100_auth_transport_resilience_decision_foundation.sql",
+    "20260711000100_whatsapp_inbound_message_foundation.sql",
+    "20260711000200_communication_consent_evidence_and_state_hardening.sql",
+    "20260712000300_communication_consent_command_writer_rpc.sql",
+    "20260713000100_communication_consent_ack_intents.sql",
+    "20260716000100_communication_provider_account_binding.sql",
+    "20260720000100_communication_delivery_event_provider_account_required.sql",
+    "20260721000100_communication_consent_ack_intent_provider_account_required.sql",
+    "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql",
+    "20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql",
+    "20260912010000_qf_vendor_package_razorpay_testmode.sql",
+    "20260912020000_qf_package_scope_governance.sql",
+    "20260912021527_qf_launch_pune_only_city_activation.sql",
+    "20260912024734_qf_active_city_authority_hardening.sql",
+    "20260912030000_qf_category_runtime_governance.sql",
+    "20260912040000_qf_aos_v2_intelligence.sql",
+    "20260912050000_qf_lead_generation_scope_lock.sql",
+    "20260923170217_vendor_media_bucket.sql",
+    "20260924183000_jarvis_os_operator_command_receipts.sql",
+    "20260927113000_qf_client_journey_phase1_foundation.sql",
+    "20260927150000_qf_client_journey_phase1_meta_qualification.sql",
+    "20260929154156_shared_single_number_jarvis_access.sql",
+    "20261001144025_qf_verified_location_geofence_straight_line.sql",
+    "20261001153000_qf_multi_city_service_zone_authority.sql",
+    "20261001154500_qf_city_market_runtime_controls.sql",
+    "20261001165000_qf_admin_service_zone_boundary_control.sql",
+    "20261002071500_vendor_fair_opportunity_distribution.sql",
+    "20261002090000_vendor_fair_opportunity_group_reconcile.sql",
+    "20261002091500_vendor_fair_opportunity_fk_indexes.sql",
+    "20261003064500_aarohi_phase1_omnichannel_activation.sql",
+    "20261003070000_aarohi_phase1_fk_indexes.sql",
+    "20261003080000_aarohi_phase2_autonomous_acquisition.sql",
+    "20261003081046_aarohi_full_fk_index_closeout.sql",
+    "20261003083000_aarohi_phase2_scale_governance.sql",
+    "20261003090000_aarohi_phase2_ops_control_analytics.sql",
+    "20261003091000_aarohi_phase2_ops_fk_indexes.sql",
+    "20261004190000_scale_phase07_durable_jobs_hardening.sql",
+    "20261004190001_scale_phase08_matching_prefilter.sql",
+    "20261004190002_scale_phase09_data_lifecycle.sql",
+    "20261005160000_scale_phase12_horizontal_worker_claims.sql",
+    "20261005200000_scale_phase14_agni_governance.sql",
+    "20261005203000_scale_phase14_trace_context.sql",
+    "20261006113000_scale_phase18_matching_slo.sql",
+    "20261006113720_phase22_identity_portability.sql",
+    "20261012080000_anisha_vendor_memory_consent_source.sql",
+    "20261012100000_anisha_memory_purge_delivery.sql",
+    "20261012213000_vendor_assignment_update_authority_closeout.sql"
+  ],
+  "common_versions": [
+    {
+      "version": "20260723000100",
+      "staging_name": "qf_mvp_marketplace_authority_foundation",
+      "source_filename": "20260723000100_qf_mvp_marketplace_authority_foundation.sql"
+    },
+    {
+      "version": "20260723000200",
+      "staging_name": "qf_mvp_assignment_lineage_backfill",
+      "source_filename": "20260723000200_qf_mvp_assignment_lineage_backfill.sql"
+    },
+    {
+      "version": "20260723000300",
+      "staging_name": "qf_mvp_canonical_assignment_authority",
+      "source_filename": "20260723000300_qf_mvp_canonical_assignment_authority.sql"
+    },
+    {
+      "version": "20260723000400",
+      "staging_name": "qf_mvp_lineage_append_only_grants",
+      "source_filename": "20260723000400_qf_mvp_lineage_append_only_grants.sql"
+    },
+    {
+      "version": "20260723000500",
+      "staging_name": "qf_mvp_assignment_universal_enforcement",
+      "source_filename": "20260723000500_qf_mvp_assignment_universal_enforcement.sql"
+    },
+    {
+      "version": "20260723000600",
+      "staging_name": "qf_mvp_public_projection_privilege_hardening",
+      "source_filename": "20260723000600_qf_mvp_public_projection_privilege_hardening.sql"
+    },
+    {
+      "version": "20260723000700",
+      "staging_name": "qf_mvp_auth_user_onboarding_trigger",
+      "source_filename": "20260723000700_qf_mvp_auth_user_onboarding_trigger.sql"
+    },
+    {
+      "version": "20260723000800",
+      "staging_name": "qf_mvp_legacy_assignment_rpc_execute_revocation",
+      "source_filename": "20260723000800_qf_mvp_legacy_assignment_rpc_execute_revocation.sql"
+    },
+    {
+      "version": "20260723000900",
+      "staging_name": "qf_mvp_credit_ledger_reconciliation_exception_register",
+      "source_filename": "20260723000900_qf_mvp_credit_ledger_reconciliation_exception_register.sql"
+    },
+    {
+      "version": "20260723001000",
+      "staging_name": "qf_mvp_profiles_privilege_admin_role_cleanup",
+      "source_filename": "20260723001000_qf_mvp_profiles_privilege_admin_role_cleanup.sql"
+    },
+    {
+      "version": "20260723001100",
+      "staging_name": "qf_mvp_vendor_crm_foundation",
+      "source_filename": "20260723001100_qf_mvp_vendor_crm_foundation.sql"
+    },
+    {
+      "version": "20260723001200",
+      "staging_name": "qf_mvp_vendor_segment_foundation",
+      "source_filename": "20260723001200_qf_mvp_vendor_segment_foundation.sql"
+    },
+    {
+      "version": "20260723001300",
+      "staging_name": "qf_mvp_vendor_campaign_foundation",
+      "source_filename": "20260723001300_qf_mvp_vendor_campaign_foundation.sql"
+    },
+    {
+      "version": "20260723001400",
+      "staging_name": "qf_mvp_vendor_campaign_evidence_hardening",
+      "source_filename": "20260723001400_qf_mvp_vendor_campaign_evidence_hardening.sql"
+    },
+    {
+      "version": "20260728001500",
+      "staging_name": "qf_mvp_vendor_campaign_execution_handoff_foundation",
+      "source_filename": "20260728001500_qf_mvp_vendor_campaign_execution_handoff_foundation.sql"
+    },
+    {
+      "version": "20260728001600",
+      "staging_name": "qf_mvp_frequency_policy_history_hardening",
+      "source_filename": "20260728001600_qf_mvp_frequency_policy_history_hardening.sql"
+    },
+    {
+      "version": "20260801110000",
+      "staging_name": "qf_mvp_automation_action_persistence",
+      "source_filename": "20260801110000_qf_mvp_automation_action_persistence.sql"
+    },
+    {
+      "version": "20260801152049",
+      "staging_name": "qf_mvp_automation_transport_replay_guard",
+      "source_filename": "20260801152049_qf_mvp_automation_transport_replay_guard.sql"
+    },
+    {
+      "version": "20260803000000",
+      "staging_name": "qf_mvp_50_2c_lead_communication_recipient",
+      "source_filename": "20260803000000_qf_mvp_50_2c_lead_communication_recipient.sql"
+    },
+    {
+      "version": "20260804000000",
+      "staging_name": "qf_mvp_50_2d_automation_transport_completion_route",
+      "source_filename": "20260804000000_qf_mvp_50_2d_automation_transport_completion_route.sql"
+    },
+    {
+      "version": "20260805000000",
+      "staging_name": "qf_mvp_50_2e_automation_transport_client_execution_route",
+      "source_filename": "20260805000000_qf_mvp_50_2e_automation_transport_client_execution_route.sql"
+    },
+    {
+      "version": "20260806000000",
+      "staging_name": "qf_mvp_50_2_atomic_client_automation_producer",
+      "source_filename": "20260806000000_qf_mvp_50_2_atomic_client_automation_producer.sql"
+    },
+    {
+      "version": "20260807000000",
+      "staging_name": "qf_mvp_50_2_execute_v1_reservation_ambiguity_repair",
+      "source_filename": "20260807000000_qf_mvp_50_2_execute_v1_reservation_ambiguity_repair.sql"
+    },
+    {
+      "version": "20260808000000",
+      "staging_name": "qf_mvp_50_2_fresh_claim_retry_wedge_repair",
+      "source_filename": "20260808000000_qf_mvp_50_2_fresh_claim_retry_wedge_repair.sql"
+    },
+    {
+      "version": "20260808500000",
+      "staging_name": "qf_mvp_50_3_automation_policy_config_foundation_bridge",
+      "source_filename": "20260808500000_qf_mvp_50_3_automation_policy_config_foundation_bridge.sql"
+    },
+    {
+      "version": "20260809000000",
+      "staging_name": "qf_mvp_50_3_vendor_automation_producer",
+      "source_filename": "20260809000000_qf_mvp_50_3_vendor_automation_producer.sql"
+    },
+    {
+      "version": "20260810000000",
+      "staging_name": "qf_mvp_50_4_campaign_recipient_automation",
+      "source_filename": "20260810000000_qf_mvp_50_4_campaign_recipient_automation.sql"
+    },
+    {
+      "version": "20260811000000",
+      "staging_name": "qf_mvp_50_3_50_4_family_aware_claim_routing",
+      "source_filename": "20260811000000_qf_mvp_50_3_50_4_family_aware_claim_routing.sql"
+    },
+    {
+      "version": "20260812000000",
+      "staging_name": "qf_mvp_50_5_automation_recovery_reconciliation",
+      "source_filename": "20260812000000_qf_mvp_50_5_automation_recovery_reconciliation.sql"
+    },
+    {
+      "version": "20260813000000",
+      "staging_name": "qf_mvp_40_13b_canary_activation_authority",
+      "source_filename": "20260813000000_qf_mvp_40_13b_canary_activation_authority.sql"
+    },
+    {
+      "version": "20260814000000",
+      "staging_name": "qf_mvp_40_marketing_consent_writer",
+      "source_filename": "20260814000000_qf_mvp_40_marketing_consent_writer.sql"
+    },
+    {
+      "version": "20260815000000",
+      "staging_name": "qf_mvp_75_01_matchcore_binding_rank_order",
+      "source_filename": "20260815000000_qf_mvp_75_01_matchcore_binding_rank_order.sql"
+    },
+    {
+      "version": "20260816000000",
+      "staging_name": "qf_mvp_75_02_geo_postgis_shortlist",
+      "source_filename": "20260816000000_qf_mvp_75_02_geo_postgis_shortlist.sql"
+    },
+    {
+      "version": "20260817000000",
+      "staging_name": "qf_mvp_80_03_audit_logs_forward_repair",
+      "source_filename": "20260817000000_qf_mvp_80_03_audit_logs_forward_repair.sql"
+    },
+    {
+      "version": "20260904000000",
+      "staging_name": "qf_mvp_82a_r0_whatsapp_inbox_realtime_publication",
+      "source_filename": "20260904000000_qf_mvp_82a_r0_whatsapp_inbox_realtime_publication.sql"
+    },
+    {
+      "version": "20260905000000",
+      "staging_name": "qf_mvp_50_6_automation_orphan_cancellation",
+      "source_filename": "20260905000000_qf_mvp_50_6_automation_orphan_cancellation.sql"
+    },
+    {
+      "version": "20260906000000",
+      "staging_name": "qf_mvp_50_7_automation_stale_business_cancellation",
+      "source_filename": "20260906000000_qf_mvp_50_7_automation_stale_business_cancellation.sql"
+    },
+    {
+      "version": "20260910060000",
+      "staging_name": "qf_mvp_40_canary_quiesce_transition",
+      "source_filename": "20260910060000_qf_mvp_40_canary_quiesce_transition.sql"
+    },
+    {
+      "version": "20260911000000",
+      "staging_name": "qf_launch_security_closeout",
+      "source_filename": "20260911000000_qf_launch_security_closeout.sql"
+    },
+    {
+      "version": "20260917000000",
+      "staging_name": "aarohi_acquisition_crm_foundation",
+      "source_filename": "20260917000000_aarohi_acquisition_crm_foundation.sql"
+    },
+    {
+      "version": "20260918093000",
+      "staging_name": "aarohi_anisha_vendor_crm_handoff",
+      "source_filename": "20260918093000_aarohi_anisha_vendor_crm_handoff.sql"
+    },
+    {
+      "version": "20260918120000",
+      "staging_name": "whatsapp_conversational_jarvis_foundation",
+      "source_filename": "20260918120000_whatsapp_conversational_jarvis_foundation.sql"
+    },
+    {
+      "version": "20260918180500",
+      "staging_name": "jarvis_whatsapp_callback_replay_receipts",
+      "source_filename": "20260918180500_jarvis_whatsapp_callback_replay_receipts.sql"
+    },
+    {
+      "version": "20260919010000",
+      "staging_name": "vendor_review_system",
+      "source_filename": "20260919010000_vendor_review_system.sql"
+    },
+    {
+      "version": "20260921054654",
+      "staging_name": "qf_audit_security_hardening",
+      "source_filename": "20260921054654_qf_audit_security_hardening.sql"
+    },
+    {
+      "version": "20260921055639",
+      "staging_name": "qf_audit_rpc_surface_hardening",
+      "source_filename": "20260921055639_qf_audit_rpc_surface_hardening.sql"
+    },
+    {
+      "version": "20260922120000",
+      "staging_name": "false_ceiling_category",
+      "source_filename": "20260922120000_false_ceiling_category.sql"
+    },
+    {
+      "version": "20260926035801",
+      "staging_name": "qf_jarvis_service_availability_deploy",
+      "source_filename": "20260926035801_qf_jarvis_service_availability_deploy.sql"
+    },
+    {
+      "version": "20260926035856",
+      "staging_name": "qf_lead_drafts_deploy",
+      "source_filename": "20260926035856_qf_lead_drafts_deploy.sql"
+    },
+    {
+      "version": "20260929094500",
+      "staging_name": "qf_riya_qualification_worker_lane",
+      "source_filename": "20260929094500_qf_riya_qualification_worker_lane.sql"
+    },
+    {
+      "version": "20261002040748",
+      "staging_name": "vendor_v2_commercial_activation",
+      "source_filename": "20261002040748_vendor_v2_commercial_activation.sql"
+    },
+    {
+      "version": "20261002043238",
+      "staging_name": "vendor_v3_v5_operating_flow",
+      "source_filename": "20261002043238_vendor_v3_v5_operating_flow.sql"
+    },
+    {
+      "version": "20261002044054",
+      "staging_name": "vendor_v3_connection_delivery_gate",
+      "source_filename": "20261002044054_vendor_v3_connection_delivery_gate.sql"
+    },
+    {
+      "version": "20261002045022",
+      "staging_name": "vendor_v3_v5_fk_indexes",
+      "source_filename": "20261002045022_vendor_v3_v5_fk_indexes.sql"
+    },
+    {
+      "version": "20261002052224",
+      "staging_name": "vendor_v3_db_delivery_projection",
+      "source_filename": "20261002052224_vendor_v3_db_delivery_projection.sql"
+    }
+  ],
+  "interpretation": "Version-only inventory. Staging and source histories use different baselines. No automatic migration replay or GO allowed. DBA must independently adjudicate each staging-only and source-only entry and historical Razorpay V1."
+}

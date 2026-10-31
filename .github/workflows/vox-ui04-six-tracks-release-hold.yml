@@ -1,0 +1,33 @@
+name: VOX UI-04 Six-Track Contracts (Release HOLD)
+on:
+  pull_request:
+    paths:
+      - 'contracts/vox/ui04*'
+      - 'scripts/mvp/vox/validate-voxUI04*'
+      - '.github/workflows/vox-ui04-six-tracks-release-hold.yml'
+permissions:
+  contents: read
+jobs:
+  core-source-and-staging-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node --test scripts/mvp/vox/*.test.mjs
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck
+  isolated-postgresql17-source-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Disposable offline PG17 (no managed DB or credentials)
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxUI04-f1-pg17.ps1

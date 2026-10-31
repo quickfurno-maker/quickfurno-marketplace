@@ -1,0 +1,32 @@
+name: VOX-L4 Governed Staff Work and Client Read UI (Release HOLD)
+on:
+  pull_request:
+    paths:
+      - 'apps/vox-web/app/team/**'
+      - 'apps/vox-web/app/api/work-transitions/**'
+      - 'apps/vox-web/lib/clientSourceStatus.ts'
+      - 'apps/vox-web/lib/workTransitions.ts'
+      - 'apps/vox-web/scripts/validate-voxL4-*'
+      - 'apps/vox-web/package.json'
+      - '.github/workflows/vox-l4-staff-operations.yml'
+permissions:
+  contents: read
+jobs:
+  verified-staff-bff-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: apps/vox-web
+      - run: npm test
+        working-directory: apps/vox-web
+      - run: npm run typecheck
+        working-directory: apps/vox-web
+      - run: npm run build
+        working-directory: apps/vox-web

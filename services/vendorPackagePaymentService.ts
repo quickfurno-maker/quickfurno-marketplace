@@ -1,4 +1,11 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { inspectRazorpayActivationReceipt, inspectRazorpayFailureReceipt } from "../lib/payments/vendorPackagePaymentReceipts.mjs";
+import { classifyVendorPackageWebhookEvent } from "../lib/payments/vendorPackageWebhookBoundary.mjs";
+import { classifyVendorPackageRefundIntake, isRefundIntakeEventType } from "../lib/payments/vendorPackageRefundIntake.mjs";
+import { processVendorPackageProviderEvent, resolveVendorPackageEventLedgerGate } from "../lib/payments/vendorPackageProviderEventProcessing.mjs";
+import { buildRazorpayProviderEventEnvelope, financeErrorCode } from "../lib/payments/vendorPackageProviderEventLedger.mjs";
+import { RC28_PROVIDER_LEDGER_RUNTIME_INSTALLED, createRc28VendorPackageEventRepository } from "../lib/payments/vendorPackageProviderEventRepository.mjs";
+import { activationLifecycleError, inspectRazorpayOrderClaim, isDefiniteRazorpayOrderRejection, storedRazorpayCheckoutLifecycleError, storedRazorpayOrderModeError } from "../lib/payments/vendorPackageOrderGuards.mjs";
 import { adminClient } from "../lib/supabase";
 import { AppError, fail, ok, type Result } from "../lib/errors";
 import { requireVendorAccess } from "./vendorAccessService";
@@ -139,7 +146,15 @@ async function razorpayFetch<T>(cfg: RazorpayConfig, path: string, init: Request
     signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) {
-    throw paymentError("RAZORPAY_HTTP_REJECTED", `Razorpay request failed with HTTP ${response.status}.`);
+    // Only a narrow set of POST /orders client errors proves no provider order
+    // was created. For 408/409/429/5xx keep the claim fenced for reconciliation.
+    const definitiveOrderRejection = path === "/orders"
+      && init.method?.toUpperCase() === "POST"
+      && isDefiniteRazorpayOrderRejection(response.status);
+    throw paymentError(
+      definitiveOrderRejection ? "RAZORPAY_HTTP_REJECTED" : "RAZORPAY_HTTP_UNCERTAIN",
+      `Razorpay request failed with HTTP ${response.status}.`,
+    );
   }
   return response.json() as Promise<T>;
 }
@@ -179,10 +194,11 @@ async function loadCurrentPackage(packageId: string): Promise<PackageRow> {
 }
 
 function assertOrderMode(order: PackageOrderRow, cfg: RazorpayConfig): void {
-  if (order.provider_mode && order.provider_mode !== cfg.mode) {
+  const failure = storedRazorpayOrderModeError(order, cfg.mode);
+  if (failure) {
     throw paymentError(
-      "PACKAGE_ORDER_MODE_MISMATCH",
-      "This payment order was created in a different Razorpay environment. Create a new package order.",
+      failure,
+      "Payment provider identity or environment could not be verified. Create a new package order.",
     );
   }
 }
@@ -192,8 +208,14 @@ function checkoutFromStoredOrder(
   cfg: RazorpayConfig,
 ): VendorPackageCheckout {
   assertOrderMode(order, cfg);
-  if (!order.provider_order_id || !order.provider_amount_subunits || order.package_currency !== RAZORPAY_CURRENCY) {
-    throw paymentError("PACKAGE_ORDER_NOT_BOUND", "Package order is not ready for payment.");
+  if (storedRazorpayCheckoutLifecycleError(order)) {
+    throw paymentError("PACKAGE_ORDER_NOT_PAYABLE", "This package order is not payable. Reconcile or create a new order.");
+  }
+  if (!order.provider_order_id || !order.provider_amount_subunits ||
+      order.package_currency !== RAZORPAY_CURRENCY || order.package_price === null ||
+      Number(order.provider_amount_subunits) !== inrToSubunits(order.package_price) ||
+      order.provider_receipt !== packageOrderReceipt(order.id)) {
+    throw paymentError("PACKAGE_ORDER_NOT_BOUND", "The saved payment order or amount is not verified.");
   }
   return {
     localOrderId: order.id,
@@ -218,6 +240,15 @@ export async function createVendorPackageRazorpayCheckout(
     if (order.activation_status === "activated") {
       throw paymentError("PACKAGE_ORDER_ALREADY_ACTIVATED", "This package order is already activated.");
     }
+    if (order.activation_status !== "not_activated") {
+      throw paymentError("PACKAGE_ORDER_NOT_PAYABLE", "Package activation state is unknown. Reconcile before payment.");
+    }
+    // A persisted provider order must not resurrect cancelled, completed,
+    // expired or refunded packages via the already-bound checkout fast path.
+    if (order.order_status !== "created" ||
+      !["not_started", "pending", "failed"].includes(order.payment_status ?? "")) {
+      throw paymentError("PACKAGE_ORDER_NOT_PAYABLE", "This order is not payable. Reconcile or create a fresh package order.");
+    }
 
     if (order.provider_order_id) {
       if (order.payment_provider !== RAZORPAY_PROVIDER) {
@@ -228,6 +259,19 @@ export async function createVendorPackageRazorpayCheckout(
       if (Number(order.provider_amount_subunits) !== expected) {
         throw paymentError("PACKAGE_ORDER_AMOUNT_DRIFT", "Stored payment amount does not match the package snapshot.");
       }
+      // Load-time checks alone race a payment/credit/refund mutation. The
+      // no-write RPC locks the current order and unpaid financial ledger.
+      const { data: boundClaim, error: boundError } = await adminClient().rpc(
+        "qf_claim_vendor_package_razorpay_order_v2",
+        { p_order_id: order.id, p_request_token: randomUUID(), p_provider_mode: cfg.mode },
+      );
+      if (boundError) throw boundError;
+      if (inspectRazorpayOrderClaim(boundClaim, {
+        orderId: order.id, amountSubunits: expected, receipt: packageOrderReceipt(order.id),
+      }) !== "already_bound" || boundClaim?.provider_order_id !== order.provider_order_id) {
+        throw paymentError("PACKAGE_ORDER_CLAIM_INVALID", "Stored payment order could not be revalidated.");
+      }
+      order = await loadOrder(order.id, access.data.vendorId);
       return ok(checkoutFromStoredOrder(order, cfg));
     }
 
@@ -247,7 +291,13 @@ export async function createVendorPackageRazorpayCheckout(
       { p_order_id: order.id, p_request_token: requestToken, p_provider_mode: cfg.mode },
     );
     if (claimError) throw claimError;
-    if ((claim as { status?: string } | null)?.status === "already_bound") {
+    const claimStatus = inspectRazorpayOrderClaim(claim, {
+      orderId: order.id, amountSubunits: amount, receipt,
+    });
+    if (claimStatus === "invalid") {
+      throw paymentError("PACKAGE_ORDER_CLAIM_INVALID", "Database payment claim was not verified. No provider order was requested.");
+    }
+    if (claimStatus === "already_bound") {
       order = await loadOrder(order.id, access.data.vendorId);
       return ok(checkoutFromStoredOrder(order, cfg));
     }
@@ -265,11 +315,17 @@ export async function createVendorPackageRazorpayCheckout(
       });
     } catch (error) {
       if (error instanceof AppError && error.code === "RAZORPAY_HTTP_REJECTED") {
-        await adminClient().rpc("qf_release_vendor_package_razorpay_order_claim_v2", {
+        const { error: releaseError } = await adminClient().rpc("qf_release_vendor_package_razorpay_order_claim_v2", {
           p_order_id: order.id,
           p_request_token: requestToken,
           p_provider_mode: cfg.mode,
         });
+        if (releaseError) {
+          throw paymentError(
+            "PACKAGE_ORDER_CLAIM_RELEASE_FAILED",
+            "Payment request was rejected, but its database claim could not be safely released. Reconcile before retrying.",
+          );
+        }
         throw error;
       }
       throw paymentError(
@@ -311,7 +367,31 @@ async function activateCapturedPayment(
   if (!order.provider_order_id || order.payment_provider !== RAZORPAY_PROVIDER) {
     throw paymentError("PACKAGE_ORDER_NOT_BOUND", "Package order is not bound to Razorpay.");
   }
-  const amount = Number(order.provider_amount_subunits ?? inrToSubunits(order.package_price));
+  // Reconciliation cannot turn a refunded order back into a credit grant.
+  // Recheck inside the SQL transaction too: this is only the first fence.
+  if (order.provider_payment_id && order.provider_payment_id !== payment.id) {
+    throw paymentError("PACKAGE_ORDER_PAYMENT_ID_DRIFT", "A different captured payment is already bound to the order.");
+  }
+  const lifecycle = activationLifecycleError(order, payment.id);
+  if (lifecycle) {
+    throw paymentError(lifecycle, "Order lifecycle does not permit activation. Reconcile it independently.");
+  }
+  // The stored provider amount must exist and equal the package snapshot price.
+  // Never fall back to the price when it is missing, and never trust a drifted
+  // stored amount as the expected capture amount (SQL re-checks under lock).
+  let snapshotAmount: number;
+  try {
+    snapshotAmount = inrToSubunits(order.package_price);
+  } catch {
+    throw paymentError("PACKAGE_ORDER_SNAPSHOT_INVALID", "Package order price snapshot is invalid.");
+  }
+  if (order.provider_amount_subunits === null || order.provider_amount_subunits === undefined) {
+    throw paymentError("PACKAGE_ORDER_NOT_BOUND", "The saved payment amount is not verified.");
+  }
+  const amount = Number(order.provider_amount_subunits);
+  if (amount !== snapshotAmount) {
+    throw paymentError("PACKAGE_ORDER_AMOUNT_DRIFT", "Stored payment amount does not match the package snapshot.");
+  }
   assertCapturedPayment(payment, {
     paymentId: payment.id,
     providerOrderId: order.provider_order_id,
@@ -319,13 +399,37 @@ async function activateCapturedPayment(
     currency: RAZORPAY_CURRENCY,
   });
 
+  // The caller's row predates the provider GET (up to 10s). Re-read so a
+  // refund/cancel that landed meanwhile is refused here, not only in SQL.
+  const fresh = await loadOrder(order.id);
+  assertOrderMode(fresh, cfg);
+  if (fresh.provider_order_id !== order.provider_order_id || fresh.payment_provider !== order.payment_provider) {
+    throw paymentError("PACKAGE_ORDER_NOT_BOUND", "Package order binding changed during payment verification.");
+  }
+  if (Number(fresh.provider_amount_subunits) !== amount || Number(fresh.package_price) !== Number(order.package_price)) {
+    throw paymentError("PACKAGE_ORDER_AMOUNT_DRIFT", "Stored payment amount changed during payment verification.");
+  }
+  if (fresh.provider_payment_id && fresh.provider_payment_id !== payment.id) {
+    throw paymentError("PACKAGE_ORDER_PAYMENT_ID_DRIFT", "A different captured payment is already bound to the order.");
+  }
+  const freshLifecycle = activationLifecycleError(fresh, payment.id);
+  if (freshLifecycle) {
+    throw paymentError(freshLifecycle, "Order lifecycle does not permit activation. Reconcile it independently.");
+  }
   const { data, error } = await adminClient().rpc("qf_activate_vendor_package_order_v2", {
     p_order_id: order.id,
     p_provider_payment_id: payment.id,
     p_provider_mode: cfg.mode,
   });
   if (error) throw error;
-  return data as { status?: string; credits_added?: number; expires_at?: string } | null;
+  const receiptState = inspectRazorpayActivationReceipt(data, {
+    orderId: order.id,
+    creditsIncluded: Number(order.credits_included),
+  });
+  if (receiptState === "invalid") {
+    throw paymentError("PAYMENT_ACTIVATION_RECEIPT_INVALID", "Verified payment did not receive a trustworthy database activation receipt. Reconcile the order before retrying.");
+  }
+  return receiptState;
 }
 
 export async function verifyVendorPackageRazorpayCheckout(
@@ -357,8 +461,8 @@ export async function verifyVendorPackageRazorpayCheckout(
       cfg,
       `/payments/${encodeURIComponent(response.razorpay_payment_id)}`,
     );
-    await activateCapturedPayment(order, payment, cfg);
-    return ok({ status: "activated" });
+    const activation = await activateCapturedPayment(order, payment, cfg);
+    return ok({ status: activation === "already_applied" ? "already_activated" : "activated" });
   } catch (error) {
     return fail(error);
   }
@@ -369,6 +473,7 @@ type RazorpayWebhook = {
   payload?: {
     payment?: { entity?: RazorpayPaymentEntity };
     order?: { entity?: { id?: string } };
+    refund?: { entity?: { id?: string; payment_id?: string } };
   };
 };
 
@@ -376,19 +481,25 @@ async function markPaymentFailed(
   order: PackageOrderRow,
   paymentId: string | null,
   cfg: RazorpayConfig,
-): Promise<void> {
+): Promise<"marked_failed" | "ignored"> {
   assertOrderMode(order, cfg);
-  const { error } = await adminClient().rpc("qf_mark_vendor_package_payment_failed_v2", {
+  const { data, error } = await adminClient().rpc("qf_mark_vendor_package_payment_failed_v2", {
     p_order_id: order.id,
     p_provider_payment_id: paymentId ?? "",
     p_provider_mode: cfg.mode,
   });
   if (error) throw error;
+  const result = inspectRazorpayFailureReceipt(data, order.id);
+  if (result === "invalid") {
+    throw paymentError("PAYMENT_FAILURE_RECEIPT_INVALID", "The database did not confirm the failure event status.");
+  }
+  return result;
 }
 
 export async function handleVendorPackageRazorpayWebhook(
   rawBody: string,
   signature: string,
+  providerEventId?: string,
 ): Promise<Result<{ status: string }>> {
   try {
     const cfg = config();
@@ -406,28 +517,92 @@ export async function handleVendorPackageRazorpayWebhook(
       throw paymentError("RAZORPAY_WEBHOOK_INVALID", "Webhook body is not valid JSON.");
     }
 
-    const payment = event.payload?.payment?.entity;
-    if (!payment?.id || !payment.order_id) return ok({ status: "ignored" });
+    // After HMAC verification, reject inconsistent linked order identities
+    // before any privileged DB lookup or provider request. Ignore unrelated
+    // signed event types without needing a payment-order identity at all.
+    // Refund events must never enter the legacy payment activation/failure
+    // handler. Structural identity is checked after raw-body HMAC verification.
+    const refundCandidate = classifyVendorPackageRefundIntake(event);
+    const candidate = refundCandidate.kind === "none"
+      ? classifyVendorPackageWebhookEvent(event) : refundCandidate;
+    if (candidate.kind === "ignored") return ok({ status: "ignored" });
+    if (candidate.kind === "invalid") {
+      throw paymentError("RAZORPAY_WEBHOOK_IDENTITY_INVALID", "The signed webhook has inconsistent payment identity.");
+    }
+    // The same verified provider/Core operation is used by legacy TEST mode
+    // and by the durable ledger after explicit release authorization. Only
+    // the ledger may acknowledge a replay or quarantine without rerunning it.
+    const processSignedCandidate = async (): Promise<string> => {
+      // No provider GET, Core credit mutation or payment.failed mutation for a
+      // refund event, including under future approved durable ledger runtime.
+      if (candidate.kind === "refund") {
+        throw paymentError("REFUND_REVIEW_REQUIRED", "Refund evidence requires independent review.");
+      }
+      const order = await loadOrderByProviderOrderId(candidate.providerOrderId);
+      assertOrderMode(order, cfg);
+      if (candidate.kind === "captured") {
+        const canonicalPayment = await razorpayFetch<RazorpayPaymentEntity>(
+          cfg, "/payments/" + encodeURIComponent(candidate.paymentId),
+        );
+        const activation = await activateCapturedPayment(order, canonicalPayment, cfg);
+        return activation === "already_applied" ? "already_activated" : "activated";
+      }
+      const recorded = await markPaymentFailed(order, candidate.paymentId, cfg);
+      return recorded === "marked_failed" ? "failed_recorded" : "failure_ignored";
+    };
 
-    const order = await loadOrderByProviderOrderId(payment.order_id);
-    assertOrderMode(order, cfg);
-
-    if (event.event === "payment.captured") {
-      const canonicalPayment = await razorpayFetch<RazorpayPaymentEntity>(
-        cfg,
-        "/payments/" + encodeURIComponent(payment.id),
-      );
-      await activateCapturedPayment(order, canonicalPayment, cfg);
-      return ok({ status: "activated" });
+    // This branch is implemented for approved deployment, but the source
+    // constant remains FALSE. Config alone cannot activate financial writes.
+    // Event-id provenance, SQL grants, human review and managed restore are
+    // mandatory before any future switch to the durable repository.
+    const ledgerGate = resolveVendorPackageEventLedgerGate({
+      providerMode: cfg.mode,
+      ledgerModeValue: process.env.RAZORPAY_VENDOR_PACKAGE_EVENT_LEDGER_MODE,
+      repository: RC28_PROVIDER_LEDGER_RUNTIME_INSTALLED
+        ? createRc28VendorPackageEventRepository(async (name, args) => await adminClient().rpc(name, args))
+        : undefined,
+    });
+    if (ledgerGate.action === "deny") {
+      throw paymentError(ledgerGate.code, "The provider-event ledger is not available for this webhook.");
+    }
+    // Ledger OFF TEST must never ACK a signed refund event as ignored or run
+    // legacy payment.failed. Require durable quarantine before any future ACK.
+    if (candidate.kind === "refund" && ledgerGate.action !== "ledger") {
+      throw paymentError("REFUND_INTAKE_LEDGER_REQUIRED", "Durable refund intake is not installed.");
+    }
+    if (ledgerGate.action === "ledger") {
+      const envelope = buildRazorpayProviderEventEnvelope({
+        eventId: providerEventId ?? null,
+        bodySha256: createHash("sha256").update(rawBody, "utf8").digest("hex"),
+        providerMode: cfg.mode,
+        candidate,
+      });
+      if (!envelope.ok) {
+        throw paymentError(envelope.reason, "Provider event identity cannot be verified.");
+      }
+      const processed = await processVendorPackageProviderEvent({
+        envelope, repository: ledgerGate.repository, handle: processSignedCandidate,
+      });
+      // A non-acknowledged outcome always yields non-2xx at the HTTP route,
+      // including an uncertain PostgreSQL completion after Core activation.
+      if (!processed.ack) {
+        throw paymentError(processed.code ?? "PROVIDER_EVENT_COMPLETION_UNCONFIRMED",
+          "Provider event needs controlled retry or reconciliation.");
+      }
+      return ok({ status: processed.status });
     }
 
-    if (event.event === "payment.failed") {
-      await markPaymentFailed(order, payment.id, cfg);
-      return ok({ status: "failed_recorded" });
-    }
-
-    return ok({ status: "ignored" });
+    // Legacy behaviour remains confined to TEST mode with ledger explicitly
+    // OFF. LIVE cannot reach this path (resolveVendorPackageEventLedgerGate).
+    return ok({ status: await processSignedCandidate() });
   } catch (error) {
+    // Deterministic finance codes (PAYMENT_REFUNDED, PAYMENT_NOT_CAPTURED, SQL
+    // P0001 messages) must reach the non-2xx response for reconciliation
+    // instead of collapsing to a generic UNKNOWN. Still never acknowledged.
+    if (!(error instanceof AppError)) {
+      const code = financeErrorCode(error);
+      if (code !== "UNKNOWN") return fail(new AppError(code, "Webhook processing needs reconciliation."));
+    }
     return fail(error);
   }
 }

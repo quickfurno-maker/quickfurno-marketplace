@@ -1,0 +1,374 @@
+#!/usr/bin/env node
+// RC8: actual node-postgres PG17 SERIALIZABLE single-connection signed-intent
+// integration. TEST ONLY: synthetic Owner/TL keys and human_enrolled flags.
+// Loopback-only ephemeral port; no managed service, no production credentials.
+import {Client,Pool} from "pg";
+import {execFileSync} from "node:child_process";
+import {readFileSync} from "node:fs";
+import {dirname,resolve} from "node:path";
+import {fileURLToPath} from "node:url";
+import {createHash,generateKeyPairSync,sign} from "node:crypto";
+import {mintRc4VerifiedAuthContext,rc4RegistryFingerprint,rc4ScopeTargetHash}
+ from "../../../contracts/vox/rc4ApprovalPipeline.mjs";
+import {canonicalAb7kApprovalBytes}
+ from "../../../contracts/vox/ab7kSignedApprovalVerifier.mjs";
+import {executeRc8PgPendingSignedIntent,reconcileRc8PgSignedIntentOutcome,
+ executeRc8PgPendingSignedIntentProduction,RC8_APPROVAL_WRITER_INSTALLED}
+ from "./rc8-pg-signed-intent-writer.mjs";
+const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
+const image="postgres:17-alpine",container="qf-vox-rc8-pg-native";
+const docker=(args,extra={})=>execFileSync("docker",args,
+ {encoding:"utf8",windowsHide:true,timeout:20000,...extra}).trim();
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const eq=(a,b,label)=>{if(a!==b)throw Error(label+" expected="+b+" actual="+a)};
+const id=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
+const now=1_800_000_000_000;
+const OWNER=id(1),TL=id(2),TEAM=id(3),CITY=id(4),SUB=id(5);
+const TYPE="EOD_OFFICIAL_RELEASE",DIGEST="b".repeat(64);
+function signer(keyId,signerId,role){
+ const pair=generateKeyPairSync("ed25519");
+ return {pair,entry:{keyId,signerId,signerRole:role,
+  publicKeyPem:pair.publicKey.export({type:"spki",format:"pem"}),
+  publicKeyFingerprint:createHash("sha256").update(pair.publicKey.export({type:"spki",format:"der"})).digest("hex"),
+  notBeforeMs:now-60000,notAfterMs:now+420000}};
+}
+const owner=signer("owner-rc8",OWNER,"OWNER"),leader=signer("tl-rc8",TL,"TEAM_LEADER");
+const registry=[owner.entry,leader.entry],fingerprint=rc4RegistryFingerprint(registry);
+function auth(userId,values){
+ return mintRc4VerifiedAuthContext({userId,sessionId:id(userId===OWNER?80:81),
+ jwtRole:"authenticated",aal:"aal2",aal2AtMs:now-1000,sessionExpiresAtMs:now+600000,
+ profileRole:null,profileActive:true,staffRole:null,teamId:null,cityId:null,
+ membershipRevokedAtMs:null,membershipExpiresAtMs:null,...values});
+}
+const ownerAuth=auth(OWNER,{profileRole:"admin"});
+const teamLeaderAuth=auth(TL,{staffRole:"team_leader",teamId:TEAM,cityId:CITY,
+ membershipExpiresAtMs:now+600000});
+function envelope(s,num){
+ const payload={domain:"qf.vox.ab7k.signed-approval",version:"v1",
+ type:TYPE,environment:"staging",keyId:s.entry.keyId,
+ signerRole:s.entry.signerRole,signerId:s.entry.signerId,
+ ownerId:OWNER,teamLeaderId:TL,subjectId:SUB,digest:DIGEST,
+ targetHash:rc4ScopeTargetHash({type:TYPE,subjectId:SUB,teamId:TEAM,cityId:CITY}),
+ nonce:id(num),issuedAtMs:now-1000,expiresAtMs:now+540000};
+ return {payload,signature:sign(null,canonicalAb7kApprovalBytes(payload),
+  s.pair.privateKey).toString("base64url")};
+}
+const request=(ownerNonce=7,tlNonce=8)=>({type:TYPE,subjectId:SUB,digest:DIGEST,
+ teamId:TEAM,cityId:CITY,ownerEnvelope:envelope(owner,ownerNonce),
+ teamLeaderEnvelope:envelope(leader,tlNonce)});
+const TEST_ONLY_GATE={humanKeyCeremonyComplete:true,
+ independentDbaAppsecApproved:true,dedicatedWriterRoleReviewed:true,
+ managedRestoreCertified:true};
+let pool,created=false;
+try{
+ if(process.env.DOCKER_HOST&&!/^(npipe|unix):\/\//.test(process.env.DOCKER_HOST))
+  throw Error("REMOTE_DOCKER_REFUSED");
+ docker(["image","inspect",image]);
+ if(docker(["ps","-aq","--filter","name=^/"+container+"$"]))
+  throw Error("CONTAINER_ALREADY_EXISTS");
+ docker(["run","--pull","never","--rm","-d",
+  "--name",container,"-p","127.0.0.1::5432","-e","POSTGRES_PASSWORD=synthetic_only",
+  image]);
+ created=true;
+ // Never treat initdb's temporary Docker-internal socket as host readiness.
+ // Cryptographic intent tests must execute against the real TCP postmaster.
+ let port=0,ready=false,lastError="";
+ for(let i=0;i<160;i++){
+  try{
+   const mapped=docker(["port",container,"5432/tcp"]);
+   const match=mapped.match(/^127\.0\.0\.1:(\d+)$/m);
+   if(match)port=Number(match[1]);
+   if(port){
+    const probe=new Pool({host:"127.0.0.1",port,user:"postgres",
+     password:"synthetic_only",database:"postgres",max:1,connectionTimeoutMillis:1200});
+    try{ready=(await probe.query("SELECT 1 AS ready")).rows[0]?.ready===1}
+    finally{await probe.end()}
+   }
+  }catch(e){ready=false;lastError=String(e?.code||e?.message||e).slice(0,160)}
+  if(ready)break;
+  await sleep(200);
+ }
+ if(!port||!ready)throw Error("SIGNER_PG17_HOST_TCP_NOT_READY "+lastError);
+ pool=new Pool({host:"127.0.0.1",port,user:"postgres",password:"synthetic_only",
+  database:"postgres",max:5,connectionTimeoutMillis:5000});
+ await pool.query("SELECT 1 AS ready");
+ await pool.query("CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN");
+ await pool.query("CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY,raw_app_meta_data jsonb NOT NULL)");
+ await pool.query("CREATE TABLE public.profiles(id uuid PRIMARY KEY,role text,is_active boolean NOT NULL)");
+ await pool.query("CREATE TABLE public.vox_staff_teams_v1(id uuid PRIMARY KEY,city_id uuid,is_active boolean NOT NULL)");
+ await pool.query("CREATE TABLE public.vox_staff_memberships_v1(auth_user_id uuid PRIMARY KEY,team_id uuid,staff_role text,is_active boolean,revoked_at timestamptz,expires_at timestamptz)");
+ await pool.query("CREATE TABLE public.vox_ab7f_four_source_eod_candidate_v1(id uuid PRIMARY KEY,staff_id uuid,team_id uuid,city_id uuid,reviewer_id uuid,source_count integer,source_digest text,state text,published boolean)");
+ await pool.query("INSERT INTO public.profiles VALUES ($1,'admin',true),($2,NULL,true)",[OWNER,TL]);
+ await pool.query("INSERT INTO auth.users VALUES($1,'{\"admin_role\":\"Superadmin\"}'),($2,'{\"qf_principal\":\"vox_staff\",\"vox_role\":\"team_leader\"}')",[OWNER,TL]);
+ await pool.query("INSERT INTO public.vox_staff_teams_v1 VALUES ($1,$2,true)",[TEAM,CITY]);
+ await pool.query("INSERT INTO public.vox_staff_memberships_v1 VALUES ($1,$2,'team_leader',true,NULL,clock_timestamp()+interval '30 days')",[TL,TEAM]);
+ // The report subject is a third independent, active Staff identity.
+ await pool.query("INSERT INTO public.profiles VALUES($1,NULL,true)",[id(90)]);
+ await pool.query("INSERT INTO auth.users VALUES($1,'{\"qf_principal\":\"vox_staff\",\"vox_role\":\"operations_manager\"}')",[id(90)]);
+ await pool.query("INSERT INTO public.vox_staff_memberships_v1 VALUES($1,$2,'operations_manager',true,NULL,clock_timestamp()+interval '30 days')",[id(90),TEAM]);
+ await pool.query("INSERT INTO public.vox_ab7f_four_source_eod_candidate_v1 VALUES($1,$2,$3,$4,$5,4,$6,'TL_ACKNOWLEDGED_AWAITING_OWNER_RELEASE',false)",[SUB,id(90),TEAM,CITY,TL,DIGEST]);
+ const ddl=readFileSync(resolve(root,"ops/vox/rc7-review-candidates/20261030010000_vox_rc8_signed_intent_transaction_review_only.sql"),"utf8");
+ await pool.query(ddl);
+ const revocationDdl=readFileSync(resolve(root,"ops/vox/rc7-review-candidates/20261030030000_vox_rc11_signer_revocation_lock_review_only.sql"),"utf8");
+ await pool.query(revocationDdl);
+ await pool.query(readFileSync(resolve(root,"ops/vox/rc37-review-candidates/20261031010000_vox_rc37_receipt_signer_evidence_review_only.sql"),"utf8"));
+ // Synthetic local registry enrolment DOES NOT authorize any real human signer.
+ for(const e of registry){
+  await pool.query("INSERT INTO public.vox_rc8_human_signer_registry_candidate_v1 "+
+   "(key_id,signer_id,signer_role,public_key_pem,public_key_fingerprint,not_before_ms,not_after_ms,human_enrolled,enrolled_at) "+
+   "VALUES ($1,$2,$3,$4,$5,$6,$7,true,clock_timestamp())",
+   [e.keyId,e.signerId,e.signerRole,e.publicKeyPem,e.publicKeyFingerprint,
+    e.notBeforeMs,e.notAfterMs]);
+ }
+ const args=(req=request())=>({acquireClient:()=>pool.connect(),request:req,
+  ownerAuth,teamLeaderAuth,now,approvedRegistryFingerprints:[fingerprint]});
+ eq(RC8_APPROVAL_WRITER_INSTALLED,false,"SOURCE_PRODUCTION_GATE");
+ // A caller cannot manufacture approval by substituting four unrelated true
+ // values or adding an unreviewed fifth release condition.
+ const wrongGate={...TEST_ONLY_GATE};
+ delete wrongGate.managedRestoreCertified;
+ wrongGate.unreviewedReady=true;
+ let deniedGate=await executeRc8PgPendingSignedIntent(args(),wrongGate);
+ eq(deniedGate.reason,"NATIVE_RELEASE_GATE_CLOSED","WRONG_APPROVAL_KEYS_DENIED");
+ deniedGate=await executeRc8PgPendingSignedIntent(args(),
+  {...TEST_ONLY_GATE,unreviewedReady:true});
+ eq(deniedGate.reason,"NATIVE_RELEASE_GATE_CLOSED","EXTRA_APPROVAL_KEY_DENIED");
+ // Invalid/mixed command domains must be denied before opening a database
+ // transaction, even if a caller supplies syntactically signed envelopes.
+ const forNonEod={...request(),type:"CORE_OPERATOR_ACTION"};
+ let invalid=await executeRc8PgPendingSignedIntent(args(forNonEod),TEST_ONLY_GATE);
+ eq(invalid.reason,"EOD_REQUEST_SCOPE_INVALID","NON_EOD_SCOPE_DENIED");
+ invalid=await executeRc8PgPendingSignedIntent(args({...request(),subjectId:"not-a-uuid"}),TEST_ONLY_GATE);
+ eq(invalid.reason,"EOD_REQUEST_SCOPE_INVALID","INVALID_EOD_SUBJECT_DENIED");
+ invalid=await executeRc8PgPendingSignedIntent(args({...request(),digest:"bad"}),TEST_ONLY_GATE);
+ eq(invalid.reason,"EOD_REQUEST_SCOPE_INVALID","INVALID_EOD_DIGEST_DENIED");
+ let r=await executeRc8PgPendingSignedIntentProduction(args());
+ // Signed bytes are insufficient without the current TL-reviewed EOD provenance.
+ await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET source_count=3 WHERE id=$1",[SUB]);
+ r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
+ eq(r.reason,"EOD_CURRENT_FOUR_SOURCE_REVIEW_REQUIRED","EOD_THREE_SOURCE_DENIED");
+ await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET source_count=4,reviewer_id=$2 WHERE id=$1",[SUB,OWNER]);
+ r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
+ eq(r.reason,"EOD_CURRENT_FOUR_SOURCE_REVIEW_REQUIRED","EOD_WRONG_TL_DENIED");
+ await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET reviewer_id=$2,source_digest=$3 WHERE id=$1",[SUB,TL,"c".repeat(64)]);
+ r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
+ eq(r.reason,"EOD_CURRENT_FOUR_SOURCE_REVIEW_REQUIRED","EOD_DIGEST_DRIFT_DENIED");
+ await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET source_digest=$2,published=true WHERE id=$1",[SUB,DIGEST]);
+ r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
+ eq(r.reason,"EOD_CURRENT_FOUR_SOURCE_REVIEW_REQUIRED","EOD_ALREADY_PUBLISHED_DENIED");
+ await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET reviewer_id=$2,published=false WHERE id=$1",[SUB,TL]);
+ await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET staff_id=NULL WHERE id=$1",[SUB]);
+ r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
+ eq(r.reason,"EOD_CURRENT_FOUR_SOURCE_REVIEW_REQUIRED","EOD_MISSING_STAFF_ID_DENIED");
+ await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET staff_id=$2 WHERE id=$1",[SUB,id(90)]);
+ await pool.query("UPDATE public.vox_staff_memberships_v1 SET revoked_at=clock_timestamp() WHERE auth_user_id=$1",[id(90)]);
+ r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
+ eq(r.reason,"EOD_SUBJECT_STAFF_REVOKED","EOD_REVOKED_STAFF_SUBJECT_DENIED");
+ await pool.query("UPDATE public.vox_staff_memberships_v1 SET revoked_at=NULL WHERE auth_user_id=$1",[id(90)]);
+ await pool.query("UPDATE auth.users SET raw_app_meta_data='{}' WHERE id=$1",[id(90)]);
+ r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
+ eq(r.reason,"EOD_SUBJECT_STAFF_REVOKED","EOD_MISSING_STAFF_AUTH_DENIED");
+ await pool.query("UPDATE auth.users SET raw_app_meta_data='{\"qf_principal\":\"vox_staff\",\"vox_role\":\"operations_manager\"}' WHERE id=$1",[id(90)]);
+ // Re-run the hard-disabled production entry independently. The preceding
+ // negative result was an intentionally revoked subject, not a gate result.
+ r=await executeRc8PgPendingSignedIntentProduction(args());
+ eq(r.reason,"NATIVE_RELEASE_GATE_CLOSED","PRODUCTION_BLOCK");
+ // The signatures are valid when verified, but transaction work may outlive
+ // their expiry. Force the final wall-clock forward only in this disposable
+ // suite and require a full rollback of receipt and all three nonce claims.
+ const wallNow=Date.now;
+ try{
+  Date.now=()=>now+600001;
+  r=await executeRc8PgPendingSignedIntent(args(request(31,32)),TEST_ONLY_GATE);
+ }finally{Date.now=wallNow;}
+ eq(r.reason,"SIGNED_EOD_IDENTITY_OR_ENVELOPE_EXPIRED_DURING_TRANSACTION",
+  "IN_FLIGHT_SIGNED_EOD_EXPIRY_DENIED");
+ const rolledClaims=await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_approval_claims_candidate_v1");
+ const rolledIntents=await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_verified_intents_candidate_v1");
+ eq(Number(rolledClaims.rows[0].n),0,"EXPIRED_EOD_NO_NONCE_CLAIMS");
+ eq(Number(rolledIntents.rows[0].n),0,"EXPIRED_EOD_NO_RECEIPT");
+ // The envelope is still valid, and both MFA sessions are fresh, but both
+ // pinned human key records have passed their notAfter bound mid-transaction.
+ try{
+  Date.now=()=>now+450000;
+  r=await executeRc8PgPendingSignedIntent(args(request(33,34)),TEST_ONLY_GATE);
+ }finally{Date.now=wallNow;}
+ eq(r.reason,"SIGNED_EOD_SIGNER_KEY_EXPIRED_DURING_TRANSACTION",
+  "IN_FLIGHT_SIGNER_KEY_EXPIRED_DENIED");
+ eq(Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_approval_claims_candidate_v1")).rows[0].n),
+  0,"EXPIRED_KEY_NO_CLAIMS");
+ eq(Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_verified_intents_candidate_v1")).rows[0].n),
+  0,"EXPIRED_KEY_NO_INTENT");
+ // Session and signatures remain unexpired, but an AAL2 verification becomes
+ // older than the verifier's 15-minute limit during a long transaction.
+ const lateOwner=auth(OWNER,{profileRole:"admin",aal2AtMs:now-14*60*1000});
+ const lateTl=auth(TL,{staffRole:"team_leader",teamId:TEAM,cityId:CITY,
+  membershipExpiresAtMs:now+600000,aal2AtMs:now-14*60*1000});
+ try{
+  Date.now=()=>now+2*60*1000+1;
+  r=await executeRc8PgPendingSignedIntent({...args(request(35,36)),
+   ownerAuth:lateOwner,teamLeaderAuth:lateTl},TEST_ONLY_GATE);
+ }finally{Date.now=wallNow;}
+ eq(r.reason,"SIGNED_EOD_AAL2_STALE_DURING_TRANSACTION",
+  "IN_FLIGHT_AAL2_FRESHNESS_DENIED");
+ eq(Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_approval_claims_candidate_v1")).rows[0].n),
+  0,"STALE_AAL2_NO_NONCE");
+ eq(Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_verified_intents_candidate_v1")).rows[0].n),
+  0,"STALE_AAL2_NO_RECEIPT");
+ // The caller's branded TL membership timestamp remains valid, but actual
+ // database membership expires while the pending receipt transaction is open.
+ await pool.query("UPDATE public.vox_staff_memberships_v1 "+
+  "SET expires_at=clock_timestamp()+interval '2 seconds' "+
+  "WHERE auth_user_id=$1",[TL]);
+ const ttlArgs={...args(request(37,38)),acquireClient:async()=>{
+  const raw=await pool.connect();
+  return {query:async(sql,values)=>{
+   const result=await raw.query(sql,values);
+   if(sql.includes("INSERT INTO public.vox_rc8_verified_intents_candidate_v1"))
+    await sleep(2500);
+   return result;
+  },release:()=>raw.release()};
+ }};
+ r=await executeRc8PgPendingSignedIntent(ttlArgs,TEST_ONLY_GATE);
+ eq(r.reason,"SIGNED_EOD_MEMBERSHIP_EXPIRED_DURING_TRANSACTION",
+  "IN_FLIGHT_SERVER_TL_MEMBERSHIP_EXPIRY_DENIED");
+ eq(Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_approval_claims_candidate_v1")).rows[0].n),
+  0,"EXPIRED_DB_TL_NO_NONCES");
+ eq(Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_verified_intents_candidate_v1")).rows[0].n),
+  0,"EXPIRED_DB_TL_NO_RECEIPT");
+ await pool.query("UPDATE public.vox_staff_memberships_v1 "+
+  "SET expires_at=clock_timestamp()+interval '30 days' "+
+  "WHERE auth_user_id=$1",[TL]);
+ // A durable COMMIT can succeed while its response is lost. Never report
+ // a false rollback or re-issue the same signed nonces without reconciliation.
+ const uncertain={...args(),acquireClient:async()=>{
+  const raw=await pool.connect();
+  return {query:async(sql,values)=>{
+   const result=await raw.query(sql,values);
+   if(sql==="COMMIT")throw Error("SYNTHETIC_POST_COMMIT_TRANSPORT_DROP");
+   return result;
+  },release:()=>raw.release()};
+ }};
+ r=await executeRc8PgPendingSignedIntent(uncertain,TEST_ONLY_GATE);
+ eq(r.reason,"COMMIT_OUTCOME_UNKNOWN","EOD_POST_COMMIT_UNKNOWN");
+ eq(r.committed,null,"EOD_UNKNOWN_NOT_FALSE_ROLLBACK");
+ eq(r.requiresReconciliation,true,"EOD_UNKNOWN_NEEDS_RECONCILIATION");
+ eq(r.subjectId,SUB,"EOD_UNKNOWN_EXACT_SUBJECT");
+ eq(r.intentId===null,false,"EOD_UNKNOWN_HAS_INTENT_ID");
+ eq(r.approved,false,"NEVER_APPROVED");
+ const committedReceipt={intentId:r.intentId,receiptSha256:r.receiptSha256};
+ const counts=async()=>({
+  claims:Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_approval_claims_candidate_v1")).rows[0].n),
+  intents:Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_verified_intents_candidate_v1")).rows[0].n)});
+ let c=await counts();eq(c.claims,3,"THREE_CLAIMS");eq(c.intents,1,"ONE_INTENT");
+ // Read-only reconciliation must match the exact durable receipt digest.
+ const rec=await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
+  intentId:r.intentId,subjectId:SUB,expectedReceiptSha256:r.receiptSha256,now});
+ eq(rec.outcome,"COMMITTED","EOD_UNKNOWN_RECONCILED_COMMITTED");
+ eq(rec.receiptSha256,r.receiptSha256,"EOD_RECONCILED_RECEIPT_DIGEST");
+ eq(rec.publicationAuthorized,false,"RECONCILED_NOT_PUBLICATION");
+ // RC33: the report stays mutable after COMMIT. If its Staff subject is later
+ // rewritten to a signer, the receipt must stop reconciling as COMMITTED.
+ for(const signerId of [TL,OWNER]){
+  await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET staff_id=$2 WHERE id=$1",[SUB,signerId]);
+  const drift=await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
+   intentId:r.intentId,subjectId:SUB,expectedReceiptSha256:r.receiptSha256,now});
+  eq(drift.outcome,"INCONSISTENT","RC33_STAFF_SUBJECT_BECAME_SIGNER_NOT_COMMITTED");
+ }
+ await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET staff_id=$2 WHERE id=$1",[SUB,id(90)]);
+ eq((await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
+  intentId:r.intentId,subjectId:SUB,expectedReceiptSha256:r.receiptSha256,now})).outcome,
+  "COMMITTED","RC33_STAFF_RESTORED_COMMITTED");
+ const absent=await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
+  intentId:id(999),subjectId:SUB,expectedReceiptSha256:r.receiptSha256});
+ eq(absent.outcome,"NOT_COMMITTED","RECONCILE_ABSENT_NOT_COMMITTED");
+ eq(absent.subjectClaimedByOtherIntent,true,"RECONCILE_ABSENT_SUBJECT_HELD");
+ // A direct revocation INSERT (FK only takes KEY SHARE) must still wait for
+ // an in-flight writer: the writer SHARE-locks the revocation table.
+ let directRevokeCode=null,probeIntentId=null,inFlightRec=null;
+ const lockProbe={...args(request(41,42)),acquireClient:async()=>{
+  const raw=await pool.connect();
+  return {query:async(sql,values)=>{
+   const out=await raw.query(sql,values);
+   if(sql.includes("pg_advisory_xact_lock("))probeIntentId=values[0];
+   if(sql.includes("human_signer_registry_candidate_v1")){
+    // RC27: while the writer transaction is open, "no rows yet" must not
+    // reconcile as NOT_COMMITTED; the open intent lock forces IN_FLIGHT.
+    inFlightRec=await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
+     intentId:probeIntentId,subjectId:SUB,expectedReceiptSha256:"a".repeat(64)});
+    const other=await pool.connect();
+    try{
+     await other.query("BEGIN");
+     await other.query("SET LOCAL lock_timeout='250ms'");
+     await other.query("INSERT INTO public.vox_rc8_signer_revocations_candidate_v1 "+
+      "(key_id,review_evidence_sha256) VALUES ($1,$2)",[leader.entry.keyId,"e".repeat(64)]);
+    }catch(e){directRevokeCode=e?.code??"ERR";}
+    finally{try{await other.query("ROLLBACK")}catch{}other.release();}
+   }
+   return out;
+  },release:()=>raw.release()};
+ }};
+ r=await executeRc8PgPendingSignedIntent(lockProbe,TEST_ONLY_GATE);
+ eq(directRevokeCode,"55P03","DIRECT_REVOCATION_INSERT_BLOCKED_DURING_WRITER");
+ eq(r.ok,false,"LOCK_PROBE_SUBJECT_ALREADY_HELD");
+ eq(inFlightRec?.outcome,"IN_FLIGHT","RC27_OPEN_WRITER_RECONCILES_IN_FLIGHT");
+ eq(inFlightRec?.publicationAuthorized,false,"RC27_IN_FLIGHT_NOT_PUBLICATION");
+ const afterRollback=await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
+  intentId:probeIntentId,subjectId:SUB,expectedReceiptSha256:"a".repeat(64)});
+ eq(afterRollback.outcome,"NOT_COMMITTED","RC27_ENDED_WRITER_RECONCILES_NOT_COMMITTED");
+ c=await counts();eq(c.claims,3,"LOCK_PROBE_NO_CLAIM");eq(c.intents,1,"LOCK_PROBE_NO_INTENT");
+ r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
+ eq(r.ok,false,"NONCE_REPLAY_DENIED");
+ r=await executeRc8PgPendingSignedIntent(args(request(9,10)),TEST_ONLY_GATE);
+ eq(r.ok,false,"SUBJECT_REPLAY_DENIED");
+ c=await counts();eq(c.claims,3,"REPLAY_NO_PARTIAL_CLAIM");
+ eq(c.intents,1,"REPLAY_NO_PARTIAL_INTENT");
+ const tampered=request(11,12);tampered.ownerEnvelope.signature="bogus";
+ r=await executeRc8PgPendingSignedIntent(args(tampered),TEST_ONLY_GATE);
+ eq(r.ok,false,"ED25519_TAMPER_DENIED");
+ // Simulate an in-flight signed-intent key SHARE lock: revocation MUST wait.
+ const held=await pool.connect(),revokeClient=await pool.connect();
+ try{
+  await held.query("BEGIN");
+  await held.query("SELECT key_id FROM public.vox_rc8_human_signer_registry_candidate_v1 WHERE key_id=$1 FOR SHARE",[owner.entry.keyId]);
+  await revokeClient.query("SET lock_timeout='250ms'");
+  let lockDenied=false;
+  try{
+   await revokeClient.query("SELECT public.qf_vox_rc11_revoke_signed_human_key_candidate_v1($1,$2)",[owner.entry.keyId,"f".repeat(64)]);
+  }catch(e){lockDenied=e?.code==="55P03";}
+  eq(lockDenied,true,"REVOKER_CANNOT_PASS_SIGNER_SHARE_LOCK");
+  await held.query("ROLLBACK");
+  const revoke=await revokeClient.query("SELECT public.qf_vox_rc11_revoke_signed_human_key_candidate_v1($1,$2) AS revoked",[owner.entry.keyId,"f".repeat(64)]);
+  eq(revoke.rows[0].revoked,true,"NATIVE_KEY_REVOCATION_COMMITTED");
+  // RC34: the durable receipt written before this revocation must stop
+  // reconciling as COMMITTED once either pinned signer key is revoked.
+  const postRevoke=await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
+   intentId:committedReceipt.intentId,subjectId:SUB,
+   expectedReceiptSha256:committedReceipt.receiptSha256,now});
+  eq(postRevoke.outcome,"INCONSISTENT","RC34_REVOKED_SIGNER_KEY_NOT_COMMITTED");
+  eq(postRevoke.publicationAuthorized,false,"RC34_REVOKED_NOT_PUBLICATION");
+ }finally{try{await held.query("ROLLBACK")}catch{}held.release();revokeClient.release();}
+
+ r=await executeRc8PgPendingSignedIntent(args(request(13,14)),TEST_ONLY_GATE);
+ eq(r.ok,false,"REVOKED_KEY_DENIED");
+ eq(r.reason,"SIGNER_KEY_REVOKED","SIGNER_KEY_REVOKED_DENIED");
+ await pool.query("UPDATE public.vox_staff_memberships_v1 SET revoked_at=clock_timestamp() WHERE auth_user_id=$1",[TL]);
+ r=await executeRc8PgPendingSignedIntent(args(request(15,16)),TEST_ONLY_GATE);
+ eq(r.reason,"CURRENT_ACTOR_REVOKED","CURRENT_TL_REVOKED_DENIED");
+ await pool.query("UPDATE public.vox_staff_memberships_v1 SET revoked_at=NULL WHERE auth_user_id=$1",[TL]);
+ await pool.query("UPDATE auth.users SET raw_app_meta_data='{\"qf_principal\":\"vox_staff\"}' WHERE id=$1",[TL]);
+ r=await executeRc8PgPendingSignedIntent(args(request(17,18)),TEST_ONLY_GATE);
+ eq(r.reason,"CURRENT_ACTOR_REVOKED","CURRENT_TL_AUTH_METADATA_REVOKED_DENIED");
+ await pool.query("UPDATE auth.users SET raw_app_meta_data='{\"qf_principal\":\"vox_staff\",\"vox_role\":\"team_leader\"}' WHERE id=$1",[TL]);
+ await pool.query("UPDATE auth.users SET raw_app_meta_data='{}' WHERE id=$1",[OWNER]);
+ r=await executeRc8PgPendingSignedIntent(args(request(19,20)),TEST_ONLY_GATE);
+ eq(r.reason,"CURRENT_ACTOR_REVOKED","CURRENT_OWNER_AUTH_METADATA_REVOKED_DENIED");
+ const finale=await counts();eq(finale.claims,3,"FINAL_CLAIMS");eq(finale.intents,1,"FINAL_INTENTS");
+ console.log("VOX_RC8_REAL_PG17_SIGNED_INTENT_PASS two_real_keys=synthetic "+
+ "real_sql_transaction=true claims=3 receipts=1 replay_and_tamper_denied=true "+
+ "revocation_denied=true owner_tl_scope_rechecked=true official_eod=false production_gate=false");
+}catch(e){console.error("VOX_RC8_REAL_PG17_SIGNED_INTENT_FAIL "+String(e?.stack||e));process.exitCode=1;}
+finally{
+ if(pool)try{await pool.end()}catch{}
+ if(created)try{docker(["rm","-f","-v",container])}catch{}
+}

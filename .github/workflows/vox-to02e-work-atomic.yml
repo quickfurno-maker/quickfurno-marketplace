@@ -1,0 +1,78 @@
+name: VOX TO-02E Atomic Staff Work - Synthetic PG17
+on:
+  pull_request:
+    paths:
+      - 'ops/vox/sql-candidates/*vox_to02e_work_queue_atomic_candidate.sql'
+      - 'scripts/mvp/vox/fixtures/vox-to02e-work-*'
+      - 'scripts/mvp/vox/fixtures/vox-to04f-50-distinct-capacity.sh'
+      - 'scripts/mvp/vox/fixtures/vox-to04f-capacity-denial-assertions.sql'
+      - '.github/workflows/vox-to02e-work-atomic.yml'
+permissions:
+  contents: read
+jobs:
+  pg17-serializable-work-claim:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: vox_to02e_synthetic
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic_fixture_only
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vox_to02e_synthetic"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: synthetic_fixture_only
+      PGDATABASE: vox_to02e_synthetic
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Transactional Core synthetic source/approval/RLS/revocation tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to02e-work-minimal-pg17.sql
+          psql -X -v ON_ERROR_STOP=1 -f ops/vox/sql-candidates/20261015030000_vox_to02e_work_queue_atomic_candidate.sql
+          psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to02e-work-atomic-assertions.sql
+      - name: Race 2, 10 and 50 concurrent claims; exactly one commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          for n in 2 10 50; do
+            ITEM=$(printf '00000000-0000-4000-8000-%012d' "$((700+n))")
+            export ITEM
+            psql -X -v ON_ERROR_STOP=1 -c "
+              insert into public.vox_work_items_candidate_v1
+                (id,team_id,city_id,source_kind,source_id)
+              values ('$ITEM',
+               '00000000-0000-4000-8000-000000000201',
+               '00000000-0000-4000-8000-000000000101',
+               'prospect','00000000-0000-4000-8000-000000000301');"
+            seq 1 "$n" | xargs -P "$n" -I{} bash -c '
+              psql -X -v ON_ERROR_STOP=1 -Atqc "select new_revision
+              from public.qf_vox_work_transition_candidate_v1(
+              '\''00000000-0000-4000-8000-000000000001'\'',
+              '\''$ITEM'\'',0,gen_random_uuid(),'\''CLAIM'\'','\'''\'');" >/dev/null 2>&1 &&
+                echo SUCCESS || true
+            ' > /tmp/vox-claim-winners
+            WINNERS=$(grep -c SUCCESS /tmp/vox-claim-winners || true)
+            REVS=$(psql -X -Atqc "select revision from public.vox_work_items_candidate_v1 where id='$ITEM'")
+            EVENTS=$(psql -X -Atqc "select count(*) from public.vox_work_events_candidate_v1 where work_item_id='$ITEM'")
+            echo "RACE=$n WINNERS=$WINNERS REVISION=$REVS EVENTS=$EVENTS"
+            test "$WINNERS" -eq 1
+            test "$REVS" -eq 1
+            test "$EVENTS" -eq 1
+          done
+          echo "VOX_TO02E_ATOMIC_WORK_CONCURRENCY_PG17_PASS_NOT_STAGING"
+      - name: Race 50 different work items against one Staff capacity of 24
+        shell: bash
+        run: bash scripts/mvp/vox/fixtures/vox-to04f-50-distinct-capacity.sh

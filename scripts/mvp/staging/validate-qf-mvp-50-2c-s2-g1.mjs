@@ -6,6 +6,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const VOX_QUARANTINE_DIR="ops/vox/quarantined-migrations/legacy-20261014";
+const VOX_QUARANTINE_FILES=[
+ "20261014010000_vox_v1_scoped_staff_authority.sql",
+ "20261014020000_vox_v1_staff_review_workflow.sql",
+ "20261014030000_vox_v1_approved_grant_finalizer.sql",
+ "20261014040000_vox_v1_staff_emergency_revocation.sql",
+ "20261014050000_vox_v1_team_leader_review_policy.sql",
+ "20261014060000_vox_operational_intent_review.sql",
+ "20261014070000_vox_approved_followup_executor.sql"
+];
+
 const MANIFEST_PATH = "supabase/staging-history/qf-mvp-staging-history-manifest.json";
 const EXTENSION_PATH = "supabase/staging-history/qf-post-g1-migration-ledger-20260929.json";
 const BASELINE_PATH = "supabase/staging-baseline/20260722000100_qf_mvp_staging_baseline_269c9265.sql";
@@ -576,17 +587,19 @@ function loadState() {
     .filter((entry) => entry.isFile())
     .map((entry) => entry.name)
     .sort();
-  const migrations = migrationFiles.map((filename) => {
-    const match = /^(\d{14})_(.+)\.sql$/.exec(filename);
-    const bytes = readFileSync(path.join(ROOT, "supabase/migrations", filename));
-    return {
-      filename,
-      version: match?.[1] ?? null,
-      name: match?.[2] ?? null,
-      sha256: canonicalMigrationSourceSha256(bytes),
-      malformed: !match,
-    };
-  });
+  const quarantineFiles=readdirSync(path.join(ROOT,VOX_QUARANTINE_DIR))
+    .filter(name=>name.endsWith(".sql")).sort();
+  // Preserve exact QF historical source pins (managed + quarantined) without
+  // ever treating quarantined Oct14 VOX SQL as deployable migration files.
+  const migrations=[
+    ...migrationFiles.map(filename=>({filename,directory:"supabase/migrations"})),
+    ...quarantineFiles.map(filename=>({filename,directory:VOX_QUARANTINE_DIR}))
+  ].map(({filename,directory})=>{
+    const match=/^(\d{14})_(.+)\.sql$/.exec(filename);
+    const bytes=readFileSync(path.join(ROOT,directory,filename));
+    return {filename,version:match?.[1]??null,name:match?.[2]??null,
+      sha256:canonicalMigrationSourceSha256(bytes),malformed:!match};
+  }).sort((a,b)=>a.filename.localeCompare(b.filename));
 
   const stagingHistoryFiles = walk("supabase/staging-history");
   const stagingHistorySqlSha256 = Object.fromEntries(
@@ -599,6 +612,8 @@ function loadState() {
     manifest: JSON.parse(manifestText),
     extension: JSON.parse(extensionText),
     migrations,
+    managedVoxSourceFiles:migrationFiles.filter(name=>/^202610140[1-7]0000_vox.*\.sql$/.test(name)),
+    quarantinedVoxSourceFiles:quarantineFiles,
     baselineExists: existsSync(path.join(ROOT, BASELINE_PATH)),
     baselineSha: sha256(readFileSync(path.join(ROOT, BASELINE_PATH))),
     targetExists: existsSync(path.join(ROOT, TARGET_PATH)),
@@ -666,11 +681,14 @@ function validateState(state) {
     extension?.safety?.hashDriftForbidden === true &&
     extension?.safety?.genericFutureMigrationAllowanceForbidden === true &&
     extension?.safety?.legacyManifestRewritten === false);
+  check("Oct14 VOX legacy SQL is pinned but NOT under managed migration discovery",
+    state.managedVoxSourceFiles?.length===0 &&
+    same(state.quarantinedVoxSourceFiles,VOX_QUARANTINE_FILES));
   check("post-G1 extension project identities are exact",
     extension?.evidenceProjects?.staging?.projectRef === "uckafzuochmbvtiodmcl" &&
     extension?.evidenceProjects?.production?.projectRef === "yqpgcsduqbxulrlzwzap");
   check("post-G1 extension records are unique, exact and hash-pinned",
-    extensionRecords.length === 44 &&
+    extensionRecords.length === 51 &&
     new Set(extensionRecords.map((record) => record.version)).size === extensionRecords.length &&
     extensionRecords.every((record) => {
       const local = localByVersion.get(record.version);
@@ -692,6 +710,13 @@ function validateState(state) {
         ["20261012080000", "SOURCE_PIN_CREATED_2026-10-12_ISOLATED_STAGE_ONLY_NO_PARENT_APPLY"],
         ["20261012100000", "SOURCE_PIN_CREATED_2026-10-12_ISOLATED_STAGE_ONLY_NO_PARENT_APPLY"],
         ["20261012213000", "SOURCE_PIN_CREATED_2026-10-12_DISPOSABLE_LOCAL_PG_CERTIFIED_6_OF_6_NO_REMOTE_APPLY"],
+        ["20261014010000", "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"],
+        ["20261014020000", "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"],
+        ["20261014030000", "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"],
+        ["20261014040000", "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"],
+        ["20261014050000", "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"],
+        ["20261014060000", "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"],
+        ["20261014070000", "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"],
       ]);
       const allowedSourcePin = sourcePinnedEvidence.get(record.version);
       return local?.version === record.version &&

@@ -1,0 +1,260 @@
+{
+  "ok": true,
+  "installedInStaging": false,
+  "canApply": false,
+  "releaseReady": false,
+  "quarantinedFoundationCount": 7,
+  "uninstalledCandidateCount": 23,
+  "totalFiles": 30,
+  "manifestDigest": "3ae02af58c07e256507532b866594486d2785e768fd4092a1b1aa8db572f8f60",
+  "files": [
+    {
+      "order": 1,
+      "stage": "QUARANTINED_FOUNDATION",
+      "path": "ops/vox/quarantined-migrations/legacy-20261014/20261014010000_vox_v1_scoped_staff_authority.sql",
+      "sha256": "a5d0da20590b178b5e0aaff5045fe9957e367f9396baea4e86222bcc7d076c4c",
+      "bytes": 4906,
+      "managedInstalled": false
+    },
+    {
+      "order": 2,
+      "stage": "QUARANTINED_FOUNDATION",
+      "path": "ops/vox/quarantined-migrations/legacy-20261014/20261014020000_vox_v1_staff_review_workflow.sql",
+      "sha256": "4f7bb561c4aa7203e11a69672017fe97447a95a6c59ada5c8cfe24ffdd1ad166",
+      "bytes": 6171,
+      "managedInstalled": false
+    },
+    {
+      "order": 3,
+      "stage": "QUARANTINED_FOUNDATION",
+      "path": "ops/vox/quarantined-migrations/legacy-20261014/20261014030000_vox_v1_approved_grant_finalizer.sql",
+      "sha256": "1a556c638b9dfe038bdb9cf951e4ee4689c362e5632789c1b97edcd86439184a",
+      "bytes": 8206,
+      "managedInstalled": false
+    },
+    {
+      "order": 4,
+      "stage": "QUARANTINED_FOUNDATION",
+      "path": "ops/vox/quarantined-migrations/legacy-20261014/20261014040000_vox_v1_staff_emergency_revocation.sql",
+      "sha256": "fb68eec0f7a7ee2ea097461522aba7fbe3d239c112fc3ccffedbfbb68659934e",
+      "bytes": 2529,
+      "managedInstalled": false
+    },
+    {
+      "order": 5,
+      "stage": "QUARANTINED_FOUNDATION",
+      "path": "ops/vox/quarantined-migrations/legacy-20261014/20261014050000_vox_v1_team_leader_review_policy.sql",
+      "sha256": "b1423c1135891610ee6e55709fc088598678f8ee59a58fd9d80f732f481fe7e9",
+      "bytes": 11873,
+      "managedInstalled": false
+    },
+    {
+      "order": 6,
+      "stage": "QUARANTINED_FOUNDATION",
+      "path": "ops/vox/quarantined-migrations/legacy-20261014/20261014060000_vox_operational_intent_review.sql",
+      "sha256": "6484c66d9eec6ca699414ec97fc50962e22b685949d280ce3c2d2aeb21fa8dfb",
+      "bytes": 6749,
+      "managedInstalled": false
+    },
+    {
+      "order": 7,
+      "stage": "QUARANTINED_FOUNDATION",
+      "path": "ops/vox/quarantined-migrations/legacy-20261014/20261014070000_vox_approved_followup_executor.sql",
+      "sha256": "454fb0c07ca7589962eddaffa0001a9a2a7562a3304d70da8e091a0499918f01",
+      "bytes": 4545,
+      "managedInstalled": false
+    },
+    {
+      "order": 8,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261015010000_vox_to02b_staff_department_governance.sql",
+      "sha256": "b9c28734b1d4b7885585da70fea8f0ddf6ac303ca09024286bd97a431b84601f",
+      "bytes": 7641,
+      "managedInstalled": false
+    },
+    {
+      "order": 9,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261015020000_vox_to02c_reviewed_department_actions.sql",
+      "sha256": "d6c46b9e21dfd4581f3ff3ae375263f249299568e4d23b530fb03735cebfacac",
+      "bytes": 11865,
+      "managedInstalled": false
+    },
+    {
+      "order": 10,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261015030000_vox_to02e_work_queue_atomic_candidate.sql",
+      "sha256": "828f64834f7461b6fd291c6f9f30d9c8c2ad6d7ceeac3950c8514d894222781c",
+      "bytes": 10291,
+      "managedInstalled": false
+    },
+    {
+      "order": 11,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261016010000_vox08j_eod_partial_review_candidate.sql",
+      "sha256": "787961d03bf6ae8a4d723dcdb1bcbab02ddd0c14374ad7142ab23f0ec3c2ffc3",
+      "bytes": 15061,
+      "managedInstalled": false
+    },
+    {
+      "order": 12,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261016020000_vox08j_staff_team_chat_candidate.sql",
+      "sha256": "3ca101ae28efbfc90f5b91b900b78fa9562bd7293dd6bb3e3f055ec2658f5b5c",
+      "bytes": 4629,
+      "managedInstalled": false
+    },
+    {
+      "order": 13,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261016030000_vox08l_staff_work_notifications_candidate.sql",
+      "sha256": "d71f5f057fdebca3d5fda89359c17ec40f67802e96e1d3440e5157f5d6889806",
+      "bytes": 11936,
+      "managedInstalled": false
+    },
+    {
+      "order": 14,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261016040000_vox08n_transactional_work_notification_outbox_candidate.sql",
+      "sha256": "a42cae691c8a006a9cf456a5f950302a0d64294af5c306a0882a5be62381c59c",
+      "bytes": 10236,
+      "managedInstalled": false
+    },
+    {
+      "order": 15,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261016050000_vox08r_internal_outbox_metrics_candidate.sql",
+      "sha256": "cc8574de7d26a10264fbf73f040ba7fabe9546b05064ca783e9978d18b37cc81",
+      "bytes": 2131,
+      "managedInstalled": false
+    },
+    {
+      "order": 16,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261017010000_vox_f1_four_source_attribution_candidate.sql",
+      "sha256": "cf512a122ed126161ae3962547a1085d28aa4dc2d0cccd8729688704c89ba1ea",
+      "bytes": 4426,
+      "managedInstalled": false
+    },
+    {
+      "order": 17,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261017020000_vox_phaseb_nonce_ledger_candidate.sql",
+      "sha256": "be7cfc2950e4017f363d4782e476aa6f6141a5b1b47af3545e990b101e8823f1",
+      "bytes": 2591,
+      "managedInstalled": false
+    },
+    {
+      "order": 18,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261017030000_vox_ab3_staff_invitation_review_candidate.sql",
+      "sha256": "dbacab9bda0617c9947506f3bb6e0186406c18014df05a216bd086fa4dc9ef0a",
+      "bytes": 6500,
+      "managedInstalled": false
+    },
+    {
+      "order": 19,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261017040000_vox_ab3_closed_day_source_snapshot_candidate.sql",
+      "sha256": "35d13e48077612ed32ec7d4fb6869e6ebc62b245b954389ba735a5d4be3e8c64",
+      "bytes": 3556,
+      "managedInstalled": false
+    },
+    {
+      "order": 20,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261018010000_vox_ab4_native_work_source_writer_candidate.sql",
+      "sha256": "d2b213c7f09f0af7e097fd9c817834d9705c45d78da263b1e26bc4f200a241f9",
+      "bytes": 3620,
+      "managedInstalled": false
+    },
+    {
+      "order": 21,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261018020000_vox_ab7b_nonwork_native_source_candidate.sql",
+      "sha256": "4bca5d5e7f89c261d4a55558de766654c467612e6ca2b4002017869da56bd209",
+      "bytes": 5584,
+      "managedInstalled": false
+    },
+    {
+      "order": 22,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261018030000_vox_ab7a_staff_lifecycle_pending_candidate.sql",
+      "sha256": "42ae40e9d421dc6d23a678925518a9d37b7d1940bace69aa7ba95df8b2199111",
+      "bytes": 3561,
+      "managedInstalled": false
+    },
+    {
+      "order": 23,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261018040000_vox_ab7b_support_task_atomic_candidate.sql",
+      "sha256": "52aa49f95f337a96f257d3866649f1fda925b9af24f85b418704743415186e14",
+      "bytes": 3901,
+      "managedInstalled": false
+    },
+    {
+      "order": 24,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261018050000_vox_ab7b_aarohi_task_atomic_candidate.sql",
+      "sha256": "c4a8765ce3bca9e1d0770dc3cba1da84bafbe9f2aaafc70fa6baf3dea02ad5db",
+      "bytes": 3815,
+      "managedInstalled": false
+    },
+    {
+      "order": 25,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261018070000_vox_ab7f_conversation_atomic_operator_candidate.sql",
+      "sha256": "e3ed5fdcdba94aa4b218130fabfc96bb278893a07b30ee18f518bfc9fc9335c8",
+      "bytes": 3975,
+      "managedInstalled": false
+    },
+    {
+      "order": 26,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261018080000_vox_ab7f_staff_atomic_suspend_candidate.sql",
+      "sha256": "c5d4b8755decdff868f49dec942761a82c63c2cba56f106921623a7208f442e4",
+      "bytes": 6304,
+      "managedInstalled": false
+    },
+    {
+      "order": 27,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261018090000_vox_ab7f_four_source_eod_persist_candidate.sql",
+      "sha256": "b5a2158da90dfb4f8927d4432c7ee45bd5ebf320bf935f18823c5d877d11f61d",
+      "bytes": 4178,
+      "managedInstalled": false
+    },
+    {
+      "order": 28,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261018100000_vox_ab7g_eod_official_release_candidate.sql",
+      "sha256": "dc33f10c32b6197207829a5c3f7c1517b89cf5bc01dd3ac29b2c2cc3599fe929",
+      "bytes": 4925,
+      "managedInstalled": false
+    },
+    {
+      "order": 29,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261018110000_vox_ab7h_signed_operator_atomic_candidate.sql",
+      "sha256": "8e13e330b133d8d7203bff23564866fe244d6882003a61647d5b6412cf488716",
+      "bytes": 6985,
+      "managedInstalled": false
+    },
+    {
+      "order": 30,
+      "stage": "UNINSTALLED_CANDIDATE",
+      "path": "ops/vox/sql-candidates/20261018120000_vox_ab7j_two_person_staff_suspend_candidate.sql",
+      "sha256": "032d2cbf6aadf81730cfdce08d0edb9ae32394d5cab9a38bfc3fbd7548d2e276",
+      "bytes": 5804,
+      "managedInstalled": false
+    }
+  ],
+  "explicitStopReasons": [
+    "STAGING_MIGRATION_VERSION_ALIASES_REQUIRE_INDEPENDENT_RECONCILIATION",
+    "QUARANTINED_7_FILE_FOUNDATION_REQUIRES_DBA_APPSEC_SIGNOFF",
+    "ONLY_SYNTHETIC_CORE_BASE_SCHEMA_TESTED",
+    "NO_APPROVED_DOWN_MIGRATION_OR_DATABASE_RESTORE_CERTIFICATION",
+    "NO_GENUINE_INDEPENDENT_FIRST_TEAM_LEADER_AAL2",
+    "NO_AUTHENTICATED_PROTECTED_STAGING_END_TO_END"
+  ]
+}

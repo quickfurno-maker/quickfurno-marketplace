@@ -93,7 +93,7 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
    "AND geo_city.id=b.approved_city_id "+
    "AND lower(btrim(l.city))=lower(btrim(z.canonical_city)) "+
    "FOR UPDATE OF c FOR SHARE OF b,ca,l,z,geo_city,reviewer,reviewer_auth,review_m,review_t":
-   "FOR UPDATE OF c";
+   "FOR UPDATE OF c FOR SHARE OF v,z,geo_city";
   const conv=await db.query(baseColumns+subjectJoin+cityJoin+
    "WHERE c.id=$1::uuid "+clientChecks,[input.conversationId]);
   const c=conv.rows[0];

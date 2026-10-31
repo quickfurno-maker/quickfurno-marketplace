@@ -104,7 +104,11 @@ test("service desk: Core 403 preserved, other failures collapse to 503",async()=
 });
 test("service desk: timeout/abort and network errors become 503",async()=>{
  setup({core:async(u,o)=>new Promise((_,rej)=>{
-  o.signal.addEventListener("abort",()=>rej(o.signal.reason));})});
+  // AbortSignal.timeout uses an unref-ed timer on Node 20 runners. Keep a
+  // bounded, referenced watchdog so the event loop cannot exit before abort.
+  const watchdog=setTimeout(()=>rej(new Error("TEST_ABORT_NOT_DELIVERED")),200);
+  o.signal.addEventListener("abort",()=>{clearTimeout(watchdog);rej(o.signal.reason)},{once:true});
+ })});
  // The genuine AbortSignal.timeout(3500) is honoured; shorten the timer for test speed.
  const orig=AbortSignal.timeout;
  AbortSignal.timeout=()=>orig.call(AbortSignal,20);

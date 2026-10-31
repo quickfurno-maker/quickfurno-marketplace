@@ -8,10 +8,19 @@ export default async function FinanceOrder({
  params}:{params:Promise<{orderId:string}>}){
  const {orderId}=await params;
  const response=await fetchOwnerFinanceOrderDetail(orderId);
- if(!response.ok)return <main className="hold"><section className="holdCard">
-  <p className="kicker">VOX / FINANCE</p><h1>Order details unavailable</h1>
-  <p>Owner MFA, exact Core order ID and separately approved read-only Staging feature gates are required. No financial action has been performed.</p>
+ if(!response.ok){
+  // An expired or missing MFA session is recoverable: send the Owner to
+  // sign-in instead of a dead-end "unavailable" card (matches /finance).
+  const needsLogin=response.error==="MFA_REQUIRED";
+  return <main className="hold"><section className="holdCard">
+  <p className="kicker">VOX / FINANCE</p>
+  <h1>{needsLogin?"Verified Owner session required":"Order details unavailable"}</h1>
+  <p>{needsLogin
+   ?"Sign in with verified Owner MFA to view this read-only order record. No financial action has been performed."
+   :"Owner MFA, exact Core order ID and separately approved read-only Staging feature gates are required. No financial action has been performed."}</p>
+  {needsLogin&&<><Link href="/login">Owner sign-in</Link>{" · "}</>}
   <Link href="/finance">Return to Finance</Link></section></main>;
+ }
  const {order,ledger}=response;
  const attempts=await fetchOwnerFinanceAttemptEvidence(orderId);
  return <main className="voxOps">

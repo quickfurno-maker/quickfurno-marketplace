@@ -17,10 +17,12 @@ try{
   if($LASTEXITCODE -ne 0){throw "PG_CONTAINER_START_DENIED_$name"}
   $containers+= $name
  }
+ # The initdb temporary postmaster listens only on the Unix socket.
+ # Require TCP readiness on the final server before any SQL or dump.
  foreach($name in $containers){
   $ok=$false
   for($i=0;$i -lt 60;$i++){
-   docker exec $name pg_isready -q -U postgres -d postgres 2>$null
+   docker exec $name pg_isready -q -h 127.0.0.1 -U postgres -d postgres 2>$null
    if($LASTEXITCODE -eq 0){$ok=$true;break}
    Start-Sleep -Milliseconds 350
   }
@@ -29,7 +31,7 @@ try{
  $fixture=Get-Content (Join-Path $root 'scripts\mvp\vox\vox07-finalizer-fixture.sql') -Raw
  $parts=$fixture -split '-- Synthetic profiles:',2
  if($parts.Count -ne 2){throw 'VOX_SYNTHETIC_FIXTURE_CORRUPT'}
- $parts[0] | docker exec -i $source psql -X -q -U postgres -d postgres -v ON_ERROR_STOP=1
+ $parts[0] | docker exec -i -e PGPASSWORD=synthetic_only $source psql -h 127.0.0.1 -X -q -U postgres -d postgres -v ON_ERROR_STOP=1
  if($LASTEXITCODE -ne 0){throw 'PRE_MIGRATION_FIXTURE_FAILED'}
  $native=@'
 CREATE TABLE public.aarohi_tasks(
@@ -46,7 +48,7 @@ CREATE TABLE public.aarohi_events(
 CREATE UNIQUE INDEX aarohi_events_idempotency_idx ON public.aarohi_events
  (tenant_id,idempotency_key) WHERE idempotency_key IS NOT NULL;
 '@
- $native | docker exec -i $source psql -X -q -U postgres -d postgres -v ON_ERROR_STOP=1
+ $native | docker exec -i -e PGPASSWORD=synthetic_only $source psql -h 127.0.0.1 -X -q -U postgres -d postgres -v ON_ERROR_STOP=1
  if($LASTEXITCODE -ne 0){throw 'NATIVE_AAROHI_FIXTURE_FAILED'}
  # Preserve original migration semantics for OFFLINE recovery while refusing
  # to re-introduce the unapproved legacy SQL to managed deploy discovery.
@@ -55,7 +57,7 @@ CREATE UNIQUE INDEX aarohi_events_idempotency_idx ON public.aarohi_events
  $sqls=@(Get-ChildItem (Join-Path $root 'ops\vox\quarantined-migrations\legacy-20261014') -Filter '20261014*vox*.sql' -File|Sort-Object Name)
  if($sqls.Count -ne 7){throw 'EXACT_SEVEN_QUARANTINED_VOX_SQL_FILES_REQUIRED'}
  foreach($sql in $sqls){
-  (Get-Content $sql.FullName -Raw)|docker exec -i $source psql -X -q -U postgres -d postgres -v ON_ERROR_STOP=1
+  (Get-Content $sql.FullName -Raw)|docker exec -i -e PGPASSWORD=synthetic_only $source psql -h 127.0.0.1 -X -q -U postgres -d postgres -v ON_ERROR_STOP=1
   if($LASTEXITCODE -ne 0){throw ('MIGRATION_FAILED_'+$sql.Name)}
  }
  @'
@@ -65,10 +67,10 @@ INSERT INTO public.profiles(id,role,is_active)
 INSERT INTO public.cities(id,is_active)
  VALUES('20000000-0000-4000-8000-000000000001',true),
        ('20000000-0000-4000-8000-000000000002',true);
-'@|docker exec -i $source psql -X -q -U postgres -d postgres -v ON_ERROR_STOP=1
+'@|docker exec -i -e PGPASSWORD=synthetic_only $source psql -h 127.0.0.1 -X -q -U postgres -d postgres -v ON_ERROR_STOP=1
  if($LASTEXITCODE -ne 0){throw 'SYNTHETIC_ROWS_FAILED'}
  # Write binary custom-format dump inside container; do not use PowerShell binary pipe.
- docker exec $source pg_dump -U postgres -d postgres --format custom --file /tmp/vox20.dump
+ docker exec -e PGPASSWORD=synthetic_only $source pg_dump -h 127.0.0.1 -U postgres -d postgres --format custom --file /tmp/vox20.dump
  if($LASTEXITCODE -ne 0){throw 'CUSTOM_ARCHIVE_FAILED'}
  docker cp "${source}:/tmp/vox20.dump" $dump|Out-Null
  if($LASTEXITCODE -ne 0){throw 'ARCHIVE_TRANSFER_FAILED'}
@@ -76,11 +78,11 @@ INSERT INTO public.cities(id,is_active)
  if($checksum -notmatch '^[A-F0-9]{64}$'){throw 'INVALID_SHA256_CHECKSUM'}
  # pg_dump deliberately excludes cluster roles; create only synthetic auth roles.
  "CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role BYPASSRLS;" |
-   docker exec -i $restored psql -X -q -U postgres -d postgres -v ON_ERROR_STOP=1
+   docker exec -i -e PGPASSWORD=synthetic_only $restored psql -h 127.0.0.1 -X -q -U postgres -d postgres -v ON_ERROR_STOP=1
  if($LASTEXITCODE -ne 0){throw 'ISOLATED_ROLE_SETUP_FAILED'}
  docker cp $dump "${restored}:/tmp/vox20.dump"|Out-Null
  if($LASTEXITCODE -ne 0){throw 'ARCHIVE_RESTORE_TRANSFER_FAILED'}
- docker exec $restored pg_restore --no-owner --exit-on-error -U postgres -d postgres /tmp/vox20.dump
+ docker exec -e PGPASSWORD=synthetic_only $restored pg_restore -h 127.0.0.1 --no-owner --exit-on-error -U postgres -d postgres /tmp/vox20.dump
  if($LASTEXITCODE -ne 0){throw 'ISOLATED_PG_RESTORE_FAILED'}
  $after=(Get-FileHash -Algorithm SHA256 -LiteralPath $dump).Hash
  if($after -ne $checksum){throw 'SHA256_ARCHIVE_CHANGED'}
@@ -104,9 +106,9 @@ select json_build_object(
    'public.qf_vox_execute_approved_aarohi_followup_v1(uuid,uuid,integer)','EXECUTE')
 )::text;
 '@
- $left=($proof|docker exec -i $source psql -X -q -A -t -U postgres -d postgres -v ON_ERROR_STOP=1|Out-String).Trim()
+ $left=($proof|docker exec -i -e PGPASSWORD=synthetic_only $source psql -h 127.0.0.1 -X -q -A -t -U postgres -d postgres -v ON_ERROR_STOP=1|Out-String).Trim()
  if($LASTEXITCODE -ne 0){throw 'SOURCE_PARITY_QUERY_FAILED'}
- $right=($proof|docker exec -i $restored psql -X -q -A -t -U postgres -d postgres -v ON_ERROR_STOP=1|Out-String).Trim()
+ $right=($proof|docker exec -i -e PGPASSWORD=synthetic_only $restored psql -h 127.0.0.1 -X -q -A -t -U postgres -d postgres -v ON_ERROR_STOP=1|Out-String).Trim()
  if($LASTEXITCODE -ne 0){throw 'RESTORED_PARITY_QUERY_FAILED'}
  $a=$left|ConvertFrom-Json
  $b=$right|ConvertFrom-Json
@@ -124,7 +126,7 @@ select json_build_object(
  $old=$ErrorActionPreference;$ErrorActionPreference='Continue'
  try{
   $probe=("SET ROLE anon; SELECT * FROM public.vox_staff_memberships_v1 LIMIT 1;"|
-    docker exec -i $restored psql -X -q -U postgres -d postgres -v ON_ERROR_STOP=1 2>&1|Out-String)
+    docker exec -i -e PGPASSWORD=synthetic_only $restored psql -h 127.0.0.1 -X -q -U postgres -d postgres -v ON_ERROR_STOP=1 2>&1|Out-String)
   $exit=$LASTEXITCODE
  }finally{$ErrorActionPreference=$old}
  if($exit -eq 0 -or $probe -notmatch '(?i)permission denied'){

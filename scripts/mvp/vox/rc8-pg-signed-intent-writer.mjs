@@ -33,6 +33,7 @@ const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]
 const LOWER_UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const HEX64=/^[a-f0-9]{64}$/;
 const P="public.vox_rc8_";
+const RC37_KEYS_TABLE="public.vox_rc37_receipt_signer_keys_candidate_v1";
 // Transaction-scoped advisory lock namespace for one signed-intent writer.
 // A hashtext collision can only produce a spurious IN_FLIGHT (fail-closed).
 const INTENT_LOCK_CLASS=827027;
@@ -251,6 +252,18 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
     request.cityId,signed.ownerId,signed.teamLeaderId]);
   if(receipt.rowCount!==1||receipt.rows[0]?.id!==intentId)
    throw Error("INTENT_RECEIPT_UNVERIFIED");
+  // RC37: persist the exact two signer keys (from the locked, pinned registry)
+  // in this same transaction so review can later prove THESE keys, not a guess.
+  const keyEvidence=await client.query(
+   "INSERT INTO "+RC37_KEYS_TABLE+" (intent_id,key_id,signer_id,signer_role,"+
+   "public_key_fingerprint,not_before_ms,not_after_ms) "+
+   "SELECT $1::uuid,k.key_id,k.signer_id::uuid,k.signer_role,k.fp,k.nb,k.na FROM "+
+   "unnest($2::text[],$3::text[],$4::text[],$5::text[],$6::bigint[],$7::bigint[]) "+
+   "AS k(key_id,signer_id,signer_role,fp,nb,na) RETURNING key_id",
+   [intentId,registry.map(k=>k.keyId),registry.map(k=>k.signerId),
+    registry.map(k=>k.signerRole),registry.map(k=>k.publicKeyFingerprint),
+    registry.map(k=>String(k.notBeforeMs)),registry.map(k=>String(k.notAfterMs))]);
+  if(keyEvidence.rowCount!==2)throw Error("SIGNER_KEY_EVIDENCE_UNVERIFIED");
   // Atomic readback: the exact three claims written by THIS transaction and
   // the receipt row must be what PostgreSQL holds for intentId, and yield the
   // digest later used to reconcile an ambiguous COMMIT.
@@ -349,7 +362,7 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
  *  IN_FLIGHT      writer transaction still open: outcome undecided, retry;
  *  INCONSISTENT   anything else: HOLD for independent DBA/AppSec review. */
 export async function reconcileRc8PgSignedIntentOutcome({acquireClient,intentId,
- subjectId,expectedReceiptSha256}={}){
+ subjectId,expectedReceiptSha256,now}={}){
  const base={approved:false,canAuthorize:false,officialEodEnabled:false,
   publicationAuthorized:false};
  if(typeof acquireClient!=="function"||typeof intentId!=="string"||
@@ -398,23 +411,29 @@ export async function reconcileRc8PgSignedIntentOutcome({acquireClient,intentId,
     r.staffId!==i.ownerId&&r.staffId!==i.teamLeaderId&&
     r.sourceDigest===i.digest&&
     r.state==="TL_ACKNOWLEDGED_AWAITING_OWNER_RELEASE"&&r.published===false;
-   // RC34: key revocation after COMMIT must invalidate the pending receipt. The
-   // writer only proves the keys were unrevoked at commit time; the receipt does
-   // not store key ids, so resolve the signers' enrolled keys by signer identity.
-   // Exactly one enrolled OWNER key and one TEAM_LEADER key, none revoked.
+   // RC34/RC37: the receipt's STORED signer keys must still be unrevoked, still
+   // the exact enrolled key material, and inside their validity window now.
+   // One statement = one snapshot, so a revocation cannot interleave per row.
    if(reportCurrent){
     const keys=await client.query(
-     "SELECT r.key_id AS \"keyId\",r.signer_id::text AS \"signerId\","+
-     "r.signer_role AS \"signerRole\",(v.key_id IS NOT NULL) AS \"revoked\" "+
-     "FROM "+P+"human_signer_registry_candidate_v1 r "+
-     "LEFT JOIN "+P+"signer_revocations_candidate_v1 v ON v.key_id=r.key_id "+
-     "WHERE r.signer_id IN ($1::uuid,$2::uuid) AND r.human_enrolled=true",
-     [i.ownerId,i.teamLeaderId]);
+     "SELECT e.key_id AS \"keyId\",e.signer_id::text AS \"signerId\","+
+     "e.signer_role AS \"signerRole\",(v.key_id IS NOT NULL) AS \"revoked\","+
+     "(r.public_key_fingerprint=e.public_key_fingerprint AND r.signer_id=e.signer_id AND "+
+     "r.signer_role=e.signer_role AND r.not_before_ms=e.not_before_ms AND "+
+     "r.not_after_ms=e.not_after_ms AND r.human_enrolled=true) AS \"registryMatches\","+
+     "e.not_before_ms AS \"notBeforeMs\",e.not_after_ms AS \"notAfterMs\" "+
+     "FROM "+RC37_KEYS_TABLE+" e "+
+     "JOIN "+P+"human_signer_registry_candidate_v1 r ON r.key_id=e.key_id "+
+     "LEFT JOIN "+P+"signer_revocations_candidate_v1 v ON v.key_id=e.key_id "+
+     "WHERE e.intent_id=$1::uuid",[intentId]);
     const k=keys.rows??[];
+    // `now` can only advance past the real clock (fixtures); never rewind it.
+    const keyTime=Math.max(Number.isSafeInteger(now)?now:0,Date.now());
     const ownerKeys=k.filter(x=>x.signerId===i.ownerId&&x.signerRole==="OWNER");
     const tlKeys=k.filter(x=>x.signerId===i.teamLeaderId&&x.signerRole==="TEAM_LEADER");
     signerKeysCurrent=k.length===2&&ownerKeys.length===1&&tlKeys.length===1&&
-     k.every(x=>x.revoked===false);
+     k.every(x=>x.revoked===false&&x.registryMatches===true&&
+      keyTime>=Number(x.notBeforeMs)&&keyTime<Number(x.notAfterMs));
    }
   }
   await client.query("ROLLBACK");started=false;

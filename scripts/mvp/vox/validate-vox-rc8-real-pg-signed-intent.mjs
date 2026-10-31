@@ -111,6 +111,7 @@ try{
  await pool.query(ddl);
  const revocationDdl=readFileSync(resolve(root,"ops/vox/rc7-review-candidates/20261030030000_vox_rc11_signer_revocation_lock_review_only.sql"),"utf8");
  await pool.query(revocationDdl);
+ await pool.query(readFileSync(resolve(root,"ops/vox/rc37-review-candidates/20261031010000_vox_rc37_receipt_signer_evidence_review_only.sql"),"utf8"));
  // Synthetic local registry enrolment DOES NOT authorize any real human signer.
  for(const e of registry){
   await pool.query("INSERT INTO public.vox_rc8_human_signer_registry_candidate_v1 "+
@@ -262,7 +263,7 @@ try{
  let c=await counts();eq(c.claims,3,"THREE_CLAIMS");eq(c.intents,1,"ONE_INTENT");
  // Read-only reconciliation must match the exact durable receipt digest.
  const rec=await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
-  intentId:r.intentId,subjectId:SUB,expectedReceiptSha256:r.receiptSha256});
+  intentId:r.intentId,subjectId:SUB,expectedReceiptSha256:r.receiptSha256,now});
  eq(rec.outcome,"COMMITTED","EOD_UNKNOWN_RECONCILED_COMMITTED");
  eq(rec.receiptSha256,r.receiptSha256,"EOD_RECONCILED_RECEIPT_DIGEST");
  eq(rec.publicationAuthorized,false,"RECONCILED_NOT_PUBLICATION");
@@ -271,12 +272,12 @@ try{
  for(const signerId of [TL,OWNER]){
   await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET staff_id=$2 WHERE id=$1",[SUB,signerId]);
   const drift=await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
-   intentId:r.intentId,subjectId:SUB,expectedReceiptSha256:r.receiptSha256});
+   intentId:r.intentId,subjectId:SUB,expectedReceiptSha256:r.receiptSha256,now});
   eq(drift.outcome,"INCONSISTENT","RC33_STAFF_SUBJECT_BECAME_SIGNER_NOT_COMMITTED");
  }
  await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET staff_id=$2 WHERE id=$1",[SUB,id(90)]);
  eq((await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
-  intentId:r.intentId,subjectId:SUB,expectedReceiptSha256:r.receiptSha256})).outcome,
+  intentId:r.intentId,subjectId:SUB,expectedReceiptSha256:r.receiptSha256,now})).outcome,
   "COMMITTED","RC33_STAFF_RESTORED_COMMITTED");
  const absent=await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
   intentId:id(999),subjectId:SUB,expectedReceiptSha256:r.receiptSha256});
@@ -343,7 +344,7 @@ try{
   // reconciling as COMMITTED once either pinned signer key is revoked.
   const postRevoke=await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
    intentId:committedReceipt.intentId,subjectId:SUB,
-   expectedReceiptSha256:committedReceipt.receiptSha256});
+   expectedReceiptSha256:committedReceipt.receiptSha256,now});
   eq(postRevoke.outcome,"INCONSISTENT","RC34_REVOKED_SIGNER_KEY_NOT_COMMITTED");
   eq(postRevoke.publicationAuthorized,false,"RC34_REVOKED_NOT_PUBLICATION");
  }finally{try{await held.query("ROLLBACK")}catch{}held.release();revokeClient.release();}

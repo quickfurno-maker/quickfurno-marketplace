@@ -96,9 +96,12 @@ function fakeDb({revoked=[],enrolmentEffective=true,registryRows=registry}={}){
      reviewerId:r.reviewer_id,sourceCount:r.source_count,sourceDigest:r.source_digest,
      state:r.state,published:r.published}]);
     return rows([r]);}
+   if(sql.includes("INSERT INTO public.vox_rc37_receipt_signer_keys_candidate_v1"))
+    return rows(v[1].map(key_id=>({key_id})));
    if(sql.includes('AS "revoked"'))
-    return rows(registryRows.filter(r=>v.includes(r.signerId)).map(r=>({keyId:r.keyId,
-     signerId:r.signerId,signerRole:r.signerRole,revoked:db.revoked.has(r.keyId)})));
+    return rows(!intents().has(v[0])?[]:registryRows.map(r=>({keyId:r.keyId,
+     signerId:r.signerId,signerRole:r.signerRole,revoked:db.revoked.has(r.keyId),
+     registryMatches:true,notBeforeMs:String(r.notBeforeMs),notAfterMs:String(r.notAfterMs)})));
    if(sql.includes("human_signer_registry_candidate_v1"))
     return rows(registryRows.map(r=>({...r,notBeforeMs:String(r.notBeforeMs),
      notAfterMs:String(r.notAfterMs),enrolmentEffective})));
@@ -263,6 +266,34 @@ test("RC34: signer key revoked after COMMIT is not COMMITTED",async()=>{
   db.revoked.delete(key);
  }
  assert.equal((await rec()).outcome,"COMMITTED");
+});
+
+test("RC37: stored signer key expiry after COMMIT is not COMMITTED; clock cannot rewind",async()=>{
+ const db=fakeDb();
+ const r=await executeRc8PgPendingSignedIntent(args(db),TEST_ONLY_GATE);
+ assert.equal(r.ok,true,r.reason);
+ const rec=at=>reconcileRc8PgSignedIntentOutcome({acquireClient:db.connect,
+  intentId:r.intentId,subjectId:SUB,expectedReceiptSha256:r.receiptSha256,now:at});
+ assert.equal((await rec(undefined)).outcome,"COMMITTED");
+ const expired=await rec(owner.entry.notAfterMs);
+ assert.equal(expired.outcome,"INCONSISTENT");
+ assert.equal(expired.publicationAuthorized,false);
+ // A fixture clock before the window can never rewind real time into validity.
+ assert.equal((await rec(1)).outcome,"COMMITTED");
+});
+
+test("RC37: writer persists signer-key evidence in the receipt transaction; SQL is immutable",()=>{
+ const src=read("scripts/mvp/vox/rc8-pg-signed-intent-writer.mjs");
+ const w=src.slice(src.indexOf("export async function executeRc8PgPendingSignedIntent("),
+  src.indexOf("export async function reconcileRc8PgSignedIntentOutcome"));
+ const ev=w.indexOf("INSERT INTO \"+RC37_KEYS_TABLE");
+ assert.ok(ev>w.indexOf("verified_intents_candidate_v1 \"+")&&ev<w.indexOf('client.query("COMMIT")'));
+ const sql=read("ops/vox/rc37-review-candidates/20261031010000_vox_rc37_receipt_signer_evidence_review_only.sql");
+ assert.match(sql,/NOT a managed migration/);
+ assert.match(sql,/VOX_RC37_ENROLLED_SIGNER_KEY_IMMUTABLE/);
+ assert.match(sql,/BEFORE TRUNCATE/);
+ assert.match(sql,/FORCE ROW LEVEL SECURITY/);
+ assert.doesNotMatch(sql,/GRANT\s/i);
 });
 
 test("RC27: in-flight writer after lost COMMIT is never reconciled as NOT_COMMITTED",async()=>{

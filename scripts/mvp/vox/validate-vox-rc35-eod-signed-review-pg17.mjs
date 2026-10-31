@@ -16,7 +16,7 @@ import {mintRc4VerifiedAuthContext,rc4RegistryFingerprint,rc4ScopeTargetHash}
  from "../../../contracts/vox/rc4ApprovalPipeline.mjs";
 import {canonicalAb7kApprovalBytes}
  from "../../../contracts/vox/ab7kSignedApprovalVerifier.mjs";
-import {executeRc8PgPendingSignedIntent} from "./rc8-pg-signed-intent-writer.mjs";
+import {executeRc8PgPendingSignedIntent,reconcileRc8PgSignedIntentOutcome} from "./rc8-pg-signed-intent-writer.mjs";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
 const image="postgres:17-alpine",container="qf-vox-rc35-eod-review-pg";
 const docker=(args)=>execFileSync("docker",args,
@@ -24,7 +24,7 @@ const docker=(args)=>execFileSync("docker",args,
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const eq=(a,b,label)=>{if(a!==b)throw Error(label+" expected="+b+" actual="+a)};
 const id=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
-const now=1_800_000_000_000;
+const now=Date.now();
 const OWNER=id(1),TL=id(2),TEAM=id(3),CITY=id(4),SUB=id(5),STAFF=id(90);
 const OTHER_OWNER=id(11),OTHER_TL=id(12),OTHER_TEAM=id(13);
 const TYPE="EOD_OFFICIAL_RELEASE",DIGEST="b".repeat(64);
@@ -100,8 +100,9 @@ try{
  await pool.query("INSERT INTO "+REPORT+" VALUES($1,$2,$3,$4,$5,4,$6,'TL_ACKNOWLEDGED_AWAITING_OWNER_RELEASE',false)",
   [SUB,STAFF,TEAM,CITY,TL,DIGEST]);
  for(const f of ["20261030010000_vox_rc8_signed_intent_transaction_review_only.sql",
-  "20261030030000_vox_rc11_signer_revocation_lock_review_only.sql"])
-  await pool.query(readFileSync(resolve(root,"ops/vox/rc7-review-candidates",f),"utf8"));
+  "20261030030000_vox_rc11_signer_revocation_lock_review_only.sql",
+  "20261031010000_vox_rc37_receipt_signer_evidence_review_only.sql"])
+  await pool.query(readFileSync(resolve(root,f.includes("rc37_receipt")?"ops/vox/rc37-review-candidates":"ops/vox/rc7-review-candidates",f),"utf8"));
  for(const e of registry)
   await pool.query("INSERT INTO public.vox_rc8_human_signer_registry_candidate_v1 "+
    "(key_id,signer_id,signer_role,public_key_pem,public_key_fingerprint,not_before_ms,not_after_ms,human_enrolled,enrolled_at) "+
@@ -198,6 +199,41 @@ try{
  as(OWNER,tlValue());
  eq((await review("o","t",input,acquire)).ok,true,"REVIEW_RESTORED_OK");
 
+ // 6b. RC37: stored signer-key evidence + immutability of receipt and registry.
+ const ev=await pool.query("SELECT key_id,signer_role,public_key_fingerprint FROM "+
+  "public.vox_rc37_receipt_signer_keys_candidate_v1 WHERE intent_id=$1 ORDER BY signer_role",[w.intentId]);
+ eq(ev.rows.length,2,"RC37_TWO_KEY_EVIDENCE_ROWS");
+ eq(ev.rows[0].key_id,owner.entry.keyId,"RC37_OWNER_KEY_STORED");
+ eq(ev.rows[1].key_id,leader.entry.keyId,"RC37_TL_KEY_STORED");
+ eq(ev.rows[0].public_key_fingerprint,owner.entry.publicKeyFingerprint,"RC37_OWNER_FP_STORED");
+ const rejects=async(sql,vals,re,label)=>{
+  let msg="";
+  try{await pool.query(sql,vals)}catch(e){msg=String(e.message)}
+  if(!re.test(msg))throw Error(label+" expected rejection "+re+" actual="+JSON.stringify(msg));
+ };
+ const R="public.vox_rc8_human_signer_registry_candidate_v1";
+ await rejects("UPDATE "+R+" SET not_after_ms=not_after_ms+1000 WHERE key_id=$1",[owner.entry.keyId],
+  /VOX_RC37_ENROLLED_SIGNER_KEY_IMMUTABLE/,"RC37_REGISTRY_WINDOW_EXTEND");
+ await rejects("UPDATE "+R+" SET public_key_fingerprint=$2 WHERE key_id=$1",[leader.entry.keyId,"e".repeat(64)],
+  /VOX_RC37_ENROLLED_SIGNER_KEY_IMMUTABLE/,"RC37_REGISTRY_KEY_SWAP");
+ await rejects("DELETE FROM "+R+" WHERE key_id=$1",[owner.entry.keyId],
+  /VOX_RC37_SIGNER_REGISTRY_APPEND_ONLY/,"RC37_REGISTRY_DELETE");
+ await rejects("UPDATE public.vox_rc37_receipt_signer_keys_candidate_v1 SET key_id=key_id",[],
+  /VOX_RC8_APPEND_ONLY/,"RC37_EVIDENCE_UPDATE");
+ for(const t of ["vox_rc8_verified_intents_candidate_v1","vox_rc8_approval_claims_candidate_v1",
+  "vox_rc37_receipt_signer_keys_candidate_v1","vox_rc8_human_signer_registry_candidate_v1",
+  "vox_rc8_signer_revocations_candidate_v1"])
+  await rejects("TRUNCATE public."+t+" CASCADE",[],/VOX_RC8_APPEND_ONLY/,"RC37_TRUNCATE_"+t);
+ c=await counts();eq(c.claims,3,"RC37_CLAIMS_SURVIVE");eq(c.intents,1,"RC37_INTENT_SURVIVES");
+ // Key EXPIRY after commit (clock may only advance past real time): not a clean pending receipt.
+ const reconcileAt=at=>reconcileRc8PgSignedIntentOutcome({acquireClient:acquire,
+  intentId:w.intentId,subjectId:SUB,expectedReceiptSha256:w.receiptSha256,now:at});
+ eq((await reconcileAt(undefined)).outcome,"COMMITTED","RC37_KEYS_IN_WINDOW");
+ const lapsed=await reconcileAt(owner.entry.notAfterMs);
+ eq(lapsed.outcome,"INCONSISTENT","RC37_KEY_EXPIRED_NOT_COMMITTED");
+ eq(lapsed.publicationAuthorized,false,"RC37_EXPIRED_NO_PUB");eq(lapsed.approved,false,"RC37_EXPIRED_NO_APPROVE");
+ eq((await reconcileAt(1)).outcome,"COMMITTED","RC37_CLOCK_CANNOT_REWIND");
+
  // 7. Revoked signer key (real native revocation function) denies the review.
  const rev=await pool.query("SELECT public.qf_vox_rc11_revoke_signed_human_key_candidate_v1($1,$2) AS revoked",
   [leader.entry.keyId,"f".repeat(64)]);
@@ -209,7 +245,8 @@ try{
  c=await counts();eq(c.claims,3,"REVIEW_READONLY_CLAIMS");eq(c.intents,1,"REVIEW_READONLY_INTENTS");
  console.log("VOX_RC35_EOD_SIGNED_REVIEW_PG17_PASS real_ed25519_bytes=true real_pg17_writer=true "+
   "real_reconciler=true distinct_owner_tl_aal2_rechecked=true scope_bound=true "+
-  "report_drift_denied=true revoked_signer_denied=true readonly=true "+
+  "report_drift_denied=true revoked_signer_denied=true key_evidence_stored=true "+
+  "registry_and_receipt_immutable=true key_expiry_denied=true readonly=true "+
   "publication=false official_eod=false provider_messages=0");
 }catch(e){console.error("VOX_RC35_EOD_SIGNED_REVIEW_PG17_FAIL "+String(e?.stack||e));process.exitCode=1;}
 finally{

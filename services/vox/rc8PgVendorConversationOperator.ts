@@ -133,7 +133,7 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
   // decision, request and activation must ALL remain current. Lock their
   // rows so a concurrent revocation cannot commit before this writer.
   const reviewed=await db.query(
-   "SELECT cap.id FROM public.vox_staff_department_capabilities_v1 cap "+
+   "SELECT cap.id,req.decided_by AS reviewer_id FROM public.vox_staff_department_capabilities_v1 cap "+
    "JOIN public.vox_staff_department_requests_v1 req ON req.id=cap.request_id "+
    "JOIN public.vox_staff_department_decisions_v1 d ON d.request_id=req.id "+
    "JOIN public.vox_staff_department_activations_v1 x "+
@@ -259,9 +259,10 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
    "JOIN public.vox_staff_teams_v1 t ON t.id=m.team_id "+
    "WHERE m.auth_user_id=$1::uuid AND os.object_id=$2::uuid "+
    "AND m.team_id=$3::uuid AND cap.city_id=$4::uuid "+
-   "AND os.id=$5::uuid AND cap.id=$6::uuid "+
+   "AND os.id=$5::uuid AND cap.id=$6::uuid AND tl.auth_user_id=$7::uuid "+
    "AND req.team_id=m.team_id AND req.city_id=cap.city_id "+
    "AND cap.revision=2 AND req.revision=1 AND t.is_active=true "+
+   "AND m.staff_role='operations_manager' AND t.city_id=cap.city_id "+
    "AND os.scope_kind='conversation' AND os.revoked_at IS NULL "+
    "AND os.expires_at>clock_timestamp() "+
    "AND m.is_active=true AND m.revoked_at IS NULL AND m.expires_at>clock_timestamp() "+
@@ -271,7 +272,8 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
    "AND tl.is_active=true AND tl.revoked_at IS NULL "+
    "AND tl.expires_at>clock_timestamp()",
    [input.verifiedStaff.userId,input.conversationId,staff.rows[0].team_id,
-    c.city_id,scope.rows[0].id,reviewed.rows[0].id]);
+    c.city_id,scope.rows[0].id,reviewed.rows[0].id,
+    reviewed.rows[0].reviewer_id]);
   if(currentGrants.rowCount!==1){
    await db.query("ROLLBACK");settled=true;
    return closed("CORE_GRANT_EXPIRED_DURING_TRANSACTION");

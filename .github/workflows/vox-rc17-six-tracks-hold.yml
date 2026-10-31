@@ -10,6 +10,7 @@ on:
       - 'scripts/mvp/vox/rc21-*.test.mjs'
       - 'scripts/mvp/vox/rc22-*.test.mjs'
       - 'scripts/mvp/vox/rc23-*.test.mjs'
+      - 'scripts/mvp/vox/rc24-*.test.mjs'
       - 'scripts/mvp/vox/rc23-migration-adjudication.mjs'
       - 'scripts/mvp/vox/rc22-migration-release-packet.mjs'
       - 'scripts/mvp/vox/rc18-finance-release-recovery-preflight.mjs'
@@ -20,6 +21,8 @@ on:
       - 'lib/payments/vendorPackageRefundEvidence.*'
       - 'lib/payments/vendorPackageWebhookBoundary.*'
       - 'lib/payments/vendorPackageRefundReconciliationReview.mjs'
+      - 'lib/payments/readBoundedRazorpayWebhookBody.*'
+      - 'app/api/webhooks/razorpay/vendor-package/route.ts'
       - 'contracts/vox/rc4ApprovalPipeline.mjs'
       - 'services/vox/rc8PgVendorConversationOperator.ts'
       - 'services/vox/verifiedStaffBearer.ts'
@@ -49,8 +52,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Run RC17-RC23 source boundary tests (no mocked green)
-        run: node --test scripts/mvp/vox/rc17-*.test.mjs scripts/mvp/vox/rc18-*.test.mjs scripts/mvp/vox/rc19-*.test.mjs scripts/mvp/vox/rc20-*.test.mjs scripts/mvp/vox/rc21-*.test.mjs scripts/mvp/vox/rc22-*.test.mjs scripts/mvp/vox/rc23-*.test.mjs
+      - name: Run RC17-RC24 source boundary tests (no mocked green)
+        run: node --test scripts/mvp/vox/rc17-*.test.mjs scripts/mvp/vox/rc18-*.test.mjs scripts/mvp/vox/rc19-*.test.mjs scripts/mvp/vox/rc20-*.test.mjs scripts/mvp/vox/rc21-*.test.mjs scripts/mvp/vox/rc22-*.test.mjs scripts/mvp/vox/rc23-*.test.mjs scripts/mvp/vox/rc24-*.test.mjs
       - name: Compute source migration and recovery HOLD evidence
         shell: bash
         run: |

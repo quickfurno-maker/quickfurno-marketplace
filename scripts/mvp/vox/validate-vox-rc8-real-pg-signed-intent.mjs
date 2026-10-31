@@ -271,12 +271,17 @@ try{
  eq(absent.subjectClaimedByOtherIntent,true,"RECONCILE_ABSENT_SUBJECT_HELD");
  // A direct revocation INSERT (FK only takes KEY SHARE) must still wait for
  // an in-flight writer: the writer SHARE-locks the revocation table.
- let directRevokeCode=null;
+ let directRevokeCode=null,probeIntentId=null,inFlightRec=null;
  const lockProbe={...args(request(41,42)),acquireClient:async()=>{
   const raw=await pool.connect();
   return {query:async(sql,values)=>{
    const out=await raw.query(sql,values);
+   if(sql.includes("pg_advisory_xact_lock("))probeIntentId=values[0];
    if(sql.includes("human_signer_registry_candidate_v1")){
+    // RC27: while the writer transaction is open, "no rows yet" must not
+    // reconcile as NOT_COMMITTED; the open intent lock forces IN_FLIGHT.
+    inFlightRec=await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
+     intentId:probeIntentId,subjectId:SUB,expectedReceiptSha256:"a".repeat(64)});
     const other=await pool.connect();
     try{
      await other.query("BEGIN");
@@ -292,6 +297,11 @@ try{
  r=await executeRc8PgPendingSignedIntent(lockProbe,TEST_ONLY_GATE);
  eq(directRevokeCode,"55P03","DIRECT_REVOCATION_INSERT_BLOCKED_DURING_WRITER");
  eq(r.ok,false,"LOCK_PROBE_SUBJECT_ALREADY_HELD");
+ eq(inFlightRec?.outcome,"IN_FLIGHT","RC27_OPEN_WRITER_RECONCILES_IN_FLIGHT");
+ eq(inFlightRec?.publicationAuthorized,false,"RC27_IN_FLIGHT_NOT_PUBLICATION");
+ const afterRollback=await reconcileRc8PgSignedIntentOutcome({acquireClient:()=>pool.connect(),
+  intentId:probeIntentId,subjectId:SUB,expectedReceiptSha256:"a".repeat(64)});
+ eq(afterRollback.outcome,"NOT_COMMITTED","RC27_ENDED_WRITER_RECONCILES_NOT_COMMITTED");
  c=await counts();eq(c.claims,3,"LOCK_PROBE_NO_CLAIM");eq(c.intents,1,"LOCK_PROBE_NO_INTENT");
  r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
  eq(r.ok,false,"NONCE_REPLAY_DENIED");

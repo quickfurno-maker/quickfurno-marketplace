@@ -55,20 +55,34 @@ const request=(o=7,t=8)=>({type:TYPE,subjectId:SUB,digest:DIGEST,teamId:TEAM,cit
 
 /** Minimal transactional stand-in: uncommitted inserts vanish on ROLLBACK. */
 function fakeDb({revoked=[],enrolmentEffective=true,registryRows=registry}={}){
+ // locks: intent advisory locks held by open writer transactions.
+ // stallCommit: the COMMIT response is lost BEFORE the server applies it; the
+ // backend keeps its transaction (and lock) until db.landStalledCommit().
  const db={claims:new Map(),intents:new Map(),revoked:new Set(revoked),log:[],
-  dropCommitResponse:false,releases:0};
+  dropCommitResponse:false,stallCommit:false,landStalledCommit:null,locks:new Set(),releases:0};
  db.connect=async()=>{
-  let pc=new Map(),pi=new Map();
+  let pc=new Map(),pi=new Map(),held=new Set();
   const claims=()=>new Map([...db.claims,...pc]),intents=()=>new Map([...db.intents,...pi]);
   const rows=r=>({rows:r,rowCount:r.length});
+  const end=()=>{for(const k of held)db.locks.delete(k);held=new Set();pc=new Map();pi=new Map();};
   return {release(){db.releases++;},async query(sql,v=[]){
    db.log.push(sql);
-   if(sql.startsWith("BEGIN")){pc=new Map();pi=new Map();return rows([]);}
-   if(sql==="ROLLBACK"){pc=new Map();pi=new Map();return rows([]);}
-   if(sql==="COMMIT"){for(const [k,x] of pc)db.claims.set(k,x);for(const [k,x] of pi)db.intents.set(k,x);
-    pc=new Map();pi=new Map();if(db.dropCommitResponse)throw Error("SYNTHETIC_POST_COMMIT_TRANSPORT_DROP");
+   if(sql.startsWith("BEGIN")){end();return rows([]);}
+   if(sql==="ROLLBACK"){end();return rows([]);}
+   if(sql==="COMMIT"){
+    if(db.stallCommit){
+     const [c,i,h]=[pc,pi,held];pc=new Map();pi=new Map();held=new Set();
+     db.landStalledCommit=()=>{for(const [k,x] of c)db.claims.set(k,x);
+      for(const [k,x] of i)db.intents.set(k,x);for(const k of h)db.locks.delete(k);};
+     throw Error("SYNTHETIC_COMMIT_RESPONSE_LOST_BEFORE_APPLY");
+    }
+    for(const [k,x] of pc)db.claims.set(k,x);for(const [k,x] of pi)db.intents.set(k,x);
+    end();if(db.dropCommitResponse)throw Error("SYNTHETIC_POST_COMMIT_TRANSPORT_DROP");
     return rows([]);}
    if(sql.startsWith("LOCK TABLE"))return rows([]);
+   if(sql.includes("pg_advisory_xact_lock(")){db.locks.add(v[0]);held.add(v[0]);return rows([{}]);}
+   if(sql.includes("pg_try_advisory_xact_lock_shared("))
+    return rows([{writerFinished:!db.locks.has(v[0])}]);
    if(sql.includes("FROM public.profiles p JOIN auth.users"))return rows(v[0]===OWNER?[{id:OWNER}]:[]);
    if(sql.includes("FOR SHARE OF m,p,t,a"))return rows(v[0]===TL?[{auth_user_id:TL}]:[]);
    if(sql.includes("FOR SHARE OF m,t,p,a"))return rows(v[0]===STAFF?[{auth_user_id:STAFF}]:[]);
@@ -189,7 +203,7 @@ test("ambiguous COMMIT reconciles to the exact durable receipt, never re-claims"
  assert.equal(rec.approved,false);assert.equal(rec.publicationAuthorized,false);
  const recSql=db.log.slice(before);
  assert.match(recSql[0],/READ ONLY/);
- assert.ok(!recSql.some(s=>/INSERT|UPDATE|DELETE|COMMIT/.test(s)));
+ assert.ok(!recSql.some(s=>/\b(?:INSERT|UPDATE|DELETE|COMMIT)\b/.test(s)));
  assert.equal(recSql.at(-1),"ROLLBACK");
  // A mismatching expected digest is never accepted as the same receipt.
  const wrong=await reconcileRc8PgSignedIntentOutcome({acquireClient:db.connect,
@@ -199,6 +213,49 @@ test("ambiguous COMMIT reconciles to the exact durable receipt, never re-claims"
  // Replay of the same signed pair after reconciliation is still denied.
  const replay=await executeRc8PgPendingSignedIntent(args(db),TEST_ONLY_GATE);
  assert.equal(replay.ok,false);assert.equal(db.claims.size,3);assert.equal(db.intents.size,1);
+});
+
+test("RC27: in-flight writer after lost COMMIT is never reconciled as NOT_COMMITTED",async()=>{
+ const db=fakeDb();db.stallCommit=true;
+ const r=await executeRc8PgPendingSignedIntent(args(db),TEST_ONLY_GATE);
+ assert.equal(r.reason,"COMMIT_OUTCOME_UNKNOWN");
+ assert.equal(db.intents.size,0);assert.equal(db.claims.size,0);
+ const rec=()=>reconcileRc8PgSignedIntentOutcome({acquireClient:db.connect,
+  intentId:r.intentId,subjectId:SUB,expectedReceiptSha256:r.receiptSha256});
+ // Pre-RC27 this read "no rows" and returned NOT_COMMITTED (fresh pair OK),
+ // then the receipt became durable: a false rollback of consumed nonces.
+ const early=await rec();
+ assert.equal(early.outcome,"IN_FLIGHT");
+ assert.equal(early.reason,"RECONCILIATION_WRITER_IN_FLIGHT");
+ assert.equal(early.retryReconciliationLater,true);
+ assert.equal(early.retryRequiresFreshSignedPair,undefined);
+ assert.equal(early.approved,false);assert.equal(early.publicationAuthorized,false);
+ const st=rc8SignedEodPublicationAuthorizationState(early);
+ assert.equal(st.state,"COMMIT_OUTCOME_UNKNOWN_RECONCILE_REQUIRED");
+ assert.equal(st.publicationAuthorized,false);assert.equal(st.canPublish,false);
+ db.landStalledCommit();
+ const late=await rec();
+ assert.equal(late.outcome,"COMMITTED");assert.equal(late.receiptSha256,r.receiptSha256);
+ assert.equal(rc8SignedEodPublicationAuthorizationState(late).publicationAuthorized,false);
+ assert.equal(db.locks.size,0);
+});
+
+test("RC27: probe failure or malformed probe row is fail-closed, never NOT_COMMITTED",async()=>{
+ for(const row of [[],[{writerFinished:"true"}],[{writerFinished:null}]]){
+  const db=fakeDb();
+  const base=await db.connect();
+  const rec=await reconcileRc8PgSignedIntentOutcome({acquireClient:async()=>({
+   release:base.release,query:async(sql,v)=>sql.includes("pg_try_advisory")?
+    {rows:row,rowCount:row.length}:base.query(sql,v)}),
+   intentId:randomUUID(),subjectId:SUB,expectedReceiptSha256:"a".repeat(64)});
+  assert.equal(rec.outcome,"IN_FLIGHT");
+ }
+ const db=fakeDb();const base=await db.connect();
+ const rec=await reconcileRc8PgSignedIntentOutcome({acquireClient:async()=>({
+  release:base.release,query:async(sql,v)=>{if(sql.includes("pg_try_advisory"))throw Error("down");
+   return base.query(sql,v);}}),
+  intentId:randomUUID(),subjectId:SUB,expectedReceiptSha256:"a".repeat(64)});
+ assert.equal(rec.outcome,null);assert.equal(rec.reason,"RECONCILIATION_UNAVAILABLE");
 });
 
 test("reconciliation of a rolled-back intent requires a fresh signed pair",async()=>{
@@ -247,10 +304,17 @@ test("source order: readback precedes commit guards; PG17 harness covers RC26 ca
  const readback=src.indexOf("DURABLE_RECEIPT_READBACK_MISMATCH");
  const commit=src.indexOf('client.query("COMMIT")');
  assert.ok(receipt>0&&readback>receipt&&commit>readback);
- assert.doesNotMatch(src.slice(src.indexOf("export async function reconcileRc8PgSignedIntentOutcome")),
-  /client\.query\("COMMIT"\)|INSERT INTO|UPDATE public|DELETE FROM/);
+ const recSrc=src.slice(src.indexOf("export async function reconcileRc8PgSignedIntentOutcome"));
+ assert.doesNotMatch(recSrc,/client\.query\("COMMIT"\)|INSERT INTO|UPDATE public|DELETE FROM/);
+ // RC27: writer holds its intent lock before any claim/receipt write; the
+ // reconciler probes it under READ COMMITTED before reading durable rows.
+ const intentLock=src.indexOf("client.query(INTENT_LOCK_SQL");
+ assert.ok(intentLock>lock&&intentLock<src.indexOf("INSERT INTO \"+P+\"approval_claims"));
+ assert.ok(recSrc.includes("READ COMMITTED READ ONLY")&&!recSrc.includes("REPEATABLE READ READ ONLY"));
+ assert.ok(recSrc.indexOf("INTENT_LOCK_PROBE_SQL")<recSrc.indexOf("readDurableReceipt(client"));
  const pg=read("scripts/mvp/vox/validate-vox-rc8-real-pg-signed-intent.mjs");
  for(const label of ["EOD_UNKNOWN_RECONCILED_COMMITTED","RECONCILE_ABSENT_NOT_COMMITTED",
-  "DIRECT_REVOCATION_INSERT_BLOCKED_DURING_WRITER","SIGNER_KEY_REVOKED_DENIED"])
+  "DIRECT_REVOCATION_INSERT_BLOCKED_DURING_WRITER","SIGNER_KEY_REVOKED_DENIED",
+  "RC27_OPEN_WRITER_RECONCILES_IN_FLIGHT","RC27_ENDED_WRITER_RECONCILES_NOT_COMMITTED"])
   assert.ok(pg.includes(label),label);
 });

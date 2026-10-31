@@ -33,6 +33,12 @@ const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]
 const LOWER_UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const HEX64=/^[a-f0-9]{64}$/;
 const P="public.vox_rc8_";
+// Transaction-scoped advisory lock namespace for one signed-intent writer.
+// A hashtext collision can only produce a spurious IN_FLIGHT (fail-closed).
+const INTENT_LOCK_CLASS=827027;
+const INTENT_LOCK_SQL="SELECT pg_advisory_xact_lock("+INTENT_LOCK_CLASS+",hashtext($1::text))";
+const INTENT_LOCK_PROBE_SQL="SELECT pg_try_advisory_xact_lock_shared("+INTENT_LOCK_CLASS+
+ ",hashtext($1::text)) AS \"writerFinished\"";
 const RECEIPT_KINDS=Object.freeze(["OWNER_NONCE","SUBJECT","TL_NONCE"]);
 const RECEIPT_FIELDS=Object.freeze(["id","type","subjectId","digest","teamId",
  "cityId","ownerId","teamLeaderId"]);
@@ -95,6 +101,11 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
   // first SELECT: a SERIALIZABLE snapshot taken earlier could miss a
   // revocation committed before the lock was granted.
   await client.query("LOCK TABLE "+P+"signer_revocations_candidate_v1 IN SHARE MODE");
+  // Hold an intent-scoped marker until this transaction ends (COMMIT or
+  // abort). After a lost COMMIT response the backend may still be in flight;
+  // the reconciler must not read "no rows" as NOT_COMMITTED while it is held.
+  const intentId=randomUUID();
+  await client.query(INTENT_LOCK_SQL,[intentId]);
   const owner=await client.query(
    "SELECT p.id FROM public.profiles p JOIN auth.users a ON a.id=p.id "+
    "WHERE p.id=$1::uuid AND p.role='admin' AND p.is_active=true "+
@@ -198,7 +209,6 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
   if(registry.some(k=>revocations.keyIds.includes(k.keyId))){
    await client.query("ROLLBACK");settled=true;return deny("SIGNER_KEY_REVOKED");
   }
-  const intentId=randomUUID();
   const claimed=[];
   const ledger={
    durable:true,
@@ -328,8 +338,10 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
 /** Read-only reconciliation of a COMMIT_OUTCOME_UNKNOWN signed EOD intent.
  * Never writes, never re-claims nonces, never approves. Outcomes:
  *  COMMITTED      exact durable receipt with the expected digest exists;
- *  NOT_COMMITTED  no receipt and no claims for intentId (nonces were never
- *                 consumed; a fresh signed pair is still required);
+ *  NOT_COMMITTED  writer transaction has ended and there is no receipt and
+ *                 no claims for intentId (nonces were never consumed; a fresh
+ *                 signed pair is still required);
+ *  IN_FLIGHT      writer transaction still open: outcome undecided, retry;
  *  INCONSISTENT   anything else: HOLD for independent DBA/AppSec review. */
 export async function reconcileRc8PgSignedIntentOutcome({acquireClient,intentId,
  subjectId,expectedReceiptSha256}={}){
@@ -344,8 +356,19 @@ export async function reconcileRc8PgSignedIntentOutcome({acquireClient,intentId,
   client=await acquireClient();
   if(!client||typeof client.query!=="function"||typeof client.release!=="function")
    return result({...base,ok:false,reason:"PG_CLIENT_INVALID",outcome:null});
-  await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
+  // READ COMMITTED on purpose: a REPEATABLE READ snapshot would be taken by
+  // the probe statement itself, BEFORE the lock is granted, and could miss a
+  // COMMIT that lands in between. Each read below gets a post-probe snapshot.
+  await client.query("BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED READ ONLY");
   started=true;
+  const probe=await client.query(INTENT_LOCK_PROBE_SQL,[intentId]);
+  if(probe.rows?.[0]?.writerFinished!==true){
+   // The writer's transaction still holds its intent lock: COMMIT may yet
+   // land. Absence of rows is not evidence of rollback; retry later.
+   await client.query("ROLLBACK");started=false;
+   return result({...base,ok:false,reason:"RECONCILIATION_WRITER_IN_FLIGHT",
+    outcome:"IN_FLIGHT",intentId,subjectId,retryReconciliationLater:true});
+  }
   const durable=await readDurableReceipt(client,intentId);
   const forSubject=await client.query(
    "SELECT id::text AS id FROM "+P+"verified_intents_candidate_v1 "+
@@ -385,7 +408,8 @@ export function rc8SignedEodPublicationAuthorizationState(outcome){
  if(outcome.ok===true&&outcome.committed===true&&HEX64.test(outcome.receiptSha256??""))
   state="PENDING_RECEIPT_AWAITING_EXTERNAL_REVIEW";
  else if(outcome.outcome==="COMMITTED")state="PENDING_RECEIPT_AWAITING_EXTERNAL_REVIEW";
- else if(outcome.reason==="COMMIT_OUTCOME_UNKNOWN")state="COMMIT_OUTCOME_UNKNOWN_RECONCILE_REQUIRED";
+ else if(outcome.reason==="COMMIT_OUTCOME_UNKNOWN"||outcome.outcome==="IN_FLIGHT")
+  state="COMMIT_OUTCOME_UNKNOWN_RECONCILE_REQUIRED";
  else if(outcome.outcome==="NOT_COMMITTED")state="NOT_COMMITTED_FRESH_SIGNED_PAIR_REQUIRED";
  else if(outcome.outcome==="INCONSISTENT")state="RECONCILIATION_INCONSISTENT_HOLD";
  else state="DENIED";

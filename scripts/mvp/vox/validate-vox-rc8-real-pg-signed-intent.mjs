@@ -158,6 +158,9 @@ try{
  r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
  eq(r.reason,"EOD_SUBJECT_STAFF_REVOKED","EOD_MISSING_STAFF_AUTH_DENIED");
  await pool.query("UPDATE auth.users SET raw_app_meta_data='{\"qf_principal\":\"vox_staff\",\"vox_role\":\"operations_manager\"}' WHERE id=$1",[id(90)]);
+ // Re-run the hard-disabled production entry independently. The preceding
+ // negative result was an intentionally revoked subject, not a gate result.
+ r=await executeRc8PgPendingSignedIntentProduction(args());
  eq(r.reason,"NATIVE_RELEASE_GATE_CLOSED","PRODUCTION_BLOCK");
  r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
  eq(r.ok,true,"NATIVE_REAL_PG_COMMIT");eq(r.approved,false,"NEVER_APPROVED");

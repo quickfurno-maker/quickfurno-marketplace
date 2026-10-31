@@ -122,6 +122,16 @@ try{
  const args=(req=request())=>({acquireClient:()=>pool.connect(),request:req,
   ownerAuth,teamLeaderAuth,now,approvedRegistryFingerprints:[fingerprint]});
  eq(RC8_APPROVAL_WRITER_INSTALLED,false,"SOURCE_PRODUCTION_GATE");
+ // A caller cannot manufacture approval by substituting four unrelated true
+ // values or adding an unreviewed fifth release condition.
+ const wrongGate={...TEST_ONLY_GATE};
+ delete wrongGate.managedRestoreCertified;
+ wrongGate.unreviewedReady=true;
+ let deniedGate=await executeRc8PgPendingSignedIntent(args(),wrongGate);
+ eq(deniedGate.reason,"NATIVE_RELEASE_GATE_CLOSED","WRONG_APPROVAL_KEYS_DENIED");
+ deniedGate=await executeRc8PgPendingSignedIntent(args(),
+  {...TEST_ONLY_GATE,unreviewedReady:true});
+ eq(deniedGate.reason,"NATIVE_RELEASE_GATE_CLOSED","EXTRA_APPROVAL_KEY_DENIED");
  // Invalid/mixed command domains must be denied before opening a database
  // transaction, even if a caller supplies syntactically signed envelopes.
  const forNonEod={...request(),type:"CORE_OPERATOR_ACTION"};

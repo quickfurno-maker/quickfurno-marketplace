@@ -36,7 +36,9 @@ test("human Team Leader verification checks real Auth and current team scope, no
 });
 test("Finance attention indicator uses only bounded Core status and cannot send money",()=>{
  const ui=read("apps/vox-web/app/finance/page.tsx");
- assert.match(ui,/const attention=result\.orders\.reduce/);
+ assert.match(ui,/const monthScoped=result\.orders\.filter/);
+ assert.match(ui,/indiaOrderMonth\(o\.createdAt\)===selectedMonth/);
+ assert.match(ui,/const attention=monthScoped\.reduce/);
  assert.match(ui,/\["pending","failed"\]\.includes/);
  assert.match(ui,/reconciliation needs separate verified provider evidence/);
  assert.match(ui,/Filters apply only to the bounded Core preview/);

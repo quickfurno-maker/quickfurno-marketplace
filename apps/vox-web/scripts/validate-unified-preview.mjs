@@ -16,8 +16,15 @@ const csp=source("next.config.ts");
 
 check("root design preview requires explicit development and local-only flag",
   ()=>assert.match(home,/NODE_ENV==="development" && process\.env\.VOX_DEMO_PREVIEW==="local-only"/));
-check("root production homepage remains locked",
-  ()=>assert.match(home,/return isLocalPreview \? <LocalPreview\/> : <Locked\/>/));
+check("root keeps production locked and permits only verified staging MFA redirect",
+  ()=>{
+    assert.match(home,/if\(isLocalPreview\)return <LocalPreview\/>/);
+    assert.match(home,/if\(process\.env\.VOX_STAFF_PORTAL_ENABLED==="staging"\)\{/);
+    assert.match(home,/await verifiedMfaSession\(\)/);
+    assert.match(home,/if\(accessToken\)redirect\("\/operations"\)/);
+    assert.match(home,/return <Locked\/>/);
+    assert.doesNotMatch(home,/service_role|adminClient\(/);
+  });
 check("no Core or Auth HTTP reads in demonstration homepage",
   ()=>assert.doesNotMatch(home,/\bfetch\s*\(|createClient|service_role|NEXT_PUBLIC_/));
 check("no fake verified metrics or Staff counts",

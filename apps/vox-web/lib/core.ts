@@ -928,3 +928,48 @@ export async function fetchStaffWorkQueuePreview(){
    completeness:"BOUNDED_NOT_TOTAL" as const} as const;
  }catch{return {ok:false,status:503,error:"CORE_QUEUE_UNAVAILABLE"} as const;}
 }
+
+/** Owner AAL2 read-only preview of quarantined refund intake events. Core
+ * independently re-verifies Owner AAL2 and its own feature gates. Provider
+ * payment/order IDs are dropped here: the Web page only needs status. */
+export async function fetchOwnerRefundIntakePreview(){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_FINANCE_READ_UI_ENABLED!=="staging"||
+    process.env.VOX_FINANCE_REFUND_REVIEW_PREVIEW_UI_ENABLED!=="staging")
+  return {ok:false,status:503,error:"REFUND_REVIEW_UI_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const r=await fetch(base+"/api/vox/v1/finance/refund-intake",{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!r.ok)return r.status===401
+   ?{ok:false,status:401,error:"MFA_REQUIRED"} as const
+   :{ok:false,status:r.status===403?403:503,error:"CORE_REFUND_REVIEW_UNAVAILABLE"} as const;
+  const payload:unknown=await r.json();
+  if(!payload||typeof payload!=="object"||Array.isArray(payload))
+   return {ok:false,status:503,error:"UNTRUSTED_REFUND_RESPONSE"} as const;
+  const v=payload as Record<string,unknown>;
+  if(v.ok!==true||v.schema!=="qf.vox.finance.refund-intake-preview.v1"||
+     v.mode!=="READ_ONLY"||v.canReview!==false||v.canRefund!==false||
+     v.canRevokeCredits!==false||v.isCompleteHistory!==false||
+     !Array.isArray(v.events)||v.events.length>20||v.previewCount!==v.events.length)
+   return {ok:false,status:503,error:"UNTRUSTED_REFUND_RESPONSE"} as const;
+  const events=[] as Array<{eventRef:string;providerMode:"test"|"live";
+   eventType:"refund.created"|"refund.processed"|"refund.failed"}>;
+  for(const raw of v.events){
+   if(!raw||typeof raw!=="object"||Array.isArray(raw))
+    return {ok:false,status:503,error:"UNTRUSTED_REFUND_RESPONSE"} as const;
+   const e=raw as Record<string,unknown>;
+   if(typeof e.eventId!=="string"||!/^[A-Za-z0-9_-]{8,64}$/.test(e.eventId)||
+      !["test","live"].includes(String(e.providerMode))||
+      !["refund.created","refund.processed","refund.failed"].includes(String(e.eventType)))
+    return {ok:false,status:503,error:"UNTRUSTED_REFUND_RESPONSE"} as const;
+   events.push({eventRef:e.eventId.slice(0,8),providerMode:e.providerMode as "test"|"live",
+    eventType:e.eventType as "refund.created"|"refund.processed"|"refund.failed"});
+  }
+  return {ok:true,status:200,events,mode:"READ_ONLY" as const,
+   isCompleteHistory:false as const} as const;
+ }catch{return {ok:false,status:503,error:"REFUND_REVIEW_UNAVAILABLE"} as const;}
+}

@@ -2,6 +2,7 @@
 import {useRef,useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
+import {withReturn} from "../../../lib/returnTo.mjs";
 
 const actions=["CLAIM","START","WAIT_EXTERNAL","REQUEST_APPROVAL","BLOCK","RESUME","COMPLETE"] as const;
 type WorkAction=typeof actions[number];
@@ -73,6 +74,6 @@ export default function WorkActionControl({itemId,revision,state,assignedToMe}:P
   </>:null}
   <button type="submit" disabled={!valid}>{busy?"Core checking…":"Request Core transition"}</button>
   {message?<p role="status" className="voxQueueCaution">{message}</p>:null}
-  {expired?<Link href="/login">Staff sign-in</Link>:null}
+  {expired?<Link href={withReturn("/login","/team/work-queue")}>Staff sign-in</Link>:null}
  </form>;
 }

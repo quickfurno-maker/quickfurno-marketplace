@@ -59,7 +59,7 @@ export default async function Finance({searchParams}:FinanceProps){
   <div className="voxHero"><p className="kicker">PAYMENT RECORDS / GOVERNED</p>
    <h1>Financial visibility.<br/><span>Without payment authority.</span></h1>
    <p>A bounded preview of Core package orders. Recorded payment status is not independent confirmation of settlement, refund, credit issuance or reconciliation.</p>
-   <nav aria-label="VOX staff workspaces"><Link href="/operations" style={{color:"#9decc8"}}>Mission Control</Link> · <Link href="/vendor360" style={{color:"#9decc8"}}>Vendor 360</Link> · <Link href="/approvals" style={{color:"#9decc8"}}>Owner Approvals</Link></nav>
+   <nav aria-label="VOX staff workspaces"><Link href="/operations" style={{color:"#9decc8"}}>Mission Control</Link> · <Link href="/vendor360" style={{color:"#9decc8"}}>Vendor 360</Link> · <Link href="/approvals" style={{color:"#9decc8"}}>Owner Approvals</Link>{process.env.VOX_FINANCE_REFUND_REVIEW_PREVIEW_UI_ENABLED==="staging"?<> · <Link href="/finance/refund-review" style={{color:"#9decc8"}}>Refund intake status</Link></>:null}</nav>
   </div>
   <div className="voxSectionTitle"><p className="kicker">RECENT CORE RECORDS</p><h2>Order preview</h2>
    <p>{attention===0?"No pending or failed statuses in the returned snapshot.":

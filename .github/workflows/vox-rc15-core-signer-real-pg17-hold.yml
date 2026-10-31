@@ -57,7 +57,8 @@ jobs:
           fi
       - name: Release HOLD
         if: always()
-        run: echo 'CORE: synthetic local PG17 only, original managed AB7B blocked, release HOLD' >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo 'CORE: synthetic local PG17 only, original managed AB7B blocked, release HOLD' >> "$GITHUB_STEP_SUMMARY"
   two-signer-transaction:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -97,4 +98,5 @@ jobs:
           fi
       - name: Release HOLD
         if: always()
-        run: echo 'SIGNER: local synthetic Owner/TL keys only, no actual official EOD approval; release HOLD' >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo 'SIGNER: local synthetic Owner/TL keys only, no actual official EOD approval; release HOLD' >> "$GITHUB_STEP_SUMMARY"

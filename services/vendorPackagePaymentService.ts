@@ -1,7 +1,9 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { inspectRazorpayActivationReceipt, inspectRazorpayFailureReceipt } from "../lib/payments/vendorPackagePaymentReceipts.mjs";
 import { classifyVendorPackageWebhookEvent } from "../lib/payments/vendorPackageWebhookBoundary.mjs";
-import { resolveVendorPackageEventLedgerGate } from "../lib/payments/vendorPackageProviderEventProcessing.mjs";
+import { processVendorPackageProviderEvent, resolveVendorPackageEventLedgerGate } from "../lib/payments/vendorPackageProviderEventProcessing.mjs";
+import { buildRazorpayProviderEventEnvelope } from "../lib/payments/vendorPackageProviderEventLedger.mjs";
+import { RC28_PROVIDER_LEDGER_RUNTIME_INSTALLED, createRc28VendorPackageEventRepository } from "../lib/payments/vendorPackageProviderEventRepository.mjs";
 import { inspectRazorpayOrderClaim, isDefiniteRazorpayOrderRejection, storedRazorpayCheckoutLifecycleError, storedRazorpayOrderModeError } from "../lib/payments/vendorPackageOrderGuards.mjs";
 import { adminClient } from "../lib/supabase";
 import { AppError, fail, ok, type Result } from "../lib/errors";
@@ -462,6 +464,7 @@ async function markPaymentFailed(
 export async function handleVendorPackageRazorpayWebhook(
   rawBody: string,
   signature: string,
+  providerEventId?: string,
 ): Promise<Result<{ status: string }>> {
   try {
     const cfg = config();
@@ -487,37 +490,62 @@ export async function handleVendorPackageRazorpayWebhook(
     if (candidate.kind === "invalid") {
       throw paymentError("RAZORPAY_WEBHOOK_IDENTITY_INVALID", "The signed webhook has inconsistent payment identity.");
     }
-    // RC27 hard-OFF: no durable provider-event repository is wired, so only
-    // TEST + ledger off keeps the legacy path; anything else fails closed
-    // before order lookup, provider GET or Core RPC.
+    // The same verified provider/Core operation is used by legacy TEST mode
+    // and by the durable ledger after explicit release authorization. Only
+    // the ledger may acknowledge a replay or quarantine without rerunning it.
+    const processSignedCandidate = async (): Promise<string> => {
+      const order = await loadOrderByProviderOrderId(candidate.providerOrderId);
+      assertOrderMode(order, cfg);
+      if (candidate.kind === "captured") {
+        const canonicalPayment = await razorpayFetch<RazorpayPaymentEntity>(
+          cfg, "/payments/" + encodeURIComponent(candidate.paymentId),
+        );
+        const activation = await activateCapturedPayment(order, canonicalPayment, cfg);
+        return activation === "already_applied" ? "already_activated" : "activated";
+      }
+      const recorded = await markPaymentFailed(order, candidate.paymentId, cfg);
+      return recorded === "marked_failed" ? "failed_recorded" : "failure_ignored";
+    };
+
+    // This branch is implemented for approved deployment, but the source
+    // constant remains FALSE. Config alone cannot activate financial writes.
+    // Event-id provenance, SQL grants, human review and managed restore are
+    // mandatory before any future switch to the durable repository.
     const ledgerGate = resolveVendorPackageEventLedgerGate({
       providerMode: cfg.mode,
       ledgerModeValue: process.env.RAZORPAY_VENDOR_PACKAGE_EVENT_LEDGER_MODE,
+      repository: RC28_PROVIDER_LEDGER_RUNTIME_INSTALLED
+        ? createRc28VendorPackageEventRepository(async (name, args) => await adminClient().rpc(name, args))
+        : undefined,
     });
-    if (ledgerGate.action !== "legacy") {
-      throw paymentError(
-        ledgerGate.action === "deny" ? ledgerGate.code : "RAZORPAY_EVENT_LEDGER_REPOSITORY_UNAVAILABLE",
-        "The provider-event ledger is not available for this webhook.",
-      );
+    if (ledgerGate.action === "deny") {
+      throw paymentError(ledgerGate.code, "The provider-event ledger is not available for this webhook.");
     }
-    const order = await loadOrderByProviderOrderId(candidate.providerOrderId);
-    assertOrderMode(order, cfg);
-
-    if (candidate.kind === "captured") {
-      const canonicalPayment = await razorpayFetch<RazorpayPaymentEntity>(
-        cfg,
-        "/payments/" + encodeURIComponent(candidate.paymentId),
-      );
-      const activation = await activateCapturedPayment(order, canonicalPayment, cfg);
-      return ok({ status: activation === "already_applied" ? "already_activated" : "activated" });
+    if (ledgerGate.action === "ledger") {
+      const envelope = buildRazorpayProviderEventEnvelope({
+        eventId: providerEventId ?? null,
+        bodySha256: createHash("sha256").update(rawBody, "utf8").digest("hex"),
+        providerMode: cfg.mode,
+        candidate,
+      });
+      if (!envelope.ok) {
+        throw paymentError(envelope.reason, "Provider event identity cannot be verified.");
+      }
+      const processed = await processVendorPackageProviderEvent({
+        envelope, repository: ledgerGate.repository, handle: processSignedCandidate,
+      });
+      // A non-acknowledged outcome always yields non-2xx at the HTTP route,
+      // including an uncertain PostgreSQL completion after Core activation.
+      if (!processed.ack) {
+        throw paymentError(processed.code ?? "PROVIDER_EVENT_COMPLETION_UNCONFIRMED",
+          "Provider event needs controlled retry or reconciliation.");
+      }
+      return ok({ status: processed.status });
     }
 
-    if (candidate.kind === "failed") {
-      const recorded = await markPaymentFailed(order, candidate.paymentId, cfg);
-      return ok({ status: recorded === "marked_failed" ? "failed_recorded" : "failure_ignored" });
-    }
-
-    return ok({ status: "ignored" });
+    // Legacy behaviour remains confined to TEST mode with ledger explicitly
+    // OFF. LIVE cannot reach this path (resolveVendorPackageEventLedgerGate).
+    return ok({ status: await processSignedCandidate() });
   } catch (error) {
     return fail(error);
   }

@@ -32,7 +32,9 @@ export default async function Operations(){
  if(!result.ok)return <main className="hold"><section className="holdCard">
   <p className="kicker">VOX / ACCESS GATE</p><h1>Operations unavailable</h1>
   <p>{result.status===401?"Staff session or MFA is required.":"Core connection is not yet certified or enabled."}</p>
-  <a href="/login">Staff sign-in</a></section></main>;
+  {result.status===401?<Link href="/login">Staff sign-in</Link>:
+    <p role="status">Access remains protected; retry after Core connectivity or authorization is restored.</p>}
+  </section></main>;
  const views=[{name:"Aarohi Acquisition",kicker:"PROSPECT PIPELINE",rows:result.view.prospectPreview as RecordValue[],kind:"acquisition" as const},
   {name:"Vendor 360",kicker:"VENDOR RELATIONSHIPS",rows:result.view.vendorCrmPreview as RecordValue[],kind:"crm" as const},
   {name:"Service Cases",kicker:"SUPPORT BACKLOG",rows:result.view.supportPreview as RecordValue[],kind:"support" as const},

@@ -11,7 +11,11 @@ export default async function Vendor360(){
  const r=await fetchScopedCrm("vendor360");
  if(!r.ok||r.kind!=="vendor360")return <main className="hold"><section className="holdCard">
  <p className="kicker">STAFF CORE AUTHORIZATION</p><h1>Vendor 360 unavailable</h1>
- <p>Verified MFA and an explicit, current Core service-zone/vendor assignment are required.</p><Link href="/login">Staff sign-in</Link></section></main>;
+ <p>{r.status===401?"Verified Staff MFA is required.":r.status===403?
+ "Your current Staff assignment does not authorize this vendor workspace.":
+ "The protected Vendor 360 Core projection is currently unavailable. No vendor state was modified."}</p>
+ <Link href={r.status===401?"/login":"/operations"}>
+ {r.status===401?"Staff sign-in":"Back to Mission Control"}</Link></section></main>;
  const vendors=r.view.vendors.map(v=>({id:v.vendorId??"",title:v.businessName,
   detail:"Core verification "+v.verificationStatus+" · Google location "+v.locationVerification,
   state:v.status,attention:!v.active||v.verificationStatus.toLowerCase()!=="verified"}));

@@ -27,6 +27,7 @@ as $$
 declare
   v_order public.vendor_package_orders%rowtype;
   v_pkg public.packages%rowtype;
+  v_payment public.payments%rowtype;
   v_expected_amount bigint;
   v_expected_receipt text;
 begin
@@ -50,8 +51,24 @@ begin
 
   if v_order.provider_order_id is not null then
     if v_order.payment_provider is distinct from 'razorpay' or
-       v_order.provider_mode is distinct from p_provider_mode then
+       v_order.provider_mode is distinct from p_provider_mode or
+       v_order.payment_status not in ('pending','failed') or
+       v_order.provider_payment_id is not null then
       raise exception 'RAZORPAY_V2_BOUND_MODE_MISMATCH' using errcode='P0001';
+    end if;
+    -- Reusing a provider order without checking the financial ledger can
+    -- return a payable checkout for an already-captured/manual Paid row.
+    select * into v_payment from public.payments
+      where id=p_order_id for share;
+    if not found or
+       v_payment.vendor_id is distinct from v_order.vendor_id or
+       v_payment.package_id is distinct from v_order.package_id or
+       v_payment.amount is distinct from v_order.package_price or
+       v_payment.payment_method is distinct from 'razorpay' or
+       v_payment.payment_status is null or
+       v_payment.payment_status not in ('Pending','Failed') or
+       v_payment.transaction_id is not null then
+      raise exception 'RAZORPAY_V2_BOUND_LEDGER_UNVERIFIED' using errcode='P0001';
     end if;
     return jsonb_build_object('status','already_bound','provider_order_id',v_order.provider_order_id);
   end if;

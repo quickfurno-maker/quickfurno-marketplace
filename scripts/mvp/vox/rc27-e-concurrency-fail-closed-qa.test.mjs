@@ -48,9 +48,18 @@ test("EOD signed-intent writer locks revocations BEFORE its SERIALIZABLE snapsho
  assert.match(src,/signer_revocations_candidate_v1 IN SHARE MODE"\);/);
 });
 
-test("Core D2-D: snapshot taken before destination lock => writer and gate MUST stay OFF",()=>{
+test("Core D2-D: session lock precedes SERIALIZABLE snapshot; writer gate stays OFF",()=>{
  const src=read("services/vox/rc8PgVendorConversationOperator.ts");
  const q=serializableQueries(src);
+ // The RC27 source must hold the D2-D session key before the snapshot, even
+ // though the inner SERIALIZABLE transaction also takes an xact-level lock.
+ const sessionLock=src.indexOf("await db.query(destinationSessionLock,[hash])");
+ const snapshot=src.indexOf('await db.query("BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE")');
+ const unlock=src.indexOf("await db.query(destinationSessionUnlock,[lockHash])");
+ assert.ok(sessionLock>0&&snapshot>sessionLock&&unlock>snapshot,
+  "destination lock must bracket the SERIALIZABLE snapshot, then unlock");
+ assert.match(src,/RC8_CORE_WRITER_INSTALLED=false as const/);
+ assert.match(src,/allConsentMutationPathsSerialized:false/);
  const lockAt=q.findIndex(s=>/pg_advisory_xact_lock|^LOCK TABLE/.test(s));
  const snapshotBeforeLock=lockAt<0||q.slice(0,lockAt).some(takesSnapshot)||
   /^SELECT pg_advisory_xact_lock/.test(q[lockAt]);

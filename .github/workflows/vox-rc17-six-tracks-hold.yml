@@ -116,6 +116,17 @@ jobs:
           set -euo pipefail
           node scripts/mvp/vox/validate-vox-rc21-legacy-v1-parser-pg17.mjs | tee "${RUNNER_TEMP}/rc21-legacy-v1.log"
           grep -Fq 'VOX_RC21_LEGACY_V1_PG17_PARSER_BLOCKERS_CONFIRMED' "${RUNNER_TEMP}/rc21-legacy-v1.log"
+      - name: Prove RC27 Core consent STOP race on real isolated PG17
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/mvp/vox/validate-vox-rc8-real-pg-vendor-core.mjs | tee "${RUNNER_TEMP}/rc27-core-pg17.log"
+          grep -Fq 'VOX_RC27_REAL_PG17_CORE_CONSENT_SNAPSHOT_RACE_PASS' "${RUNNER_TEMP}/rc27-core-pg17.log"
+      - name: Prove RC27 multi-path consent race with real PG17
+        shell: bash
+        run: |
+          set -euo pipefail
+          RC27_NATIVE_PG17=1 node --test scripts/mvp/vox/rc27-e-concurrency-fail-closed-qa.test.mjs
       - name: No abandoned database
         if: always()
         shell: bash

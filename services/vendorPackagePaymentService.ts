@@ -375,7 +375,22 @@ async function activateCapturedPayment(
   if (lifecycle) {
     throw paymentError(lifecycle, "Order lifecycle does not permit activation. Reconcile it independently.");
   }
-  const amount = Number(order.provider_amount_subunits ?? inrToSubunits(order.package_price));
+  // The stored provider amount must exist and equal the package snapshot price.
+  // Never fall back to the price when it is missing, and never trust a drifted
+  // stored amount as the expected capture amount (SQL re-checks under lock).
+  let snapshotAmount: number;
+  try {
+    snapshotAmount = inrToSubunits(order.package_price);
+  } catch {
+    throw paymentError("PACKAGE_ORDER_SNAPSHOT_INVALID", "Package order price snapshot is invalid.");
+  }
+  if (order.provider_amount_subunits === null || order.provider_amount_subunits === undefined) {
+    throw paymentError("PACKAGE_ORDER_NOT_BOUND", "The saved payment amount is not verified.");
+  }
+  const amount = Number(order.provider_amount_subunits);
+  if (amount !== snapshotAmount) {
+    throw paymentError("PACKAGE_ORDER_AMOUNT_DRIFT", "Stored payment amount does not match the package snapshot.");
+  }
   assertCapturedPayment(payment, {
     paymentId: payment.id,
     providerOrderId: order.provider_order_id,
@@ -389,6 +404,9 @@ async function activateCapturedPayment(
   assertOrderMode(fresh, cfg);
   if (fresh.provider_order_id !== order.provider_order_id || fresh.payment_provider !== order.payment_provider) {
     throw paymentError("PACKAGE_ORDER_NOT_BOUND", "Package order binding changed during payment verification.");
+  }
+  if (Number(fresh.provider_amount_subunits) !== amount || Number(fresh.package_price) !== Number(order.package_price)) {
+    throw paymentError("PACKAGE_ORDER_AMOUNT_DRIFT", "Stored payment amount changed during payment verification.");
   }
   if (fresh.provider_payment_id && fresh.provider_payment_id !== payment.id) {
     throw paymentError("PACKAGE_ORDER_PAYMENT_ID_DRIFT", "A different captured payment is already bound to the order.");

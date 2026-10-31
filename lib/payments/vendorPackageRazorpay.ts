@@ -40,11 +40,18 @@ export function requireSecret(name: string, value: string | undefined): string {
 }
 
 export function inrToSubunits(value: unknown): number {
-  const amount = Number(value);
-  if (!Number.isFinite(amount) || amount <= 0) throw new Error("PACKAGE_PRICE_INVALID");
-  const subunits = Math.round(amount * 100);
-  if (!Number.isSafeInteger(subunits) || subunits <= 0) throw new Error("PACKAGE_PRICE_INVALID");
-  return subunits;
+  // The database stores NUMERIC and calculates exact paise. Parse the decimal
+  // representation as integers, never via binary float arithmetic or a
+  // magnitude-dependent tolerance that could accept sub-paise amounts.
+  const raw = typeof value === "string" ? value.trim()
+    : typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+  const parts = /^(\d+)(?:\.(\d+))?$/.exec(raw);
+  if (!parts) throw new Error("PACKAGE_PRICE_INVALID");
+  const fractional = (parts[2] ?? "").replace(/0+$/, "");
+  if (fractional.length > 2) throw new Error("PACKAGE_PRICE_INVALID");
+  const paise = BigInt(parts[1]) * 100n + BigInt(fractional.padEnd(2, "0") || "0");
+  if (paise <= 0n || paise > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("PACKAGE_PRICE_INVALID");
+  return Number(paise);
 }
 
 export function packageOrderReceipt(orderId: string): string {

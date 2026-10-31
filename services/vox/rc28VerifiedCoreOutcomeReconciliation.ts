@@ -37,8 +37,20 @@ export async function reconcileRc28VerifiedCoreCommand(
   return unknown("RC28_CURRENT_STAFF_AAL2_REQUIRED");
  // RC26 rechecks the exact native nonce, receipt and event with a row lock,
  // then always ROLLBACKs; it never trusts a caller-supplied actor.
- return reconcileRc8CoreCommitOutcome({
+ const outcome=await reconcileRc8CoreCommitOutcome({
   conversationId:request.conversationId,nonce:request.nonce,
   action:request.action,expectedRevision:request.expectedRevision,actorId:actor.userId
  },acquireClient);
+ // PostgreSQL FOR SHARE may wait for an in-flight writer. Re-read genuine
+ // Staff Auth/membership/team/city after that wait; a revoked principal
+ // cannot receive a positive committed/noncommitted Core receipt.
+ if(outcome.outcome==="UNKNOWN")return outcome;
+ let current:Awaited<ReturnType<typeof verifyVoxOperationsStaffBearer>>;
+ try{current=await verifyVoxOperationsStaffBearer(authorization)}
+ catch{return unknown("RC28_STAFF_RECHECK_UNAVAILABLE")}
+ if(!current||current.aal!=="aal2"||current.userId!==actor.userId||
+    current.teamId!==actor.teamId||current.cityId!==actor.cityId||
+    current.expiresAtMs<=Date.now())
+  return unknown("RC28_STAFF_REVOKED_DURING_RECONCILIATION");
+ return outcome;
 }

@@ -17,7 +17,7 @@ await build({entryPoints:[resolve(root,"services/vox/rc28VerifiedCoreOutcomeReco
  b.onResolve({filter:/^\.\/rc26CoreCommitReconciliation$/},()=>({path:"receipt",namespace:"mock"}));
  b.onLoad({filter:/.*/,namespace:"mock"},args=>{
   const contents=args.path==="auth"?
-   "export async function verifyVoxOperationsStaffBearer(a){globalThis.__rc28AuthCalls.push(a);return globalThis.__rc28Actor}":
+   "export async function verifyVoxOperationsStaffBearer(a){globalThis.__rc28AuthCalls.push(a);return globalThis.__rc28AuthCalls.length===2&&globalThis.__rc28NextActor!==undefined?globalThis.__rc28NextActor:globalThis.__rc28Actor}":
    args.path==="receipt"?
    "export async function reconcileRc8CoreCommitOutcome(command,acquire){globalThis.__rc28ReceiptCalls.push({command,acquire});return Object.freeze({outcome:'COMMITTED',reason:'RECEIPT_AND_EVENT_DURABLE',requiresReconciliation:false,mutationsApplied:0,providerMessagesSent:0})}":
    "";
@@ -31,7 +31,8 @@ const id=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 const cmd=()=>({conversationId:id(1),nonce:id(2),action:"TAKEOVER",expectedRevision:0});
 const db=async()=>{throw Error("NO_DB_CALL_EXPECTED")};
 test.beforeEach(()=>{globalThis.__rc28Actor={userId:id(3),aal:"aal2",expiresAtMs:Date.now()+60000,
- teamId:id(4),cityId:id(5)};globalThis.__rc28AuthCalls=[];globalThis.__rc28ReceiptCalls=[]});
+ teamId:id(4),cityId:id(5)};globalThis.__rc28AuthCalls=[];globalThis.__rc28ReceiptCalls=[];
+ globalThis.__rc28NextActor=undefined});
 test("reviewed route release gate remains false",()=>assert.equal(off,false));
 test("invalid payload or extra actor/source fields never call auth or DB",async()=>{
  for(const x of [{...cmd(),actorId:id(8)},{...cmd(),sourceProof:"real"},
@@ -53,7 +54,7 @@ test("verified Staff userId exclusively binds immutable native receipt reconcili
  const request=cmd();
  const result=await run("Bearer synthetic",request,db);
  assert.equal(result.outcome,"COMMITTED");
- assert.deepEqual(globalThis.__rc28AuthCalls,["Bearer synthetic"]);
+ assert.deepEqual(globalThis.__rc28AuthCalls,["Bearer synthetic","Bearer synthetic"]);
  assert.equal(globalThis.__rc28ReceiptCalls.length,1);
  const actual=globalThis.__rc28ReceiptCalls[0].command;
  assert.deepEqual(actual,{...request,actorId:id(3)});
@@ -63,4 +64,24 @@ test("no provider, HTTP, grant, or DB connection is opened by the adapter",()=>{
  assert.doesNotMatch(source,/fetch\(|\.rpc\(|\.send\(|process\.env/);
  assert.match(source,/reconcileRc8CoreCommitOutcome\(/);
  assert.match(source,/verifyVoxOperationsStaffBearer\(authorization\)/);
+});
+
+test("Core receipt review rechecks real Staff identity after database wait",async()=>{
+ globalThis.__rc28NextActor=null;
+ const denied=await run("Bearer synthetic",cmd(),db);
+ assert.equal(denied.outcome,"UNKNOWN");
+ assert.equal(denied.reason,"RC28_STAFF_REVOKED_DURING_RECONCILIATION");
+ assert.equal(denied.requiresReconciliation,true);
+ assert.equal(denied.mutationsApplied,0);
+ assert.deepEqual(globalThis.__rc28AuthCalls,["Bearer synthetic","Bearer synthetic"]);
+});
+test("Core receipt review denies team or city drift after initial AAL2",async()=>{
+ for(const drift of [{teamId:id(9)},{cityId:id(8)},
+  {expiresAtMs:Date.now()-1},{userId:id(7)}]){
+  globalThis.__rc28AuthCalls=[];
+  globalThis.__rc28NextActor={...globalThis.__rc28Actor,...drift};
+  const denied=await run("Bearer synthetic",cmd(),db);
+  assert.equal(denied.outcome,"UNKNOWN");
+  assert.equal(denied.reason,"RC28_STAFF_REVOKED_DURING_RECONCILIATION");
+ }
 });

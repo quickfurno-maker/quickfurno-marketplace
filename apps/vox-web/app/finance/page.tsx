@@ -23,10 +23,18 @@ export default async function Finance({searchParams}:FinanceProps){
  const selected:FinanceState=STATES.includes(requested as FinanceState)
   ?requested as FinanceState:"all";
  const result=await fetchOwnerFinancePreview();
- if(!result.ok)return <main className="hold"><section className="holdCard">
-  <p className="kicker">VOX / FINANCE ACCESS</p><h1>Finance preview unavailable</h1>
-  <p>Verified Owner MFA, an authorized Core order read, and separately reviewed Staging feature gates are required.</p>
-  <Link href="/login">Owner sign-in</Link></section></main>;
+ if(!result.ok){
+  const needsLogin=result.error==="MFA_REQUIRED";
+  return <main className="hold"><section className="holdCard">
+   <p className="kicker">VOX / FINANCE ACCESS</p>
+   <h1>{needsLogin?"Verified Owner session required":"Finance preview unavailable"}</h1>
+   <p>{needsLogin
+    ?"Sign in with verified Owner MFA to view your authorized, read-only financial records."
+    :"The protected Core read or reviewed Staging feature is not available. No payment actions can be performed from this screen."}</p>
+   <Link href={needsLogin?"/login":"/operations"}>
+    {needsLogin?"Owner sign-in":"Back to Mission Control"}
+   </Link></section></main>;
+ }
  const months=[...new Set(result.orders.map(o=>indiaOrderMonth(o.createdAt)))].filter(
   (m):m is string=>typeof m==="string").sort().reverse().slice(0,12);
  const selectedMonth=selectBoundedFinanceMonth(params.month,months);

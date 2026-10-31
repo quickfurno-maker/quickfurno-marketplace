@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { inspectRazorpayActivationReceipt, inspectRazorpayFailureReceipt } from "../lib/payments/vendorPackagePaymentReceipts.mjs";
 import { classifyVendorPackageWebhookEvent } from "../lib/payments/vendorPackageWebhookBoundary.mjs";
+import { resolveVendorPackageEventLedgerGate } from "../lib/payments/vendorPackageProviderEventProcessing.mjs";
 import { inspectRazorpayOrderClaim, isDefiniteRazorpayOrderRejection, storedRazorpayCheckoutLifecycleError, storedRazorpayOrderModeError } from "../lib/payments/vendorPackageOrderGuards.mjs";
 import { adminClient } from "../lib/supabase";
 import { AppError, fail, ok, type Result } from "../lib/errors";
@@ -485,6 +486,19 @@ export async function handleVendorPackageRazorpayWebhook(
     if (candidate.kind === "ignored") return ok({ status: "ignored" });
     if (candidate.kind === "invalid") {
       throw paymentError("RAZORPAY_WEBHOOK_IDENTITY_INVALID", "The signed webhook has inconsistent payment identity.");
+    }
+    // RC27 hard-OFF: no durable provider-event repository is wired, so only
+    // TEST + ledger off keeps the legacy path; anything else fails closed
+    // before order lookup, provider GET or Core RPC.
+    const ledgerGate = resolveVendorPackageEventLedgerGate({
+      providerMode: cfg.mode,
+      ledgerModeValue: process.env.RAZORPAY_VENDOR_PACKAGE_EVENT_LEDGER_MODE,
+    });
+    if (ledgerGate.action !== "legacy") {
+      throw paymentError(
+        ledgerGate.action === "deny" ? ledgerGate.code : "RAZORPAY_EVENT_LEDGER_REPOSITORY_UNAVAILABLE",
+        "The provider-event ledger is not available for this webhook.",
+      );
     }
     const order = await loadOrderByProviderOrderId(candidate.providerOrderId);
     assertOrderMode(order, cfg);

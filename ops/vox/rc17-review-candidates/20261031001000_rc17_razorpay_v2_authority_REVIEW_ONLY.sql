@@ -137,8 +137,12 @@ begin
    where id = p_order_id
      and provider_order_id is null
      and provider_order_request_token = p_request_token
-      and payment_provider='razorpay' and provider_mode=p_provider_mode
-     and activation_status <> 'activated';
+     and payment_provider='razorpay' and provider_mode=p_provider_mode
+     -- A provider HTTP rejection must not reset a concurrently cancelled,
+     -- expired, refunded, paid or otherwise inconsistent package order.
+     and order_status='created'
+     and activation_status='not_activated'
+     and payment_status='pending';
   if not found then raise exception 'RAZORPAY_V2_CLAIM_RELEASE_DENIED' using errcode='P0001'; end if;
 end;
 $$;
@@ -258,7 +262,8 @@ begin
      or v_payment.amount is distinct from v_order.package_price
      or v_payment.payment_method is distinct from 'razorpay'
      or v_payment.payment_status is null
-     or v_payment.payment_status not in ('Pending', 'Failed') then
+     or v_payment.payment_status not in ('Pending', 'Failed')
+     or v_payment.transaction_id is not null then
     raise exception 'PAYMENT_BIND_DRIFT' using errcode = 'P0001';
   end if;
 

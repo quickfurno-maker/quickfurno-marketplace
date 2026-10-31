@@ -186,6 +186,16 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
    await client.query("ROLLBACK");settled=true;
    return deny("SIGNED_EOD_IDENTITY_OR_ENVELOPE_EXPIRED_DURING_TRANSACTION");
   }
+  // The signature may remain valid beyond an actual enrolled key's TTL.
+  // Recheck the pinned, locked registry at the commit boundary.
+  // Math.max supports deterministic disposable-fixture time advancement.
+  const keyCommitTime=Math.max(now,atCommit);
+  if(registry.length!==2||registry.some(k=>
+     !Number.isSafeInteger(k.notBeforeMs)||!Number.isSafeInteger(k.notAfterMs)||
+     keyCommitTime<k.notBeforeMs||keyCommitTime>=k.notAfterMs)){
+   await client.query("ROLLBACK");settled=true;
+   return deny("SIGNED_EOD_SIGNER_KEY_EXPIRED_DURING_TRANSACTION");
+  }
   // Memberships locked above cannot be concurrently changed, but their
   // TTLs advance during long transactions. Check actual PostgreSQL time,
   // not caller-provided membership expiry, immediately before COMMIT.

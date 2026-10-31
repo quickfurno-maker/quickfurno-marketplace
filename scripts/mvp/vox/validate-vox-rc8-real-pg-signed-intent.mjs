@@ -30,7 +30,7 @@ function signer(keyId,signerId,role){
  return {pair,entry:{keyId,signerId,signerRole:role,
   publicKeyPem:pair.publicKey.export({type:"spki",format:"pem"}),
   publicKeyFingerprint:createHash("sha256").update(pair.publicKey.export({type:"spki",format:"der"})).digest("hex"),
-  notBeforeMs:now-60000,notAfterMs:now+600000}};
+  notBeforeMs:now-60000,notAfterMs:now+420000}};
 }
 const owner=signer("owner-rc8",OWNER,"OWNER"),leader=signer("tl-rc8",TL,"TEAM_LEADER");
 const registry=[owner.entry,leader.entry],fingerprint=rc4RegistryFingerprint(registry);
@@ -49,7 +49,7 @@ function envelope(s,num){
  signerRole:s.entry.signerRole,signerId:s.entry.signerId,
  ownerId:OWNER,teamLeaderId:TL,subjectId:SUB,digest:DIGEST,
  targetHash:rc4ScopeTargetHash({type:TYPE,subjectId:SUB,teamId:TEAM,cityId:CITY}),
- nonce:id(num),issuedAtMs:now-1000,expiresAtMs:now+300000};
+ nonce:id(num),issuedAtMs:now-1000,expiresAtMs:now+540000};
  return {payload,signature:sign(null,canonicalAb7kApprovalBytes(payload),
   s.pair.privateKey).toString("base64url")};
 }
@@ -186,6 +186,18 @@ try{
  const rolledIntents=await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_verified_intents_candidate_v1");
  eq(Number(rolledClaims.rows[0].n),0,"EXPIRED_EOD_NO_NONCE_CLAIMS");
  eq(Number(rolledIntents.rows[0].n),0,"EXPIRED_EOD_NO_RECEIPT");
+ // The envelope is still valid, and both MFA sessions are fresh, but both
+ // pinned human key records have passed their notAfter bound mid-transaction.
+ try{
+  Date.now=()=>now+450000;
+  r=await executeRc8PgPendingSignedIntent(args(request(33,34)),TEST_ONLY_GATE);
+ }finally{Date.now=wallNow;}
+ eq(r.reason,"SIGNED_EOD_SIGNER_KEY_EXPIRED_DURING_TRANSACTION",
+  "IN_FLIGHT_SIGNER_KEY_EXPIRED_DENIED");
+ eq(Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_approval_claims_candidate_v1")).rows[0].n),
+  0,"EXPIRED_KEY_NO_CLAIMS");
+ eq(Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_verified_intents_candidate_v1")).rows[0].n),
+  0,"EXPIRED_KEY_NO_INTENT");
  // Session and signatures remain unexpired, but an AAL2 verification becomes
  // older than the verifier's 15-minute limit during a long transaction.
  const lateOwner=auth(OWNER,{profileRole:"admin",aal2AtMs:now-14*60*1000});

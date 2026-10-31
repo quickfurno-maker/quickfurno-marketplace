@@ -13,7 +13,10 @@ check('sends existing nonce, not fresh per attempt',()=>assert.match(vendor,/non
 check('same-origin no-store private request',()=>assert.match(vendor,/credentials:"same-origin",cache:"no-store"/));
 check('does not reset nonce on unknown network outcome',()=>assert.doesNotMatch(vendor.slice(vendor.indexOf('}catch{'),vendor.indexOf('finally{')),/nonceRef\.current=null/));
 check('clears nonce on confirmed success',()=>assert.match(vendor,/nonceRef\.current=null;setTitle\(""/));
-check('resets nonce for every changed field',()=>assert.equal((vendor.match(/nonceRef\.current=null/g)||[]).length,6));
+check('resets nonce for five changed fields, confirmed success and explicit 409 conflict',()=>{
+ assert.ok((vendor.match(/nonceRef\.current=null/g)||[]).length>=7);
+ assert.match(vendor,/if\(r\.status===409\)\{[\s\S]*?nonceRef\.current=null;/);
+});
 check('disables input edits midflight',()=>assert.equal((vendor.match(/disabled=\{busy\}/g)||[]).length,5));
 check('does not send vendor-facing message',()=>assert.doesNotMatch(vendor,/sendWhatsApp|provider\.send|wallet\.credit/));
 check('SupportFollowup reuses a reserved nonce without React state lag',()=>assert.match(support,/nonceRef\.current\?\?crypto.randomUUID\(\)/));

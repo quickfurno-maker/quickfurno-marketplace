@@ -10,7 +10,20 @@ export const RC8_NATIVE_APPROVAL_GATE=Object.freeze({
  dedicatedWriterRoleReviewed:false,managedRestoreCertified:false});
 const deny=reason=>Object.freeze({ok:false,reason,committed:false,
  officialEodEnabled:false,approved:false,canAuthorize:false});
-const gateOK=g=>g&&Object.values(g).length===4&&Object.values(g).every(v=>v===true);
+// No positional or caller-invented approval flags: only these independent
+// review decisions can satisfy the synthetic transaction gate. Production
+// always passes the immutable all-false gate below regardless.
+const APPROVAL_KEYS=Object.freeze([
+ "dedicatedWriterRoleReviewed","humanKeyCeremonyComplete",
+ "independentDbaAppsecApproved","managedRestoreCertified"
+]);
+const gateOK=g=>{
+ if(!g||typeof g!=="object"||Array.isArray(g))return false;
+ const keys=Object.keys(g).sort();
+ return keys.length===APPROVAL_KEYS.length&&
+  keys.every((k,i)=>k===APPROVAL_KEYS[i])&&
+  APPROVAL_KEYS.every(k=>g[k]===true);
+};
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const P="public.vox_rc8_";
 export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE_APPROVAL_GATE){

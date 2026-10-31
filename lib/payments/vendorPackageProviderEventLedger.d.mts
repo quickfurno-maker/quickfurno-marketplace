@@ -11,7 +11,7 @@ export type RazorpayProviderEventEnvelope =
       eventId: string;
       bodySha256: string;
       providerMode: "test" | "live";
-      eventType: "payment.captured" | "payment.failed";
+      eventType: "payment.captured" | "payment.failed" | "refund.created" | "refund.processed" | "refund.failed";
       providerOrderId: string;
       paymentId: string;
     }>

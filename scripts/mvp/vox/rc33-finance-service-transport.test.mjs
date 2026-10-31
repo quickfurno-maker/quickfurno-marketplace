@@ -120,3 +120,38 @@ test("payment.failed outcomes: DB-confirmed only; malformed failure receipt is n
  setup({rpc:async()=>({data:{status:"weird",order_id:ORDER_ID}})});
  assert.equal((await run(body("payment.failed"))).ok,false);
 });
+
+const refundRaw=(over={})=>JSON.stringify({event:"refund.processed",payload:{
+  refund:{entity:{id:"rfnd_RC36ABCDE",payment_id:"pay_RC33ABC123",...over}},
+  payment:{entity:{id:"pay_RC33ABC123",order_id:"order_RC33ABC123"}}
+}});
+test("RC36 signed refund intake: TEST legacy cannot ACK or touch Core/provider",async()=>{
+ setup(); const r=await run(refundRaw());
+ assert.equal(r.ok,false);assert.equal(r.code,"REFUND_INTAKE_LEDGER_REQUIRED");
+ assert.equal(state.fetches.length,0);assert.equal(state.rpcs.length,0);
+});
+test("RC36 refund identity drift/missing entity fails after HMAC, with no side effects",async()=>{
+ for(const raw of [
+  refundRaw({payment_id:"pay_DIFFERENT1234"}),
+  JSON.stringify({event:"refund.created",payload:{refund:{entity:{id:"rfnd_RC36ABCDE",payment_id:"pay_RC33ABC123"}}}}),
+  JSON.stringify({event:"refund.failed",payload:{payment:{entity:{id:"pay_RC33ABC123",order_id:"order_RC33ABC123"}}}})
+ ]){
+  setup();const r=await run(raw);
+  assert.equal(r.ok,false);assert.equal(r.code,"RAZORPAY_WEBHOOK_IDENTITY_INVALID");
+  assert.equal(state.fetches.length,0);assert.equal(state.rpcs.length,0);
+ }
+});
+test("RC36 refund signature is required before any structural classification or lookup",async()=>{
+ setup();const raw=refundRaw();
+ const r=await svc.handleVendorPackageRazorpayWebhook(raw,"0".repeat(64),"evt_RC36ABCDE");
+ assert.equal(r.ok,false);assert.equal(r.code,"PAYMENT_SIGNATURE_INVALID");
+ assert.equal(state.fetches.length,0);assert.equal(state.rpcs.length,0);
+});
+test("RC36 refund LIVE and ledger-enforce remain disabled without reviewed DB runtime",async()=>{
+ for(const opts of [{mode:"live"},{mode:"test",ledger:"enforce"}]){
+  setup(opts);const r=await run(refundRaw());
+  assert.equal(r.ok,false);
+  assert.ok(["RAZORPAY_EVENT_LEDGER_REQUIRED_FOR_LIVE","RAZORPAY_EVENT_LEDGER_REPOSITORY_UNAVAILABLE"].includes(r.code),r.code);
+  assert.equal(state.fetches.length,0);assert.equal(state.rpcs.length,0);
+ }
+});

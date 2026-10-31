@@ -50,6 +50,41 @@ try{
  expect(ready,"FINAL_POSTGRES_NOT_READY");
  query("CREATE ROLE service_role LOGIN BYPASSRLS; CREATE ROLE anon LOGIN;CREATE ROLE authenticated LOGIN;");
  query(sql);
+ // RC36 refund intake: genuine disposable PostgreSQL durable quarantine and
+ // immutable reviewer receipt. No refunds, wallet or provider operations.
+ const refundReviewSql=readFileSync(resolve(root,
+  "scripts/mvp/vox/fixtures/rc35-review-only-refund-intake-review.pg17.sql"),"utf8");
+ query(refundReviewSql);
+ const refundEvent="evt_RC36REFUND1234",refundHash="d".repeat(64);
+ const refundClaim=parse(query(fn(refundEvent,"test",refundHash,"refund.processed")));
+ expect(refundClaim.status==="claimed"&&refundClaim.attempt_count===1,"REFUND_CLAIMED");
+ expect(query(finish(refundEvent,"test",refundHash,1,"completed","activated",null),true).status!==0,
+  "REFUND_CANNOT_MINT_CREDITS");
+ const refundQuarantine=parse(query(finish(refundEvent,"test",refundHash,1,"quarantined",null,
+  "REFUND_REVIEW_REQUIRED")));
+ expect(refundQuarantine.status==="quarantined","REFUND_REVIEW_DURABLE");
+ expect(parse(query(fn(refundEvent,"test",refundHash,"refund.processed"))).status==="quarantined",
+  "REFUND_REDELIVERY_NO_MUTATION");
+ const review=(hash,reviewer,decision)=>
+  "SET ROLE service_role;SELECT public.qf_review_vendor_package_refund_intake_v2("+
+   ["'"+refundEvent+"'","'test'","'"+hash+"'","'"+reviewer+"'","'"+decision+"'","NULL"].join(",")+
+   ")::text;";
+ const reviewer="11111111-1111-4111-8111-111111111111";
+ const otherReviewer="22222222-2222-4222-8222-222222222222";
+ const firstReview=parse(query(review(refundHash,reviewer,"escalated_for_policy_decision")));
+ expect(firstReview.status==="reviewed","REFUND_REVIEW_FIRST");
+ expect(parse(query(review(refundHash,reviewer,"escalated_for_policy_decision"))).status==="reviewed",
+  "REFUND_REVIEW_IDEMPOTENT");
+ expect(parse(query(review(refundHash,otherReviewer,"escalated_for_policy_decision"))).status===
+  "review_conflict","REFUND_REVIEW_FOREIGN_REJECTED");
+ expect(query(review("e".repeat(64),reviewer,"escalated_for_policy_decision"),true).status!==0,
+  "REFUND_REVIEW_HASH_DENIED");
+ expect(query(review(refundHash,reviewer,"evidence_matched_for_human_authorization"),true).status!==0,
+  "REFUND_REVIEW_NO_FAKE_EVIDENCE");
+ const reviewAnon=query("SET ROLE anon;SELECT public.qf_review_vendor_package_refund_intake_v2("+
+  "'"+refundEvent+"','test','"+refundHash+"','"+reviewer+
+  "','escalated_for_policy_decision',NULL);",true);
+ expect(reviewAnon.status!==0,"REFUND_ANON_DENIED");
  const a=parse(query(fn(id,"test",h)));
  expect(a.status==="claimed"&&a.attempt_count===1,"FIRST_CLAIM");
  expect(parse(query(fn(id,"test",h))).status==="in_flight","ACTIVE_LEASE");
@@ -117,6 +152,24 @@ try{
    allowed[name].map(k=>sqlLiteral(args[k])).join(",")+")::text;";
   return {data:parse(query(stmt)),error:null};
  };
+ const refundEnvelope=buildRazorpayProviderEventEnvelope({
+  eventId:"evt_RC36RUNTIME001",providerMode:"test",bodySha256:"e".repeat(64),
+  candidate:{kind:"refund",eventName:"refund.processed",refundId:"rfnd_ABC12345",
+   paymentId:"pay_ABC12345",providerOrderId:"order_ABC12345"}});
+ expect(refundEnvelope.ok===true,"REFUND_ENVELOPE");
+ let forbiddenRefundHandlerCalls=0;
+ const refundHandle=async()=>{forbiddenRefundHandlerCalls++;throw Error("CREDIT_OR_PROVIDER_CALLED")};
+ const refundProcess=await processVendorPackageProviderEvent({
+  envelope:refundEnvelope,repository:createRc28VendorPackageEventRepository(callRpc),
+  handle:refundHandle});
+ expect(refundProcess.ack===true&&refundProcess.status==="quarantined"&&
+  refundProcess.code==="REFUND_REVIEW_REQUIRED"&&forbiddenRefundHandlerCalls===0,
+  "REFUND_REAL_REPOSITORY_QUARANTINE");
+ const refundReplay=await processVendorPackageProviderEvent({
+  envelope:refundEnvelope,repository:createRc28VendorPackageEventRepository(callRpc),
+  handle:refundHandle});
+ expect(refundReplay.ack===true&&refundReplay.status==="quarantined"&&
+  forbiddenRefundHandlerCalls===0,"REFUND_REAL_REPLAY");
  const envelope=buildRazorpayProviderEventEnvelope({
   eventId:"evt_RC28ACTUALDB1",providerMode:"test",bodySha256:"c".repeat(64),
   candidate:{kind:"captured",paymentId:"pay_ABC12345",providerOrderId:"order_ABC12345"}});

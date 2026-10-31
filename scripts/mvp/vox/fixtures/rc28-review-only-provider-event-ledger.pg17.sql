@@ -6,7 +6,8 @@ CREATE TABLE public.qf_vendor_package_provider_events_candidate_v2 (
   provider_mode text NOT NULL CHECK (provider_mode IN ('test','live')),
   event_id text NOT NULL CHECK (event_id ~ '^[A-Za-z0-9_-]{8,64}$'),
   body_sha256 text NOT NULL CHECK (body_sha256 ~ '^[a-f0-9]{64}$'),
-  event_type text NOT NULL CHECK (event_type IN ('payment.captured','payment.failed')),
+  event_type text NOT NULL CHECK (event_type IN ('payment.captured','payment.failed',
+    'refund.created','refund.processed','refund.failed')),
   payment_id text NOT NULL CHECK (payment_id ~ '^pay_[A-Za-z0-9]{4,64}$'),
   provider_order_id text NOT NULL CHECK (provider_order_id ~ '^order_[A-Za-z0-9]{4,64}$'),
   status text NOT NULL DEFAULT 'available'
@@ -37,7 +38,8 @@ BEGIN
  IF p_event_id IS NULL OR p_event_id !~ '^[A-Za-z0-9_-]{8,64}$' OR
     p_provider_mode NOT IN ('test','live') OR
     p_body_sha256 IS NULL OR p_body_sha256 !~ '^[a-f0-9]{64}$' OR
-    p_event_type NOT IN ('payment.captured','payment.failed') OR
+    p_event_type NOT IN ('payment.captured','payment.failed',
+      'refund.created','refund.processed','refund.failed') OR
     p_payment_id IS NULL OR p_payment_id !~ '^pay_[A-Za-z0-9]{4,64}$' OR
     p_provider_order_id IS NULL OR p_provider_order_id !~ '^order_[A-Za-z0-9]{4,64}$'
  THEN RAISE EXCEPTION 'PROVIDER_EVENT_INPUT_INVALID' USING ERRCODE='22023'; END IF;
@@ -93,6 +95,11 @@ BEGIN
     r.status<>'claimed' OR r.attempt_count IS DISTINCT FROM p_attempt_count
  THEN RAISE EXCEPTION 'PROVIDER_EVENT_COMPLETION_FENCE_DENIED'
   USING ERRCODE='42501'; END IF;
+ -- RC35: refund intake only ever quarantines for bounded human review.
+ IF r.event_type LIKE 'refund.%' AND NOT (p_disposition='quarantined' AND
+    p_outcome IS NULL AND p_error_code='REFUND_REVIEW_REQUIRED')
+ THEN RAISE EXCEPTION 'PROVIDER_EVENT_COMPLETION_SHAPE_DENIED'
+   USING ERRCODE='22023'; END IF;
  IF p_disposition='completed' AND p_error_code IS NULL AND
    ((r.event_type='payment.captured' AND p_outcome IN ('activated','already_activated')) OR
     (r.event_type='payment.failed' AND p_outcome IN ('failed_recorded','failure_ignored')))

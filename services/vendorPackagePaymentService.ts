@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { inspectRazorpayActivationReceipt, inspectRazorpayFailureReceipt } from "../lib/payments/vendorPackagePaymentReceipts.mjs";
 import { classifyVendorPackageWebhookEvent } from "../lib/payments/vendorPackageWebhookBoundary.mjs";
+import { classifyVendorPackageRefundIntake, isRefundIntakeEventType } from "../lib/payments/vendorPackageRefundIntake.mjs";
 import { processVendorPackageProviderEvent, resolveVendorPackageEventLedgerGate } from "../lib/payments/vendorPackageProviderEventProcessing.mjs";
 import { buildRazorpayProviderEventEnvelope, financeErrorCode } from "../lib/payments/vendorPackageProviderEventLedger.mjs";
 import { RC28_PROVIDER_LEDGER_RUNTIME_INSTALLED, createRc28VendorPackageEventRepository } from "../lib/payments/vendorPackageProviderEventRepository.mjs";
@@ -472,6 +473,7 @@ type RazorpayWebhook = {
   payload?: {
     payment?: { entity?: RazorpayPaymentEntity };
     order?: { entity?: { id?: string } };
+    refund?: { entity?: { id?: string; payment_id?: string } };
   };
 };
 
@@ -518,7 +520,11 @@ export async function handleVendorPackageRazorpayWebhook(
     // After HMAC verification, reject inconsistent linked order identities
     // before any privileged DB lookup or provider request. Ignore unrelated
     // signed event types without needing a payment-order identity at all.
-    const candidate = classifyVendorPackageWebhookEvent(event);
+    // Refund events must never enter the legacy payment activation/failure
+    // handler. Structural identity is checked after raw-body HMAC verification.
+    const refundCandidate = classifyVendorPackageRefundIntake(event);
+    const candidate = refundCandidate.kind === "none"
+      ? classifyVendorPackageWebhookEvent(event) : refundCandidate;
     if (candidate.kind === "ignored") return ok({ status: "ignored" });
     if (candidate.kind === "invalid") {
       throw paymentError("RAZORPAY_WEBHOOK_IDENTITY_INVALID", "The signed webhook has inconsistent payment identity.");
@@ -527,6 +533,11 @@ export async function handleVendorPackageRazorpayWebhook(
     // and by the durable ledger after explicit release authorization. Only
     // the ledger may acknowledge a replay or quarantine without rerunning it.
     const processSignedCandidate = async (): Promise<string> => {
+      // No provider GET, Core credit mutation or payment.failed mutation for a
+      // refund event, including under future approved durable ledger runtime.
+      if (candidate.kind === "refund") {
+        throw paymentError("REFUND_REVIEW_REQUIRED", "Refund evidence requires independent review.");
+      }
       const order = await loadOrderByProviderOrderId(candidate.providerOrderId);
       assertOrderMode(order, cfg);
       if (candidate.kind === "captured") {
@@ -553,6 +564,11 @@ export async function handleVendorPackageRazorpayWebhook(
     });
     if (ledgerGate.action === "deny") {
       throw paymentError(ledgerGate.code, "The provider-event ledger is not available for this webhook.");
+    }
+    // Ledger OFF TEST must never ACK a signed refund event as ignored or run
+    // legacy payment.failed. Require durable quarantine before any future ACK.
+    if (candidate.kind === "refund" && ledgerGate.action !== "ledger") {
+      throw paymentError("REFUND_INTAKE_LEDGER_REQUIRED", "Durable refund intake is not installed.");
     }
     if (ledgerGate.action === "ledger") {
       const envelope = buildRazorpayProviderEventEnvelope({

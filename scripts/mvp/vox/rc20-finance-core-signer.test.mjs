@@ -193,3 +193,32 @@ test("V2 release only resets a pristine pending claim, and bound checkout checks
  assert.match(core,/inspectRazorpayOrderClaim\(boundClaim, \{/);
  assert.match(core,/storedRazorpayCheckoutLifecycleError\(order\)/);
 });
+
+test("Core refuses in-flight expired Staff before commit and keeps rollback evidence",()=>{
+ const core=read("services/vox/rc8PgVendorConversationOperator.ts");
+ const harness=read("scripts/mvp/vox/validate-vox-rc8-real-pg-vendor-core.mjs");
+ const guard=core.indexOf("STAFF_AAL2_EXPIRED_DURING_TRANSACTION");
+ const commit=core.indexOf('db.query("COMMIT")',guard);
+ assert.ok(guard>0&&commit>guard);
+ assert.match(core,/if\(input\.verifiedStaff\.expiresAtMs<=Date\.now\(\)\)\{/);
+ assert.match(harness,/EXPIRED_AAL2_NO_EVENT/);
+ assert.match(harness,/EXPIRED_AAL2_NO_RECEIPT/);
+ assert.match(harness,/EXPIRED_AAL2_NO_TAKEOVER/);
+ assert.match(harness,/EXPIRED_AAL2_NO_REVISION/);
+});
+test("EOD approvals require exact named independent gates, not four arbitrary truths",()=>{
+ const source=read("scripts/mvp/vox/rc8-pg-signed-intent-writer.mjs");
+ const harness=read("scripts/mvp/vox/validate-vox-rc8-real-pg-signed-intent.mjs");
+ assert.match(source,/APPROVAL_KEYS=Object\.freeze/);
+ assert.match(source,/keys\.every\(\(k,i\)=>k===APPROVAL_KEYS\[i\]\)/);
+ assert.match(source,/APPROVAL_KEYS\.every\(k=>g\[k\]===true\)/);
+ assert.match(harness,/WRONG_APPROVAL_KEYS_DENIED/);
+ assert.match(harness,/EXTRA_APPROVAL_KEY_DENIED/);
+ assert.match(source,/RC8_APPROVAL_WRITER_INSTALLED=false/);
+});
+test("Finance UI directs unavailable Core to operations, MFA failure to actual login",()=>{
+ const ui=read("apps/vox-web/app/finance/page.tsx");
+ assert.match(ui,/needsLogin=result\.error==="MFA_REQUIRED"/);
+ assert.match(ui,/needsLogin\?"\/login":"\/operations"/);
+ assert.match(ui,/No payment actions can be performed from this screen/);
+});

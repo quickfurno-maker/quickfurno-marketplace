@@ -186,6 +186,22 @@ try{
  const rolledIntents=await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_verified_intents_candidate_v1");
  eq(Number(rolledClaims.rows[0].n),0,"EXPIRED_EOD_NO_NONCE_CLAIMS");
  eq(Number(rolledIntents.rows[0].n),0,"EXPIRED_EOD_NO_RECEIPT");
+ // Session and signatures remain unexpired, but an AAL2 verification becomes
+ // older than the verifier's 15-minute limit during a long transaction.
+ const lateOwner=auth(OWNER,{profileRole:"admin",aal2AtMs:now-14*60*1000});
+ const lateTl=auth(TL,{staffRole:"team_leader",teamId:TEAM,cityId:CITY,
+  membershipExpiresAtMs:now+600000,aal2AtMs:now-14*60*1000});
+ try{
+  Date.now=()=>now+2*60*1000+1;
+  r=await executeRc8PgPendingSignedIntent({...args(request(35,36)),
+   ownerAuth:lateOwner,teamLeaderAuth:lateTl},TEST_ONLY_GATE);
+ }finally{Date.now=wallNow;}
+ eq(r.reason,"SIGNED_EOD_AAL2_STALE_DURING_TRANSACTION",
+  "IN_FLIGHT_AAL2_FRESHNESS_DENIED");
+ eq(Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_approval_claims_candidate_v1")).rows[0].n),
+  0,"STALE_AAL2_NO_NONCE");
+ eq(Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_verified_intents_candidate_v1")).rows[0].n),
+  0,"STALE_AAL2_NO_RECEIPT");
  r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
  eq(r.ok,true,"NATIVE_REAL_PG_COMMIT");eq(r.approved,false,"NEVER_APPROVED");
  const counts=async()=>({

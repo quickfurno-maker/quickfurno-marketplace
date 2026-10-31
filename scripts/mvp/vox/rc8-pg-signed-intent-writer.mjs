@@ -3,7 +3,7 @@
  */
 import {randomUUID} from "node:crypto";
 import {prepareRc4SignedApproval,rc4RegistryFingerprint,
- RC4_HUMAN_APPROVED_REGISTRY_FINGERPRINTS} from "../../../contracts/vox/rc4ApprovalPipeline.mjs";
+ checkRc4ApproversAtCommit,RC4_HUMAN_APPROVED_REGISTRY_FINGERPRINTS} from "../../../contracts/vox/rc4ApprovalPipeline.mjs";
 export const RC8_APPROVAL_WRITER_INSTALLED=false;
 export const RC8_NATIVE_APPROVAL_GATE=Object.freeze({
  humanKeyCeremonyComplete:false,independentDbaAppsecApproved:false,
@@ -183,6 +183,14 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
      teamLeaderAuth.membershipExpiresAtMs<=atCommit){
    await client.query("ROLLBACK");settled=true;
    return deny("SIGNED_EOD_IDENTITY_OR_ENVELOPE_EXPIRED_DURING_TRANSACTION");
+  }
+  // Signed envelopes can remain valid while the original verified AAL2
+  // session becomes stale. Reuse the branded verifier, not caller claims.
+  const finalAuth=checkRc4ApproversAtCommit(ownerAuth,teamLeaderAuth,
+   Math.max(now,atCommit));
+  if(finalAuth){
+   await client.query("ROLLBACK");settled=true;
+   return deny("SIGNED_EOD_AAL2_STALE_DURING_TRANSACTION");
   }
   settled=true;
   try{await client.query("COMMIT");}catch{return deny("COMMIT_OUTCOME_UNKNOWN");}

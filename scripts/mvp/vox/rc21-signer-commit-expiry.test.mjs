@@ -24,3 +24,17 @@ test("native pending EOD receipt denies expired real sessions and two signed env
  assert.match(source,/RC8_APPROVAL_WRITER_INSTALLED=false/);
  assert.match(source,/humanKeyCeremonyComplete:false/);
 });
+
+test("signed EOD recomputes branded Owner and Team Leader AAL2 freshness at COMMIT",()=>{
+ const verifier=read("contracts/vox/rc4ApprovalPipeline.mjs");
+ const writer=read("scripts/mvp/vox/rc8-pg-signed-intent-writer.mjs");
+ const pg=read("scripts/mvp/vox/validate-vox-rc8-real-pg-signed-intent.mjs");
+ assert.match(verifier,/export function checkRc4ApproversAtCommit/);
+ assert.match(verifier,/checkAuth\(ownerAuth,"OWNER",now\)/);
+ assert.match(verifier,/checkAuth\(teamLeaderAuth,"TEAM_LEADER",now\)/);
+ assert.match(writer,/checkRc4ApproversAtCommit\(ownerAuth,teamLeaderAuth/);
+ assert.match(writer,/SIGNED_EOD_AAL2_STALE_DURING_TRANSACTION/);
+ assert.match(pg,/IN_FLIGHT_AAL2_FRESHNESS_DENIED/);
+ assert.match(pg,/STALE_AAL2_NO_NONCE/);
+ assert.match(pg,/STALE_AAL2_NO_RECEIPT/);
+});

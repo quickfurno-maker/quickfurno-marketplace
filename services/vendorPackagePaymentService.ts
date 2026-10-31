@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { inspectRazorpayActivationReceipt, inspectRazorpayFailureReceipt } from "../lib/payments/vendorPackagePaymentReceipts.mjs";
+import { classifyVendorPackageWebhookEvent } from "../lib/payments/vendorPackageWebhookBoundary.mjs";
 import { inspectRazorpayOrderClaim, isDefiniteRazorpayOrderRejection, storedRazorpayCheckoutLifecycleError, storedRazorpayOrderModeError } from "../lib/payments/vendorPackageOrderGuards.mjs";
 import { adminClient } from "../lib/supabase";
 import { AppError, fail, ok, type Result } from "../lib/errors";
@@ -477,23 +478,28 @@ export async function handleVendorPackageRazorpayWebhook(
       throw paymentError("RAZORPAY_WEBHOOK_INVALID", "Webhook body is not valid JSON.");
     }
 
-    const payment = event.payload?.payment?.entity;
-    if (!payment?.id || !payment.order_id) return ok({ status: "ignored" });
-
-    const order = await loadOrderByProviderOrderId(payment.order_id);
+    // After HMAC verification, reject inconsistent linked order identities
+    // before any privileged DB lookup or provider request. Ignore unrelated
+    // signed event types without needing a payment-order identity at all.
+    const candidate = classifyVendorPackageWebhookEvent(event);
+    if (candidate.kind === "ignored") return ok({ status: "ignored" });
+    if (candidate.kind === "invalid") {
+      throw paymentError("RAZORPAY_WEBHOOK_IDENTITY_INVALID", "The signed webhook has inconsistent payment identity.");
+    }
+    const order = await loadOrderByProviderOrderId(candidate.providerOrderId);
     assertOrderMode(order, cfg);
 
-    if (event.event === "payment.captured") {
+    if (candidate.kind === "captured") {
       const canonicalPayment = await razorpayFetch<RazorpayPaymentEntity>(
         cfg,
-        "/payments/" + encodeURIComponent(payment.id),
+        "/payments/" + encodeURIComponent(candidate.paymentId),
       );
       const activation = await activateCapturedPayment(order, canonicalPayment, cfg);
       return ok({ status: activation === "already_applied" ? "already_activated" : "activated" });
     }
 
-    if (event.event === "payment.failed") {
-      const recorded = await markPaymentFailed(order, payment.id, cfg);
+    if (candidate.kind === "failed") {
+      const recorded = await markPaymentFailed(order, candidate.paymentId, cfg);
       return ok({ status: recorded === "marked_failed" ? "failed_recorded" : "failure_ignored" });
     }
 

@@ -31,3 +31,14 @@ test("native Core transaction rechecks expiring Staff, review and object grants 
  assert.match(pg,/EXPIRED_SCOPE_NO_RECEIPT/);
  assert.match(source,/RC8_CORE_WRITER_INSTALLED=false/);
 });
+
+test("client project expiry after write is denied atomically by real PG17",()=>{
+ const pg=read("scripts/mvp/vox/validate-vox-rc8-real-pg-vendor-core.mjs");
+ assert.match(pg,/IN_FLIGHT_CLIENT_BINDING_EXPIRY/);
+ assert.match(pg,/EXPIRED_CLIENT_BINDING_NO_EVENT/);
+ assert.match(pg,/EXPIRED_CLIENT_BINDING_NO_RECEIPT/);
+ assert.match(pg,/EXPIRED_CLIENT_BINDING_NO_REVISION/);
+ assert.match(pg,/await sleep\(2500\)/);
+ const core=read("services/vox/rc8PgVendorConversationOperator.ts");
+ assert.match(core,/CLIENT_PROJECT_BINDING_EXPIRED_DURING_TRANSACTION/);
+});

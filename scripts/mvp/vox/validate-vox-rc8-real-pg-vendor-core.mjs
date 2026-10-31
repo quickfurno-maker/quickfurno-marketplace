@@ -256,6 +256,30 @@ try{
  // AB7B original remains blocked even for the otherwise eligible,
  // independently-reviewed client case. No source/event/receipt may survive.
  await pool.query("UPDATE public.leads SET location_verification_status='verified' WHERE id=$1",[LEAD]);
+ // The client binding is immutable by DB trigger, so expiry must be
+ // simulated by advancing the real PG clock, never updating its approval.
+ // Use a dedicated disposable client conversation with a 2-second approval.
+ const C6=id(25);
+ await pool.query("INSERT INTO public.communication_conversations VALUES($1,'quickfurno','whatsapp',$2,'client',$3,'OPEN',0,'RIYA',false,true,clock_timestamp())",[C6,HASH,CLIENT]);
+ await pool.query("INSERT INTO public.vox_staff_object_scopes_v1(auth_user_id,scope_kind,object_id,revoked_at,expires_at) VALUES($1,'conversation',$2,NULL,clock_timestamp()+interval '30 days')",[A,C6]);
+ await pool.query("INSERT INTO public.vox_rc12_client_conversation_project_bindings_candidate_v1(conversation_id,client_account_id,lead_id,service_zone_id,approved_city_id,owner_user_id,reviewed_by,team_id,review_evidence_sha256,review_state,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'APPROVED',clock_timestamp()+interval '2 seconds')",[C6,CLIENT,LEAD,ZONE,CITY,OWNER,TL,TEAM,"f".repeat(64)]);
+ client=await execute(make(C6,id(69)),async()=>{
+  const raw=await pool.connect();
+  return {
+   query:async(sql,values)=>{
+    const result=await raw.query(sql,values);
+    if(sql.includes("INSERT INTO public.vox_rc8_conversation_operator_receipts_candidate_v1"))
+     await sleep(2500);
+    return result;
+   },release:()=>raw.release()
+  };
+ });
+ eq(client.reason,"CLIENT_PROJECT_BINDING_EXPIRED_DURING_TRANSACTION","IN_FLIGHT_CLIENT_BINDING_EXPIRY");
+ eq(await count("public.communication_conversation_events"),2,"EXPIRED_CLIENT_BINDING_NO_EVENT");
+ eq(await count("public.vox_rc8_conversation_operator_receipts_candidate_v1"),2,"EXPIRED_CLIENT_BINDING_NO_RECEIPT");
+ const afterClientExpiry=await pool.query("SELECT state,revision FROM public.communication_conversations WHERE id=$1",[C6]);
+ eq(afterClientExpiry.rows[0].state,"OPEN","EXPIRED_CLIENT_BINDING_NO_TAKEOVER");
+ eq(Number(afterClientExpiry.rows[0].revision),0,"EXPIRED_CLIENT_BINDING_NO_REVISION");
  client=await execute(make(C5,id(65)),()=>pool.connect(),
   {mode:"DISPOSABLE_RC12_AB7B_PROOF"});
  eq(client.ok,false,"AB7B_ORIGINAL_BLOCK_DENIES_NATIVE_SOURCE");

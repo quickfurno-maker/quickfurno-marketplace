@@ -73,6 +73,13 @@ function checkAuth(a,role,now){
  if(role==="TEAM_LEADER"&&a.membershipExpiresAtMs<=now)return "AUTH_MEMBERSHIP_EXPIRED_DENIED";
  return null;
 }
+// Reuse the exact branded AAL2/session policy just before the PG COMMIT.
+// Caller-shaped objects cannot pass the private WeakSet brand check.
+export function checkRc4ApproversAtCommit(ownerAuth,teamLeaderAuth,now){
+ if(!Number.isSafeInteger(now)||now<=0)return "AUTH_CLOCK_INVALID";
+ return checkAuth(ownerAuth,"OWNER",now)||
+  checkAuth(teamLeaderAuth,"TEAM_LEADER",now);
+}
 
 // ---- helpers --------------------------------------------------------------
 /** Order-independent fingerprint of a NORMALIZED registry (null if invalid). */

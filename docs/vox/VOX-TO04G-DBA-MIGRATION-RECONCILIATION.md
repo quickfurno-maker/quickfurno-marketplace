@@ -29,3 +29,22 @@ Across both environments: **34 identical version IDs**, **62 distinct migration 
 `node scripts/mvp/vox/verify-to04g-migration-history.mjs` recomputes version/name statistics from evidence and checks no missing/forged records. `--release-check` must return **exit status 42** because immutable SQL source hashes, an independent DBA decision, and a successful isolated restore are absent. A green Actions run here certifies a correct HOLD, not live database parity.
 
 **NO AUTOMATED MIGRATION REBASE OR MANAGED DATABASE WRITE** until the independent evidence exists.
+
+## RC35 executable inventory reconciliation (read-only)
+
+`scripts/mvp/vox/rc35-migration-inventory-reconcile.mjs` compares two injected inventories by version, name alias and digest. It never connects to a database, runs SQL, or promotes protected SQL (7+23 stays untouched). `releaseGo` is always `false`.
+
+```
+# source inventory from the checkout (or inject a prepared file with --source)
+node scripts/mvp/vox/rc35-migration-inventory-reconcile.mjs \
+  --managed docs/vox/VOX-MANAGED-STAGING-MIGRATION-DRIFT-READONLY-20261031.json \
+  --source-dir supabase/migrations --out rc35-reconciliation.json
+```
+
+- `--managed`: array, `{migrations}`, TO04G metadata, or the 31/107 drift snapshot. Rows may add `statementsSha256` (64-hex) that the approved DBA computes from the applied statements, canonicalised with `canonicalSqlDigest` (CRLF and trailing whitespace only).
+- `--source`: `{files:[{file, sha256, canonicalSha256}]}`; `--source-dir` builds it from disk.
+- Alias semantics: same version+name; same name at another version; `_staging[_YYYYMMDD]`/ticket-prefix candidates; repeated ledger names. An alias is `accepted` only when both digests exist and are equal.
+- Exit code: `0` fully reconciled; `2` blockers present (sorted `{code,subject,detail}` list plus `reportSha256` in the JSON report); `1` bad input.
+- On the captured metadata the report carries `DIGEST_UNAVAILABLE`, `DUPLICATE_MANAGED_NAME`, `MANAGED_ONLY_NO_SOURCE_SQL`, `BASELINE_CONTENT_UNPROVEN` and historical-gap blockers. The DBA clears them only by supplying managed statement digests.
+
+Test: `node --test scripts/mvp/vox/rc35-migration-inventory-reconcile.test.mjs`

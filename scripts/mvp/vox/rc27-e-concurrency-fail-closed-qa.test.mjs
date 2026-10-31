@@ -135,13 +135,13 @@ test("migration plan: more forged authority and non-SELECT probes fail closed",(
 const NATIVE=process.env.RC27_NATIVE_PG17==="1";
 const HASH="a".repeat(64);
 function psqlSync(c,sql){
- const r=spawnSync("docker",["exec","-i",c,"psql","-U","postgres","-X","-q","-At",
+ const r=spawnSync("docker",["exec","-i","-e","PGPASSWORD=isolated_rc27e_only",c,"psql","-h","127.0.0.1","-U","postgres","-X","-q","-At",
   "-v","ON_ERROR_STOP=1"],{input:sql,encoding:"utf8",timeout:30000});
  if(r.status!==0)throw Error("PSQL_FAILED: "+r.stderr);
  return r.stdout.trim();
 }
 function psqlAsync(c,sql){
- const p=spawn("docker",["exec","-i",c,"psql","-U","postgres","-X","-q","-At",
+ const p=spawn("docker",["exec","-i","-e","PGPASSWORD=isolated_rc27e_only",c,"psql","-h","127.0.0.1","-U","postgres","-X","-q","-At",
   "-v","ON_ERROR_STOP=1"]);
  let out="",err="";p.stdout.on("data",d=>out+=d);p.stderr.on("data",d=>err+=d);
  p.stdin.end(sql);
@@ -149,7 +149,14 @@ function psqlAsync(c,sql){
 }
 async function until(c,sql,label){
  for(let i=0;i<200;i++){
-  if(psqlSync(c,sql)==="t")return;
+  try{if(psqlSync(c,sql)==="t")return}
+  catch(e){
+   // During initdb, the temporary Unix-socket server may appear and close.
+   // Only the first READY probe may retry a connection-not-ready error;
+   // all later SQL errors are genuine failures and must surface immediately.
+   if(label!=="READY"||!/connection.*(?:refused|failed)|no such file|server is starting up/i.test(String(e)))
+    throw e;
+  }
   await new Promise(r=>setTimeout(r,50));
  }
  throw Error("BARRIER_TIMEOUT_"+label);

@@ -243,6 +243,12 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
     [sourceId,input.nonce]);
    if(provenance.rowCount!==1)throw Error("F1_OR_NONCE_ATOMIC_PROOF_MISSING");
   }
+  // The verified AAL2 session may expire while this transaction waits on
+  // a destination advisory lock or consent reads. Reject before commit.
+  if(input.verifiedStaff.expiresAtMs<=Date.now()){
+   await db.query("ROLLBACK");settled=true;
+   return closed("STAFF_AAL2_EXPIRED_DURING_TRANSACTION");
+  }
   settled=true;
   try{await db.query("COMMIT");}catch{return closed("COMMIT_OUTCOME_UNKNOWN");}
   return Object.freeze({ok:true,state:target,revision:next,

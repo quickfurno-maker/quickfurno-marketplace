@@ -5,7 +5,7 @@ export type RefundIntakeReviewResult =
   | Readonly<{ ok: false; reason: string; retrySafe: boolean; creditMutation: false; refundAllowed: false }>;
 export function createRefundIntakeReviewer(
   callRpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error?: unknown }>,
-  options?: { refundBound?: boolean },
+  options?: { refundBound?: boolean; identityLedger?: { macKey: string | Uint8Array } },
 ): {
   review(input: {
     envelope: RazorpayProviderEventEnvelope;

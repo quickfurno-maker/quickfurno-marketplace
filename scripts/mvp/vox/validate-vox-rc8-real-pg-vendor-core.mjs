@@ -3,6 +3,7 @@
 // REVIEW ONLY. Synthetic identity+vendor. No AB7B source, no provider messages.
 import {Pool} from "pg";
 import {execFileSync} from "node:child_process";
+import {createHash} from "node:crypto";
 import {readFileSync} from "node:fs";
 import {dirname,resolve} from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
@@ -118,13 +119,18 @@ try{
  const run=input=>execute(input,()=>pool.connect());
  // Simulate losing the connection acknowledgement AFTER a successful real
  // PostgreSQL COMMIT. Reconcile persisted state instead of claiming rollback.
+ // RC27: the destination session-lock phase has its own short COMMIT; drop
+ // only the writer's final COMMIT (after the receipt was staged).
+ let receiptStaged=false;
  let r=await execute(make(C1,id(50)),async()=>{
   const raw=await pool.connect();
   return {query:async(sql,values)=>{
    const result=await raw.query(sql,values);
-   if(sql==="COMMIT")throw Error("SYNTHETIC_POST_COMMIT_TRANSPORT_DROP");
+   if(sql.includes("INSERT INTO public.vox_rc8_conversation_operator_receipts_candidate_v1"))
+    receiptStaged=true;
+   if(sql==="COMMIT"&&receiptStaged)throw Error("SYNTHETIC_POST_COMMIT_TRANSPORT_DROP");
    return result;
-  },release:()=>raw.release()};
+  },release:d=>raw.release(d)};
  });
  eq(r.reason,"COMMIT_OUTCOME_UNKNOWN","CORE_POST_COMMIT_UNKNOWN");
  eq(r.committed,null,"CORE_UNKNOWN_NOT_FALSE_ROLLBACK");
@@ -157,7 +163,7 @@ try{
      expiring.verifiedStaff.expiresAtMs=Date.now()-1;
     return result;
    },
-   release:()=>raw.release()
+   release:d=>raw.release(d)
   };
  });
  eq(r.reason,"STAFF_AAL2_EXPIRED_DURING_TRANSACTION","IN_FLIGHT_AAL2_EXPIRY_DENIED");
@@ -180,7 +186,7 @@ try{
       "WHERE auth_user_id=$1 AND object_id=$2",[A,C3]);
     return result;
    },
-   release:()=>raw.release()
+   release:d=>raw.release(d)
   };
  });
  eq(r.reason,"CORE_GRANT_EXPIRED_DURING_TRANSACTION","IN_FLIGHT_SCOPE_EXPIRY_DENIED");
@@ -285,7 +291,7 @@ try{
     if(sql.includes("INSERT INTO public.vox_rc8_conversation_operator_receipts_candidate_v1"))
      await sleep(2500);
     return result;
-   },release:()=>raw.release()
+   },release:d=>raw.release(d)
   };
  });
  eq(client.reason,"CLIENT_PROJECT_BINDING_EXPIRED_DURING_TRANSACTION","IN_FLIGHT_CLIENT_BINDING_EXPIRY");
@@ -336,6 +342,102 @@ try{
   [id(66),C4,A,TEAM,CITY,id(67)])}catch{forged=true}
  eq(forged,true,"FORGED_ORIGINAL_SOURCE_DENIED");
  eq(await count("public.vox_staff_source_events_candidate_v1"),1,"NO_FORGED_F1");
+ // RC27: genuine D2-D STOP vs Core snapshot race on two real backends.
+ // The STOP emulates apply_communication_consent_command exactly: READ
+ // COMMITTED, identical destination xact lock, then suppression insert.
+ const C7=id(30),C8=id(31),C9=id(32),C10=id(33);
+ for(const cId of [C7,C8,C9,C10]){
+  await pool.query("INSERT INTO public.vox_staff_object_scopes_v1(auth_user_id,scope_kind,object_id,revoked_at,expires_at) VALUES($1,'conversation',$2,NULL,clock_timestamp()+interval '30 days')",[A,cId]);
+  await pool.query("INSERT INTO public.communication_conversations VALUES ($1,'quickfurno','whatsapp',$2,'vendor',$3,'OPEN',0,'ANISHA',false,true,clock_timestamp())",
+   [cId,HASH,VENDOR]);
+ }
+ const d2dLock="SELECT pg_advisory_xact_lock(hashtextextended('dst|' || $1::text || '|' || $2::text, 0))";
+ const advisoryHeld=async()=>Number((await pool.query(
+  "SELECT count(*)::int AS n FROM pg_locks WHERE locktype='advisory' AND granted")).rows[0].n);
+ const waitForAdvisoryWaiter=async()=>{
+  for(let i=0;i<100;i++){
+   const w=await pool.query("SELECT count(*)::int AS n FROM pg_stat_activity "+
+    "WHERE wait_event_type='Lock' AND wait_event='advisory'");
+   if(w.rows[0].n>=1)return;
+   await sleep(20);
+  }
+  throw Error("CORE_WRITER_NEVER_WAITED_ON_DESTINATION_LOCK");
+ };
+ const stopRace=async(writer,conversationId,nonce,suppressionId)=>{
+  const stopper=await pool.connect();
+  try{
+   await stopper.query("BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED");
+   await stopper.query(d2dLock,[HASH,"whatsapp"]);
+   await stopper.query("INSERT INTO public.communication_suppressions VALUES ($1,'transactional','user_stop','qf-consent-v1',true,NULL,NULL,$2,'whatsapp')",[suppressionId,HASH]);
+   const pending=writer(make(conversationId,nonce),()=>pool.connect());
+   await waitForAdvisoryWaiter();
+   await stopper.query("COMMIT");
+   return await pending;
+  }finally{try{await stopper.query("ROLLBACK")}catch{}stopper.release();}
+ };
+ const eventsBefore=await count("public.communication_conversation_events");
+ r=await stopRace(execute,C7,id(80),id(93));
+ eq(r.reason,"CONSENT_DENIED","RC27_STOP_COMMITTED_DURING_WAIT_IS_VISIBLE");
+ eq((await pool.query("SELECT state FROM public.communication_conversations WHERE id=$1",[C7])).rows[0].state,
+  "OPEN","RC27_NO_TAKEOVER_AFTER_STOP");
+ eq(await count("public.communication_conversation_events"),eventsBefore,"RC27_NO_EVENT_AFTER_STOP");
+ eq(await advisoryHeld(),0,"RC27_NO_SESSION_LOCK_LEAK_AFTER_DENIAL");
+ await pool.query("DELETE FROM public.communication_suppressions");
+ // Negative control: the pre-RC27 writer (snapshot before lock) MUST lose
+ // this exact race, proving the harness genuinely detects the defect.
+ // Shallow GitHub PR checkouts do not include c003acf9 in Git history.
+ // Pin the exact reviewed legacy source as a fixture for this negative control.
+ const legacySource=readFileSync(resolve(root,"scripts/mvp/vox/fixtures/rc27-legacy-core-writer-c003acf9.txt"),"utf8");
+ const legacyHash=createHash("sha256").update(legacySource,"utf8").digest("hex");
+ eq(legacyHash,"a30ee399325de1834127c19c71165453e4e3dd047675a86fa9499aef7c9e98b4",
+  "RC27_LEGACY_NEGATIVE_CONTROL_FIXTURE_CHANGED");
+ const legacyOut=resolve(root,"test-results/vox-rc8-core-legacy-c003acf9-bundle.cjs");
+ await build({stdin:{contents:legacySource,resolveDir:resolve(root,"services/vox"),loader:"ts",
+  sourcefile:"legacy-rc8.ts"},bundle:true,platform:"node",format:"cjs",target:"node24",
+  outfile:legacyOut,logLevel:"silent"});
+ const {executeRc8PgVendorConversationOperator:legacy}=await import(pathToFileURL(legacyOut).href);
+ r=await stopRace(legacy,C8,id(81),id(94));
+ eq(r.ok,true,"RC27_NEGATIVE_CONTROL_LEGACY_WRITER_MISSES_STOP");
+ await pool.query("DELETE FROM public.communication_suppressions");
+ // Bounded wait: a destination held beyond the timeout fails closed with no
+ // serializable transaction, no mutation and no leaked session lock.
+ const holder=await pool.connect();
+ try{
+  await holder.query("BEGIN");
+  await holder.query(d2dLock,[HASH,"whatsapp"]);
+  const t0=Date.now();
+  r=await run(make(C9,id(82)));
+  eq(r.reason,"DESTINATION_LOCK_UNAVAILABLE","RC27_BOUNDED_DESTINATION_LOCK");
+  if(Date.now()-t0>8000)throw Error("RC27_LOCK_WAIT_NOT_BOUNDED");
+ }finally{try{await holder.query("ROLLBACK")}catch{}holder.release();}
+ eq(await advisoryHeld(),0,"RC27_NO_LEAK_AFTER_TIMEOUT");
+ eq((await pool.query("SELECT state FROM public.communication_conversations WHERE id=$1",[C9])).rows[0].state,
+  "OPEN","RC27_TIMEOUT_NO_TAKEOVER");
+ // Reverse direction: while the Core writer is in flight, a D2-D STOP cannot
+ // acquire the destination; once Core commits, the lock is verifiably freed.
+ let stopBlockedDuringCore=null;
+ r=await execute(make(C10,id(83)),async()=>{
+  const raw=await pool.connect();
+  return {query:async(sql,values)=>{
+   const result=await raw.query(sql,values);
+   if(sql.includes("INSERT INTO public.vox_rc8_conversation_operator_receipts_candidate_v1")){
+    const probe=await pool.connect();
+    try{
+     await probe.query("BEGIN");
+     stopBlockedDuringCore=(await probe.query(
+      "SELECT pg_try_advisory_xact_lock(hashtextextended('dst|' || $1::text || '|' || $2::text, 0)) AS got",
+      [HASH,"whatsapp"])).rows[0].got===false;
+    }finally{try{await probe.query("ROLLBACK")}catch{}probe.release();}
+   }
+   return result;
+  },release:d=>raw.release(d)};
+ });
+ eq(r.ok,true,"RC27_CORE_COMMITS_WHEN_DESTINATION_FREE");
+ eq(stopBlockedDuringCore,true,"RC27_STOP_SERIALIZED_BEHIND_CORE");
+ eq(await advisoryHeld(),0,"RC27_SESSION_LOCK_RELEASED_AFTER_COMMIT");
+ console.log("VOX_RC27_REAL_PG17_CORE_CONSENT_SNAPSHOT_RACE_PASS "+
+  "stop_during_wait_visible=true legacy_negative_control_detected=true "+
+  "bounded_lock=true reverse_serialized=true session_lock_leak=0 managed_activation=false");
  console.log("VOX_RC12_REAL_PG17_AB7B_F1_SOURCE_ATOMIC_PASS "+
   "original_ab7b_block_proven=true forward_review_only=true "+
   "conversation_event_receipt_original_f1_nonce_same_tx=true "+

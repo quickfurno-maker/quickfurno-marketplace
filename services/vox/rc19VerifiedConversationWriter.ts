@@ -11,7 +11,10 @@ export const RC19_CORE_RELEASE_APPROVALS=Object.freeze({
  staffAal2AndTeamOnboarded:false,consentMutationSerializationCertified:false,
  nativeWriterRoleAndAb7bReviewed:false,stagingOperationalAcceptancePassed:false
 });
-type NativeClient={query:(sql:string,values?:unknown[])=>Promise<{rows:any[];rowCount:number}>;release:()=>void};
+// release(true) MUST discard the backend (node-pg semantics) so a session-level
+// destination lock can never return to the pool unverified.
+type NativeClient={query:(sql:string,values?:unknown[])=>Promise<{rows:any[];rowCount:number}>;
+ release:(destroy?:boolean)=>void};
 type Command={conversationId:string;nonce:string;expectedRevision:number;action:"PAUSE_AI"|"TAKEOVER"};
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const COMMAND_KEYS=["action","conversationId","expectedRevision","nonce"];

@@ -11,7 +11,16 @@ export const RC8_CORE_RELEASE_GATE=Object.freeze({
  ab7bBindingApproved:false,staffAal2AdapterInstalled:false,
  allConsentMutationPathsSerialized:false,managedSchemaReviewed:false});
 type Db={query:(sql:string,values?:unknown[])=>Promise<{rows:any[];rowCount:number}>;
- release:()=>void};
+ /** destroy=true MUST discard the session (node-pg release(true)). */
+ release:(destroy?:boolean)=>void};
+export const RC27_DESTINATION_LOCK_TIMEOUT_MS=3000 as const;
+// Same key space as D2-D pg_advisory_xact_lock: session and transaction
+// advisory locks on one bigint conflict with each other across backends.
+const destinationKey="hashtextextended('dst|' || $1::text || '|whatsapp',0)";
+const destinationSessionLock="SELECT pg_advisory_lock("+destinationKey+")";
+const destinationSessionUnlock="SELECT pg_advisory_unlock("+destinationKey+") AS unlocked";
+const advisoryLocksHeld="SELECT count(*)::int AS held FROM pg_catalog.pg_locks "+
+ "WHERE locktype='advisory' AND pid=pg_backend_pid() AND granted";
 type Input={conversationId:string;nonce:string;expectedRevision:number;
  action:"PAUSE_AI"|"TAKEOVER";verifiedStaff:{
  userId:string;aal:"aal2";expiresAtMs:number}};
@@ -41,20 +50,40 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
     input.verifiedStaff.expiresAtMs<=Date.now()||
     typeof acquireClient!=="function")return closed("INPUT_OR_AAL2_INVALID");
  let db:Db|undefined,started=false,settled=false;
+ // Session-level D2-D destination lock: "none" | "maybe" (request sent, outcome
+ // unknown) | "held". Anything but a verified unlock destroys the connection.
+ let destinationLock:"none"|"maybe"|"held"="none",lockHash="",destroy=false;
  try{
   db=await acquireClient();
   if(!db||typeof db.query!=="function"||typeof db.release!=="function")
    return closed("TRANSACTION_ADAPTER_INVALID");
-  await db.query("BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE");
-  started=true;
-  // Read destination first, lock it BEFORE any conversation row (D2-D order).
+  // RC27: a SERIALIZABLE snapshot is fixed by the FIRST statement of the
+  // transaction, including "SELECT pg_advisory_xact_lock(...)" itself. A
+  // concurrent READ COMMITTED D2-D STOP that commits while we wait would stay
+  // invisible. Resolve the destination OUTSIDE any transaction (untrusted hint,
+  // re-verified under FOR UPDATE below), then acquire the SAME D2-D key at
+  // session level with a bounded wait BEFORE the serializable snapshot exists.
   const pre=await db.query(
    "SELECT destination_hash,subject_type FROM public.communication_conversations WHERE id=$1::uuid",
    [input.conversationId]);
   const hash=pre.rows[0]?.destination_hash;
-  if(pre.rowCount!==1||typeof hash!=="string"||!/^[a-f0-9]{64}$/.test(hash)){
-   await db.query("ROLLBACK");settled=true;return closed("CONVERSATION_NOT_FOUND");
-  }
+  if(pre.rowCount!==1||typeof hash!=="string"||!/^[a-f0-9]{64}$/.test(hash))
+   return closed("CONVERSATION_NOT_FOUND");
+  lockHash=hash;
+  await db.query("BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED READ ONLY");
+  started=true;
+  await db.query("SET LOCAL lock_timeout='"+RC27_DESTINATION_LOCK_TIMEOUT_MS+"ms'");
+  destinationLock="maybe";
+  await db.query(destinationSessionLock,[hash]);
+  destinationLock="held";
+  await db.query("COMMIT");
+  started=false;
+  await db.query("BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE");
+  started=true;
+  // Utility statement: takes no snapshot. Bounds every later row-lock wait.
+  await db.query("SET LOCAL lock_timeout='"+RC27_DESTINATION_LOCK_TIMEOUT_MS+"ms'");
+  // Re-entrant on this backend (session lock already held): never waits,
+  // keeps the D2-D transactional key held for the writer's whole transaction.
   await db.query(
    "SELECT pg_advisory_xact_lock(hashtextextended('dst|' || $1::text || '|whatsapp',0))",[hash]);
   const baseColumns=
@@ -305,6 +334,7 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
   catch{
    // The database may have committed before the connection failed.
    // Never report a proven rollback or blindly replay the nonce.
+   destroy=true;
    return Object.freeze({ok:false,reason:"COMMIT_OUTCOME_UNKNOWN",
     conversationId:input.conversationId,nonce:input.nonce,
     committed:null,requiresReconciliation:true,providerMessagesSent:0,
@@ -313,9 +343,23 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
   return Object.freeze({ok:true,state:target,revision:next,
    committed:true,canonicalAb7bSourceReady:proveSource,providerMessagesSent:0});
  }catch{
-  if(started&&!settled)try{await db!.query("ROLLBACK")}catch{}
-  return closed("PG_TRANSACTION_FAILED");
- }finally{try{db?.release()}catch{}}
+  if(started&&!settled)try{await db!.query("ROLLBACK")}catch{destroy=true}
+  return closed(destinationLock==="maybe"?"DESTINATION_LOCK_UNAVAILABLE":"PG_TRANSACTION_FAILED");
+ }finally{
+  // Fail-closed unlock: only after COMMIT/ROLLBACK, and only a verified
+  // zero-advisory-lock session may return to the pool. Otherwise discard the
+  // backend so PostgreSQL itself drops the session lock.
+  if(db&&destinationLock!=="none"&&!destroy){
+   try{
+    const u=await db.query(destinationSessionUnlock,[lockHash]);
+    const ok=destinationLock==="maybe"?typeof u.rows[0]?.unlocked==="boolean":
+     u.rows[0]?.unlocked===true;
+    const left=await db.query(advisoryLocksHeld);
+    if(!ok||left.rowCount!==1||left.rows[0]?.held!==0)destroy=true;
+   }catch{destroy=true}
+  }
+  try{db?.release(destroy)}catch{}
+ }
 }
 /** Live entry is permanently hard-off absent reviewed binding/migration.
  * Test function above is NOT called by a route. */

@@ -17,6 +17,8 @@ export type RazorpayPaymentEntity = {
   currency: string;
   status: string;
   captured?: boolean;
+  amount_refunded?: number | null;
+  refund_status?: string | null;
 };
 
 export function requireRazorpayKeyId(
@@ -89,6 +91,21 @@ export function assertCapturedPayment(payment: RazorpayPaymentEntity, expected: 
   if (payment.amount !== expected.amount) throw new Error("PAYMENT_AMOUNT_MISMATCH");
   if (payment.currency !== (expected.currency ?? RAZORPAY_CURRENCY)) {
     throw new Error("PAYMENT_CURRENCY_MISMATCH");
+  }
+  // A fully refunded Razorpay payment reports status "refunded"; a partial
+  // refund keeps "captured" with amount_refunded > 0. Neither may mint credits.
+  // Both are deterministic: quarantine (PAYMENT_REFUNDED), never an endless
+  // PAYMENT_NOT_CAPTURED retry loop or a credit grant against returned money.
+  // Only an actual numeric zero (or absent legacy field) is non-refunded.
+  // Numeric strings, negative amounts, NaN and unexpected refund statuses
+  // are not provider-certified zero and must not authorize credit grants.
+  const refunded = payment.amount_refunded;
+  const amountIsUnrefunded = refunded == null ||
+    (typeof refunded === "number" && Number.isSafeInteger(refunded) && refunded === 0);
+  const refundStatusIsEmpty = payment.refund_status == null;
+  if (payment.status === "refunded" || !amountIsUnrefunded ||
+      !refundStatusIsEmpty) {
+    throw new Error("PAYMENT_REFUNDED");
   }
   if (payment.status !== "captured" || payment.captured === false) {
     throw new Error("PAYMENT_NOT_CAPTURED");

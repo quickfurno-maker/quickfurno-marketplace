@@ -10,7 +10,7 @@ const name="qf-vox-rc17-v2-pg17";
 const docker=args=>execFileSync("docker",args,{encoding:"utf8",timeout:20000,stdio:["ignore","pipe","ignore"]}).trim();
 const sleep=ms=>new Promise(done=>setTimeout(done,ms));
 const uuid=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
-const [vendor,pkg,testOrder,liveOrder,token,other,liveToken,nullProviderOrder,cancelledOrder,refundOrder,nullStateOrder]=[1,2,3,4,5,6,7,8,9,10,13].map(uuid);
+const [vendor,pkg,testOrder,liveOrder,token,other,liveToken,nullProviderOrder,cancelledOrder,refundOrder,nullStateOrder,orphanPaymentOrder]=[1,2,3,4,5,6,7,8,9,10,13,16].map(uuid);
 const check=(value,label)=>{if(!value)throw Error(label)};
 const reject=async(fn,label)=>{let denied=false;try{await fn()}catch{denied=true}check(denied,label+"_MUST_DENY")};
 const rejectReason=async(fn,label,reason)=>{
@@ -88,17 +88,23 @@ try{
  await pool.query(setup);
  await pool.query("INSERT INTO public.vendors(id) VALUES($1)",[vendor]);
  await pool.query("INSERT INTO public.packages(id,name,lead_count,total_price,validity_days,is_active) VALUES($1,'Pune',10,790,30,true)",[pkg]);
- for(const orderId of [testOrder,liveOrder,nullProviderOrder,cancelledOrder,refundOrder,nullStateOrder]){
+ for(const orderId of [testOrder,liveOrder,nullProviderOrder,cancelledOrder,refundOrder,nullStateOrder,orphanPaymentOrder]){
   await pool.query("INSERT INTO public.vendor_package_orders(id,vendor_id,package_id,package_name,package_price,package_currency,credits_included,validity_days,order_status,payment_status,payment_provider,payment_method,activation_status) VALUES($1,$2,$3,'Pune',790,'INR',10,30,'created','not_started','not_connected','online_future','not_activated')",[orderId,vendor,pkg]);
  }
  const ddl=readFileSync(resolve(root,"ops/vox/rc17-review-candidates/20261031001000_rc17_razorpay_v2_authority_REVIEW_ONLY.sql"),"utf8");
  await pool.query(ddl);
+ // A previous manual/captured ledger must block even the initial provider
+ // POST claim, not merely reject the bind after Razorpay has created an order.
+ await pool.query("INSERT INTO public.payments(id,vendor_id,package_id,amount,payment_method,payment_status,transaction_id) VALUES($1,$2,$3,790,'manual','Paid','pay_orphan_history')",[orphanPaymentOrder,vendor,pkg]);
  const rpc=(fn,values)=>pool.query("SELECT public."+fn+"("+values.map((_,i)=>"$"+(i+1)).join(",")+") AS result",values).then(r=>r.rows[0].result);
  const claim=(id,t,mode)=>rpc("qf_claim_vendor_package_razorpay_order_v2",[id,t,mode]);
  const bind=(id,t,mode,providerId)=>rpc("qf_bind_vendor_package_razorpay_order_v2",[id,providerId,79000,"qfvp_"+id.replaceAll("-",""),t,mode]);
  const activate=(id,payment,mode)=>rpc("qf_activate_vendor_package_order_v2",[id,payment,mode]);
  const failed=(id,payment,mode)=>rpc("qf_mark_vendor_package_payment_failed_v2",[id,payment,mode]);
  const release=(id,t,mode)=>rpc("qf_release_vendor_package_razorpay_order_claim_v2",[id,t,mode]);
+ await rejectReason(()=>claim(orphanPaymentOrder,uuid(17),"test"),
+  "UNBOUND_PAID_LEDGER_CANNOT_START_PROVIDER_ORDER",
+  "RAZORPAY_V2_UNBOUND_LEDGER_RECONCILIATION_REQUIRED");
  // Three-valued-logic denials: no NULL lifecycle may upgrade to payable.
  await pool.query("UPDATE public.vendor_package_orders SET order_status=NULL WHERE id=$1",[nullStateOrder]);
  await reject(()=>claim(nullStateOrder,uuid(14),"test"),"NULL_ORDER_STATUS_DENIED");

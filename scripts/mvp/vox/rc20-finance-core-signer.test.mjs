@@ -127,3 +127,44 @@ test("signed EOD requires exact current Staff and report identities",()=>{
  assert.match(source,/row\.published!==false/);
  assert.match(source,/RC8_APPROVAL_WRITER_INSTALLED=false/);
 });
+
+// RC20 A-D mutation safety constraints and genuine PG17 exercise markers.
+test("RC20 A-D mutation safety constraints persist in same branch",()=>{
+ const sql=read("ops/vox/rc17-review-candidates/20261031001000_rc17_razorpay_v2_authority_REVIEW_ONLY.sql");
+ const start=sql.indexOf("create or replace function public.qf_activate_vendor_package_order_v2(");
+ const end=sql.indexOf("revoke all on function public.qf_activate_vendor_package_order_v2(",start);
+ assert.ok(start>=0&&end>start);
+ const activation=sql.slice(start,end);
+ assert.match(activation,/v_order\.activation_status is distinct from 'not_activated'/);
+ assert.match(activation,/v_payment\.payment_status not in \('Pending','Failed'\)/);
+ assert.match(activation,/v_payment\.transaction_id is not null/);
+ assert.match(activation,/PACKAGE_PAYMENT_LEDGER_NOT_ACTIVATABLE/);
+ const pg=read("scripts/mvp/vox/validate-vox-rc17-razorpay-v2-real-pg17.mjs");
+ for(const marker of ["PAID_LEDGER_CANNOT_MINT_CREDITS","NULL_ACTIVATION_MUST_DENY_CREDIT",
+   "CONCURRENT_EXACT_ONCE_CREDIT"])assert.ok(pg.includes(marker),marker);
+ const core=read("services/vox/rc8PgVendorConversationOperator.ts");
+ assert.match(core,/FOR UPDATE OF c FOR SHARE OF v,z,geo_city/);
+ const cpg=read("scripts/mvp/vox/validate-vox-rc8-real-pg-vendor-core.mjs");
+ assert.match(cpg,/CONCURRENT_ZONE_REVOCATION_DENIED/);
+ assert.match(cpg,/REVOCATION_NO_EVENT/);
+ const writer=read("scripts/mvp/vox/rc8-pg-signed-intent-writer.mjs");
+ assert.match(writer,/EOD_REQUEST_SCOPE_INVALID/);
+ assert.match(writer,/EOD_SUBJECT_STAFF_REVOKED/);
+ assert.match(writer,/FOR SHARE OF m,t,p,a/);
+ const signed=read("scripts/mvp/vox/validate-vox-rc8-real-pg-signed-intent.mjs");
+ for(const marker of ["NON_EOD_SCOPE_DENIED","INVALID_EOD_SUBJECT_DENIED",
+   "EOD_REVOKED_STAFF_SUBJECT_DENIED","EOD_MISSING_STAFF_AUTH_DENIED"])
+   assert.ok(signed.includes(marker),marker);
+ const view=read("apps/vox-web/app/finance/page.tsx");
+ assert.match(view,/const attention=monthScoped\.reduce/);
+ assert.match(view,/attention\+" of "\+monthScoped\.length/);
+});
+test("Core and EOD disposable PG17 suites verify actual mapped TCP endpoint",()=>{
+ for(const path of ["scripts/mvp/vox/validate-vox-rc8-real-pg-vendor-core.mjs",
+  "scripts/mvp/vox/validate-vox-rc8-real-pg-signed-intent.mjs"]){
+  const script=read(path);
+  assert.match(script,/connectionTimeoutMillis:1200/);
+  assert.match(script,/SELECT 1 AS ready/);
+  assert.doesNotMatch(script,/ready=docker\(\["exec"/);
+ }
+});

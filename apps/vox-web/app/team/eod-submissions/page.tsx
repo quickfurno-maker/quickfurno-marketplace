@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {fetchMyEodSubmissions} from "../../../lib/teamWorkflow";
+import {StaffSignInLink} from "../../components/StaffSignInLink";
 import SubmitPartial from "./SubmitPartial";
 import "../workflow.css";
 export const dynamic="force-dynamic";
@@ -20,6 +21,7 @@ export default async function MyEodSubmissions(){
    <p className="voxFlowMuted">{r.status===401?"A verified Staff MFA session is required.":
     r.status===403?"Core denied your current Staff scope.":
     "Human-reviewed staging activation and current Core source are required."}</p>
+   <StaffSignInLink status={r.status}/>
    <Link href="/team/daily-report">View read-only activity preview</Link>
   </section>:<>
    <section className="voxFlowCard" aria-labelledby="submitHeading">

@@ -1,5 +1,6 @@
 "use client";
 import {useRef,useState} from "react";
+import Link from "next/link";
 import {useRouter} from "next/navigation";
 
 const actions=["CLAIM","START","WAIT_EXTERNAL","REQUEST_APPROVAL","BLOCK","RESUME","COMPLETE"] as const;
@@ -19,6 +20,7 @@ export default function WorkActionControl({itemId,revision,state,assignedToMe}:P
  const [reason,setReason]=useState("");
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState("");
+ const [expired,setExpired]=useState(false);
  const pending=useRef<{nonce:string;command:string}|null>(null);
  if(options.length===0)return <span>Current state has no permitted work command</span>;
  const needsReason=["BLOCK","REQUEST_APPROVAL","COMPLETE"].includes(action);
@@ -32,12 +34,13 @@ export default function WorkActionControl({itemId,revision,state,assignedToMe}:P
   const fingerprint=JSON.stringify(payload);
   if(!pending.current||pending.current.command!==fingerprint)
    pending.current={nonce:crypto.randomUUID(),command:fingerprint};
-  setBusy(true);setMessage("");
+  setBusy(true);setMessage("");setExpired(false);
   try{
    const result=await fetch("/api/work-transitions",{
     method:"POST",credentials:"same-origin",
     headers:{"content-type":"application/json"},cache:"no-store",
     body:JSON.stringify({...payload,nonce:pending.current.nonce})});
+   if(result.status===401){setExpired(true);setMessage("Your verified session ended. Sign in again, then retry this command.");return;}
    const body:unknown=await result.json();
    if(!result.ok||!body||typeof body!=="object"||Array.isArray(body)||
       !("ok" in body)||body.ok!==true||
@@ -70,5 +73,6 @@ export default function WorkActionControl({itemId,revision,state,assignedToMe}:P
   </>:null}
   <button type="submit" disabled={!valid}>{busy?"Core checking…":"Request Core transition"}</button>
   {message?<p role="status" className="voxQueueCaution">{message}</p>:null}
+  {expired?<Link href="/login">Staff sign-in</Link>:null}
  </form>;
 }

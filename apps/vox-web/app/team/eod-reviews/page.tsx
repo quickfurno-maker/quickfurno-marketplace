@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {fetchTlEodQueue} from "../../../lib/teamWorkflow";
+import {StaffSignInLink} from "../../components/StaffSignInLink";
 import ReviewDecision from "./ReviewDecision";
 import "../workflow.css";
 export const dynamic="force-dynamic";
@@ -21,6 +22,7 @@ export default async function TeamLeaderPartialEodReview(){
    <p className="voxFlowMuted">{r.status===401?"Use your verified MFA session.":
     r.status===403?"Only a different current Core Team Leader can review.":
     "Protected Core review approvals and eligible reports are unavailable."}</p>
+   <StaffSignInLink status={r.status}/>
    <Link href="/team">Return to Team Operations</Link>
   </section>:<section className="voxFlowCard" aria-labelledby="reviewListTitle">
    <h2 id="reviewListTitle">Pending Core-only reports</h2>

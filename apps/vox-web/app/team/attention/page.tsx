@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {fetchStaffWorkQueuePreview} from "../../../lib/core";
 import {projectStaffAttention} from "../../../lib/attention";
+import {StaffSignInLink} from "../../components/StaffSignInLink";
 import "./attention.css";
 export const dynamic="force-dynamic";
 export default async function StaffAttention(){
@@ -22,6 +23,7 @@ export default async function StaffAttention(){
    <p>{queue.status===401?"Please sign in with verified Staff MFA.":
     queue.status===403?"Core has not authorized your current Staff scope.":
     "Protected queue access or its source evidence is unavailable."}</p>
+   <StaffSignInLink status={queue.status}/>
    <Link href="/team">Return to Team Operations</Link>
   </section>:<section className="voxAttentionPanel" aria-labelledby="attentionTitle">
    <div className="voxAttentionTitle">

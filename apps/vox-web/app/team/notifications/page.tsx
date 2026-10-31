@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {fetchStaffNotifications} from "../../../lib/staffNotifications";
+import {StaffSignInLink} from "../../components/StaffSignInLink";
 import MarkRead from "./MarkRead";
 import "../workflow.css";
 export const dynamic="force-dynamic";
@@ -30,6 +31,7 @@ export default async function StaffNotifications(){
     "Sign in using verified Staff MFA.":state.status===403?
     "Core has denied the current Staff team/subject scope.":
     "Independent protected staging approval and Core event evidence are required."}</p>
+   <StaffSignInLink status={state.status}/>
    <Link href="/team/attention">Back to Needs Attention</Link>
   </section>:<section className="voxFlowCard" aria-labelledby="inboxTitle">
    <h2 id="inboxTitle">Recent authorized work events</h2>

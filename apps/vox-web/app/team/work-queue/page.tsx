@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {fetchStaffWorkQueuePreview} from "../../../lib/core";
 import {fetchAb3DomainWindow} from "../../../lib/ab3Domain";
+import {StaffSignInLink} from "../../components/StaffSignInLink";
 import WorkActionControl from "./WorkActionControl";
 import "./queue.css";
 export const dynamic="force-dynamic";
@@ -56,6 +57,7 @@ export default async function VoxMyWorkQueue(){
       result.status===403?
       "Your current Core Staff permissions do not allow this view.":
       "This workspace requires protected Core authorization and an approved staging release."}</p>
+    <StaffSignInLink status={result.status}/>
     <Link href="/team">Return to Team Operations</Link>
    </section>:
    <section className="voxQueueCard" aria-labelledby="voxQueueListTitle">

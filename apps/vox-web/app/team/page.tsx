@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {fetchStaffOverview,fetchAdminStaffCapabilityCatalog} from "../../lib/core";
+import {StaffSignInLink} from "../components/StaffSignInLink";
 import "./team.css";
 export const dynamic="force-dynamic";
 
@@ -29,6 +30,7 @@ export default async function TeamOperationsHome(){
    <h1>Team workspace is locked</h1>
    <p>{overview.status===401?"Use your existing Supabase sign-in with verified MFA.":
       "This workspace needs current Core Staff authorization and protected VOX staging activation."}</p>
+   <StaffSignInLink status={overview.status}/>
    <Link href="/">Return to VOX</Link>
   </section>
  </main>;

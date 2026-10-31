@@ -1,22 +1,25 @@
 "use client";
 import {useRef,useState} from "react";
+import Link from "next/link";
 import {useRouter} from "next/navigation";
 export default function ChatComposer(){
  const router=useRouter();
  const [message,setMessage]=useState("");
  const [busy,setBusy]=useState(false);
  const [result,setResult]=useState("");
+ const [expired,setExpired]=useState(false);
  const retryNonce=useRef<string|null>(null);
  async function send(event:React.FormEvent){
   event.preventDefault();
   const body=message.trim();
   if(!body||body.length>500||busy)return;
   if(!retryNonce.current)retryNonce.current=crypto.randomUUID();
-  setBusy(true);setResult("");
+  setBusy(true);setResult("");setExpired(false);
   try{
    const res=await fetch("/api/team-chat",{method:"POST",credentials:"same-origin",
     headers:{"content-type":"application/json"},cache:"no-store",
     body:JSON.stringify({body,nonce:retryNonce.current})});
+   if(res.status===401){setExpired(true);setResult("Your verified session ended. Sign in again; your text is kept.");return;}
    const data:unknown=await res.json();
    if(!res.ok||!data||typeof data!=="object"||
       !("ok" in data)||data.ok!==true||
@@ -39,5 +42,6 @@ export default function ChatComposer(){
    disabled={busy||!message.trim()}>{busy?"Checking Core...":"Send to my team"}</button>
    <small>{message.length}/500 characters</small></div>
   {result?<p className="voxFlowError" role="status">{result}</p>:null}
+  {expired?<Link href="/login">Staff sign-in</Link>:null}
  </form>;
 }

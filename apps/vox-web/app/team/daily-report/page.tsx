@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {fetchStaffEodPreview} from "../../../lib/eod";
 import {fetchAb5SourceCheckpoints} from "../../../lib/ab5SourceCheckpoint";
+import {StaffSignInLink} from "../../components/StaffSignInLink";
 import "./report.css";
 export const dynamic="force-dynamic";
 const metrics=[
@@ -35,6 +36,7 @@ export default async function MyDailyReport(){
     r.status===403?"Your current Core Staff permissions do not allow this view.":
     "Protected VOX staging authorization or source evidence is unavailable."}</p>
    <p>No activity figures are shown when Core cannot verify the source.</p>
+   <StaffSignInLink status={r.status}/>
    <Link href="/team">Return to Team Operations</Link>
   </section>:<>
    <section aria-labelledby="activity-counts" className="voxReportCard">

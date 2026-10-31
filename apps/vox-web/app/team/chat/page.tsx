@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {fetchTeamChat} from "../../../lib/teamWorkflow";
+import {StaffSignInLink} from "../../components/StaffSignInLink";
 import ChatComposer from "./ChatComposer";
 import "../workflow.css";
 export const dynamic="force-dynamic";
@@ -21,6 +22,7 @@ export default async function StaffTeamChat(){
    <p className="voxFlowMuted">{r.status===401?"Sign in with verified Staff MFA.":
     r.status===403?"Your Core Staff scope does not allow this conversation.":
     "Protected Staging Staff chat has not been independently activated."}</p>
+   <StaffSignInLink status={r.status}/>
    <Link href="/team">Return to Team Operations</Link>
   </section>:<>
    <section className="voxFlowCard" aria-labelledby="newTeamMessage">

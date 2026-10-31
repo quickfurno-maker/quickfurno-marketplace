@@ -118,6 +118,10 @@ try{
  await pool.query("UPDATE public.payments SET payment_status='Paid',transaction_id='pay_existing_unactivated' WHERE id=$1",[nullStateOrder]);
  await rejectReason(()=>bind(nullStateOrder,uuid(14),"test","order_nullstate"),"PAID_UNACTIVATED_LEDGER_BIND_DENIED","PAYMENT_BIND_DRIFT");
  await rejectReason(()=>activate(nullStateOrder,"pay_existing_unactivated","test"),"PAID_LEDGER_CANNOT_MINT_CREDITS","PACKAGE_PAYMENT_LEDGER_NOT_ACTIVATABLE");
+ await rejectReason(()=>claim(nullStateOrder,uuid(15),"test"),"PAID_BOUND_CHECKOUT_DENIED","RAZORPAY_V2_BOUND_LEDGER_UNVERIFIED");
+ await pool.query("UPDATE public.payments SET payment_status='Pending' WHERE id=$1",[nullStateOrder]);
+ await rejectReason(()=>claim(nullStateOrder,uuid(15),"test"),"CAPTURED_TXID_BOUND_CHECKOUT_DENIED","RAZORPAY_V2_BOUND_LEDGER_UNVERIFIED");
+ await rejectReason(()=>bind(nullStateOrder,uuid(14),"test","order_nullstate"),"CAPTURED_TXID_BIND_DENIED","PAYMENT_BIND_DRIFT");
  await pool.query("UPDATE public.vendor_package_orders SET payment_provider=NULL WHERE id=$1",[nullProviderOrder]);
  await reject(()=>claim(nullProviderOrder,other,"test"),"NULL_PROVIDER_CANNOT_CLAIM");
  await claim(cancelledOrder,uuid(11),"test");
@@ -159,6 +163,15 @@ try{
  const logs=await pool.query("SELECT count(*)::int AS n FROM public.vendor_credit_logs");
  check(logs.rows[0].n===1,"EXACT_ONCE_LOG_FAILED");
  await claim(liveOrder,liveToken,"live");
+ // The provider rejected a POST after an external refund/cancellation. A
+ // stale release must never reset this order to not_started/not_connected.
+ await pool.query("UPDATE public.vendor_package_orders SET order_status='cancelled' WHERE id=$1",[liveOrder]);
+ await rejectReason(()=>release(liveOrder,liveToken,"live"),"CANCELLED_CLAIM_RELEASE_DENIED","RAZORPAY_V2_CLAIM_RELEASE_DENIED");
+ await pool.query("UPDATE public.vendor_package_orders SET order_status='created',payment_status='refunded' WHERE id=$1",[liveOrder]);
+ await rejectReason(()=>release(liveOrder,liveToken,"live"),"REFUNDED_CLAIM_RELEASE_DENIED","RAZORPAY_V2_CLAIM_RELEASE_DENIED");
+ await pool.query("UPDATE public.vendor_package_orders SET payment_status='pending',activation_status=NULL WHERE id=$1",[liveOrder]);
+ await rejectReason(()=>release(liveOrder,liveToken,"live"),"NULL_ACTIVATION_CLAIM_RELEASE_DENIED","RAZORPAY_V2_CLAIM_RELEASE_DENIED");
+ await pool.query("UPDATE public.vendor_package_orders SET activation_status='not_activated' WHERE id=$1",[liveOrder]);
  await reject(()=>release(liveOrder,other,"live"),"WRONG_RELEASE_TOKEN");
  await reject(()=>release(liveOrder,liveToken,"test"),"WRONG_RELEASE_MODE");
  await release(liveOrder,liveToken,"live");

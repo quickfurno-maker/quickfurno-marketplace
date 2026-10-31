@@ -102,6 +102,10 @@ try{
  await pool.query("INSERT INTO auth.users VALUES($1,'{\"admin_role\":\"Superadmin\"}'),($2,'{\"qf_principal\":\"vox_staff\",\"vox_role\":\"team_leader\"}')",[OWNER,TL]);
  await pool.query("INSERT INTO public.vox_staff_teams_v1 VALUES ($1,$2,true)",[TEAM,CITY]);
  await pool.query("INSERT INTO public.vox_staff_memberships_v1 VALUES ($1,$2,'team_leader',true,NULL,clock_timestamp()+interval '30 days')",[TL,TEAM]);
+ // The report subject is a third independent, active Staff identity.
+ await pool.query("INSERT INTO public.profiles VALUES($1,NULL,true)",[id(90)]);
+ await pool.query("INSERT INTO auth.users VALUES($1,'{\"qf_principal\":\"vox_staff\",\"vox_role\":\"operations_manager\"}')",[id(90)]);
+ await pool.query("INSERT INTO public.vox_staff_memberships_v1 VALUES($1,$2,'operations_manager',true,NULL,clock_timestamp()+interval '30 days')",[id(90),TEAM]);
  await pool.query("INSERT INTO public.vox_ab7f_four_source_eod_candidate_v1 VALUES($1,$2,$3,$4,$5,4,$6,'TL_ACKNOWLEDGED_AWAITING_OWNER_RELEASE',false)",[SUB,id(90),TEAM,CITY,TL,DIGEST]);
  const ddl=readFileSync(resolve(root,"ops/vox/rc7-review-candidates/20261030010000_vox_rc8_signed_intent_transaction_review_only.sql"),"utf8");
  await pool.query(ddl);
@@ -146,6 +150,14 @@ try{
  r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
  eq(r.reason,"EOD_CURRENT_FOUR_SOURCE_REVIEW_REQUIRED","EOD_MISSING_STAFF_ID_DENIED");
  await pool.query("UPDATE public.vox_ab7f_four_source_eod_candidate_v1 SET staff_id=$2 WHERE id=$1",[SUB,id(90)]);
+ await pool.query("UPDATE public.vox_staff_memberships_v1 SET revoked_at=clock_timestamp() WHERE auth_user_id=$1",[id(90)]);
+ r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
+ eq(r.reason,"EOD_SUBJECT_STAFF_REVOKED","EOD_REVOKED_STAFF_SUBJECT_DENIED");
+ await pool.query("UPDATE public.vox_staff_memberships_v1 SET revoked_at=NULL WHERE auth_user_id=$1",[id(90)]);
+ await pool.query("UPDATE auth.users SET raw_app_meta_data='{}' WHERE id=$1",[id(90)]);
+ r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
+ eq(r.reason,"EOD_SUBJECT_STAFF_REVOKED","EOD_MISSING_STAFF_AUTH_DENIED");
+ await pool.query("UPDATE auth.users SET raw_app_meta_data='{\"qf_principal\":\"vox_staff\",\"vox_role\":\"operations_manager\"}' WHERE id=$1",[id(90)]);
  eq(r.reason,"NATIVE_RELEASE_GATE_CLOSED","PRODUCTION_BLOCK");
  r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
  eq(r.ok,true,"NATIVE_REAL_PG_COMMIT");eq(r.approved,false,"NEVER_APPROVED");

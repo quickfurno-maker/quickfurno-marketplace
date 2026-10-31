@@ -14,6 +14,7 @@ import {readFileSync,readdirSync,writeFileSync,statSync} from "node:fs";
 import {dirname,resolve,sep} from "node:path";
 import {fileURLToPath} from "node:url";
 import {scanSqlObjects} from "../../../contracts/vox/rc4ReleasePlan.mjs";
+import {lintSqlAcl} from "./d-db-sql-acl-lint.mjs";
 
 const here=dirname(fileURLToPath(import.meta.url));
 const repoRoot=resolve(here,"../../..");
@@ -55,11 +56,41 @@ const MANAGED_ENV=["DATABASE_URL","SUPABASE_DB_URL","SUPABASE_SERVICE_ROLE_KEY",
 export const managedCredentialsPresent=(env=process.env)=>
  MANAGED_ENV.filter(k=>typeof env[k]==="string"&&env[k].length>0);
 
+// Roots whose every file is pending/review-only SQL. Their bytes are hashed so a renamed or copied
+// pending file cannot pass as a clean plan source.
+export const PENDING_SQL_ROOTS=Object.freeze(["ops/vox/sql-candidates","ops/vox/quarantined-migrations",
+ "ops/vox/identity-attestation-overlay","ops/vox/rc4-approval-overlay","ops/security/sql-candidates"]);
+
+/** Map<sha256, class> of every pending SQL file under `root`, read locally (no network, no execution). */
+export function collectPendingShas(root){
+ const m=new Map();
+ const walk=(abs,rel)=>{
+  let ents;try{ents=readdirSync(abs,{withFileTypes:true})}catch{return}
+  for(const e of ents){
+   const a=resolve(abs,e.name),r=rel+"/"+e.name;
+   if(e.isDirectory())walk(a,r);
+   else if(e.isFile()&&/\.sql$/i.test(e.name)){
+    try{const b=readFileSync(a);if(b.length&&b.length<=MAX_SQL_BYTES){const h=sha(b);if(!m.has(h))m.set(h,pendingClass(r)||"PENDING")}}catch{}
+   }
+  }
+ };
+ for(const d of PENDING_SQL_ROOTS)walk(resolve(root,d),d);
+ return m;
+}
+
+// A destructive plan file may name {rollback:{path,sha256}}: a canonical, readable, pinned file.
+function rollbackOk(rb,readBytes){
+ if(!rb||!safeRel(rb.path)||!HEX64.test(rb.sha256||""))return false;
+ const b=readBytes(rb.path);
+ return Buffer.isBuffer(b)&&b.length>0&&sha(b)===rb.sha256;
+}
+
 /**
  * Pure evaluation. `readBytes(path)->Buffer|null` supplies local SQL bytes;
- * `localVersions` (optional array) overrides inventory.localVersions.
+ * `localVersions` (optional array) overrides inventory.localVersions;
+ * `pendingShas` (optional Map<sha256,class>) marks byte-identical pending SQL.
  */
-export function evaluateReleasePreflight({inventory,readBytes,localVersions}){
+export function evaluateReleasePreflight({inventory,readBytes,localVersions,pendingShas}){
  const findings=[];
  const add=(code,severity,detail,path)=>findings.push(Object.freeze({code,severity,detail,...(path?{path}:{})}));
  const inv=inventory;
@@ -90,6 +121,14 @@ export function evaluateReleasePreflight({inventory,readBytes,localVersions}){
    row.observedSha256=sha(buf);row.bytes=buf.length;row.text=buf.toString("utf8");
    if(row.pinnedSha256&&row.pinnedSha256!==row.observedSha256)
     add("SOURCE_SHA_MISMATCH","BLOCK","on-disk SHA256 differs from pin",path);
+   const twin=pendingShas&&pendingShas.get(row.observedSha256);
+   if(twin&&!row.pending){row.pending=twin;add("PENDING_SQL_BYTE_IDENTICAL","BLOCK",`bytes are identical to pending ${twin} SQL under a different path`,path)}
+   const rb=rollbackOk(s.rollback,readBytes);
+   for(const l of lintSqlAcl(row.text)){
+    if(l.code==="DESTRUCTIVE_DDL_NEEDS_ROLLBACK"&&rb)continue;
+    if(l.code==="P0_6_CONTENT"&&!row.pending)row.pending="P0_6";
+    add(l.code,l.severity,l.detail,path);
+   }
   }
   if(row.pending)add("PENDING_SQL_NOT_ENABLEABLE","BLOCK",`${row.pending} SQL can never be released by this tool`,path);
   rows.push(row);
@@ -242,7 +281,7 @@ export function run(argv,{env=process.env}={}){
  if(opt["migrations-dir"]){
   localVersions=readdirSync(resolve(root,opt["migrations-dir"])).map(n=>MIG_NAME.exec(n)?.[1]).filter(Boolean).sort();
  }
- const report=evaluateReleasePreflight({inventory,readBytes,localVersions});
+ const report=evaluateReleasePreflight({inventory,readBytes,localVersions,pendingShas:collectPendingShas(root)});
  assertReportNonExecuting(report);
  if(opt.out){
   const abs=resolve(opt.out),low=abs.toLowerCase();

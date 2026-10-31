@@ -19,4 +19,8 @@ Exit `0` GO, `2` HOLD, `64` usage/forbidden flag (`--apply`, `--push`, `--go`, `
 - approvals missing or not bound to the current ordered pin (the ordered plan is withheld unless GO)
 - **P0-6, the 7 quarantined, the 23 candidates and review-only overlay SQL always BLOCK** (`PENDING_SQL_NOT_ENABLEABLE`), however pinned or approved
 
+- **content/hash pending detection** (`PENDING_SQL_BYTE_IDENTICAL`, `P0_6_CONTENT`): a plan file byte-identical to any file under the pending SQL roots, or that (re)defines/drops `is_admin()`, is pending whatever its path
+- **ACL lint** (`d-db-sql-acl-lint.mjs`, comment-stripped, no SQL emitted): `GRANT` to PUBLIC/anon, `ALTER DEFAULT PRIVILEGES`, new function without `REVOKE ... FROM PUBLIC` in the same file, `SECURITY DEFINER` without `SET search_path` all BLOCK
+- destructive DDL (`DROP TABLE/COLUMN/...`, `TRUNCATE`) HOLDs unless the source names a canonical pinned `rollback {path, sha256}`
+
 Approvals are asserted identifiers, not signatures; real signoff stays with the RC4 signed-approval pipeline. A GO from this tool is a preflight consistency result, not authority to apply. Blanket `db push` / `migration repair` stay forbidden. Managed Staging/prod, payment, EOD and UI holds are unchanged.

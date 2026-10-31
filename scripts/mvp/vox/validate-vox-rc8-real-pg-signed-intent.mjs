@@ -202,6 +202,30 @@ try{
   0,"STALE_AAL2_NO_NONCE");
  eq(Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_verified_intents_candidate_v1")).rows[0].n),
   0,"STALE_AAL2_NO_RECEIPT");
+ // The caller's branded TL membership timestamp remains valid, but actual
+ // database membership expires while the pending receipt transaction is open.
+ await pool.query("UPDATE public.vox_staff_memberships_v1 "+
+  "SET expires_at=clock_timestamp()+interval '2 seconds' "+
+  "WHERE auth_user_id=$1",[TL]);
+ const ttlArgs={...args(request(37,38)),acquireClient:async()=>{
+  const raw=await pool.connect();
+  return {query:async(sql,values)=>{
+   const result=await raw.query(sql,values);
+   if(sql.includes("INSERT INTO public.vox_rc8_verified_intents_candidate_v1"))
+    await sleep(2500);
+   return result;
+  },release:()=>raw.release()};
+ }};
+ r=await executeRc8PgPendingSignedIntent(ttlArgs,TEST_ONLY_GATE);
+ eq(r.reason,"SIGNED_EOD_MEMBERSHIP_EXPIRED_DURING_TRANSACTION",
+  "IN_FLIGHT_SERVER_TL_MEMBERSHIP_EXPIRY_DENIED");
+ eq(Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_approval_claims_candidate_v1")).rows[0].n),
+  0,"EXPIRED_DB_TL_NO_NONCES");
+ eq(Number((await pool.query("SELECT count(*)::int AS n FROM public.vox_rc8_verified_intents_candidate_v1")).rows[0].n),
+  0,"EXPIRED_DB_TL_NO_RECEIPT");
+ await pool.query("UPDATE public.vox_staff_memberships_v1 "+
+  "SET expires_at=clock_timestamp()+interval '30 days' "+
+  "WHERE auth_user_id=$1",[TL]);
  r=await executeRc8PgPendingSignedIntent(args(),TEST_ONLY_GATE);
  eq(r.ok,true,"NATIVE_REAL_PG_COMMIT");eq(r.approved,false,"NEVER_APPROVED");
  const counts=async()=>({

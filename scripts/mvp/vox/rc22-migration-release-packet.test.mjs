@@ -25,3 +25,17 @@ test("DB handoff emits no write-capable SQL or managed DB requests",()=>{
  assert.doesNotMatch(s,/\bfetch\s*\(|\.query\(|\.rpc\(|\bexecFileSync\(|\bspawnSync\(|\bprocess\.env\b/);
  assert.match(s,/releaseGo:false/);
 });
+
+test("migration release packet rejects version collisions and keeps immutable source pins",async()=>{
+ const {rc22AssertUniqueVersions,RC22_PINNED_SOURCE}=await import("./rc22-migration-release-packet.mjs");
+ assert.throws(()=>rc22AssertUniqueVersions([
+  "20261013144901_first.sql","20261013144901_second.sql"
+ ]),/DUPLICATE_MIGRATION_VERSION/);
+ assert.equal(rc22AssertUniqueVersions(["20261013144901_reviewed.sql"]),true);
+ assert.throws(()=>rc22AssertUniqueVersions(["not-a-migration.sql"]),/MIGRATION_NAME_FORMAT_INVALID/);
+ const packet=buildRc22MigrationPacket();
+ assert.equal(packet.migrations.count,RC22_PINNED_SOURCE.count);
+ assert.equal(packet.migrations.aggregateSha256,RC22_PINNED_SOURCE.aggregateSha256);
+ assert.equal(packet.historicalFinance.sha256,RC22_PINNED_SOURCE.legacySha256);
+ assert.equal(packet.financeCandidate.sha256,RC22_PINNED_SOURCE.candidateSha256);
+});

@@ -42,3 +42,26 @@ test("client project expiry after write is denied atomically by real PG17",()=>{
  const core=read("services/vox/rc8PgVendorConversationOperator.ts");
  assert.match(core,/CLIENT_PROJECT_BINDING_EXPIRED_DURING_TRANSACTION/);
 });
+
+test("commit-time Core grants bind the original reviewed capability and same-team TL",()=>{
+ const source=read("services/vox/rc8PgVendorConversationOperator.ts");
+ const final=source.slice(source.indexOf("const currentGrants=await db.query("),
+  source.indexOf('if(currentGrants.rowCount!==1)'));
+ for(const required of [
+  'tl.team_id=req.team_id',
+  'os.id=$5::uuid AND cap.id=$6::uuid',
+  'req.team_id=m.team_id AND req.city_id=cap.city_id',
+  'cap.revision=2 AND req.revision=1 AND t.is_active=true',
+  'scope.rows[0].id,reviewed.rows[0].id',
+  "tl.expires_at>clock_timestamp()"
+ ])assert.ok(final.includes(required),required);
+});
+test("commit-time client binding also verifies same-team independent reviewer expiry",()=>{
+ const source=read("services/vox/rc8PgVendorConversationOperator.ts");
+ const final=source.slice(source.indexOf("const currentProject=await db.query("),
+   source.indexOf("if(currentProject.rowCount!==1)"));
+ for(const required of ["review_m.auth_user_id=b.reviewed_by",
+  "review_m.team_id=b.team_id","review_m.staff_role='team_leader'",
+  "review_m.expires_at>clock_timestamp()","review_t.city_id=b.approved_city_id"])
+  assert.ok(final.includes(required),required);
+});

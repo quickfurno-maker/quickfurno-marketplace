@@ -38,3 +38,12 @@ test("signed EOD recomputes branded Owner and Team Leader AAL2 freshness at COMM
  assert.match(pg,/STALE_AAL2_NO_NONCE/);
  assert.match(pg,/STALE_AAL2_NO_RECEIPT/);
 });
+
+test("final EOD SQL validates live membership TTL",()=>{
+ const code=read("scripts/mvp/vox/rc8-pg-signed-intent-writer.mjs");
+ assert.ok(code.includes("SIGNED_EOD_MEMBERSHIP_EXPIRED_DURING_TRANSACTION"));
+ assert.ok(code.includes("lockedEodSubjectStaffId"));
+ assert.ok(code.includes("now:Date.now()"));
+ const pg=read("scripts/mvp/vox/validate-vox-rc8-real-pg-signed-intent.mjs");
+ assert.ok(pg.includes("IN_FLIGHT_SERVER_TL_MEMBERSHIP_EXPIRY_DENIED"));
+});

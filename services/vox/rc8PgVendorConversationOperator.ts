@@ -255,8 +255,13 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
    "ON cap.auth_user_id=m.auth_user_id AND cap.team_id=m.team_id "+
    "JOIN public.vox_staff_department_requests_v1 req ON req.id=cap.request_id "+
    "JOIN public.vox_staff_memberships_v1 tl ON tl.auth_user_id=req.decided_by "+
+   "AND tl.team_id=req.team_id "+
+   "JOIN public.vox_staff_teams_v1 t ON t.id=m.team_id "+
    "WHERE m.auth_user_id=$1::uuid AND os.object_id=$2::uuid "+
    "AND m.team_id=$3::uuid AND cap.city_id=$4::uuid "+
+   "AND os.id=$5::uuid AND cap.id=$6::uuid "+
+   "AND req.team_id=m.team_id AND req.city_id=cap.city_id "+
+   "AND cap.revision=2 AND req.revision=1 AND t.is_active=true "+
    "AND os.scope_kind='conversation' AND os.revoked_at IS NULL "+
    "AND os.expires_at>clock_timestamp() "+
    "AND m.is_active=true AND m.revoked_at IS NULL AND m.expires_at>clock_timestamp() "+
@@ -265,16 +270,23 @@ export async function executeRc8PgVendorConversationOperator(input:Input,
    "AND req.expires_at>clock_timestamp() AND tl.staff_role='team_leader' "+
    "AND tl.is_active=true AND tl.revoked_at IS NULL "+
    "AND tl.expires_at>clock_timestamp()",
-   [input.verifiedStaff.userId,input.conversationId,staff.rows[0].team_id,c.city_id]);
+   [input.verifiedStaff.userId,input.conversationId,staff.rows[0].team_id,
+    c.city_id,scope.rows[0].id,reviewed.rows[0].id]);
   if(currentGrants.rowCount!==1){
    await db.query("ROLLBACK");settled=true;
    return closed("CORE_GRANT_EXPIRED_DURING_TRANSACTION");
   }
   if(clientBinding){
    const currentProject=await db.query(
-    "SELECT conversation_id FROM public.vox_rc12_client_conversation_project_bindings_candidate_v1 "+
-    "WHERE conversation_id=$1::uuid AND review_state='APPROVED' "+
-    "AND expires_at>clock_timestamp()",[input.conversationId]);
+    "SELECT b.conversation_id FROM public.vox_rc12_client_conversation_project_bindings_candidate_v1 b "+
+    "JOIN public.vox_staff_memberships_v1 review_m ON review_m.auth_user_id=b.reviewed_by "+
+    "AND review_m.team_id=b.team_id AND review_m.staff_role='team_leader' "+
+    "AND review_m.is_active=true AND review_m.revoked_at IS NULL "+
+    "AND review_m.expires_at>clock_timestamp() "+
+    "JOIN public.vox_staff_teams_v1 review_t ON review_t.id=b.team_id "+
+    "AND review_t.is_active=true AND review_t.city_id=b.approved_city_id "+
+    "WHERE b.conversation_id=$1::uuid AND b.review_state='APPROVED' "+
+    "AND b.expires_at>clock_timestamp()",[input.conversationId]);
    if(currentProject.rowCount!==1){
     await db.query("ROLLBACK");settled=true;
     return closed("CLIENT_PROJECT_BINDING_EXPIRED_DURING_TRANSACTION");

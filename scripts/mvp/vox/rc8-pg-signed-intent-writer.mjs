@@ -70,6 +70,7 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
   if(owner.rowCount!==1||tl.rowCount!==1){
    await client.query("ROLLBACK");settled=true;return deny("CURRENT_ACTOR_REVOKED");
   }
+  let lockedEodSubjectStaffId=null;
   // EOD signatures must bind to the CURRENT locked four-source report,
   // not just a caller-supplied digest and UUID. Operator-command requests use
   // their separate signed-operator source and never this EOD path.
@@ -111,6 +112,7 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
     await client.query("ROLLBACK");settled=true;
     return deny("EOD_SUBJECT_STAFF_REVOKED");
    }
+   lockedEodSubjectStaffId=row.staff_id;
   }
   const registryRows=await client.query(
    "SELECT key_id AS \"keyId\",signer_id::text AS \"signerId\", "+
@@ -184,6 +186,21 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
    await client.query("ROLLBACK");settled=true;
    return deny("SIGNED_EOD_IDENTITY_OR_ENVELOPE_EXPIRED_DURING_TRANSACTION");
   }
+  // Memberships locked above cannot be concurrently changed, but their
+  // TTLs advance during long transactions. Check actual PostgreSQL time,
+  // not caller-provided membership expiry, immediately before COMMIT.
+  const finalMembers=await client.query(
+   "SELECT m.auth_user_id FROM public.vox_staff_memberships_v1 m "+
+   "WHERE m.team_id=$1::uuid AND m.is_active=true AND m.revoked_at IS NULL "+
+   "AND m.expires_at>clock_timestamp() AND ("+
+   "(m.auth_user_id=$2::uuid AND m.staff_role='team_leader') OR "+
+   "(m.auth_user_id=$3::uuid))",
+   [request.teamId,teamLeaderAuth?.userId,lockedEodSubjectStaffId]);
+  if(finalMembers.rowCount!==2||
+     new Set(finalMembers.rows.map(r=>r.auth_user_id)).size!==2){
+   await client.query("ROLLBACK");settled=true;
+   return deny("SIGNED_EOD_MEMBERSHIP_EXPIRED_DURING_TRANSACTION");
+  }
   // Signed envelopes can remain valid while the original verified AAL2
   // session becomes stale. Reuse the branded verifier, not caller claims.
   const finalAuth=checkRc4ApproversAtCommit(ownerAuth,teamLeaderAuth,
@@ -203,6 +220,7 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
 }
 export function executeRc8PgPendingSignedIntentProduction(options){
  return executeRc8PgPendingSignedIntent({...options,
+  now:Date.now(), // live entry must never accept a caller-controlled clock
   approvedRegistryFingerprints:RC4_HUMAN_APPROVED_REGISTRY_FINGERPRINTS
  },RC8_NATIVE_APPROVAL_GATE);
 }

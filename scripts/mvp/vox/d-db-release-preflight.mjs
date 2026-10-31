@@ -31,9 +31,14 @@ export const PENDING_SQL_PATTERNS=Object.freeze([
  [/(^|\/)ops\/vox\/sql-candidates\//,"CANDIDATE_23"],
  [/(^|\/)ops\/vox\/quarantined-migrations\//,"QUARANTINED_7"],
  [/(^|\/)ops\/vox\/(identity-attestation-overlay|rc4-approval-overlay|rc\d+-review-candidates)\//,"REVIEW_ONLY_OVERLAY"],
- [/(^|\/)(?:\d{14}_)?[\w-]*p0[-_]?6[\w-]*\.sql$/i,"P0_6"]
+ [/(^|\/)ops\/security\/(sql-candidates|tests)\//,"SECURITY_CANDIDATE"],
+ [/(^|\/)(?:\d{14}_)?[\w-]*p0[-_]?6[\w-]*\.sql$/i,"P0_6"],
+ [/(^|\/)[\w-]*p0[-_]?6[\w-]*\//i,"P0_6"]
 ]);
-export const pendingClass=p=>{for(const [re,c] of PENDING_SQL_PATTERNS)if(re.test(p))return c;return null};
+// Classify on a normalized path: case-insensitive filesystems (Windows/macOS) and "//" or "./"
+// segments resolve to the same file, so they must not slip past the case-sensitive patterns.
+const normPending=p=>String(p).replace(/\/+/g,"/").split("/").filter(s=>s!=="."&&s!=="").join("/").toLowerCase();
+export const pendingClass=p=>{const n=normPending(p);for(const [re,c] of PENDING_SQL_PATTERNS)if(re.test(n))return c;return null};
 
 export const safeRel=p=>typeof p==="string"&&p.length>0&&!p.includes("..")&&!p.includes("\\")&&
  !p.startsWith("/")&&!/^[a-z]:/i.test(p)&&!p.includes("\0");

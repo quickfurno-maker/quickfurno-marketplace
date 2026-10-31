@@ -1,4 +1,6 @@
 import Link from "next/link";
+import {redirect} from "next/navigation";
+import {verifiedMfaSession} from "../lib/auth";
 import {VoxWorkspaceFrame} from "./components/VoxWorkspaceNav";
 import {VoxRolePerspective} from "./components/VoxRolePerspective";
 import "./mission.css";
@@ -28,6 +30,8 @@ function Locked() {
     <p>Staff-only access remains disabled. Core-verified identity, multi-city permissions,
       staff MFA and origin security must pass certification before this application opens.</p>
     <p className="lockFoot">No vendor information or operational controls are exposed.</p>
+    {process.env.VOX_STAFF_PORTAL_ENABLED==="staging"
+      ?<Link href="/login">Verified Staff sign-in</Link>:null}
   </div></main>;
 }
 
@@ -118,7 +122,15 @@ function LocalPreview() {
   </VoxWorkspaceFrame>;
 }
 
-export default function Home() {
+export default async function Home() {
   const isLocalPreview=process.env.NODE_ENV==="development" && process.env.VOX_DEMO_PREVIEW==="local-only";
-  return isLocalPreview ? <LocalPreview/> : <Locked/>;
+  if(isLocalPreview)return <LocalPreview/>;
+  // A verified AAL2 Staff session must not be trapped on the permanent
+  // locked splash page. The destination independently rechecks current Core
+  // permissions and only exposes a bounded read-only projection.
+  if(process.env.VOX_STAFF_PORTAL_ENABLED==="staging"){
+    const accessToken=await verifiedMfaSession();
+    if(accessToken)redirect("/operations");
+  }
+  return <Locked/>;
 }

@@ -199,6 +199,27 @@ try{
  as(OWNER,tlValue());
  eq((await review("o","t",input,acquire)).ok,true,"REVIEW_RESTORED_OK");
 
+ // 6a. RC38: the report changes (real committed UPDATE) AFTER the first snapshot
+ // but before the second one, i.e. while the review is in progress. The review
+ // must not return a positive result off the stale first snapshot.
+ for(const [sql,label] of [
+  ["UPDATE "+REPORT+" SET source_digest='"+"d".repeat(64)+"' WHERE id=$1","CONCURRENT_DIGEST_CHANGE"],
+  ["UPDATE "+REPORT+" SET published=true WHERE id=$1","CONCURRENT_PUBLISHED"]]){
+  let acquired=0;
+  const racing=async()=>{
+   acquired++;
+   // 1st acquire = first snapshot (clean); mutate before the 2nd acquire runs.
+   if(acquired===2)await pool.query(sql,[SUB]);
+   return pool.connect();
+  };
+  as(OWNER,tlValue());
+  denied(await review("o","t",input,racing),"SIGNED_EOD_CHANGED_DURING_REVIEW",label);
+  eq(acquired,2,label+"_TWO_SNAPSHOTS");
+  await pool.query("UPDATE "+REPORT+" SET source_digest=$2,published=false WHERE id=$1",[SUB,DIGEST]);
+ }
+ as(OWNER,tlValue());
+ eq((await review("o","t",input,acquire)).ok,true,"REVIEW_RESTORED_AFTER_RACE_OK");
+
  // 6b. RC37: stored signer-key evidence + immutability of receipt and registry.
  const ev=await pool.query("SELECT key_id,signer_role,public_key_fingerprint FROM "+
   "public.vox_rc37_receipt_signer_keys_candidate_v1 WHERE intent_id=$1 ORDER BY signer_role",[w.intentId]);
@@ -246,7 +267,8 @@ try{
  console.log("VOX_RC35_EOD_SIGNED_REVIEW_PG17_PASS real_ed25519_bytes=true real_pg17_writer=true "+
   "real_reconciler=true distinct_owner_tl_aal2_rechecked=true scope_bound=true "+
   "report_drift_denied=true revoked_signer_denied=true key_evidence_stored=true "+
-  "registry_and_receipt_immutable=true key_expiry_denied=true readonly=true "+
+  "registry_and_receipt_immutable=true key_expiry_denied=true "+
+  "concurrent_report_change_denied=true readonly=true "+
   "publication=false official_eod=false provider_messages=0");
 }catch(e){console.error("VOX_RC35_EOD_SIGNED_REVIEW_PG17_FAIL "+String(e?.stack||e));process.exitCode=1;}
 finally{

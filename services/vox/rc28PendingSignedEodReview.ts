@@ -65,6 +65,22 @@ export async function verifyRc28PendingEodForHumanReview(
     currentLeader.teamId!==leader.teamId||currentLeader.cityId!==leader.cityId||
     currentLeader.aal!=="aal2"||currentLeader.expiresAtMs<=Date.now())
   return deny("HUMAN_AAL2_REVOKED_DURING_RECONCILIATION");
+ // RC38: the first proof is a point-in-time read. The four-source report stays
+ // mutable and signer keys can expire/be revoked while humans are re-verified,
+ // so a SECOND independent read-only snapshot must reproduce the identical
+ // receipt, signers and scope. Any drift or outage is a fail-closed denial.
+ let final;
+ try{final=await reconcileRc8PgSignedIntentOutcome({
+  acquireClient,intentId:input.intentId,subjectId:input.subjectId,
+  expectedReceiptSha256:input.expectedReceiptSha256
+ })}catch{return deny("SIGNER_RECEIPT_FINAL_RECONCILIATION_UNAVAILABLE")}
+ if(final.outcome!=="COMMITTED"||final.ok!==true||
+    rc8SignedEodPublicationAuthorizationState(final).publicationAuthorized!==false||
+    final.receiptSha256!==proof.receiptSha256||final.intentId!==proof.intentId||
+    final.subjectId!==proof.subjectId||final.ownerId!==proof.ownerId||
+    final.teamLeaderId!==proof.teamLeaderId||final.teamId!==proof.teamId||
+    final.cityId!==proof.cityId)
+  return deny("SIGNED_EOD_CHANGED_DURING_REVIEW");
  return Object.freeze({ok:true,state:"PENDING_RECEIPT_AWAITING_EXTERNAL_REVIEW",
   receiptSha256:proof.receiptSha256,approved:false,
   publicationAuthorized:false,providerMessagesSent:0,requiresIndependentReview:true});

@@ -19,7 +19,7 @@ await build({entryPoints:[resolve(root,"services/vox/rc28PendingSignedEodReview.
   path==="auth"?"export async function verifyVoxOwnerBearer(){globalThis.__eodOwnerCalls++;return globalThis.__eodOwnerCalls>1&&globalThis.__eodRevokeOwner?null:globalThis.__eodOwner}"+
    "export async function verifyVoxTeamLeaderBearer(){globalThis.__eodLeaderCalls++;return globalThis.__eodLeaderCalls>1&&globalThis.__eodRevokeLeader?null:globalThis.__eodLeader}":
   path==="pg"?"export async function reconcileRc8PgSignedIntentOutcome(x){globalThis.__eodCalls.push(x);"+
-   "if(globalThis.__eodThrow)throw Error('synthetic DB down');return globalThis.__eodProof}"+
+   "if(globalThis.__eodThrow)throw Error('synthetic DB down');return globalThis.__eodProofFn?globalThis.__eodProofFn():globalThis.__eodProof}"+
    "export function rc8SignedEodPublicationAuthorizationState(){return {publicationAuthorized:globalThis.__eodPublish}}":
   ""}) );
  }}]});
@@ -40,6 +40,7 @@ test.beforeEach(()=>{
  globalThis.__eodOwnerCalls=0;globalThis.__eodLeaderCalls=0;
  globalThis.__eodProof=committed();
  globalThis.__eodPublish=false;globalThis.__eodThrow=false;globalThis.__eodCalls=[];
+ globalThis.__eodProofFn=null;
 });
 test("human EOD review route and publication always HARD OFF",()=>{
  assert.equal(RC28_SIGNED_EOD_REVIEW_ROUTE_INSTALLED,false);
@@ -65,8 +66,8 @@ test("genuine pending receipt remains pending with no publication authorization"
  const x=await run("owner","tl",pending(),acquire);
  assert.equal(x.ok,true);assert.equal(x.state,"PENDING_RECEIPT_AWAITING_EXTERNAL_REVIEW");
  assert.equal(x.publicationAuthorized,false);assert.equal(x.approved,false);
- assert.equal(globalThis.__eodCalls.length,1);
- assert.deepEqual(globalThis.__eodCalls[0],{acquireClient:acquire,...pending()});
+ assert.equal(globalThis.__eodCalls.length,2);
+ for(const c of globalThis.__eodCalls)assert.deepEqual(c,{acquireClient:acquire,...pending()});
 });
 test("in-flight, conflict, forged publication and SQL outage never authorize EOD",async()=>{
  for(const proof of [{outcome:"IN_FLIGHT",ok:false},{outcome:"COMMITTED",ok:true,receiptSha256:"b".repeat(64)}]){
@@ -112,4 +113,21 @@ test("RC29 revoked Owner or TL during slow reconciliation cannot produce a posit
  assert.equal(result.ok,false);
  assert.equal(result.reason,"HUMAN_AAL2_REVOKED_DURING_RECONCILIATION");
  assert.equal(result.publicationAuthorized,false);
+});
+test("RC38 report/signer change between the two snapshots is a fail-closed denial",async()=>{
+ for(const second of [{outcome:"INCONSISTENT",ok:false},{outcome:"IN_FLIGHT",ok:false},
+  committed({receiptSha256:"b".repeat(64)}),committed({ownerId:id(9)}),
+  committed({teamLeaderId:id(9)}),committed({teamId:id(9)}),committed({cityId:id(9)})]){
+  const seq=[committed(),second];
+  globalThis.__eodProofFn=()=>seq.shift();
+  const r=await run("owner","tl",pending(),acquire);
+  assert.equal(r.ok,false);assert.equal(r.reason,"SIGNED_EOD_CHANGED_DURING_REVIEW");
+  assert.equal(r.publicationAuthorized,false);assert.equal(r.approved,false);
+ }
+});
+test("RC38 second snapshot outage denies",async()=>{
+ let n=0;
+ globalThis.__eodProofFn=()=>{if(++n>1)throw Error("db down");return committed()};
+ assert.equal((await run("owner","tl",pending(),acquire)).reason,
+  "SIGNER_RECEIPT_FINAL_RECONCILIATION_UNAVAILABLE");
 });

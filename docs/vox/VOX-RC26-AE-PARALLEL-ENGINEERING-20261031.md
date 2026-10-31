@@ -28,3 +28,7 @@
 5. Exact new-head GitHub CI and separate Production GO remain required. No managed Staging/Production deployment, external messaging, real payments/refunds/credits, key enrollment or feature activation took place.
 
 This is **engineering progress with explicit unresolved integration blockers**, not a production-ready certification.
+
+## Follow-up CI compatibility correction
+
+On first GitHub head `a95c1bfd`, four legacy Node 20 source workflows failed at the same new RC26 Core test: Node 20 cannot import `.ts` by extension. The actual business/source assertions were not failing. The test now compiles the local import-free TypeScript module with the repository's TypeScript compiler, checks transpile diagnostics and dynamically imports that output. The Core production module, hard OFF gates and seven assertions are unchanged. This focused test **7/7 PASS under a real network-isolated Node 20 container**, and the full source suite **917/917 PASS under Node 24**. Exact new-head GitHub CI must confirm the fix; do not assert CI certification early.

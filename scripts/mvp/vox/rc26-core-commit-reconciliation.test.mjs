@@ -3,10 +3,21 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {resolve,dirname} from "node:path";
 import {fileURLToPath} from "node:url";
-import {reconcileRc8CoreCommitOutcome,RC26_CORE_RECONCILER_ROUTE_INSTALLED}
- from "../../../services/vox/rc26CoreCommitReconciliation.ts";
+import ts from "typescript";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
 const read=p=>readFileSync(resolve(root,p),"utf8");
+// Node 20 is still used by legacy VOX source CI. Transpile only this local,
+// import-free TypeScript module into native ES module JavaScript for testing.
+// Root tsc independently validates types; do not skip transpile diagnostics.
+const compiled=ts.transpileModule(read("services/vox/rc26CoreCommitReconciliation.ts"),{
+ compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022},
+ reportDiagnostics:true
+});
+if(compiled.diagnostics?.some(x=>x.category===ts.DiagnosticCategory.Error))
+ throw Error("RC26_CORE_RECONCILIATION_TS_TRANSPILE_FAILED");
+const {reconcileRc8CoreCommitOutcome,RC26_CORE_RECONCILER_ROUTE_INSTALLED}=
+ await import("data:text/javascript;base64,"+
+  Buffer.from(compiled.outputText,"utf8").toString("base64"));
 const id=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 const CONV=id(1),NONCE=id(2),ACTOR=id(3),EVENT=id(4);
 const original={conversationId:CONV,nonce:NONCE,actorId:ACTOR,action:"TAKEOVER",expectedRevision:0};

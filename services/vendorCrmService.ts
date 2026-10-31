@@ -104,12 +104,14 @@ export async function listVendorCrmDirectory(rawQuery: Record<string, unknown>):
     if (q.onboarding_stage) pq = pq.eq("onboarding_stage", q.onboarding_stage);
     if (q.relationship_status) pq = pq.eq("relationship_status", q.relationship_status);
     if (q.source) pq = pq.eq("acquisition_source", q.source);
-    const { data } = await pq;
+    const { data, error: pqError } = await pq;
+    assertCrmRead(pqError, "directory profile filter");
     crmIdFilter = (data ?? []).map((r: { vendor_id: string }) => r.vendor_id);
     if (crmIdFilter.length === 0) return { rows: [], page: q.page, pageSize: q.pageSize, total: 0 };
   }
   if (q.tagId) {
-    const { data } = await c.from(CRM_TAG_ASSIGNMENTS).select("vendor_id").eq("tag_id", q.tagId).is("removed_at", null);
+    const { data, error: tagError } = await c.from(CRM_TAG_ASSIGNMENTS).select("vendor_id").eq("tag_id", q.tagId).is("removed_at", null);
+    assertCrmRead(tagError, "directory tag filter");
     const tagIds = (data ?? []).map((r: { vendor_id: string }) => r.vendor_id);
     crmIdFilter = crmIdFilter === null ? tagIds : crmIdFilter.filter((id) => tagIds.includes(id));
     if (crmIdFilter.length === 0) return { rows: [], page: q.page, pageSize: q.pageSize, total: 0 };
@@ -117,7 +119,8 @@ export async function listVendorCrmDirectory(rawQuery: Record<string, unknown>):
   if (q.taskState) {
     let tq = c.from(CRM_TASKS).select("vendor_id").in("status", ["open", "in_progress"]);
     if (q.taskState === "overdue") tq = tq.lt("due_at", new Date().toISOString());
-    const { data } = await tq;
+    const { data, error: taskError } = await tq;
+    assertCrmRead(taskError, "directory task filter");
     const taskIds = Array.from(new Set((data ?? []).map((r: { vendor_id: string }) => r.vendor_id)));
     crmIdFilter = crmIdFilter === null ? taskIds : crmIdFilter.filter((id) => taskIds.includes(id));
     if (crmIdFilter.length === 0) return { rows: [], page: q.page, pageSize: q.pageSize, total: 0 };
@@ -152,12 +155,17 @@ export async function listVendorCrmDirectory(rawQuery: Record<string, unknown>):
   if (ids.length === 0) return { rows: [], page: q.page, pageSize: q.pageSize, total: count ?? 0 };
 
   // 3. batch-load CRM extensions for exactly this page's vendor ids (no N+1).
-  const [{ data: profs }, { data: asgs }, { data: tasks }, { data: contacts }] = await Promise.all([
+  const [
+    { data: profs, error: profsError }, { data: asgs, error: asgsError },
+    { data: tasks, error: tasksError }, { data: contacts, error: contactsError },
+  ] = await Promise.all([
     c.from(CRM_PROFILES).select("vendor_id, onboarding_stage, relationship_status, acquisition_source, acquisition_channel, acquisition_owner, acquisition_completed_at, next_follow_up_at, last_interaction_at").in("vendor_id", ids),
     c.from(CRM_TAG_ASSIGNMENTS).select("vendor_id, tag_id, vendor_tags(id, name, is_active)").in("vendor_id", ids).is("removed_at", null),
     c.from(CRM_TASKS).select("vendor_id, status, due_at").in("vendor_id", ids).in("status", ["open", "in_progress"]),
     c.from(CRM_CONTACTS).select("vendor_id, name").in("vendor_id", ids).eq("is_primary", true).eq("is_active", true),
   ]);
+  // Fail closed: a failed batch must not render as "0 open tasks / no tags".
+  assertCrmRead(profsError ?? asgsError ?? tasksError ?? contactsError ?? null, "directory batch");
   const profById = new Map((profs ?? []).map((p: any) => [p.vendor_id, p]));
   const tagsById = new Map<string, { id: string; name: string }[]>();
   for (const a of (asgs ?? []) as any[]) {

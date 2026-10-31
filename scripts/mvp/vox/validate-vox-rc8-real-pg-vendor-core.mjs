@@ -131,6 +131,28 @@ try{
  r=await run(make(C3,id(51)));eq(r.ok,false,"D2C_SUPPRESSION_DENIED");
  eq(await count("public.communication_conversation_events"),1,"CONSENT_NO_EVENT");
  await pool.query("DELETE FROM public.communication_suppressions");
+ // A concurrent zone disable must serialize with the vendor Core writer.
+ // Lock the same zone, start the operator, then revoke before releasing it.
+ // An old snapshot must not commit a takeover after eligibility disappears.
+ const zoneBlocker=await pool.connect();
+ try{
+  await zoneBlocker.query("BEGIN");
+  await zoneBlocker.query("SELECT id FROM public.marketplace_service_zones WHERE id=$1 FOR UPDATE",[ZONE]);
+  const concurrentWriter=run(make(C3,id(60)));
+  await sleep(100);
+  await zoneBlocker.query("UPDATE public.marketplace_service_zones SET matching_enabled=false WHERE id=$1",[ZONE]);
+  await zoneBlocker.query("COMMIT");
+  r=await concurrentWriter;
+  eq(r.ok,false,"CONCURRENT_ZONE_REVOCATION_DENIED");
+  const unchanged=await pool.query("SELECT state,revision FROM public.communication_conversations WHERE id=$1",[C3]);
+  eq(unchanged.rows[0].state,"OPEN","REVOCATION_NOT_APPLIED_AS_TAKEOVER");
+  eq(Number(unchanged.rows[0].revision),0,"REVOCATION_NO_REVISION");
+  eq(await count("public.communication_conversation_events"),1,"REVOCATION_NO_EVENT");
+ }finally{
+  try{await zoneBlocker.query("ROLLBACK")}catch{}
+  zoneBlocker.release();
+  await pool.query("UPDATE public.marketplace_service_zones SET matching_enabled=true WHERE id=$1",[ZONE]);
+ }
  // Real marketplace zone authority: inactive matching never grants a city.
  await pool.query("UPDATE public.marketplace_service_zones SET matching_enabled=false WHERE id=$1",[ZONE]);
  r=await run(make(C3,id(53)));eq(r.ok,false,"ZONE_DISABLED_DENIED");

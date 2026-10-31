@@ -9,6 +9,8 @@ on:
       - 'scripts/mvp/vox/rc20-*.test.mjs'
       - 'scripts/mvp/vox/rc21-*.test.mjs'
       - 'scripts/mvp/vox/rc22-*.test.mjs'
+      - 'scripts/mvp/vox/rc23-*.test.mjs'
+      - 'scripts/mvp/vox/rc23-migration-adjudication.mjs'
       - 'scripts/mvp/vox/rc22-migration-release-packet.mjs'
       - 'scripts/mvp/vox/rc18-finance-release-recovery-preflight.mjs'
       - 'scripts/mvp/vox/validate-vox-rc17-*.mjs'
@@ -17,6 +19,7 @@ on:
       - 'lib/payments/vendorPackagePaymentReceipts.*'
       - 'lib/payments/vendorPackageRefundEvidence.*'
       - 'lib/payments/vendorPackageWebhookBoundary.*'
+      - 'lib/payments/vendorPackageRefundReconciliationReview.mjs'
       - 'contracts/vox/rc4ApprovalPipeline.mjs'
       - 'services/vox/rc8PgVendorConversationOperator.ts'
       - 'services/vox/verifiedStaffBearer.ts'
@@ -46,8 +49,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Run RC17-RC22 source boundary tests (no mocked green)
-        run: node --test scripts/mvp/vox/rc17-*.test.mjs scripts/mvp/vox/rc18-*.test.mjs scripts/mvp/vox/rc19-*.test.mjs scripts/mvp/vox/rc20-*.test.mjs scripts/mvp/vox/rc21-*.test.mjs scripts/mvp/vox/rc22-*.test.mjs
+      - name: Run RC17-RC23 source boundary tests (no mocked green)
+        run: node --test scripts/mvp/vox/rc17-*.test.mjs scripts/mvp/vox/rc18-*.test.mjs scripts/mvp/vox/rc19-*.test.mjs scripts/mvp/vox/rc20-*.test.mjs scripts/mvp/vox/rc21-*.test.mjs scripts/mvp/vox/rc22-*.test.mjs scripts/mvp/vox/rc23-*.test.mjs
       - name: Compute source migration and recovery HOLD evidence
         shell: bash
         run: |
@@ -56,6 +59,8 @@ jobs:
           grep -Fq 'VOX_RC18_RECOVERY_REVIEW_HOLD ' "${RUNNER_TEMP}/vox-rc20-recovery.log"
           node scripts/mvp/vox/rc22-migration-release-packet.mjs | tee "${RUNNER_TEMP}/vox-rc22-migration-handoff.log"
           grep -Fq 'VOX_RC22_MIGRATION_HANDOFF_HOLD ' "${RUNNER_TEMP}/vox-rc22-migration-handoff.log"
+          node scripts/mvp/vox/rc23-migration-adjudication.mjs | tee "${RUNNER_TEMP}/vox-rc23-history-hold.log"
+          grep -Fq 'VOX_RC23_MIGRATION_HISTORY_HOLD ' "${RUNNER_TEMP}/vox-rc23-history-hold.log"
       - name: Typecheck Core real application
         run: npm run typecheck
       - name: Preserve release HOLD

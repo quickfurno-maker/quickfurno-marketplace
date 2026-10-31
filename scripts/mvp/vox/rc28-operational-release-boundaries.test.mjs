@@ -23,13 +23,19 @@ test("Finance candidate denies public/auth and separates TEST/LIVE exact-event i
  assert.match(sql,/GRANT EXECUTE ON FUNCTION/);
  assert.doesNotMatch(sql,/GRANT .* TO anon|GRANT .* TO authenticated/i);
 });
-test("live provider route has no repository wiring and remains hard OFF",()=>{
+test("provider repository wiring is dormant until independently approved financial release",()=>{
  const runtime=read("services/vendorPackagePaymentService.ts");
  const repo=read("lib/payments/vendorPackageProviderEventRepository.mjs");
+ const gate=read("lib/payments/vendorPackageProviderEventProcessing.mjs");
+ const ledger=read("lib/payments/vendorPackageProviderEventLedger.mjs");
  assert.match(runtime,/resolveVendorPackageEventLedgerGate/);
- assert.doesNotMatch(runtime,/createRc28VendorPackageEventRepository/);
+ assert.match(runtime,/createRc28VendorPackageEventRepository/);
+ assert.match(runtime,/RC28_PROVIDER_LEDGER_RUNTIME_INSTALLED\s*\?/);
  assert.match(repo,/RC28_PROVIDER_LEDGER_RUNTIME_INSTALLED=false/);
- assert.match(runtime,/ledgerGate\.action !== "legacy"/);
+ assert.match(runtime,/if \(ledgerGate\.action === "deny"\)/);
+ assert.match(runtime,/if \(!processed\.ack\)/);
+ assert.match(ledger,/providerMode==="live"&&ledgerMode!=="enforce"/);
+ assert.match(gate,/RAZORPAY_EVENT_LEDGER_REPOSITORY_UNAVAILABLE/);
 });
 test("genuine Staff Core reconciliation remains unexposed and never accepts injected actor",()=>{
  const core=read("services/vox/rc28VerifiedCoreOutcomeReconciliation.ts");

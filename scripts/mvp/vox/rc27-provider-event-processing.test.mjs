@@ -174,12 +174,21 @@ test("service wiring: gate runs after HMAC/classify and before any order lookup 
  const g=at("resolveVendorPackageEventLedgerGate(");
  assert.ok(at("verifyWebhookSignature(")<g);
  assert.ok(at("classifyVendorPackageWebhookEvent(event)")<g);
- assert.ok(g<at("loadOrderByProviderOrderId("));
- assert.ok(g<at("razorpayFetch<"));
- assert.ok(g<at("markPaymentFailed("));
- assert.match(fn,/ledgerModeValue: process\.env\.RAZORPAY_VENDOR_PACKAGE_EVENT_LEDGER_MODE,\s*\}\);/,
-  "no repository is passed: enforce stays fail-closed");
- assert.match(fn,/if \(ledgerGate\.action !== "legacy"\) \{\s*throw paymentError\(/);
+ // The closure is DEFINED before the ledger gate but must never execute
+ // until after the gate has denied unapproved LIVE and enforce requests.
+ const handlerDefinition=at("const processSignedCandidate = async");
+ const handlerCall=at("await processSignedCandidate()");
+ assert.ok(handlerDefinition<g&&g<handlerCall);
+ assert.ok(at("loadOrderByProviderOrderId(")<g,
+  "lookup lives inside the deferred closure, not on the pre-gate path");
+ assert.ok(fn.indexOf("processSignedCandidate(",handlerDefinition+20)>g,
+  "no pre-gate call may execute the Core writer");
+ assert.match(fn,/RC28_PROVIDER_LEDGER_RUNTIME_INSTALLED\s*\?/,
+  "only explicit source-level release certification can install the repository");
+ assert.match(fn,/if \(ledgerGate\.action === "deny"\) \{/);
+ assert.match(fn,/if \(ledgerGate\.action === "ledger"\) \{/);
+ assert.match(fn,/processVendorPackageProviderEvent\(\{/);
+ assert.match(fn,/if \(!processed\.ack\) \{/);
  const route=readFileSync(resolve(root,"app/api/webhooks/razorpay/vendor-package/route.ts"),"utf8");
  assert.match(route,/x-razorpay-signature/);
  assert.match(route,/readBoundedRazorpayWebhookBody\(request\)/);

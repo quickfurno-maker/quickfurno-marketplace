@@ -69,7 +69,8 @@ test("test-only installed route enforces real actor preflight and serialized SQL
  gate(true);const calls=world();
  const r=await sim.POST(request());
  assert.equal(r.status,200);assert.equal((await r.json()).providerMessagesSent,0);
- assert.equal(calls.auth,2);assert.equal(calls.sql,1);
+ // Route preflight + handler preflight + post-RPC live Staff re-verification.
+ assert.equal(calls.auth,3);assert.equal(calls.sql,1);
 });
 test("revoked AAL2, malformed input and forged role never reach core authority",async()=>{
  gate(true);

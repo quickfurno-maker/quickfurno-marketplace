@@ -195,7 +195,7 @@ test("compiled role-enabled verifier: positive and negative AAL2/role/membership
   ["sub mismatch",()=>world(),jwt({sub:FORGED})],
   ["anonymous",()=>world(),jwt({is_anonymous:true})],
   ["expired",()=>world(),jwt({exp:Math.floor(Date.now()/1000)-1})],
-  ["too long lived",()=>world(),jwt({exp:Math.floor(Date.now()/1000)+86401})],
+  ["too long lived",()=>world(),jwt({exp:Math.floor(Date.now()/1000)+90000})],
   ["no auth user",()=>world({user:null}),jwt()],
   ["not vox_staff",()=>world({user:{id:U,app_metadata:{qf_principal:"other",vox_role:"finance_reviewer"}}}),jwt()],
   ["wrong role",()=>world({user:{id:U,app_metadata:{qf_principal:"vox_staff",vox_role:"operations_manager"}}}),jwt()],

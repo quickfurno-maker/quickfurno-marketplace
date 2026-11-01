@@ -8,6 +8,11 @@ on:
       - 'scripts/mvp/vox/rc43-*.test.mjs'
       - 'scripts/mvp/vox/rc44-*.test.mjs'
       - 'scripts/mvp/vox/rc45-*.test.mjs'
+      - 'scripts/mvp/vox/rc47-*.test.mjs'
+      - 'scripts/mvp/vox/rc47-managed-recovery-handoff.mjs'
+      - 'apps/vox-web/app/api/conversation-control/**'
+      - 'apps/vox-web/lib/conversationControl.ts'
+      - 'apps/vox-web/scripts/validate-rc46-conversation-control.spec.mjs'
       - 'services/vendorCreditWalletService.ts'
       - 'lib/supabase.ts'
       - 'services/vox/rc44DedicatedEodReviewReader.ts'
@@ -50,6 +55,8 @@ jobs:
         run: node --test scripts/mvp/vox/rc41-finance-refund-case-review.test.mjs scripts/mvp/vox/rc40-managed-ledger-reconciler.test.mjs scripts/mvp/vox/rc38-staging-predeploy-gate.test.mjs
       - name: RC42 guarded Core, credit-only Finance, and EOD read-only contracts
         run: node --test scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-policy.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-service.test.mjs scripts/mvp/vox/rc42-eod-atomic-data-api-review.test.mjs scripts/mvp/vox/rc43-core-route-integration.test.mjs scripts/mvp/vox/rc43-eod-route-integration.test.mjs scripts/mvp/vox/rc43-bad-lead-owner-aal2-review.test.mjs scripts/mvp/vox/rc44-eod-dedicated-reader.test.mjs scripts/mvp/vox/rc45-legacy-bad-lead-credit-bypass.test.mjs
+      - name: RC47 actual EOD transport and fail-closed managed recovery handoff
+        run: node --test scripts/mvp/vox/rc47-eod-actual-supabase-transport.test.mjs scripts/mvp/vox/rc47-managed-recovery-handoff.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

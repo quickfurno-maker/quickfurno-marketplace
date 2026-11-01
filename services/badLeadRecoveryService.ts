@@ -13,6 +13,9 @@ type RecoveryRpcResult={
  automatic_replacement_created?:boolean
 };
 const blocked=<T>(code:string,error:string):Result<T>=>({ok:false,code,error});
+// RC43 owner-controlled release constant. An environment flag alone MUST NOT
+// activate a real canonical vendor credit mutation before DBA/AppSec + recovery GO.
+export const RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=false as const;
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const policyDenied=<T>()=>blocked<T>("BAD_LEAD_CREDIT_ONLY_POLICY",
  "A verified bad lead receives one lead credit, never money or a replacement assignment.");
@@ -65,7 +68,8 @@ export async function applyBadLeadRecovery(
  if(!isAllowedBadLeadRecoveryAction(action))return policyDenied();
  try{
   if(action==="restore_credit"){
-   if(process.env.QF_VOX_BAD_LEAD_CREDIT_ONLY_ATOMIC_ENABLED!=="staging")
+   if(!RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED ||
+      process.env.QF_VOX_BAD_LEAD_CREDIT_ONLY_ATOMIC_ENABLED!=="staging")
     return blocked("CREDIT_ONLY_ATOMIC_NOT_APPROVED",
      "Reviewed atomic one-credit-per-assignment authority is not installed.");
    const {data,error}=await adminClient().rpc(

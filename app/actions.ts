@@ -34,6 +34,7 @@ import * as aarohiRegistration from "../services/aarohiRegistrationIntentService
 import * as adminVendorLocation from "../services/adminVendorLocationService";
 import * as leadAssignmentLifecycle from "../services/leadAssignmentLifecycleService";
 import * as badLeadRecovery from "../services/badLeadRecoveryService";
+import { verifyVoxOwnerBearer } from "../services/vox/verifiedStaffBearer";
 import {
   queueHumanConversationReply,
   releaseHumanConversationToAi,
@@ -909,8 +910,8 @@ export const adminSetCityStrictLocation = async (id: string, enabled: boolean) =
     revalidatePath("/api/cities");
     return result;
   });
-export const adminApproveBadLead  = async (id: string, note?: string) => asAdmin(() => admin.approveBadLeadReport(id, note));
-export const adminRejectBadLead   = async (id: string, note?: string) => asAdmin(() => admin.rejectBadLeadReport(id, note));
+export const adminApproveBadLead  = async (id: string, note?: string) => asAdmin((actor) => admin.approveBadLeadReport(id, note, actor));
+export const adminRejectBadLead   = async (id: string, note?: string) => asAdmin((actor) => admin.rejectBadLeadReport(id, note, actor));
 export const adminBadLeadReports  = async () => asAdmin(() => admin.getPendingBadLeadReports());
 
 // --------------------------------------------------------------------------
@@ -948,6 +949,16 @@ export const adminApplyBadLeadRecovery = async (
   action: badLeadRecovery.BadLeadRecoveryAction,
 ) =>
   asAdmin(async (actor) => {
+    // Compensation is a financial-equivalent credit mutation, even though
+    // QuickFurno NEVER gives money for a bad lead. Require current Owner AAL2
+    // from real GoTrue and bind the verified subject to the admin actor.
+    // A role cookie or client-provided ID alone must never authorize the RPC.
+    try {
+      const { data: { session }, error } = await (await serverClient()).auth.getSession();
+      if (error || !session?.access_token ||
+          await verifyVoxOwnerBearer("Bearer " + session.access_token) !== actor)
+        return fail(appError("UNAUTHORIZED"));
+    } catch { return fail(appError("UNAUTHORIZED")); }
     const result = await badLeadRecovery.applyBadLeadRecovery(reportId, action, actor);
     revalidatePath("/admin/leads");
     revalidatePath("/admin/lead-distribution");

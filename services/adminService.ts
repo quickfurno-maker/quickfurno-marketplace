@@ -781,46 +781,54 @@ export async function setCityStrictLocation(id: string, enabled: boolean, actorU
   }
 }
 
-/** Approve a bad-lead report. MVP does not auto-refund credits; any refund is a separate manual admin action. */
-export async function approveBadLeadReport(reportId: string, decision?: string): Promise<Result<null>> {
+/** Human bad-lead adjudication is NOT credit restoration. The separate
+ * RC43 AAL2 + assignment-unique canonical RPC alone may restore 1 lead credit.
+ * This legacy admin approval cannot issue cash, money wallet credit or a lead.
+ */
+export async function approveBadLeadReport(
+  reportId: string, decision?: string, actorUserId?: string,
+): Promise<Result<null>> {
   try {
+    if (!actorUserId) throw appError("UNAUTHORIZED");
     const db = adminClient();
-    const { data: r, error } = await db
-      .from("bad_lead_reports").select("id, vendor_id, lead_assignment_id, status").eq("id", reportId).single();
+    const { data: r, error } = await db.from("bad_lead_reports")
+      .select("id, vendor_id, lead_assignment_id, status").eq("id", reportId).single();
     if (error || !r) throw appError("UNKNOWN");
-    if (r.status !== "Pending") return ok(null); // idempotent
-
-    await db.from("bad_lead_reports").update({
+    if (r.status !== "Pending") return ok(null); // no repeated review
+    const now = new Date().toISOString();
+    const approved = await db.from("bad_lead_reports").update({
       status: "Approved",
       credit_restored: false,
-      admin_decision: decision ?? "Approved after admin review. Credit was not refunded automatically.",
-      reviewed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }).eq("id", reportId);
-
-    await db.from("lead_assignments").update({ is_bad_lead_reported: true }).eq("id", r.lead_assignment_id);
+      admin_decision: decision ?? "Human-approved for separate 1-lead-credit review. No cash, wallet money or credit has been granted.",
+      reviewed_by: actorUserId, reviewed_at: now, updated_at: now,
+    }).eq("id", reportId).eq("status", "Pending").select("id").maybeSingle();
+    if (approved.error) throw approved.error;
+    if (!approved.data) throw appError("UNKNOWN"); // concurrent decision
+    // The initial bad-lead intake already marks its assignment reported.
+    // Avoid a second cross-table mutation after the human decision commits:
+    // approval is only a reviewed status, never a wallet or lead operation.
     return ok(null);
-  } catch (e) {
-    return fail(e);
-  }
+  } catch (e) { return fail(e); }
 }
 
-export async function rejectBadLeadReport(reportId: string, decision?: string): Promise<Result<null>> {
+export async function rejectBadLeadReport(
+  reportId: string, decision?: string, actorUserId?: string,
+): Promise<Result<null>> {
   try {
-    const { error } = await adminClient()
-      .from("bad_lead_reports")
+    if (!actorUserId) throw appError("UNAUTHORIZED");
+    const {data,error}=await adminClient().from("bad_lead_reports")
       .update({
         status: "Rejected",
-        admin_decision: decision ?? "Report rejected.",
+        admin_decision: decision ?? "Report rejected. No lead credit or money awarded.",
+        reviewed_by: actorUserId,
         reviewed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      })
-      .eq("id", reportId);
-    if (error) throw error;
+      }).eq("id", reportId).in("status",["Pending","Under Review"])
+      .select("id").maybeSingle();
+    if(error) throw error;
+    if(!data) throw appError("UNKNOWN");
     return ok(null);
-  } catch (e) {
-    return fail(e);
-  }
+  } catch(e) { return fail(e); }
 }
 
 /** Pending bad-lead reports with vendor + lead context for the review queue. */

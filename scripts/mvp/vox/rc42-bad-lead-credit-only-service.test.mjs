@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {build} from "esbuild";
-import {mkdtempSync,rmSync} from "node:fs";
+import {mkdtempSync,rmSync,readFileSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {resolve,join,dirname} from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
@@ -11,6 +11,11 @@ const out=join(tmp,"credit-service.mjs");
 await build({entryPoints:[resolve(root,"services/badLeadRecoveryService.ts")],outfile:out,
  bundle:true,platform:"node",format:"esm",target:"node24",logLevel:"silent",
  plugins:[{name:"credit-service-stubs",setup(b){
+  // Test-only compiled copy opens the reviewed-install switch to exercise the
+  // *candidate* contract; production source remains a hard literal false.
+  b.onLoad({filter:/services[\\/]badLeadRecoveryService\.ts$/},a=>({loader:"ts",contents:
+   readFileSync(a.path,"utf8").replace("RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=false as const",
+   "RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=true as const")}));
   b.onResolve({filter:/^\.\.\/lib\/supabase$/},()=>({path:"supabase",namespace:"fake"}));
   b.onResolve({filter:/^\.\.\/lib\/errors$/},()=>({path:"errors",namespace:"fake"}));
   b.onLoad({filter:/.*/,namespace:"fake"},a=>({loader:"js",contents:
@@ -19,6 +24,11 @@ await build({entryPoints:[resolve(root,"services/badLeadRecoveryService.ts")],ou
   }));
  }}]});
 const {applyBadLeadRecovery:apply,recommendBadLeadRecovery:recommend}=await import(pathToFileURL(out).href);
+test("production source cannot activate lead credit via env alone",()=>{
+ const src=readFileSync(resolve(root,"services/badLeadRecoveryService.ts"),"utf8");
+ assert.match(src,/RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=false as const/);
+ assert.match(src,/if\(!RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED\s*\|\|/);
+});
 const REPORT="11111111-1111-4111-8111-111111111111",ACTOR="22222222-2222-4222-8222-222222222222";
 const gate="QF_VOX_BAD_LEAD_CREDIT_ONLY_ATOMIC_ENABLED";
 const calls=[];

@@ -20,11 +20,23 @@ const valid=(x:unknown):x is Pending=>{
   typeof v.subjectId==="string"&&UUID.test(v.subjectId)&&
   typeof v.expectedReceiptSha256==="string"&&HEX.test(v.expectedReceiptSha256);
 };
+type Reconcile=(args:Pending)=>Promise<Awaited<ReturnType<typeof reconcileRc8PgSignedIntentOutcome>>>;
 export async function verifyRc28PendingEodForHumanReview(
  ownerAuthorization:string|null,leaderAuthorization:string|null,
  input:unknown,acquireClient:()=>Promise<Db>
 ){
- if(!valid(input)||typeof acquireClient!=="function")return deny("SIGNED_INTENT_INPUT_INVALID");
+ if(typeof acquireClient!=="function")return deny("SIGNED_INTENT_INPUT_INVALID");
+ return verifyRc28PendingEodWithReconciler(ownerAuthorization,leaderAuthorization,input,
+  args=>reconcileRc8PgSignedIntentOutcome({acquireClient,...args}));
+}
+/** The single review flow (two AAL2 humans, receipt-scope binding, AAL2 recheck,
+ * second independent snapshot). Evidence comes ONLY from `reconcile`: the pg
+ * reconciler above or the RC41 Data API snapshot. Neither can approve/publish. */
+export async function verifyRc28PendingEodWithReconciler(
+ ownerAuthorization:string|null,leaderAuthorization:string|null,
+ input:unknown,reconcile:Reconcile
+){
+ if(!valid(input)||typeof reconcile!=="function")return deny("SIGNED_INTENT_INPUT_INVALID");
  let owner:string|null,leader:Awaited<ReturnType<typeof verifyVoxTeamLeaderBearer>>;
  try{
   [owner,leader]=await Promise.all([
@@ -35,8 +47,8 @@ export async function verifyRc28PendingEodForHumanReview(
     leader.expiresAtMs<=Date.now())return deny("DISTINCT_OWNER_AND_TL_AAL2_REQUIRED");
  // No caller may pass ownerId, teamLeaderId, publication flag or key signature.
  let proof;
- try{proof=await reconcileRc8PgSignedIntentOutcome({
-  acquireClient,intentId:input.intentId,subjectId:input.subjectId,
+ try{proof=await reconcile({
+  intentId:input.intentId,subjectId:input.subjectId,
   expectedReceiptSha256:input.expectedReceiptSha256
  })}catch{return deny("SIGNER_RECEIPT_RECONCILIATION_UNAVAILABLE")}
  const state=rc8SignedEodPublicationAuthorizationState(proof);
@@ -70,8 +82,8 @@ export async function verifyRc28PendingEodForHumanReview(
  // so a SECOND independent read-only snapshot must reproduce the identical
  // receipt, signers and scope. Any drift or outage is a fail-closed denial.
  let final;
- try{final=await reconcileRc8PgSignedIntentOutcome({
-  acquireClient,intentId:input.intentId,subjectId:input.subjectId,
+ try{final=await reconcile({
+  intentId:input.intentId,subjectId:input.subjectId,
   expectedReceiptSha256:input.expectedReceiptSha256
  })}catch{return deny("SIGNER_RECEIPT_FINAL_RECONCILIATION_UNAVAILABLE")}
  if(final.outcome!=="COMMITTED"||final.ok!==true||

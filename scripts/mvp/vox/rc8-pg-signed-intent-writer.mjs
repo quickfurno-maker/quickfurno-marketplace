@@ -353,6 +353,67 @@ export async function executeRc8PgPendingSignedIntent(options={},gate=RC8_NATIVE
   return deny("PG_TRANSACTION_FAILED");
  }finally{try{client?.release?.(destroyConnection)}catch{}}
 }
+// The pending receipt is only meaningful while the CURRENT four-source report
+// still carries the exact digest/scope the two humans signed.
+function rc8ReportCurrent(r,i){
+ return !!r&&typeof r==="object"&&!!i&&r.teamId===i.teamId&&r.cityId===i.cityId&&
+  r.reviewerId===i.teamLeaderId&&Number(r.sourceCount)===4&&
+  // The receipt does not store the report's Staff subject, and the report
+  // stays mutable after COMMIT. Re-assert the writer's independence rule:
+  // the submitting Staff may never become the Owner or Team Leader signer.
+  typeof r.staffId==="string"&&LOWER_UUID.test(r.staffId)&&
+  r.staffId!==i.ownerId&&r.staffId!==i.teamLeaderId&&
+  r.sourceDigest===i.digest&&
+  r.state==="TL_ACKNOWLEDGED_AWAITING_OWNER_RELEASE"&&r.published===false;
+}
+function rc8SignerKeysCurrent(k,i,now){
+ if(!Array.isArray(k))return false;
+ // `now` can only advance past the real clock (fixtures); never rewind it.
+ const keyTime=Math.max(Number.isSafeInteger(now)?now:0,Date.now());
+ const ownerKeys=k.filter(x=>x.signerId===i.ownerId&&x.signerRole==="OWNER");
+ const tlKeys=k.filter(x=>x.signerId===i.teamLeaderId&&x.signerRole==="TEAM_LEADER");
+ return k.length===2&&ownerKeys.length===1&&tlKeys.length===1&&
+  k.every(x=>x.revoked===false&&x.registryMatches===true&&
+   keyTime>=Number(x.notBeforeMs)&&keyTime<Number(x.notAfterMs));
+}
+// RC41: when a snapshot carries Owner/TL attestations they must name exactly
+// the receipt's two DISTINCT humans, each with current authority and AAL2.
+function rc8AttestationsCurrent(a,i){
+ const ok=(x,id)=>!!x&&typeof x==="object"&&x.userId===id&&
+  x.authorityCurrent===true&&x.aal2Current===true;
+ return !!a&&typeof a==="object"&&i.ownerId!==i.teamLeaderId&&
+  ok(a.owner,i.ownerId)&&ok(a.teamLeader,i.teamLeaderId);
+}
+/** Pure decision over ONE consistent evidence snapshot. The pg reconciler
+ * (several reads in one READ ONLY transaction) and the RC41 Data API RPC
+ * snapshot (one statement) both decide here, so the rules cannot diverge.
+ * `attestations` is required whenever it is supplied (RPC path); the pg path
+ * leaves it undefined because its callers verify the humans separately.
+ * `allowNotCommitted:false` (RPC path) cannot observe the writer lock, so a
+ * missing receipt is never reported as NOT_COMMITTED (it may be in flight). */
+export function rc8EvaluateReceiptEvidence({intentId,subjectId,expectedReceiptSha256,now,
+ durable,subjectIntentIds,report,keys,attestations,allowNotCommitted=true}={}){
+ const base={approved:false,canAuthorize:false,officialEodEnabled:false,
+  publicationAuthorized:false};
+ const intents=durable?.intents??[],claims=durable?.claims??[];
+ const i=intents.length===1?intents[0]:null;
+ const reportCurrent=!!i&&rc8ReportCurrent(report,i);
+ const signerKeysCurrent=reportCurrent&&rc8SignerKeysCurrent(keys,i,now);
+ const attested=attestations===undefined||(!!i&&rc8AttestationsCurrent(attestations,i));
+ const otherIntent=(subjectIntentIds??[]).some(id=>id!==intentId);
+ if(allowNotCommitted&&intents.length===0&&claims.length===0)
+  return result({...base,ok:true,outcome:"NOT_COMMITTED",intentId,subjectId,
+   subjectClaimedByOtherIntent:otherIntent,retryRequiresFreshSignedPair:true});
+ const digest=i?rc8SignedIntentReceiptSha256(i,claims):null;
+ if(digest&&digest===expectedReceiptSha256&&!otherIntent&&reportCurrent&&signerKeysCurrent&&
+    attested&&i.id===intentId&&i.subjectId===subjectId)
+  return result({...base,ok:true,outcome:"COMMITTED",intentId,subjectId,
+   receiptSha256:digest,state:"AWAITING_EXTERNAL_REVIEW",
+   // Durable signer/scope identity so a reviewer can be bound to THIS receipt.
+   ownerId:i.ownerId,teamLeaderId:i.teamLeaderId,teamId:i.teamId,cityId:i.cityId});
+ return result({...base,ok:false,reason:"RECONCILIATION_INCONSISTENT",
+  outcome:"INCONSISTENT",intentId,subjectId,requiresIndependentReview:true});
+}
 /** Read-only reconciliation of a COMMIT_OUTCOME_UNKNOWN signed EOD intent.
  * Never writes, never re-claims nonces, never approves. Outcomes:
  *  COMMITTED      exact durable receipt with the expected digest exists;
@@ -394,27 +455,18 @@ export async function reconcileRc8PgSignedIntentOutcome({acquireClient,intentId,
   // The pending receipt is only meaningful while the CURRENT four-source report
   // still carries the exact digest/scope the two humans signed. Read it inside
   // the same read-only transaction (writer already finished, so it is stable).
-  let reportCurrent=false,signerKeysCurrent=false;
+  let report=null,keyRows=[];
   if(durable.intents.length===1){
    const rep=await client.query(
     "SELECT team_id::text AS \"teamId\",city_id::text AS \"cityId\","+
     "staff_id::text AS \"staffId\",reviewer_id::text AS \"reviewerId\",source_count AS \"sourceCount\","+
     "source_digest AS \"sourceDigest\",state,published "+
     "FROM public.vox_ab7f_four_source_eod_candidate_v1 WHERE id=$1::uuid",[subjectId]);
-   const r=rep.rows?.[0],i=durable.intents[0];
-   reportCurrent=rep.rows?.length===1&&r.teamId===i.teamId&&r.cityId===i.cityId&&
-    r.reviewerId===i.teamLeaderId&&Number(r.sourceCount)===4&&
-    // The receipt does not store the report's Staff subject, and the report
-    // stays mutable after COMMIT. Re-assert the writer's independence rule:
-    // the submitting Staff may never become the Owner or Team Leader signer.
-    typeof r.staffId==="string"&&LOWER_UUID.test(r.staffId)&&
-    r.staffId!==i.ownerId&&r.staffId!==i.teamLeaderId&&
-    r.sourceDigest===i.digest&&
-    r.state==="TL_ACKNOWLEDGED_AWAITING_OWNER_RELEASE"&&r.published===false;
+   report=rep.rows?.length===1?rep.rows[0]:null;
    // RC34/RC37: the receipt's STORED signer keys must still be unrevoked, still
    // the exact enrolled key material, and inside their validity window now.
    // One statement = one snapshot, so a revocation cannot interleave per row.
-   if(reportCurrent){
+   if(rc8ReportCurrent(report,durable.intents[0])){
     const keys=await client.query(
      "SELECT e.key_id AS \"keyId\",e.signer_id::text AS \"signerId\","+
      "e.signer_role AS \"signerRole\",(v.key_id IS NOT NULL) AS \"revoked\","+
@@ -426,32 +478,12 @@ export async function reconcileRc8PgSignedIntentOutcome({acquireClient,intentId,
      "JOIN "+P+"human_signer_registry_candidate_v1 r ON r.key_id=e.key_id "+
      "LEFT JOIN "+P+"signer_revocations_candidate_v1 v ON v.key_id=e.key_id "+
      "WHERE e.intent_id=$1::uuid",[intentId]);
-    const k=keys.rows??[];
-    // `now` can only advance past the real clock (fixtures); never rewind it.
-    const keyTime=Math.max(Number.isSafeInteger(now)?now:0,Date.now());
-    const ownerKeys=k.filter(x=>x.signerId===i.ownerId&&x.signerRole==="OWNER");
-    const tlKeys=k.filter(x=>x.signerId===i.teamLeaderId&&x.signerRole==="TEAM_LEADER");
-    signerKeysCurrent=k.length===2&&ownerKeys.length===1&&tlKeys.length===1&&
-     k.every(x=>x.revoked===false&&x.registryMatches===true&&
-      keyTime>=Number(x.notBeforeMs)&&keyTime<Number(x.notAfterMs));
+    keyRows=keys.rows??[];
    }
   }
   await client.query("ROLLBACK");started=false;
-  const otherIntent=(forSubject.rows??[]).some(r=>r.id!==intentId);
-  if(durable.intents.length===0&&durable.claims.length===0)
-   return result({...base,ok:true,outcome:"NOT_COMMITTED",intentId,subjectId,
-    subjectClaimedByOtherIntent:otherIntent,retryRequiresFreshSignedPair:true});
-  const digest=durable.intents.length===1?
-   rc8SignedIntentReceiptSha256(durable.intents[0],durable.claims):null;
-  if(digest&&digest===expectedReceiptSha256&&!otherIntent&&reportCurrent&&signerKeysCurrent&&
-     durable.intents[0].subjectId===subjectId)
-   return result({...base,ok:true,outcome:"COMMITTED",intentId,subjectId,
-    receiptSha256:digest,state:"AWAITING_EXTERNAL_REVIEW",
-    // Durable signer/scope identity so a reviewer can be bound to THIS receipt.
-    ownerId:durable.intents[0].ownerId,teamLeaderId:durable.intents[0].teamLeaderId,
-    teamId:durable.intents[0].teamId,cityId:durable.intents[0].cityId});
-  return result({...base,ok:false,reason:"RECONCILIATION_INCONSISTENT",
-   outcome:"INCONSISTENT",intentId,subjectId,requiresIndependentReview:true});
+  return rc8EvaluateReceiptEvidence({intentId,subjectId,expectedReceiptSha256,now,
+   durable,subjectIntentIds:(forSubject.rows??[]).map(r=>r.id),report,keys:keyRows});
  }catch{
   // Unknown backend state after a failed read: never return it to the pool.
   destroyConnection=true;

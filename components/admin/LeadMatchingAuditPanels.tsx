@@ -7,7 +7,7 @@
 // request a replacement only through Core's existing authorities and explicit
 // Superadmin confirmation; this component never mutates money directly.
 // ============================================================================
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   adminAddVendorLeadReportComment,
   adminApplyBadLeadRecovery,
@@ -442,6 +442,7 @@ export function BadLeadReportsReviewPanel({
 }) {
   const [statusFilter, setStatusFilter] = useState("All");
   const [recoveryReceipt,setRecoveryReceipt]=useState<string|null>(null);
+  const recoveryPending=useRef(new Set<string>());
   const commentsByReport = useMemo(() => {
     const map = new Map<string, BadLeadReportComment[]>();
     (data.badLeadReportComments ?? []).forEach((comment) => {
@@ -491,9 +492,15 @@ export function BadLeadReportsReviewPanel({
       restore_credit: "return exactly 1 LEAD credit (no money refund or automatic replacement)",
       reject: "reject recovery",
     };
+    if(recoveryPending.current.has(report.id)){
+      notify("This report already has a pending decision. Verify its canonical receipt before trying again.","info");
+      return;
+    }
     if (!window.confirm(`Confirm human recovery decision: ${labels[action]}? This uses Core's governed recovery authority.`)) return;
+    recoveryPending.current.add(report.id);
     setRecoveryReceipt(null);
     runAction("Recovery decision applied",async()=>{
+      try{
       const result=await adminApplyBadLeadRecovery(report.id,action);
       if(result.ok&&action==="restore_credit"){
         const data=result.data;
@@ -505,9 +512,13 @@ export function BadLeadReportsReviewPanel({
                 data.creditRestorationApprovalId)
           setRecoveryReceipt("Previously approved credit restoration. 0 additional credits. Approval "+
             data.creditRestorationApprovalId+".");
-        else setRecoveryReceipt("No verified credit restoration receipt returned.");
+        else {
+          setRecoveryReceipt("Receipt not verified. Check the canonical assignment ledger before any retry.");
+          return {ok:false,error:"Canonical credit receipt unavailable. Verify the ledger before retrying."};
+        }
       }else if(result.ok&&action==="reject")setRecoveryReceipt("Recovery rejected. No LEAD credit or money granted.");
       return result;
+      }finally{recoveryPending.current.delete(report.id);}
     });
   }
 

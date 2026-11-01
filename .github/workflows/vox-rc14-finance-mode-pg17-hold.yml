@@ -14,6 +14,8 @@ on:
       - 'lib/payments/vendorPackageRefundReviewAuthority.*'
       - 'lib/payments/vendorPackageRefundIdentityBinding.*'
       - 'scripts/mvp/vox/rc38-finance-refund-identity-ledger.test.mjs'
+      - 'scripts/mvp/vox/rc39-finance-refund-identity-intake.test.mjs'
+      - 'lib/payments/vendorPackageRefundIdentityIntake.*'
       - 'scripts/mvp/vox/fixtures/rc38-review-only-refund-identity-ledger-v4.pg17.sql'
       - 'scripts/mvp/vox/validate-vox-rc38-refund-identity-ledger-pg17.mjs'
       - 'services/vox/verifiedFinanceReviewerBearer.ts'
@@ -75,7 +77,7 @@ jobs:
           node scripts/mvp/vox/validate-vox-rc11-real-pg-finance-attempts.mjs 2>&1 | tee "$log"
           grep -Fq 'VOX_RC11_REAL_PG17_FINANCE_ATTEMPT_AUDIT_PASS events=4 attempts=3' "$log"
       - name: Verify signed refund intake and immutable reviewer contracts
-        run: node --test scripts/mvp/vox/rc33-finance-service-transport.test.mjs scripts/mvp/vox/rc36-finance-refund-intake-review.test.mjs scripts/mvp/vox/rc37-finance-refund-review-authority.test.mjs scripts/mvp/vox/rc38-finance-refund-identity-ledger.test.mjs
+        run: node --test scripts/mvp/vox/rc33-finance-service-transport.test.mjs scripts/mvp/vox/rc36-finance-refund-intake-review.test.mjs scripts/mvp/vox/rc37-finance-refund-review-authority.test.mjs scripts/mvp/vox/rc38-finance-refund-identity-ledger.test.mjs scripts/mvp/vox/rc39-finance-refund-identity-intake.test.mjs
       - name: Verify genuine PG17 refund quarantine, replay and reviewer policy HOLD
         shell: bash
         run: |

@@ -5,6 +5,12 @@ import { classifyVendorPackageRefundIntake, isRefundIntakeEventType } from "../l
 import { processVendorPackageProviderEvent, resolveVendorPackageEventLedgerGate } from "../lib/payments/vendorPackageProviderEventProcessing.mjs";
 import { buildRazorpayProviderEventEnvelope, financeErrorCode } from "../lib/payments/vendorPackageProviderEventLedger.mjs";
 import { RC28_PROVIDER_LEDGER_RUNTIME_INSTALLED, createRc28VendorPackageEventRepository } from "../lib/payments/vendorPackageProviderEventRepository.mjs";
+import { createStagedRefundIdentityIntake } from "../lib/payments/vendorPackageRefundIdentityIntake.mjs";
+
+// Compile-time OFF. The staged refund identity intake additionally requires its own
+// hard-false release constant, an env flag and DBA-approved v4 SQL; this source
+// constant alone can never activate it and nothing reads it from config.
+const RC39_REFUND_IDENTITY_SQL_APPROVED = false as boolean;
 import { activationLifecycleError, inspectRazorpayOrderClaim, isDefiniteRazorpayOrderRejection, storedRazorpayCheckoutLifecycleError, storedRazorpayOrderModeError } from "../lib/payments/vendorPackageOrderGuards.mjs";
 import { adminClient } from "../lib/supabase";
 import { AppError, fail, ok, type Result } from "../lib/errors";
@@ -579,6 +585,27 @@ export async function handleVendorPackageRazorpayWebhook(
       });
       if (!envelope.ok) {
         throw paymentError(envelope.reason, "Provider event identity cannot be verified.");
+      }
+      // Refund events: durable v2 quarantine, then v4 HMAC identity binding. Every
+      // gate is closed in source, so handled:false falls through to today's flow
+      // with no extra I/O. No credit, refund or provider effect on either path.
+      if (candidate.kind === "refund") {
+        const staged = await createStagedRefundIdentityIntake({
+          repository: ledgerGate.repository,
+          callRpc: async (name, args) => await adminClient().rpc(name, args),
+          macKey: process.env.QF_VOX_REFUND_IDENTITY_MAC_KEY as string,
+          keyId: process.env.QF_VOX_REFUND_IDENTITY_MAC_KEY_ID as string,
+          providerMode: cfg.mode,
+          env: process.env,
+          sqlApproved: RC39_REFUND_IDENTITY_SQL_APPROVED,
+        }).process(envelope);
+        if (staged.handled) {
+          if (!staged.ack) {
+            throw paymentError(staged.code ?? "REFUND_IDENTITY_UNCONFIRMED",
+              "Refund identity intake needs controlled retry or review.");
+          }
+          return ok({ status: staged.status });
+        }
       }
       const processed = await processVendorPackageProviderEvent({
         envelope, repository: ledgerGate.repository, handle: processSignedCandidate,

@@ -25,6 +25,11 @@ on:
       - 'scripts/mvp/vox/rc37-*.test.mjs'
       - 'scripts/mvp/vox/rc38-*.test.mjs'
       - 'scripts/mvp/vox/rc39-*.test.mjs'
+      - 'scripts/mvp/vox/rc40-*.test.mjs'
+      - 'scripts/mvp/vox/rc40-source-sql-digest-collector.mjs'
+      - 'services/vox/rc6TransactionalConsentProof.ts'
+      - 'lib/payments/vendorPackageConsumedCreditRefundAdjudication.*'
+      - 'docs/vox/VOX-RC40-SOURCE-SQL-DIGESTS-20261101.json'
       - 'scripts/mvp/vox/rc39-protected-features-off-gate.mjs'
       - 'scripts/mvp/vox/rc38-migration-staged-dryrun*.mjs'
       - 'app/api/vox/v1/signed-eod-review/**'
@@ -111,8 +116,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Run RC17-RC38 source, operational and database preflight regressions
-        run: node --test scripts/mvp/vox/rc17-*.test.mjs scripts/mvp/vox/rc18-*.test.mjs scripts/mvp/vox/rc19-*.test.mjs scripts/mvp/vox/rc20-*.test.mjs scripts/mvp/vox/rc21-*.test.mjs scripts/mvp/vox/rc22-*.test.mjs scripts/mvp/vox/rc23-*.test.mjs scripts/mvp/vox/rc24-*.test.mjs scripts/mvp/vox/rc25-*.test.mjs scripts/mvp/vox/rc26-*.test.mjs scripts/mvp/vox/rc27-*.test.mjs scripts/mvp/vox/rc28-*.test.mjs scripts/mvp/vox/rc29-*.test.mjs scripts/mvp/vox/rc31-*.test.mjs scripts/mvp/vox/rc32-*.test.mjs scripts/mvp/vox/rc33-*.test.mjs scripts/mvp/vox/rc34-*.test.mjs scripts/mvp/vox/rc35-*.test.mjs scripts/mvp/vox/rc36-*.test.mjs scripts/mvp/vox/rc37-*.test.mjs scripts/mvp/vox/rc38-*.test.mjs scripts/mvp/vox/rc39-*.test.mjs scripts/mvp/vox/d-db-release-preflight.test.mjs scripts/mvp/vox/d-db-sql-acl-lint.test.mjs scripts/mvp/vox/d-db-p0-6-pg17-rehearsal.test.mjs
+      - name: Run RC17-RC40 source, operational and database preflight regressions
+        run: node --test scripts/mvp/vox/rc17-*.test.mjs scripts/mvp/vox/rc18-*.test.mjs scripts/mvp/vox/rc19-*.test.mjs scripts/mvp/vox/rc20-*.test.mjs scripts/mvp/vox/rc21-*.test.mjs scripts/mvp/vox/rc22-*.test.mjs scripts/mvp/vox/rc23-*.test.mjs scripts/mvp/vox/rc24-*.test.mjs scripts/mvp/vox/rc25-*.test.mjs scripts/mvp/vox/rc26-*.test.mjs scripts/mvp/vox/rc27-*.test.mjs scripts/mvp/vox/rc28-*.test.mjs scripts/mvp/vox/rc29-*.test.mjs scripts/mvp/vox/rc31-*.test.mjs scripts/mvp/vox/rc32-*.test.mjs scripts/mvp/vox/rc33-*.test.mjs scripts/mvp/vox/rc34-*.test.mjs scripts/mvp/vox/rc35-*.test.mjs scripts/mvp/vox/rc36-*.test.mjs scripts/mvp/vox/rc37-*.test.mjs scripts/mvp/vox/rc38-*.test.mjs scripts/mvp/vox/rc39-*.test.mjs scripts/mvp/vox/rc40-*.test.mjs scripts/mvp/vox/d-db-release-preflight.test.mjs scripts/mvp/vox/d-db-sql-acl-lint.test.mjs scripts/mvp/vox/d-db-p0-6-pg17-rehearsal.test.mjs
       - name: Enforce RC39 protected features OFF, no direct pg pool, source-only workflows
         run: node scripts/mvp/vox/rc39-protected-features-off-gate.mjs
       - name: Enforce QF MVP 50 Razorpay raw-body financial authority gate

@@ -89,15 +89,15 @@ function setup({auth={},core=async()=>{throw new TypeError("fetch failed")}}={})
  globalThis.fetch=async(url,opts)=>{state.requests.push({url:String(url),opts});return core(String(url),opts,state);};
  return state;
 }
-const LOGIN='href="/login"';
+const LOGIN=p=>'href="/login?next='+encodeURIComponent("/"+p)+'"';
 
 // ---- UI: 401 must offer sign-in; nothing else may ------------------------
-test("every Staff page offers /login when the AAL2 session is missing",async()=>{
+test("every Staff page offers its bounded /login?next return on missing AAL2",async()=>{
  for(const [label,auth] of [["AAL1",{aal:"aal1"}],["no user",{user:false}],["session mismatch",{sessionUser:"other"}]]){
   for(const p of PAGES){
    const s=setup({auth,core:async()=>Response.json({secret:"leak"})});
    const html=await pages[p]({});
-   assert.ok(html.includes(LOGIN),p+" ("+label+") has no direct sign-in link");
+   assert.ok(html.includes(LOGIN(p)),p+" ("+label+") has no scoped MFA return link");
    assert.equal(html.includes("leak"),false);
    assert.equal(s.requests.length,0,p+" ("+label+") must not call Core without a verified session");
   }
@@ -110,11 +110,11 @@ test("403 / disabled / unavailable states never claim a sign-in problem",async()
    async()=>{throw new TypeError("fetch failed")}]){
    setup({core});
    const html=await pages[p]({});
-   assert.equal(html.includes(LOGIN),false,p+" shows sign-in for a non-401 state");
+   assert.equal(html.includes(LOGIN(p)),false,p+" shows sign-in for a non-401 state");
    assert.equal(html.includes("leak"),false);
   }
   setup();for(const k of FLAGS)delete process.env[k];
-  assert.equal((await pages[p]({})).includes(LOGIN),false,p+" disabled gate");
+  assert.equal((await pages[p]({})).includes(LOGIN(p)),false,p+" disabled gate");
  }
 });
 const queue=(over={})=>({ok:true,schema:"qf.vox.work.queue.preview.v1",mode:"READ_ONLY",

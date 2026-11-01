@@ -37,6 +37,26 @@ function walk(dir, accept, out = []) {
   return out;
 }
 const codeFile = n => /\.(ts|tsx|mjs|js)$/.test(n);
+/** Preserve full nested route identity. A trailing slash marks a URL
+ * concatenation that MUST resolve to a real dynamic child handler. */
+export function extractPortalCorePaths(source) {
+  const re=/\/api\/vox\/v1\/([a-z0-9-]+(?:\/[a-z0-9-]+)*)/g;
+  return [...new Set([...source.matchAll(re)].map(m =>
+    m[1]+(source[m.index+m[0].length]==="/"? "/*":"")))].sort();
+}
+/** Never invent a route when a Web reference points to a dynamic segment.
+ * Accept only the real checked-in [parameter]/route.ts at that exact depth. */
+export function portalCoreHandlerExists(rootDir,reference) {
+  const dynamic=reference.endsWith("/*");
+  const name=dynamic?reference.slice(0,-2):reference;
+  if(!/^[a-z0-9-]+(?:\/[a-z0-9-]+)*$/.test(name))return false;
+  const dir=join(rootDir,name);
+  if(existsSync(join(dir,"route.ts")))return true;
+  if(!dynamic||!existsSync(dir)||!statSync(dir).isDirectory())return false;
+  return readdirSync(dir).some(child=>
+    /^\[[A-Za-z][A-Za-z0-9_]*\]$/.test(child)&&
+    existsSync(join(dir,child,"route.ts")));
+}
 
 // ---------------------------------------------------------------- arguments
 function parseArgs(argv) {
@@ -170,8 +190,8 @@ function stepPortalContract() {
   }
   const refs = new Set();
   for (const p of [...walk(join(web, "lib"), codeFile), ...walk(join(web, "app"), codeFile)])
-    for (const m of read(p).matchAll(/\/api\/vox\/v1\/([a-z0-9-]+)/g)) refs.add(m[1]);
-  for (const name of refs) if (!existsSync(join(root, "app/api/vox/v1", name, "route.ts"))) failures.push("PORTAL_REFERENCES_MISSING_CORE_ROUTE:" + name);
+    for (const name of extractPortalCorePaths(read(p))) refs.add(name);
+  for (const name of refs) if (!portalCoreHandlerExists(join(root, "app/api/vox/v1"), name)) failures.push("PORTAL_REFERENCES_MISSING_CORE_ROUTE:" + name);
   const routes = walk(join(root, "app", "api", "vox", "v1"), n => n === "route.ts");
   const surface = routes.map(p => {
     const t = read(p), owner = t.includes("verifyVoxOwnerBearer("), staff = t.includes("getVerifiedScopedStaff(");
@@ -369,4 +389,6 @@ async function main() {
   return verdict.exitCode;
 }
 
-main().then(code => { process.exitCode = code; }, e => { process.stderr.write("RC4_QA_FATAL " + (e?.message || "unknown") + "\n"); process.exitCode = 1; });
+// Importable for focused scanner regression tests; execute only as CLI entrypoint.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url))
+  main().then(code => { process.exitCode = code; }, e => { process.stderr.write("RC4_QA_FATAL " + (e?.message || "unknown") + "\n"); process.exitCode = 1; });

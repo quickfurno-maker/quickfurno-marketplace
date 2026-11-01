@@ -87,6 +87,20 @@ test("read-only PostgREST result is denied if JWT expires while request is in fl
  assert.deepEqual(reply,{data:null,error:{message:"EOD_REVIEW_READER_EXPIRED_DURING_READ"}});
  assert.doesNotMatch(JSON.stringify(reply),/would_be_stale/);
 });
+test("read-only EOD snapshot cannot pass after dedicated token ages beyond its review window",async()=>{
+ const start=Math.floor(Date.now()/1000);let clock=start;
+ const token={...good,iat:start-3590,exp:start+900};
+ const fn=create({...config(token),clockSeconds:()=>clock});
+ assert.equal(typeof fn,"function");
+ globalThis.__rc44Rpc=async()=>{
+  clock=start+20;
+  return {data:{proof:"stale-review-window"},error:null};
+ };
+ const r=await fn("qf_vox_rc41_signed_eod_review_snapshot_v1",
+  {p_intent_id:U,p_subject_id:V});
+ assert.deepEqual(r,{data:null,error:{message:"EOD_REVIEW_READER_EXPIRED_DURING_READ"}});
+ assert.doesNotMatch(JSON.stringify(r),/stale-review-window/);
+});
 test("clock rollback after reader construction refuses RPC without network access",async()=>{
  const start=Math.floor(Date.now()/1000);let clock=start;
  let calls=0;globalThis.__rc44Rpc=async()=>{calls++;return {data:{proof:"unsafe"},error:null};};

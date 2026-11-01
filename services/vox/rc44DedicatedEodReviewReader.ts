@@ -65,8 +65,10 @@ export function createRc44DedicatedEodReviewReader(input:Rc44ReaderInput):Rc41Rp
   const fresh=()=>{
    const t=current();
    return Number.isSafeInteger(t)&&Number(payload.exp)>t&&
-    (payload.nbf===undefined||Number(payload.nbf)<=t)&&
-    (payload.iat===undefined||Number(payload.iat)<=t+30);
+    (payload.nbf===undefined||(Number(payload.nbf)<=t&&
+      t-Number(payload.nbf)<=3600))&&
+    (payload.iat===undefined||(Number(payload.iat)<=t+30&&
+      t-Number(payload.iat)<=3600));
   };
   if(!fresh())fail();
   // Backend validates the signed PostgREST reader JWT. No service-role or

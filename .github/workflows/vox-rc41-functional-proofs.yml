@@ -10,6 +10,8 @@ on:
       - 'scripts/mvp/vox/rc45-*.test.mjs'
       - 'scripts/mvp/vox/rc47-*.test.mjs'
       - 'scripts/mvp/vox/rc48-*.test.mjs'
+      - 'scripts/mvp/vox/rc50-*.test.mjs'
+      - 'scripts/mvp/vox/rc50-staging-sql-handoff.mjs'
       - 'scripts/mvp/vox/rc47-managed-recovery-handoff.mjs'
       - 'apps/vox-web/app/api/conversation-control/**'
       - 'apps/vox-web/lib/conversationControl.ts'
@@ -25,6 +27,8 @@ on:
       - 'services/vox/rc42*.ts'
       - 'services/badLeadRecoveryService.ts'
       - 'app/api/vox/v1/core/conversation-operator/**'
+      - 'app/api/vox/v1/core/conversation-candidates/**'
+      - 'apps/vox-web/app/api/conversation-candidates/**'
       - 'app/api/vox/v1/eod-atomic-review/**'
       - 'scripts/mvp/vox/validate-vox-rc41-*.mjs'
       - 'scripts/mvp/vox/validate-vox-rc41-*.ps1'
@@ -61,6 +65,8 @@ jobs:
         run: node --test scripts/mvp/vox/rc47-eod-actual-supabase-transport.test.mjs scripts/mvp/vox/rc47-managed-recovery-handoff.test.mjs
       - name: RC48 real Web to native Core two-hop integration, hard-off verification
         run: node --test scripts/mvp/vox/rc48-core-real-two-hop.test.mjs
+      - name: RC50 Core scoped conversation discovery and SQL evidence handoff
+        run: node --test scripts/mvp/vox/rc50-conversation-candidates.test.mjs scripts/mvp/vox/rc50-staging-sql-handoff.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

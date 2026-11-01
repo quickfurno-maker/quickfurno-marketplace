@@ -42,6 +42,10 @@ export function createRc44DedicatedEodReviewReader(input:Rc44ReaderInput):Rc41Rp
     (payload.nbf as number)>now))return null;
  if(payload.iat!==undefined&&(!Number.isSafeInteger(payload.iat)||
     (payload.iat as number)>now+30))return null;
+ // Reject contradictory JWT time claims before any reader creation. A
+ // PostgREST signature check is still mandatory and separately enforced.
+ if(payload.nbf!==undefined&&Number(payload.nbf)>=Number(payload.exp))return null;
+ if(payload.iat!==undefined&&Number(payload.iat)>=Number(payload.exp))return null;
  let transport:ReturnType<typeof createVoxEodSnapshotReaderTransport>;
  try{
   transport=createVoxEodSnapshotReaderTransport({url,anonKey:key,bearer});

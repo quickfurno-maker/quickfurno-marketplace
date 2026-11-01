@@ -30,7 +30,10 @@ test("missing key, forged roles, service_role, expired or overlong tokens cannot
   {...good,exp:999},{...good,exp:90000},{...good,aal:"aal2"},
   {...good,nbf:Math.floor(Date.now()/1000)+90},
   {...good,iat:Math.floor(Date.now()/1000)+300},
-  {...good,nbf:"fake"},{...good,iat:"future"}]){
+  {...good,nbf:"fake"},{...good,iat:"future"},
+  {...good,nbf:Math.floor(Date.now()/1000)+1900},
+  {...good,iat:Math.floor(Date.now()/1000)+1900},
+  {role:good.role,exp:Math.floor(Date.now()/1000)+15,iat:Math.floor(Date.now()/1000)+16}]){
   const args=v.role?config(v):{supabaseUrl:"https://db.local.test",anonKey:"public-anon",readerJwt:null};
   assert.equal(create(args),null);
  }

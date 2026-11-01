@@ -74,6 +74,20 @@ test("missing or unsafe EOD reviewer bearer never sends network traffic",async()
   assert.equal(calls.length,0);
  }
 });
+test("malformed intent or subject IDs never issue a reviewed EOD request",async()=>{
+ calls.length=0;
+ const rpc=create({url:"https://db.local.test",anonKey:"anon-key",bearer:"dedicated-reader-test"});
+ for(const args of [null,{},
+  {p_intent_id:"bad",p_subject_id:V},
+  {p_intent_id:U,p_subject_id:"not-uuid"},
+  {p_intent_id:U,p_subject_id:""}]){
+  const result=await rpc(F,args);
+  assert.equal(result.data,null);
+  assert.equal(result.error.message,"EOD_REVIEW_ARGUMENTS_INVALID");
+ }
+ assert.equal(calls.length,0);
+ assert.equal(realtimeAttempts,0);
+});
 test("transport never offers another RPC function or direct privileged table API",async()=>{
  calls.length=0;
  const rpc=create({url:"https://db.local.test",anonKey:"anon-only",bearer:"reader"});

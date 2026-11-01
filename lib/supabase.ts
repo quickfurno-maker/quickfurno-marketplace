@@ -92,9 +92,12 @@ export function createVoxEodSnapshotReaderTransport(
     auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
     global:{headers:{Authorization:"Bearer "+input.bearer}},
   });
+  const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return async (fn,args)=>{
     if(fn!=="qf_vox_rc41_signed_eod_review_snapshot_v1")
       return {data:null,error:{message:"EOD_REVIEW_FUNCTION_DENIED"}};
+    if(!args||!uuid.test(args.p_intent_id||"")||!uuid.test(args.p_subject_id||""))
+      return {data:null,error:{message:"EOD_REVIEW_ARGUMENTS_INVALID"}};
     // Bounded read-only EOD HTTP RPC. Timeout never triggers privileged fallback.
     return client.rpc(fn,args).abortSignal(AbortSignal.timeout(3500));
   };

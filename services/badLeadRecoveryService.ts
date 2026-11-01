@@ -64,6 +64,8 @@ export async function applyBadLeadRecovery(
  replacementAssignmentId:string|null;
  restorationStatus?:"applied"|"already_applied"|"rejected";
  originalAssignmentId?:string;
+ creditRestorationApprovalId?:string;
+ leadCreditsRestored?:0|1;
 }>>{
  if(!UUID.test(reportId||"")||!UUID.test(actorId||""))
   return blocked("VALIDATION","Report and verified administrator are required.");
@@ -95,6 +97,8 @@ export async function applyBadLeadRecovery(
     return blocked("CREDIT_ONLY_RESPONSE_INVALID","Credit-only result failed safe contract.");
    return ok({reportId,action,replacementStatus:"not_requested",
     replacementAssignmentId:null,originalAssignmentId:r.original_assignment_id,
+    creditRestorationApprovalId:r.credit_restoration_approval_id??undefined,
+    leadCreditsRestored:r.status==="applied"?1:0,
     restorationStatus:r.status});
   }
   // Existing reject path never restores credits, pays money or assigns a lead.

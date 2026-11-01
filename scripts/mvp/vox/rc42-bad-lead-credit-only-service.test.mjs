@@ -57,6 +57,8 @@ test("authenticated upstream actor handoff reaches only assignment-atomic candid
  assert.equal(r.data.replacementStatus,"not_requested");
  assert.equal(r.data.restorationStatus,"applied");
  assert.equal(r.data.originalAssignmentId,"44444444-4444-4444-8444-444444444444");
+ assert.equal(r.data.creditRestorationApprovalId,"55555555-5555-4555-8555-555555555555");
+ assert.equal(r.data.leadCreditsRestored,1);
  assert.deepEqual(calls,[{name:"qf_vox_rc42_bad_lead_credit_only_atomic_candidate_v1",
   args:{p_report_id:REPORT,p_actor_id:ACTOR}}]);
 });
@@ -67,6 +69,8 @@ test("replay is zero additional lead credits; no direct money or replacement",as
   credit_restoration_approval_id:"55555555-5555-4555-8555-555555555555"};
  const reply=await apply(REPORT,"restore_credit",ACTOR);
  assert.equal(reply.ok,true);assert.equal(reply.data.restorationStatus,"already_applied");
+ assert.equal(reply.data.creditRestorationApprovalId,"55555555-5555-4555-8555-555555555555");
+ assert.equal(reply.data.leadCreditsRestored,0);
  assert.equal(calls.length,1);
 });
 test("money or extra credits in RPC response never claim successful restoration",async()=>{

@@ -83,6 +83,11 @@ export function createVoxEodSnapshotReaderTransport(
   input: {url:string;anonKey:string;bearer:string},
 ): (fn:"qf_vox_rc41_signed_eod_review_snapshot_v1",
      args:{p_intent_id:string;p_subject_id:string})=>Promise<{data:unknown;error:unknown}> {
+  // Never allow an empty, header-injectable or public anon-key bearer to
+  // masquerade as the dedicated reviewed read-only EOD principal.
+  if(typeof input.bearer!=="string"||!input.bearer.trim()||
+     /[\r\n\s]/.test(input.bearer)||input.bearer===input.anonKey)
+    return async()=>({data:null,error:{message:"EOD_REVIEW_BEARER_INVALID"}});
   const client:SupabaseClient=createClient(input.url,input.anonKey,{
     auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
     global:{headers:{Authorization:"Bearer "+input.bearer}},

@@ -64,6 +64,16 @@ test("real supabase-js sends dedicated Authorization bearer, NOT the anon fallba
  assert.equal(request.signal instanceof AbortSignal,true);
  assert.equal(realtimeAttempts,0);
 });
+test("missing or unsafe EOD reviewer bearer never sends network traffic",async()=>{
+ for(const bearer of ["","  ","anon-public","broken\r\nheader","contains space"]){
+  calls.length=0;
+  const rpc=create({url:"https://db.local.test",anonKey:"anon-public",bearer});
+  const result=await rpc(F,{p_intent_id:U,p_subject_id:V});
+  assert.equal(result.data,null);
+  assert.equal(result.error.message,"EOD_REVIEW_BEARER_INVALID");
+  assert.equal(calls.length,0);
+ }
+});
 test("transport never offers another RPC function or direct privileged table API",async()=>{
  calls.length=0;
  const rpc=create({url:"https://db.local.test",anonKey:"anon-only",bearer:"reader"});

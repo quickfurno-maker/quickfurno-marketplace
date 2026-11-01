@@ -10,6 +10,9 @@ export default function ConversationControl(){
  const [action,setAction]=useState<Action>("PAUSE_AI");
  const [busy,setBusy]=useState(false),[message,setMessage]=useState("");
  const [expired,setExpired]=useState(false);
+ // An HTTP failure may follow a committed SQL transaction; keep the same
+ // pending nonce and freeze command edits until Core confirms its receipt.
+ const [uncertain,setUncertain]=useState(false);
  const [choices,setChoices]=useState<Array<{id:string;revision:number;state:"OPEN"|"PAUSED";allowedActions:string[]}>>([]);
  const [choicesError,setChoicesError]=useState("");
  useEffect(()=>{
@@ -36,7 +39,7 @@ export default function ConversationControl(){
  const pending=useRef<{command:string;nonce:string}|null>(null);
  const valid=UUID.test(conversationId.trim())&&/^\d{1,10}$/.test(revision)&&
   Number.isSafeInteger(Number(revision))&&Number(revision)<=2147483646;
- const changed=()=>{pending.current=null;setMessage("");setExpired(false);};
+ const changed=()=>{if(uncertain)return;pending.current=null;setMessage("");setExpired(false);};
  async function submit(event:React.FormEvent){
   event.preventDefault();if(busy||!valid)return;
   const cmd={conversationId:conversationId.trim(),expectedRevision:Number(revision),action};
@@ -52,6 +55,12 @@ export default function ConversationControl(){
    if(response.status===401){setExpired(true);
     setMessage("Verified Staff MFA expired. Sign in to continue.");return;}
    const v:unknown=await response.json();
+   if(!response.ok&&v&&typeof v==="object"&&!Array.isArray(v)&&
+      "error" in v&&v.error==="CORE_OUTCOME_UNKNOWN"){
+    setUncertain(true);
+    setMessage("Core SQL outcome is UNKNOWN. Do not change this command or nonce. Retry only the exact same request after reconciliation with your Team Leader.");
+    return;
+   }
    if(!response.ok||!v||typeof v!=="object"||Array.isArray(v)||
      !("ok" in v)||v.ok!==true||
      !("conversationId" in v)||v.conversationId!==cmd.conversationId||
@@ -63,12 +72,13 @@ export default function ConversationControl(){
      !("replayed" in v)||typeof v.replayed!=="boolean"||
      !("receiptSha256" in v)||typeof v.receiptSha256!=="string"||
      !/^[a-f0-9]{64}$/.test(v.receiptSha256)){
+    if(response.status!==409&&response.ok)setUncertain(true);
     setMessage(response.status===409?
      "Conversation revision changed; retrieve its current Core revision.":
-     "No Core commit confirmed. Retry the SAME command and nonce, or contact your Team Leader.");
+     "Core result could not be verified. Do not assume rollback. Keep the SAME nonce and reconcile with your Team Leader.");
     return;
    }
-   pending.current=null;
+   pending.current=null;setUncertain(false);
    // An exact-nonce replay confirms an OLD receipt, not the CURRENT revision.
    // Only a fresh accepted atomic commit can advance this local revision hint.
    if(!v.replayed)setRevision(String(v.newRevision));
@@ -78,12 +88,13 @@ export default function ConversationControl(){
     "Core confirmed "+v.state+" at revision "+v.newRevision+
     ". Receipt "+v.receiptSha256.slice(0,16)+
     ". Zero provider messages. Core will recheck revision for any future action.");
-  }catch{setMessage("Core result unavailable. Retry the exact same command; do not change its nonce.");}
+  }catch{setUncertain(true);
+   setMessage("Core outcome UNKNOWN. Keep the exact same command and nonce; reconcile with your Team Leader before further actions.");}
   finally{setBusy(false);}
  }
  return <form className="voxWorkActionForm" onSubmit={submit}>
   <label htmlFor="convo-choice">My Core-authorized conversations (read-only selection)</label>
-  <select id="convo-choice" disabled={busy} value={choices.some(x=>x.id===conversationId)?conversationId:""}
+  <select id="convo-choice" disabled={busy||uncertain} value={choices.some(x=>x.id===conversationId)?conversationId:""}
    onChange={e=>{
     const selected=choices.find(x=>x.id===e.target.value);if(!selected)return;
     setConversationId(selected.id);setRevision(String(selected.revision));
@@ -97,14 +108,14 @@ export default function ConversationControl(){
   <p>Selection is only a current Core hint. Atomic authority rechecks Staff grants, consent and revision.</p>
   <label htmlFor="convo-id">Core-authorized conversation ID</label>
   <input id="convo-id" value={conversationId} maxLength={36}
-   placeholder="Conversation UUID from your assigned Core record" disabled={busy}
+   placeholder="Conversation UUID from your assigned Core record" disabled={busy||uncertain}
    onChange={e=>{setConversationId(e.target.value);changed();}} required/>
   <label htmlFor="convo-revision">Current Core revision</label>
   <input id="convo-revision" type="number" min="0" max="2147483646"
-   value={revision} disabled={busy}
+   value={revision} disabled={busy||uncertain}
    onChange={e=>{setRevision(e.target.value);changed();}} required/>
   <label htmlFor="convo-action">Governed action</label>
-  <select id="convo-action" value={action} disabled={busy}
+  <select id="convo-action" value={action} disabled={busy||uncertain}
    onChange={e=>{setAction(e.target.value as Action);changed();}}>
    <option value="PAUSE_AI">Pause AI</option>
    <option value="TAKEOVER">Human takeover</option>
@@ -113,6 +124,7 @@ export default function ConversationControl(){
    This form cannot grant itself access. No outbound message is generated.</p>
   <button type="submit" disabled={busy||!valid}>
    {busy?"Checking native Core…":"Submit atomic control"}</button>
+  {uncertain?<p role="alert">Outcome uncertain: command fields are locked to preserve its original nonce until a verified Core receipt is returned.</p>:null}
   {message?<p role="status">{message}</p>:null}
   {expired?<Link href={withReturn("/login","/team/conversation-control")}>Staff sign-in</Link>:null}
  </form>;

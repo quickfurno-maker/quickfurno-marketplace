@@ -2,6 +2,7 @@ import "server-only";
 import {createRc42SignedEodDataApiReviewHandler} from "@/services/vox/rc42SignedEodDataApiReviewHandler";
 import {verifyRc41PendingEodViaRpc} from "@/services/vox/rc41SignedEodReviewSnapshot";
 import {verifyVoxOwnerBearer} from "@/services/vox/verifiedStaffBearer";
+import {createRc44DedicatedEodReviewReader} from "@/services/vox/rc44DedicatedEodReviewReader";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 // UNINSTALLED candidate. Dedicated reviewed reader role not yet provisioned.
@@ -11,7 +12,11 @@ const handler=createRc42SignedEodDataApiReviewHandler({
  enabled:()=>process.env.VOX_RC42_EOD_ATOMIC_REVIEW_ENABLED==="staging"&&
   process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED==="staging",
  installed:()=>RC42_EOD_ATOMIC_DATA_API_READER_INSTALLED,
- rpc:()=>null,
+ rpc:()=>createRc44DedicatedEodReviewReader({
+  supabaseUrl:process.env.NEXT_PUBLIC_SUPABASE_URL,
+  anonKey:process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  readerJwt:process.env.VOX_EOD_REVIEW_READER_JWT
+ }),
  review:(owner,leader,input,rpc)=>verifyRc41PendingEodViaRpc(owner,leader,input,rpc)
 });
 export async function GET(request:Request){

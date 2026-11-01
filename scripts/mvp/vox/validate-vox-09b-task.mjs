@@ -25,11 +25,24 @@ t("urgent task denied",()=>assert.equal(normalizeScopedVendorTask({...input,prio
 t("past task denied",()=>assert.equal(normalizeScopedVendorTask({...input,dueAt:new Date(now-1000).toISOString()},scope,now),null));
 t("too distant task denied",()=>assert.equal(normalizeScopedVendorTask({...input,dueAt:new Date(now+100*86400000).toISOString()},scope,now),null));
 const api=read("app/api/vox/v1/vendor-task/route.ts");
+const atomicSql=read("ops/vox/rc32-review-candidates/20261031010000_vox_rc32_core_vendor_task_atomic_candidate.sql");
 t("real staff Supabase AAL2 required",()=>assert.match(api,/getVerifiedScopedStaff\(request.headers.get\("authorization"\)\)/));
-t("default-off staging write gate",()=>assert.match(api,/VOX_VENDOR_CRM_TASKS_ENABLED!=="staging"/));
-t("canonical vendor city checked",()=>assert.match(api,/zone.data\?\.city_id!==scope.cityId/));
-t("native CRM authority called",()=>assert.match(api,/createVendorTask\(task.vendorId/));
-t("service actor derived server-side",()=>assert.match(api,/},scope.userId\)/));
+t("default-off staging write gate",()=>{
+ assert.match(api,/VOX_VENDOR_CRM_TASKS_ENABLED!=="staging"/);
+ assert.match(api,/VOX_VENDOR_TASK_ATOMIC_RPC_ENABLED!=="staging"/);
+ assert.match(api,/if\(gatesOff\(\)\)/);
+});
+t("canonical vendor city checked atomically with vendor row lock",()=>{
+ assert.match(atomicSql,/z\.city_id=p_city/);
+ assert.match(atomicSql,/for share of v,z/);
+ assert.match(atomicSql,/VOX_CORE_TASK_VENDOR_CITY_DENIED/);
+});
+t("native CRM atomic RPC only",()=>{
+ assert.match(api,/qf_vox_core_vendor_task_atomic_candidate_v1/);
+ assert.match(api,/adminClient\(\)\.rpc\(RPC/);
+ assert.doesNotMatch(api,/createVendorTask\(|\.from\(/);
+});
+t("service actor derived server-side",()=>assert.match(api,/p_actor:scope.userId/));
 t("rejects body over 700 bytes",()=>assert.match(api,/raw.length>700/));
 t("other methods closed",()=>assert.equal((api.match(/METHOD_NOT_ALLOWED/g)||[]).length,3));
 t("does not mutate vendors or finance",()=>assert.doesNotMatch(api,/\.from\("vendors"\)\.update|remaining_credits|lead_assignments|sendWhatsApp/));

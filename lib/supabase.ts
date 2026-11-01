@@ -90,6 +90,7 @@ export function createVoxEodSnapshotReaderTransport(
   return async (fn,args)=>{
     if(fn!=="qf_vox_rc41_signed_eod_review_snapshot_v1")
       return {data:null,error:{message:"EOD_REVIEW_FUNCTION_DENIED"}};
-    return client.rpc(fn,args);
+    // Bounded read-only EOD HTTP RPC. Timeout never triggers privileged fallback.
+    return client.rpc(fn,args).abortSignal(AbortSignal.timeout(3500));
   };
 }

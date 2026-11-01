@@ -33,9 +33,17 @@ const V="22222222-2222-4222-8222-222222222222";
 const oldFetch=globalThis.fetch;
 const calls=[];
 let wireStatus=200;
+let wireHang=false;
 globalThis.fetch=async(url,options={})=>{
  const headers=new Headers(options.headers);
- calls.push({url:String(url),headers,method:options.method,body:options.body});
+ calls.push({url:String(url),headers,method:options.method,body:options.body,
+  signal:options.signal});
+ if(wireHang)return new Promise((resolve,reject)=>{
+  const signal=options.signal;
+  if(!signal)return reject(Error("EOD_MISSING_ABORT_SIGNAL"));
+  if(signal.aborted)return reject(signal.reason);
+  signal.addEventListener("abort",()=>reject(signal.reason),{once:true});
+ });
  return new Response(wireStatus===200?
   JSON.stringify({state:"PENDING_RECEIPT_AWAITING_EXTERNAL_REVIEW"}):
   JSON.stringify({code:"PGRST301",message:"JWT invalid"}),{
@@ -53,6 +61,7 @@ test("real supabase-js sends dedicated Authorization bearer, NOT the anon fallba
  assert.equal(request.headers.get("apikey"),"anon-test-public-only");
  assert.doesNotMatch(JSON.stringify(result),/service_role|access_token/);
  assert.deepEqual(JSON.parse(request.body),{p_intent_id:U,p_subject_id:V});
+ assert.equal(request.signal instanceof AbortSignal,true);
  assert.equal(realtimeAttempts,0);
 });
 test("transport never offers another RPC function or direct privileged table API",async()=>{
@@ -77,6 +86,20 @@ test("real PostgREST denied reader JWT never claims data or retries with privile
   assert.doesNotMatch(JSON.stringify(result),/rejected-dedicated-reader|service_role/);
   assert.equal(realtimeAttempts,0);
  }finally{wireStatus=200;}
+});
+test("real EOD PostgREST HTTP request aborts at bounded timeout without fallback",async()=>{
+ calls.length=0;wireHang=true;
+ try{
+  const rpc=create({url:"https://db.local.test",anonKey:"anon-only",bearer:"dedicated-reader-test"});
+  const started=Date.now();
+  const result=await rpc(F,{p_intent_id:U,p_subject_id:V});
+  assert.notEqual(result.error,null);
+  assert.equal(result.data,null);
+  assert.equal(calls.length,1);
+  assert.ok(Date.now()-started<8000,"request must terminate within a bounded window");
+  assert.equal(calls[0].headers.get("authorization"),"Bearer dedicated-reader-test");
+  assert.equal(realtimeAttempts,0);
+ }finally{wireHang=false;}
 });
 process.on("exit",()=>{
  globalThis.fetch=oldFetch;

@@ -14,7 +14,7 @@ await build({entryPoints:[resolve(root,"services/vox/rc44DedicatedEodReviewReade
   b.onResolve({filter:/^@supabase\/supabase-js$/},()=>({path:"supabase",namespace:"test"}));
   b.onResolve({filter:/^@supabase\/ssr$/},()=>({path:"ssr",namespace:"test"}));
   b.onLoad({filter:/.*/,namespace:"test"},a=>({loader:"js",contents:a.path==="supabase"?
-   "export const createClient=(u,k,o)=>{globalThis.__rc44Create.push({u,k,o});return {rpc:(fn,args)=>globalThis.__rc44Rpc(fn,args)};}":""}));
+   "export const createClient=(u,k,o)=>{globalThis.__rc44Create.push({u,k,o});return {rpc:(fn,args)=>({abortSignal:(signal)=>{if(!(signal instanceof AbortSignal))throw Error('EOD_TEST_ABORT_SIGNAL_REQUIRED');return globalThis.__rc44Rpc(fn,args);}})};}":""}));
  }}]});
 const {createRc44DedicatedEodReviewReader:create}=await import(pathToFileURL(out).href);
 const U="11111111-1111-4111-8111-111111111111",V="22222222-2222-4222-8222-222222222222";

@@ -57,6 +57,17 @@ test("authoritative Staff principal and consent-bound atomic RPC, zero provider 
  assert.equal(d.calls[0].args.p_action,"TAKEOVER");
  assert.equal(d.calls[0].args.p_aal,"aal2");
 });
+test("AAL2 expiry during atomic SQL read does not certify the returned receipt",async()=>{
+ let now=1000000;
+ const d=deps({now:()=>now,
+  rpc:async()=>{now=2000001;return {data:[receipt],error:null};}});
+ const res=await create(d)(request());
+ assert.equal(res.status,403);
+ const body=await res.json();
+ assert.equal(body.error,"STAFF_AAL2_EXPIRED_DURING_RPC");
+ assert.equal(body.providerMessagesSent,0);
+ assert.equal(body.committed,false);
+});
 test("wrong nonce, revision, missing receipt or provider messages never certify",async()=>{
  for(const altered of [{...receipt,nonce:U},{...receipt,new_revision:7},
   {...receipt,provider_messages_sent:1},{...receipt,receipt_sha256:"b"},

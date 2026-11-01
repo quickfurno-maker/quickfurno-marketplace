@@ -27,6 +27,15 @@ export async function GET(request:Request){
   if(!scope||scope.role!=="operations_manager"||!scope.canReadContent||
      !UUID.test(scope.userId)||!UUID.test(scope.cityId)||!UUID.test(scope.teamId))
    return denied("SCOPED_OPERATIONS_MANAGER_REQUIRED",403);
+  // Never pass forged or unbounded object scopes into privileged Data API
+  // queries, even if a compromised upstream resolver returns malformed data.
+  if(!Array.isArray(scope.conversationIds)||!Array.isArray(scope.vendorIds)||
+     scope.conversationIds.length>200||scope.vendorIds.length>200||
+     scope.conversationIds.some(id=>typeof id!=="string"||!UUID.test(id))||
+     scope.vendorIds.some(id=>typeof id!=="string"||!UUID.test(id))||
+     new Set(scope.conversationIds).size!==scope.conversationIds.length||
+     new Set(scope.vendorIds).size!==scope.vendorIds.length)
+   return denied("SCOPED_OBJECT_GRANTS_INVALID",403);
   if(!scope.conversationIds.length||!scope.vendorIds.length)
    return json({ok:true,schema:"qf.vox.conversation.candidates.v1",
     mode:"READ_ONLY",actionsEnabled:false,conversations:[]},200);

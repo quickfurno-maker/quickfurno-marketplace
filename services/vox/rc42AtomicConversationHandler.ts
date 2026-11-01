@@ -53,6 +53,10 @@ export function createRc42AtomicConversationHandler(deps:Deps){
    });
    if(error||!Array.isArray(data)||data.length!==1)return status("ATOMIC_RPC_UNAVAILABLE",503);
    const row=data[0] as Record<string,unknown>;
+   // Session authority must still be current when a network-delayed SQL
+   // receipt arrives; never certify a late result using expired AAL2.
+   if(actor.expiresAtMs<=(deps.now??Date.now)())
+    return status("STAFF_AAL2_EXPIRED_DURING_RPC",403);
    if(!row||typeof row!=="object"||row.nonce!==value.nonce||
       row.conversation_id!==value.conversationId||row.action!==value.action||
       row.previous_revision!==value.expectedRevision||

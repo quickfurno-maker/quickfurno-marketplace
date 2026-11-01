@@ -91,6 +91,19 @@ test("missing or forged Staff identity keys deny Core discovery before database 
   assert.equal(state.queries.length,0);
  }
 });
+test("malformed, duplicate or oversized Staff object grants deny before database",async()=>{
+ for(const mutated of [
+  {conversationIds:["bad"]},{vendorIds:["bad"]},
+  {conversationIds:[convo,convo]},{vendorIds:[vendor,vendor]},
+  {conversationIds:Array(201).fill(convo)},
+  {vendorIds:Array(201).fill(vendor)},
+  {conversationIds:null},{vendorIds:null}
+ ]){
+  reset();state.scope={...baseScope,...mutated};
+  const result=await api.GET(req());
+  assert.equal(result.status,403);assert.equal(state.queries.length,0);
+ }
+});
 test("Core returns bounded exact vendor-only revision hints, not write permission",async()=>{
  reset();const res=await api.GET(req());assert.equal(res.status,200);
  const data=await res.json();

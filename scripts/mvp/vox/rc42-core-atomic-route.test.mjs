@@ -17,6 +17,9 @@ const cmd={conversationId:C,nonce:N,expectedRevision:4,action:"TAKEOVER"};
 const actor={userId:U,teamId:U,cityId:U,aal:"aal2",expiresAtMs:2000000};
 const receipt={nonce:N,conversation_id:C,action:"TAKEOVER",previous_revision:4,
  new_revision:5,state:"HUMAN",replayed:false,consent_scope:"transactional",
+ consent_policy_version:"qf-consent-v1",
+ consent_reason:"transactional_no_consent_objection",
+ event_id:"44444444-4444-4444-8444-444444444444",
  receipt_sha256:"a".repeat(64),provider_messages_sent:0};
 const request=(body=cmd)=>new Request("https://local.test/api/vox/v1/core/conversation-operator",{
  method:"POST",headers:{"authorization":"Bearer test","content-type":"application/json"},
@@ -56,7 +59,12 @@ test("authoritative Staff principal and consent-bound atomic RPC, zero provider 
 });
 test("wrong nonce, revision, missing receipt or provider messages never certify",async()=>{
  for(const altered of [{...receipt,nonce:U},{...receipt,new_revision:7},
-  {...receipt,provider_messages_sent:1},{...receipt,receipt_sha256:"b"}]){
+  {...receipt,provider_messages_sent:1},{...receipt,receipt_sha256:"b"},
+  {...receipt,state:"PUBLISHED"},
+  {...receipt,event_id:"forged"},
+  {...receipt,consent_policy_version:"unknown"},
+  {...receipt,consent_reason:"unapproved_scope"}
+ ]){
   const d=deps({rpc:async()=>({data:[altered],error:null})});
   assert.equal((await create(d)(request())).status,503);
  }

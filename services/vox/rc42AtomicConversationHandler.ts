@@ -58,8 +58,14 @@ export function createRc42AtomicConversationHandler(deps:Deps){
       row.previous_revision!==value.expectedRevision||
       row.new_revision!==value.expectedRevision+1||
       row.provider_messages_sent!==0||typeof row.replayed!=="boolean"||
+      row.state!==(value.action==="TAKEOVER"?"HUMAN":"PAUSED")||
+      typeof row.event_id!=="string"||!UUID.test(row.event_id)||
+      row.consent_policy_version!=="qf-consent-v1"||
+      !["transactional_no_consent_objection",
+        "preference_transactional_no_objection",
+        "preference_policy_version_mismatch_no_objection"].includes(String(row.consent_reason))||
       typeof row.receipt_sha256!=="string"||!/^[a-f0-9]{64}$/.test(row.receipt_sha256)||
-      !["transactional"].includes(String(row.consent_scope)))
+      row.consent_scope!=="transactional")
     return status("ATOMIC_RECEIPT_INVALID",503);
    return send({ok:true,state:row.state,action:row.action,nonce:row.nonce,
     conversationId:row.conversation_id,previousRevision:row.previous_revision,

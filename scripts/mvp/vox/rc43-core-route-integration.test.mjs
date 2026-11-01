@@ -35,6 +35,9 @@ const actor={userId:U,teamId:U,cityId:U,aal:"aal2",expiresAtMs:Date.now()+120000
 const cmd={conversationId:C,nonce:N,expectedRevision:2,action:"PAUSE_AI"};
 const receipt={nonce:N,conversation_id:C,action:"PAUSE_AI",previous_revision:2,
  new_revision:3,state:"PAUSED",replayed:false,consent_scope:"transactional",
+ consent_policy_version:"qf-consent-v1",
+ consent_reason:"transactional_no_consent_objection",
+ event_id:"55555555-5555-4555-8555-555555555555",
  receipt_sha256:"a".repeat(64),provider_messages_sent:0};
 const flags=["VOX_RC42_CORE_CONVERSATION_OPERATOR_ENABLED","VOX_STAFF_GRANTS_ENABLED",
  "VOX_DEPARTMENT_ENFORCEMENT_ENABLED"];

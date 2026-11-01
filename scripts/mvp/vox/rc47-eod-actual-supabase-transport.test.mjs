@@ -32,11 +32,14 @@ const U="11111111-1111-4111-8111-111111111111";
 const V="22222222-2222-4222-8222-222222222222";
 const oldFetch=globalThis.fetch;
 const calls=[];
+let wireStatus=200;
 globalThis.fetch=async(url,options={})=>{
  const headers=new Headers(options.headers);
  calls.push({url:String(url),headers,method:options.method,body:options.body});
- return new Response(JSON.stringify({state:"PENDING_RECEIPT_AWAITING_EXTERNAL_REVIEW"}),{
-  status:200,headers:{"content-type":"application/json"}});
+ return new Response(wireStatus===200?
+  JSON.stringify({state:"PENDING_RECEIPT_AWAITING_EXTERNAL_REVIEW"}):
+  JSON.stringify({code:"PGRST301",message:"JWT invalid"}),{
+  status:wireStatus,headers:{"content-type":"application/json"}});
 };
 test("real supabase-js sends dedicated Authorization bearer, NOT the anon fallback bearer",async()=>{
  calls.length=0;
@@ -60,6 +63,20 @@ test("transport never offers another RPC function or direct privileged table API
  assert.equal(result.error.message,"EOD_REVIEW_FUNCTION_DENIED");
  assert.equal(calls.length,0);
  assert.equal(realtimeAttempts,0);
+});
+test("real PostgREST denied reader JWT never claims data or retries with privileged credentials",async()=>{
+ calls.length=0;wireStatus=403;
+ try{
+  const rpc=create({url:"https://db.local.test",anonKey:"anon-key",bearer:"rejected-dedicated-reader"});
+  const result=await rpc(F,{p_intent_id:U,p_subject_id:V});
+  assert.equal(result.data,null);
+  assert.notEqual(result.error,null);
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].headers.get("authorization"),"Bearer rejected-dedicated-reader");
+  assert.equal(calls[0].headers.get("apikey"),"anon-key");
+  assert.doesNotMatch(JSON.stringify(result),/rejected-dedicated-reader|service_role/);
+  assert.equal(realtimeAttempts,0);
+ }finally{wireStatus=200;}
 });
 process.on("exit",()=>{
  globalThis.fetch=oldFetch;

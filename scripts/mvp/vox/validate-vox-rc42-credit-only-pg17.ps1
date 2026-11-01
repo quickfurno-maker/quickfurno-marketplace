@@ -17,8 +17,25 @@ function Sql([string]$q) {
 function RunFile([string]$file,[string]$dest){
  & docker cp $file ($name + ':/tmp/' + $dest) | Out-Null
  if($LASTEXITCODE -ne 0){throw "DOCKER_COPY_FAILED:$dest"}
- $v=& docker exec $name psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -f ("/tmp/"+$dest) 2>&1
- if($LASTEXITCODE -ne 0){throw "POSTGRES_FILE_FAILED:$dest $v"}
+ # PostgreSQL first boot may briefly accept pg_isready and then restart
+ # before initdb has fully completed. Retry ONLY transient connection loss.
+ # -1 wraps each fixture file in one transaction so interrupted imports never
+ # leave a partial schema. SQL/permission errors fail immediately.
+ for($try=1;$try -le 8;$try++){
+  # Candidate includes its own explicit BEGIN/COMMIT; do not nest -1 there.
+  if($dest -eq "rc42-candidate.sql"){
+   $v=& docker exec $name psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -f ("/tmp/"+$dest) 2>&1
+  }else{
+   $v=& docker exec $name psql -X --single-transaction -U postgres -d postgres -v ON_ERROR_STOP=1 -f ("/tmp/"+$dest) 2>&1
+  }
+  if($LASTEXITCODE -eq 0){return}
+  $detail=($v|Out-String)
+  if($detail -notmatch '(?i)(connection to server|could not connect|server closed the connection|database system is starting up|server is starting up)'){
+   throw "POSTGRES_FILE_FAILED_NONTRANSIENT:$dest $detail"
+  }
+  if($try -eq 8){throw "POSTGRES_FILE_CONNECT_RETRY_EXHAUSTED:$dest $detail"}
+  Start-Sleep -Milliseconds (350*$try)
+ }
 }
 function Assert([bool]$ok,[string]$label){if(-not $ok){throw "RC42_PG17_FAIL:$label"}; Write-Output "PASS $label"}
 try{

@@ -10,7 +10,8 @@ type RecoveryRpcResult={
  status?:string;reason_code?:string|null;
  original_assignment_id?:string;credit_restoration_approval_id?:string|null;
  lead_credits_restored?:number;cash_refunded_minor_units?:number;
- automatic_replacement_created?:boolean
+ automatic_replacement_created?:boolean;replacement_assignment_id?:string|null;
+ monetary_refund_id?:string|null
 };
 const blocked=<T>(code:string,error:string):Result<T>=>({ok:false,code,error});
 // RC43 owner-controlled release constant. An environment flag alone MUST NOT
@@ -32,6 +33,11 @@ export async function recommendBadLeadRecovery(
   const row=(data??{}) as RecoveryRpcResult;
   if(row.status!=="applied")return blocked(String(row.reason_code??"RECOVERY_RECOMMENDATION_REFUSED"),
    "Recovery recommendation was refused.");
+  if((row.lead_credits_restored!==undefined&&row.lead_credits_restored!==0)||
+     (row.cash_refunded_minor_units!==undefined&&row.cash_refunded_minor_units!==0)||
+     row.automatic_replacement_created===true||row.replacement_assignment_id!=null||
+     row.monetary_refund_id!=null)
+   return blocked("RECOMMENDATION_RESPONSE_INVALID","Recommendation cannot execute a credit, replacement or refund.");
   return ok({reportId,recommendation});
  }catch(e){return fail(e);}
 }
@@ -92,7 +98,8 @@ export async function applyBadLeadRecovery(
    if(r.cash_refunded_minor_units!==0||r.lead_credits_restored!==(r.status==="applied"?1:0)||
       !UUID.test(r.original_assignment_id??"")||
       !UUID.test(r.credit_restoration_approval_id??"")||
-      (r.automatic_replacement_created===true)||
+      (r.automatic_replacement_created===true)||r.replacement_assignment_id!=null||
+      r.monetary_refund_id!=null||
       (r.status==="applied"&&r.automatic_replacement_created!==false))
     return blocked("CREDIT_ONLY_RESPONSE_INVALID","Credit-only result failed safe contract.");
    return ok({reportId,action,replacementStatus:"not_requested",
@@ -113,7 +120,8 @@ export async function applyBadLeadRecovery(
   // claiming any cash, lead credits or a new assignment.
   if((r.lead_credits_restored!==undefined&&r.lead_credits_restored!==0)||
      (r.cash_refunded_minor_units!==undefined&&r.cash_refunded_minor_units!==0)||
-     r.automatic_replacement_created===true)
+     r.automatic_replacement_created===true||r.replacement_assignment_id!=null||
+     r.monetary_refund_id!=null)
    return blocked("REJECT_RESPONSE_INVALID","Unexpected financial or replacement effect in rejection receipt.");
   return ok({reportId,action,replacementStatus:"not_requested",replacementAssignmentId:null});
  }catch(e){return fail(e);}

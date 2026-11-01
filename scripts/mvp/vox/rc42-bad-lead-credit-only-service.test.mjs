@@ -97,7 +97,9 @@ test("rejection never acknowledges forged money, credit or replacement effects",
   {lead_credits_restored:1},
   {cash_refunded_minor_units:50},
   {automatic_replacement_created:true},
-  {lead_credits_restored:2,cash_refunded_minor_units:100}
+  {lead_credits_restored:2,cash_refunded_minor_units:100},
+  {replacement_assignment_id:"66666666-6666-4666-8666-666666666666"},
+  {monetary_refund_id:"refund_forged"}
  ]){
   globalThis.__rc42Reply={status:"applied",...values};
   const v=await apply(REPORT,"reject",ACTOR);
@@ -108,6 +110,16 @@ test("rejection never acknowledges forged money, credit or replacement effects",
  assert.equal(v.ok,true);
  assert.equal(v.data.replacementAssignmentId,null);
  assert.ok(calls.every(c=>c.name==="qf_apply_bad_lead_recovery_v1"));
+});
+test("advisory recommendation cannot masquerade as a payout or lead grant",async()=>{
+ before();
+ for(const effect of [{cash_refunded_minor_units:1},{lead_credits_restored:1},
+  {replacement_assignment_id:"66666666-6666-4666-8666-666666666666"},
+  {monetary_refund_id:"refund_forged"}]){
+  globalThis.__rc42Reply={status:"applied",...effect};
+  const r=await recommend(REPORT,"restore_credit");
+  assert.equal(r.ok,false);assert.equal(r.code,"RECOMMENDATION_RESPONSE_INVALID");
+ }
 });
 test("unverified actor ID blocked before all grant calls",async()=>{
  before();process.env[gate]="staging";

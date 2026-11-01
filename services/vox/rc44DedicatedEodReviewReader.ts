@@ -34,6 +34,13 @@ export function createRc44DedicatedEodReviewReader(input:Rc44ReaderInput):Rc41Rp
  const now=input.nowSeconds??Math.floor(Date.now()/1000);
  if(payload.role!==ROLE||typeof payload.exp!=="number"||!Number.isSafeInteger(payload.exp)||
     payload.exp<=now||payload.exp>now+3600||payload.aal!==undefined)return null;
+ // Do not even construct a PostgREST transport for a token that claims it
+ // was issued in the future or is not yet valid. The backend MUST still
+ // verify signature and every custom role grant independently.
+ if(payload.nbf!==undefined&&(!Number.isSafeInteger(payload.nbf)||
+    (payload.nbf as number)>now))return null;
+ if(payload.iat!==undefined&&(!Number.isSafeInteger(payload.iat)||
+    (payload.iat as number)>now+30))return null;
  let transport:ReturnType<typeof createVoxEodSnapshotReaderTransport>;
  try{
   transport=createVoxEodSnapshotReaderTransport({url,anonKey:key,bearer});

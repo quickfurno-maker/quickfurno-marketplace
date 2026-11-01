@@ -27,7 +27,10 @@ globalThis.__rc44Rpc=async()=>({data:{proof:"sample"},error:null});
 test("missing key, forged roles, service_role, expired or overlong tokens cannot construct a reader",()=>{
  for(const v of [
   {},{...good,role:"service_role"},{...good,role:"authenticated"},
-  {...good,exp:999},{...good,exp:90000},{...good,aal:"aal2"}]){
+  {...good,exp:999},{...good,exp:90000},{...good,aal:"aal2"},
+  {...good,nbf:Math.floor(Date.now()/1000)+90},
+  {...good,iat:Math.floor(Date.now()/1000)+300},
+  {...good,nbf:"fake"},{...good,iat:"future"}]){
   const args=v.role?config(v):{supabaseUrl:"https://db.local.test",anonKey:"public-anon",readerJwt:null};
   assert.equal(create(args),null);
  }

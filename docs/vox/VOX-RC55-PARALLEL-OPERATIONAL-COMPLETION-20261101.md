@@ -1,0 +1,16 @@
+# VOX RC55 — parallel operational implementation, verified source candidate
+
+Date: 2026-11-01. Protected Draft PR #450. Base: `fd59caba1d804e20df18aae15685e134d69b58c0`. This is **source-only** and NOT a Staging or Production launch authorization.
+
+## Independently developed workstreams
+- **DB:** New private, read-only `rc55-private-baseline-containment.mjs` validates all original captured ledger versions against the existing second-read checksums and the pinned 107 source-only SQL file digests. It tests strict contiguous whole-file text inclusion into the genuine managed baseline without printing SQL or assigning aliases. Private JARVIS run: all 31 version checks verified, 821 genuine baseline statements, 107 sources checked; **0 strict whole-file contiguous embeds**. This does NOT prove no semantic relationship or no statement-level match. All seven managed-version discrepancies, two duplicate managed SQL pairs and 85 unmatched source files still require independent DBA source mapping. There are no new verified aliases, migration writes or deployment approvals.
+- **Core/Staff:** Exact-scoped conversation discovery refuses malformed, duplicate or oversized vendor/conversation grant IDs before touching the Data API. The uninstalled atomic Core conversation writer also checks that verified Staff AAL2 remains unexpired after the SQL RPC responds. A transaction may be committed before a late response is denied; the backend remains the actual lock and source of truth.
+- **Finance:** Both human-selected and generated bad-lead recovery recommendations now require real current Owner AAL2 through `rc44VerifiedBadLeadOwner`, matching the existing approval gate. This is a recommendation security improvement only; canonical credit mutation remains hard OFF. **Locked policy: one LEAD credit for an approved bad lead, never cash refund or automatic replacement.**
+- **EOD:** The dedicated read-only reviewed token decoder refuses JWT timestamps that would place issue/not-before time at or after expiry. PostgREST must still verify JWT signatures and role grants; official EOD reader/writer remains uninstalled.
+- **QA:** protected RC55 CI checks run source-integrity, Core atomic and scoped read, Finance AAL2, EOD reader and safe release feature-off proofs.
+
+## Executed local validation
+Five isolated JARVIS worktrees each passed their targeted tests and were cherry-picked into the single integration candidate. Combined focused source tests **63/63 PASS**. Root TypeScript `npx tsc --noEmit` PASS. `scripts/mvp/vox/rc39-protected-features-off-gate.mjs` PASS. Read-only genuine private ledger report returned `releaseGo=false`, no SQL printed. Root Next.js 16.4.1 production build PASS after native local `npm ci` without linked node_modules.
+
+## Release decision: HOLD
+Source correctness does not replace independent qualified DBA/AppSec review, full isolated managed Auth/Vault/Storage/PostGIS/ACL/PITR restoration, genuine Owner+Team Leader MFA and Staff UAT, approved Staging migration/rollback, and separate Production authorization. Real payments, lead-credit grants, provider WhatsApp/RCS, official EOD, managed Staging changes and Production deployment remain disabled. No SQL or credentials from private JARVIS capture committed.

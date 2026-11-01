@@ -36,6 +36,21 @@ export async function submitConversationControl(cmd:ConversationCommand){
    signal:AbortSignal.timeout(3500)
   });
   if(!response.ok){
+   // An AAL2 revocation can produce HTTP 403 AFTER Core SQL has committed.
+   // Only a strict, redacted Core unknown-outcome receipt can qualify a
+   // non-5xx denial as ambiguous. Never promote remote data to success.
+   let failed:unknown=null;
+   try{failed=await response.json();}catch{/* No trustworthy receipt. */}
+   if(failed&&typeof failed==="object"&&!Array.isArray(failed)){
+    const value=failed as Record<string,unknown>;
+    if(value.ok===false&&value.committed===null&&
+       value.commitState==="unknown"&&value.retrySameNonceOnly===true&&
+       value.providerMessagesSent===0)
+     return {ok:false,status:response.status===504?504:
+      response.status===403?403:503,
+      error:"CORE_OUTCOME_UNKNOWN",committed:null,
+      retrySameNonceOnly:true} as const;
+   }
    // Core can commit before an HTTP timeout/transport error. Preserve its
    // uncertain status and exact-nonce reconciliation instruction; do not
    // imply that a failed HTTP response rolled back the SQL transaction.

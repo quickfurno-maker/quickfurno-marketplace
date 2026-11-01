@@ -133,6 +133,18 @@ test("Core 504 and 503 cannot be mistaken for rollback or trigger a new nonce",a
  assert.equal(state.calls.length,2);
  for(const call of state.calls)assert.equal(JSON.parse(call.options.body).nonce,N);
 });
+test("Core 403 after Staff revocation retains unknown SQL outcome and exact nonce",async()=>{
+ reset();state.status=403;
+ state.receipt={ok:false,error:"STAFF_SCOPE_REVOKED_DURING_RPC",
+  committed:null,commitState:"unknown",retrySameNonceOnly:true,
+  providerMessagesSent:0};
+ const res=await api.POST(request());assert.equal(res.status,403);
+ const body=await res.json();
+ assert.equal(body.error,"CORE_OUTCOME_UNKNOWN");
+ assert.equal(body.committed,null);assert.equal(body.retrySameNonceOnly,true);
+ assert.equal(state.calls.length,1);
+ assert.equal(JSON.parse(state.calls[0].options.body).nonce,N);
+});
 test("Web loss of Core response never confirms rollback or invents a nonce",async()=>{
  reset();state.transportFailure=true;
  const r=await api.POST(request());

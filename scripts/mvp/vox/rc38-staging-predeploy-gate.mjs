@@ -162,6 +162,24 @@ function checkRecovery(ev,now,add){
  if(typeof ev.capturedBy!=="string"||!ev.capturedBy.trim())add("RECOVERY_CAPTURED_BY_MISSING","recovery.capturedBy","operator id required for independence check","operator id");
 }
 
+// Optional RC40 source-SQL/managed-ledger reconciliation report. Supplying it makes an incomplete,
+// tampered or differently-pinned report a blocker; omitting it changes nothing. It never grants approval.
+export const RECONCILE_SCHEMA="qf.vox.rc40.managed-ledger-reconciliation.v1";
+function checkReconciliation(text,expectedSha,add){
+ const sub="--source-sql-reconciliation";
+ let r;try{r=JSON.parse(text);}catch{add("SOURCE_SQL_RECONCILIATION_MALFORMED",sub,"not valid JSON","valid RC40 reconciliation report");return null;}
+ if(!isObj(r)||r.schema!==RECONCILE_SCHEMA||!HEX64.test(r.reconciliationSha256||"")){add("SOURCE_SQL_RECONCILIATION_MALFORMED",sub,"schema != "+RECONCILE_SCHEMA,"valid RC40 reconciliation report");return null;}
+ const {reconciliationSha256,...body}=r;
+ if(sha(JSON.stringify(body))!==reconciliationSha256){add("SOURCE_SQL_RECONCILIATION_TAMPERED",sub,"report digest mismatch","re-run rc40-managed-ledger-reconciler.mjs");return null;}
+ if(r.releaseGo!==false||r.approvalClaimed!==false||r.executesSql!==false||r.managedWrites!==false)
+  add("SOURCE_SQL_RECONCILIATION_UNSAFE_FLAGS",sub,"report claims release/approval/execution","regenerated offline report");
+ if(r.candidateSha!==expectedSha)add("SOURCE_SQL_RECONCILIATION_SHA_MISMATCH",sub,"report pinned "+r.candidateSha+" != expected "+expectedSha,"reconciliation re-run for the reviewed commit");
+ if(r.status!=="RECONCILED_COMPLETE"||r.counts?.managedMissing!==0||r.counts?.sourceUnmatched!==0)
+  add("SOURCE_SQL_RECONCILIATION_INCOMPLETE",sub,"status="+r.status+" managedMissing="+r.counts?.managedMissing+" sourceUnmatched="+r.counts?.sourceUnmatched,
+   "independent managed ledger capture for every missing-original-SQL version (see qf.vox.rc40.missing-original-sql.v1)");
+ return reconciliationSha256;
+}
+
 // Trusted key registry: public keys only, sha256 of the file bytes pinned out-of-band by the operator.
 function loadKeys(text,pinned,add){
  if(!HEX64.test(pinned||"")){add("TRUSTED_KEYS_PIN_MISSING","--trusted-keys-sha256","64-hex pin of the registry file is required","registry sha256 recorded out-of-band by the owner");return null;}
@@ -220,7 +238,7 @@ export function evaluatePredeployGate(i){
  const blocked=[];
  const add=(code,subject,detail,need)=>blocked.push({code,subject,detail:detail||"",requiredExternalInput:need||null});
  const now=Number.isFinite(i.now)?i.now:Date.now();
- for(const [n,t] of Object.entries({rollbacks:i.rollbackText,recovery:i.recoveryText,approvals:i.approvalsText,migrationDigests:i.migrationDigestsText,aliases:i.aliasText}))
+ for(const [n,t] of Object.entries({rollbacks:i.rollbackText,recovery:i.recoveryText,approvals:i.approvalsText,migrationDigests:i.migrationDigestsText,aliases:i.aliasText,sourceSqlReconciliation:i.sourceSqlReconciliationText}))
   if(typeof t==="string"&&SECRET_RE.test(t))add("SECRET_IN_INPUT",n,"input contains secret-shaped content; refusing to process","remove credentials/keys from the file and rotate any that were exposed");
  const parse=(t,code,subject)=>{if(typeof t!=="string")return undefined;try{return JSON.parse(t);}catch{add(code,subject,"not valid JSON","valid JSON file");return undefined;}};
  let plan=null;
@@ -233,13 +251,15 @@ export function evaluatePredeployGate(i){
  checkHead(i.headSha,i.expectedSha,add);
  if(plan)checkMigrationDigests(parse(i.migrationDigestsText,"MIGRATION_DIGESTS_MALFORMED","--migration-digests"),plan,add);
  else add("MIGRATION_DIGESTS_UNCHECKED","--migration-digests","no plan to compare against",null);
+ const reconSha=typeof i.sourceSqlReconciliationText==="string"?checkReconciliation(i.sourceSqlReconciliationText,i.expectedSha,add):null;
  const recovery=parse(i.recoveryText,"RECOVERY_MALFORMED","--recovery");
  checkRecovery(recovery,now,add);
 
  const migrations=plan?migrationRows(plan):[];
  const binding=sha(canonicalJson({schema:GATE_SCHEMA,expectedSha:i.expectedSha??null,headSha:i.headSha??null,
   planSha256:plan?.planSha256??null,evidencePackageSha256:plan?.evidencePackageSha256??null,migrations,
-  recoverySha256:recovery?sha(canonicalJson(recovery)):null}));
+  recoverySha256:recovery?sha(canonicalJson(recovery)):null,
+  ...(typeof i.sourceSqlReconciliationText==="string"?{sourceSqlReconciliationSha256:reconSha}:{})}));
  const evTimes=RECOVERY_COMPONENTS.flatMap(n=>[ms(recovery?.components?.[n]?.capturedAt)]).filter(Number.isFinite);
  const operators=new Set(String(i.operators??"").split(",").map(s=>s.trim()).filter(Boolean));
  if(typeof recovery?.capturedBy==="string")operators.add(recovery.capturedBy.trim());
@@ -268,9 +288,9 @@ export function evaluatePredeployGate(i){
 }
 
 // ---------------------------------------------------------------- CLI
-const VALUE_FLAGS=new Set(["managed","source-dir","aliases","rollbacks","expected-sha","migration-digests","recovery","approvals","trusted-keys","trusted-keys-sha256","operators","out"]);
+const VALUE_FLAGS=new Set(["managed","source-dir","aliases","rollbacks","expected-sha","migration-digests","recovery","approvals","trusted-keys","trusted-keys-sha256","operators","out","source-sql-reconciliation"]);
 const DANGEROUS=/^(apply|execute|deploy|push|repair|merge|promote|force|go|yes|db-url|linked|skip-gates|bypass|override|sql|migrate|install|head-sha|now)$/i;
-const USAGE="usage: rc38-staging-predeploy-gate.mjs --managed <ledger.json> --source-dir <dir> [--aliases f] --rollbacks f --expected-sha <40hex> --migration-digests f --recovery f --approvals f --trusted-keys f --trusted-keys-sha256 <64hex> --operators a,b [--out gate.json]";
+const USAGE="usage: rc38-staging-predeploy-gate.mjs --managed <ledger.json> --source-dir <dir> [--aliases f] --rollbacks f --expected-sha <40hex> --migration-digests f --recovery f --approvals f --trusted-keys f --trusted-keys-sha256 <64hex> --operators a,b [--source-sql-reconciliation rc40-report.json] [--out gate.json]";
 export function parseArgs(argv){
  const opt={};
  for(let k=0;k<argv.length;k++){
@@ -299,7 +319,8 @@ export function runCli(argv,io={log:console.log,err:console.error},{now=Date.now
   const g=evaluatePredeployGate({now,headSha,expectedSha:o["expected-sha"],managedText:readText(o.managed),sourceDir:resolve(o["source-dir"]),
    aliasText:readText(o.aliases),rollbackText:readText(o.rollbacks),migrationDigestsText:readText(o["migration-digests"]),
    recoveryText:readText(o.recovery),approvalsText:readText(o.approvals),trustedKeysText:readText(o["trusted-keys"]),
-   trustedKeysSha256:o["trusted-keys-sha256"],operators:o.operators});
+   trustedKeysSha256:o["trusted-keys-sha256"],operators:o.operators,
+   sourceSqlReconciliationText:readText(o["source-sql-reconciliation"])});
   const text=JSON.stringify(g,null,2)+"\n";
   if(o.out)writeReport(o.out,text);else io.log(text.trimEnd());
   return g.verdict==="APPROVED_FOR_STAGING_PREDEPLOY"?0:2;

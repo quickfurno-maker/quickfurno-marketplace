@@ -12,12 +12,32 @@ const handle=createRc42AtomicConversationHandler({
   process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED==="staging",
  installed:()=>RC42_ATOMIC_CONVERSATION_RPC_INSTALLED,
  verify:verifyVoxOperationsStaffBearer,
- rpc:async(fn,args)=>adminClient().rpc(fn,args)
+ rpc:rc42ReviewedDataApiRpc
 });
-export const POST=handle;
+export async function POST(request:Request){
+ // Independent GoTrue AAL2 preflight at the actual Core route boundary.
+ // The handler checks again, and the atomic SQL independently locks Staff
+ // grants, city, consent, revision and original conversation.
+ if(!RC42_ATOMIC_CONVERSATION_RPC_INSTALLED||
+    process.env.VOX_RC42_CORE_CONVERSATION_OPERATOR_ENABLED!=="staging")
+  return handle(request);
+ try{
+  if(!await verifyVoxOperationsStaffBearer(request.headers.get("authorization")))
+   return Response.json({ok:false,error:"CURRENT_STAFF_AAL2_REQUIRED"},{status:403,
+    headers:{"cache-control":"private, no-store, max-age=0"}});
+ }catch{return Response.json({ok:false,error:"CURRENT_STAFF_AUTH_UNAVAILABLE"},{status:503,
+  headers:{"cache-control":"private, no-store, max-age=0"}});}
+ return handle(request);
+}
 const denied=()=>Response.json({ok:false,error:"METHOD_NOT_ALLOWED"},{status:405,
  headers:{"cache-control":"private, no-store, max-age=0","allow":"POST"}});
 export const GET=denied;
 export const PUT=denied;
 export const PATCH=denied;
 export const DELETE=denied;
+
+// Kept after the immutable runtime gate: no Data API call can execute
+// until the reviewed installation and actual AAL2 checks succeed.
+async function rc42ReviewedDataApiRpc(fn:string,args:Record<string,unknown>){
+ return adminClient().rpc(fn,args);
+}

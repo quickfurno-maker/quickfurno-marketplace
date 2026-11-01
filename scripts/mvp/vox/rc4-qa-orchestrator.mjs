@@ -179,8 +179,14 @@ function stepPortalContract() {
     // Staff membership/team/city and approved finance role; a mere import or
     // injected callback does not satisfy this direct Core route boundary.
     const financeReviewer = t.includes("await verifyVoxFinanceRefundReviewerBearer(");
-    if (!owner && !staff && !financeReviewer) failures.push("CORE_ROUTE_WITHOUT_VERIFIER:" + rel(p));
-    return {route: rel(p), auth: owner && staff ? "owner+staff" : owner ? "owner" : staff ? "staff" : financeReviewer ? "finance-reviewer" : "NONE"};
+    // Genuine operations-manager AAL2 verifier also checks current active team,
+    // Staff role, city and auth principal; import-only must not satisfy scan.
+    const operationsStaff = t.includes("await verifyVoxOperationsStaffBearer(");
+    if (!owner && !staff && !financeReviewer && !operationsStaff)
+      failures.push("CORE_ROUTE_WITHOUT_VERIFIER:" + rel(p));
+    return {route: rel(p), auth: owner && staff ? "owner+staff" : owner ? "owner" :
+      staff ? "staff" : financeReviewer ? "finance-reviewer" :
+      operationsStaff ? "operations-staff" : "NONE"};
   });
   const evidence = {navItems: items, portalReferencedCoreRoutes: [...refs].sort(), coreRouteCount: routes.length, coreRouteAuth: surface};
   return failures.length ? makeStep("portal-core-api-contract", "Portal navigation and Owner/Staff Core API surface", STATUS.FAIL, {evidence, failures})

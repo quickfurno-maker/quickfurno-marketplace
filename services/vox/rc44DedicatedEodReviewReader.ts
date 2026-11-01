@@ -21,7 +21,9 @@ export type Rc44ReaderInput={
 export function createRc44DedicatedEodReviewReader(input:Rc44ReaderInput):Rc41Rpc|null{
  const url=input.supabaseUrl?.trim(),key=input.anonKey?.trim();
  const bearer=input.readerJwt?.trim();
- if(!url||!key||!bearer||bearer.length>8192||!JWT.test(bearer))return null;
+ // An anon JWT is not the dedicated execute-only reviewer. Reject it before
+ // constructing even an inert PostgREST transport; never fall back to admin.
+ if(!url||!key||!bearer||bearer===key||bearer.length>8192||!JWT.test(bearer))return null;
  let u:URL;
  try {u=new URL(url);}catch{return null;}
  if(u.protocol!=="https:"||u.username||u.password||u.search||u.hash)return null;

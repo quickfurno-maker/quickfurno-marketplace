@@ -39,6 +39,11 @@ test("missing key, forged roles, service_role, expired or overlong tokens cannot
  }
  assert.equal(globalThis.__rc44Create.length,0);
 });
+test("dedicated EOD JWT cannot equal public anon JWT, even if role claims look correct",()=>{
+ const token=issuer(good),before=globalThis.__rc44Create.length;
+ assert.equal(create({...config(good),anonKey:token,readerJwt:token}),null);
+ assert.equal(globalThis.__rc44Create.length,before);
+});
 test("dedicated PostgREST bearer never uses privileged service role key",async()=>{
  globalThis.__rc44Create.length=0;
  const fn=create(config(good));

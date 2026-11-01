@@ -21,12 +21,14 @@ on:
       - 'scripts/mvp/vox/rc56-*.test.mjs'
       - 'scripts/mvp/vox/rc56-private-statement-evidence.mjs'
       - 'scripts/mvp/vox/rc57-*.test.mjs'
+      - 'scripts/mvp/vox/rc58-*.test.mjs'
       - 'scripts/mvp/vox/rc57-private-lexical-reconciliation.mjs'
       - 'docs/vox/VOX-RC53-*'
       - 'docs/vox/VOX-RC54-*'
       - 'docs/vox/VOX-RC55-*'
       - 'docs/vox/VOX-RC56-*'
       - 'docs/vox/VOX-RC57-*'
+      - 'docs/vox/VOX-RC58-*'
       - 'docs/vox/VOX-RC52-*'
       - 'scripts/mvp/vox/rc50-staging-sql-handoff.mjs'
       - 'scripts/mvp/vox/rc47-managed-recovery-handoff.mjs'
@@ -97,6 +99,8 @@ jobs:
         run: node --test scripts/mvp/vox/rc56-private-statement-evidence.test.mjs scripts/mvp/vox/rc56-cross-evidence-once.test.mjs scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc44-eod-dedicated-reader.test.mjs
       - name: RC57 SQL lexical reconciliation, actual finance index shape, bounded Core outcome and dedicated EOD reader
         run: node --test scripts/mvp/vox/rc57-private-lexical-reconciliation.test.mjs scripts/mvp/vox/rc57-finance-index-identity.test.mjs scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc44-eod-dedicated-reader.test.mjs
+      - name: RC58 real Core unknown-outcome, credit reconciliation and EOD reader aging
+        run: node --test scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-service.test.mjs scripts/mvp/vox/rc44-eod-dedicated-reader.test.mjs scripts/mvp/vox/rc58-ci-coverage.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

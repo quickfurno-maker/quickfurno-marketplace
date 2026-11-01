@@ -25,6 +25,10 @@ function valid(x:unknown):x is Command{
   (o.action==="PAUSE_AI"||o.action==="TAKEOVER");
 }
 const status=(error:string,code:number)=>send({ok:false,error,committed:false,providerMessagesSent:0},code);
+// After invoking a DB RPC, even an HTTP error cannot establish rollback.
+// Reconcile the SAME idempotency nonce against the canonical database before retry.
+const uncertain=(error:string,code:number)=>send({ok:false,error,committed:null,
+ commitState:"unknown",retrySameNonceOnly:true,providerMessagesSent:0},code);
 export function createRc42AtomicConversationHandler(deps:Deps){
  return async function handle(request:Request):Promise<Response>{
   if(!deps.enabled()||!deps.installed())return status("CORE_CONVERSATION_ATOMIC_NOT_INSTALLED",503);
@@ -64,16 +68,14 @@ export function createRc42AtomicConversationHandler(deps:Deps){
      rpcTimer=setTimeout(()=>resolve({timedOut:true}),timeoutMs);
     })
    ]);
-   if(result.timedOut)return send({ok:false,error:"ATOMIC_RPC_OUTCOME_UNKNOWN",
-    committed:null,commitState:"unknown",retrySameNonceOnly:true,
-    providerMessagesSent:0},504);
+   if(result.timedOut)return uncertain("ATOMIC_RPC_OUTCOME_UNKNOWN",504);
    const {data,error}=result.value;
-   if(error||!Array.isArray(data)||data.length!==1)return status("ATOMIC_RPC_UNAVAILABLE",503);
+   if(error||!Array.isArray(data)||data.length!==1)return uncertain("ATOMIC_RPC_UNAVAILABLE",503);
    const row=data[0] as Record<string,unknown>;
    // Session authority must still be current when a network-delayed SQL
    // receipt arrives; never certify a late result using expired AAL2.
    if(actor.expiresAtMs<=(deps.now??Date.now)())
-    return status("STAFF_AAL2_EXPIRED_DURING_RPC",403);
+    return uncertain("STAFF_AAL2_EXPIRED_DURING_RPC",403);
    if(!row||typeof row!=="object"||row.nonce!==value.nonce||
       row.conversation_id!==value.conversationId||row.action!==value.action||
       row.previous_revision!==value.expectedRevision||
@@ -87,23 +89,23 @@ export function createRc42AtomicConversationHandler(deps:Deps){
         "preference_policy_version_mismatch_no_objection"].includes(String(row.consent_reason))||
       typeof row.receipt_sha256!=="string"||!/^[a-f0-9]{64}$/.test(row.receipt_sha256)||
       row.consent_scope!=="transactional")
-    return status("ATOMIC_RECEIPT_INVALID",503);
+    return uncertain("ATOMIC_RECEIPT_INVALID",503);
    // SQL may have committed while the request was in flight. Never claim
    // operator authority is still current unless live GoTrue + Staff scope
    // verifies again after the atomic receipt. This is NOT a rollback claim.
    let current:Rc42Actor|null;
    try{current=await deps.verify(b);}
-   catch{return status("STAFF_AUTH_RECHECK_UNAVAILABLE",503);}
+   catch{return uncertain("STAFF_AUTH_RECHECK_UNAVAILABLE",503);}
    if(!current||current.aal!=="aal2"||current.userId!==actor.userId||
       current.teamId!==actor.teamId||current.cityId!==actor.cityId||
       !Number.isSafeInteger(current.expiresAtMs)||
       current.expiresAtMs<=(deps.now??Date.now)())
-    return status("STAFF_SCOPE_REVOKED_DURING_RPC",403);
+    return uncertain("STAFF_SCOPE_REVOKED_DURING_RPC",403);
    return send({ok:true,state:row.state,action:row.action,nonce:row.nonce,
     conversationId:row.conversation_id,previousRevision:row.previous_revision,
     newRevision:row.new_revision,replayed:row.replayed,receiptSha256:row.receipt_sha256,
     providerMessagesSent:0,mode:"ATOMIC_NO_PROVIDER_SEND"},200);
-  }catch{return status("ATOMIC_RPC_UNAVAILABLE",503);}
+  }catch{return uncertain("ATOMIC_RPC_UNAVAILABLE",503);}
   finally{if(rpcTimer!==undefined)clearTimeout(rpcTimer);}
  };
 }

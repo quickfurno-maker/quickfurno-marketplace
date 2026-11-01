@@ -74,6 +74,27 @@ test("replay is zero additional lead credits; no direct money or replacement",as
  assert.equal(reply.data.leadCreditsRestored,0);
  assert.equal(calls.length,1);
 });
+test("an attempted credit RPC transport failure never claims rollback or allows a new grant",async()=>{
+ before();process.env[gate]="staging";
+ const original=globalThis.__rc42Db;
+ try{
+  globalThis.__rc42Db=()=>({rpc:async()=>{throw Error("private connection data");}});
+  const thrown=await apply(REPORT,"restore_credit",ACTOR);
+  assert.equal(thrown.ok,false);assert.equal(thrown.code,"CREDIT_OUTCOME_UNKNOWN");
+  assert.equal(String(thrown.error).includes("private connection data"),false);
+  globalThis.__rc42Db=()=>({rpc:async()=>({data:null,error:{message:"private backend state"}})});
+  const result=await apply(REPORT,"restore_credit",ACTOR);
+  assert.equal(result.ok,false);assert.equal(result.code,"CREDIT_OUTCOME_UNKNOWN");
+  assert.equal(String(result.error).includes("private backend state"),false);
+ }finally{globalThis.__rc42Db=original;}
+});
+test("unverifiable credit receipt is an uncertain outcome, never permission to grant again",async()=>{
+ before();process.env[gate]="staging";
+ globalThis.__rc42Reply={status:"applied",lead_credits_restored:2,
+  cash_refunded_minor_units:0,original_assignment_id:"wrong"};
+ const r=await apply(REPORT,"restore_credit",ACTOR);
+ assert.equal(r.ok,false);assert.equal(r.code,"CREDIT_OUTCOME_UNKNOWN");
+});
 test("money or extra credits in RPC response never claim successful restoration",async()=>{
  before();process.env[gate]="staging";
  for(const bad of [

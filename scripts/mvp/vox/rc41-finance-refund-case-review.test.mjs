@@ -196,6 +196,8 @@ test("source: no write, provider, body, caller-principal or pg-pool path; SQL ca
   assert.doesNotMatch(s,/\.insert\(|\.update\(|\.delete\(|\.upsert\(|razorpay|fetch\(|from\s+"pg"|new Pool|DATABASE_URL/i,p);
   assert.doesNotMatch(s,/request\.(json|text|formData|body)/,p);
   assert.doesNotMatch(s,/reviewerId\s*:\s*(body|params|u\.|request)/,p);
+  if(p.endsWith("/route.ts"))assert.match(s,/await verifyVoxFinanceRefundReviewerBearer\(request\.headers\.get\("authorization"\)\)/,
+   "route must independently verify canonical AAL2 finance reviewer, not merely pass a callback");
  }
  const sql=readFileSync(resolve(root,"ops/vox/rc41-review-candidates/20261101010000_vox_rc41_refund_case_snapshot_REVIEW_ONLY.sql"),"utf8");
  assert.match(sql,/STABLE SECURITY INVOKER/);assert.match(sql,/NON-DEPLOYABLE/);

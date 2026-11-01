@@ -87,6 +87,19 @@ test("real PostgREST denied reader JWT never claims data or retries with privile
   assert.equal(realtimeAttempts,0);
  }finally{wireStatus=200;}
 });
+test("rate-limited or unavailable EOD reader never retries or exposes privileged data",async()=>{
+ for(const status of [429,503]){
+  calls.length=0;wireStatus=status;
+  try{
+   const rpc=create({url:"https://db.local.test",anonKey:"anon-key",bearer:"dedicated-reader-test"});
+   const result=await rpc(F,{p_intent_id:U,p_subject_id:V});
+   assert.equal(result.data,null);assert.notEqual(result.error,null);
+   assert.equal(calls.length,1);
+   assert.equal(calls[0].headers.get("authorization"),"Bearer dedicated-reader-test");
+   assert.equal(realtimeAttempts,0);
+  }finally{wireStatus=200;}
+ }
+});
 test("real EOD PostgREST HTTP request aborts at bounded timeout without fallback",async()=>{
  calls.length=0;wireHang=true;
  // Node 20's AbortSignal.timeout() owns an unref'ed timer. Standalone mock

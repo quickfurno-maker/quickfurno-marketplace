@@ -1,0 +1,20 @@
+# VOX RC56 — Five-track operational integration and PostgreSQL 17 proof
+
+2026-11-01; protected Draft PR #450 base `e33577648d1a449a2c6d1362d08d604efe26e1e2`. All managed Staging, Production, payment/lead-credit activation, provider sends and official EOD remain **HOLD**. The SQL files here are independent-approval REVIEW-ONLY candidates, **not deployed migrations**.
+
+## A. Managed database recovery — genuine private evidence
+New read-only `scripts/mvp/vox/rc56-private-statement-evidence.mjs` first verifies all 31/31 original managed-only Staging SQL versions against their private second-read manifests; checks canonical checksums on all 107 source-only files; then compares actual recovered baseline statement text to exact source SQL substring fragments of at least 80 bytes. The JARVIS private run examined 821 original baseline statements, 694 eligible long statements and all 107 source-only files: **0 strict literal long-statement matches**. This result does **not** imply semantic nonequivalence, nor does it prove no short or reformatted statement matches. No original SQL or secret printed, no alias invented, `releaseGo=false`, zero managed SQL writes. Independent DBA must reconcile 7 managed discrepancies, 2 duplicate managed SQL pairs, 85 previously unmatched source files and perform isolated full Auth/Vault/Storage/PostGIS/ACL/PITR restore with approval.
+
+## B. Core/Staff — post-RPC authority freshness
+The source-only Core atomic conversation handler now re-verifies live Staff authority **after** an RPC returns before certifying the receipt. Revoked user, downgraded AAL2, changed team/city, expired session or Auth outage returns a fail-closed HTTP response with no provider sends. The transaction *could* already have committed before the response; this safeguard does **not** claim rollback. The canonical SQL writer is still uninstalled. Negative tests cover revoked and drifted authority and authentic preflight scope.
+
+## C. Finance — actual PostgreSQL 17 cross-evidence once-per-original-assignment
+The uninstalled reviewed bad-lead SQL candidate now includes a broader unique partial index protecting every active credit restoration evidence type per original consumed assignment, with historical-duplicate preflight that fails rather than silently discarding evidence. Crucially, **both** actual disposable PostgreSQL 17 harness variants PASSED: the fixture wallet AND the real canonical credit restoration function/ledger, including concurrent second reports and direct competing cross-evidence inserts. All reimbursements for bad leads remain exactly **one LEAD credit**, never cash refund, money wallet credit, double-credit or automatic replacement. No live financial activation or SQL deployment occurred.
+
+## D. EOD — public bearer confused-deputy prevention
+The source-only dedicated read-only EOD reviewer refuses bearer tokens identical to the public anon JWT before creating an execute-only transport. The caller still requires a reviewed role, role-specific signed token and database-enforced PostgREST privileges. Official EOD reader/writer remains uninstalled.
+
+## E. QA and release isolation
+All five independent JARVIS worktrees had targeted tests PASS and are cherry-picked into the consolidated RC56 source candidate. Protected workflow now triggers and runs RC56 tests; actual disposable PG17 proof jobs, protected-feature-off gate and no provider/Production activation remain. Independent DBA/AppSec, full managed restore, real Owner + TL MFA, Staff UAT, staging rollback and Production approval remain mandatory.
+
+Integrated JARVIS validation: **72/72 focused tests PASS**, root TypeScript PASS, root Next.js 16.4.1 production build PASS using native `npm ci`, protected-feature OFF gate PASS, private SQL read-only second-read checks PASS. Both actual disposable PostgreSQL 17 credit harnesses (fixture and canonical ledger) PASS, including concurrency and cross-evidence uniqueness enforcement. New exact-head GitHub CI must still finish separately. Even passing source and disposable PostgreSQL tests never constitutes Production GO.

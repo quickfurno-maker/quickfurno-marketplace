@@ -33,14 +33,28 @@ export default function ConversationControl(){
      !("ok" in v)||v.ok!==true||
      !("conversationId" in v)||v.conversationId!==cmd.conversationId||
      !("newRevision" in v)||v.newRevision!==cmd.expectedRevision+1||
-     !("providerMessagesSent" in v)||v.providerMessagesSent!==0){
+     !("providerMessagesSent" in v)||v.providerMessagesSent!==0||
+     !("nonce" in v)||v.nonce!==pending.current?.nonce||
+     !("action" in v)||v.action!==cmd.action||
+     !("state" in v)||v.state!==(cmd.action==="TAKEOVER"?"HUMAN":"PAUSED")||
+     !("replayed" in v)||typeof v.replayed!=="boolean"||
+     !("receiptSha256" in v)||typeof v.receiptSha256!=="string"||
+     !/^[a-f0-9]{64}$/.test(v.receiptSha256)){
     setMessage(response.status===409?
      "Conversation revision changed; retrieve its current Core revision.":
      "No Core commit confirmed. Retry the SAME command and nonce, or contact your Team Leader.");
     return;
    }
    pending.current=null;
-   setMessage("Core confirmed the internal conversation control; no provider message was sent.");
+   // An exact-nonce replay confirms an OLD receipt, not the CURRENT revision.
+   // Only a fresh accepted atomic commit can advance this local revision hint.
+   if(!v.replayed)setRevision(String(v.newRevision));
+   setMessage(v.replayed?
+    "Previously confirmed receipt "+v.receiptSha256.slice(0,16)+
+    ". No new control action occurred. Verify the current Core revision before another command.":
+    "Core confirmed "+v.state+" at revision "+v.newRevision+
+    ". Receipt "+v.receiptSha256.slice(0,16)+
+    ". Zero provider messages. Core will recheck revision for any future action.");
   }catch{setMessage("Core result unavailable. Retry the exact same command; do not change its nonce.");}
   finally{setBusy(false);}
  }

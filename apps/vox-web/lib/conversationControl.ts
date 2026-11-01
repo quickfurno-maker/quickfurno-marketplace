@@ -58,6 +58,7 @@ export async function submitConversationControl(cmd:ConversationCommand){
   return {ok:true,status:200,conversationId:cmd.conversationId,
    action:cmd.action,newRevision:cmd.expectedRevision+1,
    state:r.state as "PAUSED"|"HUMAN",
-   replayed:r.replayed,providerMessagesSent:0 as const} as const;
+   replayed:r.replayed,providerMessagesSent:0 as const,
+   receiptSha256:r.receiptSha256,nonce:cmd.nonce} as const;
  }catch{return {ok:false,status:503,error:"CORE_CONVERSATION_UNAVAILABLE"} as const;}
 }

@@ -88,6 +88,7 @@ test("approved native Core POST forwards exact command and MFA bearer",async()=>
  assert.equal(res.status,200);
  const v=await res.json();
  assert.equal(v.ok,true);assert.equal(v.providerMessagesSent,0);
+ assert.equal(v.receiptSha256,"a".repeat(64));assert.equal(v.nonce,cmd.nonce);
  assert.equal(state.calls.length,1);
  const c=state.calls[0];
  assert.equal(c.url,"https://staging-core.quickfurno.in/api/vox/v1/core/conversation-operator");
@@ -138,6 +139,9 @@ test("Staff form preserves nonce across ambiguous retries, no provider send",()=
  assert.match(source,/pending\.current\.nonce/);
  assert.match(source,/crypto\.randomUUID\(\)/);
  assert.match(source,/providerMessagesSent/);
+ assert.match(source,/v\.receiptSha256\.slice\(0,16\)/);
+ assert.match(source,/v\.nonce!==pending\.current\?\.nonce/);
+ assert.match(source,/if\(!v\.replayed\)setRevision/);
  assert.match(page,/VOX_RC42_CORE_CONVERSATION_OPERATOR_ENABLED==="staging"/);
  assert.doesNotMatch(source,/sendWhatsApp|razorpay|adminClient/);
 });

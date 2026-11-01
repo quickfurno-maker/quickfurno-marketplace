@@ -84,6 +84,7 @@ test("two-hop simulated approved path checks current AAL2 twice, binds atomic ar
  const r=await web.POST(webRequest());assert.equal(r.status,200);
  const body=await r.json();assert.equal(body.ok,true);
  assert.equal(body.providerMessagesSent,0);assert.equal(body.newRevision,3);
+ assert.equal(body.receiptSha256,"a".repeat(64));assert.equal(body.nonce,N);
  assert.equal(state.auth,2);assert.equal(state.sql,1);assert.equal(state.fetches,1);
  assert.equal(state.fn,"qf_vox_rc41_core_conversation_operator_atomic_candidate_v1");
  assert.equal(state.args.p_actor,U);assert.equal(state.args.p_nonce,N);

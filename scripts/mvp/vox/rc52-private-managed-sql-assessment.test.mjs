@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
-import {mkdtempSync,rmSync,readFileSync} from "node:fs";
+import {mkdtempSync,rmSync,readFileSync,mkdirSync,writeFileSync} from "node:fs";
 import {join,basename} from "node:path";
 import {tmpdir} from "node:os";
 import {DEFAULT_EVIDENCE} from "./rc40-managed-ledger-reconciler.mjs";
@@ -61,5 +61,12 @@ test("unknown extra captured version cannot silently pass the independent file s
  objects.set(extra,JSON.stringify({version:"20990101000000",name:"unreviewed",statements:["SELECT 1;"]}));
  assert.throws(()=>assessPrivateCapture(fake),/UNEXPECTED_CAPTURE_FILES/);
  objects.delete(extra);
+});
+test("captured original migration SQL cannot be placed inside a sibling Git worktree",()=>{
+ const worktree=join(dir,"another-checkout"),privatePath=join(worktree,"private-sql");
+ mkdirSync(privatePath,{recursive:true});
+ writeFileSync(join(worktree,".git"),"gitdir: ../not-a-real-git-dir");
+ assert.throws(()=>assessPrivateCapture({...fake,privateDir:privatePath}),
+  /PRIVATE_DIR_MUST_BE_OUTSIDE_REPOSITORY/);
 });
 process.on("exit",()=>rmSync(dir,{recursive:true,force:true}));

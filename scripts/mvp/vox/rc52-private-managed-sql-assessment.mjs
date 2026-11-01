@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Read-only PRIVATE managed SQL evidence assessment. It never publishes SQL,
 // applies a migration, infers aliases, or certifies independently verified provenance.
-import {readFileSync,readdirSync,lstatSync,realpathSync} from "node:fs";
+import {readFileSync,readdirSync,lstatSync,realpathSync,existsSync} from "node:fs";
 import {resolve,join,dirname,sep} from "node:path";
 import {fileURLToPath} from "node:url";
 import {createHash} from "node:crypto";
@@ -19,7 +19,19 @@ export function assessPrivateCapture({candidateSha,evidenceText,privateDir,read=
  const canonical=realpathSync(dir),isInside=x=>
   x.toLowerCase()===root.toLowerCase()||
   x.toLowerCase().startsWith(root.toLowerCase()+sep);
- if(isInside(dir)||isInside(canonical))fail("PRIVATE_DIR_MUST_BE_OUTSIDE_REPOSITORY");
+ // A sibling worktree has a .git FILE, not a .git directory. Private
+ // original migration SQL must never live in any Git checkout/worktree.
+ const insideAnyGitWorktree=path=>{
+  let parent=path;
+  for(;;){
+   if(existsSync(join(parent,".git")))return true;
+   const next=dirname(parent);
+   if(next===parent)return false;
+   parent=next;
+  }
+ };
+ if(isInside(dir)||isInside(canonical)||insideAnyGitWorktree(canonical))
+  fail("PRIVATE_DIR_MUST_BE_OUTSIDE_REPOSITORY");
  const ev=parseEvidence(evidenceText);
  const expected=new Map(ev.managedOnly.map(e=>[e.version,e.name]));
  const filenames=list(dir).filter(f=>f!=="_verification.json").sort();

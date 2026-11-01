@@ -48,6 +48,11 @@ export function createRc44DedicatedEodReviewReader(input:Rc44ReaderInput):Rc41Rp
  // PostgREST signature check is still mandatory and separately enforced.
  if(payload.nbf!==undefined&&Number(payload.nbf)>=Number(payload.exp))return null;
  if(payload.iat!==undefined&&Number(payload.iat)>=Number(payload.exp))return null;
+ // A token with an ancient issue time but a future expiry is not a
+ // short-lived dedicated reviewer credential. The PostgREST signature gate
+ // remains independently mandatory.
+ if(payload.iat!==undefined&&now-Number(payload.iat)>3600)return null;
+ if(payload.nbf!==undefined&&now-Number(payload.nbf)>3600)return null;
  let transport:ReturnType<typeof createVoxEodSnapshotReaderTransport>;
  try{
   transport=createVoxEodSnapshotReaderTransport({url,anonKey:key,bearer});

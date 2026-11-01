@@ -17,7 +17,7 @@ const flags=["VOX_STAFF_PORTAL_ENABLED","VOX_TEAM_WORKSPACE_ENABLED",
  "VOX_STAFF_GRANTS_ENABLED","VOX_RC42_CORE_CONVERSATION_OPERATOR_ENABLED",
  "VOX_DEPARTMENT_ENFORCEMENT_ENABLED"];
 const state={allowed:true,token:"mock-staff-aal2",origin:"https://staging-core.quickfurno.in",
- auth:0,calls:[],status:200,receipt:{...original},
+ auth:0,calls:[],status:200,transportFailure:false,receipt:{...original},
  discovery:{ok:true,schema:"qf.vox.conversation.candidates.v1",mode:"READ_ONLY",
  actionsEnabled:false,conversations:[{id:C,revision:2,state:"OPEN",
  allowedActions:["PAUSE_AI","TAKEOVER"]}]}};
@@ -25,6 +25,7 @@ const env={};
 const ctx=vm.createContext({Request,Response,URL,AbortSignal,
  process:{env},fetch:async(url,options)=>{
   state.calls.push({url,options});
+  if(state.transportFailure)throw Error("simulated Core transport lost after POST");
   return Response.json(String(url).endsWith("/conversation-candidates")?
     state.discovery:state.receipt,{status:state.status});
  }});
@@ -65,7 +66,7 @@ const gate=(on)=>{for(const flag of flags)on?env[flag]="staging":delete env[flag
 function reset(){
  gate(true);state.allowed=true;state.token="mock-staff-aal2";
  state.origin="https://staging-core.quickfurno.in";state.auth=0;
- state.calls=[];state.status=200;state.receipt={...original};
+ state.calls=[];state.status=200;state.transportFailure=false;state.receipt={...original};
 }
 function request(value=cmd){return new Request("https://localhost/api/conversation-control",{
  method:"POST",headers:{"content-type":"application/json"},
@@ -116,6 +117,31 @@ test("Core rejection and forged receipts cannot become confirmed actions",async(
   state.receipt=fake;
   assert.equal((await api.POST(request())).status,503);
  }
+});
+test("Core 504 and 503 cannot be mistaken for rollback or trigger a new nonce",async()=>{
+ reset();
+ for(const status of [504,503]){
+  state.status=status;
+  const r=await api.POST(request());
+  assert.equal(r.status,status);
+  const body=await r.json();
+  assert.equal(body.ok,false);
+  assert.equal(body.error,"CORE_OUTCOME_UNKNOWN");
+  assert.equal(body.committed,null);
+  assert.equal(body.retrySameNonceOnly,true);
+ }
+ assert.equal(state.calls.length,2);
+ for(const call of state.calls)assert.equal(JSON.parse(call.options.body).nonce,N);
+});
+test("Web loss of Core response never confirms rollback or invents a nonce",async()=>{
+ reset();state.transportFailure=true;
+ const r=await api.POST(request());
+ assert.equal(r.status,503);
+ const body=await r.json();
+ assert.equal(body.committed,null);assert.equal(body.retrySameNonceOnly,true);
+ assert.equal(body.error,"CORE_OUTCOME_UNKNOWN");
+ assert.equal(state.calls.length,1);
+ assert.equal(JSON.parse(state.calls[0].options.body).nonce,N);
 });
 test("genuine department-enforcement gate must be active before any Staff auth",async()=>{
  reset();delete env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED;

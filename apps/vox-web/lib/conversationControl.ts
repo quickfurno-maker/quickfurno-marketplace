@@ -35,9 +35,18 @@ export async function submitConversationControl(cmd:ConversationCommand){
    body:JSON.stringify(cmd),cache:"no-store",redirect:"error",
    signal:AbortSignal.timeout(3500)
   });
-  if(!response.ok)return {ok:false,status:response.status===401?401:
-   response.status===403?403:response.status===409?409:503,
-   error:"CORE_CONVERSATION_NOT_VERIFIED"} as const;
+  if(!response.ok){
+   // Core can commit before an HTTP timeout/transport error. Preserve its
+   // uncertain status and exact-nonce reconciliation instruction; do not
+   // imply that a failed HTTP response rolled back the SQL transaction.
+   if(response.status>=500)return {ok:false,
+    status:response.status===504?504:503,
+    error:"CORE_OUTCOME_UNKNOWN",committed:null,
+    retrySameNonceOnly:true} as const;
+   return {ok:false,status:response.status===401?401:
+    response.status===403?403:response.status===409?409:503,
+    error:"CORE_CONVERSATION_NOT_VERIFIED"} as const;
+  }
   const raw:unknown=await response.json();
   if(!raw||typeof raw!=="object"||Array.isArray(raw))
    return {ok:false,status:503,error:"INVALID_ATOMIC_RECEIPT"} as const;
@@ -60,7 +69,8 @@ export async function submitConversationControl(cmd:ConversationCommand){
    state:r.state as "PAUSED"|"HUMAN",
    replayed:r.replayed,providerMessagesSent:0 as const,
    receiptSha256:r.receiptSha256,nonce:cmd.nonce} as const;
- }catch{return {ok:false,status:503,error:"CORE_CONVERSATION_UNAVAILABLE"} as const;}
+ }catch{return {ok:false,status:503,error:"CORE_OUTCOME_UNKNOWN",
+  committed:null,retrySameNonceOnly:true} as const;}
 }
 
 export type ConversationCandidate={id:string;revision:number;state:"OPEN"|"PAUSED";

@@ -87,6 +87,17 @@ test("post-RPC independent Auth failure never certifies an atomic receipt",async
  assert.equal(r.status,503);assert.equal(d.calls.length,1);assert.equal(checks,2);
  assert.equal((await r.json()).error,"STAFF_AUTH_RECHECK_UNAVAILABLE");
 });
+test("timed-out atomic HTTP result is UNKNOWN, never false rollback or new-nonce permission",async()=>{
+ const d=deps({rpcTimeoutMs:30,rpc:async()=>new Promise(()=>{})});
+ const r=await create(d)(request());
+ assert.equal(r.status,504);
+ const out=await r.json();
+ assert.equal(out.ok,false);assert.equal(out.committed,null);
+ assert.equal(out.commitState,"unknown");
+ assert.equal(out.retrySameNonceOnly,true);
+ assert.equal(out.providerMessagesSent,0);
+ assert.equal(out.error,"ATOMIC_RPC_OUTCOME_UNKNOWN");
+});
 test("wrong nonce, revision, missing receipt or provider messages never certify",async()=>{
  for(const altered of [{...receipt,nonce:U},{...receipt,new_revision:7},
   {...receipt,provider_messages_sent:1},{...receipt,receipt_sha256:"b"},

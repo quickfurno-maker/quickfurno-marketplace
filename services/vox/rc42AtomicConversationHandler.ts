@@ -5,7 +5,7 @@ import "server-only";
 export type Rc42Actor=Readonly<{userId:string;aal:"aal2";expiresAtMs:number;teamId:string;cityId:string}>;
 type Command={conversationId:string;nonce:string;expectedRevision:number;action:"PAUSE_AI"|"TAKEOVER"};
 type Deps={
- enabled:()=>boolean;installed:()=>boolean;now?:()=>number;
+ enabled:()=>boolean;installed:()=>boolean;now?:()=>number;rpcTimeoutMs?:number;
  verify:(bearer:string|null)=>Promise<Rc42Actor|null>;
  rpc:(name:string,args:Record<string,unknown>)=>Promise<{data:unknown;error:unknown}>
 };
@@ -44,13 +44,30 @@ export function createRc42AtomicConversationHandler(deps:Deps){
   if(!actor||actor.aal!=="aal2"||!UUID.test(actor.userId)||!UUID.test(actor.teamId)||
      !UUID.test(actor.cityId)||!Number.isSafeInteger(actor.expiresAtMs)||
      actor.expiresAtMs<=(deps.now??Date.now)())return status("STAFF_AAL2_REQUIRED",403);
+  let rpcTimer:ReturnType<typeof setTimeout>|undefined;
   try{
-   const {data,error}=await deps.rpc(FN,{
+   const rpcCall=deps.rpc(FN,{
     p_actor:actor.userId,p_aal:"aal2",
     p_aal_expires_at:new Date(actor.expiresAtMs).toISOString(),
     p_conversation:value.conversationId,p_nonce:value.nonce,
     p_expected_revision:value.expectedRevision,p_action:value.action
    });
+   // The native transaction may commit even if the HTTP response gets lost.
+   // Bounded waiting returns an explicit UNKNOWN outcome, never a false
+   // rollback claim or an automatic new-nonce retry.
+   const configured=deps.rpcTimeoutMs;
+   const timeoutMs=Number.isSafeInteger(configured)&&
+    Number(configured)>=25&&Number(configured)<=5000?Number(configured):3500;
+   const result=await Promise.race([
+    rpcCall.then(value=>({timedOut:false as const,value})),
+    new Promise<{timedOut:true}>(resolve=>{
+     rpcTimer=setTimeout(()=>resolve({timedOut:true}),timeoutMs);
+    })
+   ]);
+   if(result.timedOut)return send({ok:false,error:"ATOMIC_RPC_OUTCOME_UNKNOWN",
+    committed:null,commitState:"unknown",retrySameNonceOnly:true,
+    providerMessagesSent:0},504);
+   const {data,error}=result.value;
    if(error||!Array.isArray(data)||data.length!==1)return status("ATOMIC_RPC_UNAVAILABLE",503);
    const row=data[0] as Record<string,unknown>;
    // Session authority must still be current when a network-delayed SQL
@@ -87,5 +104,6 @@ export function createRc42AtomicConversationHandler(deps:Deps){
     newRevision:row.new_revision,replayed:row.replayed,receiptSha256:row.receipt_sha256,
     providerMessagesSent:0,mode:"ATOMIC_NO_PROVIDER_SEND"},200);
   }catch{return status("ATOMIC_RPC_UNAVAILABLE",503);}
+  finally{if(rpcTimer!==undefined)clearTimeout(rpcTimer);}
  };
 }

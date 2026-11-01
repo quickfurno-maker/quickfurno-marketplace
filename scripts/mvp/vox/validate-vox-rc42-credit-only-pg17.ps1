@@ -159,6 +159,20 @@ CREATE UNIQUE INDEX rc44_credit_ref_unique ON public.vendor_credit_logs(referenc
  }catch{$duplicateError=$_.Exception.Message}
  Assert ($duplicateError -match 'vox_rc56_all_evidence_once_per_original_assignment') 'cross-evidence unique index blocks direct competing approval in actual PG17'
  Assert ((Sql "select count(*) from public.credit_restoration_approvals where original_assignment_id='$assignment3';") -eq '1') 'cross-evidence violating insert rolls back without touching prior restoration'
+ # A canonical function can replay a previously applied credit even when
+ # a new approval row was inserted. The wrapper must reject the replay,
+ # roll the approval insertion back and leave the wallet untouched.
+ $assignment4='12121212-1212-4212-8212-121212121212'
+ $report4='13131313-1313-4313-8313-131313131313'
+ [void](Sql "insert into public.lead_assignments values ('$assignment4','$vendor','$lead',true,'delivered'); insert into public.bad_lead_reports(id,vendor_id,lead_assignment_id,status,reason_code,recovery_status) values ('$report4','$vendor','$assignment4','Approved','bad_lead_validated','recommended');")
+ $fakeReturn="CREATE OR REPLACE FUNCTION public.qf_approve_credit_restoration_v2(uuid,uuid,text) RETURNS jsonb LANGUAGE sql AS 'SELECT jsonb_build_object(''status'',''already_applied'',''ledger_id'',gen_random_uuid())';"
+ [void](Sql $fakeReturn)
+ $replayRejected=$false
+ try{[void](Sql "select public.qf_vox_rc42_bad_lead_credit_only_atomic_candidate_v1('$report4','$actor');")}
+ catch{$replayRejected=$_.Exception.Message -match 'RC60_CANONICAL_CREDIT_NOT_NEWLY_APPLIED'}
+ Assert $replayRejected 'new credit cannot be reported from a canonical already_applied response'
+ Assert ((Sql "select count(*) from public.credit_restoration_approvals where original_assignment_id='$assignment4';") -eq '0') 'canonical replay aborts new approval in same PostgreSQL transaction'
+ Assert ((Sql $wallet) -eq '12') 'canonical replay cannot increment wallet again'
  # A pre-existing counterfeit index with the expected name must never make
  # CREATE INDEX IF NOT EXISTS silently certify the wrong uniqueness rule.
  [void](Sql 'drop index public.vox_rc56_all_evidence_once_per_original_assignment;')

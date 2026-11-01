@@ -5,7 +5,8 @@ export const dynamic="force-dynamic";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export async function POST(request:Request){
  if(process.env.VOX_RC42_CORE_CONVERSATION_OPERATOR_ENABLED!=="staging"||
-    process.env.VOX_STAFF_GRANTS_ENABLED!=="staging")
+    process.env.VOX_STAFF_GRANTS_ENABLED!=="staging"||
+    process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED!=="staging")
   return safeJson({ok:false,error:"CONVERSATION_ATOMIC_NOT_APPROVED"},503);
  const u=new URL(request.url);
  if(u.search||u.hash)return safeJson({ok:false,error:"FILTER_DENIED"},400);

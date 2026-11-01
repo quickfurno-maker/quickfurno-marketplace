@@ -14,7 +14,8 @@ const original={ok:true,state:"PAUSED",action:"PAUSE_AI",nonce:N,
  conversationId:C,previousRevision:2,newRevision:3,replayed:false,
  receiptSha256:"a".repeat(64),providerMessagesSent:0,mode:"ATOMIC_NO_PROVIDER_SEND"};
 const flags=["VOX_STAFF_PORTAL_ENABLED","VOX_TEAM_WORKSPACE_ENABLED",
- "VOX_STAFF_GRANTS_ENABLED","VOX_RC42_CORE_CONVERSATION_OPERATOR_ENABLED"];
+ "VOX_STAFF_GRANTS_ENABLED","VOX_RC42_CORE_CONVERSATION_OPERATOR_ENABLED",
+ "VOX_DEPARTMENT_ENFORCEMENT_ENABLED"];
 const state={allowed:true,token:"mock-staff-aal2",origin:"https://staging-core.quickfurno.in",
  auth:0,calls:[],status:200,receipt:{...original}};
 const env={};
@@ -106,6 +107,29 @@ test("Core rejection and forged receipts cannot become confirmed actions",async(
   state.receipt=fake;
   assert.equal((await api.POST(request())).status,503);
  }
+});
+test("genuine department-enforcement gate must be active before any Staff auth",async()=>{
+ reset();delete env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED;
+ assert.equal((await api.POST(request())).status,503);
+ assert.equal(state.auth,0);assert.equal(state.calls.length,0);
+});
+test("human takeover accepts only HUMAN state and exact Core-authorized revision",async()=>{
+ reset();
+ const c={...cmd,action:"TAKEOVER"};
+ state.receipt={...original,action:"TAKEOVER",state:"HUMAN"};
+ const accepted=await api.POST(request(c));
+ assert.equal(accepted.status,200);
+ assert.equal((await accepted.json()).state,"HUMAN");
+ assert.equal(state.calls.length,1);
+ assert.deepEqual(JSON.parse(state.calls[0].options.body),c);
+});
+test("nonce replay proves zero outbound sends without forging a new commit",async()=>{
+ reset();state.receipt={...original,replayed:true};
+ const result=await api.POST(request());
+ assert.equal(result.status,200);
+ const reply=await result.json();
+ assert.equal(reply.replayed,true);assert.equal(reply.providerMessagesSent,0);
+ assert.equal(reply.newRevision,3);
 });
 test("Staff form preserves nonce across ambiguous retries, no provider send",()=>{
  const source=readFileSync(resolve(app,

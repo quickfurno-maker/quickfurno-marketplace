@@ -6,6 +6,7 @@ export default function ConversationControlPage(){
  const enabled=process.env.VOX_STAFF_PORTAL_ENABLED==="staging"&&
   process.env.VOX_TEAM_WORKSPACE_ENABLED==="staging"&&
   process.env.VOX_STAFF_GRANTS_ENABLED==="staging"&&
+  process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED==="staging"&&
   process.env.VOX_RC42_CORE_CONVERSATION_OPERATOR_ENABLED==="staging"&&
   ["scoped","dual"].includes(String(process.env.VOX_STAFF_VIEW_MODE));
  return <main className="voxQueueRoot">

@@ -12,16 +12,22 @@ export function assessRc47Recovery({candidateSha,evidenceText,captureText}){
  const {report,missing}=reconcileManagedLedger({candidateSha,evidenceText,captureText});
  const migrationComplete=report.status==="RECONCILED_COMPLETE"&&
   report.counts.managedMissing===0&&report.counts.sourceUnmatched===0;
+ const status=migrationComplete?"MIGRATION_EVIDENCE_READY_FOR_INDEPENDENT_REVIEW":
+  report.counts.managedMissing>0?"BLOCKED_ORIGINAL_SQL_MISSING":
+  "BLOCKED_SOURCE_MIGRATIONS_UNMATCHED";
  // No caller-supplied boolean may impersonate independent actual restore,
  // DBA/AppSec approval, Staff MFA acceptance or managed authorization.
  return Object.freeze({
   schema:"qf.vox.rc47.managed-recovery-handoff.v1",
   candidateSha,reconciliationSha256:report.reconciliationSha256,
   evidenceSha256:report.sourceEvidenceSha256,
-  status:migrationComplete?"MIGRATION_EVIDENCE_READY_FOR_INDEPENDENT_REVIEW":"BLOCKED_ORIGINAL_SQL_MISSING",
+  status,
   releaseGo:false,managedWrites:false,connectsToManaged:false,
   sqlExecuted:false,approvalClaimed:false,restoreCertified:false,
   needsReadOnlyManagedCapture:report.counts.managedMissing>0,
+  needsSourceReconciliation:report.counts.sourceUnmatched>0,
+  outstandingManagedOriginalCount:report.counts.managedMissing,
+  outstandingSourceMigrationCount:report.counts.sourceUnmatched,
   originalSqlRequired:missing.items.map(m=>({
    version:m.version,name:m.name,source:m.requiredInput,
    placeholderIsSql:false
@@ -30,7 +36,7 @@ export function assessRc47Recovery({candidateSha,evidenceText,captureText}){
   counts:Object.freeze({...report.counts}),
   mandatoryRemainingGates:[
    "AUTHENTIC_INDEPENDENT_MANAGED_SQL_CAPTURE",
-   "MATCH_ALL_31_MANAGED_ORIGINALS_AND_107_SOURCE_ONLY",
+   "RECONCILE_ALL_MANAGED_ORIGINAL_SQL_AND_UNMATCHED_SOURCE_SQL",
    "ISOLATED_FULL_RESTORE_AUTH_VAULT_STORAGE_ROLES_POSTGIS",
    "INDEPENDENT_DBA_APPSEC_SIGNOFF",
    "OWNER_AND_TEAM_LEADER_STAFF_AAL2_REAL_SESSIONS",

@@ -12,6 +12,10 @@ test("real checked-in evidence blocks without authentic original managed SQL",()
  assert.equal(v.counts.sourceUnmatched,107);
  assert.equal(v.originalSqlRequired.length,31);
  assert.equal(v.sourceOnlyStillUnmatched.length,107);
+ assert.equal(v.needsReadOnlyManagedCapture,true);
+ assert.equal(v.needsSourceReconciliation,true);
+ assert.equal(v.outstandingManagedOriginalCount,31);
+ assert.equal(v.outstandingSourceMigrationCount,107);
  assert.equal(v.originalSqlRequired.every(x=>x.placeholderIsSql===false),true);
 });
 test("never represents offline evidence as independent restore or release approval",()=>{

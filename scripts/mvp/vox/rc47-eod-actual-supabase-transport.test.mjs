@@ -8,6 +8,14 @@ import {fileURLToPath,pathToFileURL} from "node:url";
 // Actual installed @supabase/supabase-js network stack, mock only the wire.
 // No real provider, managed project, bearer secrets, or database connection.
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
+// Supabase's realtime client checks for WebSocket at construction on Node 20.
+// This is an HTTP-only reader: provide a TEST-ONLY forbidden transport so CI
+// can exercise the real HTTP path without ever opening a realtime socket.
+const originalWebSocket=globalThis.WebSocket;
+let realtimeAttempts=0;
+globalThis.WebSocket=class ForbiddenRealtimeSocket {
+ constructor(){realtimeAttempts++;throw Error("RC47_REALTIME_CONNECTION_FORBIDDEN");}
+};
 const tmp=mkdtempSync(join(tmpdir(),"rc47-eod-transport-"));
 await build({entryPoints:[resolve(root,"lib/supabase.ts")],
  outfile:join(tmp,"transport.mjs"),bundle:true,platform:"node",format:"esm",
@@ -42,6 +50,7 @@ test("real supabase-js sends dedicated Authorization bearer, NOT the anon fallba
  assert.equal(request.headers.get("apikey"),"anon-test-public-only");
  assert.doesNotMatch(JSON.stringify(result),/service_role|access_token/);
  assert.deepEqual(JSON.parse(request.body),{p_intent_id:U,p_subject_id:V});
+ assert.equal(realtimeAttempts,0);
 });
 test("transport never offers another RPC function or direct privileged table API",async()=>{
  calls.length=0;
@@ -50,8 +59,10 @@ test("transport never offers another RPC function or direct privileged table API
  assert.equal(result.data,null);
  assert.equal(result.error.message,"EOD_REVIEW_FUNCTION_DENIED");
  assert.equal(calls.length,0);
+ assert.equal(realtimeAttempts,0);
 });
 process.on("exit",()=>{
  globalThis.fetch=oldFetch;
+ globalThis.WebSocket=originalWebSocket;
  rmSync(tmp,{recursive:true,force:true});
 });

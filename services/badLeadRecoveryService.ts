@@ -62,6 +62,8 @@ export async function applyBadLeadRecovery(
  reportId:string;action:BadLeadRecoveryAction;
  replacementStatus:"not_requested"|"assigned"|"pending_no_eligible_vendor";
  replacementAssignmentId:string|null;
+ restorationStatus?:"applied"|"already_applied"|"rejected";
+ originalAssignmentId?:string;
 }>>{
  if(!UUID.test(reportId||"")||!UUID.test(actorId||""))
   return blocked("VALIDATION","Report and verified administrator are required.");
@@ -82,10 +84,17 @@ export async function applyBadLeadRecovery(
     return blocked(String(r.reason_code??"CREDIT_ONLY_RECOVERY_REFUSED"),
      "Lead-credit restoration was denied by canonical authority.");
    // V2 returns 0 on replay, 1 on first restoration and never money or replacement.
+   // The SQL authority must identify the ORIGINAL consumed assignment and
+   // the unique canonical approval on both first application and replay.
+   // A mere {status:"applied",lead_credits_restored:1} is not proof.
    if(r.cash_refunded_minor_units!==0||r.lead_credits_restored!==(r.status==="applied"?1:0)||
+      !UUID.test(r.original_assignment_id??"")||
+      !UUID.test(r.credit_restoration_approval_id??"")||
       (r.status==="applied"&&r.automatic_replacement_created!==false))
     return blocked("CREDIT_ONLY_RESPONSE_INVALID","Credit-only result failed safe contract.");
-   return ok({reportId,action,replacementStatus:"not_requested",replacementAssignmentId:null});
+   return ok({reportId,action,replacementStatus:"not_requested",
+    replacementAssignmentId:null,originalAssignmentId:r.original_assignment_id,
+    restorationStatus:r.status});
   }
   // Existing reject path never restores credits, pays money or assigns a lead.
   const {data,error}=await adminClient().rpc("qf_apply_bad_lead_recovery_v1",{

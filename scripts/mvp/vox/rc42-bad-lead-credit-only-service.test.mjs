@@ -35,6 +35,8 @@ const calls=[];
 globalThis.__rc42Db=()=>({rpc:async(name,args)=>{calls.push({name,args});return {data:globalThis.__rc42Reply,error:null};}});
 const before=()=>{calls.length=0;delete process.env[gate];globalThis.__rc42Reply={
  status:"applied",lead_credits_restored:1,cash_refunded_minor_units:0,
+ original_assignment_id:"44444444-4444-4444-8444-444444444444",
+ credit_restoration_approval_id:"55555555-5555-4555-8555-555555555555",
  automatic_replacement_created:false};};
 test("default OFF cannot grant any credit or call database",async()=>{
  before();const r=await apply(REPORT,"restore_credit",ACTOR);
@@ -53,13 +55,18 @@ test("authenticated upstream actor handoff reaches only assignment-atomic candid
  before();process.env[gate]="staging";
  const r=await apply(REPORT,"restore_credit",ACTOR);assert.equal(r.ok,true);
  assert.equal(r.data.replacementStatus,"not_requested");
+ assert.equal(r.data.restorationStatus,"applied");
+ assert.equal(r.data.originalAssignmentId,"44444444-4444-4444-8444-444444444444");
  assert.deepEqual(calls,[{name:"qf_vox_rc42_bad_lead_credit_only_atomic_candidate_v1",
   args:{p_report_id:REPORT,p_actor_id:ACTOR}}]);
 });
 test("replay is zero additional lead credits; no direct money or replacement",async()=>{
  before();process.env[gate]="staging";
- globalThis.__rc42Reply={status:"already_applied",lead_credits_restored:0,cash_refunded_minor_units:0};
- assert.equal((await apply(REPORT,"restore_credit",ACTOR)).ok,true);
+ globalThis.__rc42Reply={status:"already_applied",lead_credits_restored:0,cash_refunded_minor_units:0,
+  original_assignment_id:"44444444-4444-4444-8444-444444444444",
+  credit_restoration_approval_id:"55555555-5555-4555-8555-555555555555"};
+ const reply=await apply(REPORT,"restore_credit",ACTOR);
+ assert.equal(reply.ok,true);assert.equal(reply.data.restorationStatus,"already_applied");
  assert.equal(calls.length,1);
 });
 test("money or extra credits in RPC response never claim successful restoration",async()=>{
@@ -69,6 +76,9 @@ test("money or extra credits in RPC response never claim successful restoration"
   {status:"applied",lead_credits_restored:1,cash_refunded_minor_units:100},
   {status:"applied",lead_credits_restored:1,cash_refunded_minor_units:0,automatic_replacement_created:true},
   {status:"already_applied",lead_credits_restored:1,cash_refunded_minor_units:0},
+  {status:"applied",lead_credits_restored:1,cash_refunded_minor_units:0,automatic_replacement_created:false},
+  {...globalThis.__rc42Reply,original_assignment_id:"wrong"},
+  {...globalThis.__rc42Reply,credit_restoration_approval_id:null},
   {status:"rejected",reason_code:"human_approval_required"}
  ]){
   globalThis.__rc42Reply=bad;

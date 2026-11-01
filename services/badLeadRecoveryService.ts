@@ -109,6 +109,12 @@ export async function applyBadLeadRecovery(
   const r=(data??{}) as RecoveryRpcResult;
   if(r.status!=="applied"&&r.status!=="already_applied")
    return blocked(String(r.reason_code??"RECOVERY_REJECT_REFUSED"),"Rejection was refused.");
+  // A human rejection must not be reported successful from a response
+  // claiming any cash, lead credits or a new assignment.
+  if((r.lead_credits_restored!==undefined&&r.lead_credits_restored!==0)||
+     (r.cash_refunded_minor_units!==undefined&&r.cash_refunded_minor_units!==0)||
+     r.automatic_replacement_created===true)
+   return blocked("REJECT_RESPONSE_INVALID","Unexpected financial or replacement effect in rejection receipt.");
   return ok({reportId,action,replacementStatus:"not_requested",replacementAssignmentId:null});
  }catch(e){return fail(e);}
 }

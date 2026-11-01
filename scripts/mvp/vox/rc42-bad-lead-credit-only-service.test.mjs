@@ -91,6 +91,24 @@ test("money or extra credits in RPC response never claim successful restoration"
   assert.equal(r.ok,false);
  }
 });
+test("rejection never acknowledges forged money, credit or replacement effects",async()=>{
+ before();
+ for(const values of [
+  {lead_credits_restored:1},
+  {cash_refunded_minor_units:50},
+  {automatic_replacement_created:true},
+  {lead_credits_restored:2,cash_refunded_minor_units:100}
+ ]){
+  globalThis.__rc42Reply={status:"applied",...values};
+  const v=await apply(REPORT,"reject",ACTOR);
+  assert.equal(v.ok,false);assert.equal(v.code,"REJECT_RESPONSE_INVALID");
+ }
+ globalThis.__rc42Reply={status:"already_applied",lead_credits_restored:0,cash_refunded_minor_units:0};
+ const v=await apply(REPORT,"reject",ACTOR);
+ assert.equal(v.ok,true);
+ assert.equal(v.data.replacementAssignmentId,null);
+ assert.ok(calls.every(c=>c.name==="qf_apply_bad_lead_recovery_v1"));
+});
 test("unverified actor ID blocked before all grant calls",async()=>{
  before();process.env[gate]="staging";
  assert.equal((await apply(REPORT,"restore_credit","forged-actor")).ok,false);

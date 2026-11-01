@@ -15,7 +15,7 @@ const handler=createRc42SignedEodDataApiReviewHandler({
  rpc:()=>createRc44DedicatedEodReviewReader({
   supabaseUrl:process.env.NEXT_PUBLIC_SUPABASE_URL,
   anonKey:process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  readerJwt:process.env.VOX_EOD_REVIEW_READER_JWT
+  readerJwt:process.env.QF_VOX_EOD_REVIEW_READER_JWT
  }),
  review:(owner,leader,input,rpc)=>verifyRc41PendingEodViaRpc(owner,leader,input,rpc)
 });

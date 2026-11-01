@@ -6,6 +6,8 @@ on:
       - 'ops/vox/rc42-review-candidates/**'
       - 'scripts/mvp/vox/rc42-*.test.mjs'
       - 'scripts/mvp/vox/rc43-*.test.mjs'
+      - 'scripts/mvp/vox/rc44-*.test.mjs'
+      - 'services/vox/rc44DedicatedEodReviewReader.ts'
       - 'app/actions.ts'
       - 'services/adminService.ts'
       - 'scripts/mvp/vox/validate-vox-rc42-*.ps1'
@@ -44,7 +46,7 @@ jobs:
       - name: Real compiled Finance route, managed ledger reconciliation and predeployment HOLD regression
         run: node --test scripts/mvp/vox/rc41-finance-refund-case-review.test.mjs scripts/mvp/vox/rc40-managed-ledger-reconciler.test.mjs scripts/mvp/vox/rc38-staging-predeploy-gate.test.mjs
       - name: RC42 guarded Core, credit-only Finance, and EOD read-only contracts
-        run: node --test scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-policy.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-service.test.mjs scripts/mvp/vox/rc42-eod-atomic-data-api-review.test.mjs scripts/mvp/vox/rc43-core-route-integration.test.mjs scripts/mvp/vox/rc43-eod-route-integration.test.mjs scripts/mvp/vox/rc43-bad-lead-owner-aal2-review.test.mjs
+        run: node --test scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-policy.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-service.test.mjs scripts/mvp/vox/rc42-eod-atomic-data-api-review.test.mjs scripts/mvp/vox/rc43-core-route-integration.test.mjs scripts/mvp/vox/rc43-eod-route-integration.test.mjs scripts/mvp/vox/rc43-bad-lead-owner-aal2-review.test.mjs scripts/mvp/vox/rc44-eod-dedicated-reader.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false
@@ -77,6 +79,19 @@ jobs:
           set -euo pipefail
           pwsh -NoProfile -File scripts/mvp/vox/validate-vox-rc42-credit-only-pg17.ps1 | tee "$RUNNER_TEMP/rc42-credit.log"
           grep -Fq 'VOX_RC42_CREDIT_ONLY_PG17_DISPOSABLE_PASS' "$RUNNER_TEMP/rc42-credit.log"
+  canonical-credit-real-pg17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Execute ACTUAL canonical credit mutation and approval SQL against disposable PG17
+        shell: bash
+        run: |
+          set -euo pipefail
+          pwsh -NoProfile -File scripts/mvp/vox/validate-vox-rc42-credit-only-pg17.ps1 -UseCanonicalCreditAuthority | tee "$RUNNER_TEMP/rc44-real-canonical-credit.log"
+          grep -Fq 'VOX_RC44_CANONICAL_CREDIT_PG17_DISPOSABLE_PASS' "$RUNNER_TEMP/rc44-real-canonical-credit.log"
   eod-real-pg17:
     runs-on: ubuntu-latest
     timeout-minutes: 20

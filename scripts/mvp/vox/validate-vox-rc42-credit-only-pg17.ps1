@@ -57,7 +57,7 @@ CREATE TABLE public.vendor_credit_logs(
  created_at timestamptz NOT NULL DEFAULT now());
 CREATE UNIQUE INDEX rc44_credit_ref_unique ON public.vendor_credit_logs(reference_type,reference_id);
 '@
-  $tempSql=Join-Path $env:TEMP ("rc44-canonical-credit-"+$PID+".sql")
+  $tempSql=Join-Path ([System.IO.Path]::GetTempPath()) ("rc44-canonical-credit-"+$PID+".sql")
   Set-Content -Path $tempSql -Value ($schema+[Environment]::NewLine+($fn -join [Environment]::NewLine)) -Encoding utf8
   RunFile $tempSql 'rc44-real-canonical.sql'
  }

@@ -66,7 +66,7 @@ test("AAL2 expiry during atomic SQL read does not certify the returned receipt",
  const body=await res.json();
  assert.equal(body.error,"STAFF_AAL2_EXPIRED_DURING_RPC");
  assert.equal(body.providerMessagesSent,0);
- assert.equal(body.committed,false);
+ assert.equal(body.committed,null);assert.equal(body.retrySameNonceOnly,true);
 });
 test("post-RPC current Staff scope must still match the verified original actor",async()=>{
  for(const stale of [null,{...actor,aal:"aal1"},
@@ -77,7 +77,9 @@ test("post-RPC current Staff scope must still match the verified original actor"
   const r=await create(d)(request());
   assert.equal(r.status,403);assert.equal(d.calls.length,1);
   assert.equal(checks,2);
-  assert.equal((await r.json()).error,"STAFF_SCOPE_REVOKED_DURING_RPC");
+  const result=await r.json();
+  assert.equal(result.error,"STAFF_SCOPE_REVOKED_DURING_RPC");
+  assert.equal(result.committed,null);assert.equal(result.retrySameNonceOnly,true);
  }
 });
 test("post-RPC independent Auth failure never certifies an atomic receipt",async()=>{
@@ -85,7 +87,9 @@ test("post-RPC independent Auth failure never certifies an atomic receipt",async
  const d=deps({verify:async()=>{if(++checks===2)throw Error("auth unavailable");return actor;}});
  const r=await create(d)(request());
  assert.equal(r.status,503);assert.equal(d.calls.length,1);assert.equal(checks,2);
- assert.equal((await r.json()).error,"STAFF_AUTH_RECHECK_UNAVAILABLE");
+ const result=await r.json();
+ assert.equal(result.error,"STAFF_AUTH_RECHECK_UNAVAILABLE");
+ assert.equal(result.committed,null);assert.equal(result.retrySameNonceOnly,true);
 });
 test("timed-out atomic HTTP result is UNKNOWN, never false rollback or new-nonce permission",async()=>{
  const d=deps({rpcTimeoutMs:30,rpc:async()=>new Promise(()=>{})});
@@ -107,14 +111,23 @@ test("wrong nonce, revision, missing receipt or provider messages never certify"
   {...receipt,consent_reason:"unapproved_scope"}
  ]){
   const d=deps({rpc:async()=>({data:[altered],error:null})});
-  assert.equal((await create(d)(request())).status,503);
+  const r=await create(d)(request());
+  assert.equal(r.status,503);assert.equal((await r.json()).committed,null);
  }
  const d=deps({rpc:async()=>({data:[],error:null})});
  assert.equal((await create(d)(request())).status,503);
 });
+test("an RPC error result is uncertain after an attempted mutation",async()=>{
+ const d=deps({rpc:async()=>({data:null,error:{code:"CONNECTION_LOST"}})});
+ const r=await create(d)(request());assert.equal(r.status,503);
+ const b=await r.json();assert.equal(b.error,"ATOMIC_RPC_UNAVAILABLE");
+ assert.equal(b.committed,null);assert.equal(b.retrySameNonceOnly,true);
+ assert.equal(b.providerMessagesSent,0);
+});
 test("RPC transport failure remains unavailable; no fallback",async()=>{
  const d=deps({rpc:async()=>{throw Error("unavailable");}});
  const r=await create(d)(request());assert.equal(r.status,503);
- const b=await r.json();assert.equal(b.committed,false);assert.equal(b.providerMessagesSent,0);
+ const b=await r.json();assert.equal(b.committed,null);assert.equal(b.retrySameNonceOnly,true);
+ assert.equal(b.providerMessagesSent,0);
 });
 process.on("exit",()=>rmSync(dir,{recursive:true,force:true}));

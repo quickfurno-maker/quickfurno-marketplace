@@ -54,7 +54,8 @@ test("route is read-only GET, default OFF, never publishes or writes",()=>{
  for(const m of ["POST","PUT","PATCH","DELETE"])assert.match(route,new RegExp("export const "+m+"=deny"));
  for(const s of [route,handlerSrc,dbSrc])
   assert.doesNotMatch(s,/\.rpc\(|adminClient|service_role|publishOfficial|fetch\(|\.insert\(|\.update\(/);
- assert.match(dbSrc,/default_transaction_read_only=on/);
+ assert.match(dbSrc,/RC38_SIGNED_EOD_REVIEW_READER_INSTALLED=false/);
+ assert.doesNotMatch(dbSrc,/\bnew\s+Pool\s*\(|import\s*\(.*pg|require\(['"]pg/);
 });
 test("disabled by default and when DB source missing: 503 before any auth or DB",async()=>{
  enabled=false;
@@ -66,8 +67,8 @@ test("disabled by default and when DB source missing: 503 before any auth or DB"
  assert.equal(globalThis.__rec.length,0);
  delete process.env.RC38_SIGNED_EOD_REVIEW_READER_DATABASE_URL;
  assert.equal(dbSource(),null);
- process.env.RC38_SIGNED_EOD_REVIEW_READER_DATABASE_URL="http://not-postgres";
- assert.equal(dbSource(),null);
+ process.env.RC38_SIGNED_EOD_REVIEW_READER_DATABASE_URL="postgresql://unapproved-reader:fake@localhost:5432/staging";
+ assert.equal(dbSource(),null,"unapproved connection string cannot enable a direct PostgreSQL pool");
  delete process.env.RC38_SIGNED_EOD_REVIEW_READER_DATABASE_URL;
 });
 test("strict query: exact three params, no extras, duplicates or caller identity",async()=>{

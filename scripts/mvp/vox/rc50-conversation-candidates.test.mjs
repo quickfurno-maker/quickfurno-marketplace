@@ -28,7 +28,7 @@ const env=["VOX_STAFF_READ_ENABLED","VOX_RC42_CORE_CONVERSATION_OPERATOR_ENABLED
 const flags=on=>env.forEach(k=>on?process.env[k]="staging":delete process.env[k]);
 const state={auth:0,scope:null,db:null,queries:[],rows:{},revokeDuringRead:false,
  deactivateZoneDuringRead:false,rezoneVendorDuringRead:false,
- revisionChangedDuringRead:false};
+ revisionChangedDuringRead:false,identityChangedDuringRead:false};
 globalThis.__rc50=state;
 const q=(table)=>{
  const ops=[];state.queries.push({table,ops});
@@ -42,6 +42,9 @@ const q=(table)=>{
    if(table==="vendors"&&state.revisionChangedDuringRead&&
       state.queries.filter(x=>x.table==="vendors").length===2)
     state.rows.communication_conversations=state.rows.communication_conversations.map(row=>({...row,revision:5}));
+   if(table==="vendors"&&state.identityChangedDuringRead&&
+      state.queries.filter(x=>x.table==="vendors").length===2)
+    state.rows.communication_conversations=state.rows.communication_conversations.map(row=>({...row,tenant_id:"other-tenant",assigned_actor:"RIYA"}));
    if(table==="communication_conversations"&&state.revokeDuringRead)state.scope=null;
    if(table==="communication_conversations"&&state.deactivateZoneDuringRead)
     state.rows.marketplace_service_zones=[{id:zone,city_id:city,is_active:false}];
@@ -57,6 +60,7 @@ function reset(){
  flags(true);state.auth=0;state.queries=[];state.scope={...baseScope};
  state.revokeDuringRead=false;state.deactivateZoneDuringRead=false;
  state.rezoneVendorDuringRead=false;state.revisionChangedDuringRead=false;
+ state.identityChangedDuringRead=false;
  state.db={from:q};
  state.rows={vendors:[{id:vendor,service_zone_id:zone}],
   marketplace_service_zones:[{id:zone,city_id:city,is_active:true}],
@@ -122,6 +126,12 @@ test("current conversation revision changing during zone read invalidates stale 
  const res=await api.GET(req());
  assert.equal(res.status,409);
  assert.equal((await res.json()).error,"CONVERSATION_CHANGED_DURING_READ");
+ assert.equal(state.auth,1);
+});
+test("change of tenant and agent during asynchronous location check invalidates hint",async()=>{
+ reset();state.identityChangedDuringRead=true;
+ const r=await api.GET(req());assert.equal(r.status,409);
+ assert.equal((await r.json()).error,"CONVERSATION_CHANGED_DURING_READ");
  assert.equal(state.auth,1);
 });
 test("PAUSED conversation allows only human takeover in selection hint",async()=>{

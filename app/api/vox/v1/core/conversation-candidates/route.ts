@@ -95,15 +95,19 @@ export async function GET(request:Request){
   // Current revision and state are only hints, but must not knowingly be
   // returned stale (the independent atomic writer still verifies under lock).
   const latest=await db.from("communication_conversations")
-   .select("id,subject_id,state,human_takeover,assigned_actor,revision")
+   .select("id,subject_id,subject_type,tenant_id,channel,state,human_takeover,assigned_actor,revision")
    .in("id",conversations.map(x=>x.id)).limit(21);
   if(latest.error||!latest.data||latest.data.length!==conversations.length)
    return denied("CONVERSATION_CHANGED_DURING_READ",409);
   const selected=new Map(conversations.map(x=>[x.id,x]));
+  const initialById=new Map(rows.data.map(row=>[row.id,row]));
   const latestIds=new Set<string>();
   for(const row of latest.data){
-   const original=selected.get(row.id);
-   if(!original||latestIds.has(row.id)||!vendorIds.has(row.subject_id)||
+   const original=selected.get(row.id),first=initialById.get(row.id);
+   if(!original||!first||latestIds.has(row.id)||!vendorIds.has(row.subject_id)||
+      row.subject_id!==first.subject_id||row.subject_type!==first.subject_type||
+      row.tenant_id!==first.tenant_id||row.channel!==first.channel||
+      row.assigned_actor!==first.assigned_actor||
       row.revision!==original.revision||row.state!==original.state||
       row.human_takeover!==false||!["RIYA","ANISHA","AAROHI"].includes(row.assigned_actor))
     return denied("CONVERSATION_CHANGED_DURING_READ",409);

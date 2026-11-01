@@ -441,6 +441,7 @@ export function BadLeadReportsReviewPanel({
   runAction: RunAction;
 }) {
   const [statusFilter, setStatusFilter] = useState("All");
+  const [recoveryReceipt,setRecoveryReceipt]=useState<string|null>(null);
   const commentsByReport = useMemo(() => {
     const map = new Map<string, BadLeadReportComment[]>();
     (data.badLeadReportComments ?? []).forEach((comment) => {
@@ -491,7 +492,23 @@ export function BadLeadReportsReviewPanel({
       reject: "reject recovery",
     };
     if (!window.confirm(`Confirm human recovery decision: ${labels[action]}? This uses Core's governed recovery authority.`)) return;
-    runAction("Recovery decision applied", () => adminApplyBadLeadRecovery(report.id, action));
+    setRecoveryReceipt(null);
+    runAction("Recovery decision applied",async()=>{
+      const result=await adminApplyBadLeadRecovery(report.id,action);
+      if(result.ok&&action==="restore_credit"){
+        const data=result.data;
+        if(data.restorationStatus==="applied"&&data.leadCreditsRestored===1&&
+           data.creditRestorationApprovalId&&data.originalAssignmentId)
+          setRecoveryReceipt("1 LEAD credit restored, no money or replacement. Assignment "+
+            data.originalAssignmentId+"; approval "+data.creditRestorationApprovalId+".");
+        else if(data.restorationStatus==="already_applied"&&data.leadCreditsRestored===0&&
+                data.creditRestorationApprovalId)
+          setRecoveryReceipt("Previously approved credit restoration. 0 additional credits. Approval "+
+            data.creditRestorationApprovalId+".");
+        else setRecoveryReceipt("No verified credit restoration receipt returned.");
+      }else if(result.ok&&action==="reject")setRecoveryReceipt("Recovery rejected. No LEAD credit or money granted.");
+      return result;
+    });
   }
 
   return (
@@ -499,6 +516,7 @@ export function BadLeadReportsReviewPanel({
       title="Bad Lead Reports Review"
       description="Bad-lead compensation is always exactly 1 lead credit after human approval—never a cash refund, money wallet credit or automatic replacement. Atomic restoration remains blocked until reviewed Staging installation."
     >
+      {recoveryReceipt?<p role="status" className="mb-4 rounded-lg border border-slate-200 p-3 text-xs text-slate-700">{recoveryReceipt}</p>:null}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {uniqueOptions(["Pending", "Under Review", "Valid", "Invalid", "Resolved", "Rejected", ...data.badReports.map((report) => report.status)]).map((option) => (
           <button

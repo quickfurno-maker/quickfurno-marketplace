@@ -910,8 +910,26 @@ export const adminSetCityStrictLocation = async (id: string, enabled: boolean) =
     revalidatePath("/api/cities");
     return result;
   });
-export const adminApproveBadLead  = async (id: string, note?: string) => asAdmin((actor) => admin.approveBadLeadReport(id, note, actor));
-export const adminRejectBadLead   = async (id: string, note?: string) => asAdmin((actor) => admin.rejectBadLeadReport(id, note, actor));
+// Bad-lead review status is authorization evidence for a future one-credit
+// restoration. Both the original approval and every alternate VALID path must
+// require the SAME genuinely verified Owner AAL2 as the credit mutation itself.
+async function rc44VerifiedBadLeadOwner(actor:string):Promise<boolean>{
+ try{
+  const {data:{session},error}=await (await serverClient()).auth.getSession();
+  if(error||!session?.access_token)return false;
+  return await verifyVoxOwnerBearer("Bearer "+session.access_token)===actor;
+ }catch{return false;}
+}
+export const adminApproveBadLead=async (id:string,note?:string)=>
+ asAdmin(async actor=>{
+  if(!await rc44VerifiedBadLeadOwner(actor))return fail(appError("UNAUTHORIZED"));
+  return admin.approveBadLeadReport(id,note,actor);
+ });
+export const adminRejectBadLead=async (id:string,note?:string)=>
+ asAdmin(async actor=>{
+  if(!await rc44VerifiedBadLeadOwner(actor))return fail(appError("UNAUTHORIZED"));
+  return admin.rejectBadLeadReport(id,note,actor);
+ });
 export const adminBadLeadReports  = async () => asAdmin(() => admin.getPendingBadLeadReports());
 
 // --------------------------------------------------------------------------
@@ -929,9 +947,12 @@ export const adminGetLeadMatchingAuditDetails = async (leadId: string) =>
 export const adminListVendorLeadReports = async (limit?: number) =>
   asAdmin(() => audit.listVendorLeadReports(limit));
 export const adminUpdateVendorLeadReportStatus = async (reportId: string, input: { status: string; adminNotes?: string | null }) =>
-  asAdmin(async () => {
-    const user = await requireSuperadmin();
-    const result = await audit.updateVendorLeadReportStatus(reportId, input, user.id);
+  asAdmin(async (actor) => {
+    // "Valid" is a credit-restoration eligibility state in the reviewed SQL.
+    // The alternate status editor MUST NOT approve a bad lead at AAL1.
+    if (input?.status==="Valid" && !await rc44VerifiedBadLeadOwner(actor))
+      return fail(appError("UNAUTHORIZED"));
+    const result = await audit.updateVendorLeadReportStatus(reportId, input, actor);
     revalidatePath("/admin/leads");
     return result;
   });

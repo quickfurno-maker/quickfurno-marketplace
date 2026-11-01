@@ -39,7 +39,18 @@ test("rejection requires authenticated actor and does not touch a ledger",()=>{
  assert.match(scope,/if\(!data\) throw appError/);
  assert.doesNotMatch(scope,/vendor_credit_logs|remaining_credits|razorpay|qf_approve_credit_restoration_v2/i);
 });
-test("all active Admin handlers pass the authenticated actor into review decisions",()=>{
- assert.match(actions,/asAdmin\(\(actor\) => admin\.approveBadLeadReport\(id, note, actor\)\)/);
- assert.match(actions,/asAdmin\(\(actor\) => admin\.rejectBadLeadReport\(id, note, actor\)\)/);
+test("every human approval, rejection and alternate Valid path requires genuine Owner AAL2",()=>{
+ const helper=actions.split("async function rc44VerifiedBadLeadOwner(actor:string)")[1]?.split("export const adminApproveBadLead")[0]??"";
+ assert.match(helper,/auth\.getSession\(\)/);
+ assert.match(helper,/verifyVoxOwnerBearer\("Bearer "\+session\.access_token\)===actor/);
+ const approve=actions.split("export const adminApproveBadLead=")[1]?.split("export const adminRejectBadLead=")[0]??"";
+ const reject=actions.split("export const adminRejectBadLead=")[1]?.split("export const adminBadLeadReports")[0]??"";
+ const alternate=actions.split("export const adminUpdateVendorLeadReportStatus =")[1]?.split("export const adminRecommendBadLeadRecovery")[0]??"";
+ assert.match(approve,/rc44VerifiedBadLeadOwner\(actor\)/);
+ assert.match(approve,/admin\.approveBadLeadReport\(id,note,actor\)/);
+ assert.match(reject,/rc44VerifiedBadLeadOwner\(actor\)/);
+ assert.match(reject,/admin\.rejectBadLeadReport\(id,note,actor\)/);
+ assert.match(alternate,/input\?\.status==="Valid"/);
+ assert.match(alternate,/rc44VerifiedBadLeadOwner\(actor\)/);
+ assert.match(alternate,/audit\.updateVendorLeadReportStatus\(reportId, input, actor\)/);
 });

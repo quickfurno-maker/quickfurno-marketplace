@@ -1,0 +1,105 @@
+name: VOX functional Staff E2E - real Core routes + compiled Web (NO DEPLOY)
+
+# Disposable loopback-only GoTrue + PostgREST + PostgreSQL 17 on the runner's Docker.
+# Real Core Staff route handlers + the real `next build` VOX Web, real GoTrue AAL2.
+# No GitHub environment, no secrets, no deploy, no migrations, no publish,
+# no managed Supabase/Staging/Production, no payment provider.
+
+on:
+  pull_request:
+    paths:
+      - "scripts/mvp/vox/validate-functional-staff-compiled-e2e.harness.mjs"
+      - "scripts/mvp/vox/fixtures/web-core-loopback.preload.cjs"
+      - "scripts/mvp/vox/fixtures/vox-real-source.loader.mjs"
+      - "scripts/mvp/vox/fixtures/totp.mjs"
+      - "app/api/vox/v1/work-queue/**"
+      - "app/api/vox/v1/eod-source-status/**"
+      - "app/api/vox/v1/finance/route.ts"
+      - "services/vox/verified*.ts"
+      - "contracts/vox/**"
+      - "apps/vox-web/lib/**"
+      - "apps/vox-web/app/team/work-queue/**"
+      - "apps/vox-web/app/team/eod-sources/**"
+      - "apps/vox-web/app/finance/page.tsx"
+      - "apps/vox-web/app/api/auth/**"
+      - "apps/vox-web/package.json"
+      - ".github/workflows/vox-functional-staff-e2e.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vox-functional-staff-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  functional-staff-e2e:
+    name: Real Core Staff routes + compiled Web, real GoTrue AAL2, PG17 (NO DEPLOY)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact PR source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - name: Verify runner Docker and no managed Supabase env
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker version
+          test -z "${SUPABASE_URL:-}"
+          test -z "${DATABASE_URL:-}"
+          test -z "${SUPABASE_SERVICE_ROLE_KEY:-}"
+          test -z "${VOX_CORE_ORIGIN:-}"
+      - name: Install pinned root dependencies (no scripts)
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install pinned Web dependencies (no scripts)
+        working-directory: apps/vox-web
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build the real compiled Web
+        working-directory: apps/vox-web
+        run: npm run build
+      - name: Run functional Staff E2E (synthetic localhost only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="${RUNNER_TEMP}/vox-functional-e2e.log"
+          set +e
+          VOX_QA_REQUIRE_WEB_BUILD=1 node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \
+            scripts/mvp/vox/validate-functional-staff-compiled-e2e.harness.mjs 2>&1 | tee "$log"
+          code="${PIPESTATUS[0]}"
+          set -e
+          test "$code" -eq 0 || { echo 'VOX_FUNCTIONAL FAIL: harness exited non-zero' >&2; exit 1; }
+          if grep -Eq '^(FAIL|SKIP) ' "$log"; then
+            echo 'VOX_FUNCTIONAL FAIL: a FAIL or SKIP line is present' >&2
+            exit 1
+          fi
+          grep -Eqx 'VOX_FUNCTIONAL_PG_VERSION 17\..*' "$log" || { echo 'PG17 marker missing' >&2; exit 1; }
+          grep -Eqx 'VOX_FUNCTIONAL_STAFF_E2E_PASS core=[1-9][0-9]* web=[1-9][0-9]* failed=0' "$log" \
+            || { echo 'VOX_FUNCTIONAL FAIL: exact success marker (Core and compiled Web both ran) missing' >&2; exit 1; }
+          echo 'VOX_FUNCTIONAL_CI_GATE_FULL_PASS_VERIFIED'
+      - name: Verify synthetic containers removed
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          leftovers="$(docker ps -aq --filter 'name=vox-func-')"
+          if [ -n "$leftovers" ]; then
+            echo "Leftover vox-func containers found; removing" >&2
+            docker rm -f $leftovers
+            exit 1
+          fi
+          echo 'VOX_FUNCTIONAL_NO_LEFTOVER_CONTAINERS'
+      - name: Explicit release HOLD
+        if: always()
+        run: |
+          {
+            echo '## VOX functional Staff E2E (NO DEPLOY)'
+            echo 'Scope: real Core Staff routes + compiled Web against disposable loopback GoTrue/PostgREST/PG17 with synthetic secrets.'
+            echo 'Managed Staging/Production, a human authenticator, payment providers and full UAT: **NOT CHECKED**. No environment, secrets, deploy, migrations or feature enabling.'
+          } >> "$GITHUB_STEP_SUMMARY"

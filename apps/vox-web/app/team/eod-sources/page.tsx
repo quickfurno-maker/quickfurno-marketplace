@@ -1,4 +1,5 @@
 import Link from "next/link";
+import {StaffSignInLink} from "../../components/StaffSignInLink";
 import {fetchStaffSourceReadiness} from "../../../lib/clientSourceStatus";
 import "../workflow.css";
 export const dynamic="force-dynamic";
@@ -19,6 +20,7 @@ export default async function EodSourceReadiness(){
    <h2>Source status is locked</h2>
    <p>A current approved Staff MFA session and Core source permissions
     are required. No missing data is treated as zero.</p>
+   <StaffSignInLink status={r.status} returnTo="/team/eod-sources"/>
   </section>:<section className="voxFlowCard">
    <h2>Verified source objects vs. event evidence</h2>
    <ul className="voxFlowList">{r.sources.map(s=>

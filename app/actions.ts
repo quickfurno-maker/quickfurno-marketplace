@@ -960,10 +960,18 @@ export const adminUpdateVendorLeadReportStatus = async (reportId: string, input:
 export const adminRecommendBadLeadRecovery = async (
   reportId: string,
   recommendation: "none" | "restore_credit" | "replace" | "restore_credit_and_replace",
-) => asAdmin(() => badLeadRecovery.recommendBadLeadRecovery(reportId, recommendation));
+) => asAdmin(async actor => {
+  // Recommendations feed the eventual compensation decision. Require the
+  // same CURRENT Owner AAL2 as approval, but never issue credits here.
+  if(!await rc44VerifiedBadLeadOwner(actor))return fail(appError("UNAUTHORIZED"));
+  return badLeadRecovery.recommendBadLeadRecovery(reportId,recommendation);
+});
 
 export const adminGenerateBadLeadRecoveryRecommendation = async (reportId: string) =>
-  asAdmin(() => badLeadRecovery.generateBadLeadRecoveryRecommendation(reportId));
+  asAdmin(async actor => {
+    if(!await rc44VerifiedBadLeadOwner(actor))return fail(appError("UNAUTHORIZED"));
+    return badLeadRecovery.generateBadLeadRecoveryRecommendation(reportId);
+  });
 
 export const adminApplyBadLeadRecovery = async (
   reportId: string,

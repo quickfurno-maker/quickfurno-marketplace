@@ -4,7 +4,7 @@ import {build} from "esbuild";
 import {mkdirSync} from "node:fs";
 import {resolve,dirname} from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
-// Compiled REAL route + REAL verifiedScopedStaff + REAL vendorCrmService.
+// Compiled REAL route + REAL verifiedScopedStaff.
 // Only Supabase is an in-memory fake. The atomic RPC SQL stays uninstalled; its
 // error/result contract is mimicked here and proven separately by the PG17 .ps1.
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
@@ -66,7 +66,7 @@ function setup(over={}){
  globalThis.__rc34={client:fakeClient(state),
   authUser:{id:U,app_metadata:{qf_principal:"vox_staff",vox_role:"vendor_success_agent",admin_role:null}}};
  process.env.VOX_VENDOR_CRM_TASKS_ENABLED="staging";
- delete process.env.VOX_VENDOR_TASK_ATOMIC_RPC_ENABLED;
+ process.env.VOX_VENDOR_TASK_ATOMIC_RPC_ENABLED="staging";
  delete process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED;
  return state;
 }
@@ -103,49 +103,4 @@ test("RPC path: valid UUID receipt is accepted (201 create / 200 replay)",async(
   const r=await post();const j=await r.json();
   assert.equal(r.status,status);assert.equal(j.taskId,id(100));assert.equal(j.created,created);
  }
-});
-test("legacy path: create 201 then exact replay 200 with the same id, one insert",async()=>{
- const s=setup();
- const a=await post();const aj=await a.json();
- assert.equal(a.status,201);assert.equal(aj.created,true);
- const b=await post();const bj=await b.json();
- assert.equal(b.status,200);assert.equal(bj.created,false);assert.equal(bj.taskId,aj.taskId);
- assert.equal(s.inserts,1);
- const c=await post(body({title:"A completely different title"}));
- assert.equal(c.status,409);assert.equal((await c.json()).error,"IDEMPOTENCY_CONFLICT");
- assert.equal(s.inserts,1);
-});
-test("legacy path: non-UUID id returned by the store is not echoed",async()=>{
- const s=setup({insertId:"forged-id"});
- const r=await post();const t=await r.text();
- assert.equal(r.status,503);assert.equal(t.includes("forged-id"),false);
- assert.equal(t.includes("taskId"),false);
-});
-test("legacy path: grant revoked mid-flight denies creation AND replay with no task id",async()=>{
- const s=setup();
- assert.equal((await post()).status,201);
- assert.equal(s.inserts,1);
- // Revoke the vendor grant after the first authority read (during zone lookup).
- s.onZoneRead=()=>{s.tables.vox_staff_object_scopes_v1[0].revoked_at=new Date().toISOString()};
- const r=await post();const t=await r.text();
- assert.ok([400,403].includes(r.status),String(r.status));
- assert.equal(t.includes("taskId"),false);
- assert.equal(s.inserts,1);
-});
-test("legacy path: staff membership revoked mid-flight denies replay",async()=>{
- const s=setup();
- assert.equal((await post()).status,201);
- let calls=0;
- s.onZoneRead=()=>{if(++calls>=1)s.tables.vox_staff_memberships_v1[0].is_active=false};
- const r=await post();const t=await r.text();
- assert.equal(r.status,403);assert.equal(t.includes("taskId"),false);
- assert.equal(s.inserts,1);
-});
-test("another actor's idempotency row is never replayed to this actor",async()=>{
- const s=setup();
- const key=(await (async()=>{await post();return s.tables.vendor_tasks[0].idempotency_key})());
- s.tables.vendor_tasks[0].created_by=id(77);
- const r=await post();const t=await r.text();
- assert.equal(r.status,409);assert.equal(t.includes("taskId"),false);
- assert.match(key,/^vox-[0-9a-f]{64}$/);
 });

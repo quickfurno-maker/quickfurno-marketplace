@@ -114,14 +114,14 @@ test("RPC missing / unauthorized / malformed result fails closed with 503, no fa
   assert.equal(JSON.stringify(j).includes("function"),false);
  }
 });
-test("gate default OFF never calls the RPC (legacy path retained)",async()=>{
- for(const v of [undefined,"","true","1","production"]){
-  const s=setup();
-  if(v===undefined)delete process.env.VOX_VENDOR_TASK_ATOMIC_RPC_ENABLED;
-  else process.env.VOX_VENDOR_TASK_ATOMIC_RPC_ENABLED=v;
-  await post().catch(()=>{});
-  assert.equal(s.rpcCalls.length,0);
- }
+test("either gate not exactly staging never reaches Auth, body or the RPC",async()=>{
+ for(const flag of ["VOX_VENDOR_CRM_TASKS_ENABLED","VOX_VENDOR_TASK_ATOMIC_RPC_ENABLED"])
+  for(const v of [undefined,"","true","1","production"]){
+   const s=setup();
+   if(v===undefined)delete process.env[flag];else process.env[flag]=v;
+   const r=await post();
+   assert.equal(r.status,503);assert.equal(s.rpcCalls.length,0);assert.equal(s.reads.length,0);
+  }
 });
 test("pre-RPC checks still deny: unassigned vendor never reaches the RPC",async()=>{
  const s=setup();

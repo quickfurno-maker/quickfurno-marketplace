@@ -10,7 +10,7 @@
 
 **EOD:** The reviewed read-only dedicated PostgREST reviewer now checks both initial and post-read credential freshness (issue and not-before age <= 3600 seconds). Data returned after the credential ages out is discarded. Official signed EOD remains uninstalled.
 
-**Web BFF / Staff UX:** The authenticated VOX Web adapter now preserves Core HTTP 504 uncertain results, and marks other Core 5xx or lost HTTP responses as unknown with the exact same-nonce recovery contract. It does not create a fresh command, auto-send provider messages or claim a rollback. Its existing Web integration suite has added 503, 504 and transport-loss regression tests.
+**Web BFF / Staff UX:** The authenticated VOX Web adapter now preserves Core HTTP 504 uncertain results, and marks other Core 5xx or lost HTTP responses as unknown with the exact same-nonce recovery contract. It does not create a fresh command, auto-send provider messages or claim a rollback. An explicit Core HTTP 403 response bearing a strictly validated post-RPC `committed:null` receipt is also propagated as uncertain rather than ordinary pre-RPC denial. This is covered by an actual BFF regression test. Its existing Web integration suite has added 503, 504 and transport-loss regression tests.
 
 **QA:** Focused regression tests, the protected GitHub workflow and the existing VOX Web integration workflow cover these changes, full code paths and existing disposable PostgreSQL 17 functional proofs. No protected launch flag changed.
 

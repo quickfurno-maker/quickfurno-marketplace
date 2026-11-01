@@ -91,8 +91,26 @@ export async function GET(request:Request){
   if(!currentProof.ok||currentProof.ids.length!==verified.ids.length||
      !verified.ids.every(id=>currentProof.ids.includes(id)))
    return denied("VENDOR_CITY_CHANGED_DURING_READ",403);
-  // Revalidate Staff LAST, after the second city and vendor reads, so a
-  // concurrent revocation cannot be mistaken for an approved selection.
+  // Re-fetch every selected conversation after the asynchronous zone reads.
+  // Current revision and state are only hints, but must not knowingly be
+  // returned stale (the independent atomic writer still verifies under lock).
+  const latest=await db.from("communication_conversations")
+   .select("id,subject_id,state,human_takeover,assigned_actor,revision")
+   .in("id",conversations.map(x=>x.id)).limit(21);
+  if(latest.error||!latest.data||latest.data.length!==conversations.length)
+   return denied("CONVERSATION_CHANGED_DURING_READ",409);
+  const selected=new Map(conversations.map(x=>[x.id,x]));
+  const latestIds=new Set<string>();
+  for(const row of latest.data){
+   const original=selected.get(row.id);
+   if(!original||latestIds.has(row.id)||!vendorIds.has(row.subject_id)||
+      row.revision!==original.revision||row.state!==original.state||
+      row.human_takeover!==false||!["RIYA","ANISHA","AAROHI"].includes(row.assigned_actor))
+    return denied("CONVERSATION_CHANGED_DURING_READ",409);
+   latestIds.add(row.id);
+  }
+  // Staff authority is checked LAST, after all current conversation and
+  // location reads; this selection is never sufficient to authorize a write.
   const fresh=await getVerifiedScopedStaff(request.headers.get("authorization"));
   if(!fresh||fresh.userId!==scope.userId||fresh.role!=="operations_manager"||
      fresh.teamId!==scope.teamId||fresh.cityId!==scope.cityId||

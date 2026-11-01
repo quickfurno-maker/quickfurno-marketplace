@@ -27,7 +27,8 @@ const env=["VOX_STAFF_READ_ENABLED","VOX_RC42_CORE_CONVERSATION_OPERATOR_ENABLED
  "VOX_STAFF_GRANTS_ENABLED","VOX_DEPARTMENT_ENFORCEMENT_ENABLED"];
 const flags=on=>env.forEach(k=>on?process.env[k]="staging":delete process.env[k]);
 const state={auth:0,scope:null,db:null,queries:[],rows:{},revokeDuringRead:false,
- deactivateZoneDuringRead:false,rezoneVendorDuringRead:false};
+ deactivateZoneDuringRead:false,rezoneVendorDuringRead:false,
+ revisionChangedDuringRead:false};
 globalThis.__rc50=state;
 const q=(table)=>{
  const ops=[];state.queries.push({table,ops});
@@ -38,6 +39,9 @@ const q=(table)=>{
   order:(...args)=>{ops.push(["order",...args]);return chain;},
   limit:(...args)=>{ops.push(["limit",...args]);return chain;},
   then:(resolve,reject)=>{
+   if(table==="vendors"&&state.revisionChangedDuringRead&&
+      state.queries.filter(x=>x.table==="vendors").length===2)
+    state.rows.communication_conversations=state.rows.communication_conversations.map(row=>({...row,revision:5}));
    if(table==="communication_conversations"&&state.revokeDuringRead)state.scope=null;
    if(table==="communication_conversations"&&state.deactivateZoneDuringRead)
     state.rows.marketplace_service_zones=[{id:zone,city_id:city,is_active:false}];
@@ -52,7 +56,7 @@ const baseScope={role:"operations_manager",canReadContent:true,cityId:city,teamI
 function reset(){
  flags(true);state.auth=0;state.queries=[];state.scope={...baseScope};
  state.revokeDuringRead=false;state.deactivateZoneDuringRead=false;
- state.rezoneVendorDuringRead=false;
+ state.rezoneVendorDuringRead=false;state.revisionChangedDuringRead=false;
  state.db={from:q};
  state.rows={vendors:[{id:vendor,service_zone_id:zone}],
   marketplace_service_zones:[{id:zone,city_id:city,is_active:true}],
@@ -111,6 +115,13 @@ test("zone deactivation or vendor re-zone during async read fails closed",async(
  reset();state.rezoneVendorDuringRead=true;
  const moved=await api.GET(req());
  assert.equal(moved.status,403);
+ assert.equal(state.auth,1);
+});
+test("current conversation revision changing during zone read invalidates stale hint",async()=>{
+ reset();state.revisionChangedDuringRead=true;
+ const res=await api.GET(req());
+ assert.equal(res.status,409);
+ assert.equal((await res.json()).error,"CONVERSATION_CHANGED_DURING_READ");
  assert.equal(state.auth,1);
 });
 test("PAUSED conversation allows only human takeover in selection hint",async()=>{

@@ -23,7 +23,8 @@ await build({entryPoints:[resolve(root,"services/badLeadRecoveryService.ts")],ou
    "export function ok(data){return {ok:true,data};} export function fail(e){return {ok:false,code:'UNAVAILABLE',error:String(e)};}"
   }));
  }}]});
-const {applyBadLeadRecovery:apply,recommendBadLeadRecovery:recommend}=await import(pathToFileURL(out).href);
+const {applyBadLeadRecovery:apply,recommendBadLeadRecovery:recommend,
+ generateBadLeadRecoveryRecommendation:generate}=await import(pathToFileURL(out).href);
 test("production source cannot activate lead credit via env alone",()=>{
  const src=readFileSync(resolve(root,"services/badLeadRecoveryService.ts"),"utf8");
  assert.match(src,/RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=false as const/);
@@ -124,6 +125,16 @@ test("advisory recommendation cannot masquerade as a payout or lead grant",async
 test("unverified actor ID blocked before all grant calls",async()=>{
  before();process.env[gate]="staging";
  assert.equal((await apply(REPORT,"restore_credit","forged-actor")).ok,false);
+ assert.equal(calls.length,0);
+});
+test("malformed report ID cannot reach recommendation or credit lookup",async()=>{
+ before();
+ for(const bad of ["","../other","not-uuid",null]){
+  const recommendResult=await recommend(bad,"restore_credit");
+  const generateResult=await generate(bad);
+  assert.equal(recommendResult.code,"VALIDATION");
+  assert.equal(generateResult.code,"VALIDATION");
+ }
  assert.equal(calls.length,0);
 });
 test("recommendation refuses legacy direct replacement before database",async()=>{

@@ -24,6 +24,7 @@ const policyDenied=<T>()=>blocked<T>("BAD_LEAD_CREDIT_ONLY_POLICY",
 export async function recommendBadLeadRecovery(
  reportId:string,recommendation:"none"|Exclude<BadLeadRecoveryAction,"reject">
 ):Promise<Result<{reportId:string;recommendation:string}>>{
+ if(!UUID.test(reportId||""))return blocked("VALIDATION","Valid bad-lead report is required.");
  if(recommendation!=="none"&&recommendation!=="restore_credit")return policyDenied();
  try{
   const {data,error}=await adminClient().rpc("qf_recommend_bad_lead_recovery_v1",{
@@ -45,6 +46,7 @@ export async function recommendBadLeadRecovery(
 export async function generateBadLeadRecoveryRecommendation(
  reportId:string
 ):Promise<Result<{reportId:string;recommendation:string}>>{
+ if(!UUID.test(reportId||""))return blocked("VALIDATION","Valid bad-lead report is required.");
  try{
   const {data,error}=await adminClient().from("bad_lead_reports")
    .select("reason_code,report_type").eq("id",reportId).maybeSingle();

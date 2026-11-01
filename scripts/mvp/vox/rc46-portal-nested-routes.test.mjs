@@ -25,7 +25,9 @@ test("flat endpoints, duplicates and URL queries still resolve canonically",()=>
 test("real Web Core adapter references only installed exact route path",()=>{
  const src=readFileSync(join(root,"apps/vox-web/lib/conversationControl.ts"),"utf8");
  const refs=extractPortalCorePaths(src);
- assert.deepEqual(refs,["core/conversation-operator"]);
+ assert.deepEqual(refs,["core/conversation-candidates","core/conversation-operator"]);
+ // The new read-only scoped discovery endpoint is checked just as strictly
+ // as the original atomic writer: every referenced Core route must exist.
  for(const path of refs)assert.equal(portalCoreHandlerExists(join(root,"app/api/vox/v1"),path),true);
 });
 

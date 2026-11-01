@@ -47,10 +47,19 @@ BEGIN
  IF a.lifecycle_status NOT IN ('assigned','delivered','accepted','invalid') THEN
   RETURN jsonb_build_object('status','rejected','reason_code','assignment_not_recoverable');
  END IF;
+ -- An original assignment can have a PREEXISTING approved restoration under
+ -- another evidence type (manual admin request/reconciliation). That also
+ -- consumed its one legitimate compensation: never restore an extra LEAD
+ -- credit merely because the record was not named bad_lead_report.
  SELECT * INTO prior FROM public.credit_restoration_approvals
- WHERE original_assignment_id=a.id AND evidence_type='bad_lead_report'
-  AND status IN ('requested','approved','applied') FOR UPDATE;
+ WHERE original_assignment_id=a.id
+  AND status IN ('requested','approved','applied')
+ ORDER BY id LIMIT 1 FOR UPDATE;
  IF FOUND THEN
+  IF prior.evidence_type<>'bad_lead_report' THEN
+   RETURN jsonb_build_object('status','rejected',
+    'reason_code','existing_other_restoration_requires_review');
+  END IF;
   IF prior.status='applied' AND prior.restoration_ledger_id IS NOT NULL THEN
    RETURN jsonb_build_object('status','already_applied','original_assignment_id',a.id,
     'lead_credits_restored',0,'credit_restoration_approval_id',prior.id,

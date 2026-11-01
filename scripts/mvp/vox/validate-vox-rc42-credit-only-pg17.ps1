@@ -112,6 +112,18 @@ CREATE UNIQUE INDEX rc44_credit_ref_unique ON public.vendor_credit_logs(referenc
   }
   Assert ((Sql "select count(*) from public.credit_restoration_approvals where status='applied';") -eq '2') 'one canonical approval per original assignment after overlap'
  }finally { $jobs|Remove-Job -Force -ErrorAction SilentlyContinue }
+ # A restoration previously applied via admin_request must also consume
+ # the original assignment's single eligible lead-credit remedy. Testing an
+ # unrelated evidence_type prevents silently granting a second credit.
+ $assignment3='99999999-9999-4999-8999-999999999999'
+ $report3='cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+ $prior3='dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+ $ledger3='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
+ [void](Sql "insert into public.lead_assignments values ('$assignment3','$vendor','$lead',true,'delivered'); insert into public.bad_lead_reports (id,vendor_id,lead_assignment_id,status,reason_code,recovery_status) values ('$report3','$vendor','$assignment3','Approved','bad_lead_validated','recommended'); insert into public.credit_restoration_approvals(id,original_assignment_id,vendor_id,lead_id,evidence_type,evidence_reference,reason_code,requested_by,status,approved_by,idempotency_key,restoration_ledger_id) values ('$prior3','$assignment3','$vendor','$lead','admin_request','historical-owner-review','historical_credit','$actor','applied','$actor','historical-compensation:$assignment3','$ledger3');")
+ $third=(Sql "select public.qf_vox_rc42_bad_lead_credit_only_atomic_candidate_v1('$report3','$actor');")|ConvertFrom-Json
+ Assert ($third.status -eq 'rejected' -and $third.reason_code -eq 'existing_other_restoration_requires_review') 'historical OTHER evidence-type restoration blocks second LEAD credit'
+ Assert ((Sql $wallet) -eq '12') 'cross-evidence double-credit attempt leaves real wallet unchanged'
+ Assert ((Sql "select count(*) from public.credit_restoration_approvals where original_assignment_id='$assignment3';") -eq '1') 'cross-evidence attempt cannot create a second approval'
  if($UseCanonicalCreditAuthority){Write-Output 'VOX_RC44_CANONICAL_CREDIT_PG17_DISPOSABLE_PASS'}
  else {Write-Output 'VOX_RC42_CREDIT_ONLY_PG17_DISPOSABLE_PASS'}
 }finally{

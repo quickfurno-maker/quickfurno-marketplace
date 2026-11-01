@@ -15,7 +15,9 @@ on:
       - 'scripts/mvp/vox/rc52-*.test.mjs'
       - 'scripts/mvp/vox/rc52-*.mjs'
       - 'scripts/mvp/vox/rc53-*.test.mjs'
+      - 'scripts/mvp/vox/rc54-*.test.mjs'
       - 'docs/vox/VOX-RC53-*'
+      - 'docs/vox/VOX-RC54-*'
       - 'docs/vox/VOX-RC52-*'
       - 'scripts/mvp/vox/rc50-staging-sql-handoff.mjs'
       - 'scripts/mvp/vox/rc47-managed-recovery-handoff.mjs'
@@ -78,8 +80,8 @@ jobs:
         run: node --test scripts/mvp/vox/rc51-finance-operator-ui.test.mjs
       - name: RC52 private original SQL read-only synthetic integrity regression
         run: node --test scripts/mvp/vox/rc52-private-managed-sql-assessment.test.mjs
-      - name: RC53 ensure operational proof jobs and protected feature holds cannot silently disappear
-        run: node --test scripts/mvp/vox/rc53-ci-coverage.test.mjs
+      - name: RC53 and RC54 operational proof jobs and protected feature holds cannot silently disappear
+        run: node --test scripts/mvp/vox/rc53-ci-coverage.test.mjs scripts/mvp/vox/rc54-ci-coverage.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

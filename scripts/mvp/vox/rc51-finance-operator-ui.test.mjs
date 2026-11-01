@@ -19,6 +19,14 @@ test("same-report UI submissions are serialized and release the guard even after
  assert.match(ui,/recoveryPending\.current\.add\(report\.id\)/);
  assert.match(ui,/finally\{recoveryPending\.current\.delete\(report\.id\);\}/);
 });
+test("ambiguous credit RPCs remain locked against another in-session submission",()=>{
+ assert.match(ui,/recoveryNeedsReview=useRef\(new Set<string>\(\)\)/);
+ assert.match(ui,/recoveryNeedsReview.current.has\(report.id\)/);
+ assert.match(ui,/result.code==="CREDIT_OUTCOME_UNKNOWN"/);
+ assert.match(ui,/recoveryNeedsReview.current.add\(report.id\)/);
+ assert.match(ui,/Reconcile its original assignment and canonical ledger before ANY repeat grant/);
+ assert.match(ui,/finally\{recoveryPending.current.delete\(report.id\);\}/);
+});
 test("missing canonical receipt never surfaces as a confirmed credit restoration",()=>{
  assert.match(ui,/Canonical credit receipt unavailable\. Verify the ledger before retrying/);
  assert.match(ui,/data\.creditRestorationApprovalId&&data\.originalAssignmentId/);

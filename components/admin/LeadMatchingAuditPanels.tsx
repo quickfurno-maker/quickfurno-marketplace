@@ -443,6 +443,9 @@ export function BadLeadReportsReviewPanel({
   const [statusFilter, setStatusFilter] = useState("All");
   const [recoveryReceipt,setRecoveryReceipt]=useState<string|null>(null);
   const recoveryPending=useRef(new Set<string>());
+  // A missing credit receipt cannot prove that the canonical ledger was
+  // untouched. Do not offer another credit decision on this report in-session.
+  const recoveryNeedsReview=useRef(new Set<string>());
   const commentsByReport = useMemo(() => {
     const map = new Map<string, BadLeadReportComment[]>();
     (data.badLeadReportComments ?? []).forEach((comment) => {
@@ -492,6 +495,10 @@ export function BadLeadReportsReviewPanel({
       restore_credit: "return exactly 1 LEAD credit (no money refund or automatic replacement)",
       reject: "reject recovery",
     };
+    if(recoveryNeedsReview.current.has(report.id)){
+      notify("Credit outcome UNKNOWN. Verify the original assignment and canonical ledger with a reviewer before another decision.","error");
+      return;
+    }
     if(recoveryPending.current.has(report.id)){
       notify("This report already has a pending decision. Verify its canonical receipt before trying again.","info");
       return;
@@ -502,6 +509,12 @@ export function BadLeadReportsReviewPanel({
     runAction("Recovery decision applied",async()=>{
       try{
       const result=await adminApplyBadLeadRecovery(report.id,action);
+      if(!result.ok&&action==="restore_credit"&&result.code==="CREDIT_OUTCOME_UNKNOWN"){
+        recoveryNeedsReview.current.add(report.id);
+        setRecoveryReceipt("Credit outcome UNKNOWN for report "+report.id+
+          ". Reconcile its original assignment and canonical ledger before ANY repeat grant.");
+        return result;
+      }
       if(result.ok&&action==="restore_credit"){
         const data=result.data;
         if(data.restorationStatus==="applied"&&data.leadCreditsRestored===1&&
@@ -513,11 +526,18 @@ export function BadLeadReportsReviewPanel({
           setRecoveryReceipt("Previously approved credit restoration. 0 additional credits. Approval "+
             data.creditRestorationApprovalId+".");
         else {
+          recoveryNeedsReview.current.add(report.id);
           setRecoveryReceipt("Receipt not verified. Check the canonical assignment ledger before any retry.");
           return {ok:false,error:"Canonical credit receipt unavailable. Verify the ledger before retrying."};
         }
       }else if(result.ok&&action==="reject")setRecoveryReceipt("Recovery rejected. No LEAD credit or money granted.");
       return result;
+      }catch(error){
+        if(action!=="restore_credit")throw error;
+        recoveryNeedsReview.current.add(report.id);
+        setRecoveryReceipt("Credit RPC response lost. Original assignment must be reconciled before another attempt.");
+        return {ok:false,code:"CREDIT_OUTCOME_UNKNOWN",
+          error:"Credit result uncertain. Check canonical ledger before retrying."};
       }finally{recoveryPending.current.delete(report.id);}
     });
   }

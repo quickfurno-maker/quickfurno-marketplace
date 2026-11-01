@@ -71,6 +71,17 @@ export function createRc42AtomicConversationHandler(deps:Deps){
       typeof row.receipt_sha256!=="string"||!/^[a-f0-9]{64}$/.test(row.receipt_sha256)||
       row.consent_scope!=="transactional")
     return status("ATOMIC_RECEIPT_INVALID",503);
+   // SQL may have committed while the request was in flight. Never claim
+   // operator authority is still current unless live GoTrue + Staff scope
+   // verifies again after the atomic receipt. This is NOT a rollback claim.
+   let current:Rc42Actor|null;
+   try{current=await deps.verify(b);}
+   catch{return status("STAFF_AUTH_RECHECK_UNAVAILABLE",503);}
+   if(!current||current.aal!=="aal2"||current.userId!==actor.userId||
+      current.teamId!==actor.teamId||current.cityId!==actor.cityId||
+      !Number.isSafeInteger(current.expiresAtMs)||
+      current.expiresAtMs<=(deps.now??Date.now)())
+    return status("STAFF_SCOPE_REVOKED_DURING_RPC",403);
    return send({ok:true,state:row.state,action:row.action,nonce:row.nonce,
     conversationId:row.conversation_id,previousRevision:row.previous_revision,
     newRevision:row.new_revision,replayed:row.replayed,receiptSha256:row.receipt_sha256,

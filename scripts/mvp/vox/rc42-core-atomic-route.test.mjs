@@ -68,6 +68,25 @@ test("AAL2 expiry during atomic SQL read does not certify the returned receipt",
  assert.equal(body.providerMessagesSent,0);
  assert.equal(body.committed,false);
 });
+test("post-RPC current Staff scope must still match the verified original actor",async()=>{
+ for(const stale of [null,{...actor,aal:"aal1"},
+  {...actor,userId:C},{...actor,teamId:C},{...actor,cityId:C},
+  {...actor,expiresAtMs:0}]){
+  let checks=0;
+  const d=deps({verify:async()=>++checks===1?actor:stale});
+  const r=await create(d)(request());
+  assert.equal(r.status,403);assert.equal(d.calls.length,1);
+  assert.equal(checks,2);
+  assert.equal((await r.json()).error,"STAFF_SCOPE_REVOKED_DURING_RPC");
+ }
+});
+test("post-RPC independent Auth failure never certifies an atomic receipt",async()=>{
+ let checks=0;
+ const d=deps({verify:async()=>{if(++checks===2)throw Error("auth unavailable");return actor;}});
+ const r=await create(d)(request());
+ assert.equal(r.status,503);assert.equal(d.calls.length,1);assert.equal(checks,2);
+ assert.equal((await r.json()).error,"STAFF_AUTH_RECHECK_UNAVAILABLE");
+});
 test("wrong nonce, revision, missing receipt or provider messages never certify",async()=>{
  for(const altered of [{...receipt,nonce:U},{...receipt,new_revision:7},
   {...receipt,provider_messages_sent:1},{...receipt,receipt_sha256:"b"},

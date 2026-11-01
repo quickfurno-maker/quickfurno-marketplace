@@ -12,6 +12,26 @@ END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS vox_rc42_bad_lead_once_per_original_assignment
  ON public.credit_restoration_approvals(original_assignment_id)
  WHERE evidence_type='bad_lead_report' AND status IN ('requested','approved','applied');
+-- RC56 review-only broader constraint: all evidence types share the SAME
+-- original consumed assignment. The narrower RC42 index would not prevent
+-- a separate manual/reconciliation flow from granting a second remedy.
+-- Refuse activation if historical active duplicates exist; do not clean,
+-- overwrite, merge or silently pick a winning credit restoration.
+DO $$
+BEGIN
+ IF EXISTS(
+  SELECT original_assignment_id FROM public.credit_restoration_approvals
+  WHERE original_assignment_id IS NOT NULL
+    AND status IN ('requested','approved','applied')
+  GROUP BY original_assignment_id HAVING count(*)>1
+ ) THEN
+  RAISE EXCEPTION 'RC56_CROSS_EVIDENCE_RESTORATION_COLLISION_REVIEW_REQUIRED';
+ END IF;
+END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS vox_rc56_all_evidence_once_per_original_assignment
+ ON public.credit_restoration_approvals(original_assignment_id)
+ WHERE original_assignment_id IS NOT NULL
+  AND status IN ('requested','approved','applied');
 CREATE OR REPLACE FUNCTION public.qf_vox_rc42_bad_lead_credit_only_atomic_candidate_v1(
  p_report_id uuid,p_actor_id uuid
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER

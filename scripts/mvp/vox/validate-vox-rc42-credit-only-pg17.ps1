@@ -79,7 +79,8 @@ CREATE UNIQUE INDEX rc44_credit_ref_unique ON public.vendor_credit_logs(referenc
   RunFile $tempSql 'rc44-real-canonical.sql'
  }
  RunFile $candidate "rc42-candidate.sql"
- Assert ((Sql "select count(*) from pg_indexes where indexname='vox_rc42_bad_lead_once_per_original_assignment';") -eq '1') 'assignment-wide unique credit guard in disposable PG17'
+ Assert ((Sql "select count(*) from pg_indexes where indexname='vox_rc42_bad_lead_once_per_original_assignment';") -eq '1') 'bad-lead scoped unique credit guard in disposable PG17'
+ Assert ((Sql "select count(*) from pg_indexes where indexname='vox_rc56_all_evidence_once_per_original_assignment';") -eq '1') 'cross-evidence assignment-wide unique index exists in disposable PG17'
  $call1="select public.qf_vox_rc42_bad_lead_credit_only_atomic_candidate_v1('$report1','$actor');"
  $call2="select public.qf_vox_rc42_bad_lead_credit_only_atomic_candidate_v1('$report2','$actor');"
  $r1=(Sql $call1)|ConvertFrom-Json
@@ -141,6 +142,15 @@ CREATE UNIQUE INDEX rc44_credit_ref_unique ON public.vendor_credit_logs(referenc
  Assert ($third.status -eq 'rejected' -and $third.reason_code -eq 'existing_other_restoration_requires_review') 'historical OTHER evidence-type restoration blocks second LEAD credit'
  Assert ((Sql $wallet) -eq '12') 'cross-evidence double-credit attempt leaves real wallet unchanged'
  Assert ((Sql "select count(*) from public.credit_restoration_approvals where original_assignment_id='$assignment3';") -eq '1') 'cross-evidence attempt cannot create a second approval'
+ # Verify the NEW RC56 index really forbids another active approval from any
+ # evidence type, even when inserted outside the guarded bad-lead RPC.
+ $duplicateId='ffffffff-ffff-4fff-8fff-ffffffffffff'
+ $duplicateError=$null
+ try{
+  [void](Sql "insert into public.credit_restoration_approvals(id,original_assignment_id,vendor_id,lead_id,evidence_type,evidence_reference,reason_code,requested_by,status,approved_by,idempotency_key) values ('$duplicateId','$assignment3','$vendor','$lead','manual_reconciliation','additional','other','$actor','requested','$actor','duplicate-compensation:$assignment3');")
+ }catch{$duplicateError=$_.Exception.Message}
+ Assert ($duplicateError -match 'vox_rc56_all_evidence_once_per_original_assignment') 'cross-evidence unique index blocks direct competing approval in actual PG17'
+ Assert ((Sql "select count(*) from public.credit_restoration_approvals where original_assignment_id='$assignment3';") -eq '1') 'cross-evidence violating insert rolls back without touching prior restoration'
  if($UseCanonicalCreditAuthority){Write-Output 'VOX_RC44_CANONICAL_CREDIT_PG17_DISPOSABLE_PASS'}
  else {Write-Output 'VOX_RC42_CREDIT_ONLY_PG17_DISPOSABLE_PASS'}
 }finally{

@@ -9,6 +9,7 @@ on:
       - 'scripts/mvp/vox/rc44-*.test.mjs'
       - 'scripts/mvp/vox/rc45-*.test.mjs'
       - 'scripts/mvp/vox/rc47-*.test.mjs'
+      - 'scripts/mvp/vox/rc48-*.test.mjs'
       - 'scripts/mvp/vox/rc47-managed-recovery-handoff.mjs'
       - 'apps/vox-web/app/api/conversation-control/**'
       - 'apps/vox-web/lib/conversationControl.ts'
@@ -57,6 +58,8 @@ jobs:
         run: node --test scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-policy.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-service.test.mjs scripts/mvp/vox/rc42-eod-atomic-data-api-review.test.mjs scripts/mvp/vox/rc43-core-route-integration.test.mjs scripts/mvp/vox/rc43-eod-route-integration.test.mjs scripts/mvp/vox/rc43-bad-lead-owner-aal2-review.test.mjs scripts/mvp/vox/rc44-eod-dedicated-reader.test.mjs scripts/mvp/vox/rc45-legacy-bad-lead-credit-bypass.test.mjs
       - name: RC47 actual EOD transport and fail-closed managed recovery handoff
         run: node --test scripts/mvp/vox/rc47-eod-actual-supabase-transport.test.mjs scripts/mvp/vox/rc47-managed-recovery-handoff.test.mjs
+      - name: RC48 real Web to native Core two-hop integration, hard-off verification
+        run: node --test scripts/mvp/vox/rc48-core-real-two-hop.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

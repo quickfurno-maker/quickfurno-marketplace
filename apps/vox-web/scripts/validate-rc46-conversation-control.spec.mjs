@@ -17,12 +17,16 @@ const flags=["VOX_STAFF_PORTAL_ENABLED","VOX_TEAM_WORKSPACE_ENABLED",
  "VOX_STAFF_GRANTS_ENABLED","VOX_RC42_CORE_CONVERSATION_OPERATOR_ENABLED",
  "VOX_DEPARTMENT_ENFORCEMENT_ENABLED"];
 const state={allowed:true,token:"mock-staff-aal2",origin:"https://staging-core.quickfurno.in",
- auth:0,calls:[],status:200,receipt:{...original}};
+ auth:0,calls:[],status:200,receipt:{...original},
+ discovery:{ok:true,schema:"qf.vox.conversation.candidates.v1",mode:"READ_ONLY",
+ actionsEnabled:false,conversations:[{id:C,revision:2,state:"OPEN",
+ allowedActions:["PAUSE_AI","TAKEOVER"]}]}};
 const env={};
 const ctx=vm.createContext({Request,Response,URL,AbortSignal,
  process:{env},fetch:async(url,options)=>{
   state.calls.push({url,options});
-  return Response.json(state.receipt,{status:state.status});
+  return Response.json(String(url).endsWith("/conversation-candidates")?
+    state.discovery:state.receipt,{status:state.status});
  }});
 async function load(path,imports){
  const source=readFileSync(resolve(app,path),"utf8");
@@ -51,6 +55,10 @@ const api=await load("app/api/conversation-control/route.ts",{
  "../../../lib/conversationControl":{
   submitConversationControl:adapter.submitConversationControl
  }
+});
+const discovery=await load("app/api/conversation-candidates/route.ts",{
+ "../../../lib/auth":{safeJson:(value,status)=>Response.json(value,{status})},
+ "../../../lib/conversationControl":{fetchConversationCandidates:adapter.fetchConversationCandidates}
 });
 const gate=(on)=>{for(const flag of flags)on?env[flag]="staging":delete env[flag];
  env.VOX_STAFF_VIEW_MODE="scoped";};
@@ -131,6 +139,29 @@ test("nonce replay proves zero outbound sends without forging a new commit",asyn
  const reply=await result.json();
  assert.equal(reply.replayed,true);assert.equal(reply.providerMessagesSent,0);
  assert.equal(reply.newRevision,3);
+});
+test("authorized bounded Core conversation hints are read-only and strict",async()=>{
+ reset();
+ const r=await discovery.GET(new Request("https://localhost/api/conversation-candidates"));
+ assert.equal(r.status,200);
+ const body=await r.json();assert.equal(body.actionsEnabled,false);
+ assert.deepEqual(body.conversations[0],{id:C,revision:2,state:"OPEN",
+  allowedActions:["PAUSE_AI","TAKEOVER"]});
+ assert.equal(state.calls.length,1);
+ assert.match(state.calls[0].url,/\/core\/conversation-candidates$/);
+ for(const method of ["POST","PUT","PATCH","DELETE"])
+  assert.equal(discovery[method]().status,405);
+});
+test("forged candidate lists, unscoped calls and filters do not expose list",async()=>{
+ reset();
+ state.discovery={...state.discovery,actionsEnabled:true};
+ assert.equal((await discovery.GET(new Request("https://localhost/api/conversation-candidates"))).status,503);
+ state.discovery={...state.discovery,actionsEnabled:false,conversations:[{id:C,revision:2,state:"PAUSED",
+  allowedActions:["PAUSE_AI","TAKEOVER"]}]};
+ assert.equal((await discovery.GET(new Request("https://localhost/api/conversation-candidates"))).status,503);
+ state.token=null;
+ assert.equal((await discovery.GET(new Request("https://localhost/api/conversation-candidates"))).status,401);
+ assert.equal((await discovery.GET(new Request("https://localhost/api/conversation-candidates?anything=1"))).status,400);
 });
 test("Staff form preserves nonce across ambiguous retries, no provider send",()=>{
  const source=readFileSync(resolve(app,

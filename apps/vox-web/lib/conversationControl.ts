@@ -62,3 +62,54 @@ export async function submitConversationControl(cmd:ConversationCommand){
    receiptSha256:r.receiptSha256,nonce:cmd.nonce} as const;
  }catch{return {ok:false,status:503,error:"CORE_CONVERSATION_UNAVAILABLE"} as const;}
 }
+
+export type ConversationCandidate={id:string;revision:number;state:"OPEN"|"PAUSED";
+ allowedActions:Array<"PAUSE_AI"|"TAKEOVER">};
+/** Read-only Core-scoped selector. Never claims this is an authorization to
+ * execute; the atomic Core write rechecks all live grants and revision.
+ */
+export async function fetchConversationCandidates(){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_TEAM_WORKSPACE_ENABLED!=="staging"||
+    process.env.VOX_STAFF_GRANTS_ENABLED!=="staging"||
+    process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED!=="staging"||
+    process.env.VOX_RC42_CORE_CONVERSATION_OPERATOR_ENABLED!=="staging"||
+    !["scoped","dual"].includes(String(process.env.VOX_STAFF_VIEW_MODE)))return off();
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"STAFF_MFA_REQUIRED"} as const;
+ const base=origin();
+ if(!base)return {ok:false,status:503,error:"CORE_ORIGIN_UNVERIFIED"} as const;
+ try{
+  const response=await fetch(base+"/api/vox/v1/core/conversation-candidates",{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!response.ok)return {ok:false,status:response.status===403?403:503,
+   error:"CORE_CONVERSATION_DISCOVERY_DENIED"} as const;
+  const raw:unknown=await response.json();
+  if(!raw||typeof raw!=="object"||Array.isArray(raw))
+   return {ok:false,status:503,error:"UNTRUSTED_CONVERSATION_LIST"} as const;
+  const v=raw as Record<string,unknown>;
+  if(v.ok!==true||v.schema!=="qf.vox.conversation.candidates.v1"||
+     v.mode!=="READ_ONLY"||v.actionsEnabled!==false||
+     !Array.isArray(v.conversations)||v.conversations.length>20)
+   return {ok:false,status:503,error:"UNTRUSTED_CONVERSATION_LIST"} as const;
+  const seen=new Set<string>(),conversations:ConversationCandidate[]=[];
+  for(const item of v.conversations){
+   if(!item||typeof item!=="object"||Array.isArray(item))
+    return {ok:false,status:503,error:"UNTRUSTED_CONVERSATION_LIST"} as const;
+   const x=item as Record<string,unknown>;
+   const actions=x.state==="OPEN"?["PAUSE_AI","TAKEOVER"]:["TAKEOVER"];
+   if(Object.keys(x).sort().join("|")!=="allowedActions|id|revision|state"||
+      typeof x.id!=="string"||!UUID.test(x.id)||seen.has(x.id)||
+      (x.state!=="OPEN"&&x.state!=="PAUSED")||
+      !Number.isSafeInteger(x.revision)||(x.revision as number)<0||
+      (x.revision as number)>2147483646||
+      !Array.isArray(x.allowedActions)||x.allowedActions.join("|")!==actions.join("|"))
+    return {ok:false,status:503,error:"UNTRUSTED_CONVERSATION_LIST"} as const;
+   seen.add(x.id);conversations.push({id:x.id,revision:x.revision as number,
+    state:x.state as "OPEN"|"PAUSED",allowedActions:actions as Array<"PAUSE_AI"|"TAKEOVER">});
+  }
+  return {ok:true,status:200,mode:"READ_ONLY" as const,
+   actionsEnabled:false as const,conversations} as const;
+ }catch{return {ok:false,status:503,error:"CONVERSATION_DISCOVERY_UNAVAILABLE"} as const;}
+}

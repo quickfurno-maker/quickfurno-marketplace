@@ -1,5 +1,5 @@
 "use client";
-import {useRef,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import Link from "next/link";
 import {withReturn} from "../../../lib/returnTo.mjs";
 type Action="PAUSE_AI"|"TAKEOVER";
@@ -10,6 +10,29 @@ export default function ConversationControl(){
  const [action,setAction]=useState<Action>("PAUSE_AI");
  const [busy,setBusy]=useState(false),[message,setMessage]=useState("");
  const [expired,setExpired]=useState(false);
+ const [choices,setChoices]=useState<Array<{id:string;revision:number;state:"OPEN"|"PAUSED";allowedActions:string[]}>>([]);
+ const [choicesError,setChoicesError]=useState("");
+ useEffect(()=>{
+  const controller=new AbortController();
+  (async()=>{
+   try{
+    const response=await fetch("/api/conversation-candidates",{credentials:"same-origin",
+     cache:"no-store",signal:controller.signal});
+    if(!response.ok){if(!controller.signal.aborted)setChoicesError("Assigned conversations unavailable; use a Core-authorized ID and revision.");return;}
+    const data:unknown=await response.json();
+    if(!data||typeof data!=="object"||Array.isArray(data))return;
+    const result=data as Record<string,unknown>;
+    if(result.ok===true&&result.mode==="READ_ONLY"&&result.actionsEnabled===false&&
+       Array.isArray(result.conversations)&&result.conversations.length<=20)
+      if(!controller.signal.aborted)setChoices(result.conversations.filter((r:unknown)=>
+       !!r&&typeof r==="object"&&!Array.isArray(r)&&
+       "id" in r&&typeof r.id==="string"&&UUID.test(r.id)&&
+       "revision" in r&&Number.isSafeInteger(r.revision)&&
+       "state" in r&&(r.state==="OPEN"||r.state==="PAUSED")) as typeof choices);
+   }catch{if(!controller.signal.aborted)setChoicesError("Authorized conversation list unavailable.");}
+  })();
+  return ()=>controller.abort();
+ },[]);
  const pending=useRef<{command:string;nonce:string}|null>(null);
  const valid=UUID.test(conversationId.trim())&&/^\d{1,10}$/.test(revision)&&
   Number.isSafeInteger(Number(revision))&&Number(revision)<=2147483646;
@@ -59,6 +82,19 @@ export default function ConversationControl(){
   finally{setBusy(false);}
  }
  return <form className="voxWorkActionForm" onSubmit={submit}>
+  <label htmlFor="convo-choice">My Core-authorized conversations (read-only selection)</label>
+  <select id="convo-choice" disabled={busy} value={choices.some(x=>x.id===conversationId)?conversationId:""}
+   onChange={e=>{
+    const selected=choices.find(x=>x.id===e.target.value);if(!selected)return;
+    setConversationId(selected.id);setRevision(String(selected.revision));
+    if(selected.state==="PAUSED")setAction("TAKEOVER");
+    changed();
+   }}>
+   <option value="">Enter ID manually or choose an assigned conversation</option>
+   {choices.map(x=><option key={x.id} value={x.id}>{x.id.slice(0,8)} · {x.state} · revision {x.revision}</option>)}
+  </select>
+  {choicesError?<p role="status">{choicesError}</p>:null}
+  <p>Selection is only a current Core hint. Atomic authority rechecks Staff grants, consent and revision.</p>
   <label htmlFor="convo-id">Core-authorized conversation ID</label>
   <input id="convo-id" value={conversationId} maxLength={36}
    placeholder="Conversation UUID from your assigned Core record" disabled={busy}

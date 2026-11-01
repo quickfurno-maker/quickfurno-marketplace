@@ -355,7 +355,7 @@ GRANT SELECT,INSERT ON public.vox_rc41_core_conversation_operator_receipts_candi
  $jobs=1..6|%{Job "SET ROLE service_role; $(Call 48 300 0)"}
  $outs=$jobs|%{Receive-Job $_ -Wait};$jobs|Remove-Job
  $fresh=@($outs|?{$_ -match '\|f\|[0-9a-f]{64}\|0'}).Count;$replay=@($outs|?{$_ -match '\|t\|[0-9a-f]{64}\|0'}).Count
- $hashes=@($outs|%{([regex]::Match($_,'([0-9a-f]{64})')).Groups[1].Value}|sort -Unique).Count
+ $hashes=@($outs|%{([regex]::Match($_,'([0-9a-f]{64})')).Groups[1].Value}|Sort-Object -Unique).Count
  if($fresh -ne 1 -or $replay -ne 5 -or $hashes -ne 1){throw "RC41_SIX_WAY_SAME_NONCE fresh=$fresh replay=$replay hashes=$hashes :: $($outs -join ' // ')"}
  Write-Output 'PASS six same-nonce commands: 1 write, 5 replays, identical receipt'
 

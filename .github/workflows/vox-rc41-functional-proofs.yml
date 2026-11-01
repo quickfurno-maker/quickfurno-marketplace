@@ -62,6 +62,12 @@ jobs:
         with:
           node-version: '24'
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Pull isolated PostgreSQL 17 image (do not skip database execution)
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull postgres:17-alpine
+          docker image inspect postgres:17-alpine > /dev/null
       - name: Real Ed25519 + signed EOD single snapshot PostgREST-shaped RPC proof against isolated PG17
         shell: bash
         run: |

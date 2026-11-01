@@ -12,6 +12,7 @@ await build({entryPoints:[resolve(root,"services/vox/rc44DedicatedEodReviewReade
  plugins:[{name:"reader-transport",setup(b){
   b.onResolve({filter:/^server-only$/},()=>({path:"server-only",namespace:"test"}));
   b.onResolve({filter:/^@supabase\/supabase-js$/},()=>({path:"supabase",namespace:"test"}));
+  b.onResolve({filter:/^@supabase\/ssr$/},()=>({path:"ssr",namespace:"test"}));
   b.onLoad({filter:/.*/,namespace:"test"},a=>({loader:"js",contents:a.path==="supabase"?
    "export const createClient=(u,k,o)=>{globalThis.__rc44Create.push({u,k,o});return {rpc:(fn,args)=>globalThis.__rc44Rpc(fn,args)};}":""}));
  }}]});

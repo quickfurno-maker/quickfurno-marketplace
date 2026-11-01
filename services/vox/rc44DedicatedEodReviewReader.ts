@@ -1,5 +1,5 @@
 import "server-only";
-import {createClient,type SupabaseClient} from "@supabase/supabase-js";
+import {createVoxEodSnapshotReaderTransport} from "../../lib/supabase";
 import type {Rc41Rpc} from "./rc41SignedEodReviewSnapshot";
 
 // This is an explicit, execute-only PostgREST reader integration, not the
@@ -34,12 +34,9 @@ export function createRc44DedicatedEodReviewReader(input:Rc44ReaderInput):Rc41Rp
  const now=input.nowSeconds??Math.floor(Date.now()/1000);
  if(payload.role!==ROLE||typeof payload.exp!=="number"||!Number.isSafeInteger(payload.exp)||
     payload.exp<=now||payload.exp>now+3600||payload.aal!==undefined)return null;
- let client:SupabaseClient;
+ let transport:ReturnType<typeof createVoxEodSnapshotReaderTransport>;
  try{
-  client=createClient(url,key,{
-   auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
-   global:{headers:{Authorization:"Bearer "+bearer}}
-  });
+  transport=createVoxEodSnapshotReaderTransport({url,anonKey:key,bearer});
  }catch{return null;}
  return async (fn,args)=>{
   if(fn!=="qf_vox_rc41_signed_eod_review_snapshot_v1"||
@@ -48,7 +45,7 @@ export function createRc44DedicatedEodReviewReader(input:Rc44ReaderInput):Rc41Rp
   // Backend validates the signed PostgREST reader JWT. No service-role or
   // privileged fallback, no direct table read and no SQL or EOD mutations.
   try{
-   const {data,error}=await client.rpc(fn,{p_intent_id:args.p_intent_id,
+   const {data,error}=await transport(fn,{p_intent_id:args.p_intent_id,
     p_subject_id:args.p_subject_id});
    if(error)return {data:null,error:{message:"EOD_REVIEW_READER_RPC_UNAVAILABLE"}};
    return {data,error:null};

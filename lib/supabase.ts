@@ -73,3 +73,23 @@ export async function verifySupabaseBearerUser(token: string) {
     return null;
   }
 }
+
+/** RC45 approved persistence boundary for the dedicated, read-only EOD reviewer.
+ * The caller must independently validate role/expiry. This constructor NEVER
+ * derives credentials from service_role, adminClient or the user's session.
+ * PostgREST must validate the signed execute-only reader JWT at its boundary.
+ */
+export function createVoxEodSnapshotReaderTransport(
+  input: {url:string;anonKey:string;bearer:string},
+): (fn:"qf_vox_rc41_signed_eod_review_snapshot_v1",
+     args:{p_intent_id:string;p_subject_id:string})=>Promise<{data:unknown;error:unknown}> {
+  const client:SupabaseClient=createClient(input.url,input.anonKey,{
+    auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
+    global:{headers:{Authorization:"Bearer "+input.bearer}},
+  });
+  return async (fn,args)=>{
+    if(fn!=="qf_vox_rc41_signed_eod_review_snapshot_v1")
+      return {data:null,error:{message:"EOD_REVIEW_FUNCTION_DENIED"}};
+    return client.rpc(fn,args);
+  };
+}

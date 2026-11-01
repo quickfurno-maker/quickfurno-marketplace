@@ -44,6 +44,37 @@ try{
  $wrong=(Sql "select public.qf_vox_rc42_bad_lead_credit_only_atomic_candidate_v1('$report1','77777777-7777-4777-8777-777777777777');")|ConvertFrom-Json
  Assert ($wrong.reason_code -eq 'verified_owner_required') 'forged administrator denied'
  Assert ((Sql "select count(*) from public.credit_restoration_approvals where status='applied';") -eq '1') 'only one canonical approval'
+ # Prove ACTUAL overlapping PostgreSQL transactions on the same original assignment.
+ # Force first approved restoration to pause inside the inserting transaction;
+ # second report locks the same assignment and must wait/replay, not double credit.
+ $assignment2='88888888-8888-4888-8888-888888888888'
+ $a='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+ $b='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+ $vendor='22222222-2222-4222-8222-222222222222'
+ $lead='55555555-5555-4555-8555-555555555555'
+ $ins="insert into public.lead_assignments values ('$assignment2','$vendor','$lead',true,'delivered'); insert into public.bad_lead_reports (id,vendor_id,lead_assignment_id,status,reason_code,recovery_status) values ('$a','$vendor','$assignment2','Approved','bad_lead_validated','recommended'),('$b','$vendor','$assignment2','Approved','bad_lead_validated','recommended');"
+ [void](Sql $ins)
+ $slow="CREATE OR REPLACE FUNCTION public.rc42_disposable_delay_insert() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN PERFORM pg_sleep(0.6); RETURN NEW; END'; CREATE TRIGGER rc42_disposable_credit_overlap BEFORE INSERT ON public.credit_restoration_approvals FOR EACH ROW EXECUTE FUNCTION public.rc42_disposable_delay_insert();"
+ [void](Sql $slow)
+ $jobs=@()
+ foreach($id in @($a,$b)){
+  $query="select public.qf_vox_rc42_bad_lead_credit_only_atomic_candidate_v1('$id','$actor');"
+  $jobs+=Start-Job -ArgumentList $name,$query -ScriptBlock {
+   param($container,$sql)
+   $raw=& docker exec $container psql -X -U postgres -d postgres -A -t -v ON_ERROR_STOP=1 -c $sql 2>&1
+   if($LASTEXITCODE -ne 0){throw "PARALLEL_PG17_FAILED:$raw"}
+   return (($raw|Out-String).Trim())
+  }
+ }
+ try {
+  $jobs|Wait-Job -Timeout 25|Out-Null
+  Assert ((@($jobs|Where-Object State -eq 'Completed')).Count -eq 2) 'two overlapping credit restorations complete'
+  $results=@($jobs|Receive-Job | ForEach-Object {$_|ConvertFrom-Json})
+  Assert ((@($results|Where-Object status -eq 'applied')).Count -eq 1) 'exactly one transaction applied a second original assignment'
+  Assert ((@($results|Where-Object status -eq 'already_applied')).Count -eq 1) 'contending second report replayed with zero additional credit'
+  Assert ((Sql 'select lead_credits from public.credit_test_wallet;') -eq '12') 'true PostgreSQL overlap yields one extra credit, never two'
+  Assert ((Sql "select count(*) from public.credit_restoration_approvals where status='applied';") -eq '2') 'one canonical approval per original assignment after overlap'
+ }finally { $jobs|Remove-Job -Force -ErrorAction SilentlyContinue }
  Write-Output 'VOX_RC42_CREDIT_ONLY_PG17_DISPOSABLE_PASS'
 }finally{
  & docker rm -f $name 2>$null | Out-Null

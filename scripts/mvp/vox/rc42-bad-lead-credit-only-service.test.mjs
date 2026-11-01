@@ -1,0 +1,79 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {build} from "esbuild";
+import {mkdtempSync,rmSync} from "node:fs";
+import {tmpdir} from "node:os";
+import {resolve,join,dirname} from "node:path";
+import {fileURLToPath,pathToFileURL} from "node:url";
+const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
+const tmp=mkdtempSync(join(tmpdir(),"qf-vox-rc42-credit-"));
+const out=join(tmp,"credit-service.mjs");
+await build({entryPoints:[resolve(root,"services/badLeadRecoveryService.ts")],outfile:out,
+ bundle:true,platform:"node",format:"esm",target:"node24",logLevel:"silent",
+ plugins:[{name:"credit-service-stubs",setup(b){
+  b.onResolve({filter:/^\.\.\/lib\/supabase$/},()=>({path:"supabase",namespace:"fake"}));
+  b.onResolve({filter:/^\.\.\/lib\/errors$/},()=>({path:"errors",namespace:"fake"}));
+  b.onLoad({filter:/.*/,namespace:"fake"},a=>({loader:"js",contents:
+   a.path==="supabase"?"export function adminClient(){return globalThis.__rc42Db();}":
+   "export function ok(data){return {ok:true,data};} export function fail(e){return {ok:false,code:'UNAVAILABLE',error:String(e)};}"
+  }));
+ }}]});
+const {applyBadLeadRecovery:apply,recommendBadLeadRecovery:recommend}=await import(pathToFileURL(out).href);
+const REPORT="11111111-1111-4111-8111-111111111111",ACTOR="22222222-2222-4222-8222-222222222222";
+const gate="QF_VOX_BAD_LEAD_CREDIT_ONLY_ATOMIC_ENABLED";
+const calls=[];
+globalThis.__rc42Db=()=>({rpc:async(name,args)=>{calls.push({name,args});return {data:globalThis.__rc42Reply,error:null};}});
+const before=()=>{calls.length=0;delete process.env[gate];globalThis.__rc42Reply={
+ status:"applied",lead_credits_restored:1,cash_refunded_minor_units:0,
+ automatic_replacement_created:false};};
+test("default OFF cannot grant any credit or call database",async()=>{
+ before();const r=await apply(REPORT,"restore_credit",ACTOR);
+ assert.equal(r.ok,false);assert.equal(r.code,"CREDIT_ONLY_ATOMIC_NOT_APPROVED");
+ assert.equal(calls.length,0);
+});
+test("legacy direct replacement, double remedy and money actions denied even when gate ON",async()=>{
+ before();process.env[gate]="staging";
+ for(const action of ["replace","restore_credit_and_replace","cash_refund"]){
+  const r=await apply(REPORT,action,ACTOR);
+  assert.equal(r.ok,false);assert.equal(r.code,"BAD_LEAD_CREDIT_ONLY_POLICY");
+ }
+ assert.equal(calls.length,0);
+});
+test("authenticated upstream actor handoff reaches only assignment-atomic candidate",async()=>{
+ before();process.env[gate]="staging";
+ const r=await apply(REPORT,"restore_credit",ACTOR);assert.equal(r.ok,true);
+ assert.equal(r.data.replacementStatus,"not_requested");
+ assert.deepEqual(calls,[{name:"qf_vox_rc42_bad_lead_credit_only_atomic_candidate_v1",
+  args:{p_report_id:REPORT,p_actor_id:ACTOR}}]);
+});
+test("replay is zero additional lead credits; no direct money or replacement",async()=>{
+ before();process.env[gate]="staging";
+ globalThis.__rc42Reply={status:"already_applied",lead_credits_restored:0,cash_refunded_minor_units:0};
+ assert.equal((await apply(REPORT,"restore_credit",ACTOR)).ok,true);
+ assert.equal(calls.length,1);
+});
+test("money or extra credits in RPC response never claim successful restoration",async()=>{
+ before();process.env[gate]="staging";
+ for(const bad of [
+  {status:"applied",lead_credits_restored:2,cash_refunded_minor_units:0},
+  {status:"applied",lead_credits_restored:1,cash_refunded_minor_units:100},
+  {status:"applied",lead_credits_restored:1,cash_refunded_minor_units:0,automatic_replacement_created:true},
+  {status:"already_applied",lead_credits_restored:1,cash_refunded_minor_units:0},
+  {status:"rejected",reason_code:"human_approval_required"}
+ ]){
+  globalThis.__rc42Reply=bad;
+  const r=await apply(REPORT,"restore_credit",ACTOR);
+  assert.equal(r.ok,false);
+ }
+});
+test("unverified actor ID blocked before all grant calls",async()=>{
+ before();process.env[gate]="staging";
+ assert.equal((await apply(REPORT,"restore_credit","forged-actor")).ok,false);
+ assert.equal(calls.length,0);
+});
+test("recommendation refuses legacy direct replacement before database",async()=>{
+ before();assert.equal((await recommend(REPORT,"replace")).ok,false);
+ assert.equal((await recommend(REPORT,"restore_credit_and_replace")).ok,false);
+ assert.equal(calls.length,0);
+});
+process.on("exit",()=>{try{rmSync(tmp,{recursive:true,force:true});}catch{}});

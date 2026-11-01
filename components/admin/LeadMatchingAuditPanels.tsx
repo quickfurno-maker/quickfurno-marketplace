@@ -484,12 +484,10 @@ export function BadLeadReportsReviewPanel({
 
   function applyRecovery(
     report: BadReport,
-    action: "restore_credit" | "replace" | "restore_credit_and_replace" | "reject",
+    action: "restore_credit" | "reject",
   ) {
     const labels = {
-      restore_credit: "restore one credit",
-      replace: "approve a replacement match",
-      restore_credit_and_replace: "restore one credit and approve a replacement match",
+      restore_credit: "return exactly 1 LEAD credit (no money refund or automatic replacement)",
       reject: "reject recovery",
     };
     if (!window.confirm(`Confirm human recovery decision: ${labels[action]}? This uses Core's governed recovery authority.`)) return;
@@ -499,7 +497,7 @@ export function BadLeadReportsReviewPanel({
   return (
     <SectionCard
       title="Bad Lead Reports Review"
-      description="Human-governed recovery. Recommendations are advisory only; credit restoration and replacement require an explicit admin decision and use Core’s existing credit and assignment authorities."
+      description="Bad-lead compensation is always exactly 1 lead credit after human approval—never a cash refund, money wallet credit or automatic replacement. Atomic restoration remains blocked until reviewed Staging installation."
     >
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {uniqueOptions(["Pending", "Under Review", "Valid", "Invalid", "Resolved", "Rejected", ...data.badReports.map((report) => report.status)]).map((option) => (
@@ -606,9 +604,7 @@ export function BadLeadReportsReviewPanel({
                     onClick: () => updateStatus(report, status),
                   })),
                   { label: "Generate recovery recommendation", onClick: () => generateRecoveryRecommendation(report) },
-                  { label: "Restore one credit", onClick: () => applyRecovery(report, "restore_credit") },
-                  { label: "Restore credit + replace", onClick: () => applyRecovery(report, "restore_credit_and_replace") },
-                  { label: "Replace only", onClick: () => applyRecovery(report, "replace") },
+                  { label: "Return 1 lead credit (no money)", onClick: () => applyRecovery(report, "restore_credit") },
                   { label: "Reject recovery", onClick: () => applyRecovery(report, "reject") },
                   { label: "Add admin comment", onClick: () => addComment(report) },
                 ]}

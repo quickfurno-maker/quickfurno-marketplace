@@ -17,6 +17,8 @@ const files = {
   leadCard: read("components/vendor-dashboard-v2/leads/VendorLeadCard.tsx"),
   actions: read("app/actions.ts"),
   recoveryService: read("services/badLeadRecoveryService.ts"),
+  creditOnlyPolicy: read("lib/vox/creditOnlyBadLeadPolicy.mjs"),
+  creditOnlyCandidate: read("ops/vox/rc42-review-candidates/20261101020000_vox_rc42_bad_lead_credit_only_atomic_REVIEW_ONLY.sql"),
   recoveryAos: read("lib/aos/v2/badLeadRecoveryRecommendation.ts"),
   adminUi: read("components/admin/LeadMatchingAuditPanels.tsx"),
   vendorIntelligence: read("services/vendorIntelligenceService.ts"),
@@ -104,16 +106,16 @@ check("V4 DB recovery does not auto-select replacement vendors",
   !files.operatingMigration.includes("qf_assign_lead_vendors_v2"));
 check("V4 AOS recommendation is pure advisory", !/supabase|adminClient|fetch\(|executeCanonicalAssignment/.test(files.recoveryAos));
 check("V4 AOS recommendation never mutates recovery", files.recoveryAos.includes("cannot restore credits"));
-check("V4 application service ranks replacements through existing MatchCore", files.recoveryService.includes("evaluateVendorsForLead"));
-check("V4 replacement assignment uses sole canonical assignment authority", files.recoveryService.includes("executeCanonicalAssignment") && files.recoveryService.includes('mode:"replacement"'));
-check("V4 replacement assignment binds approved replacement request", files.recoveryService.includes("replacementRequestId"));
-check("V4 replacement finalization is separate and governed", files.recoveryService.includes("qf_finalize_replacement_request_v1"));
+check("RC42 disallows legacy automatic replacement and combined compensation", files.recoveryService.includes("isAllowedBadLeadRecoveryAction(action)") && !files.recoveryService.includes('mode:"replacement"'));
+check("RC42 credit-only path never calls legacy report-keyed mutation RPC", files.recoveryService.includes('qf_vox_rc42_bad_lead_credit_only_atomic_candidate_v1') && files.recoveryService.includes('QF_VOX_BAD_LEAD_CREDIT_ONLY_ATOMIC_ENABLED'));
+check("RC42 one approved bad lead returns one LEAD credit, no cash", files.creditOnlyPolicy.includes('credits:1') && files.creditOnlyPolicy.includes('cashRefundAllowed:false') && files.creditOnlyPolicy.includes('automaticReplacementAllowed:false'));
+check("RC42 SQL enforces cross-report uniqueness on original assignment", files.creditOnlyCandidate.includes('vox_rc42_bad_lead_once_per_original_assignment') && files.creditOnlyCandidate.includes('original_assignment_id') && files.creditOnlyCandidate.includes('qf_approve_credit_restoration_v2'));
 check("V4 application service never directly updates vendor credits",
   !files.recoveryService.includes("remaining_credits") && !files.recoveryService.includes("total_credits"));
 check("V4 admin recovery is Superadmin-gated through asAdmin", files.actions.includes("adminApplyBadLeadRecovery") && files.actions.includes("asAdmin(async (actor)"));
 check("V4 admin UI requires explicit human confirmation", files.adminUi.includes("Confirm human recovery decision"));
-check("V4 admin UI keeps recommendation separate from execution",
-  files.adminUi.includes("Generate recovery recommendation") && files.adminUi.includes("Restore credit + replace"));
+check("RC42 admin UI keeps recommendation separate and credit only",
+  files.adminUi.includes("Generate recovery recommendation") && files.adminUi.includes("Return 1 lead credit (no money)") && !files.adminUi.includes("Restore credit + replace"));
 check("V4 finalization links invalid original to canonical replacement", files.operatingMigration.includes("replaced_by_assignment_id=v_new.id"));
 check("V4 browser roles cannot execute recovery RPCs", files.operatingMigration.includes("VENDOR_V3_V5_AUTHORITY_EXPOSED"));
 

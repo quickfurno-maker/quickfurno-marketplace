@@ -32,6 +32,33 @@ CREATE UNIQUE INDEX IF NOT EXISTS vox_rc56_all_evidence_once_per_original_assign
  ON public.credit_restoration_approvals(original_assignment_id)
  WHERE original_assignment_id IS NOT NULL
   AND status IN ('requested','approved','applied');
+-- Never accept a pre-existing same-name but non-unique, invalid, incomplete
+-- or wrong-column index as a successful IF NOT EXISTS installation.
+DO $$
+DECLARE index_safe boolean;
+BEGIN
+ SELECT i.indisunique AND i.indisvalid AND i.indisready AND
+   i.indnkeyatts=1 AND i.indexprs IS NULL AND i.indpred IS NOT NULL AND
+   a.attname='original_assignment_id' AND am.amname='btree' AND
+   position('original_assignment_id IS NOT NULL' in
+     pg_get_expr(i.indpred,i.indrelid))>0 AND
+   position('requested' in pg_get_expr(i.indpred,i.indrelid))>0 AND
+   position('approved' in pg_get_expr(i.indpred,i.indrelid))>0 AND
+   position('applied' in pg_get_expr(i.indpred,i.indrelid))>0 AND
+   position('evidence_type' in pg_get_expr(i.indpred,i.indrelid))=0
+ INTO index_safe
+ FROM pg_index i
+ JOIN pg_class idx ON idx.oid=i.indexrelid
+ JOIN pg_namespace n ON n.oid=idx.relnamespace
+ JOIN pg_class t ON t.oid=i.indrelid
+ JOIN pg_am am ON am.oid=idx.relam
+ JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=i.indkey[0]
+ WHERE n.nspname='public' AND t.relname='credit_restoration_approvals'
+  AND idx.relname='vox_rc56_all_evidence_once_per_original_assignment';
+ IF NOT coalesce(index_safe,false) THEN
+  RAISE EXCEPTION 'RC57_CROSS_EVIDENCE_INDEX_DEFINITION_UNTRUSTED';
+ END IF;
+END $$;
 CREATE OR REPLACE FUNCTION public.qf_vox_rc42_bad_lead_credit_only_atomic_candidate_v1(
  p_report_id uuid,p_actor_id uuid
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER

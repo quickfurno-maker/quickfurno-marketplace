@@ -23,12 +23,20 @@ function RunFile([string]$file,[string]$dest){
  # leave a partial schema. SQL/permission errors fail immediately.
  for($try=1;$try -le 8;$try++){
   # Candidate includes its own explicit BEGIN/COMMIT; do not nest -1 there.
-  if($dest -eq "rc42-candidate.sql"){
-   $v=& docker exec $name psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -f ("/tmp/"+$dest) 2>&1
-  }else{
-   $v=& docker exec $name psql -X --single-transaction -U postgres -d postgres -v ON_ERROR_STOP=1 -f ("/tmp/"+$dest) 2>&1
-  }
-  if($LASTEXITCODE -eq 0){return}
+  # Native stderr NOTICE output is not a failure. On Windows PowerShell
+  # ErrorActionPreference=Stop otherwise stops BEFORE $LASTEXITCODE is read.
+  # PostgreSQL's ON_ERROR_STOP and nonzero exit code remain mandatory.
+  $priorErrorAction=$ErrorActionPreference
+  $ErrorActionPreference='Continue'
+  try {
+   if($dest -eq "rc42-candidate.sql"){
+    $v=& docker exec $name psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -f ("/tmp/"+$dest) 2>&1
+   }else{
+    $v=& docker exec $name psql -X --single-transaction -U postgres -d postgres -v ON_ERROR_STOP=1 -f ("/tmp/"+$dest) 2>&1
+   }
+   $runExit=$LASTEXITCODE
+  }finally{$ErrorActionPreference=$priorErrorAction}
+  if($runExit -eq 0){return}
   $detail=($v|Out-String)
   if($detail -notmatch '(?i)(connection to server|could not connect|server closed the connection|database system is starting up|server is starting up)'){
    throw "POSTGRES_FILE_FAILED_NONTRANSIENT:$dest $detail"
@@ -151,6 +159,18 @@ CREATE UNIQUE INDEX rc44_credit_ref_unique ON public.vendor_credit_logs(referenc
  }catch{$duplicateError=$_.Exception.Message}
  Assert ($duplicateError -match 'vox_rc56_all_evidence_once_per_original_assignment') 'cross-evidence unique index blocks direct competing approval in actual PG17'
  Assert ((Sql "select count(*) from public.credit_restoration_approvals where original_assignment_id='$assignment3';") -eq '1') 'cross-evidence violating insert rolls back without touching prior restoration'
+ # A pre-existing counterfeit index with the expected name must never make
+ # CREATE INDEX IF NOT EXISTS silently certify the wrong uniqueness rule.
+ [void](Sql 'drop index public.vox_rc56_all_evidence_once_per_original_assignment;')
+ [void](Sql 'create index vox_rc56_all_evidence_once_per_original_assignment on public.credit_restoration_approvals(vendor_id);')
+ $spoofRejected=$false
+ try{RunFile $candidate 'rc42-candidate.sql'}
+ catch{
+  $spoofMessage=$_.Exception.Message
+  $spoofRejected=$spoofMessage -match 'RC57_CROSS_EVIDENCE_INDEX_DEFINITION_UNTRUSTED'
+  # Deliberately do not print raw database error contents in CI logs.
+ }
+ Assert $spoofRejected 'spoofed same-name non-unique index fails reviewed SQL candidate before installing a release'
  if($UseCanonicalCreditAuthority){Write-Output 'VOX_RC44_CANONICAL_CREDIT_PG17_DISPOSABLE_PASS'}
  else {Write-Output 'VOX_RC42_CREDIT_ONLY_PG17_DISPOSABLE_PASS'}
 }finally{

@@ -12,7 +12,7 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 const fail=()=>{throw Error("EOD_REVIEW_READER_UNAVAILABLE");};
 export type Rc44ReaderInput={
  supabaseUrl?:string|null;anonKey?:string|null;readerJwt?:string|null;
- nowSeconds?:number
+ nowSeconds?:number;clockSeconds?:()=>number
 };
 /** Returning null can never be treated as a valid reader or substitute
  * adminClient/service_role. JWT claims here are only a local early reject:
@@ -31,7 +31,8 @@ export function createRc44DedicatedEodReviewReader(input:Rc44ReaderInput):Rc41Rp
   if(!decoded||typeof decoded!=="object"||Array.isArray(decoded))return null;
   payload=decoded;
  }catch{return null;}
- const now=input.nowSeconds??Math.floor(Date.now()/1000);
+ const current=input.clockSeconds??(()=>Math.floor(Date.now()/1000));
+ const now=input.nowSeconds??current();
  if(payload.role!==ROLE||typeof payload.exp!=="number"||!Number.isSafeInteger(payload.exp)||
     payload.exp<=now||payload.exp>now+3600||payload.aal!==undefined)return null;
  // Do not even construct a PostgREST transport for a token that claims it
@@ -48,12 +49,16 @@ export function createRc44DedicatedEodReviewReader(input:Rc44ReaderInput):Rc41Rp
  return async (fn,args)=>{
   if(fn!=="qf_vox_rc41_signed_eod_review_snapshot_v1"||
      !args||!UUID.test(args.p_intent_id)||!UUID.test(args.p_subject_id))fail();
-  if(Number(payload.exp)<=Math.floor(Date.now()/1000))fail();
+  if(Number(payload.exp)<=current())fail();
   // Backend validates the signed PostgREST reader JWT. No service-role or
   // privileged fallback, no direct table read and no SQL or EOD mutations.
   try{
    const {data,error}=await transport(fn,{p_intent_id:args.p_intent_id,
     p_subject_id:args.p_subject_id});
+   // A JWT expiring while the HTTP read was in flight must never yield
+   // a verified pending review snapshot to downstream approval handlers.
+   if(Number(payload.exp)<=current())
+    return {data:null,error:{message:"EOD_REVIEW_READER_EXPIRED_DURING_READ"}};
    if(error)return {data:null,error:{message:"EOD_REVIEW_READER_RPC_UNAVAILABLE"}};
    return {data,error:null};
   }catch{return {data:null,error:{message:"EOD_REVIEW_READER_RPC_UNAVAILABLE"}};}

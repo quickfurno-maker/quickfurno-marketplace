@@ -63,4 +63,18 @@ test("PostgREST failure returns redacted status without token or raw provider re
  assert.equal(v.data,null);
  assert.equal(JSON.stringify(v).includes("secret"),false);
 });
+test("read-only PostgREST result is denied if JWT expires while request is in flight",async()=>{
+ const start=Math.floor(Date.now()/1000);
+ let clock=start;
+ const fn=create({...config({...good,exp:start+15}),
+  clockSeconds:()=>clock});
+ globalThis.__rc44Rpc=async()=>{
+  clock=start+16;
+  return {data:{proof:"would_be_stale"},error:null};
+ };
+ const reply=await fn("qf_vox_rc41_signed_eod_review_snapshot_v1",
+  {p_intent_id:U,p_subject_id:V});
+ assert.deepEqual(reply,{data:null,error:{message:"EOD_REVIEW_READER_EXPIRED_DURING_READ"}});
+ assert.doesNotMatch(JSON.stringify(reply),/would_be_stale/);
+});
 process.on("exit",()=>rmSync(tmp,{recursive:true,force:true}));

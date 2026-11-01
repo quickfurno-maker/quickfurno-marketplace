@@ -33,7 +33,7 @@ export async function submitConversationControl(cmd:ConversationCommand){
    method:"POST",headers:{authorization:"Bearer "+token,
     "content-type":"application/json",accept:"application/json"},
    body:JSON.stringify(cmd),cache:"no-store",redirect:"error",
-   signal:AbortSignal.timeout(3500)
+   signal:AbortSignal.timeout(6500)
   });
   if(!response.ok){
    // An AAL2 revocation can produce HTTP 403 AFTER Core SQL has committed.

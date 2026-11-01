@@ -118,6 +118,16 @@ test("Core rejection and forged receipts cannot become confirmed actions",async(
   assert.equal((await api.POST(request())).status,503);
  }
 });
+test("BFF timeout exceeds Core atomic RPC timeout so verified 504 can be observed",()=>{
+ const src=readFileSync(resolve(app,"lib/conversationControl.ts"),"utf8");
+ assert.match(src,/signal:AbortSignal.timeout\(6500\)/);
+ const ui=readFileSync(resolve(app,"app/team/conversation-control/ConversationControl.tsx"),"utf8");
+ assert.match(ui,/setUncertain\(true\)/);
+ assert.match(ui,/disabled=\{busy\|\|uncertain\}/);
+ assert.match(ui,/v.error==="CORE_OUTCOME_UNKNOWN"/);
+ assert.match(ui,/pending.current=null;setUncertain\(false\)/);
+ assert.match(ui,/Do not assume rollback/);
+});
 test("Core 504 and 503 cannot be mistaken for rollback or trigger a new nonce",async()=>{
  reset();
  for(const status of [504,503]){

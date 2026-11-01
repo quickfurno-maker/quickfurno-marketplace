@@ -20,6 +20,10 @@ export const RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=false as const;
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const policyDenied=<T>()=>blocked<T>("BAD_LEAD_CREDIT_ONLY_POLICY",
  "A verified bad lead receives one lead credit, never money or a replacement assignment.");
+// Credit may have committed even when the RPC response is lost. The same
+// report must be reconciled against its ORIGINAL assignment before any retry.
+const uncertainCredit=<T>()=>blocked<T>("CREDIT_OUTCOME_UNKNOWN",
+ "Lead-credit outcome is uncertain. Reconcile this exact bad-lead report before retry; never issue another credit.");
 
 export async function recommendBadLeadRecovery(
  reportId:string,recommendation:"none"|Exclude<BadLeadRecoveryAction,"reject">
@@ -88,7 +92,7 @@ export async function applyBadLeadRecovery(
     "qf_vox_rc42_bad_lead_credit_only_atomic_candidate_v1",{
      p_report_id:reportId,p_actor_id:actorId
     });
-   if(error)throw error;
+   if(error)return uncertainCredit();
    const r=(data??{}) as RecoveryRpcResult;
    if(r.status!=="applied"&&r.status!=="already_applied")
     return blocked(String(r.reason_code??"CREDIT_ONLY_RECOVERY_REFUSED"),
@@ -103,7 +107,7 @@ export async function applyBadLeadRecovery(
       (r.automatic_replacement_created===true)||r.replacement_assignment_id!=null||
       r.monetary_refund_id!=null||
       (r.status==="applied"&&r.automatic_replacement_created!==false))
-    return blocked("CREDIT_ONLY_RESPONSE_INVALID","Credit-only result failed safe contract.");
+    return uncertainCredit();
    return ok({reportId,action,replacementStatus:"not_requested",
     replacementAssignmentId:null,originalAssignmentId:r.original_assignment_id,
     creditRestorationApprovalId:r.credit_restoration_approval_id??undefined,
@@ -126,5 +130,10 @@ export async function applyBadLeadRecovery(
      r.monetary_refund_id!=null)
    return blocked("REJECT_RESPONSE_INVALID","Unexpected financial or replacement effect in rejection receipt.");
   return ok({reportId,action,replacementStatus:"not_requested",replacementAssignmentId:null});
- }catch(e){return fail(e);}
+ }catch(e){
+  if(action==="restore_credit"&&RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED&&
+     process.env.QF_VOX_BAD_LEAD_CREDIT_ONLY_ATOMIC_ENABLED==="staging")
+   return uncertainCredit();
+  return fail(e);
+ }
 }

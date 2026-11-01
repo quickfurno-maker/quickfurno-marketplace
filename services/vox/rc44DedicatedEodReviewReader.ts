@@ -49,7 +49,15 @@ export function createRc44DedicatedEodReviewReader(input:Rc44ReaderInput):Rc41Rp
  return async (fn,args)=>{
   if(fn!=="qf_vox_rc41_signed_eod_review_snapshot_v1"||
      !args||!UUID.test(args.p_intent_id)||!UUID.test(args.p_subject_id))fail();
-  if(Number(payload.exp)<=current())fail();
+  // A forged clock, future-issued token, or token that is not yet valid
+  // cannot initiate or complete a privileged reader request.
+  const fresh=()=>{
+   const t=current();
+   return Number.isSafeInteger(t)&&Number(payload.exp)>t&&
+    (payload.nbf===undefined||Number(payload.nbf)<=t)&&
+    (payload.iat===undefined||Number(payload.iat)<=t+30);
+  };
+  if(!fresh())fail();
   // Backend validates the signed PostgREST reader JWT. No service-role or
   // privileged fallback, no direct table read and no SQL or EOD mutations.
   try{
@@ -57,7 +65,7 @@ export function createRc44DedicatedEodReviewReader(input:Rc44ReaderInput):Rc41Rp
     p_subject_id:args.p_subject_id});
    // A JWT expiring while the HTTP read was in flight must never yield
    // a verified pending review snapshot to downstream approval handlers.
-   if(Number(payload.exp)<=current())
+   if(!fresh())
     return {data:null,error:{message:"EOD_REVIEW_READER_EXPIRED_DURING_READ"}};
    if(error)return {data:null,error:{message:"EOD_REVIEW_READER_RPC_UNAVAILABLE"}};
    return {data,error:null};

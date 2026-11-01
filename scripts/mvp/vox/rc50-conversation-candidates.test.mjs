@@ -26,7 +26,8 @@ const [city,zone,vendor,convo,other,staff]=ids;
 const env=["VOX_STAFF_READ_ENABLED","VOX_RC42_CORE_CONVERSATION_OPERATOR_ENABLED",
  "VOX_STAFF_GRANTS_ENABLED","VOX_DEPARTMENT_ENFORCEMENT_ENABLED"];
 const flags=on=>env.forEach(k=>on?process.env[k]="staging":delete process.env[k]);
-const state={auth:0,scope:null,db:null,queries:[],rows:{},revokeDuringRead:false};
+const state={auth:0,scope:null,db:null,queries:[],rows:{},revokeDuringRead:false,
+ deactivateZoneDuringRead:false,rezoneVendorDuringRead:false};
 globalThis.__rc50=state;
 const q=(table)=>{
  const ops=[];state.queries.push({table,ops});
@@ -38,6 +39,10 @@ const q=(table)=>{
   limit:(...args)=>{ops.push(["limit",...args]);return chain;},
   then:(resolve,reject)=>{
    if(table==="communication_conversations"&&state.revokeDuringRead)state.scope=null;
+   if(table==="communication_conversations"&&state.deactivateZoneDuringRead)
+    state.rows.marketplace_service_zones=[{id:zone,city_id:city,is_active:false}];
+   if(table==="communication_conversations"&&state.rezoneVendorDuringRead)
+    state.rows.vendors=[{id:vendor,service_zone_id:other}];
    return Promise.resolve({data:state.rows[table]??[],error:null}).then(resolve,reject);
   }
  };return chain;
@@ -46,7 +51,8 @@ const baseScope={role:"operations_manager",canReadContent:true,cityId:city,teamI
  conversationIds:[convo],vendorIds:[vendor]};
 function reset(){
  flags(true);state.auth=0;state.queries=[];state.scope={...baseScope};
- state.revokeDuringRead=false;
+ state.revokeDuringRead=false;state.deactivateZoneDuringRead=false;
+ state.rezoneVendorDuringRead=false;
  state.db={from:q};
  state.rows={vendors:[{id:vendor,service_zone_id:zone}],
   marketplace_service_zones:[{id:zone,city_id:city,is_active:true}],
@@ -97,6 +103,15 @@ test("Staff scope revoked during asynchronous Core reads cannot return current c
  const res=await api.GET(req());
  assert.equal(res.status,403);
  assert.equal(state.auth,2);
+});
+test("zone deactivation or vendor re-zone during async read fails closed",async()=>{
+ reset();state.deactivateZoneDuringRead=true;
+ const response=await api.GET(req());
+ assert.equal(response.status,403);assert.equal((await response.json()).ok,false);
+ reset();state.rezoneVendorDuringRead=true;
+ const moved=await api.GET(req());
+ assert.equal(moved.status,403);
+ assert.equal(state.auth,1);
 });
 test("PAUSED conversation allows only human takeover in selection hint",async()=>{
  reset();state.rows.communication_conversations[0].state="PAUSED";

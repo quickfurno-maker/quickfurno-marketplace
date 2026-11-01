@@ -70,8 +70,29 @@ export async function GET(request:Request){
    if(conversations.length<20)conversations.push({id:row.id,revision:row.revision,
     state:row.state,allowedActions:row.state==="OPEN"?["PAUSE_AI","TAKEOVER"]:["TAKEOVER"]});
   }
-  // Revalidate after asynchronous reads so an immediately revoked scope
-  // is not returned as an apparently current operator selection.
+  // A vendor can be re-zoned or its city zone disabled while the above
+  // read is in flight, even with unchanged Staff object grants. Re-query
+  // canonical locations before presenting a CURRENT operator selection.
+  const currentVendors=await db.from("vendors").select("id,service_zone_id")
+   .in("id",verified.ids).limit(201);
+  if(currentVendors.error||!currentVendors.data||
+     currentVendors.data.length!==verified.ids.length)
+   return denied("VENDOR_SCOPE_CHANGED_DURING_READ",403);
+  const currentZoneIds=[...new Set(currentVendors.data.map(v=>v.service_zone_id))];
+  const currentZones=currentZoneIds.length?await db.from("marketplace_service_zones")
+   .select("id,city_id,is_active").in("id",currentZoneIds)
+   .eq("city_id",scope.cityId).eq("is_active",true).limit(201):
+   {data:[],error:null};
+  if(currentZones.error||!currentZones.data||currentZones.data.length>200)
+   return denied("ZONE_SCOPE_CHANGED_DURING_READ",403);
+  const currentProof=deriveCanonicalCityVendorIds({
+   cityId:scope.cityId,grantedVendorIds:verified.ids,
+   vendors:currentVendors.data,zones:currentZones.data});
+  if(!currentProof.ok||currentProof.ids.length!==verified.ids.length||
+     !verified.ids.every(id=>currentProof.ids.includes(id)))
+   return denied("VENDOR_CITY_CHANGED_DURING_READ",403);
+  // Revalidate Staff LAST, after the second city and vendor reads, so a
+  // concurrent revocation cannot be mistaken for an approved selection.
   const fresh=await getVerifiedScopedStaff(request.headers.get("authorization"));
   if(!fresh||fresh.userId!==scope.userId||fresh.role!=="operations_manager"||
      fresh.teamId!==scope.teamId||fresh.cityId!==scope.cityId||

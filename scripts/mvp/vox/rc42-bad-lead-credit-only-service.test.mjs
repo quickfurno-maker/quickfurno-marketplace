@@ -79,6 +79,7 @@ test("money or extra credits in RPC response never claim successful restoration"
   {status:"applied",lead_credits_restored:1,cash_refunded_minor_units:0,automatic_replacement_created:false},
   {...globalThis.__rc42Reply,original_assignment_id:"wrong"},
   {...globalThis.__rc42Reply,credit_restoration_approval_id:null},
+  {...globalThis.__rc42Reply,status:"already_applied",lead_credits_restored:0,automatic_replacement_created:true},
   {status:"rejected",reason_code:"human_approval_required"}
  ]){
   globalThis.__rc42Reply=bad;

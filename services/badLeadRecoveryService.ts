@@ -90,6 +90,7 @@ export async function applyBadLeadRecovery(
    if(r.cash_refunded_minor_units!==0||r.lead_credits_restored!==(r.status==="applied"?1:0)||
       !UUID.test(r.original_assignment_id??"")||
       !UUID.test(r.credit_restoration_approval_id??"")||
+      (r.automatic_replacement_created===true)||
       (r.status==="applied"&&r.automatic_replacement_created!==false))
     return blocked("CREDIT_ONLY_RESPONSE_INVALID","Credit-only result failed safe contract.");
    return ok({reportId,action,replacementStatus:"not_requested",

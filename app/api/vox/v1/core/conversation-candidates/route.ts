@@ -24,7 +24,8 @@ export async function GET(request:Request){
  if(url.search||url.hash)return denied("UNSUPPORTED_FILTER",400);
  try{
   const scope=await getVerifiedScopedStaff(request.headers.get("authorization"));
-  if(!scope||scope.role!=="operations_manager"||!scope.canReadContent)
+  if(!scope||scope.role!=="operations_manager"||!scope.canReadContent||
+     !UUID.test(scope.userId)||!UUID.test(scope.cityId)||!UUID.test(scope.teamId))
    return denied("SCOPED_OPERATIONS_MANAGER_REQUIRED",403);
   if(!scope.conversationIds.length||!scope.vendorIds.length)
    return json({ok:true,schema:"qf.vox.conversation.candidates.v1",

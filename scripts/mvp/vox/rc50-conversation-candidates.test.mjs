@@ -54,7 +54,7 @@ const q=(table)=>{
   }
  };return chain;
 };
-const baseScope={role:"operations_manager",canReadContent:true,cityId:city,teamId:staff,
+const baseScope={userId:other,role:"operations_manager",canReadContent:true,cityId:city,teamId:staff,
  conversationIds:[convo],vendorIds:[vendor]};
 function reset(){
  flags(true);state.auth=0;state.queries=[];state.scope={...baseScope};
@@ -82,6 +82,14 @@ test("only current Operations Manager with exact scope may discover",async()=>{
  assert.equal(state.queries.length,0);
  reset();state.scope=null;
  assert.equal((await api.GET(req())).status,403);
+});
+test("missing or forged Staff identity keys deny Core discovery before database access",async()=>{
+ for(const bad of [{userId:undefined},{userId:"forged"},{cityId:"bad-city"},{teamId:null}]){
+  reset();state.scope={...baseScope,...bad};
+  const response=await api.GET(req());
+  assert.equal(response.status,403);
+  assert.equal(state.queries.length,0);
+ }
 });
 test("Core returns bounded exact vendor-only revision hints, not write permission",async()=>{
  reset();const res=await api.GET(req());assert.equal(res.status,200);

@@ -56,4 +56,10 @@ test("missing baseline slice, incomplete verification and wrong candidate fail c
  objects.set("_verification.json",JSON.stringify({...v,versions:summary}));
  assert.throws(()=>assessPrivateCapture({...fake,candidateSha:"invalid"}),/EXACT_SHA_REQUIRED/);
 });
+test("unknown extra captured version cannot silently pass the independent file set",()=>{
+ const extra="20990101000000.json";
+ objects.set(extra,JSON.stringify({version:"20990101000000",name:"unreviewed",statements:["SELECT 1;"]}));
+ assert.throws(()=>assessPrivateCapture(fake),/UNEXPECTED_CAPTURE_FILES/);
+ objects.delete(extra);
+});
 process.on("exit",()=>rmSync(dir,{recursive:true,force:true}));

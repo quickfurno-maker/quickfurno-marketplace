@@ -33,11 +33,12 @@ export function assessPrivateCapture({candidateSha,evidenceText,privateDir,read=
  if(verifiedByVersion.size!==expected.size)fail("SECOND_READ_DUPLICATE_VERSION");
  const allowed=/^\d{14}(?:\.part\d{3})?\.json$/;
  if(filenames.some(f=>!allowed.test(f)||stat(join(dir,f)).isSymbolicLink()))fail("FILE_SET_UNTRUSTED");
- const versions=new Set(),digests=new Map(),duplicates=[],entries=[],match=new Map(ev.entries.map(e=>[e.canonicalSha256,e.file]));
+ const versions=new Set(),consumedFiles=new Set(),digests=new Map(),duplicates=[],entries=[],match=new Map(ev.entries.map(e=>[e.canonicalSha256,e.file]));
  let statementsTotal=0,bytesTotal=0;
  for(const [version,name] of expected){
   const files=filenames.filter(f=>f===version+".json"||f.startsWith(version+".part"));
   if(!files.length)fail("ORIGINAL_MISSING_"+version);
+  for(const f of files)consumedFiles.add(f);
   const pieces=files.map(f=>{
    const o=JSON.parse(read(join(dir,f),"utf8"));
    if(o.version!==version||o.name!==name||!Array.isArray(o.statements)||
@@ -75,7 +76,9 @@ export function assessPrivateCapture({candidateSha,evidenceText,privateDir,read=
    renderedBytes:rendered.length,canonicalSqlSha256:digest,
    exactSourceFile:match.get(digest)||null});
  }
- if(filenames.length!==expected.size-1+9||versions.size!==expected.size)
+ // Capture manifests may be rechunked without changing SQL; allow only files
+ // belonging to an expected version and require exact contiguous slice proof.
+ if(filenames.some(f=>!consumedFiles.has(f))||versions.size!==expected.size)
   fail("UNEXPECTED_CAPTURE_FILES");
  const exact=entries.filter(x=>x.exactSourceFile!==null);
  const uniqueExactSources=new Set(exact.map(x=>x.exactSourceFile));

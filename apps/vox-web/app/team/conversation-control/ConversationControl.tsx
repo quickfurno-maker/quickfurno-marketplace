@@ -1,0 +1,69 @@
+"use client";
+import {useRef,useState} from "react";
+import Link from "next/link";
+import {withReturn} from "../../../lib/returnTo.mjs";
+type Action="PAUSE_AI"|"TAKEOVER";
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export default function ConversationControl(){
+ const [conversationId,setConversationId]=useState("");
+ const [revision,setRevision]=useState("");
+ const [action,setAction]=useState<Action>("PAUSE_AI");
+ const [busy,setBusy]=useState(false),[message,setMessage]=useState("");
+ const [expired,setExpired]=useState(false);
+ const pending=useRef<{command:string;nonce:string}|null>(null);
+ const valid=UUID.test(conversationId.trim())&&/^\d{1,10}$/.test(revision)&&
+  Number.isSafeInteger(Number(revision))&&Number(revision)<=2147483646;
+ const changed=()=>{pending.current=null;setMessage("");setExpired(false);};
+ async function submit(event:React.FormEvent){
+  event.preventDefault();if(busy||!valid)return;
+  const cmd={conversationId:conversationId.trim(),expectedRevision:Number(revision),action};
+  const fingerprint=JSON.stringify(cmd);
+  if(!pending.current||pending.current.command!==fingerprint)
+   pending.current={command:fingerprint,nonce:crypto.randomUUID()};
+  setBusy(true);setMessage("");
+  try{
+   const response=await fetch("/api/conversation-control",{
+    method:"POST",credentials:"same-origin",
+    headers:{"content-type":"application/json"},cache:"no-store",
+    body:JSON.stringify({...cmd,nonce:pending.current.nonce})});
+   if(response.status===401){setExpired(true);
+    setMessage("Verified Staff MFA expired. Sign in to continue.");return;}
+   const v:unknown=await response.json();
+   if(!response.ok||!v||typeof v!=="object"||Array.isArray(v)||
+     !("ok" in v)||v.ok!==true||
+     !("conversationId" in v)||v.conversationId!==cmd.conversationId||
+     !("newRevision" in v)||v.newRevision!==cmd.expectedRevision+1||
+     !("providerMessagesSent" in v)||v.providerMessagesSent!==0){
+    setMessage(response.status===409?
+     "Conversation revision changed; retrieve its current Core revision.":
+     "No Core commit confirmed. Retry the SAME command and nonce, or contact your Team Leader.");
+    return;
+   }
+   pending.current=null;
+   setMessage("Core confirmed the internal conversation control; no provider message was sent.");
+  }catch{setMessage("Core result unavailable. Retry the exact same command; do not change its nonce.");}
+  finally{setBusy(false);}
+ }
+ return <form className="voxWorkActionForm" onSubmit={submit}>
+  <label htmlFor="convo-id">Core-authorized conversation ID</label>
+  <input id="convo-id" value={conversationId} maxLength={36}
+   placeholder="Conversation UUID from your assigned Core record" disabled={busy}
+   onChange={e=>{setConversationId(e.target.value);changed();}} required/>
+  <label htmlFor="convo-revision">Current Core revision</label>
+  <input id="convo-revision" type="number" min="0" max="2147483646"
+   value={revision} disabled={busy}
+   onChange={e=>{setRevision(e.target.value);changed();}} required/>
+  <label htmlFor="convo-action">Governed action</label>
+  <select id="convo-action" value={action} disabled={busy}
+   onChange={e=>{setAction(e.target.value as Action);changed();}}>
+   <option value="PAUSE_AI">Pause AI</option>
+   <option value="TAKEOVER">Human takeover</option>
+  </select>
+  <p>Only an assigned Operations Manager with a current object grant can commit.
+   This form cannot grant itself access. No outbound message is generated.</p>
+  <button type="submit" disabled={busy||!valid}>
+   {busy?"Checking native Core…":"Submit atomic control"}</button>
+  {message?<p role="status">{message}</p>:null}
+  {expired?<Link href={withReturn("/login","/team/conversation-control")}>Staff sign-in</Link>:null}
+ </form>;
+}

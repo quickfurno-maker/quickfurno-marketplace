@@ -30,7 +30,7 @@ export default async function TeamOperationsHome(){
    <h1>Team workspace is locked</h1>
    <p>{overview.status===401?"Use your existing Supabase sign-in with verified MFA.":
       "This workspace needs current Core Staff authorization and protected VOX staging activation."}</p>
-   <StaffSignInLink status={overview.status}/>
+   <StaffSignInLink status={overview.status} returnTo="/team"/>
    <Link href="/">Return to VOX</Link>
   </section>
  </main>;

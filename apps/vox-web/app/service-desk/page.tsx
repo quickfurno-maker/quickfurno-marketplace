@@ -11,7 +11,9 @@ export default async function ServiceDesk(){
  const r=await fetchScopedServiceDesk();
  if(!r.ok)return <main className="hold"><section className="holdCard">
  <p className="kicker">VOX / HUMAN DESK</p><h1>Service Desk unavailable</h1>
- <p>AAL2 staff sign-in, an assigned Core vendor/case, and a current conversation grant are required.</p>
+ <p>{r.status===401?"Verified Staff MFA is required to open the Service Desk.":r.status===403?
+ "Your current Staff assignment or conversation grant does not authorize the Service Desk.":
+ "The protected Service Desk Core projection is currently unavailable. No case or conversation was modified."}</p>
  {r.status===401?<Link href={withReturn("/login","/service-desk")}>Staff sign-in</Link>:
   <Link href="/operations">Back to Mission Control</Link>}</section></main>;
  const cases=r.view.support.map(c=>({id:c.threadId??"",title:"Case "+(c.threadId?.slice(0,8)??"unknown"),

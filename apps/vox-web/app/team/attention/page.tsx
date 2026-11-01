@@ -23,7 +23,7 @@ export default async function StaffAttention(){
    <p>{queue.status===401?"Please sign in with verified Staff MFA.":
     queue.status===403?"Core has not authorized your current Staff scope.":
     "Protected queue access or its source evidence is unavailable."}</p>
-   <StaffSignInLink status={queue.status}/>
+   <StaffSignInLink status={queue.status} returnTo="/team/attention"/>
    <Link href="/team">Return to Team Operations</Link>
   </section>:<section className="voxAttentionPanel" aria-labelledby="attentionTitle">
    <div className="voxAttentionTitle">

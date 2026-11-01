@@ -36,7 +36,7 @@ export default async function MyDailyReport(){
     r.status===403?"Your current Core Staff permissions do not allow this view.":
     "Protected VOX staging authorization or source evidence is unavailable."}</p>
    <p>No activity figures are shown when Core cannot verify the source.</p>
-   <StaffSignInLink status={r.status}/>
+   <StaffSignInLink status={r.status} returnTo="/team/daily-report"/>
    <Link href="/team">Return to Team Operations</Link>
   </section>:<>
    <section aria-labelledby="activity-counts" className="voxReportCard">

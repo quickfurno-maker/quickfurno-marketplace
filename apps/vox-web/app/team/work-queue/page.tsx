@@ -57,7 +57,7 @@ export default async function VoxMyWorkQueue(){
       result.status===403?
       "Your current Core Staff permissions do not allow this view.":
       "This workspace requires protected Core authorization and an approved staging release."}</p>
-    <StaffSignInLink status={result.status}/>
+    <StaffSignInLink status={result.status} returnTo="/team/work-queue"/>
     <Link href="/team">Return to Team Operations</Link>
    </section>:
    <section className="voxQueueCard" aria-labelledby="voxQueueListTitle">

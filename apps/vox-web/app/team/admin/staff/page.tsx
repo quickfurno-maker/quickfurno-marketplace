@@ -13,7 +13,7 @@ export default async function StaffSetupPage(){
   <p>{result.status===401?"Sign in using your verified MFA session.":
       result.status===403?"This workspace is only for the existing verified Core Superadmin.":
       "The private Admin setup requires separate Core and VOX activation and certification."}</p>
-  <StaffSignInLink status={result.status}/>
+  <StaffSignInLink status={result.status} returnTo="/team/admin/staff"/>
   <Link href="/team">Back to Team Operations</Link>
  </section></main>;
  const directory=await fetchAdminStaffDirectory();

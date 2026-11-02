@@ -38,6 +38,12 @@ on:
       - 'scripts/mvp/vox/rc71-bad-lead-metadata-checkpoint.test.mjs'
       - 'scripts/mvp/vox/rc72-*.test.mjs'
       - 'scripts/mvp/vox/rc73-*.test.mjs'
+      - 'scripts/mvp/vox/rc74-*.test.mjs'
+      - 'apps/vox-web/scripts/validate-rc74-*.spec.mjs'
+      - 'apps/vox-web/app/team/work-queue/WorkActionControl.tsx'
+      - 'apps/vox-web/app/mfa/page.tsx'
+      - 'apps/vox-web/app/mfa/form.tsx'
+      - 'services/adminAuditService.ts'
       - 'scripts/mvp/vox/rc73-private-mismatch-triage.mjs'
       - 'scripts/mvp/vox/rc73-staging-owner-guard-smoke.mjs'
       - 'services/vox/rc73PostCommentOwnerAuthority.ts'
@@ -190,6 +196,8 @@ jobs:
         run: node --test apps/vox-web/scripts/validate-rc72-scoped-pagination.spec.mjs apps/vox-web/scripts/validate-rc72-eod-date-receipt.spec.mjs scripts/mvp/vox/rc72-bad-lead-comment-checkpoint.test.mjs
       - name: RC73 actual Core EOD business date, comment AAL2, private DBA safety, Staging guard denial
         run: node --test scripts/mvp/vox/rc73-eod-core-date-http.test.mjs scripts/mvp/vox/rc73-finance-comment-owner.test.mjs scripts/mvp/vox/rc73-private-mismatch-triage.test.mjs scripts/mvp/vox/rc73-staging-owner-guard-smoke.test.mjs
+      - name: RC74 terminal Staff recovery, linked bad-lead flag, MFA encoding safety
+        run: node --test apps/vox-web/scripts/validate-rc74-terminal-work-recovery.spec.mjs scripts/mvp/vox/rc74-bad-lead-linked-assignment.test.mjs apps/vox-web/scripts/validate-rc74-ascii-mfa-utf8.spec.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

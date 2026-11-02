@@ -126,10 +126,11 @@ export async function submitMyPartialEod(nonce:string){
  const r=await requestCore("eod-submissions",{nonce,businessDate});
  if(!r.ok)return r;
  const x=r.body;
- if(!exact(x,["ok","schema","reportId","state","revision","eventCount",
+ if(!exact(x,["ok","schema","reportId","businessDate","state","revision","eventCount",
   "completeness","externalMessagesSent","staffPrivilegesChanged"])||
    x.ok!==true||x.schema!=="qf.vox.eod.submission.receipt.v1"||
-   !isId(x.reportId)||!["PENDING_REVIEW","ACKNOWLEDGED","REJECTED"].includes(String(x.state))||
+   !isId(x.reportId)||x.businessDate!==businessDate||
+   !["PENDING_REVIEW","ACKNOWLEDGED","REJECTED"].includes(String(x.state))||
    !Number.isSafeInteger(x.revision)||![0,1].includes(x.revision as number)||
    (x.state==="PENDING_REVIEW"&&x.revision!==0)||
    (x.state!=="PENDING_REVIEW"&&x.revision!==1)||

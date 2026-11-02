@@ -12,6 +12,7 @@
 // ============================================================================
 import { adminClient } from "../lib/supabase";
 import { rc76ValidAtomicBadLeadReceipt } from "./vox/rc76AtomicBadLeadStatusReceipt";
+import { rc77BoundedAtomicBadLeadReview } from "./vox/rc77BoundedAtomicBadLeadReview";
 import { appError, fail, isMissingRelationError, ok, type Result } from "../lib/errors";
 
 export const BAD_LEAD_REVIEW_STATUSES = [
@@ -192,13 +193,17 @@ export async function updateVendorLeadReportStatus(
       if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
          !["owner","dual"].includes(String(process.env.VOX_STAFF_VIEW_MODE)))
         throw appError("UNAUTHORIZED");
-      const {data:atomic,error:atomicError}=await db.rpc(
+      const attempt=await rc77BoundedAtomicBadLeadReview(()=>db.rpc(
         "qf_vox_rc75_bad_lead_status_atomic_candidate_v1",{
           p_report_id:reportId,p_status:status,p_admin_notes:notes??null,
           p_reviewed_by:reviewedBy
-        });
-      if(atomicError||!rc76ValidAtomicBadLeadReceipt(atomic,reportId,status))
-        throw appError("VALIDATION");
+        }));
+      // An atomic SQL mutation can commit despite a dropped or malformed
+      // response. Never invite a retry or fall back to the old two-write flow.
+      if(!attempt.completed||attempt.reply.error||
+         !rc76ValidAtomicBadLeadReceipt(attempt.reply.data,reportId,status))
+        return {ok:false,code:"ATOMIC_REVIEW_OUTCOME_UNKNOWN",
+          error:"Atomic bad-lead review may have committed. Reconcile the original report and assignment in Core before any new status decision."};
       return ok(null);
     }
     const { data: report, error } = await db

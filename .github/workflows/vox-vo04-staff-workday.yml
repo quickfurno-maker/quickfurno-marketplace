@@ -10,6 +10,8 @@ on:
       - 'apps/vox-web/lib/vo03PendingStaffTime.d.mts'
       - 'apps/vox-web/app/team/page.tsx'
       - 'scripts/mvp/vox/vo04-staff-workday.test.mjs'
+      - 'scripts/mvp/vox/vo04-browser-core-time-parity.test.mjs'
+      - 'apps/vox-web/lib/vo03PendingStaffTime.mjs'
       - '.github/workflows/vox-vo04-staff-workday.yml'
   workflow_dispatch:
 permissions:
@@ -27,7 +29,7 @@ jobs:
           node-version: '24'
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Staff Workday exact source contract and receipt recovery
-        run: node --test scripts/mvp/vox/vo04-staff-workday.test.mjs scripts/mvp/vox/vo03-staff-time-recovery.test.mjs
+        run: node --test scripts/mvp/vox/vo04-staff-workday.test.mjs scripts/mvp/vox/vo03-staff-time-recovery.test.mjs scripts/mvp/vox/vo04-browser-core-time-parity.test.mjs
       - name: Root TypeScript
         run: ./node_modules/.bin/tsc --noEmit
       - name: VOX Web test suite

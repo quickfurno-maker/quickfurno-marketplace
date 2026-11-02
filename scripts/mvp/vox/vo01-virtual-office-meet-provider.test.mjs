@@ -7,7 +7,7 @@ function f(){
  const calls={network:0,reserve:0,commit:0,auth:0};
  const deps={environment:"staging",enabled:()=>true,installed:()=>true,
   verifyCurrentScope:async()=>{calls.auth++;return true;},
-  reserveOriginalNonce:async()=>{calls.reserve++;return {status:"RESERVED"};},
+  reserveOriginalNonce:async()=>{calls.reserve++;return {status:"RESERVED",nonce:intent.nonce,durable:true};},
   commitReceipt:async()=>{calls.commit++;return true;},
   accessToken:async()=>"secure-hosted-token-12345",
   providerFetch:async(url,opts)=>{calls.network++;
@@ -71,4 +71,35 @@ test("VO1 revoked scope before reservation never creates meeting",async()=>{
  deps.verifyCurrentScope=async()=>false;
  assert.equal((await createScopedMeet(intent,deps)).reason,"CURRENT_MEETING_SCOPE_DENIED");
  assert.equal(calls.network,0);assert.equal(calls.reserve,0);
+});
+
+test("VO2 previously created meeting cannot leak after replay scope revoked",async()=>{
+ const {deps,calls}=f();
+ let checks=0;
+ deps.verifyCurrentScope=async()=>++checks===1;
+ deps.reserveOriginalNonce=async()=>({status:"REPLAY",receipt:{
+  nonce:intent.nonce,joinUrl:"https://meet.google.com/abc-defg-hij",spaceName:"spaces/abc0123"}});
+ const result=await createScopedMeet(intent,deps);
+ assert.equal(result.ok,false);assert.equal(result.reason,"CURRENT_MEETING_SCOPE_DENIED");
+ assert.equal(calls.network,0);
+});
+test("VO2 unbound or non-durable reservations never create provider meetings",async()=>{
+ for(const reservation of [{status:"RESERVED"},{
+  status:"RESERVED",nonce:id(99),durable:true},{
+  status:"RESERVED",nonce:intent.nonce,durable:false}]){
+  const {deps,calls}=f();
+  deps.reserveOriginalNonce=async()=>reservation;
+  const result=await createScopedMeet(intent,deps);
+  assert.equal(result.ok,false);
+  assert.equal(result.reason,"MEETING_NONCE_NOT_RESERVED");
+  assert.equal(calls.network,0);
+ }
+});
+test("VO2 valid replay performs two current Core grant checks",async()=>{
+ const {deps,calls}=f();
+ deps.reserveOriginalNonce=async()=>({status:"REPLAY",receipt:{
+  nonce:intent.nonce,joinUrl:"https://meet.google.com/abc-defg-hij",spaceName:"spaces/abc0123"}});
+ const result=await createScopedMeet(intent,deps);
+ assert.equal(result.ok,true);assert.equal(result.replayed,true);
+ assert.equal(calls.auth,2);assert.equal(calls.network,0);
 });

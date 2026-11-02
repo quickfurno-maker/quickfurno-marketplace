@@ -123,8 +123,21 @@ BEGIN
   'bad_lead_assignment:'||a.id::text||':credit_only') RETURNING id INTO approval_id;
  credit := public.qf_approve_credit_restoration_v2(
   approval_id,p_actor_id,'human_approved_bad_lead_credit_only');
- IF coalesce(credit->>'status','') NOT IN ('applied','already_applied') THEN
-  RAISE EXCEPTION 'RC42_CREDIT_MUTATION_NOT_ATOMIC' USING ERRCODE='P0001';
+ -- An already_applied response is NOT evidence of a newly restored credit.
+ -- The enclosing transaction must abort, including the inserted approval,
+ -- rather than falsely reporting one additional LEAD credit.
+ IF coalesce(credit->>'status','') <> 'applied' OR
+    nullif(credit->>'ledger_id','') IS NULL THEN
+  RAISE EXCEPTION 'RC60_CANONICAL_CREDIT_NOT_NEWLY_APPLIED' USING ERRCODE='P0001';
+ END IF;
+ -- Both the real canonical function and the fixture must durably mark the
+ -- exact newly created approval applied and bind its ledger id in this TX.
+ PERFORM 1 FROM public.credit_restoration_approvals
+  WHERE id=approval_id AND original_assignment_id=a.id
+   AND vendor_id=a.vendor_id AND status='applied'
+   AND restoration_ledger_id=(credit->>'ledger_id')::uuid;
+ IF NOT FOUND THEN
+  RAISE EXCEPTION 'RC60_CANONICAL_LEDGER_RECEIPT_MISMATCH' USING ERRCODE='P0001';
  END IF;
  UPDATE public.bad_lead_reports SET recovery_recommendation='restore_credit',
   recovery_status='applied',credit_restored=true,

@@ -3,9 +3,9 @@ import { fail, ok, type Result } from "../lib/errors";
 import { deriveAosBadLeadRecoveryRecommendation } from "../lib/aos/v2/badLeadRecoveryRecommendation";
 import { isAllowedBadLeadRecoveryAction } from "../lib/vox/creditOnlyBadLeadPolicy.mjs";
 
-/** Historical type retained for existing server action / UI compatibility.
- * Runtime rejects replace / restore_credit_and_replace under the new policy. */
-export type BadLeadRecoveryAction="restore_credit"|"replace"|"restore_credit_and_replace"|"reject";
+/** Only one vendor LEAD credit restoration or a human rejection is supported.
+ * Historical replacement actions are rejected at runtime as untrusted input. */
+export type BadLeadRecoveryAction="restore_credit"|"reject";
 type RecoveryRpcResult={
  status?:string;reason_code?:string|null;
  original_assignment_id?:string;credit_restoration_approval_id?:string|null;
@@ -95,7 +95,7 @@ export async function applyBadLeadRecovery(
  reportId:string,action:BadLeadRecoveryAction,actorId:string
 ):Promise<Result<{
  reportId:string;action:BadLeadRecoveryAction;
- replacementStatus:"not_requested"|"assigned"|"pending_no_eligible_vendor";
+ replacementStatus:"not_requested";
  replacementAssignmentId:string|null;
  restorationStatus?:"applied"|"already_applied"|"rejected";
  originalAssignmentId?:string;

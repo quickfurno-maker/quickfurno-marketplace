@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from "react";
 import Link from "next/link";
 import {withReturn} from "../../../lib/returnTo.mjs";
+import {loadPendingConversation,savePendingConversation,clearPendingConversation} from "../../../lib/pendingConversationRecovery";
 type Action="PAUSE_AI"|"TAKEOVER";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export default function ConversationControl(){
@@ -10,6 +11,8 @@ export default function ConversationControl(){
  const [action,setAction]=useState<Action>("PAUSE_AI");
  const [busy,setBusy]=useState(false),[message,setMessage]=useState("");
  const [expired,setExpired]=useState(false);
+ const [recoveryReady,setRecoveryReady]=useState(false);
+ const pending=useRef<{command:string;nonce:string}|null>(null);
  // An HTTP failure may follow a committed SQL transaction; keep the same
  // pending nonce and freeze command edits until Core confirms its receipt.
  const [uncertain,setUncertain]=useState(false);
@@ -36,16 +39,37 @@ export default function ConversationControl(){
   })();
   return ()=>controller.abort();
  },[]);
- const pending=useRef<{command:string;nonce:string}|null>(null);
+ // A page refresh must not silently manufacture a new nonce after an
+ // uncertain Core transaction. Session-tab storage has no authority to grant.
+ useEffect(()=>{
+  const restored=loadPendingConversation(window.sessionStorage);
+  if(restored){
+   const {nonce,...cmd}=restored;
+   pending.current={command:JSON.stringify(cmd),nonce};
+   setConversationId(cmd.conversationId);
+   setRevision(String(cmd.expectedRevision));
+   setAction(cmd.action);
+   setUncertain(true);
+   setMessage("A previously submitted Core command is still pending confirmation. Its exact nonce was recovered from this tab. Verify with your Team Leader, then retry ONLY this unchanged command.");
+  }
+  setRecoveryReady(true);
+ },[]);
  const valid=UUID.test(conversationId.trim())&&/^\d{1,10}$/.test(revision)&&
   Number.isSafeInteger(Number(revision))&&Number(revision)<=2147483646;
  const changed=()=>{if(uncertain)return;pending.current=null;setMessage("");setExpired(false);};
  async function submit(event:React.FormEvent){
-  event.preventDefault();if(busy||!valid)return;
+  event.preventDefault();if(!recoveryReady||busy||!valid)return;
   const cmd={conversationId:conversationId.trim(),expectedRevision:Number(revision),action};
   const fingerprint=JSON.stringify(cmd);
   if(!pending.current||pending.current.command!==fingerprint)
    pending.current={command:fingerprint,nonce:crypto.randomUUID()};
+  // Checkpoint BEFORE the HTTP call: even a refresh while SQL is running
+  // must retain the same command and nonce for explicit reconciliation.
+  if(!savePendingConversation(window.sessionStorage,{...cmd,nonce:pending.current.nonce})){
+   setUncertain(true);
+   setMessage("Cannot retain this command in the current tab. No Core request was sent. Enable session storage and reconcile before attempting another command.");
+   return;
+  }
   setBusy(true);setMessage("");
   try{
    const response=await fetch("/api/conversation-control",{
@@ -72,10 +96,17 @@ export default function ConversationControl(){
      !("replayed" in v)||typeof v.replayed!=="boolean"||
      !("receiptSha256" in v)||typeof v.receiptSha256!=="string"||
      !/^[a-f0-9]{64}$/.test(v.receiptSha256)){
-    if(response.status!==409&&response.ok)setUncertain(true);
+    // No authenticated canonical no-commit proof was returned. Lock the
+    // command even for HTTP 409; never mint a new nonce from a rejected reply.
+    setUncertain(true);
     setMessage(response.status===409?
-     "Conversation revision changed; retrieve its current Core revision.":
+     "Core reported a revision conflict. Keep this command and nonce locked until the original outcome is reconciled with your Team Leader.":
      "Core result could not be verified. Do not assume rollback. Keep the SAME nonce and reconcile with your Team Leader.");
+    return;
+   }
+   if(!clearPendingConversation(window.sessionStorage)){
+    setUncertain(true);
+    setMessage("Core receipt verified, but local pending-command cleanup failed. Preserve the same nonce until this tab can be reconciled.");
     return;
    }
    pending.current=null;setUncertain(false);
@@ -122,9 +153,9 @@ export default function ConversationControl(){
   </select>
   <p>Only an assigned Operations Manager with a current object grant can commit.
    This form cannot grant itself access. No outbound message is generated.</p>
-  <button type="submit" disabled={busy||!valid}>
+  <button type="submit" disabled={!recoveryReady||busy||!valid}>
    {busy?"Checking native Core…":"Submit atomic control"}</button>
-  {uncertain?<p role="alert">Outcome uncertain: command fields are locked to preserve its original nonce until a verified Core receipt is returned.</p>:null}
+  {uncertain?<p role="alert">A pending command is locked to its original nonce in this tab until a verified Core receipt is returned. Do not open a new tab or submit a new command for the same conversation until it is reconciled.</p>:null}
   {message?<p role="status">{message}</p>:null}
   {expired?<Link href={withReturn("/login","/team/conversation-control")}>Staff sign-in</Link>:null}
  </form>;

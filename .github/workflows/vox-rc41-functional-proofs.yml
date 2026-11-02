@@ -44,6 +44,8 @@ on:
       - 'apps/vox-web/lib/conversationControl.ts'
       - 'apps/vox-web/app/team/conversation-control/**'
       - 'apps/vox-web/scripts/validate-rc46-conversation-control.spec.mjs'
+      - 'apps/vox-web/scripts/validate-rc63-pending-conversation.spec.mjs'
+      - 'apps/vox-web/lib/pendingConversationRecovery.ts'
       - 'services/vendorCreditWalletService.ts'
       - 'lib/supabase.ts'
       - 'services/vox/rc44DedicatedEodReviewReader.ts'
@@ -117,6 +119,8 @@ jobs:
         run: node --test scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc42-eod-atomic-data-api-review.test.mjs scripts/mvp/vox/rc61-deadline-integrity.test.mjs
       - name: First-hop Owner and Staff AAL2 plus canonical Finance RPC fail-closed deadlines
         run: node --test scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc43-core-route-integration.test.mjs scripts/mvp/vox/rc43-eod-route-integration.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-service.test.mjs scripts/mvp/vox/rc62-operational-deadline-coverage.test.mjs
+      - name: RC63 Staff same-nonce recovery across in-tab refresh, denied storage and malformed records
+        run: node --test apps/vox-web/scripts/validate-rc63-pending-conversation.spec.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

@@ -21,12 +21,24 @@ export async function POST(request:Request){
  if(!RC42_ATOMIC_CONVERSATION_RPC_INSTALLED||
     process.env.VOX_RC42_CORE_CONVERSATION_OPERATOR_ENABLED!=="staging")
   return handle(request);
+ let preflightTimer:ReturnType<typeof setTimeout>|undefined;
  try{
-  if(!await verifyVoxOperationsStaffBearer(request.headers.get("authorization")))
-   return Response.json({ok:false,error:"CURRENT_STAFF_AAL2_REQUIRED"},{status:403,
-    headers:{"cache-control":"private, no-store, max-age=0"}});
+  // The real route boundary checks identity before any mutating SQL call.
+  // Its own GoTrue timeout must be smaller than the downstream Web deadline.
+  const v=await Promise.race([
+   verifyVoxOperationsStaffBearer(request.headers.get("authorization"))
+    .then(actor=>({timeout:false as const,actor})),
+   new Promise<{timeout:true}>(resolve=>{
+    preflightTimer=setTimeout(()=>resolve({timeout:true}),1500);
+   })
+  ]);
+  if(v.timeout)return Response.json({ok:false,error:"CURRENT_STAFF_AUTH_TIMEOUT"},
+   {status:503,headers:{"cache-control":"private, no-store, max-age=0"}});
+  if(!v.actor)return Response.json({ok:false,error:"CURRENT_STAFF_AAL2_REQUIRED"},
+   {status:403,headers:{"cache-control":"private, no-store, max-age=0"}});
  }catch{return Response.json({ok:false,error:"CURRENT_STAFF_AUTH_UNAVAILABLE"},{status:503,
   headers:{"cache-control":"private, no-store, max-age=0"}});}
+ finally{if(preflightTimer!==undefined)clearTimeout(preflightTimer);}
  return handle(request);
 }
 const denied=()=>Response.json({ok:false,error:"METHOD_NOT_ALLOWED"},{status:405,

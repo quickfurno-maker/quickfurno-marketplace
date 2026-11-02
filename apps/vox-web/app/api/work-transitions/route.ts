@@ -14,6 +14,7 @@ export async function POST(request:Request){
  if(new URL(request.url).search)return safeJson({ok:false,error:"FILTER_DENIED"},400);
  if(request.headers.get("content-type")?.split(";",1)[0]?.trim().toLowerCase()!=="application/json")
   return safeJson({ok:false,error:"JSON_REQUIRED"},415);
+ let submitted=false;
  try{
   const raw=await request.text();
   if(raw.length<2||raw.length>900)return safeJson({ok:false,error:"INVALID_SIZE"},413);
@@ -32,12 +33,13 @@ export async function POST(request:Request){
     (v.action==="CLAIM"&&v.reason!=="")||
     (["BLOCK","REQUEST_APPROVAL","COMPLETE"].includes(String(v.action))&&v.reason.length<12))
    return safeJson({ok:false,error:"INVALID_WORK_COMMAND"},400);
+  submitted=true;
   const result=await submitScopedWorkTransition({
    action:v.action as typeof ACTIONS[number],
    itemId:v.itemId,expectedRevision:v.expectedRevision as number,
    nonce:v.nonce,reason:v.reason});
   return safeJson(result,result.status);
- }catch{return safeJson({ok:false,error:"INVALID_JSON"},400);}
+ }catch{return submitted?safeJson({ok:false,error:"CORE_WORK_OUTCOME_UNKNOWN",committed:null,retrySameNonceOnly:true},503):safeJson({ok:false,error:"INVALID_JSON"},400);}
 }
 export function GET(){return safeJson({ok:false,error:"METHOD_NOT_ALLOWED"},405);}
 export function PUT(){return safeJson({ok:false,error:"METHOD_NOT_ALLOWED"},405);}

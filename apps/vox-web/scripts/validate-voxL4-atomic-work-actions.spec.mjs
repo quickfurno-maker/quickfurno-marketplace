@@ -47,7 +47,8 @@ const adapter=await load("../lib/workTransitions.ts",{
  "./auth":{verifiedMfaSession:async()=>{
   state.receivedAuth++;return state.authDenied?null:state.token;
  }},
- "./core":{origin:()=> "https://staging-core.quickfurno.in"}
+ "./core":{origin:()=> "https://staging-core.quickfurno.in"},
+ "./rc65BoundedStaffMfa":{rc65BoundedStaffMfa:async fn=>({completed:true,token:await fn()})}
 });
 const api=await load("../app/api/work-transitions/route.ts",{
  "../../../lib/auth":{

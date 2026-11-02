@@ -13,7 +13,7 @@ check("cannot accept arbitrary JSON fields",()=>assert.match(code,/UNKNOWN_OR_MI
 check("nonce is a UUID and revision integer",()=>{assert.match(code,/!id\(data\.nonce\)/);assert.match(code,/Number\.isSafeInteger\(data\.expectedRevision\)/);});
 check("no client actor/team/city in DB parameters",()=>{assert.match(code,/p_actor:scoped\.userId/);assert.doesNotMatch(code,/p_actor:data|p_team:data|p_city:data/);});
 check("single dedicated SQL transition RPC",()=>assert.match(code,/\.rpc\("qf_vox_work_transition_candidate_v1"/));
-check("successful receipt rejects wrong subject, revision or unexpected state",()=>{assert.match(code,/receipt\.work_item_id!==data\.itemId/);assert.match(code,/receipt\.new_revision!==\(data\.expectedRevision as number\)\+1/);assert.match(code,/INVALID_CORE_RECEIPT/);});
+check("successful receipt rejects wrong subject, revision or unexpected state",()=>{assert.match(code,/receipt\.work_item_id!==data\.itemId/);assert.match(code,/receipt\.new_revision!==\(data\.expectedRevision as number\)\+1/);assert.match(code,/WORK_TRANSITION_OUTCOME_UNKNOWN/);assert.match(code,/retrySameNonceOnly:true/);});
 check("no direct provider sends, payment or credits",()=>assert.doesNotMatch(code,/sendWhatsApp|sendMessage\(|\.insert\(|\.update\(|\.delete\(|razorpay|chargeCredit\(/i));
 check("no claims of affecting vendor matching or outbound messages",()=>{assert.match(code,/providerMessagesSent:0/);assert.match(code,/affectsVendorLeadMatching:false/);});
 check("all reads/extra HTTP methods denied",()=>{for(const v of ["GET","PATCH","PUT","DELETE"])assert.ok(code.includes("export function "+v+"()"));});

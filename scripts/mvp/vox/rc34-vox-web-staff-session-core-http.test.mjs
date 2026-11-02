@@ -164,7 +164,10 @@ test("work-transitions BFF: verified happy path is pinned; denials are mapped wi
   setup({core:async()=>Response.json({secret:"other-team-item"},{status:core})});
   const r=await post(transitions,cmd());assert.equal(r.status,want);
   const t=await r.text();assert.equal(t.includes("other-team-item"),false);
-  assert.equal(JSON.parse(t).error,"CORE_WORK_ACTION_NOT_VERIFIED");
+  const body=JSON.parse(t);
+  assert.equal(body.error,"CORE_WORK_OUTCOME_UNKNOWN");
+  assert.equal(body.committed,null);
+  assert.equal(body.retrySameNonceOnly,true);
  }
 });
 test("work-transitions BFF: missing session is a 401 the client can act on, with no Core call",async()=>{
@@ -195,7 +198,10 @@ test("work-transitions BFF: gates and forged receipts are rejected",async()=>{
   workReceipt({providerMessagesSent:1}),workReceipt({affectsVendorLeadMatching:true}),workReceipt({extra:1})]){
   setup({core:async()=>Response.json(bad)});
   const r=await post(transitions,cmd());assert.equal(r.status,503);
-  assert.equal((await r.json()).error,"UNTRUSTED_CORE_WORK_RECEIPT");
+  const body=await r.json();
+  assert.equal(body.error,"CORE_WORK_OUTCOME_UNKNOWN");
+  assert.equal(body.committed,null);
+  assert.equal(body.retrySameNonceOnly,true);
  }
  setup({core:async()=>Response.json(workReceipt())});
  delete process.env.VOX_WORK_ACTIONS_ENABLED;

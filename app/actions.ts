@@ -37,6 +37,7 @@ import * as badLeadRecovery from "../services/badLeadRecoveryService";
 import { verifyVoxOwnerBearer } from "../services/vox/verifiedStaffBearer";
 import { rc65PostCreditOwnerAuthority } from "../services/vox/rc65PostCreditOwnerAuthority";
 import { rc68PostRecommendationOwnerAuthority } from "../services/vox/rc68PostRecommendationOwnerAuthority";
+import { rc70PostEligibilityOwnerAuthority } from "../services/vox/rc70PostEligibilityOwnerAuthority";
 import {
   queueHumanConversationReply,
   releaseHumanConversationToAi,
@@ -955,8 +956,14 @@ export const adminUpdateVendorLeadReportStatus = async (reportId: string, input:
     if (input?.status==="Valid" && !await rc44VerifiedBadLeadOwner(actor))
       return fail(appError("UNAUTHORIZED"));
     const result = await audit.updateVendorLeadReportStatus(reportId, input, actor);
-    revalidatePath("/admin/leads");
-    return result;
+    // "Valid" makes a bad-lead report eligible for a later credit-only
+    // remedy. A successful metadata write followed by revoked Owner AAL2
+    // must remain UNKNOWN, not a falsely acknowledged eligibility approval.
+    const verified = input?.status==="Valid"
+      ?await rc70PostEligibilityOwnerAuthority(result,()=>rc44VerifiedBadLeadOwner(actor))
+      :result;
+    if(verified.ok)revalidatePath("/admin/leads");
+    return verified;
   });
 
 export const adminRecommendBadLeadRecovery = async (

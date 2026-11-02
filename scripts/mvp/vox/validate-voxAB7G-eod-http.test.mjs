@@ -64,7 +64,13 @@ test("AB7G stage switches and extra body fields fail closed",async()=>{
  assert.equal((await x.POST(req({...input,ownerId:id(4)}))).status,400);
  assert.equal(x.writes,0);
 });
-test("AB7G DB replay/review rejection and forged receipt cannot publish",async()=>{
- assert.equal((await h({dbError:true}).POST(req())).status,409);
- assert.equal((await h({forged:true}).POST(req())).status,503);
+test("AB7G lost DB receipt and forged receipt never claim publication rollback",async()=>{
+ for(const mode of [{dbError:true},{forged:true}]){
+  const res=await h(mode).POST(req());
+  assert.equal(res.status,503);
+  const data=await res.json();
+  assert.equal(data.error,"OFFICIAL_EOD_OUTCOME_UNKNOWN");
+  assert.equal(data.publicationAuthorized,null);
+  assert.equal(data.retrySameNonceOnly,true);
+ }
 });

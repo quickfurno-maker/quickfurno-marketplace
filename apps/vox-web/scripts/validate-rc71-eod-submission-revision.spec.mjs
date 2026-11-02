@@ -13,7 +13,7 @@ test("real EOD Web Core adapter carries revision after validated Core receipt an
 });
 test("actual Staff browser requires the revision before clearing original nonce",()=>{
  const src=read("../app/team/eod-submissions/SubmitPartial.tsx");
- assert.match(src,/completeness\|eventCount\|ok\|reportId\|revision\|state\|status/);
+ assert.match(src,/completeness\|eventCount\|nonce\|ok\|reportId\|revision\|state\|status/);
  assert.match(src,/data\.state==="PENDING_REVIEW"&&data\.revision!==0/);
  assert.match(src,/data\.state!=="PENDING_REVIEW"&&data\.revision!==1/);
  assert.ok(src.indexOf('data.revision!==1')<src.indexOf('clearPendingEodSubmission(store(),item)'));

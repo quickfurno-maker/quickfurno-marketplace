@@ -126,10 +126,10 @@ export async function submitMyPartialEod(nonce:string){
  const r=await requestCore("eod-submissions",{nonce,businessDate});
  if(!r.ok)return r;
  const x=r.body;
- if(!exact(x,["ok","schema","reportId","businessDate","state","revision","eventCount",
+ if(!exact(x,["ok","schema","reportId","nonce","businessDate","state","revision","eventCount",
   "completeness","externalMessagesSent","staffPrivilegesChanged"])||
    x.ok!==true||x.schema!=="qf.vox.eod.submission.receipt.v1"||
-   !isId(x.reportId)||x.businessDate!==businessDate||
+   !isId(x.reportId)||x.nonce!==nonce||x.businessDate!==businessDate||
    !["PENDING_REVIEW","ACKNOWLEDGED","REJECTED"].includes(String(x.state))||
    !Number.isSafeInteger(x.revision)||![0,1].includes(x.revision as number)||
    (x.state==="PENDING_REVIEW"&&x.revision!==0)||
@@ -139,7 +139,7 @@ export async function submitMyPartialEod(nonce:string){
    x.completeness!=="PARTIAL_UNVERIFIED_TOTAL"||
    x.externalMessagesSent!==0||x.staffPrivilegesChanged!==false)
   return deny(503,"INVALID_EOD_RECEIPT");
- return {ok:true,status:200,reportId:x.reportId,businessDate,
+ return {ok:true,status:200,reportId:x.reportId,nonce,businessDate,
   state:x.state as string,revision:x.revision as 0|1,eventCount:x.eventCount as number,
   completeness:"PARTIAL_UNVERIFIED_TOTAL" as const} as const;
 }

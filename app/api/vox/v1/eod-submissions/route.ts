@@ -92,7 +92,7 @@ export async function POST(request:Request){
    (r.report_state!=="PENDING_REVIEW"&&r.report_revision!==1))
    return send({ok:false,error:"EOD_RECEIPT_INVALID"},503);
   return send({ok:true,schema:"qf.vox.eod.submission.receipt.v1",
-   reportId:r.report_id,businessDate:parsed.businessDate,state:r.report_state,revision:r.report_revision,
+   reportId:r.report_id,nonce:parsed.nonce,businessDate:parsed.businessDate,state:r.report_state,revision:r.report_revision,
    eventCount:r.event_count,completeness:"PARTIAL_UNVERIFIED_TOTAL",
    externalMessagesSent:0,staffPrivilegesChanged:false},200);
  }catch{return send({ok:false,error:"EOD_CORE_UNAVAILABLE"},503);}

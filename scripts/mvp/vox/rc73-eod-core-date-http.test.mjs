@@ -51,8 +51,9 @@ test("actual Core POST binds successful receipt to its validated India business 
  assert.equal(response.status,200);
  const receipt=await response.json();
  assert.equal(receipt.businessDate,ist);
+ assert.equal(receipt.nonce,uuid(9));
  assert.deepEqual(Object.keys(receipt).sort(),["businessDate","completeness","eventCount",
- "externalMessagesSent","ok","reportId","revision","schema","staffPrivilegesChanged","state"]);
+ "externalMessagesSent","nonce","ok","reportId","revision","schema","staffPrivilegesChanged","state"]);
  assert.equal(receipt.externalMessagesSent,0);
  assert.equal(receipt.staffPrivilegesChanged,false);
  assert.deepEqual(calls,[{name:"qf_vox_eod_submit_candidate_v1",

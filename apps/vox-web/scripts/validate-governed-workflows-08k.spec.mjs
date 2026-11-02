@@ -26,7 +26,7 @@ const reply=(path,method)=>{
  }
  if(path.endsWith("eod-submissions")){
   return method==="POST"?{ok:true,schema:"qf.vox.eod.submission.receipt.v1",
-   reportId:uuid(10),businessDate:fixed,state:"PENDING_REVIEW",revision:0,eventCount:2,
+   reportId:uuid(10),nonce:uuid(21),businessDate:fixed,state:"PENDING_REVIEW",revision:0,eventCount:2,
    completeness:"PARTIAL_UNVERIFIED_TOTAL",externalMessagesSent:0,
    staffPrivilegesChanged:false}:{ok:true,schema:"qf.vox.eod.my-submissions.v1",
    mode:"READ_ONLY",completeness:"PARTIAL_UNVERIFIED_TOTAL",totalKnown:false,
@@ -147,6 +147,8 @@ test("EOD POST refuses inconsistent state/revision receipts, even after Core HTT
   {...b,state:"ACKNOWLEDGED",revision:0},
   {...b,state:"REJECTED",revision:0},
   {...b,state:"PENDING_REVIEW",revision:1},
+  {...b,nonce:uuid(20)},
+  {...b,nonce:null},
   {...b,businessDate:"2026-10-15"},
   {...b,businessDate:null},
   {...b,revision:2},

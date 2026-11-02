@@ -56,6 +56,17 @@ test("Owner AAL2 reject before reader and never publish an official EOD",async()
  assert.equal(r.status,503);assert.equal(b.publicationAuthorized,false);
  assert.equal(b.providerMessagesSent,0);assert.equal(v.ownerCalls,1);assert.equal(v.reviewCalls,0);
 });
+test("hung real Owner MFA check times out before any EOD reader or reviewer",async()=>{
+ flags(true);
+ const w=world();
+ globalThis.__rc43Eod.owner=async()=>{w.ownerCalls++;return new Promise(()=>{});};
+ const start=Date.now(),r=await sim.GET(request());
+ assert.ok(Date.now()-start<2500);assert.equal(r.status,503);
+ const body=await r.json();
+ assert.equal(body.error,"OWNER_AUTH_TIMEOUT");assert.equal(body.approved,false);
+ assert.equal(body.publicationAuthorized,false);assert.equal(body.providerMessagesSent,0);
+ assert.equal(w.ownerCalls,1);assert.equal(w.reviewCalls,0);
+});
 test("all mutations rejected even with simulated installed reader",async()=>{
  for(const mod of [prod,sim])for(const verb of ["POST","PUT","PATCH","DELETE"]){
   assert.equal((await mod[verb]()).status,405);

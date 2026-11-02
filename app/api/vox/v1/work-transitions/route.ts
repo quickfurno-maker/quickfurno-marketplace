@@ -7,6 +7,22 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 const ACTIONS=new Set(["CLAIM","START","WAIT_EXTERNAL","REQUEST_APPROVAL","BLOCK","RESUME","COMPLETE"]);
 const STAFF_PREFLIGHT_TIMEOUT_MS=1500;
 const WORK_RPC_TIMEOUT_MS=4000;
+const POST_RPC_STAFF_RECHECK_TIMEOUT_MS=1250;
+// Compare the whole bounded object grant surface, not just the JWT subject.
+// A changed/revoked team, city, role, department or object scope must never
+// certify a transaction that may already have committed.
+const sameStaffScope=(a:Awaited<ReturnType<typeof getVerifiedScopedStaff>>,
+ b:Awaited<ReturnType<typeof getVerifiedScopedStaff>>):boolean=>{
+ if(!a||!b||a.userId!==b.userId||a.teamId!==b.teamId||
+  a.cityId!==b.cityId||a.role!==b.role||a.canReadContent!==b.canReadContent||
+  b.canMutate!==false||a.canMutate!==false)return false;
+ for(const key of ["prospectIds","vendorIds","supportThreadIds","conversationIds"] as const){
+  const initial=Array.isArray(a[key])?[...a[key]].sort():[];
+  const current=Array.isArray(b[key])?[...b[key]].sort():[];
+  if(initial.length!==current.length||initial.some((v,i)=>v!==current[i]))return false;
+ }
+ return true;
+};
 const unknown=()=>send({ok:false,error:"WORK_TRANSITION_OUTCOME_UNKNOWN",committed:null,retrySameNonceOnly:true},503);
 const EXACT_FIELDS=["action","itemId","expectedRevision","nonce","reason"];
 const id=(x:unknown):x is string=>typeof x==="string"&&UUID.test(x);
@@ -100,6 +116,22 @@ export async function POST(request:Request){
      !Number.isSafeInteger(receipt.new_revision)||
      receipt.new_revision!==(data.expectedRevision as number)+1)
    return unknown();
+  // The SQL transaction may have committed while current Staff AAL2,
+  // membership or object scope was revoked. Re-verify after its receipt,
+  // with a bounded deadline. UNKNOWN is not a rollback or permission to
+  // issue another nonce.
+  let recheckTimer:ReturnType<typeof setTimeout>|undefined;
+  try{
+   const latest=await Promise.race([
+    getVerifiedScopedStaff(request.headers.get("authorization"))
+     .then(value=>({timedOut:false as const,value})),
+    new Promise<{timedOut:true}>(resolve=>{
+     recheckTimer=setTimeout(()=>resolve({timedOut:true}),POST_RPC_STAFF_RECHECK_TIMEOUT_MS);
+    })
+   ]);
+   if(latest.timedOut||!sameStaffScope(scoped,latest.value))return unknown();
+  }catch{return unknown();}
+  finally{if(recheckTimer!==undefined)clearTimeout(recheckTimer);}
   return send({ok:true,schema:"qf.vox.work.transaction.receipt.v1",
    workItemId:receipt.work_item_id,newState:receipt.new_state,
    revision:receipt.new_revision,providerMessagesSent:0,

@@ -57,7 +57,7 @@ test("valid neutral Staff obtains only the exact canonical work state and no ext
  assert.equal(r.status,200);const v=await r.json();
  assert.equal(v.workItemId,ID);assert.equal(v.newState,"ASSIGNED");
  assert.equal(v.providerMessagesSent,0);assert.equal(v.affectsVendorLeadMatching,false);
- assert.equal(w.sql,1);assert.equal(w.auth,1);
+ assert.equal(w.sql,1);assert.equal(w.auth,2);
 });
 test("hung, thrown, error, missing and forged SQL receipts remain UNKNOWN",async()=>{
  enable();
@@ -79,6 +79,35 @@ test("hung, thrown, error, missing and forged SQL receipts remain UNKNOWN",async
   assert.equal(w.auth,1);
  }
 });
+test("post-commit Staff AAL2 and scope are reverified before reporting success",async()=>{
+ enable();
+ for(const mode of ["revoked","role-change","team-change","scope-change","hang","throw"]){
+  const w=world();let round=0;
+  globalThis.__rc66Core.verify=async()=>{
+   round++;
+   if(round===1)return {userId:ID,role:"operations_manager",teamId:ID,
+    cityId:ID,canMutate:false,canReadContent:true,vendorIds:[ID]};
+   if(mode==="hang")return new Promise(()=>{});
+   if(mode==="throw")throw Error("private staff record");
+   if(mode==="revoked")return null;
+   const out={userId:ID,role:"operations_manager",teamId:ID,cityId:ID,
+    canMutate:false,canReadContent:true,vendorIds:[ID]};
+   if(mode==="role-change")out.role="support_agent";
+   if(mode==="team-change")out.teamId=NONCE;
+   if(mode==="scope-change")out.vendorIds=[];
+   return out;
+  };
+  const response=await api.POST(request());
+  assert.equal(response.status,503,mode);
+  const reply=await response.json();
+  assert.equal(reply.error,"WORK_TRANSITION_OUTCOME_UNKNOWN",mode);
+  assert.equal(reply.committed,null);
+  assert.equal(reply.retrySameNonceOnly,true);
+  assert.equal(JSON.stringify(reply).includes("private"),false);
+  assert.equal(round,2);assert.equal(w.sql,1);
+ }
+});
+
 test("forged original action, revision and nonce rejected before Auth",async()=>{
  enable();const w=world();
  for(const payload of [{...body,actorId:ID},{...body,expectedRevision:-1},

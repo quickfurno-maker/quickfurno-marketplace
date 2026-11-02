@@ -70,3 +70,22 @@ test("int4 revision overflow is denied before Auth or SQL",async()=>{
  assert.equal(globalThis.__rc80Work.dbCalls,0);
 });
 process.on("exit",()=>rmSync(dir,{recursive:true,force:true}));
+
+test("RC84 missing or malformed effective object grant cannot be treated as empty proof",async()=>{
+ for(const changed of [
+  {...scope(),prospectIds:undefined},
+  {...scope(),vendorIds:null},
+  {...scope(),supportThreadIds:[8]},
+  {...scope(),conversationIds:undefined}
+ ]){
+  reset(scope(),changed);
+  const r=await api.POST(post(0));
+  assert.equal(r.status,503);
+  const b=await r.json();
+  assert.equal(b.error,"WORK_TRANSITION_OUTCOME_UNKNOWN");
+  assert.equal(b.committed,null);
+  assert.equal(b.retrySameNonceOnly,true);
+  assert.equal(globalThis.__rc80Work.dbCalls,1);
+  assert.equal(globalThis.__rc80Work.authCalls,2);
+ }
+});

@@ -17,16 +17,21 @@ const sameStaffScope=(a:Awaited<ReturnType<typeof getVerifiedScopedStaff>>,
   a.cityId!==b.cityId||a.role!==b.role||a.canReadContent!==b.canReadContent||
   b.canMutate!==false||a.canMutate!==false)return false;
  for(const key of ["prospectIds","vendorIds","supportThreadIds","conversationIds"] as const){
-  const initial=Array.isArray(a[key])?[...a[key]].sort():[];
-  const current=Array.isArray(b[key])?[...b[key]].sort():[];
-  if(initial.length!==current.length||initial.some((v,i)=>v!==current[i]))return false;
+  const before=a[key],after=b[key];
+  // A missing array is lost effective Core grant proof, NOT an empty grant.
+  if(!Array.isArray(before)||!Array.isArray(after)||
+     before.some(v=>typeof v!=="string")||after.some(v=>typeof v!=="string")||
+     before.length!==after.length)return false;
+  const initial=[...before].sort(),current=[...after].sort();
+  if(initial.some((v,i)=>v!==current[i]))return false;
  }
  // Department revocation or substitution is material even when the scoped
  // object lists happen to be identical. Never certify an in-flight write.
  const before=(a as typeof a & {verifiedDepartments?:unknown}).verifiedDepartments;
  const after=(b as typeof b & {verifiedDepartments?:unknown}).verifiedDepartments;
  if(!Array.isArray(before)||!Array.isArray(after)||
-    before.some(x=>typeof x!=="string")||after.some(x=>typeof x!=="string"))return false;
+    before.some(x=>typeof x!=="string")||after.some(x=>typeof x!=="string")||
+    before.length!==after.length)return false;
  const initialPacks=[...before].sort(),currentPacks=[...after].sort();
  return initialPacks.length===currentPacks.length&&
   initialPacks.every((v,i)=>v===currentPacks[i]);

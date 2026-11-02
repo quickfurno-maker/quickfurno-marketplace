@@ -530,7 +530,11 @@ export function BadLeadReportsReviewPanel({
       notify("Comment text is required.", "error");
       return;
     }
-    runAction("Report comment added", () => adminAddVendorLeadReportComment(report.id, comment));
+    // Comment may have committed even when HTTP/result handling failed.
+    // The same original-report checkpoint prevents duplicate comments and
+    // contradictory credit/eligibility decisions without Core reconciliation.
+    runGovernedMetadata(report,"Report comment added",
+      ()=>adminAddVendorLeadReportComment(report.id,comment));
   }
 
   function generateRecoveryRecommendation(report: BadReport) {

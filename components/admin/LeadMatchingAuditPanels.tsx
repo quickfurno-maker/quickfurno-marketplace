@@ -496,7 +496,7 @@ export function BadLeadReportsReviewPanel({
       reject: "reject recovery",
     };
     if(recoveryNeedsReview.current.has(report.id)){
-      notify("Credit outcome UNKNOWN. Verify the original assignment and canonical ledger with a reviewer before another decision.","error");
+      notify("A recovery decision has an UNKNOWN outcome. Verify the report, original assignment and canonical ledger with a reviewer before another decision.","error");
       return;
     }
     if(recoveryPending.current.has(report.id)){
@@ -509,10 +509,13 @@ export function BadLeadReportsReviewPanel({
     runAction("Recovery decision applied",async()=>{
       try{
       const result=await adminApplyBadLeadRecovery(report.id,action);
-      if(!result.ok&&action==="restore_credit"&&result.code==="CREDIT_OUTCOME_UNKNOWN"){
+      if(!result.ok&&(
+         (action==="restore_credit"&&result.code==="CREDIT_OUTCOME_UNKNOWN")||
+         (action==="reject"&&result.code==="REJECT_OUTCOME_UNKNOWN"))){
         recoveryNeedsReview.current.add(report.id);
-        setRecoveryReceipt("Credit outcome UNKNOWN for report "+report.id+
-          ". Reconcile its original assignment and canonical ledger before ANY repeat grant.");
+        setRecoveryReceipt((action==="restore_credit"?"Credit":"Rejection")+
+          " outcome UNKNOWN for report "+report.id+
+          ". Reconcile its original assignment and canonical ledger before ANY further decision.");
         return result;
       }
       if(result.ok&&action==="restore_credit"){
@@ -532,12 +535,12 @@ export function BadLeadReportsReviewPanel({
         }
       }else if(result.ok&&action==="reject")setRecoveryReceipt("Recovery rejected. No LEAD credit or money granted.");
       return result;
-      }catch(error){
-        if(action!=="restore_credit")throw error;
+      }catch{
         recoveryNeedsReview.current.add(report.id);
-        setRecoveryReceipt("Credit RPC response lost. Original assignment must be reconciled before another attempt.");
-        return {ok:false,code:"CREDIT_OUTCOME_UNKNOWN",
-          error:"Credit result uncertain. Check canonical ledger before retrying."};
+        setRecoveryReceipt((action==="restore_credit"?"Credit":"Rejection")+
+          " RPC response lost. Original report and assignment must be reconciled before another decision.");
+        return {ok:false,code:action==="restore_credit"?"CREDIT_OUTCOME_UNKNOWN":"REJECT_OUTCOME_UNKNOWN",
+          error:"Recovery decision uncertain. Check the canonical report and ledger before retrying."};
       }finally{recoveryPending.current.delete(report.id);}
     });
   }

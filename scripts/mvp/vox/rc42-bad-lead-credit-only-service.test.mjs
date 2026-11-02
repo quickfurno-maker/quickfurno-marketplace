@@ -16,7 +16,8 @@ await build({entryPoints:[resolve(root,"services/badLeadRecoveryService.ts")],ou
   b.onLoad({filter:/services[\\/]badLeadRecoveryService\.ts$/},a=>({loader:"ts",contents:
    readFileSync(a.path,"utf8").replace("RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=false as const",
    "RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=true as const")
-    .replace("CREDIT_RPC_TIMEOUT_MS=4000","CREDIT_RPC_TIMEOUT_MS=25")}));
+    .replace("CREDIT_RPC_TIMEOUT_MS=4000","CREDIT_RPC_TIMEOUT_MS=25")
+    .replace("REJECT_RPC_TIMEOUT_MS=4000","REJECT_RPC_TIMEOUT_MS=25")}));
   b.onResolve({filter:/^\.\.\/lib\/supabase$/},()=>({path:"supabase",namespace:"fake"}));
   b.onResolve({filter:/^\.\.\/lib\/errors$/},()=>({path:"errors",namespace:"fake"}));
   b.onLoad({filter:/.*/,namespace:"fake"},a=>({loader:"js",contents:
@@ -139,13 +140,36 @@ test("rejection never acknowledges forged money, credit or replacement effects",
  ]){
   globalThis.__rc42Reply={status:"applied",...values};
   const v=await apply(REPORT,"reject",ACTOR);
-  assert.equal(v.ok,false);assert.equal(v.code,"REJECT_RESPONSE_INVALID");
+  assert.equal(v.ok,false);assert.equal(v.code,"REJECT_OUTCOME_UNKNOWN");
  }
  globalThis.__rc42Reply={status:"already_applied",lead_credits_restored:0,cash_refunded_minor_units:0};
  const v=await apply(REPORT,"reject",ACTOR);
  assert.equal(v.ok,true);
  assert.equal(v.data.replacementAssignmentId,null);
  assert.ok(calls.every(c=>c.name==="qf_apply_bad_lead_recovery_v1"));
+});
+test("rejection transport errors, null receipts and hanging RPC are UNKNOWN and never auto-retried",async()=>{
+ before();
+ const original=globalThis.__rc42Db;
+ let calls=0;
+ try{
+  for(const mode of ["throw","null","hang"]){
+   calls=0;
+   globalThis.__rc42Db=()=>({rpc:async(name,args)=>{
+    calls++;
+    assert.equal(name,"qf_apply_bad_lead_recovery_v1");
+    assert.equal(args.p_action,"reject");
+    if(mode==="throw")throw Error("private backend detail");
+    if(mode==="null")return {data:null,error:null};
+    return new Promise(()=>{});
+   }});
+   const result=await apply(REPORT,"reject",ACTOR);
+   assert.equal(result.ok,false);
+   assert.equal(result.code,"REJECT_OUTCOME_UNKNOWN");
+   assert.equal(String(result.error).includes("private backend detail"),false);
+   assert.equal(calls,1);
+  }
+ }finally{globalThis.__rc42Db=original;}
 });
 test("advisory recommendation cannot masquerade as a payout or lead grant",async()=>{
  before();

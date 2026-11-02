@@ -23,6 +23,10 @@ test("one-credit UI blocks repeated operator decisions after unresolved canonica
  assert.match(ui,/recoveryNeedsReview=useRef\(new Set<string>\(\)\)/);
  assert.match(ui,/recoveryNeedsReview\.current\.has\(report\.id\)/);
  assert.match(ui,/result\.code==="CREDIT_OUTCOME_UNKNOWN"/);
+ assert.match(ui,/action==="reject"&&result\.code==="REJECT_OUTCOME_UNKNOWN"/);
+ const service=read("services/badLeadRecoveryService.ts");
+ assert.match(service,/REJECT_RPC_TIMEOUT_MS=4000/);
+ assert.match(service,/if\(action==="reject"\)return uncertainReject\(\)/);
  assert.match(ui,/recoveryNeedsReview\.current\.add\(report\.id\)/);
  assert.match(ui,/finally\{recoveryPending\.current\.delete\(report\.id\);\}/);
  const fn=read("services/badLeadRecoveryService.ts");

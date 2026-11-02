@@ -27,6 +27,11 @@ const uncertainCredit=<T>()=>blocked<T>("CREDIT_OUTCOME_UNKNOWN",
 // A lost canonical credit receipt may follow a committed one-credit transaction.
 // This limits HTTP waiting; it NEVER retries the RPC or declares rollback.
 const CREDIT_RPC_TIMEOUT_MS=4000;
+// Rejection also changes canonical report state. A lost receipt is not proof
+// of rollback; never invite another contradictory decision automatically.
+const REJECT_RPC_TIMEOUT_MS=4000;
+const uncertainReject=<T>()=>blocked<T>("REJECT_OUTCOME_UNKNOWN",
+ "Rejection outcome is uncertain. Reconcile the exact report before another decision.");
 
 export async function recommendBadLeadRecovery(
  reportId:string,recommendation:"none"|Exclude<BadLeadRecoveryAction,"reject">
@@ -129,11 +134,24 @@ export async function applyBadLeadRecovery(
     restorationStatus:r.status});
   }
   // Existing reject path never restores credits, pays money or assigns a lead.
-  const {data,error}=await adminClient().rpc("qf_apply_bad_lead_recovery_v1",{
-   p_report_id:reportId,p_actor_id:actorId,p_action:"reject"
-  });
-  if(error)throw error;
-  const r=(data??{}) as RecoveryRpcResult;
+  let rejectTimer:ReturnType<typeof setTimeout>|undefined;
+  let rejectResult:{data:unknown;error:unknown};
+  try{
+   const reply=await Promise.race([
+    Promise.resolve(adminClient().rpc("qf_apply_bad_lead_recovery_v1",{
+     p_report_id:reportId,p_actor_id:actorId,p_action:"reject"
+    })).then(value=>({timedOut:false as const,value})),
+    new Promise<{timedOut:true}>(resolve=>{
+     rejectTimer=setTimeout(()=>resolve({timedOut:true}),REJECT_RPC_TIMEOUT_MS);
+    })
+   ]);
+   if(reply.timedOut)return uncertainReject();
+   rejectResult=reply.value;
+  }finally{if(rejectTimer!==undefined)clearTimeout(rejectTimer);}
+  const {data,error}=rejectResult;
+  if(error||!data||typeof data!=="object"||Array.isArray(data))
+   return uncertainReject();
+  const r=data as RecoveryRpcResult;
   if(r.status!=="applied"&&r.status!=="already_applied")
    return blocked(String(r.reason_code??"RECOVERY_REJECT_REFUSED"),"Rejection was refused.");
   // A human rejection must not be reported successful from a response
@@ -142,12 +160,13 @@ export async function applyBadLeadRecovery(
      (r.cash_refunded_minor_units!==undefined&&r.cash_refunded_minor_units!==0)||
      r.automatic_replacement_created===true||r.replacement_assignment_id!=null||
      r.monetary_refund_id!=null)
-   return blocked("REJECT_RESPONSE_INVALID","Unexpected financial or replacement effect in rejection receipt.");
+   return uncertainReject();
   return ok({reportId,action,replacementStatus:"not_requested",replacementAssignmentId:null});
  }catch(e){
   if(action==="restore_credit"&&RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED&&
      process.env.QF_VOX_BAD_LEAD_CREDIT_ONLY_ATOMIC_ENABLED==="staging")
    return uncertainCredit();
+  if(action==="reject")return uncertainReject();
   return fail(e);
  }
 }

@@ -57,7 +57,8 @@ async function load(relative,short){
  const tested=source
   .replace("STAFF_PREFLIGHT_TIMEOUT_MS=1500","STAFF_PREFLIGHT_TIMEOUT_MS=25")
   .replace("TL_PREFLIGHT_TIMEOUT_MS=1500","TL_PREFLIGHT_TIMEOUT_MS=25")
-  .replace("}),4000);","}),25);");
+  .replace("}),4000);","}),25);")
+  .replaceAll("}),1250);","}),25);");
  const js=ts.transpileModule(tested,{compilerOptions:{module:ts.ModuleKind.ESNext,
   target:ts.ScriptTarget.ES2022}}).outputText;
  const m=new vm.SourceTextModule(js,{context:ctx,identifier:"route-"+short});
@@ -350,6 +351,38 @@ test("RC83 independent TL cannot certify a report after scoped objects change",a
   assert.equal(b.error,"EOD_REVIEW_OUTCOME_UNKNOWN");
   assert.equal(b.retrySameNonceOnly,true);
   assert.equal(state.calls.filter(x=>x.type==="rpc").length,1);
+  assert.equal(state.authCalls,2);
+ }
+});
+
+
+test("RC84 Staff history GET checks current grants after reading DB",async()=>{
+ state.tables.vox_staff_eod_reports_candidate_v1[0].staff_id=scope.userId;
+ state.authHook=n=>n===1?scope:{...scope,vendorIds:[uuid(9)]};
+ const r=await submits.GET(get("eod-submissions"));
+ assert.equal(r.status,503);
+ assert.equal((await r.json()).error,"EOD_HISTORY_AUTH_CHANGED");
+ assert.equal(state.calls.filter(x=>x.type==="read").length,1);
+ assert.equal(state.authCalls,2);
+});
+test("RC84 TL report queue GET cannot reveal rows after reviewer revoked",async()=>{
+ const tl={...scope,role:"team_leader",canReadContent:false};
+ state.authHook=n=>n===1?tl:{...tl,role:"support_agent"};
+ const r=await reviews.GET(get("eod-reviews"));
+ assert.equal(r.status,503);
+ assert.equal((await r.json()).error,"EOD_TL_QUEUE_AUTH_CHANGED");
+ assert.equal(state.calls.filter(x=>x.type==="read").length,1);
+ assert.equal(state.authCalls,2);
+});
+test("RC84 hung post-read identity check never releases EOD rows",async()=>{
+ const tl={...scope,role:"team_leader",canReadContent:false};
+ for(const [handler,path,initial,expected] of [
+  [submits,"eod-submissions",scope,"EOD_HISTORY_AUTH_CHANGED"],
+  [reviews,"eod-reviews",tl,"EOD_TL_QUEUE_AUTH_CHANGED"]
+ ]){
+  state.calls=[];state.authCalls=0;state.authHook=n=>n===1?initial:new Promise(()=>{});
+  const r=await handler.GET(get(path));
+  assert.equal(r.status,503);assert.equal((await r.json()).error,expected);
   assert.equal(state.authCalls,2);
  }
 });

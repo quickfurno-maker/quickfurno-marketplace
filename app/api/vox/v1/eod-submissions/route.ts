@@ -70,6 +70,21 @@ export async function GET(request:Request){
    records.push({reportId:e.id,businessDate:e.business_date,
      eventCount:e.event_count,state:e.state,revision:e.revision});
   }
+  // The scoped history query can race a Staff grant revocation. Never
+  // disclose the selected rows under an authority that is now stale.
+  let recheckTimer:ReturnType<typeof setTimeout>|undefined;
+  try{
+   const fresh=await Promise.race([
+    getVerifiedScopedStaff(request.headers.get("authorization"))
+     .then(value=>({timedOut:false as const,value})),
+    new Promise<{timedOut:true}>(resolve=>{
+     recheckTimer=setTimeout(()=>resolve({timedOut:true}),1250);
+    })
+   ]);
+   if(fresh.timedOut||!sameScoped(scope,fresh.value))
+    return send({ok:false,error:"EOD_HISTORY_AUTH_CHANGED"},503);
+  }catch{return send({ok:false,error:"EOD_HISTORY_AUTH_CHANGED"},503);}
+  finally{if(recheckTimer!==undefined)clearTimeout(recheckTimer);}
   return send({ok:true,schema:"qf.vox.eod.my-submissions.v1",mode:"READ_ONLY",
    completeness:"PARTIAL_UNVERIFIED_TOTAL",totalKnown:false,records},200);
  }catch{return send({ok:false,error:"EOD_HISTORY_UNAVAILABLE"},503);}

@@ -46,6 +46,36 @@ export async function GET(request:Request){
     businessDate:r.business_date,eventCount:r.event_count,revision:0,
     completeness:"PARTIAL_UNVERIFIED_TOTAL"});
   }
+  // Independent TL access may be revoked while the queue query is executing.
+  // Recheck exact reviewer/team/city and every verified grant before release.
+  let recheckTimer:ReturnType<typeof setTimeout>|undefined;
+  try{
+   const fresh=await Promise.race([
+    getVerifiedScopedStaff(request.headers.get("authorization"))
+     .then(value=>({timedOut:false as const,value})),
+    new Promise<{timedOut:true}>(resolve=>{
+     recheckTimer=setTimeout(()=>resolve({timedOut:true}),1250);
+    })
+   ]);
+   if(fresh.timedOut||!fresh.value||
+      fresh.value.userId!==scope.userId||fresh.value.teamId!==scope.teamId||
+      fresh.value.cityId!==scope.cityId||fresh.value.role!=="team_leader"||
+      fresh.value.canMutate!==false||scope.canMutate!==false||
+      fresh.value.canReadContent!==scope.canReadContent)
+    return send({ok:false,error:"EOD_TL_QUEUE_AUTH_CHANGED"},503);
+   for(const key of ["verifiedDepartments","prospectIds","vendorIds",
+    "supportThreadIds","conversationIds"] as const){
+    const before=scope[key],after=fresh.value[key];
+    if(!Array.isArray(before)||!Array.isArray(after)||
+       before.length!==after.length||
+       before.some(v=>typeof v!=="string")||after.some(v=>typeof v!=="string"))
+     return send({ok:false,error:"EOD_TL_QUEUE_AUTH_CHANGED"},503);
+    const a=[...before].sort(),c=[...after].sort();
+    if(a.some((v,i)=>v!==c[i]))
+     return send({ok:false,error:"EOD_TL_QUEUE_AUTH_CHANGED"},503);
+   }
+  }catch{return send({ok:false,error:"EOD_TL_QUEUE_AUTH_CHANGED"},503);}
+  finally{if(recheckTimer!==undefined)clearTimeout(recheckTimer);}
   return send({ok:true,schema:"qf.vox.eod.tl.queue.v1",mode:"READ_ONLY",
    actionsRequireCurrentCoreRpc:true,totalKnown:false,pending},200);
  }catch{return send({ok:false,error:"EOD_TL_QUEUE_UNAVAILABLE"},503);}

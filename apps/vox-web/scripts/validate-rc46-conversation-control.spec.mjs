@@ -120,7 +120,7 @@ test("Core rejection and forged receipts cannot become confirmed actions",async(
 });
 test("BFF timeout exceeds Core atomic RPC timeout so verified 504 can be observed",()=>{
  const src=readFileSync(resolve(app,"lib/conversationControl.ts"),"utf8");
- assert.match(src,/signal:AbortSignal.timeout\(6500\)/);
+ assert.match(src,/signal:AbortSignal.timeout\(10000\)/);
  const ui=readFileSync(resolve(app,"app/team/conversation-control/ConversationControl.tsx"),"utf8");
  assert.match(ui,/setUncertain\(true\)/);
  assert.match(ui,/disabled=\{busy\|\|uncertain\}/);

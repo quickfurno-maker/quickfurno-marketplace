@@ -16,6 +16,9 @@ test("actual Core route and SQL handler bound preflight identity before any muta
  assert.match(handler,/STAFF_AUTH_RECHECK_TIMEOUT/);
  assert.match(handler,/retrySameNonceOnly:true/);
  assert.match(route,/RC42_ATOMIC_CONVERSATION_RPC_INSTALLED=false as const/);
+ const web=read("apps/vox-web/lib/conversationControl.ts");
+ assert.match(web,/signal:AbortSignal\.timeout\(10000\)/);
+ assert.match(web,/Core may use up to 1\.5s boundary AAL2/);
 });
 test("EOD first-hop Owner identity and dual-review both fail closed",()=>{
  const route=read("app/api/vox/v1/eod-atomic-review/route.ts");

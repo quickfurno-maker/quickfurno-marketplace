@@ -10,7 +10,7 @@ test("Web timeout exceeds atomic Core timeout; UI preserves nonce on an uncertai
  const bff=read("apps/vox-web/lib/conversationControl.ts");
  const ui=read("apps/vox-web/app/team/conversation-control/ConversationControl.tsx");
  assert.match(core,/Number\(configured\):3500/);
- assert.match(bff,/signal:AbortSignal\.timeout\(6500\)/);
+ assert.match(bff,/signal:AbortSignal\.timeout\(10000\)/);
  assert.match(bff,/retrySameNonceOnly:true/);
  assert.match(ui,/setUncertain\(true\)/);
  assert.match(ui,/pending\.current\.nonce/);

@@ -33,7 +33,10 @@ export async function submitConversationControl(cmd:ConversationCommand){
    method:"POST",headers:{authorization:"Bearer "+token,
     "content-type":"application/json",accept:"application/json"},
    body:JSON.stringify(cmd),cache:"no-store",redirect:"error",
-   signal:AbortSignal.timeout(6500)
+   // Core may use up to 1.5s boundary AAL2 + 1.25s handler AAL2 +
+   // 3.5s SQL + 1.25s post-SQL AAL2. Preserve an additional 2.5s
+   // transport margin so the Core receipt can arrive before this BFF aborts.
+   signal:AbortSignal.timeout(10000)
   });
   if(!response.ok){
    // An AAL2 revocation can produce HTTP 403 AFTER Core SQL has committed.

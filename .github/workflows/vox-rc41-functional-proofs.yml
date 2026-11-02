@@ -25,6 +25,7 @@ on:
       - 'scripts/mvp/vox/rc59-*.test.mjs'
       - 'scripts/mvp/vox/rc60-*.test.mjs'
       - 'scripts/mvp/vox/rc61-*.test.mjs'
+      - 'scripts/mvp/vox/rc62-*.test.mjs'
       - 'scripts/mvp/vox/rc57-private-lexical-reconciliation.mjs'
       - 'docs/vox/VOX-RC53-*'
       - 'docs/vox/VOX-RC54-*'
@@ -35,6 +36,7 @@ on:
       - 'docs/vox/VOX-RC59-*'
       - 'docs/vox/VOX-RC60-*'
       - 'docs/vox/VOX-RC61-*'
+      - 'docs/vox/VOX-OPERATIONAL-BOUNDARIES-*'
       - 'docs/vox/VOX-RC52-*'
       - 'scripts/mvp/vox/rc50-staging-sql-handoff.mjs'
       - 'scripts/mvp/vox/rc47-managed-recovery-handoff.mjs'
@@ -113,6 +115,8 @@ jobs:
         run: node --test scripts/mvp/vox/rc60-credit-ledger-proof.test.mjs scripts/mvp/vox/rc60-ci-coverage.test.mjs
       - name: Bounded Core post-SQL auth and genuine two-human EOD review cannot hang
         run: node --test scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc42-eod-atomic-data-api-review.test.mjs scripts/mvp/vox/rc61-deadline-integrity.test.mjs
+      - name: First-hop Owner and Staff AAL2 plus canonical Finance RPC fail-closed deadlines
+        run: node --test scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc43-core-route-integration.test.mjs scripts/mvp/vox/rc43-eod-route-integration.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-service.test.mjs scripts/mvp/vox/rc62-operational-deadline-coverage.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

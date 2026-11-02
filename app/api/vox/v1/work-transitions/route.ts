@@ -21,7 +21,15 @@ const sameStaffScope=(a:Awaited<ReturnType<typeof getVerifiedScopedStaff>>,
   const current=Array.isArray(b[key])?[...b[key]].sort():[];
   if(initial.length!==current.length||initial.some((v,i)=>v!==current[i]))return false;
  }
- return true;
+ // Department revocation or substitution is material even when the scoped
+ // object lists happen to be identical. Never certify an in-flight write.
+ const before=(a as typeof a & {verifiedDepartments?:unknown}).verifiedDepartments;
+ const after=(b as typeof b & {verifiedDepartments?:unknown}).verifiedDepartments;
+ if(!Array.isArray(before)||!Array.isArray(after)||
+    before.some(x=>typeof x!=="string")||after.some(x=>typeof x!=="string"))return false;
+ const initialPacks=[...before].sort(),currentPacks=[...after].sort();
+ return initialPacks.length===currentPacks.length&&
+  initialPacks.every((v,i)=>v===currentPacks[i]);
 };
 const unknown=()=>send({ok:false,error:"WORK_TRANSITION_OUTCOME_UNKNOWN",committed:null,retrySameNonceOnly:true},503);
 const EXACT_FIELDS=["action","itemId","expectedRevision","nonce","reason"];
@@ -60,6 +68,7 @@ export async function POST(request:Request){
  if(!ACTIONS.has(String(data.action))||!id(data.itemId)||!id(data.nonce)||
     !Number.isSafeInteger(data.expectedRevision)||
     (data.expectedRevision as number)<0||
+    (data.expectedRevision as number)>2147483646||
     typeof data.reason!=="string"||data.reason.length>300||
     data.reason!==data.reason.trim()||
     (data.action==="CLAIM"&&data.reason!=="")||

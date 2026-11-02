@@ -38,12 +38,12 @@ export function MfaForm({next=null}:{next?:string|null}){
     value={code} onChange={e=>{setCode(e.target.value.replace(/\D/g,"").slice(0,6));if(error)setError("");}}
     placeholder="000000" aria-describedby="vox-mfa-hint"
     aria-invalid={Boolean(error)} required disabled={busy} autoFocus/>
-   <p className="voxMfaHint" id="vox-mfa-hint">Six digits · Codes refresh automatically in your authenticator app</p>
+   <p className="voxMfaHint" id="vox-mfa-hint">Six digits &middot; Codes refresh automatically in your authenticator app</p>
   </div>
   {error?<p className="voxAuthError voxMfaError" role="alert">{error}</p>:null}
   <button className="voxAuthSubmit" disabled={busy||!complete} type="submit">
-   <span>{busy?"Verifying securely…":"Verify and continue"}</span>
-   <span className="voxAuthArrow" aria-hidden="true">→</span>
+   <span>{busy?"Verifying securely...":"Verify and continue"}</span>
+   <span className="voxAuthArrow" aria-hidden="true">&rarr;</span>
   </button>
  </form>;
 }

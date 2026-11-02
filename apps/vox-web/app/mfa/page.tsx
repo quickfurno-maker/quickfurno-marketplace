@@ -21,12 +21,12 @@ export default async function Mfa({searchParams}:{searchParams:Promise<{next?:st
      <h2>Work securely.<br/><em>Stay in control.</em></h2>
      <p>Your VOX account uses a second verification step to protect staff information, customer relationships and governed approvals.</p>
      <div className="voxMfaProgress" aria-label="Sign-in step 2 of 2">
-      <div className="voxMfaProgressItem"><span className="voxMfaProgressMarker" aria-hidden="true">✓</span><div><strong>Account credentials</strong><small>First step completed</small></div></div>
+      <div className="voxMfaProgressItem"><span className="voxMfaProgressMarker" aria-hidden="true">&#x2713;</span><div><strong>Account credentials</strong><small>First step completed</small></div></div>
       <div className="voxMfaProgressConnector" aria-hidden="true"/>
       <div className="voxMfaProgressItem"><span className="voxMfaProgressMarker voxMfaProgressCurrent" aria-hidden="true">2</span><div><strong>Authenticator verification</strong><small>Confirm it is you</small></div></div>
      </div>
     </div>
-    <div className="voxAuthStoryFoot"><span className="voxAuthStoryLock" aria-hidden="true">✦</span> Authorized QuickFurno team access only</div>
+    <div className="voxAuthStoryFoot"><span className="voxAuthStoryLock" aria-hidden="true">*</span> Authorized QuickFurno team access only</div>
    </aside>
    <section className="voxAuthCard voxMfaCard" aria-labelledby="vox-mfa-heading">
     <div className="voxAuthCardHead">
@@ -48,9 +48,9 @@ export default async function Mfa({searchParams}:{searchParams:Promise<{next?:st
      <span>Setting up your authenticator for the first time?</span>
      <Link href={withReturn("/mfa/enroll",next)}>Enroll your authenticator</Link>
     </div>
-    <div className="voxAuthCardFoot"><span className="voxAuthFootIcon" aria-hidden="true">◆</span> Password-only sessions never unlock VOX</div>
+    <div className="voxAuthCardFoot"><span className="voxAuthFootIcon" aria-hidden="true">*</span> Password-only sessions never unlock VOX</div>
    </section>
   </div>
-  <footer className="voxAuthFooter"><span>© QuickFurno · Internal operations</span><span>Encrypted · Authorized personnel only</span></footer>
+  <footer className="voxAuthFooter"><span>&copy; QuickFurno &middot; Internal operations</span><span>Encrypted &middot; Authorized personnel only</span></footer>
  </main>;
 }

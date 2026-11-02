@@ -54,7 +54,10 @@ const ctx=vm.createContext({process:{env:flags},Date:FixedDate,Intl,URL,
  Response,Request,setTimeout,clearTimeout});
 async function load(relative,short){
  const source=readFileSync(new URL("../../../app/api/vox/v1/"+relative+"/route.ts",import.meta.url),"utf8");
- const tested=relative==="eod-submissions"?source.replace("}),4000);","}),25);"):source;
+ const tested=source
+  .replace("STAFF_PREFLIGHT_TIMEOUT_MS=1500","STAFF_PREFLIGHT_TIMEOUT_MS=25")
+  .replace("TL_PREFLIGHT_TIMEOUT_MS=1500","TL_PREFLIGHT_TIMEOUT_MS=25")
+  .replace("}),4000);","}),25);");
  const js=ts.transpileModule(tested,{compilerOptions:{module:ts.ModuleKind.ESNext,
   target:ts.ScriptTarget.ES2022}}).outputText;
  const m=new vm.SourceTextModule(js,{context:ctx,identifier:"route-"+short});
@@ -305,4 +308,24 @@ test("RC81 Staff department or object grant revocation after SQL is never a conf
   assert.equal(state.calls.filter(x=>x.type==="rpc").length,1);
   assert.equal(state.authCalls,2);
  }
+});
+
+
+test("RC82 hung Staff preflight never calls EOD submission SQL",async()=>{
+ state.authHook=()=>new Promise(()=>{});
+ const r=await submits.POST(post("eod-submissions",{businessDate:date,nonce:uuid(44)}));
+ assert.equal(r.status,503);
+ assert.equal((await r.json()).error,"EOD_STAFF_PREFLIGHT_TIMEOUT");
+ assert.equal(state.calls.filter(x=>x.type==="rpc").length,0);
+ assert.equal(state.authCalls,1);
+});
+test("RC82 hung independent Team Leader preflight never mutates SQL review",async()=>{
+ state.authHook=()=>new Promise(()=>{});
+ const r=await reviews.POST(post("eod-reviews",{
+  reportId:uuid(4),expectedRevision:0,nonce:uuid(50),decision:"ACKNOWLEDGED"
+ }));
+ assert.equal(r.status,503);
+ assert.equal((await r.json()).error,"EOD_TL_PREFLIGHT_TIMEOUT");
+ assert.equal(state.calls.filter(x=>x.type==="rpc").length,0);
+ assert.equal(state.authCalls,1);
 });

@@ -9,6 +9,7 @@ const send=(body:unknown,status:number)=>Response.json(body,{status,headers:{
  "cache-control":"private, no-store, max-age=0","vary":"Authorization",
  "x-content-type-options":"nosniff"
 }});
+const STAFF_PREFLIGHT_TIMEOUT_MS=1500;
 const submissionUnknown=()=>send({ok:false,error:"EOD_SUBMISSION_OUTCOME_UNKNOWN",
  committed:null,retrySameNonceOnly:true},503);
 const enabled=()=>process.env.VOX_STAFF_GRANTS_ENABLED==="staging"&&
@@ -97,7 +98,18 @@ export async function POST(request:Request){
  let attempted=false;
  try{
   const authHeader=request.headers.get("authorization");
-  const scope=await getVerifiedScopedStaff(authHeader);
+  let preflightTimer:ReturnType<typeof setTimeout>|undefined;
+  let scope:Awaited<ReturnType<typeof getVerifiedScopedStaff>>;
+  try{
+   const checked=await Promise.race([
+    getVerifiedScopedStaff(authHeader).then(value=>({timedOut:false as const,value})),
+    new Promise<{timedOut:true}>(resolve=>{
+     preflightTimer=setTimeout(()=>resolve({timedOut:true}),STAFF_PREFLIGHT_TIMEOUT_MS);
+    })
+   ]);
+   if(checked.timedOut)return send({ok:false,error:"EOD_STAFF_PREFLIGHT_TIMEOUT"},503);
+   scope=checked.value;
+  }finally{if(preflightTimer!==undefined)clearTimeout(preflightTimer);}
   if(!eligible(scope))return send({ok:false,error:"CURRENT_AAL2_STAFF_REQUIRED"},403);
   attempted=true;
   // A timeout or rejected transport is not proof the same-date SQL submission

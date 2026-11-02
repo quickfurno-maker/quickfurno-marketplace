@@ -11,6 +11,7 @@ const send=(v:unknown,status:number)=>Response.json(v,{status,headers:{
 }});
 // A reviewed SQL decision may already have committed when a response or
 // independent Team Leader authority is lost; never invite a new nonce.
+const TL_PREFLIGHT_TIMEOUT_MS=1500;
 const outcomeUnknown=()=>send({ok:false,error:"EOD_REVIEW_OUTCOME_UNKNOWN",
  committed:null,retrySameNonceOnly:true},503);
 const enabled=()=>process.env.VOX_STAFF_GRANTS_ENABLED==="staging"&&
@@ -68,7 +69,19 @@ export async function POST(request:Request){
   return send({ok:false,error:"INVALID_REVIEW_COMMAND"},400);
  let attempted=false;
  try{
-  const scope=await getVerifiedScopedStaff(request.headers.get("authorization"));
+  let preflightTimer:ReturnType<typeof setTimeout>|undefined;
+  let scope:Awaited<ReturnType<typeof getVerifiedScopedStaff>>;
+  try{
+   const checked=await Promise.race([
+    getVerifiedScopedStaff(request.headers.get("authorization"))
+     .then(value=>({timedOut:false as const,value})),
+    new Promise<{timedOut:true}>(resolve=>{
+     preflightTimer=setTimeout(()=>resolve({timedOut:true}),TL_PREFLIGHT_TIMEOUT_MS);
+    })
+   ]);
+   if(checked.timedOut)return send({ok:false,error:"EOD_TL_PREFLIGHT_TIMEOUT"},503);
+   scope=checked.value;
+  }finally{if(preflightTimer!==undefined)clearTimeout(preflightTimer);}
   if(!scope||scope.role!=="team_leader"||scope.canMutate!==false)
    return send({ok:false,error:"CURRENT_INDEPENDENT_TL_AAL2_REQUIRED"},403);
   // p_actor comes only from independently verified Supabase Auth/Core; SQL

@@ -22,7 +22,7 @@ const state={allowed:true,token:"mock-staff-aal2",origin:"https://staging-core.q
  actionsEnabled:false,conversations:[{id:C,revision:2,state:"OPEN",
  allowedActions:["PAUSE_AI","TAKEOVER"]}]}};
 const env={};
-const ctx=vm.createContext({Request,Response,URL,AbortSignal,
+const ctx=vm.createContext({Request,Response,URL,AbortSignal,setTimeout,clearTimeout,
  process:{env},fetch:async(url,options)=>{
   state.calls.push({url,options});
   if(state.transportFailure)throw Error("simulated Core transport lost after POST");
@@ -43,10 +43,12 @@ async function load(path,imports){
  });
  await mod.evaluate();return mod.namespace;
 }
+const bounded=await load("lib/rc65BoundedStaffMfa.ts",{});
 const adapter=await load("lib/conversationControl.ts",{
  "server-only":{},
  "./auth":{verifiedMfaSession:async()=>{state.auth++;return state.token;}},
- "./core":{origin:()=>state.origin}
+ "./core":{origin:()=>state.origin},
+ "./rc65BoundedStaffMfa":{rc65BoundedStaffMfa:bounded.rc65BoundedStaffMfa}
 });
 const api=await load("app/api/conversation-control/route.ts",{
  "../../../lib/auth":{

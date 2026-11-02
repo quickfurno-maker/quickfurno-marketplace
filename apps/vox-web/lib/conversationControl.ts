@@ -1,6 +1,7 @@
 import "server-only";
 import {verifiedMfaSession} from "./auth";
 import {origin} from "./core";
+import {rc65BoundedStaffMfa} from "./rc65BoundedStaffMfa";
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HASH=/^[a-f0-9]{64}$/;
@@ -24,8 +25,10 @@ export async function submitConversationControl(cmd:ConversationCommand){
     cmd.expectedRevision>2147483646||
     (cmd.action!=="PAUSE_AI"&&cmd.action!=="TAKEOVER"))
   return {ok:false,status:400,error:"INVALID_CONVERSATION_COMMAND"} as const;
- const token=await verifiedMfaSession();
- if(!token)return {ok:false,status:401,error:"STAFF_MFA_REQUIRED"} as const;
+ const staff=await rc65BoundedStaffMfa(verifiedMfaSession);
+ if(!staff.completed)return {ok:false,status:503,error:"STAFF_AUTH_PREFLIGHT_TIMEOUT"} as const;
+ if(!staff.token)return {ok:false,status:401,error:"STAFF_MFA_REQUIRED"} as const;
+ const token=staff.token;
  const base=origin();
  if(!base)return {ok:false,status:503,error:"CORE_ORIGIN_UNVERIFIED"} as const;
  try{
@@ -105,8 +108,10 @@ export async function fetchConversationCandidates(){
     process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED!=="staging"||
     process.env.VOX_RC42_CORE_CONVERSATION_OPERATOR_ENABLED!=="staging"||
     !["scoped","dual"].includes(String(process.env.VOX_STAFF_VIEW_MODE)))return off();
- const token=await verifiedMfaSession();
- if(!token)return {ok:false,status:401,error:"STAFF_MFA_REQUIRED"} as const;
+ const staff=await rc65BoundedStaffMfa(verifiedMfaSession);
+ if(!staff.completed)return {ok:false,status:503,error:"STAFF_AUTH_PREFLIGHT_TIMEOUT"} as const;
+ if(!staff.token)return {ok:false,status:401,error:"STAFF_MFA_REQUIRED"} as const;
+ const token=staff.token;
  const base=origin();
  if(!base)return {ok:false,status:503,error:"CORE_ORIGIN_UNVERIFIED"} as const;
  try{

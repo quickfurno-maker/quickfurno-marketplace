@@ -45,6 +45,7 @@ const ctx=vm.createContext({process:{env:flags},Date:FixedDate,Intl,URL,
  AbortSignal:{timeout:(ms)=>{state.deadlineMs=ms;return AbortSignal.timeout(10000);}},
  fetch:async(url,options)=>{
   state.requests.push({url,options});
+  if(state.throwTransport)throw Error("test-only private transport");
   return {ok:state.status<400,status:state.status,
    json:async()=>state.payload??reply(url,options.method)};
  }});
@@ -71,7 +72,7 @@ beforeEach(()=>{
  flags.VOX_STAFF_VIEW_MODE="scoped";
  Object.assign(state,{token:"SIMULATED_AAL2",
   origin:"https://staging-core.quickfurno.in",status:200,payload:null,
-  requests:[],authChecks:0});
+  requests:[],authChecks:0,throwTransport:false});
 });
 test("default-off Staff portal, team mode and per-feature flag prevent any fetch",async()=>{
  for(const flag of ["VOX_STAFF_PORTAL_ENABLED","VOX_TEAM_WORKSPACE_ENABLED",
@@ -233,4 +234,21 @@ test("RC82 EOD writes outlive maximum Core commit + Staff recheck without changi
  assert.equal(state.deadlineMs,9000);
  await api.sendTeamChat("Internal only",uuid(21));
  assert.equal(state.deadlineMs,3500);
+});
+
+
+test("RC83 lost Core transport for EOD write preserves uncertain original nonce",async()=>{
+ state.throwTransport=true;
+ const submission=await api.submitMyPartialEod(uuid(21));
+ assert.equal(submission.ok,false);
+ assert.equal(submission.status,503);
+ assert.equal(submission.error,"EOD_SUBMISSION_OUTCOME_UNKNOWN");
+ const review=await api.decideTlEod(uuid(10),uuid(22),"ACKNOWLEDGED");
+ assert.equal(review.ok,false);
+ assert.equal(review.status,503);
+ assert.equal(review.error,"EOD_REVIEW_OUTCOME_UNKNOWN");
+ const chat=await api.sendTeamChat("Internal only",uuid(21));
+ assert.equal(chat.error,"CORE_UNAVAILABLE");
+ assert.equal(state.requests.length,3);
+ assert.equal(state.requests[0].options.signal.aborted,false);
 });

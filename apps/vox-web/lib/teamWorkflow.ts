@@ -54,7 +54,15 @@ async function requestCore(path:"staff-chat"|"eod-submissions"|"eod-reviews",
   if(!body||typeof body!=="object"||Array.isArray(body))
    return deny(503,"INVALID_CORE_RESPONSE");
   return {ok:true,status:response.status,body:body as Record<string,unknown>} as const;
- }catch{return deny(503,"CORE_UNAVAILABLE");}
+ }catch{
+  // Network timeout after a mutating EOD request may mean SQL committed.
+  // Preserve exact original nonce; never classify it as a safe retry.
+  if(payload&&path==="eod-submissions")
+   return deny(503,"EOD_SUBMISSION_OUTCOME_UNKNOWN");
+  if(payload&&path==="eod-reviews")
+   return deny(503,"EOD_REVIEW_OUTCOME_UNKNOWN");
+  return deny(503,"CORE_UNAVAILABLE");
+ }
 }
 const exact=(v:Record<string,unknown>,fields:string[])=>{
  return Object.keys(v).sort().join("|")===[...fields].sort().join("|");

@@ -247,3 +247,30 @@ test("RC82 rejection cannot run without distinct reviewed Staging permission",as
  assert.equal(second.ok,false);assert.equal(second.code,"BAD_LEAD_REJECTION_NOT_APPROVED");
  assert.equal(calls.length,0);
 });
+
+
+test("RC83 forged Core reason strings and ambiguous write status never reach operator",async()=>{
+ before();process.env[gate]="staging";
+ for(const [reply,action,expected] of [
+  [{status:"denied",reason_code:"PRIVATE\nbackend details"},"restore_credit","CREDIT_ONLY_RECOVERY_REFUSED"],
+  [{status:"committed_pending",reason_code:"PRIVATE_AUTH_FAILURE"},"restore_credit","CREDIT_OUTCOME_UNKNOWN"],
+  [{status:"denied",reason_code:"PRIVATE\nbackend details"},"reject","RECOVERY_REJECT_REFUSED"],
+  [{status:"committed_pending",reason_code:"PRIVATE_AUTH_FAILURE"},"reject","REJECT_OUTCOME_UNKNOWN"]
+ ]){
+  globalThis.__rc42Reply=reply;
+  const r=await apply(REPORT,action,ACTOR);
+  assert.equal(r.ok,false);assert.equal(r.code,expected);
+  assert.equal(JSON.stringify(r).includes("PRIVATE"),false);
+ }
+});
+test("RC83 recommendation ambiguous status cannot claim definite refusal",async()=>{
+ before();
+ const saved=globalThis.__rc42Db;
+ try{
+  globalThis.__rc42Db=()=>({rpc:async()=>({
+   data:{status:"committed_pending",reason_code:"HUMAN_APPROVAL_REQUIRED"},error:null
+  })});
+  const r=await recommend(REPORT,"restore_credit");
+  assert.equal(r.ok,false);assert.equal(r.code,"RECOMMEND_OUTCOME_UNKNOWN");
+ }finally{globalThis.__rc42Db=saved;}
+});

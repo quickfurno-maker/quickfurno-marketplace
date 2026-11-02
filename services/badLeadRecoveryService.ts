@@ -20,6 +20,11 @@ export const RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=false as const;
 // Rejection also mutates canonical recovery state. Release it only after a
 // separately reviewed Staging installation; never by environment flag alone.
 export const RC82_BAD_LEAD_REJECTION_RPC_INSTALLED=false as const;
+// Canonical RPC transport cannot hand browser callers arbitrary reason text,
+// objects or backend diagnostics masquerading as an application error code.
+const knownRefusal=(s:unknown)=>["blocked","denied","refused","rejected"].includes(String(s));
+const safeReason=(v:unknown,fallback:string)=>typeof v==="string"&&
+ /^[A-Z][A-Z0-9_]{2,63}$/.test(v)?v:fallback;
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const policyDenied=<T>()=>blocked<T>("BAD_LEAD_CREDIT_ONLY_POLICY",
  "A verified bad lead receives one lead credit, never money or a replacement assignment.");
@@ -61,8 +66,11 @@ export async function recommendBadLeadRecovery(
   if(error||!data||typeof data!=="object"||Array.isArray(data))
    return uncertainRecommendation();
   const row=data as RecoveryRpcResult;
-  if(row.status!=="applied")return blocked(String(row.reason_code??"RECOVERY_RECOMMENDATION_REFUSED"),
-   "Recovery recommendation was refused.");
+  if(row.status!=="applied"){
+   if(!knownRefusal(row.status))return uncertainRecommendation();
+   return blocked(safeReason(row.reason_code,"RECOVERY_RECOMMENDATION_REFUSED"),
+    "Recovery recommendation was refused.");
+  }
   if((row.lead_credits_restored!==undefined&&row.lead_credits_restored!==0)||
      (row.cash_refunded_minor_units!==undefined&&row.cash_refunded_minor_units!==0)||
      row.automatic_replacement_created===true||row.replacement_assignment_id!=null||
@@ -131,9 +139,11 @@ export async function applyBadLeadRecovery(
    }finally{if(creditTimer!==undefined)clearTimeout(creditTimer);}
    if(error)return uncertainCredit();
    const r=(data??{}) as RecoveryRpcResult;
-   if(r.status!=="applied"&&r.status!=="already_applied")
-    return blocked(String(r.reason_code??"CREDIT_ONLY_RECOVERY_REFUSED"),
+   if(r.status!=="applied"&&r.status!=="already_applied"){
+    if(!knownRefusal(r.status))return uncertainCredit();
+    return blocked(safeReason(r.reason_code,"CREDIT_ONLY_RECOVERY_REFUSED"),
      "Lead-credit restoration was denied by canonical authority.");
+   }
    // V2 returns 0 on replay, 1 on first restoration and never money or replacement.
    // The SQL authority must identify the ORIGINAL consumed assignment and
    // the unique canonical approval on both first application and replay.
@@ -176,8 +186,10 @@ export async function applyBadLeadRecovery(
   if(error||!data||typeof data!=="object"||Array.isArray(data))
    return uncertainReject();
   const r=data as RecoveryRpcResult;
-  if(r.status!=="applied"&&r.status!=="already_applied")
-   return blocked(String(r.reason_code??"RECOVERY_REJECT_REFUSED"),"Rejection was refused.");
+  if(r.status!=="applied"&&r.status!=="already_applied"){
+   if(!knownRefusal(r.status))return uncertainReject();
+   return blocked(safeReason(r.reason_code,"RECOVERY_REJECT_REFUSED"),"Rejection was refused.");
+  }
   // A human rejection must not be reported successful from a response
   // claiming any cash, lead credits or a new assignment.
   if((r.lead_credits_restored!==undefined&&r.lead_credits_restored!==0)||

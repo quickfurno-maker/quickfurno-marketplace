@@ -24,6 +24,9 @@ const policyDenied=<T>()=>blocked<T>("BAD_LEAD_CREDIT_ONLY_POLICY",
 // report must be reconciled against its ORIGINAL assignment before any retry.
 const uncertainCredit=<T>()=>blocked<T>("CREDIT_OUTCOME_UNKNOWN",
  "Lead-credit outcome is uncertain. Reconcile this exact bad-lead report before retry; never issue another credit.");
+// A lost canonical credit receipt may follow a committed one-credit transaction.
+// This limits HTTP waiting; it NEVER retries the RPC or declares rollback.
+const CREDIT_RPC_TIMEOUT_MS=4000;
 
 export async function recommendBadLeadRecovery(
  reportId:string,recommendation:"none"|Exclude<BadLeadRecoveryAction,"reject">
@@ -88,10 +91,21 @@ export async function applyBadLeadRecovery(
       process.env.QF_VOX_BAD_LEAD_CREDIT_ONLY_ATOMIC_ENABLED!=="staging")
     return blocked("CREDIT_ONLY_ATOMIC_NOT_APPROVED",
      "Reviewed atomic one-credit-per-assignment authority is not installed.");
-   const {data,error}=await adminClient().rpc(
-    "qf_vox_rc42_bad_lead_credit_only_atomic_candidate_v1",{
-     p_report_id:reportId,p_actor_id:actorId
-    });
+   let creditTimer:ReturnType<typeof setTimeout>|undefined;
+   let data:unknown,error:unknown;
+   try{
+    const result=await Promise.race([
+     Promise.resolve(adminClient().rpc(
+      "qf_vox_rc42_bad_lead_credit_only_atomic_candidate_v1",{
+       p_report_id:reportId,p_actor_id:actorId
+      })).then(value=>({timedOut:false as const,value})),
+     new Promise<{timedOut:true}>(resolve=>{
+      creditTimer=setTimeout(()=>resolve({timedOut:true}),CREDIT_RPC_TIMEOUT_MS);
+     })
+    ]);
+    if(result.timedOut)return uncertainCredit();
+    ({data,error}=result.value);
+   }finally{if(creditTimer!==undefined)clearTimeout(creditTimer);}
    if(error)return uncertainCredit();
    const r=(data??{}) as RecoveryRpcResult;
    if(r.status!=="applied"&&r.status!=="already_applied")

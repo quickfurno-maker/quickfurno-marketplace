@@ -5,7 +5,7 @@ import "server-only";
 export type Rc42Actor=Readonly<{userId:string;aal:"aal2";expiresAtMs:number;teamId:string;cityId:string}>;
 type Command={conversationId:string;nonce:string;expectedRevision:number;action:"PAUSE_AI"|"TAKEOVER"};
 type Deps={
- enabled:()=>boolean;installed:()=>boolean;now?:()=>number;rpcTimeoutMs?:number;recheckTimeoutMs?:number;
+ enabled:()=>boolean;installed:()=>boolean;now?:()=>number;rpcTimeoutMs?:number;recheckTimeoutMs?:number;authTimeoutMs?:number;
  verify:(bearer:string|null)=>Promise<Rc42Actor|null>;
  rpc:(name:string,args:Record<string,unknown>)=>Promise<{data:unknown;error:unknown}>
 };
@@ -44,7 +44,23 @@ export function createRc42AtomicConversationHandler(deps:Deps){
   if(!valid(value))return status("INVALID_COMMAND",400);
   const b=request.headers.get("authorization");
   let actor:Rc42Actor|null;
-  try{actor=await deps.verify(b);}catch{return status("STAFF_AUTH_UNAVAILABLE",503);}
+  let authTimer:ReturnType<typeof setTimeout>|undefined;
+  try{
+   // This first independent GoTrue check is BEFORE SQL. Fail closed, rather
+   // than leaving a stalled identity provider to hang the entire HTTP call.
+   const chosen=deps.authTimeoutMs;
+   const authMs=Number.isSafeInteger(chosen)&&Number(chosen)>=25&&
+    Number(chosen)<=2500?Number(chosen):1250;
+   const checked=await Promise.race([
+    deps.verify(b).then(value=>({timedOut:false as const,value})),
+    new Promise<{timedOut:true}>(resolve=>{
+     authTimer=setTimeout(()=>resolve({timedOut:true}),authMs);
+    })
+   ]);
+   if(checked.timedOut)return status("STAFF_AUTH_PREFLIGHT_TIMEOUT",503);
+   actor=checked.value;
+  }catch{return status("STAFF_AUTH_UNAVAILABLE",503);}
+  finally{if(authTimer!==undefined)clearTimeout(authTimer);}
   if(!actor||actor.aal!=="aal2"||!UUID.test(actor.userId)||!UUID.test(actor.teamId)||
      !UUID.test(actor.cityId)||!Number.isSafeInteger(actor.expiresAtMs)||
      actor.expiresAtMs<=(deps.now??Date.now)())return status("STAFF_AAL2_REQUIRED",403);

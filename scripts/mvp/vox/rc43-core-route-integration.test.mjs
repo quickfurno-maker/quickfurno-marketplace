@@ -79,6 +79,16 @@ test("revoked AAL2, malformed input and forged role never reach core authority",
  calls=world();assert.equal((await sim.POST(request({...cmd,actorId:U}))).status,400);
  assert.equal(calls.sql,0);
 });
+test("actual installed Core route rejects a hung GoTrue preflight before SQL",async()=>{
+ gate(true);
+ const calls=world();
+ globalThis.__rc43Core.verify=async()=>{calls.auth++;return new Promise(()=>{});};
+ const start=Date.now();
+ const r=await sim.POST(request());
+ assert.ok(Date.now()-start<2500);assert.equal(r.status,503);
+ const b=await r.json();assert.equal(b.error,"CURRENT_STAFF_AUTH_TIMEOUT");
+ assert.equal(calls.auth,1);assert.equal(calls.sql,0);
+});
 test("all non-POST HTTP methods are closed in both production and simulated route",async()=>{
  for(const mod of [prod,sim])for(const verb of ["GET","PUT","PATCH","DELETE"]){
   const r=await mod[verb]();assert.equal(r.status,405);

@@ -24,12 +24,24 @@ export async function GET(request:Request){
  // Owner + distinct TL before/after reads and performs two receipt snapshots.
  if(!RC42_EOD_ATOMIC_DATA_API_READER_INSTALLED||
     process.env.VOX_RC42_EOD_ATOMIC_REVIEW_ENABLED!=="staging")return handler(request);
+ let preflightTimer:ReturnType<typeof setTimeout>|undefined;
+ const denyOwner=(error:string,status:number)=>Response.json({ok:false,error,
+  approved:false,publicationAuthorized:false,providerMessagesSent:0},
+  {status,headers:{"cache-control":"private, no-store, max-age=0"}});
  try{
-  if(!await verifyVoxOwnerBearer(request.headers.get("authorization")))
-   return Response.json({ok:false,error:"OWNER_AAL2_REQUIRED"},{status:403,
-    headers:{"cache-control":"private, no-store, max-age=0"}});
- }catch{return Response.json({ok:false,error:"OWNER_AUTH_UNAVAILABLE"},{status:503,
-  headers:{"cache-control":"private, no-store, max-age=0"}});}
+  // Separate Owner AAL2 preflight is BEFORE all read-only EOD review calls.
+  // A stalled GoTrue request must never hang this route indefinitely.
+  const result=await Promise.race([
+   verifyVoxOwnerBearer(request.headers.get("authorization"))
+    .then(actor=>({timedOut:false as const,actor})),
+   new Promise<{timedOut:true}>(resolve=>{
+    preflightTimer=setTimeout(()=>resolve({timedOut:true}),1500);
+   })
+  ]);
+  if(result.timedOut)return denyOwner("OWNER_AUTH_TIMEOUT",503);
+  if(!result.actor)return denyOwner("OWNER_AAL2_REQUIRED",403);
+ }catch{return denyOwner("OWNER_AUTH_UNAVAILABLE",503);}
+ finally{if(preflightTimer!==undefined)clearTimeout(preflightTimer);}
  return handler(request);
 }
 const deny=()=>Response.json({ok:false,error:"METHOD_NOT_ALLOWED"},{status:405,

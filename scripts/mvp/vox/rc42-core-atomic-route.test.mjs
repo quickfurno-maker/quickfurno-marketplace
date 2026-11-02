@@ -46,6 +46,18 @@ test("AAL1, expired or missing verified Staff never reaches SQL",async()=>{
   assert.equal(r.status,403);assert.equal(d.calls.length,0);
  }
 });
+test("hung first GoTrue check cannot reach SQL or claim an uncertain commit",async()=>{
+ let calls=0;
+ const d=deps({authTimeoutMs:25,verify:async()=>{
+  calls++;return new Promise(()=>{});
+ }});
+ const before=Date.now();
+ const r=await create(d)(request());
+ assert.ok(Date.now()-before<1000);assert.equal(r.status,503);
+ const v=await r.json();assert.equal(v.error,"STAFF_AUTH_PREFLIGHT_TIMEOUT");
+ assert.equal(v.committed,false);assert.equal(v.providerMessagesSent,0);
+ assert.equal(calls,1);assert.equal(d.calls.length,0);
+});
 test("authoritative Staff principal and consent-bound atomic RPC, zero provider send",async()=>{
  const d=deps(),r=await create(d)(request());
  assert.equal(r.status,200);const b=await r.json();

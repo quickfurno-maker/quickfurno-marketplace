@@ -192,7 +192,15 @@ export async function updateVendorLeadReportStatus(
     // Parity with the legacy approve flow: a Valid report flags the assignment
     // for reporting. Informational only — no credit is refunded.
     if (status === "Valid" && report?.lead_assignment_id) {
-      await db.from("lead_assignments").update({ is_bad_lead_reported: true }).eq("id", report.lead_assignment_id);
+      // This flag is informational; it must not grant credit or money.
+      // The report metadata write above may already have committed. If the
+      // linked assignment flag fails or matches no row, return UNKNOWN/failed
+      // to the governed UI, never false confirmation of a complete review.
+      const {data:updatedAssignment,error:assignmentError}=await db
+        .from("lead_assignments").update({is_bad_lead_reported:true})
+        .eq("id",report.lead_assignment_id).select("id").single();
+      if(assignmentError||updatedAssignment?.id!==report.lead_assignment_id)
+        throw appError("VALIDATION");
     }
     return ok(null);
   } catch (e) {

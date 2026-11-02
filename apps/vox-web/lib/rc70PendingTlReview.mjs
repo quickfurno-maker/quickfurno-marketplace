@@ -30,7 +30,7 @@ export function savePendingTlReview(store,row){
   store.setItem(KEY,JSON.stringify(next));
   const actual=readPendingTlReviews(store);
   return actual.available&&actual.records.length===next.length&&
-   actual.records.some(x=>x.reportId===row.reportId&&x.decision===row.decision&&x.nonce===row.nonce);
+   actual.records.every((x,i)=>JSON.stringify(x)===JSON.stringify(next[i]));
  }catch{return false;}
 }
 export function clearPendingTlReview(store,row){
@@ -43,6 +43,6 @@ export function clearPendingTlReview(store,row){
   else store.removeItem(KEY);
   const after=readPendingTlReviews(store);
   return after.available&&after.records.length===next.length&&
-   !after.records.some(x=>x.reportId===row.reportId);
+   after.records.every((x,i)=>JSON.stringify(x)===JSON.stringify(next[i]));
  }catch{return false;}
 }

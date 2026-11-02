@@ -40,6 +40,13 @@ on:
       - 'scripts/mvp/vox/rc73-*.test.mjs'
       - 'scripts/mvp/vox/rc74-*.test.mjs'
       - 'scripts/mvp/vox/rc75-*.test.mjs'
+      - 'scripts/mvp/vox/rc76-*.test.mjs'
+      - 'apps/vox-web/scripts/validate-rc76-*.spec.mjs'
+      - 'apps/vox-web/scripts/validate-rc40-staff-uat-recovery.spec.mjs'
+      - 'services/vox/rc76AtomicBadLeadStatusReceipt.ts'
+      - 'apps/vox-web/app/team/work-queue/PendingWorkNotice.tsx'
+      - 'apps/vox-web/app/team/work-queue/page.tsx'
+      - 'app/actions.ts'
       - 'apps/vox-web/scripts/validate-rc75-*.spec.mjs'
       - 'ops/vox/rc75-review-only/**'
       - 'scripts/mvp/vox/validate-vox-rc75-atomic-bad-lead-pg17.ps1'
@@ -207,6 +214,8 @@ jobs:
         run: node --test apps/vox-web/scripts/validate-rc74-terminal-work-recovery.spec.mjs scripts/mvp/vox/rc74-bad-lead-linked-assignment.test.mjs apps/vox-web/scripts/validate-rc74-ascii-mfa-utf8.spec.mjs
       - name: RC75 Staff action/Core parity, TL lost-review notice, quarantined atomic Finance candidate
         run: node --test apps/vox-web/scripts/validate-rc75-work-state-action-parity.spec.mjs apps/vox-web/scripts/validate-rc75-eod-unlisted-review-recovery.spec.mjs scripts/mvp/vox/rc75-bad-lead-atomic-review.test.mjs
+      - name: RC76 compiled Staff security, fail-closed atomic bad-lead integration and lost Core nonce recovery
+        run: node --test apps/vox-web/scripts/validate-rc40-staff-uat-recovery.spec.mjs scripts/mvp/vox/rc76-finance-atomic-readiness.test.mjs apps/vox-web/scripts/validate-rc76-hidden-work-recovery.spec.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

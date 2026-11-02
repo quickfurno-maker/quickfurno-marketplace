@@ -62,6 +62,20 @@ test("forged, revoked, mutated or mismatched receipt never passes",async()=>{
   const d=deps({review:async()=>bad});assert.equal((await create(d)(request())).status,409);
  }
 });
+test("hung independent Owner and Team Leader review times out with zero approval",async()=>{
+ const d=deps({reviewTimeoutMs:25,
+  review:async()=>new Promise(()=>{})});
+ const start=Date.now();
+ const r=await create(d)(request());
+ assert.equal(r.status,503);
+ assert.ok(Date.now()-start<1000);
+ const body=await r.json();
+ assert.equal(body.ok,false);
+ assert.equal(body.error,"EOD_REVIEW_TIMEOUT");
+ assert.equal(body.approved,false);
+ assert.equal(body.publicationAuthorized,false);
+ assert.equal(body.providerMessagesSent,0);
+});
 test("RPC or signer verification exceptions are fail-closed",async()=>{
  const d=deps({review:async()=>{throw Error("revoked");}});
  const r=await create(d)(request());assert.equal(r.status,503);

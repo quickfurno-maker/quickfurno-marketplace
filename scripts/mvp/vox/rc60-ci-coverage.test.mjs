@@ -17,6 +17,7 @@ test("review-only Finance replay fails closed before recording a new restoration
  const harness=read("scripts/mvp/vox/validate-vox-rc42-credit-only-pg17.ps1");
  assert.match(sql,/RC60_CANONICAL_CREDIT_NOT_NEWLY_APPLIED/);
  assert.match(sql,/RC60_CANONICAL_LEDGER_RECEIPT_MISMATCH/);
+ assert.match(sql,/RC60_CANONICAL_LEDGER_ROW_UNBOUND/);
  assert.match(harness,/canonical already_applied response/);
  assert.match(harness,/replay aborts new approval/);
  assert.match(harness,/replay cannot increment wallet again/);

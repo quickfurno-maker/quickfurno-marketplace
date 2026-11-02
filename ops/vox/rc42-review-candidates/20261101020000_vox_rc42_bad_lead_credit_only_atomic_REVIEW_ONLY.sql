@@ -139,6 +139,21 @@ BEGIN
  IF NOT FOUND THEN
   RAISE EXCEPTION 'RC60_CANONICAL_LEDGER_RECEIPT_MISMATCH' USING ERRCODE='P0001';
  END IF;
+ -- The receipt must also bind to the ACTUAL canonical credit ledger record,
+ -- not merely an arbitrary UUID copied into the new approval by a broken
+ -- or stale canonical function. This protects against an old ledger replay
+ -- masquerading as a newly issued LEAD credit.
+ PERFORM 1 FROM public.vendor_credit_logs l
+  WHERE l.id=(credit->>'ledger_id')::uuid
+    AND l.vendor_id=a.vendor_id
+    AND l.approval_reference=approval_id
+    AND l.reference_type='credit_restoration_approval'
+    AND l.reference_id=approval_id::text
+    AND l.change_type='approved_bad_lead_restoration'
+    AND l.credits_delta=1;
+ IF NOT FOUND THEN
+  RAISE EXCEPTION 'RC60_CANONICAL_LEDGER_ROW_UNBOUND' USING ERRCODE='P0001';
+ END IF;
  UPDATE public.bad_lead_reports SET recovery_recommendation='restore_credit',
   recovery_status='applied',credit_restored=true,
   credit_restoration_approval_id=approval_id,reviewed_by=p_actor_id,

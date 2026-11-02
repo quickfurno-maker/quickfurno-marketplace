@@ -130,13 +130,15 @@ export async function submitMyPartialEod(nonce:string){
    x.ok!==true||x.schema!=="qf.vox.eod.submission.receipt.v1"||
    !isId(x.reportId)||!["PENDING_REVIEW","ACKNOWLEDGED","REJECTED"].includes(String(x.state))||
    !Number.isSafeInteger(x.revision)||![0,1].includes(x.revision as number)||
+   (x.state==="PENDING_REVIEW"&&x.revision!==0)||
+   (x.state!=="PENDING_REVIEW"&&x.revision!==1)||
    !Number.isSafeInteger(x.eventCount)||(x.eventCount as number)<0||
    (x.eventCount as number)>100||
    x.completeness!=="PARTIAL_UNVERIFIED_TOTAL"||
    x.externalMessagesSent!==0||x.staffPrivilegesChanged!==false)
   return deny(503,"INVALID_EOD_RECEIPT");
  return {ok:true,status:200,reportId:x.reportId,
-  state:x.state as string,eventCount:x.eventCount as number,
+  state:x.state as string,revision:x.revision as 0|1,eventCount:x.eventCount as number,
   completeness:"PARTIAL_UNVERIFIED_TOTAL" as const} as const;
 }
 export async function fetchTlEodQueue(){

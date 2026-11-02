@@ -135,9 +135,25 @@ test("employee EOD POST derives India date and accepts only nonce",async()=>{
  const r=await api.submitMyPartialEod(uuid(21));
  assert.equal(r.ok,true);
  assert.equal(r.completeness,"PARTIAL_UNVERIFIED_TOTAL");
+ assert.equal(r.revision,0);
  const call=state.requests[0];
  assert.equal(call.options.method,"POST");
  assert.deepEqual(JSON.parse(call.options.body),{nonce:uuid(21),businessDate:fixed});
+});
+test("EOD POST refuses inconsistent state/revision receipts, even after Core HTTP 200",async()=>{
+ const b=reply("eod-submissions","POST");
+ for(const invalid of [
+  {...b,state:"ACKNOWLEDGED",revision:0},
+  {...b,state:"REJECTED",revision:0},
+  {...b,state:"PENDING_REVIEW",revision:1},
+  {...b,revision:2},
+  {...b,externalMessagesSent:1}
+ ]){
+  state.payload=invalid;
+  const result=await api.submitMyPartialEod(uuid(21));
+  assert.equal(result.ok,false);
+  assert.equal(result.status,503);
+ }
 });
 test("EOD GET strictly verifies partial-only count and row state",async()=>{
  assert.equal((await api.fetchMyEodSubmissions()).ok,true);

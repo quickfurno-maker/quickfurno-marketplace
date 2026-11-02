@@ -42,6 +42,19 @@ test("missing reviewed Data API reader fails closed before two-human review",asy
  const d=deps({rpc:()=>null});const r=await create(d)(request());
  assert.equal(r.status,503);assert.equal(d.calls.length,0);
 });
+test("reader construction failure never leaks credentials or starts a review",async()=>{
+ let reviews=0;
+ const d=deps({rpc:()=>{throw Error("sensitive_reader_factory_error");},
+  review:async()=>{reviews++;return proof;}});
+ const r=await create(d)(request());
+ assert.equal(r.status,503);
+ const b=await r.json();
+ assert.equal(b.error,"REVIEWED_DATA_API_READER_UNAVAILABLE");
+ assert.equal(b.publicationAuthorized,false);
+ assert.equal(b.providerMessagesSent,0);
+ assert.equal(JSON.stringify(b).includes("sensitive_reader_factory_error"),false);
+ assert.equal(reviews,0);
+});
 test("signed receipt preview never grants official EOD publication",async()=>{
  const d=deps();const r=await create(d)(request());assert.equal(r.status,200);
  const b=await r.json();assert.equal(b.ok,true);
@@ -61,6 +74,20 @@ test("forged, revoked, mutated or mismatched receipt never passes",async()=>{
  ]){
   const d=deps({review:async()=>bad});assert.equal((await create(d)(request())).status,409);
  }
+});
+test("hung independent Owner and Team Leader review times out with zero approval",async()=>{
+ const d=deps({reviewTimeoutMs:25,
+  review:async()=>new Promise(()=>{})});
+ const start=Date.now();
+ const r=await create(d)(request());
+ assert.equal(r.status,503);
+ assert.ok(Date.now()-start<1000);
+ const body=await r.json();
+ assert.equal(body.ok,false);
+ assert.equal(body.error,"EOD_REVIEW_TIMEOUT");
+ assert.equal(body.approved,false);
+ assert.equal(body.publicationAuthorized,false);
+ assert.equal(body.providerMessagesSent,0);
 });
 test("RPC or signer verification exceptions are fail-closed",async()=>{
  const d=deps({review:async()=>{throw Error("revoked");}});

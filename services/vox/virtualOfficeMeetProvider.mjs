@@ -28,15 +28,24 @@ export async function createScopedMeet(input,deps={}){
  catch{return deny("MEETING_NONCE_RESERVATION_UNAVAILABLE");}
  if(reserved?.status==="REPLAY"){
   const link=googleMeetJoinLink(reserved.receipt?.joinUrl);
-  if(link.ok&&reserved.receipt?.nonce===intent.nonce&&
-   typeof reserved.receipt?.spaceName==="string"&&
-   /^spaces\/[A-Za-z0-9_-]{2,128}$/.test(reserved.receipt.spaceName))
-    return {ok:true,replayed:true,providerCalled:false,nonce:intent.nonce,
-      joinUrl:link.joinUrl,spaceName:reserved.receipt.spaceName};
-  return {ok:false,reason:"MEETING_NONCE_RECONCILIATION_REQUIRED",
-   committed:null,retrySameNonceOnly:true,providerCalled:false};
+  if(!link.ok||reserved.receipt?.nonce!==intent.nonce||
+   typeof reserved.receipt?.spaceName!=="string"||
+   !/^spaces\/[A-Za-z0-9_-]{2,128}$/.test(reserved.receipt.spaceName))
+    return {ok:false,reason:"MEETING_NONCE_RECONCILIATION_REQUIRED",
+     committed:null,retrySameNonceOnly:true,providerCalled:false};
+  // The original scoped grant may have been revoked while this prior meeting
+  // existed. A nonce replay is NOT a perpetual right to disclose its join URL.
+  try{
+   if(await deps.verifyCurrentScope(intent)!==true)
+    return deny("CURRENT_MEETING_SCOPE_DENIED");
+  }catch{return deny("CURRENT_MEETING_SCOPE_UNAVAILABLE");}
+  return {ok:true,replayed:true,providerCalled:false,nonce:intent.nonce,
+   joinUrl:link.joinUrl,spaceName:reserved.receipt.spaceName};
  }
- if(reserved?.status!=="RESERVED")return deny("MEETING_NONCE_NOT_RESERVED");
+ // Reservation must be bound to the original request and a durable transaction.
+ // Mere truthy RESERVED from a broken adapter must never trigger provider I/O.
+ if(reserved?.status!=="RESERVED"||reserved.nonce!==intent.nonce||
+    reserved.durable!==true)return deny("MEETING_NONCE_NOT_RESERVED");
  // From this point a lost response may hide a real provider-created space.
  let token;
  try{token=await deps.accessToken();}

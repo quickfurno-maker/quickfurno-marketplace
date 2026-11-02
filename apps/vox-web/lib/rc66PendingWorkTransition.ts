@@ -39,14 +39,26 @@ export function savePendingWork(store:Store,record:PendingWork):boolean{
  const old=state.records.find(x=>x.itemId===record.itemId);
  if(old&&JSON.stringify(old)!==JSON.stringify(record))return false;
  if(!old){if(state.records.length>=40)return false;state.records.push(record);}
- try{store.setItem(PENDING_WORK_KEY,JSON.stringify(state.records));return true;}
- catch{return false;}
+ try{
+  store.setItem(PENDING_WORK_KEY,JSON.stringify(state.records));
+  // Browser storage may silently ignore writes. Never submit a Core command
+  // until the original nonce is independently read back from this tab.
+  const verified=readPendingWork(store);
+  return verified.available&&verified.records.length===state.records.length&&
+   verified.records.some(x=>x.itemId===record.itemId&&
+    JSON.stringify(x)===JSON.stringify(record));
+ }catch{return false;}
 }
 export function clearPendingWork(store:Store,itemId:string,nonce:string):boolean{
  if(!store||!UUID.test(itemId)||!UUID.test(nonce))return false;
  const state=readPendingWork(store);if(!state.available)return false;
  const old=state.records.find(x=>x.itemId===itemId);
  if(!old||old.nonce!==nonce)return false;
- try{store.setItem(PENDING_WORK_KEY,JSON.stringify(state.records.filter(x=>x.itemId!==itemId)));return true;}
- catch{return false;}
+ try{
+  const remaining=state.records.filter(x=>x.itemId!==itemId);
+  store.setItem(PENDING_WORK_KEY,JSON.stringify(remaining));
+  const verified=readPendingWork(store);
+  return verified.available&&verified.records.length===remaining.length&&
+   !verified.records.some(x=>x.itemId===itemId);
+ }catch{return false;}
 }

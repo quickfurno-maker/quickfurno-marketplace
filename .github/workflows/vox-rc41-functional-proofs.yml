@@ -145,6 +145,8 @@ jobs:
         run: node --test scripts/mvp/vox/rc66-work-core-boundary.test.mjs apps/vox-web/scripts/validate-rc66-work-recovery.spec.mjs scripts/mvp/vox/rc34-vox-web-staff-session-core-http.test.mjs
       - name: RC66 compiled Web work-queue to Core HTTP security contract
         run: node --experimental-vm-modules --test apps/vox-web/scripts/validate-voxL4-atomic-work-actions.spec.mjs
+      - name: RC67 post-SQL Staff grant revalidation and bounded human Finance recommendation
+        run: node --test scripts/mvp/vox/rc66-work-core-boundary.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-service.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

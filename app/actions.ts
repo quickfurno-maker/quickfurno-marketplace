@@ -970,8 +970,12 @@ export const adminUpdateVendorLeadReportStatus = async (reportId: string, input:
 
 export const adminRecommendBadLeadRecovery = async (
   reportId: string,
-  recommendation: "none" | "restore_credit" | "replace" | "restore_credit_and_replace",
+  recommendation: "none" | "restore_credit",
 ) => asAdmin(async actor => {
+  // Only "none" or a one-LEAD-credit recommendation is permitted. Do not
+  // offer or persist a replacement-assignment recommendation for bad leads.
+  if(recommendation!=="none"&&recommendation!=="restore_credit")
+    return fail(appError("VALIDATION"));
   // Recommendations feed the eventual compensation decision. Require the
   // same CURRENT Owner AAL2 as approval, but never issue credits here.
   if(!await rc44VerifiedBadLeadOwner(actor))return fail(appError("UNAUTHORIZED"));

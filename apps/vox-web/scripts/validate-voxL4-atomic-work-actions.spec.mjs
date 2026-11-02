@@ -163,7 +163,12 @@ test("client transition forms use crypto nonce, same-origin and report Core rece
  assert.match(s,/crypto.randomUUID/);
  assert.match(s,/credentials:"same-origin"/);
  assert.match(s,/expectedRevision:revision/);
- assert.match(s,/providerMessagesSent/);
+ // The UI now delegates exact receipt verification to a pure tested helper,
+ // rather than repeating partial field checks inside the component.
+ assert.match(s,/isVerifiedWorkReceipt\(body,/);
+ const validator=readFileSync(new URL("../lib/rc69VerifiedWorkReceipt.ts",import.meta.url),"utf8");
+ assert.match(validator,/receipt\.providerMessagesSent===0/);
+ assert.match(validator,/receipt\.affectsVendorLeadMatching===false/);
  assert.doesNotMatch(s,/createClient\(|service_role|NEXT_PUBLIC_.*KEY/);
 });
 test("zero browser action when all flags OFF; only Core has authority",()=>{

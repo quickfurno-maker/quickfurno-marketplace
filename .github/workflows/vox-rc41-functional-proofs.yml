@@ -29,6 +29,10 @@ on:
       - 'scripts/mvp/vox/rc64-*.test.mjs'
       - 'scripts/mvp/vox/rc65-*.test.mjs'
       - 'scripts/mvp/vox/rc66-*.test.mjs'
+      - 'scripts/mvp/vox/rc68-*.test.mjs'
+      - 'apps/vox-web/scripts/validate-rc68-vendor360-tasks.spec.mjs'
+      - 'apps/vox-web/app/vendor360/**'
+      - 'services/vox/rc68PostRecommendationOwnerAuthority.ts'
       - 'apps/vox-web/scripts/validate-rc66-work-recovery.spec.mjs'
       - 'apps/vox-web/lib/rc66PendingWorkTransition.ts'
       - 'apps/vox-web/lib/workTransitions.ts'
@@ -147,6 +151,8 @@ jobs:
         run: node --experimental-vm-modules --test apps/vox-web/scripts/validate-voxL4-atomic-work-actions.spec.mjs
       - name: RC67 post-SQL Staff grant revalidation and bounded human Finance recommendation
         run: node --test scripts/mvp/vox/rc66-work-core-boundary.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-service.test.mjs
+      - name: RC68 Vendor 360 actual assigned Core tasks and post-recommendation Owner proof
+        run: node --test apps/vox-web/scripts/validate-rc68-vendor360-tasks.spec.mjs scripts/mvp/vox/rc68-finance-recommendation-owner.test.mjs scripts/mvp/vox/rc55-finance-recommendation-aal2.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

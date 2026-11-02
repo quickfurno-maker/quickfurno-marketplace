@@ -954,13 +954,14 @@ export const adminUpdateVendorLeadReportStatus = async (reportId: string, input:
   asAdmin(async (actor) => {
     // "Valid" is a credit-restoration eligibility state in the reviewed SQL.
     // The alternate status editor MUST NOT approve a bad lead at AAL1.
-    if (input?.status==="Valid" && !await rc44VerifiedBadLeadOwner(actor))
+    if ((input?.status==="Valid"||process.env.VOX_BAD_LEAD_ATOMIC_REVIEW_ENABLED==="staging")&&
+        !await rc44VerifiedBadLeadOwner(actor))
       return fail(appError("UNAUTHORIZED"));
     const result = await audit.updateVendorLeadReportStatus(reportId, input, actor);
     // "Valid" makes a bad-lead report eligible for a later credit-only
     // remedy. A successful metadata write followed by revoked Owner AAL2
     // must remain UNKNOWN, not a falsely acknowledged eligibility approval.
-    const verified = input?.status==="Valid"
+    const verified = (input?.status==="Valid"||process.env.VOX_BAD_LEAD_ATOMIC_REVIEW_ENABLED==="staging")
       ?await rc70PostEligibilityOwnerAuthority(result,()=>rc44VerifiedBadLeadOwner(actor))
       :result;
     if(verified.ok)revalidatePath("/admin/leads");

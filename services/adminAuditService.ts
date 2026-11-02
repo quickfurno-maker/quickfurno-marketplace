@@ -11,6 +11,7 @@
 // Server-only: uses adminClient via guarded server actions.
 // ============================================================================
 import { adminClient } from "../lib/supabase";
+import { rc76ValidAtomicBadLeadReceipt } from "./vox/rc76AtomicBadLeadStatusReceipt";
 import { appError, fail, isMissingRelationError, ok, type Result } from "../lib/errors";
 
 export const BAD_LEAD_REVIEW_STATUSES = [
@@ -181,6 +182,25 @@ export async function updateVendorLeadReportStatus(
     if (notes) update.admin_notes = notes;
 
     const db = adminClient();
+    // This optional atomic Staging-only path is OFF by default. If it is
+    // explicitly selected, a missing reviewed SQL function or malformed
+    // receipt MUST FAIL CLOSED: never silently run the legacy two-write path.
+    const atomicMode=process.env.VOX_BAD_LEAD_ATOMIC_REVIEW_ENABLED;
+    if(atomicMode && !["off","disabled","false","0","staging"].includes(atomicMode))
+      throw appError("VALIDATION");
+    if(atomicMode==="staging"){
+      if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+         !["owner","dual"].includes(String(process.env.VOX_STAFF_VIEW_MODE)))
+        throw appError("UNAUTHORIZED");
+      const {data:atomic,error:atomicError}=await db.rpc(
+        "qf_vox_rc75_bad_lead_status_atomic_candidate_v1",{
+          p_report_id:reportId,p_status:status,p_admin_notes:notes??null,
+          p_reviewed_by:reviewedBy
+        });
+      if(atomicError||!rc76ValidAtomicBadLeadReceipt(atomic,reportId,status))
+        throw appError("VALIDATION");
+      return ok(null);
+    }
     const { data: report, error } = await db
       .from("bad_lead_reports")
       .update(update)

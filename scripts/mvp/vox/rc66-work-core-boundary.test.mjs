@@ -36,7 +36,8 @@ function request(data=body){return new Request("https://local.test/api/vox/v1/wo
  body:JSON.stringify(data)})}
 function world(){
  let sql=0,auth=0;
- globalThis.__rc66Core={verify:async()=>{auth++;return {userId:ID,role:"operations_manager",canMutate:false}},
+ globalThis.__rc66Core={verify:async()=>{auth++;return {userId:ID,role:"operations_manager",
+  canMutate:false,verifiedDepartments:["service_support"]}},
   rpc:async()=>{sql++;return {data:[{work_item_id:ID,new_state:"ASSIGNED",new_revision:2}],error:null}}};
  return {get sql(){return sql},get auth(){return auth}};
 }

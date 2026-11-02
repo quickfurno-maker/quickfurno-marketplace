@@ -32,6 +32,9 @@ jobs:
         run: node --test scripts/mvp/vox/vo04-staff-workday.test.mjs scripts/mvp/vox/vo03-staff-time-recovery.test.mjs scripts/mvp/vox/vo04-browser-core-time-parity.test.mjs
       - name: Root TypeScript
         run: ./node_modules/.bin/tsc --noEmit
+      - name: Install VOX Web pinned dependencies
+        working-directory: apps/vox-web
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: VOX Web test suite
         working-directory: apps/vox-web
         run: npm test

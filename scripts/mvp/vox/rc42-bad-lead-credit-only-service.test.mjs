@@ -15,7 +15,8 @@ await build({entryPoints:[resolve(root,"services/badLeadRecoveryService.ts")],ou
   // *candidate* contract; production source remains a hard literal false.
   b.onLoad({filter:/services[\\/]badLeadRecoveryService\.ts$/},a=>({loader:"ts",contents:
    readFileSync(a.path,"utf8").replace("RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=false as const",
-   "RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=true as const")}));
+   "RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=true as const")
+    .replace("CREDIT_RPC_TIMEOUT_MS=4000","CREDIT_RPC_TIMEOUT_MS=25")}));
   b.onResolve({filter:/^\.\.\/lib\/supabase$/},()=>({path:"supabase",namespace:"fake"}));
   b.onResolve({filter:/^\.\.\/lib\/errors$/},()=>({path:"errors",namespace:"fake"}));
   b.onLoad({filter:/.*/,namespace:"fake"},a=>({loader:"js",contents:
@@ -86,6 +87,19 @@ test("an attempted credit RPC transport failure never claims rollback or allows 
   const result=await apply(REPORT,"restore_credit",ACTOR);
   assert.equal(result.ok,false);assert.equal(result.code,"CREDIT_OUTCOME_UNKNOWN");
   assert.equal(String(result.error).includes("private backend state"),false);
+ }finally{globalThis.__rc42Db=original;}
+});
+test("hung canonical credit RPC is bounded, unknown and never automatically retried",async()=>{
+ before();process.env[gate]="staging";
+ const original=globalThis.__rc42Db;let attempted=0;
+ try{
+  globalThis.__rc42Db=()=>({rpc:async()=>{attempted++;return new Promise(()=>{});}});
+  const start=Date.now();
+  const r=await apply(REPORT,"restore_credit",ACTOR);
+  assert.ok(Date.now()-start<1000);
+  assert.equal(r.ok,false);assert.equal(r.code,"CREDIT_OUTCOME_UNKNOWN");
+  assert.match(r.error,/Reconcile this exact bad-lead report/);
+  assert.equal(attempted,1);
  }finally{globalThis.__rc42Db=original;}
 });
 test("unverifiable credit receipt is an uncertain outcome, never permission to grant again",async()=>{

@@ -1,0 +1,29 @@
+name: VOX VO3 Core Staff Time HTTP - SOURCE HOLD
+on:
+  pull_request:
+    branches:
+      - feat/vox-rc6-operational-20261030
+    paths:
+      - 'app/api/vox/v1/staff-time/**'
+      - 'services/vox/virtualOfficeTimeWriter.d.mts'
+      - 'scripts/mvp/vox/vo03-time-core-route.test.mjs'
+      - '.github/workflows/vox-vo03-staff-time-core.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  time-route-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Exact Staff time HTTP gate and injected RPC contract
+        run: node --test scripts/mvp/vox/vo03-time-core-route.test.mjs scripts/mvp/vox/vo02-time-writer.test.mjs
+      - name: Root TypeScript compile only
+        run: ./node_modules/.bin/tsc --noEmit

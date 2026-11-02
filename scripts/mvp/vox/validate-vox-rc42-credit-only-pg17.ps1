@@ -165,7 +165,10 @@ CREATE UNIQUE INDEX rc44_credit_ref_unique ON public.vendor_credit_logs(referenc
  $assignment4='12121212-1212-4212-8212-121212121212'
  $report4='13131313-1313-4313-8313-131313131313'
  [void](Sql "insert into public.lead_assignments values ('$assignment4','$vendor','$lead',true,'delivered'); insert into public.bad_lead_reports(id,vendor_id,lead_assignment_id,status,reason_code,recovery_status) values ('$report4','$vendor','$assignment4','Approved','bad_lead_validated','recommended');")
- $fakeReturn="CREATE OR REPLACE FUNCTION public.qf_approve_credit_restoration_v2(uuid,uuid,text) RETURNS jsonb LANGUAGE sql AS 'SELECT jsonb_build_object(''status'',''already_applied'',''ledger_id'',gen_random_uuid())';"
+ # PostgreSQL forbids renaming input parameters in CREATE OR REPLACE.
+ # The disposable fixture and actual canonical function use different names.
+ $fakeArgs=if($UseCanonicalCreditAuthority){'p_approval_id uuid,p_actor_id uuid,p_reason_code text'}else{'p_approval uuid,p_actor uuid,p_reason text'}
+ $fakeReturn="CREATE OR REPLACE FUNCTION public.qf_approve_credit_restoration_v2($fakeArgs) RETURNS jsonb LANGUAGE sql AS 'SELECT jsonb_build_object(''status'',''already_applied'',''ledger_id'',gen_random_uuid())';"
  [void](Sql $fakeReturn)
  $replayRejected=$false
  try{[void](Sql "select public.qf_vox_rc42_bad_lead_credit_only_atomic_candidate_v1('$report4','$actor');")}

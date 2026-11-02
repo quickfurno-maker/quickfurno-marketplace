@@ -31,6 +31,11 @@ on:
       - 'scripts/mvp/vox/rc66-*.test.mjs'
       - 'scripts/mvp/vox/rc68-*.test.mjs'
       - 'scripts/mvp/vox/rc69-*.test.mjs'
+      - 'scripts/mvp/vox/rc70-*.test.mjs'
+      - 'apps/vox-web/scripts/validate-rc70-*.spec.mjs'
+      - 'apps/vox-web/lib/rc70PendingTlReview.mjs'
+      - 'apps/vox-web/lib/rc70PendingEodSubmission.mjs'
+      - 'services/vox/rc70PostEligibilityOwnerAuthority.ts'
       - 'apps/vox-web/scripts/validate-rc69-work-receipt.spec.mjs'
       - 'apps/vox-web/lib/rc69VerifiedWorkReceipt.ts'
       - 'apps/vox-web/scripts/validate-rc68-vendor360-tasks.spec.mjs'
@@ -158,6 +163,8 @@ jobs:
         run: node --test apps/vox-web/scripts/validate-rc68-vendor360-tasks.spec.mjs scripts/mvp/vox/rc68-finance-recommendation-owner.test.mjs scripts/mvp/vox/rc55-finance-recommendation-aal2.test.mjs
       - name: RC69 real Core to Staff BFF to browser exact receipt and preserved nonce proof
         run: node --test scripts/mvp/vox/rc69-work-receipt-two-hop.test.mjs apps/vox-web/scripts/validate-rc69-work-receipt.spec.mjs apps/vox-web/scripts/validate-rc66-work-recovery.spec.mjs scripts/mvp/vox/rc34-vox-web-staff-session-core-http.test.mjs
+      - name: RC70 real TL review and Staff partial EOD restored nonces; financial eligibility Owner authority
+        run: node --test apps/vox-web/scripts/validate-rc70-tl-review-checkpoint.spec.mjs apps/vox-web/scripts/validate-rc70-partial-eod-submission.spec.mjs scripts/mvp/vox/rc70-finance-eligibility-owner.test.mjs scripts/mvp/vox/rc68-finance-recommendation-owner.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

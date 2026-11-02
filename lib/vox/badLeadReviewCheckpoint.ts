@@ -1,6 +1,5 @@
-/** Same-tab only UX guard for unresolved bad-lead decisions. Not DB authority.
- * No customer data, session tokens, credit amounts or payment details stored.
- * Canonical SQL still owns idempotency and approved per-assignment uniqueness.
+/** Same-tab only guard: a local checkpoint never grants credit/money.
+ * Any unverifiable write blocks further decisions until manual reconciliation.
  */
 export const BAD_LEAD_REVIEW_CHECKPOINT_KEY="qf.vox.bad-lead-pending.v1";
 type Store=Pick<Storage,"getItem"|"setItem">|null;
@@ -26,14 +25,22 @@ export function markBadLeadPending(storage:Store,reportId:string):boolean{
  if(!checkpoint.available)return false;
  checkpoint.locked.add(reportId);
  if(checkpoint.locked.size>64)return false;
- try{storage.setItem(BAD_LEAD_REVIEW_CHECKPOINT_KEY,JSON.stringify([...checkpoint.locked].sort()));return true;}
- catch{return false;}
+ try{
+  storage.setItem(BAD_LEAD_REVIEW_CHECKPOINT_KEY,JSON.stringify([...checkpoint.locked].sort()));
+  const actual=readBadLeadReviewCheckpoint(storage);
+  return actual.available&&actual.locked.size===checkpoint.locked.size&&
+   actual.locked.has(reportId);
+ }catch{return false;}
 }
 export function clearBadLeadPending(storage:Store,reportId:string):boolean{
- if(!storage)return false;
+ if(!storage||!UUID.test(reportId))return false;
  const checkpoint=readBadLeadReviewCheckpoint(storage);
- if(!checkpoint.available||!UUID.test(reportId))return false;
+ if(!checkpoint.available||!checkpoint.locked.has(reportId))return false;
  checkpoint.locked.delete(reportId);
- try{storage.setItem(BAD_LEAD_REVIEW_CHECKPOINT_KEY,JSON.stringify([...checkpoint.locked].sort()));return true;}
- catch{return false;}
+ try{
+  storage.setItem(BAD_LEAD_REVIEW_CHECKPOINT_KEY,JSON.stringify([...checkpoint.locked].sort()));
+  const actual=readBadLeadReviewCheckpoint(storage);
+  return actual.available&&actual.locked.size===checkpoint.locked.size&&
+   !actual.locked.has(reportId);
+ }catch{return false;}
 }

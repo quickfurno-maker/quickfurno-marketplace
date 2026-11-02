@@ -476,16 +476,52 @@ export function BadLeadReportsReviewPanel({
     [data.assignments],
   );
 
+  // Status and recommendation writes can commit even when a response is lost.
+  // The same local lock used for credit decisions must cover this preliminary
+  // eligibility metadata; it never substitutes for Core's canonical ledger.
+  function runGovernedMetadata(report:BadReport,label:string,
+    write:()=>Promise<{ok:boolean;error?:string}>){
+    if(!recoveryReady||!recoveryStorageAvailable||recoveryNeedsReview.current.has(report.id)||
+       recoveryPending.current.has(report.id)){
+      notify("An earlier bad-lead decision is unresolved. Reconcile the original report first.","error");
+      return;
+    }
+    if(!markBadLeadPending(badLeadSessionStore(),report.id)){
+      notify("Cannot preserve the review checkpoint. No Core action was sent.","error");
+      return;
+    }
+    recoveryNeedsReview.current.add(report.id);
+    recoveryPending.current.add(report.id);
+    runAction(label,async()=>{
+      try{
+        const result=await write();
+        if(!result.ok){
+          setRecoveryReceipt("Review metadata outcome may be unknown for report "+report.id+
+            ". Confirm the original Core report before further decisions.");
+          return result;
+        }
+        if(!clearBadLeadPending(badLeadSessionStore(),report.id)){
+          setRecoveryReceipt("Core acknowledged the metadata write, but the checkpoint cannot be cleared. Reconcile before another decision.");
+          return {ok:false,error:"Metadata checkpoint cleanup failed. Reconcile original report."};
+        }
+        recoveryNeedsReview.current.delete(report.id);
+        setRecoveryReceipt("Core confirmed "+label.toLowerCase()+"; no LEAD credit or money was issued.");
+        return result;
+      }catch{
+        setRecoveryReceipt("Review metadata outcome UNKNOWN for "+report.id+
+          ". Reconcile the Core report; never issue a second decision blindly.");
+        return {ok:false,error:"Metadata outcome uncertain; reconcile original report."};
+      }finally{recoveryPending.current.delete(report.id);}
+    });
+  }
   function updateStatus(report: BadReport, status: (typeof badLeadReviewStatuses)[number]) {
-    if(!recoveryReady||!recoveryStorageAvailable||recoveryNeedsReview.current.has(report.id)){
+    if(!recoveryReady||!recoveryStorageAvailable||recoveryNeedsReview.current.has(report.id)) {
       notify("Recovery decision checkpoint requires reconciliation before status changes.","error");
       return;
     }
-    const note = window.prompt(`Admin note for "${status}" (optional)`) ?? undefined;
-    runAction(
-      `Report marked ${status}`,
-      () => adminUpdateVendorLeadReportStatus(report.id, { status, adminNotes: note?.trim() || undefined }),
-    );
+    const note=window.prompt(`Admin note for "${status}" (optional)`)??undefined;
+    runGovernedMetadata(report,`Report marked ${status}`,
+      ()=>adminUpdateVendorLeadReportStatus(report.id,{status,adminNotes:note?.trim()||undefined}));
   }
 
   function addComment(report: BadReport) {
@@ -498,7 +534,8 @@ export function BadLeadReportsReviewPanel({
   }
 
   function generateRecoveryRecommendation(report: BadReport) {
-    runAction("Recovery recommendation generated", () => adminGenerateBadLeadRecoveryRecommendation(report.id));
+    runGovernedMetadata(report,"Recovery recommendation generated",
+      ()=>adminGenerateBadLeadRecoveryRecommendation(report.id));
   }
 
   function applyRecovery(

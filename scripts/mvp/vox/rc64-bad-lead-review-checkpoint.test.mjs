@@ -45,9 +45,14 @@ test("real operator records checkpoint ahead of network and blocks unresolved de
   "recoveryNeedsReview.current.add(report.id)",
   "action===\"reject\"&&result.code===\"REJECT_OUTCOME_UNKNOWN\""])
   assert.ok(ui.includes(marker),marker);
- assert.ok(ui.indexOf("markBadLeadPending(badLeadSessionStore(),report.id)")<
-  ui.indexOf("adminApplyBadLeadRecovery(report.id,action)"),"checkpoint before RPC");
- assert.ok(ui.indexOf("clearBadLeadPending(badLeadSessionStore(),report.id)")>
-  ui.indexOf("adminApplyBadLeadRecovery(report.id,action)"),"clear only after verified response");
+ const credit=ui.split("function applyRecovery(")[1]??"";
+ assert.ok(credit.indexOf("markBadLeadPending(badLeadSessionStore(),report.id)")>=0&&
+  credit.indexOf("markBadLeadPending(badLeadSessionStore(),report.id)")<
+   credit.indexOf("adminApplyBadLeadRecovery(report.id,action)"),"credit checkpoint before RPC");
+ assert.ok(credit.indexOf("clearBadLeadPending(badLeadSessionStore(),report.id)")>
+  credit.indexOf("adminApplyBadLeadRecovery(report.id,action)"),"credit checkpoint clears only after receipt");
+ // Other metadata actions now have their OWN earlier checkpoint. Never let
+ // its readback check satisfy the invariant for a credit action.
+ assert.match(ui,/function runGovernedMetadata\(/);
 });
 process.on("exit",()=>rmSync(temp,{recursive:true,force:true}));

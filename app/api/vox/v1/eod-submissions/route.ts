@@ -9,12 +9,33 @@ const send=(body:unknown,status:number)=>Response.json(body,{status,headers:{
  "cache-control":"private, no-store, max-age=0","vary":"Authorization",
  "x-content-type-options":"nosniff"
 }});
+const submissionUnknown=()=>send({ok:false,error:"EOD_SUBMISSION_OUTCOME_UNKNOWN",
+ committed:null,retrySameNonceOnly:true},503);
 const enabled=()=>process.env.VOX_STAFF_GRANTS_ENABLED==="staging"&&
  process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED==="staging"&&
  process.env.VOX_EOD_SUBMISSIONS_ENABLED==="staging";
 const eligible=(s:Awaited<ReturnType<typeof getVerifiedScopedStaff>>)=>{
  return !!s&&s.canReadContent===true&&s.canMutate===false&&
  ["operations_manager","acquisition_agent","vendor_success_agent","support_agent"].includes(s.role);
+};
+// Compare the fresh effective role, city, team, department packs and every
+// object grant after a potentially committed Core submission.
+const sameScoped=(a:Awaited<ReturnType<typeof getVerifiedScopedStaff>>,
+ b:Awaited<ReturnType<typeof getVerifiedScopedStaff>>):boolean=>{
+ if(!a||!b||a.userId!==b.userId||a.teamId!==b.teamId||
+    a.cityId!==b.cityId||a.role!==b.role||a.canReadContent!==b.canReadContent||
+    a.canMutate!==false||b.canMutate!==false)return false;
+ const props=["prospectIds","vendorIds","supportThreadIds","conversationIds",
+  "verifiedDepartments"] as const;
+ for(const key of props){
+  const left=a[key],right=b[key];
+  if(!Array.isArray(left)||!Array.isArray(right)||left.length!==right.length||
+     left.some(x=>typeof x!=="string")||right.some(x=>typeof x!=="string"))
+   return false;
+  const x=[...left].sort(),y=[...right].sort();
+  if(x.some((v,i)=>v!==y[i]))return false;
+ }
+ return true;
 };
 const IST=()=>new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Kolkata",
  year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
@@ -73,29 +94,57 @@ export async function POST(request:Request){
     !id(parsed.nonce)||typeof parsed.businessDate!=="string"||
     parsed.businessDate!==IST())
   return send({ok:false,error:"CURRENT_IST_NONCE_REQUIRED"},400);
+ let attempted=false;
  try{
-  const scope=await getVerifiedScopedStaff(request.headers.get("authorization"));
+  const authHeader=request.headers.get("authorization");
+  const scope=await getVerifiedScopedStaff(authHeader);
   if(!eligible(scope))return send({ok:false,error:"CURRENT_AAL2_STAFF_REQUIRED"},403);
-  const {data,error}=await adminClient().rpc("qf_vox_eod_submit_candidate_v1",{
-   p_actor:scope!.userId,p_nonce:parsed.nonce,p_business_date:parsed.businessDate
-  });
-  if(error||!Array.isArray(data)||data.length!==1)
-   return send({ok:false,error:"EOD_CORE_DENIED_OR_STALE"},409);
+  attempted=true;
+  // A timeout or rejected transport is not proof the same-date SQL submission
+  // rolled back. Never send a different nonce or claim a clean denial.
+  let rpcTimer:ReturnType<typeof setTimeout>|undefined;
+  let result:{data:unknown;error:unknown};
+  try{
+   const response=await Promise.race([
+    Promise.resolve(adminClient().rpc("qf_vox_eod_submit_candidate_v1",{
+     p_actor:scope!.userId,p_nonce:parsed.nonce,p_business_date:parsed.businessDate
+    })).then(value=>({timedOut:false as const,value})),
+    new Promise<{timedOut:true}>(resolve=>{
+     rpcTimer=setTimeout(()=>resolve({timedOut:true}),4000);
+    })
+   ]);
+   if(response.timedOut)return submissionUnknown();
+   result=response.value;
+  }finally{if(rpcTimer!==undefined)clearTimeout(rpcTimer);}
+  const {data,error}=result;
+  if(error||!Array.isArray(data)||data.length!==1)return submissionUnknown();
   const row:unknown=data[0];
-  if(!row||typeof row!=="object"||Array.isArray(row))
-   return send({ok:false,error:"EOD_RECEIPT_INVALID"},503);
+  if(!row||typeof row!=="object"||Array.isArray(row))return submissionUnknown();
   const r=row as Record<string,unknown>;
   if(!id(r.report_id)||!["PENDING_REVIEW","ACKNOWLEDGED","REJECTED"].includes(String(r.report_state))||
    !Number.isSafeInteger(r.report_revision)||!Number.isSafeInteger(r.event_count)||
    (r.event_count as number)<0||(r.event_count as number)>100||
    (r.report_state==="PENDING_REVIEW"&&r.report_revision!==0)||
    (r.report_state!=="PENDING_REVIEW"&&r.report_revision!==1))
-   return send({ok:false,error:"EOD_RECEIPT_INVALID"},503);
+   return submissionUnknown();
+  // The Staff grant may have been revoked since SQL committed. Verify once
+  // more, with a hard deadline and no second Core submission RPC.
+  let authTimer:ReturnType<typeof setTimeout>|undefined;
+  try{
+   const latest=await Promise.race([
+    getVerifiedScopedStaff(authHeader).then(value=>({timedOut:false as const,value})),
+    new Promise<{timedOut:true}>(resolve=>{
+     authTimer=setTimeout(()=>resolve({timedOut:true}),1250);
+    })
+   ]);
+   if(latest.timedOut||!sameScoped(scope,latest.value))return submissionUnknown();
+  }catch{return submissionUnknown();}
+  finally{if(authTimer!==undefined)clearTimeout(authTimer);}
   return send({ok:true,schema:"qf.vox.eod.submission.receipt.v1",
    reportId:r.report_id,nonce:parsed.nonce,businessDate:parsed.businessDate,state:r.report_state,revision:r.report_revision,
    eventCount:r.event_count,completeness:"PARTIAL_UNVERIFIED_TOTAL",
    externalMessagesSent:0,staffPrivilegesChanged:false},200);
- }catch{return send({ok:false,error:"EOD_CORE_UNAVAILABLE"},503);}
+ }catch{return attempted?submissionUnknown():send({ok:false,error:"EOD_CORE_UNAVAILABLE"},503);}
 }
 export function PUT(){return send({ok:false,error:"METHOD_NOT_ALLOWED"},405);}
 export function PATCH(){return send({ok:false,error:"METHOD_NOT_ALLOWED"},405);}

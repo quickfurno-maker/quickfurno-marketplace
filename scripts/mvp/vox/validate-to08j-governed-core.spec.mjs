@@ -7,20 +7,20 @@ import {canReadWriteTeamInternalChat} from "../../../contracts/vox/teamChatEligi
 const uuid=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 const scope={userId:uuid(1),teamId:uuid(2),cityId:uuid(3),role:"support_agent",
  canMutate:false,canReadContent:true,verifiedDepartments:["service_support"],
- prospectIds:[],vendorIds:[],supportThreadIds:[]};
+ prospectIds:[],vendorIds:[],supportThreadIds:[],conversationIds:[]};
 const date="2026-10-16";
 class FixedDate extends Date{
  constructor(...args){super(...(args.length?args:["2026-10-16T08:00:00.000Z"]));}
  static now(){return Date.parse("2026-10-16T08:00:00.000Z");}
 }
 const flags={};
-const state={scope:{...scope},authCalls:0,authHook:null,calls:[],rpcData:[],rpcError:null,tables:{}};
+const state={scope:{...scope},authCalls:0,authHook:null,calls:[],rpcHook:null,rpcData:[],rpcError:null,tables:{}};
 const reset=()=>{
  Object.keys(flags).forEach(k=>delete flags[k]);
  for(const n of ["VOX_STAFF_GRANTS_ENABLED","VOX_DEPARTMENT_ENFORCEMENT_ENABLED",
  "VOX_EOD_SUBMISSIONS_ENABLED","VOX_EOD_TL_REVIEW_ENABLED","VOX_STAFF_TEAM_CHAT_ENABLED"])
   flags[n]="staging";
- state.scope={...scope};state.authCalls=0;state.authHook=null;state.calls=[];state.rpcError=null;
+ state.scope={...scope};state.authCalls=0;state.authHook=null;state.calls=[];state.rpcError=null;state.rpcHook=null;
  state.rpcData=[];state.tables={
   vox_staff_eod_reports_candidate_v1:[{id:uuid(4),staff_id:uuid(5),team_id:scope.teamId,
    city_id:scope.cityId,business_date:date,event_count:1,state:"PENDING_REVIEW",
@@ -47,14 +47,15 @@ const db=()=>({
  },
  rpc(name,params){
   state.calls.push({type:"rpc",name,params});
-  return Promise.resolve({data:state.rpcData,error:state.rpcError});
+  return state.rpcHook?state.rpcHook(name,params):Promise.resolve({data:state.rpcData,error:state.rpcError});
  }
 });
 const ctx=vm.createContext({process:{env:flags},Date:FixedDate,Intl,URL,
  Response,Request,setTimeout,clearTimeout});
 async function load(relative,short){
  const source=readFileSync(new URL("../../../app/api/vox/v1/"+relative+"/route.ts",import.meta.url),"utf8");
- const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,
+ const tested=relative==="eod-submissions"?source.replace("}),4000);","}),25);"):source;
+ const js=ts.transpileModule(tested,{compilerOptions:{module:ts.ModuleKind.ESNext,
   target:ts.ScriptTarget.ES2022}}).outputText;
  const m=new vm.SourceTextModule(js,{context:ctx,identifier:"route-"+short});
  const imports=new Map([
@@ -123,7 +124,9 @@ test("EOD denies AAL1, Team Leader and invalid RPC without fabricated receipt",a
  state.scope={...scope,role:"team_leader"};
  assert.equal((await submits.POST(post("eod-submissions",{businessDate:date,nonce:uuid(44)}))).status,403);
  state.scope={...scope};state.rpcError={code:"DENIED"};
- assert.equal((await submits.POST(post("eod-submissions",{businessDate:date,nonce:uuid(44)}))).status,409);
+ const uncertain=await submits.POST(post("eod-submissions",{businessDate:date,nonce:uuid(44)}));
+ assert.equal(uncertain.status,503);
+ assert.equal((await uncertain.json()).retrySameNonceOnly,true);
 });
 test("Staff cannot claim official complete report, read history only exact own rows",async()=>{
  state.tables.vox_staff_eod_reports_candidate_v1[0].staff_id=scope.userId;
@@ -269,4 +272,37 @@ test("ambiguous Core review RPC failure is UNKNOWN instead of safe retry",async(
  assert.equal(b.error,"EOD_REVIEW_OUTCOME_UNKNOWN");
  assert.equal(b.retrySameNonceOnly,true);
  assert.equal(state.calls.filter(c=>c.type==="rpc").length,1);
+});
+
+
+test("RC81 partial EOD receipt binds original nonce and needs unchanged second Staff verification",async()=>{
+ state.rpcData=[{report_id:uuid(4),report_state:"PENDING_REVIEW",report_revision:0,event_count:2}];
+ const r=await submits.POST(post("eod-submissions",{businessDate:date,nonce:uuid(44)}));
+ assert.equal(r.status,200);const body=await r.json();
+ assert.equal(body.nonce,uuid(44));assert.equal(body.state,"PENDING_REVIEW");
+ assert.equal(state.calls.filter(x=>x.type==="rpc").length,1);
+ assert.equal(state.authCalls,2);
+});
+test("RC81 lost EOD submission RPC is UNKNOWN with original nonce locked and no second SQL",async()=>{
+ state.rpcHook=()=>new Promise(()=>{});
+ const r=await submits.POST(post("eod-submissions",{businessDate:date,nonce:uuid(44)}));
+ assert.equal(r.status,503);const b=await r.json();
+ assert.equal(b.error,"EOD_SUBMISSION_OUTCOME_UNKNOWN");
+ assert.equal(b.retrySameNonceOnly,true);assert.equal(b.committed,null);
+ assert.equal(state.calls.filter(x=>x.type==="rpc").length,1);
+});
+test("RC81 Staff department or object grant revocation after SQL is never a confirmed EOD receipt",async()=>{
+ state.rpcData=[{report_id:uuid(4),report_state:"PENDING_REVIEW",report_revision:0,event_count:2}];
+ for(const changed of [{...scope,verifiedDepartments:[]},
+  {...scope,vendorIds:[uuid(9)]},{...scope,role:"team_leader"}]){
+  state.authCalls=0;state.calls=[];
+  state.authHook=n=>n===1?{...scope,vendorIds:[uuid(8)]}:
+   {...changed,vendorIds:changed.vendorIds??[uuid(8)]};
+  const r=await submits.POST(post("eod-submissions",{businessDate:date,nonce:uuid(44)}));
+  assert.equal(r.status,503);const b=await r.json();
+  assert.equal(b.error,"EOD_SUBMISSION_OUTCOME_UNKNOWN");
+  assert.equal(b.retrySameNonceOnly,true);
+  assert.equal(state.calls.filter(x=>x.type==="rpc").length,1);
+  assert.equal(state.authCalls,2);
+ }
 });

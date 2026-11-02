@@ -23,6 +23,7 @@ on:
       - 'scripts/mvp/vox/rc57-*.test.mjs'
       - 'scripts/mvp/vox/rc58-*.test.mjs'
       - 'scripts/mvp/vox/rc59-*.test.mjs'
+      - 'scripts/mvp/vox/rc60-*.test.mjs'
       - 'scripts/mvp/vox/rc57-private-lexical-reconciliation.mjs'
       - 'docs/vox/VOX-RC53-*'
       - 'docs/vox/VOX-RC54-*'
@@ -31,6 +32,7 @@ on:
       - 'docs/vox/VOX-RC57-*'
       - 'docs/vox/VOX-RC58-*'
       - 'docs/vox/VOX-RC59-*'
+      - 'docs/vox/VOX-RC60-*'
       - 'docs/vox/VOX-RC52-*'
       - 'scripts/mvp/vox/rc50-staging-sql-handoff.mjs'
       - 'scripts/mvp/vox/rc47-managed-recovery-handoff.mjs'
@@ -105,6 +107,8 @@ jobs:
         run: node --test scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-service.test.mjs scripts/mvp/vox/rc44-eod-dedicated-reader.test.mjs scripts/mvp/vox/rc58-ci-coverage.test.mjs
       - name: RC59 Core timeout vs BFF deadline, Finance unknown-credit UI and protected flags
         run: node --test scripts/mvp/vox/rc51-finance-operator-ui.test.mjs scripts/mvp/vox/rc59-ui-outcome.test.mjs
+      - name: RC60 candidate credit ledger receipt, SQL replay rollback and financial HOLD
+        run: node --test scripts/mvp/vox/rc60-credit-ledger-proof.test.mjs scripts/mvp/vox/rc60-ci-coverage.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

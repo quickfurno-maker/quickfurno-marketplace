@@ -206,6 +206,20 @@ export async function updateVendorLeadReportStatus(
           error:"Atomic bad-lead review may have committed. Reconcile the original report and assignment in Core before any new status decision."};
       return ok(null);
     }
+    // The legacy (non-atomic) review path is still used by the existing
+    // admin service. Before changing a report to Valid, require its original
+    // assignment reference. This preflight avoids a false successful Valid
+    // review for a report that never had an assignment; it does not establish
+    // atomicity or replace the approved RC75 transaction.
+    let expectedAssignmentId:string|null=null;
+    if(status==="Valid"){
+      const {data:existing,error:existingError}=await db
+        .from("bad_lead_reports").select("lead_assignment_id")
+        .eq("id",reportId).single();
+      if(existingError||!existing?.lead_assignment_id)
+        throw appError("VALIDATION");
+      expectedAssignmentId=String(existing.lead_assignment_id);
+    }
     const { data: report, error } = await db
       .from("bad_lead_reports")
       .update(update)
@@ -216,7 +230,9 @@ export async function updateVendorLeadReportStatus(
 
     // Parity with the legacy approve flow: a Valid report flags the assignment
     // for reporting. Informational only — no credit is refunded.
-    if (status === "Valid" && report?.lead_assignment_id) {
+    if(status==="Valid"&&report?.lead_assignment_id!==expectedAssignmentId)
+      throw appError("VALIDATION");
+    if (status === "Valid") {
       // This flag is informational; it must not grant credit or money.
       // The report metadata write above may already have committed. If the
       // linked assignment flag fails or matches no row, return UNKNOWN/failed

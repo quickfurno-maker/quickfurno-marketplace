@@ -29,7 +29,7 @@ export function markBadLeadPending(storage:Store,reportId:string):boolean{
   storage.setItem(BAD_LEAD_REVIEW_CHECKPOINT_KEY,JSON.stringify([...checkpoint.locked].sort()));
   const actual=readBadLeadReviewCheckpoint(storage);
   return actual.available&&actual.locked.size===checkpoint.locked.size&&
-   actual.locked.has(reportId);
+   [...checkpoint.locked].every(id=>actual.locked.has(id));
  }catch{return false;}
 }
 export function clearBadLeadPending(storage:Store,reportId:string):boolean{
@@ -41,6 +41,6 @@ export function clearBadLeadPending(storage:Store,reportId:string):boolean{
   storage.setItem(BAD_LEAD_REVIEW_CHECKPOINT_KEY,JSON.stringify([...checkpoint.locked].sort()));
   const actual=readBadLeadReviewCheckpoint(storage);
   return actual.available&&actual.locked.size===checkpoint.locked.size&&
-   !actual.locked.has(reportId);
+   [...checkpoint.locked].every(id=>actual.locked.has(id));
  }catch{return false;}
 }

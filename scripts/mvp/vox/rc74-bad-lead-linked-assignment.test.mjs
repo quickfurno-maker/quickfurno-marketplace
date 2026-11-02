@@ -18,7 +18,7 @@ globalThis.__rc74AuditFactory=()=>({
    eq(field,value){calls.push({table,step:"filter",field,value});return chain;},
    select(columns){calls.push({table,step:"select",columns});return chain;},
    async single(){
-    if(table==="bad_lead_reports")return {data:{id:R,lead_assignment_id:A},error:null};
+    if(table==="bad_lead_reports")return {data:{id:R,lead_assignment_id:mode==="unassigned"?null:A},error:null};
     if(table==="lead_assignments")return mode==="success"?
       {data:{id:A},error:null}:mode==="missing"?
       {data:null,error:{message:"row not found"}}:
@@ -56,6 +56,13 @@ test("missing or mismatched linked assignment must never yield successful Valid 
   assert.ok(calls.some(c=>c.table==="bad_lead_reports"&&c.step==="update"));
   assert.ok(calls.some(c=>c.table==="lead_assignments"&&c.step==="update"));
  }
+});
+test("legacy Valid review refuses a report without original assignment BEFORE its status is mutated",async()=>{
+ mode="unassigned";calls=[];
+ const r=await write(R,{status:"Valid"},"owner-verified");
+ assert.equal(r.ok,false);
+ assert.equal(calls.filter(x=>x.table==="bad_lead_reports"&&x.step==="update").length,0);
+ assert.equal(calls.filter(x=>x.table==="lead_assignments").length,0);
 });
 test("non-Valid review does not touch assignment at all",async()=>{
  mode="missing";calls=[];

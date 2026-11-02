@@ -4,7 +4,7 @@ import {readPendingTimeCommand,savePendingTimeCommand,clearPendingTimeCommand}
  from "../../../apps/vox-web/lib/vo03PendingStaffTime.mjs";
 const id=n=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 const cmd={action:"TASK_START",nonce:id(1),expectedRevision:4,workItemId:id(2)};
-const receipt={schema:"qf.vox.staff.time.receipt.v1",nonce:id(1),revision:5,
+const receipt={ok:true,schema:"qf.vox.staff.time.receipt.v1",nonce:id(1),revision:5,
  eventId:id(3),occurredAt:"2026-11-03T01:00:00.000Z",
  providerMessagesSent:0,moneyMinorUnits:0,productionCertified:false};
 function store(){
@@ -38,7 +38,7 @@ test("VO3 no browser-derived clock, role, money or external send fields",()=>{
 });
 test("VO3 only exact validated Core receipt clears a pending timer",()=>{
  const s=store();savePendingTimeCommand(s,cmd);
- for(const bad of [{...receipt,nonce:id(22)},{...receipt,revision:4},
+ for(const bad of [{...receipt,ok:false},{...receipt,nonce:id(22)},{...receipt,revision:4},
   {...receipt,providerMessagesSent:1},{...receipt,productionCertified:true},
   {...receipt,moneyMinorUnits:1},{...receipt,eventId:"x"},
   {...receipt,unknown:true}]){

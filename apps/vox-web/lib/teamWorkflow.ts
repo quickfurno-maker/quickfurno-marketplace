@@ -176,11 +176,11 @@ export async function decideTlEod(reportId:string,nonce:string,decision:string){
  const r=await requestCore("eod-reviews",{reportId,nonce,decision,expectedRevision:0});
  if(!r.ok)return r;
  const x=r.body;
- if(!exact(x,["ok","schema","reportId","state","revision","source",
+ if(!exact(x,["ok","schema","reportId","nonce","state","revision","source",
   "providerMessagesSent","staffPrivilegesChanged"])||
   x.ok!==true||x.schema!=="qf.vox.eod.tl.receipt.v1"||
-  x.reportId!==reportId||x.state!==decision||x.revision!==1||
+  x.reportId!==reportId||x.nonce!==nonce||x.state!==decision||x.revision!==1||
   x.source!=="PARTIAL_CORE_WORK_ONLY"||x.providerMessagesSent!==0||
   x.staffPrivilegesChanged!==false)return deny(503,"INVALID_TL_RECEIPT");
- return {ok:true,status:200,reportId,state:decision,revision:1} as const;
+ return {ok:true,status:200,reportId,nonce,state:decision,revision:1} as const;
 }

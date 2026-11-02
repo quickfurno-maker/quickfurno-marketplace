@@ -34,7 +34,7 @@ const reply=(path,method)=>{
     state:"PENDING_REVIEW",revision:0}]};
  }
  return method==="POST"?{ok:true,schema:"qf.vox.eod.tl.receipt.v1",
-  reportId:uuid(10),state:"ACKNOWLEDGED",revision:1,source:"PARTIAL_CORE_WORK_ONLY",
+  reportId:uuid(10),nonce:uuid(22),state:"ACKNOWLEDGED",revision:1,source:"PARTIAL_CORE_WORK_ONLY",
   providerMessagesSent:0,staffPrivilegesChanged:false}:
   {ok:true,schema:"qf.vox.eod.tl.queue.v1",mode:"READ_ONLY",
    actionsRequireCurrentCoreRpc:true,totalKnown:false,
@@ -186,6 +186,8 @@ test("TL action cannot accept target/team/role and checks receipt",async()=>{
  assert.deepEqual(JSON.parse(state.requests[0].options.body),{
   reportId:uuid(10),nonce:uuid(22),decision:"ACKNOWLEDGED",expectedRevision:0});
  assert.equal((await api.decideTlEod(uuid(10),uuid(22),"APPROVED")).status,400);
+ state.payload={...reply("eod-reviews","POST"),nonce:uuid(77)};
+ assert.equal((await api.decideTlEod(uuid(10),uuid(22),"ACKNOWLEDGED")).status,503);
  state.payload={...reply("eod-reviews","POST"),reportId:uuid(77)};
  assert.equal((await api.decideTlEod(uuid(10),uuid(22),"ACKNOWLEDGED")).status,503);
 });

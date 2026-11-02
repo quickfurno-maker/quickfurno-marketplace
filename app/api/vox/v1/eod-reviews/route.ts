@@ -81,7 +81,7 @@ export async function POST(request:Request){
   if(r.report_id!==body.reportId||r.report_state!==body.decision||r.report_revision!==1)
    return send({ok:false,error:"INVALID_REVIEW_RECEIPT"},503);
   return send({ok:true,schema:"qf.vox.eod.tl.receipt.v1",reportId:r.report_id,
-   state:r.report_state,revision:1,source:"PARTIAL_CORE_WORK_ONLY",
+   nonce:body.nonce,state:r.report_state,revision:1,source:"PARTIAL_CORE_WORK_ONLY",
    providerMessagesSent:0,staffPrivilegesChanged:false},200);
  }catch{return send({ok:false,error:"EOD_REVIEW_UNAVAILABLE"},503);}
 }

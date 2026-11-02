@@ -47,10 +47,11 @@ export default function ReviewDecision({reportId}:{reportId:string}){
    });
    const doc:unknown=await response.json();
    if(!response.ok||!doc||typeof doc!=="object"||Array.isArray(doc)||
-    Object.keys(doc).sort().join("|")!=="ok|reportId|revision|state|status"||
+    Object.keys(doc).sort().join("|")!=="nonce|ok|reportId|revision|state|status"||
     !("ok" in doc)||doc.ok!==true||
     !("status" in doc)||doc.status!==200||
     !("reportId" in doc)||doc.reportId!==reportId||
+    !("nonce" in doc)||doc.nonce!==record.nonce||
     !("state" in doc)||doc.state!==decision||
     !("revision" in doc)||doc.revision!==1){
     setMessage("Core review outcome is not verified. Keep the original "+decision.toLowerCase()+" nonce; reconcile before any different decision.");

@@ -22,6 +22,11 @@ export default async function Vendor360(){
   state:v.status,attention:!v.active||v.verificationStatus.toLowerCase()!=="verified"}));
  const crm=r.view.crm.map(c=>({id:c.vendorId??"",title:c.onboarding,
    detail:c.vendorId?"Vendor #"+c.vendorId.slice(0,8):"Unlinked record",state:c.relationship}));
+ // The Core projection already supplies bounded, scoped tasks. They must be
+ // visible to Staff; displaying them does not grant execution privileges.
+ const taskRows=r.view.tasks.map(t=>({id:t.id??"",title:t.title,
+  detail:t.vendorId?"Assigned vendor #"+t.vendorId.slice(0,8):"Unlinked Core task",
+  state:t.status,attention:!["done","closed","completed"].includes(t.status.toLowerCase())}));
  return <main className="voxOps"><header className="voxTop"><div className="voxLogo">V</div><div><b>VOX / VENDOR 360</b>
  <small>Canonical QuickFurno Vendor CRM</small></div><div className="voxSession">CITY VERIFIED · READ ONLY</div></header>
  <div className="voxHero"><p className="kicker">VENDOR RELATIONSHIPS / VERIFIED LOCATIONS</p><h1>The complete context,<br/><span>without privileged shortcuts.</span></h1>
@@ -30,6 +35,7 @@ export default async function Vendor360(){
  <div className="voxWorkspace">
   <ScopedQueue kicker="VENDORS" title="Assigned Core vendors" rows={vendors} emptyLabel="No vendors assigned."/>
   <ScopedQueue kicker="CRM" title="Vendor relationships" rows={crm} emptyLabel="No vendor CRM records."/>
+  <ScopedQueue kicker="TASKS" title="Assigned vendor follow-ups" rows={taskRows} emptyLabel="No scoped vendor follow-up tasks."/>
  </div>
  {process.env.VOX_VENDOR_TASK_UI_ENABLED==="staging"?<TaskCreator vendors={r.view.vendors.filter(v=>v.vendorId).map(v=>({vendorId:v.vendorId!,businessName:v.businessName}))}/>:null}
  {process.env.VOX_OPERATIONAL_PROPOSAL_UI_ENABLED==="staging"?<StaffProposalForm kind="VENDOR_PROFILE_CHANGE" targets={r.view.vendors.filter(v=>v.vendorId).map(v=>({id:v.vendorId!,title:v.businessName}))}/>:null}

@@ -25,9 +25,12 @@ export async function POST(request:Request){
  try{
   // The real route boundary checks identity before any mutating SQL call.
   // Its own GoTrue timeout must be smaller than the downstream Web deadline.
+  // Explicit real awaited verifier is also part of the protected Core route
+  // contract; timeout still contains a hung GoTrue request before any SQL.
+  const verifyCurrentStaff=async()=>await verifyVoxOperationsStaffBearer(
+   request.headers.get("authorization"));
   const v=await Promise.race([
-   verifyVoxOperationsStaffBearer(request.headers.get("authorization"))
-    .then(actor=>({timeout:false as const,actor})),
+   verifyCurrentStaff().then(actor=>({timeout:false as const,actor})),
    new Promise<{timeout:true}>(resolve=>{
     preflightTimer=setTimeout(()=>resolve({timeout:true}),1500);
    })

@@ -9,6 +9,9 @@ test("actual Core route and SQL handler bound preflight identity before any muta
  const route=read("app/api/vox/v1/core/conversation-operator/route.ts");
  const handler=read("services/vox/rc42AtomicConversationHandler.ts");
  assert.match(route,/CURRENT_STAFF_AUTH_TIMEOUT/);
+ // The actual awaited verifier must be visible to the protected portal/Core
+ // route-surface security scanner, not merely an imported or mocked symbol.
+ assert.match(route,/await verifyVoxOperationsStaffBearer\(/);
  assert.match(route,/setTimeout\(\(\)=>resolve\(\{timeout:true\}\),1500\)/);
  assert.match(handler,/STAFF_AUTH_PREFLIGHT_TIMEOUT/);
  assert.match(handler,/authTimeoutMs\?:number/);

@@ -148,7 +148,7 @@ const post=(route,body,{origin=ORIGIN,host="127.0.0.1:3107",type="application/js
  route.POST(new Request(ORIGIN+"/x",{method:"POST",headers:{origin,host,"content-type":type},
   body:typeof body==="string"?body:JSON.stringify(body)}));
 const cmd=(over={})=>({action:"CLAIM",itemId:ITEM,expectedRevision:0,nonce:NONCE,reason:"",...over});
-const workReceipt=(over={})=>({ok:true,schema:"qf.vox.work.transaction.receipt.v1",workItemId:ITEM,
+const workReceipt=(over={})=>({ok:true,schema:"qf.vox.work.transaction.receipt.v1",workItemId:ITEM,nonce:NONCE,
  newState:"ASSIGNED",revision:1,providerMessagesSent:0,affectsVendorLeadMatching:false,...over});
 test("work-transitions BFF: verified happy path is pinned; denials are mapped without Core bodies",async()=>{
  const s=setup({core:async()=>Response.json(workReceipt())});

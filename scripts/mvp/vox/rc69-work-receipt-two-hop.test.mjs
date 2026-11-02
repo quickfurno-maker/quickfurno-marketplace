@@ -38,7 +38,7 @@ test.after(()=>{globalThis.fetch=originalFetch;for(const [k,v] of Object.entries
 const command=(action,nonce=NONCE)=>({action,itemId:ITEM,expectedRevision:5,nonce,
  reason:["BLOCK","REQUEST_APPROVAL","COMPLETE"].includes(action)?"Documented internal workflow reason":""});
 const receipt=(state,extra={})=>({ok:true,schema:"qf.vox.work.transaction.receipt.v1",
- workItemId:ITEM,newState:state,revision:6,providerMessagesSent:0,
+ workItemId:ITEM,nonce:NONCE,newState:state,revision:6,providerMessagesSent:0,
  affectsVendorLeadMatching:false,...extra});
 const request=payload=>new Request("http://127.0.0.1:3107/api/work-transitions",
  {method:"POST",headers:{origin:"http://127.0.0.1:3107",host:"127.0.0.1:3107",
@@ -59,7 +59,7 @@ test("real two-hop Core receipt survives Web BFF without losing UI-required sche
   const res=await api.POST(request(payload));
   assert.equal(res.status,200,action);
   const body=await res.json();
-  assert.deepEqual(Object.keys(body).sort(),["affectsVendorLeadMatching","newState","ok","providerMessagesSent","revision","schema","status","workItemId"].sort());
+  assert.deepEqual(Object.keys(body).sort(),["affectsVendorLeadMatching","newState","nonce","ok","providerMessagesSent","revision","schema","status","workItemId"].sort());
   assert.equal(body.schema,"qf.vox.work.transaction.receipt.v1");
   assert.equal(body.affectsVendorLeadMatching,false);
   assert.equal(body.status,200);
@@ -69,7 +69,7 @@ test("real two-hop Core receipt survives Web BFF without losing UI-required sche
   assert.equal(body.providerMessagesSent,0);
   // Genuine BFF output must pass the genuine client validator, not merely
   // individual server-side assertions, before the UI clears its nonce.
-  assert.equal(isTrustedByStaffUi(body,{action,itemId:ITEM,expectedRevision:5}),true);
+  assert.equal(isTrustedByStaffUi(body,{action,itemId:ITEM,nonce:NONCE,expectedRevision:5}),true);
   assert.equal(globalThis.__rc69.calls.length,1);
   assert.equal(globalThis.__rc69.calls[0].url,
    "https://staging-core.quickfurno.in/api/vox/v1/work-transitions");
@@ -79,14 +79,14 @@ test("real two-hop Core receipt survives Web BFF without losing UI-required sche
 test("Core success with forged side effects, wrong revision or state cannot become verified browser success",async()=>{
  for(const altered of [
   {schema:"wrong"},{providerMessagesSent:1},{affectsVendorLeadMatching:true},
-  {revision:7},{newState:"DONE"},{workItemId:"other"},{privateData:"secret"}]){
+  {revision:7},{newState:"DONE"},{workItemId:"other"},{nonce:"33333333-3333-4333-8333-333333333333"},{privateData:"secret"}]){
   setup(Response.json(receipt("ASSIGNED",altered)));
   const res=await api.POST(request(command("CLAIM")));
   assert.equal(res.status,503);
   const body=await res.json();
   assert.equal(body.error,"CORE_WORK_OUTCOME_UNKNOWN");
   assert.equal(body.committed,null);assert.equal(body.retrySameNonceOnly,true);
-  assert.equal(isTrustedByStaffUi(body,{action:"CLAIM",itemId:ITEM,expectedRevision:5}),false);
+  assert.equal(isTrustedByStaffUi(body,{action:"CLAIM",itemId:ITEM,nonce:NONCE,expectedRevision:5}),false);
   assert.equal(JSON.stringify(body).includes("secret"),false);
  }
 });

@@ -11,13 +11,14 @@ await build({entryPoints:[resolve(root,"lib/rc69VerifiedWorkReceipt.ts")],
  bundle:true,outfile:out,platform:"node",format:"esm",target:"node24",logLevel:"silent"});
 const {isVerifiedWorkReceipt:verify}=await import(pathToFileURL(out).href);
 const ITEM="11111111-1111-4111-8111-111111111111";
+const NONCE="22222222-2222-4222-8222-222222222222";
 const ACTIONS={CLAIM:"ASSIGNED",START:"IN_PROGRESS",WAIT_EXTERNAL:"WAITING_EXTERNAL",
  REQUEST_APPROVAL:"WAITING_APPROVAL",BLOCK:"BLOCKED",RESUME:"IN_PROGRESS",COMPLETE:"DONE"};
 const receipt=(state="ASSIGNED",extra={})=>({ok:true,status:200,
- schema:"qf.vox.work.transaction.receipt.v1",workItemId:ITEM,
+ schema:"qf.vox.work.transaction.receipt.v1",workItemId:ITEM,nonce:NONCE,
  newState:state,revision:6,providerMessagesSent:0,
  affectsVendorLeadMatching:false,...extra});
-const command=action=>({action,itemId:ITEM,expectedRevision:5});
+const command=action=>({action,itemId:ITEM,nonce:NONCE,expectedRevision:5});
 test("each of seven actual Staff actions accepts its exact verified Core/BFF success receipt",()=>{
  for(const [action,newState] of Object.entries(ACTIONS)){
   assert.equal(verify(receipt(newState),command(action)),true,action);
@@ -29,6 +30,7 @@ test("forged success cannot clear a protected same-tab original nonce",()=>{
   receipt("ASSIGNED",{providerMessagesSent:1}),
   receipt("ASSIGNED",{affectsVendorLeadMatching:true}),
   receipt("ASSIGNED",{workItemId:"other"}),
+  receipt("ASSIGNED",{nonce:"33333333-3333-4333-8333-333333333333"}),
   receipt("ASSIGNED",{revision:5}),
   receipt("ASSIGNED",{revision:7}),
   receipt("ASSIGNED",{status:503}),
@@ -45,7 +47,7 @@ test("forged success cannot clear a protected same-tab original nonce",()=>{
 });
 test("the actual WorkActionControl verifies receipt before clearing the exact nonce",()=>{
  const ui=readFileSync(resolve(root,"app/team/work-queue/WorkActionControl.tsx"),"utf8");
- assert.match(ui,/isVerifiedWorkReceipt\(body,\{action,itemId,expectedRevision:revision\}\)/);
+ assert.match(ui,/isVerifiedWorkReceipt\(body,\{action,itemId,nonce:pending\.current\.nonce,expectedRevision:revision\}\)/);
  assert.ok(ui.indexOf("isVerifiedWorkReceipt(body")<ui.indexOf("clearPendingWork(tabStore()"));
  assert.ok(ui.indexOf("savePendingWork(tabStore()")<ui.indexOf('fetch("/api/work-transitions"'));
  assert.match(ui,/setUncertain\(true\)/);

@@ -87,7 +87,7 @@ export default function WorkActionControl({itemId,revision,state,assignedToMe}:P
     return;
    }
    const body:unknown=await result.json();
-   if(!result.ok||!isVerifiedWorkReceipt(body,{action,itemId,expectedRevision:revision})){
+   if(!result.ok||!isVerifiedWorkReceipt(body,{action,itemId,nonce:pending.current.nonce,expectedRevision:revision})){
     setUncertain(true);
     setMessage(result.status===409?
      "Core revision changed or its receipt was lost. Do not create a new nonce; reconcile the original command with your Team Leader.":

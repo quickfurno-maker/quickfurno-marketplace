@@ -133,7 +133,7 @@ export async function POST(request:Request){
   }catch{return unknown();}
   finally{if(recheckTimer!==undefined)clearTimeout(recheckTimer);}
   return send({ok:true,schema:"qf.vox.work.transaction.receipt.v1",
-   workItemId:receipt.work_item_id,newState:receipt.new_state,
+   workItemId:receipt.work_item_id,nonce:data.nonce,newState:receipt.new_state,
    revision:receipt.new_revision,providerMessagesSent:0,
    affectsVendorLeadMatching:false},200);
  }catch{return attempted?unknown():send({ok:false,error:"WORK_STAFF_AUTH_UNAVAILABLE"},503);}

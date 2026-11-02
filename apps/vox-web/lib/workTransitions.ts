@@ -48,9 +48,9 @@ export async function submitScopedWorkTransition(cmd:WorkCommand){
   if(!obj||typeof obj!=="object"||Array.isArray(obj))return uncertain();
   const r=obj as Record<string,unknown>;
   if(!exact(r,["ok","schema","workItemId","newState","revision",
-    "providerMessagesSent","affectsVendorLeadMatching"])||
+    "nonce","providerMessagesSent","affectsVendorLeadMatching"])||
     r.ok!==true||r.schema!=="qf.vox.work.transaction.receipt.v1"||
-    r.workItemId!==cmd.itemId||
+    r.workItemId!==cmd.itemId||r.nonce!==cmd.nonce||
     !["ASSIGNED","IN_PROGRESS","WAITING_EXTERNAL","WAITING_APPROVAL","BLOCKED","DONE"].includes(String(r.newState))||
     r.newState!==({CLAIM:"ASSIGNED",START:"IN_PROGRESS",
      WAIT_EXTERNAL:"WAITING_EXTERNAL",REQUEST_APPROVAL:"WAITING_APPROVAL",
@@ -62,7 +62,7 @@ export async function submitScopedWorkTransition(cmd:WorkCommand){
   // Dropping schema / matching flag would make a committed transition appear
   // unconfirmed and strand its original nonce in browser recovery storage.
   return {ok:true,status:200,schema:"qf.vox.work.transaction.receipt.v1" as const,
-   workItemId:cmd.itemId,revision:r.revision as number,newState:r.newState as string,
+   workItemId:cmd.itemId,nonce:cmd.nonce,revision:r.revision as number,newState:r.newState as string,
    providerMessagesSent:0 as const,affectsVendorLeadMatching:false as const} as const;
  }catch{return uncertain();}
 }
@@ -103,13 +103,13 @@ export async function transitionMyStaffWork(cmd:{
   const v=result as Record<string,unknown>;
   const expected=cmd.action==="CLAIM"?"ASSIGNED":"IN_PROGRESS";
   if(!exact(v,["ok","schema","workItemId","newState","revision",
-   "providerMessagesSent","affectsVendorLeadMatching"])||
+   "nonce","providerMessagesSent","affectsVendorLeadMatching"])||
    v.ok!==true||v.schema!=="qf.vox.work.transaction.receipt.v1"||
-   v.workItemId!==cmd.itemId||v.newState!==expected||
+   v.workItemId!==cmd.itemId||v.nonce!==cmd.nonce||v.newState!==expected||
    !Number.isSafeInteger(v.revision)||v.revision!==cmd.expectedRevision+1||
    v.providerMessagesSent!==0||v.affectsVendorLeadMatching!==false)
    return uncertain();
-  return {ok:true,status:200,workItemId:cmd.itemId,newState:expected,
+  return {ok:true,status:200,workItemId:cmd.itemId,nonce:cmd.nonce,newState:expected,
    revision:v.revision as number,externalMessagesSent:0 as const} as const;
  }catch{return uncertain();}
 }

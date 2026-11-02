@@ -16,7 +16,7 @@ function reset(){
  state.token="MOCK_SERVER_MFA_TOKEN";state.coreStatus=200;state.coreRequests=[];
  state.receivedAuth=0;state.originOkay=true;state.authDenied=false;
  state.core={ok:true,schema:"qf.vox.work.transaction.receipt.v1",
-  workItemId:ITEM,newState:"ASSIGNED",revision:4,providerMessagesSent:0,
+  workItemId:ITEM,nonce:NONCE,newState:"ASSIGNED",revision:4,providerMessagesSent:0,
   affectsVendorLeadMatching:false};
 }
 reset();
@@ -132,7 +132,7 @@ test("Core extra PII, forged provider send, revision and state never become succ
  ];
  for(const row of forged){
   state.core={ok:true,schema:"qf.vox.work.transaction.receipt.v1",
-   workItemId:ITEM,newState:"ASSIGNED",revision:4,
+   workItemId:ITEM,nonce:NONCE,newState:"ASSIGNED",revision:4,
    providerMessagesSent:0,affectsVendorLeadMatching:false,...row};
   assert.equal((await api.POST(request())).status,503);
  }
@@ -146,7 +146,7 @@ test("other 6 work commands require exact Core state + revision",async()=>{
  ];
  for(const [action,newState,reason] of expected){
   state.core={ok:true,schema:"qf.vox.work.transaction.receipt.v1",
-   workItemId:ITEM,newState,revision:4,
+   workItemId:ITEM,nonce:NONCE,newState,revision:4,
    providerMessagesSent:0,affectsVendorLeadMatching:false};
   const r=await api.POST(request(input(action,reason)));
   assert.equal(r.status,200,action);

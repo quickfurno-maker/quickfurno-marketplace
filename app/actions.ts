@@ -37,6 +37,7 @@ import * as badLeadRecovery from "../services/badLeadRecoveryService";
 import { verifyVoxOwnerBearer } from "../services/vox/verifiedStaffBearer";
 import { rc65PostCreditOwnerAuthority } from "../services/vox/rc65PostCreditOwnerAuthority";
 import { rc68PostRecommendationOwnerAuthority } from "../services/vox/rc68PostRecommendationOwnerAuthority";
+import { rc73PostCommentOwnerAuthority } from "../services/vox/rc73PostCommentOwnerAuthority";
 import { rc70PostEligibilityOwnerAuthority } from "../services/vox/rc70PostEligibilityOwnerAuthority";
 import {
   queueHumanConversationReply,
@@ -1012,11 +1013,18 @@ export const adminApplyBadLeadRecovery = async (
     return verified;
   });
 export const adminAddVendorLeadReportComment = async (reportId: string, comment: string, isInternal = false) =>
-  asAdmin(async () => {
-    const user = await requireSuperadmin();
-    const result = await audit.addVendorLeadReportComment(reportId, comment, user.id, isInternal);
-    revalidatePath("/admin/leads");
-    return result;
+  asAdmin(async actor => {
+    // An added bad-lead review comment affects the governed evidence trail.
+    // Staff admin cookies alone cannot authorize this Owner-sensitive write.
+    if(!await rc44VerifiedBadLeadOwner(actor))return fail(appError("UNAUTHORIZED"));
+    const user=await requireSuperadmin();
+    if(user.id!==actor)return fail(appError("UNAUTHORIZED"));
+    const result=await audit.addVendorLeadReportComment(reportId,comment,user.id,isInternal);
+    // A comment can commit immediately before AAL2 revocation. Unknown means
+    // reconcile the original report, not "rolled back" or safe to retry.
+    const verified=await rc73PostCommentOwnerAuthority(result,()=>rc44VerifiedBadLeadOwner(actor));
+    if(verified.ok)revalidatePath("/admin/leads");
+    return verified;
   });
 export const adminListPackageOrdersAuditOnly = async (limit?: number) =>
   asAdmin(() => audit.listPackageOrdersAuditOnly(limit));

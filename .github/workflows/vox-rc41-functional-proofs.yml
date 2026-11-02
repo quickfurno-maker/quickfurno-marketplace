@@ -37,6 +37,11 @@ on:
       - 'apps/vox-web/scripts/validate-rc71-eod-submission-revision.spec.mjs'
       - 'scripts/mvp/vox/rc71-bad-lead-metadata-checkpoint.test.mjs'
       - 'scripts/mvp/vox/rc72-*.test.mjs'
+      - 'scripts/mvp/vox/rc73-*.test.mjs'
+      - 'scripts/mvp/vox/rc73-private-mismatch-triage.mjs'
+      - 'scripts/mvp/vox/rc73-staging-owner-guard-smoke.mjs'
+      - 'services/vox/rc73PostCommentOwnerAuthority.ts'
+      - 'app/api/vox/v1/eod-submissions/**'
       - 'apps/vox-web/scripts/validate-rc72-*.spec.mjs'
       - 'apps/vox-web/app/components/ScopedQueue.tsx'
       - 'apps/vox-web/app/components/scopedQueuePage.mjs'
@@ -183,6 +188,8 @@ jobs:
         run: node --test apps/vox-web/scripts/validate-rc71-eod-submission-revision.spec.mjs apps/vox-web/scripts/validate-rc70-partial-eod-submission.spec.mjs scripts/mvp/vox/rc64-bad-lead-review-checkpoint.test.mjs scripts/mvp/vox/rc71-bad-lead-metadata-checkpoint.test.mjs
       - name: RC72 Staff 20 per page, Finance comments, EOD business-date receipt proof
         run: node --test apps/vox-web/scripts/validate-rc72-scoped-pagination.spec.mjs apps/vox-web/scripts/validate-rc72-eod-date-receipt.spec.mjs scripts/mvp/vox/rc72-bad-lead-comment-checkpoint.test.mjs
+      - name: RC73 actual Core EOD business date, comment AAL2, private DBA safety, Staging guard denial
+        run: node --test scripts/mvp/vox/rc73-eod-core-date-http.test.mjs scripts/mvp/vox/rc73-finance-comment-owner.test.mjs scripts/mvp/vox/rc73-private-mismatch-triage.test.mjs scripts/mvp/vox/rc73-staging-owner-guard-smoke.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

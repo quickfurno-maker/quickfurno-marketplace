@@ -3,6 +3,7 @@ import {fetchStaffWorkQueuePreview} from "../../../lib/core";
 import {fetchAb3DomainWindow} from "../../../lib/ab3Domain";
 import {StaffSignInLink} from "../../components/StaffSignInLink";
 import WorkActionControl from "./WorkActionControl";
+import PendingWorkNotice from "./PendingWorkNotice";
 import "./queue.css";
 export const dynamic="force-dynamic";
 /** Existing one Staff login and current Core object/city/team grants.
@@ -65,6 +66,7 @@ export default async function VoxMyWorkQueue(){
      <h2 id="voxQueueListTitle">Current authorized work</h2>
      <span className="voxQueueTag">Core-scoped · bounded preview</span>
     </div>
+    {actionUiEnabled?<PendingWorkNotice visibleWorkItemIds={result.items.map(item=>item.workItemId)}/>:null}
     <p className="voxQueueCaution">
      Only currently permitted tasks are shown, never team-wide totals or
      an official daily performance report.</p>

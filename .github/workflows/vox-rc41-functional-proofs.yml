@@ -34,6 +34,11 @@ on:
       - 'scripts/mvp/vox/rc70-*.test.mjs'
       - 'apps/vox-web/scripts/validate-rc70-*.spec.mjs'
       - 'apps/vox-web/scripts/validate-rc71-premium-mfa.spec.mjs'
+      - 'apps/vox-web/scripts/validate-rc71-eod-submission-revision.spec.mjs'
+      - 'scripts/mvp/vox/rc71-bad-lead-metadata-checkpoint.test.mjs'
+      - 'lib/vox/badLeadReviewCheckpoint.ts'
+      - 'components/admin/LeadMatchingAuditPanels.tsx'
+      - 'apps/vox-web/lib/teamWorkflow.ts'
       - 'apps/vox-web/app/mfa/**'
       - 'apps/vox-web/lib/rc70PendingTlReview.mjs'
       - 'apps/vox-web/lib/rc70PendingEodSubmission.mjs'
@@ -169,6 +174,8 @@ jobs:
         run: node --test apps/vox-web/scripts/validate-rc70-tl-review-checkpoint.spec.mjs apps/vox-web/scripts/validate-rc70-partial-eod-submission.spec.mjs scripts/mvp/vox/rc70-finance-eligibility-owner.test.mjs scripts/mvp/vox/rc68-finance-recommendation-owner.test.mjs
       - name: RC71 premium MFA screen, existing AAL2 and safe return regression
         run: node --test apps/vox-web/scripts/validate-rc71-premium-mfa.spec.mjs apps/vox-web/scripts/validate-staff-session-recovery-rc35.spec.mjs
+      - name: RC71 genuine partial EOD revision and bad-lead metadata unknown-outcome checkpoint proofs
+        run: node --test apps/vox-web/scripts/validate-rc71-eod-submission-revision.spec.mjs apps/vox-web/scripts/validate-rc70-partial-eod-submission.spec.mjs scripts/mvp/vox/rc64-bad-lead-review-checkpoint.test.mjs scripts/mvp/vox/rc71-bad-lead-metadata-checkpoint.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

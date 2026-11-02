@@ -42,8 +42,9 @@ export function clearPendingTimeCommand(store,item,receipt){
  // Clear only after a server-authoritative, exactly matched Core receipt.
  if(!receipt||typeof receipt!=="object"||Array.isArray(receipt)||
    Object.keys(receipt).sort().join("|")!==
-    "eventId|moneyMinorUnits|nonce|occurredAt|productionCertified|providerMessagesSent|revision|schema"||
+    "eventId|moneyMinorUnits|nonce|occurredAt|ok|productionCertified|providerMessagesSent|revision|schema"||
    receipt.schema!=="qf.vox.staff.time.receipt.v1"||
+   receipt.ok!==true||
    receipt.nonce!==parsed.command.nonce||
    receipt.revision!==parsed.command.expectedRevision+1||
    typeof receipt.eventId!=="string"||

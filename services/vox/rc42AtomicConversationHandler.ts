@@ -5,7 +5,7 @@ import "server-only";
 export type Rc42Actor=Readonly<{userId:string;aal:"aal2";expiresAtMs:number;teamId:string;cityId:string}>;
 type Command={conversationId:string;nonce:string;expectedRevision:number;action:"PAUSE_AI"|"TAKEOVER"};
 type Deps={
- enabled:()=>boolean;installed:()=>boolean;now?:()=>number;rpcTimeoutMs?:number;
+ enabled:()=>boolean;installed:()=>boolean;now?:()=>number;rpcTimeoutMs?:number;recheckTimeoutMs?:number;
  verify:(bearer:string|null)=>Promise<Rc42Actor|null>;
  rpc:(name:string,args:Record<string,unknown>)=>Promise<{data:unknown;error:unknown}>
 };
@@ -94,8 +94,24 @@ export function createRc42AtomicConversationHandler(deps:Deps){
    // operator authority is still current unless live GoTrue + Staff scope
    // verifies again after the atomic receipt. This is NOT a rollback claim.
    let current:Rc42Actor|null;
-   try{current=await deps.verify(b);}
-   catch{return uncertain("STAFF_AUTH_RECHECK_UNAVAILABLE",503);}
+   let verifyTimer:ReturnType<typeof setTimeout>|undefined;
+   try{
+    const configuredRecheck=deps.recheckTimeoutMs;
+    // Bounded after-RPC verification is vital: the SQL may already have
+    // committed, and a hanging GoTrue recheck cannot hold HTTP indefinitely.
+    const recheckMs=Number.isSafeInteger(configuredRecheck)&&
+     Number(configuredRecheck)>=25&&Number(configuredRecheck)<=2500?
+      Number(configuredRecheck):1250;
+    const rechecked=await Promise.race([
+     deps.verify(b).then(value=>({timedOut:false as const,value})),
+     new Promise<{timedOut:true}>(resolve=>{
+      verifyTimer=setTimeout(()=>resolve({timedOut:true}),recheckMs);
+     })
+    ]);
+    if(rechecked.timedOut)return uncertain("STAFF_AUTH_RECHECK_TIMEOUT",503);
+    current=rechecked.value;
+   }catch{return uncertain("STAFF_AUTH_RECHECK_UNAVAILABLE",503);}
+   finally{if(verifyTimer!==undefined)clearTimeout(verifyTimer);}
    if(!current||current.aal!=="aal2"||current.userId!==actor.userId||
       current.teamId!==actor.teamId||current.cityId!==actor.cityId||
       !Number.isSafeInteger(current.expiresAtMs)||

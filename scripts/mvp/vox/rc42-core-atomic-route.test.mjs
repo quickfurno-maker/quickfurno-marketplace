@@ -102,6 +102,26 @@ test("timed-out atomic HTTP result is UNKNOWN, never false rollback or new-nonce
  assert.equal(out.providerMessagesSent,0);
  assert.equal(out.error,"ATOMIC_RPC_OUTCOME_UNKNOWN");
 });
+test("post-RPC GoTrue verification timeout cannot hang or falsely claim rollback",async()=>{
+ let checks=0;
+ const d=deps({recheckTimeoutMs:25,verify:async()=>{
+  checks++;
+  if(checks===1)return actor;
+  return new Promise(()=>{});
+ }});
+ const start=Date.now();
+ const r=await create(d)(request());
+ assert.equal(r.status,503);
+ assert.ok(Date.now()-start<1000);
+ const reply=await r.json();
+ assert.equal(reply.ok,false);
+ assert.equal(reply.error,"STAFF_AUTH_RECHECK_TIMEOUT");
+ assert.equal(reply.committed,null);
+ assert.equal(reply.commitState,"unknown");
+ assert.equal(reply.retrySameNonceOnly,true);
+ assert.equal(reply.providerMessagesSent,0);
+ assert.equal(checks,2);assert.equal(d.calls.length,1);
+});
 test("wrong nonce, revision, missing receipt or provider messages never certify",async()=>{
  for(const altered of [{...receipt,nonce:U},{...receipt,new_revision:7},
   {...receipt,provider_messages_sent:1},{...receipt,receipt_sha256:"b"},

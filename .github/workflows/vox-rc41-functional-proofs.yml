@@ -43,6 +43,12 @@ on:
       - 'scripts/mvp/vox/rc76-*.test.mjs'
       - 'scripts/mvp/vox/rc77-*.test.mjs'
       - 'scripts/mvp/vox/rc78-*.test.mjs'
+      - 'scripts/mvp/vox/rc79-*.test.mjs'
+      - 'apps/vox-web/lib/rc69VerifiedWorkReceipt.ts'
+      - 'apps/vox-web/lib/workTransitions.ts'
+      - 'app/api/vox/v1/work-transitions/**'
+      - 'app/api/vox/v1/eod-reviews/**'
+      - 'apps/vox-web/app/team/eod-reviews/ReviewDecision.tsx'
       - 'apps/vox-web/scripts/validate-rc78-*.spec.mjs'
       - 'apps/vox-web/lib/rc70PendingTlReview.mjs'
       - 'lib/vox/badLeadReviewCheckpoint.ts'
@@ -231,6 +237,8 @@ jobs:
         run: node --test apps/vox-web/scripts/validate-rc77-persistent-work-nonce.spec.mjs scripts/mvp/vox/rc77-atomic-status-timeout.test.mjs apps/vox-web/scripts/validate-rc77-eod-original-nonce.spec.mjs scripts/mvp/vox/rc73-eod-core-date-http.test.mjs
       - name: RC78 preserve all original work, Finance and Team Leader nonce checkpoints
         run: node --test apps/vox-web/scripts/validate-rc78-work-checkpoint-integrity.spec.mjs apps/vox-web/scripts/validate-rc78-tl-checkpoint-integrity.spec.mjs scripts/mvp/vox/rc78-bad-lead-checkpoint-integrity.test.mjs scripts/mvp/vox/rc74-bad-lead-linked-assignment.test.mjs
+      - name: RC79 actual Staff and Team Leader original-nonce receipts, credit-only recommendation API
+        run: node --experimental-vm-modules --test apps/vox-web/scripts/validate-rc69-work-receipt.spec.mjs scripts/mvp/vox/rc69-work-receipt-two-hop.test.mjs apps/vox-web/scripts/validate-governed-workflows-08k.spec.mjs scripts/mvp/vox/rc79-credit-only-recommendation-contract.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

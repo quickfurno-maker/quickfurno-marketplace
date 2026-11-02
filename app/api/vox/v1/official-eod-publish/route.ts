@@ -86,6 +86,21 @@ export async function POST(request:Request){
     receipt.source_sha256!==input.sourceDigest||
     receipt.publication_state!=="OFFICIALLY_RELEASED_BY_OWNER")
    return uncertain();
+  // An immutable receipt can be real while the Owner's verified AAL2 or
+  // account scope is revoked mid-request. Only the SAME current Owner can
+  // receive a confirmed publication response; unknown != rollback.
+  let recheckTimer:ReturnType<typeof setTimeout>|undefined;
+  try{
+   const rechecked=await Promise.race([
+    verifyVoxOwnerBearer(request.headers.get("authorization"))
+     .then(value=>({timedOut:false as const,value})),
+    new Promise<{timedOut:true}>(resolve=>{
+     recheckTimer=setTimeout(()=>resolve({timedOut:true}),EOD_OWNER_AUTH_TIMEOUT_MS);
+    })
+   ]);
+   if(rechecked.timedOut||rechecked.value!==ownerId)return uncertain();
+  }catch{return uncertain();}
+  finally{if(recheckTimer!==undefined)clearTimeout(recheckTimer);}
   return send({ok:true,reportId:input.reportId,
    state:"OFFICIALLY_RELEASED_BY_OWNER",nativeCoreLedger:true,
    externalMessagesSent:0},201);

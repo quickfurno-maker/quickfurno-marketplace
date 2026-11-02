@@ -82,7 +82,27 @@ test("lost, errored, malformed and timed-out publish RPCs never imply rollback o
   assert.equal(JSON.stringify(body).includes("private"),false);
  }
 });
-test("only an exact receipt may be accepted in test-only simulated installed mode",async()=>{
+test("successful SQL receipt requires the SAME current Owner again before HTTP success",async()=>{
+ enable();
+ for(const mode of ["revoked","different-owner","hang","throw"]){
+  const w=world();let auth=0;
+  globalThis.__rc64Eod.verify=async()=>{
+   if(++auth===1)return A;
+   if(mode==="revoked")return null;
+   if(mode==="different-owner")return B;
+   if(mode==="throw")throw Error("private auth detail");
+   return new Promise(()=>{});
+  };
+  const res=await sim.POST(request());
+  assert.equal(res.status,503,mode);
+  const body=await res.json();
+  assert.equal(body.error,"OFFICIAL_EOD_OUTCOME_UNKNOWN",mode);
+  assert.equal(body.publicationAuthorized,null);
+  assert.equal(body.retrySameNonceOnly,true);
+  assert.equal(auth,2);assert.equal(w.calls,1);
+ }
+});
+test("only an exact receipt plus reverified Owner may be accepted in test-only mode",async()=>{
  enable();const w=world(),res=await sim.POST(request());assert.equal(res.status,201);
  const body=await res.json();assert.equal(body.externalMessagesSent,0);
  assert.equal(w.calls,1);

@@ -16,6 +16,8 @@ await build({entryPoints:[resolve(root,"services/badLeadRecoveryService.ts")],ou
   b.onLoad({filter:/services[\\/]badLeadRecoveryService\.ts$/},a=>({loader:"ts",contents:
    readFileSync(a.path,"utf8").replace("RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=false as const",
    "RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=true as const")
+    .replace("RC82_BAD_LEAD_REJECTION_RPC_INSTALLED=false as const",
+     "RC82_BAD_LEAD_REJECTION_RPC_INSTALLED=true as const")
     .replace("CREDIT_RPC_TIMEOUT_MS=4000","CREDIT_RPC_TIMEOUT_MS=25")
     .replace("REJECT_RPC_TIMEOUT_MS=4000","REJECT_RPC_TIMEOUT_MS=25")
     .replace("RECOMMEND_RPC_TIMEOUT_MS=3000","RECOMMEND_RPC_TIMEOUT_MS=25")}));
@@ -35,9 +37,11 @@ test("production source cannot activate lead credit via env alone",()=>{
 });
 const REPORT="11111111-1111-4111-8111-111111111111",ACTOR="22222222-2222-4222-8222-222222222222";
 const gate="QF_VOX_BAD_LEAD_CREDIT_ONLY_ATOMIC_ENABLED";
+const rejectGate="QF_VOX_BAD_LEAD_REJECT_RPC_ENABLED";
 const calls=[];
 globalThis.__rc42Db=()=>({rpc:async(name,args)=>{calls.push({name,args});return {data:globalThis.__rc42Reply,error:null};}});
-const before=()=>{calls.length=0;delete process.env[gate];globalThis.__rc42Reply={
+const before=()=>{calls.length=0;delete process.env[gate];
+ process.env[rejectGate]="staging";globalThis.__rc42Reply={
  status:"applied",lead_credits_restored:1,cash_refunded_minor_units:0,
  original_assignment_id:"44444444-4444-4444-8444-444444444444",
  credit_restoration_approval_id:"55555555-5555-4555-8555-555555555555",
@@ -225,3 +229,21 @@ test("recommendation refuses legacy direct replacement before database",async()=
  assert.equal(calls.length,0);
 });
 process.on("exit",()=>{try{rmSync(tmp,{recursive:true,force:true});}catch{}});
+
+
+test("RC82 canonical rejection writer stays hard-OFF in actual source",()=>{
+ const src=readFileSync(resolve(root,"services/badLeadRecoveryService.ts"),"utf8");
+ assert.match(src,/RC82_BAD_LEAD_REJECTION_RPC_INSTALLED=false as const/);
+ assert.match(src,/if\(!RC82_BAD_LEAD_REJECTION_RPC_INSTALLED \|\|/);
+ assert.match(src,/QF_VOX_BAD_LEAD_REJECT_RPC_ENABLED/);
+});
+test("RC82 rejection cannot run without distinct reviewed Staging permission",async()=>{
+ before();delete process.env[rejectGate];
+ const r=await apply(REPORT,"reject",ACTOR);
+ assert.equal(r.ok,false);assert.equal(r.code,"BAD_LEAD_REJECTION_NOT_APPROVED");
+ assert.equal(calls.length,0);
+ process.env[rejectGate]="production";
+ const second=await apply(REPORT,"reject",ACTOR);
+ assert.equal(second.ok,false);assert.equal(second.code,"BAD_LEAD_REJECTION_NOT_APPROVED");
+ assert.equal(calls.length,0);
+});

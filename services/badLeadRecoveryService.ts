@@ -17,6 +17,9 @@ const blocked=<T>(code:string,error:string):Result<T>=>({ok:false,code,error});
 // RC43 owner-controlled release constant. An environment flag alone MUST NOT
 // activate a real canonical vendor credit mutation before DBA/AppSec + recovery GO.
 export const RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=false as const;
+// Rejection also mutates canonical recovery state. Release it only after a
+// separately reviewed Staging installation; never by environment flag alone.
+export const RC82_BAD_LEAD_REJECTION_RPC_INSTALLED=false as const;
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const policyDenied=<T>()=>blocked<T>("BAD_LEAD_CREDIT_ONLY_POLICY",
  "A verified bad lead receives one lead credit, never money or a replacement assignment.");
@@ -148,6 +151,12 @@ export async function applyBadLeadRecovery(
     leadCreditsRestored:r.status==="applied"?1:0,
     restorationStatus:r.status});
   }
+  // A reject can still commit a financial-equivalent decision. Keep the old
+  // report-scoped reject writer disabled until its SQL/authorization review.
+  if(!RC82_BAD_LEAD_REJECTION_RPC_INSTALLED ||
+     process.env.QF_VOX_BAD_LEAD_REJECT_RPC_ENABLED!=="staging")
+   return blocked("BAD_LEAD_REJECTION_NOT_APPROVED",
+    "Canonical bad-lead rejection is awaiting reviewed Staging installation.");
   // Existing reject path never restores credits, pays money or assigns a lead.
   let rejectTimer:ReturnType<typeof setTimeout>|undefined;
   let rejectResult:{data:unknown;error:unknown};

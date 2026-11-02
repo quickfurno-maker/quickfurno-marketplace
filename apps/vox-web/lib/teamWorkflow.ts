@@ -16,13 +16,18 @@ async function requestCore(path:"staff-chat"|"eod-submissions"|"eod-reviews",
  if(!token)return deny(401,"MFA_REQUIRED");
  const url=origin();
  if(!url)return deny(503,"CORE_NOT_CONFIGURED");
+ // Core can spend 1.5s verifying Staff, 4s committing SQL and 1.25s
+ // rechecking grants. A 3.5s Web deadline would kill a legitimate receipt
+ // while the SQL could still commit. Read paths and chat stay bounded at 3.5s.
+ const deadline=payload&&(path==="eod-submissions"||path==="eod-reviews")
+  ?9000:3500;
  try{
   const response=await fetch(url+"/api/vox/v1/"+path,{
    method:payload?"POST":"GET",
    headers:{authorization:"Bearer "+token,accept:"application/json",
     ...(payload?{"content-type":"application/json"}:{})},
    ...(payload?{body:JSON.stringify(payload)}:{}),
-   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(deadline)
   });
   if(!response.ok){
    // Preserve only the two exact Core unknown-outcome contracts, never

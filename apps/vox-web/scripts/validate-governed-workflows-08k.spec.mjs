@@ -42,7 +42,8 @@ const reply=(path,method)=>{
     eventCount:2,revision:0,completeness:"PARTIAL_UNVERIFIED_TOTAL"}]};
 };
 const ctx=vm.createContext({process:{env:flags},Date:FixedDate,Intl,URL,
- AbortSignal,fetch:async(url,options)=>{
+ AbortSignal:{timeout:(ms)=>{state.deadlineMs=ms;return AbortSignal.timeout(10000);}},
+ fetch:async(url,options)=>{
   state.requests.push({url,options});
   return {ok:state.status<400,status:state.status,
    json:async()=>state.payload??reply(url,options.method)};
@@ -216,4 +217,20 @@ test("three operator pages are server scoped and never say full daily report",()
   assert.match(text,/export const dynamic="force-dynamic"/);
   assert.match(text,/\.\.\/workflow\.css/);
  }
+});
+
+
+test("RC82 EOD writes outlive maximum Core commit + Staff recheck without changing read deadlines",async()=>{
+ await api.fetchMyEodSubmissions();
+ assert.equal(state.deadlineMs,3500);
+ await api.fetchTlEodQueue();
+ assert.equal(state.deadlineMs,3500);
+ await api.fetchTeamChat();
+ assert.equal(state.deadlineMs,3500);
+ await api.submitMyPartialEod(uuid(21));
+ assert.equal(state.deadlineMs,9000);
+ await api.decideTlEod(uuid(10),uuid(22),"ACKNOWLEDGED");
+ assert.equal(state.deadlineMs,9000);
+ await api.sendTeamChat("Internal only",uuid(21));
+ assert.equal(state.deadlineMs,3500);
 });

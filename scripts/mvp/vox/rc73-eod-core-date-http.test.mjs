@@ -16,7 +16,8 @@ const old=Object.fromEntries(["VOX_STAFF_GRANTS_ENABLED",
  .map(x=>[x,process.env[x]]));
 for(const key of Object.keys(old))process.env[key]="staging";
 globalThis.__rc73EodScope={canReadContent:true,canMutate:false,role:"support_agent",
- userId:uuid(1),teamId:uuid(2),cityId:uuid(3)};
+ userId:uuid(1),teamId:uuid(2),cityId:uuid(3),verifiedDepartments:["service_support"],
+ prospectIds:[],vendorIds:[],supportThreadIds:[],conversationIds:[]};
 let calls=[];
 globalThis.__rc73EodRpc=async(name,payload)=>{
  calls.push({name,payload});

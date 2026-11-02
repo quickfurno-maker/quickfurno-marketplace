@@ -128,6 +128,23 @@ test("BFF timeout exceeds Core atomic RPC timeout so verified 504 can be observe
  assert.match(ui,/pending.current=null;setUncertain\(false\)/);
  assert.match(ui,/Do not assume rollback/);
 });
+test("HTTP 200 without canonical receipt is UNKNOWN, not a failed transaction",async()=>{
+ reset();state.status=200;
+ for(const forged of [null,{},[],{...original,nonce:C},
+  {...original,providerMessagesSent:1},
+  {...original,receiptSha256:"invalid"}]){
+  state.receipt=forged;
+  const response=await api.POST(request());
+  assert.equal(response.status,503);
+  const body=await response.json();
+  assert.equal(body.error,"CORE_OUTCOME_UNKNOWN");
+  assert.equal(body.committed,null);
+  assert.equal(body.retrySameNonceOnly,true);
+  assert.equal(body.ok,false);
+ }
+ assert.equal(state.calls.length,6);
+ for(const call of state.calls)assert.equal(JSON.parse(call.options.body).nonce,N);
+});
 test("Core 504 and 503 cannot be mistaken for rollback or trigger a new nonce",async()=>{
  reset();
  for(const status of [504,503]){

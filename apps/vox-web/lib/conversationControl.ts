@@ -64,7 +64,8 @@ export async function submitConversationControl(cmd:ConversationCommand){
   }
   const raw:unknown=await response.json();
   if(!raw||typeof raw!=="object"||Array.isArray(raw))
-   return {ok:false,status:503,error:"INVALID_ATOMIC_RECEIPT"} as const;
+   return {ok:false,status:503,error:"CORE_OUTCOME_UNKNOWN",
+    committed:null,retrySameNonceOnly:true} as const;
   const r=raw as Record<string,unknown>;
   const expectedKeys=["ok","state","action","nonce","conversationId",
    "previousRevision","newRevision","replayed","receiptSha256",
@@ -78,7 +79,8 @@ export async function submitConversationControl(cmd:ConversationCommand){
     typeof r.replayed!=="boolean"||
     typeof r.receiptSha256!=="string"||!HASH.test(r.receiptSha256)||
     r.providerMessagesSent!==0)
-   return {ok:false,status:503,error:"UNTRUSTED_ATOMIC_RECEIPT"} as const;
+   return {ok:false,status:503,error:"CORE_OUTCOME_UNKNOWN",
+    committed:null,retrySameNonceOnly:true} as const;
   return {ok:true,status:200,conversationId:cmd.conversationId,
    action:cmd.action,newRevision:cmd.expectedRevision+1,
    state:r.state as "PAUSED"|"HUMAN",

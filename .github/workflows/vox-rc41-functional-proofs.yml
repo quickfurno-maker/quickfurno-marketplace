@@ -42,6 +42,11 @@ on:
       - 'scripts/mvp/vox/rc75-*.test.mjs'
       - 'scripts/mvp/vox/rc76-*.test.mjs'
       - 'scripts/mvp/vox/rc77-*.test.mjs'
+      - 'scripts/mvp/vox/rc78-*.test.mjs'
+      - 'apps/vox-web/scripts/validate-rc78-*.spec.mjs'
+      - 'apps/vox-web/lib/rc70PendingTlReview.mjs'
+      - 'lib/vox/badLeadReviewCheckpoint.ts'
+      - 'services/adminAuditService.ts'
       - 'apps/vox-web/scripts/validate-rc77-*.spec.mjs'
       - 'apps/vox-web/lib/rc66PendingWorkTransition.ts'
       - 'services/vox/rc77BoundedAtomicBadLeadReview.ts'
@@ -224,6 +229,8 @@ jobs:
         run: node --test apps/vox-web/scripts/validate-rc40-staff-uat-recovery.spec.mjs scripts/mvp/vox/rc76-finance-atomic-readiness.test.mjs apps/vox-web/scripts/validate-rc76-hidden-work-recovery.spec.mjs
       - name: RC77 Staff nonce readback, uncertain Finance RPC and verified original EOD nonce
         run: node --test apps/vox-web/scripts/validate-rc77-persistent-work-nonce.spec.mjs scripts/mvp/vox/rc77-atomic-status-timeout.test.mjs apps/vox-web/scripts/validate-rc77-eod-original-nonce.spec.mjs scripts/mvp/vox/rc73-eod-core-date-http.test.mjs
+      - name: RC78 preserve all original work, Finance and Team Leader nonce checkpoints
+        run: node --test apps/vox-web/scripts/validate-rc78-work-checkpoint-integrity.spec.mjs apps/vox-web/scripts/validate-rc78-tl-checkpoint-integrity.spec.mjs scripts/mvp/vox/rc78-bad-lead-checkpoint-integrity.test.mjs scripts/mvp/vox/rc74-bad-lead-linked-assignment.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

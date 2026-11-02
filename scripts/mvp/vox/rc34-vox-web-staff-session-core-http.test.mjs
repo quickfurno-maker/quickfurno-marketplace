@@ -254,7 +254,7 @@ test("team-chat BFF: missing session answers 401 and never reaches Core",async()
 test("client forms check for 401 before parsing the body and link to /login",()=>{
  for(const f of ["team/chat/ChatComposer.tsx","team/notifications/MarkRead.tsx","team/work-queue/WorkActionControl.tsx"]){
   const src=readFileSync(resolve(web,"app",f),"utf8");
-  const i401=src.search(/\.status===401\)\{setExpired\(true\)/),iJson=src.indexOf(".json()");
+  const i401=src.search(/\.status===401\)\{\s*setExpired\(true\)/),iJson=src.indexOf(".json()");
   assert.ok(i401>0&&i401<iJson,f+" must handle 401 before .json()");
   if(f==="team/work-queue/WorkActionControl.tsx")
    assert.match(src,/href=\{withReturn\("\/login","\/team\/work-queue"\)\}/);

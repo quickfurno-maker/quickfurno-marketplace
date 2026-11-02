@@ -28,6 +28,13 @@ on:
       - 'scripts/mvp/vox/rc62-*.test.mjs'
       - 'scripts/mvp/vox/rc64-*.test.mjs'
       - 'scripts/mvp/vox/rc65-*.test.mjs'
+      - 'scripts/mvp/vox/rc66-*.test.mjs'
+      - 'apps/vox-web/scripts/validate-rc66-work-recovery.spec.mjs'
+      - 'apps/vox-web/lib/rc66PendingWorkTransition.ts'
+      - 'apps/vox-web/lib/workTransitions.ts'
+      - 'apps/vox-web/app/api/work-transitions/**'
+      - 'apps/vox-web/app/team/work-queue/**'
+      - 'app/api/vox/v1/work-transitions/**'
       - 'apps/vox-web/scripts/validate-rc65-bounded-mfa.spec.mjs'
       - 'apps/vox-web/lib/rc65BoundedStaffMfa.ts'
       - 'services/vox/rc65PostCreditOwnerAuthority.ts'
@@ -134,6 +141,10 @@ jobs:
         run: node --test apps/vox-web/scripts/validate-rc65-bounded-mfa.spec.mjs scripts/mvp/vox/rc65-finance-post-owner-check.test.mjs scripts/mvp/vox/rc64-official-eod-publish-guard.test.mjs
       - name: RC65 real compiled VOX Web adapter and BFF security VM proof
         run: node --experimental-vm-modules --test apps/vox-web/scripts/validate-rc46-conversation-control.spec.mjs
+      - name: RC66 real Core work transition bounded authority, ambiguous receipt, and same-tab work nonce
+        run: node --test scripts/mvp/vox/rc66-work-core-boundary.test.mjs apps/vox-web/scripts/validate-rc66-work-recovery.spec.mjs scripts/mvp/vox/rc34-vox-web-staff-session-core-http.test.mjs
+      - name: RC66 compiled Web work-queue to Core HTTP security contract
+        run: node --experimental-vm-modules --test apps/vox-web/scripts/validate-voxL4-atomic-work-actions.spec.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

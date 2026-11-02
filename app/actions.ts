@@ -35,6 +35,7 @@ import * as adminVendorLocation from "../services/adminVendorLocationService";
 import * as leadAssignmentLifecycle from "../services/leadAssignmentLifecycleService";
 import * as badLeadRecovery from "../services/badLeadRecoveryService";
 import { verifyVoxOwnerBearer } from "../services/vox/verifiedStaffBearer";
+import { rc65PostCreditOwnerAuthority } from "../services/vox/rc65PostCreditOwnerAuthority";
 import {
   queueHumanConversationReply,
   releaseHumanConversationToAi,
@@ -989,11 +990,16 @@ export const adminApplyBadLeadRecovery = async (
         return fail(appError("UNAUTHORIZED"));
     } catch { return fail(appError("UNAUTHORIZED")); }
     const result = await badLeadRecovery.applyBadLeadRecovery(reportId, action, actor);
+    // A canonical credit/rejection may have committed while the Owner AAL2
+    // expired. Recheck the identical verified actor after SQL; ambiguity
+    // cannot be reported as successful or used to authorize another decision.
+    const verified=await rc65PostCreditOwnerAuthority(result,action,
+      ()=>rc44VerifiedBadLeadOwner(actor));
     revalidatePath("/admin/leads");
     revalidatePath("/admin/lead-distribution");
     revalidatePath("/vendor/dashboard/matching");
     revalidatePath("/vendor/dashboard");
-    return result;
+    return verified;
   });
 export const adminAddVendorLeadReportComment = async (reportId: string, comment: string, isInternal = false) =>
   asAdmin(async () => {

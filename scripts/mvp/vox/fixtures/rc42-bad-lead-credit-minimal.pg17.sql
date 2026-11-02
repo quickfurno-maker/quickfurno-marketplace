@@ -20,16 +20,35 @@ CREATE TABLE public.credit_restoration_approvals(
  status text not null,approved_by uuid,decided_at timestamptz,idempotency_key text unique,
  restoration_ledger_id uuid);
 CREATE TABLE public.credit_test_wallet(vendor_id uuid primary key,lead_credits int not null);
+-- Mirror the actual canonical ledger columns so even the disposable fixture
+-- cannot satisfy the wrapper using a fabricated UUID alone.
+CREATE TABLE public.vendor_credit_logs(
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),vendor_id uuid NOT NULL,
+ change_type text NOT NULL,credits_before integer NOT NULL,
+ credits_delta integer NOT NULL,credits_after integer NOT NULL,
+ reason text,updated_by text,reference_type text,reference_id text,
+ approval_reference uuid,idempotency_key text UNIQUE,actor_kind text,
+ actor_id uuid,created_at timestamptz NOT NULL DEFAULT now());
 -- STUB: only proves new RC42 transaction calls canonical function atomically.
 -- Real authoritative qf_approve_credit_restoration_v2 must receive its OWN PG17 proof separately.
 CREATE FUNCTION public.qf_approve_credit_restoration_v2(p_approval uuid,p_actor uuid,p_reason text)
 RETURNS jsonb LANGUAGE plpgsql AS $$
 DECLARE rec public.credit_restoration_approvals%rowtype; v_ledger uuid:=gen_random_uuid();
+ v_before integer;
 BEGIN
  SELECT * INTO rec FROM public.credit_restoration_approvals WHERE id=p_approval FOR UPDATE;
  IF NOT FOUND OR rec.status<>'approved' OR rec.approved_by IS NULL THEN
  RETURN jsonb_build_object('status','rejected'); END IF;
- UPDATE public.credit_test_wallet SET lead_credits=lead_credits+1 WHERE vendor_id=rec.vendor_id;
+ SELECT lead_credits INTO v_before FROM public.credit_test_wallet
+  WHERE vendor_id=rec.vendor_id FOR UPDATE;
+ IF v_before IS NULL THEN RETURN jsonb_build_object('status','rejected'); END IF;
+ UPDATE public.credit_test_wallet SET lead_credits=v_before+1 WHERE vendor_id=rec.vendor_id;
+ INSERT INTO public.vendor_credit_logs(id,vendor_id,change_type,credits_before,
+  credits_delta,credits_after,reason,updated_by,reference_type,reference_id,
+  approval_reference,idempotency_key,actor_kind,actor_id)
+ VALUES(v_ledger,rec.vendor_id,'approved_bad_lead_restoration',
+  v_before,1,v_before+1,'disposable','test_stub','credit_restoration_approval',
+  rec.id::text,rec.id,'restoration:'||rec.id::text,'admin',p_actor);
  UPDATE public.credit_restoration_approvals SET status='applied',restoration_ledger_id=v_ledger WHERE id=p_approval;
  RETURN jsonb_build_object('status','applied','ledger_id',v_ledger);
 END $$;

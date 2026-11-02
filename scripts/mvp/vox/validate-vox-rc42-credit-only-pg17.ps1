@@ -72,7 +72,7 @@ try{
 ALTER TABLE public.credit_restoration_approvals ADD COLUMN updated_at timestamptz DEFAULT now();
 CREATE TABLE public.vendors(id uuid PRIMARY KEY,remaining_credits integer NOT NULL,last_assigned_at timestamptz);
 INSERT INTO public.vendors VALUES('22222222-2222-4222-8222-222222222222',10,NULL);
-CREATE TABLE public.vendor_credit_logs(
+CREATE TABLE IF NOT EXISTS public.vendor_credit_logs(
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  vendor_id uuid NOT NULL,change_type text NOT NULL,
  credits_before integer NOT NULL,credits_delta integer NOT NULL,

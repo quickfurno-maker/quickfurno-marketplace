@@ -17,6 +17,10 @@ test("canonical ledger receipt must match original consumed assignment and appro
  assert.match(sql,/WHERE id=approval_id AND original_assignment_id=a.id/);
  assert.match(sql,/vendor_id=a.vendor_id AND status='applied'/);
  assert.match(sql,/restoration_ledger_id=\(credit->>'ledger_id'\)::uuid/);
+ assert.match(sql,/RC60_CANONICAL_LEDGER_ROW_UNBOUND/);
+ assert.match(sql,/l\.approval_reference=approval_id/);
+ assert.match(sql,/l\.reference_id=approval_id::text/);
+ assert.match(sql,/l\.credits_delta=1/);
  assert.match(sql,/cash_refunded_minor_units',0/);
  assert.match(sql,/automatic_replacement_created',false/);
  assert.match(read("services/badLeadRecoveryService.ts"),/RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=false as const/);

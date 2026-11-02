@@ -17,7 +17,8 @@ await build({entryPoints:[resolve(root,"services/badLeadRecoveryService.ts")],ou
    readFileSync(a.path,"utf8").replace("RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=false as const",
    "RC43_BAD_LEAD_ATOMIC_RPC_INSTALLED=true as const")
     .replace("CREDIT_RPC_TIMEOUT_MS=4000","CREDIT_RPC_TIMEOUT_MS=25")
-    .replace("REJECT_RPC_TIMEOUT_MS=4000","REJECT_RPC_TIMEOUT_MS=25")}));
+    .replace("REJECT_RPC_TIMEOUT_MS=4000","REJECT_RPC_TIMEOUT_MS=25")
+    .replace("RECOMMEND_RPC_TIMEOUT_MS=3000","RECOMMEND_RPC_TIMEOUT_MS=25")}));
   b.onResolve({filter:/^\.\.\/lib\/supabase$/},()=>({path:"supabase",namespace:"fake"}));
   b.onResolve({filter:/^\.\.\/lib\/errors$/},()=>({path:"errors",namespace:"fake"}));
   b.onLoad({filter:/.*/,namespace:"fake"},a=>({loader:"js",contents:
@@ -41,6 +42,28 @@ const before=()=>{calls.length=0;delete process.env[gate];globalThis.__rc42Reply
  original_assignment_id:"44444444-4444-4444-8444-444444444444",
  credit_restoration_approval_id:"55555555-5555-4555-8555-555555555555",
  automatic_replacement_created:false};};
+test("recommendation receipt loss is bounded, UNKNOWN and never retries or grants credits",async()=>{
+ before();
+ const saved=globalThis.__rc42Db;
+ for(const mode of ["hang","throw","transport","missing","forged"]){
+  let sent=0;
+  globalThis.__rc42Db=()=>({rpc:async(name,args)=>{
+   sent++;
+   assert.equal(name,"qf_recommend_bad_lead_recovery_v1");
+   if(mode==="hang")return new Promise(()=>{});
+   if(mode==="throw")throw Error("private error");
+   if(mode==="transport")return {data:null,error:{message:"private"}};
+   if(mode==="missing")return {data:null,error:null};
+   return {data:{status:"applied",lead_credits_restored:1},error:null};
+  }});
+  const reply=await recommend(REPORT,"restore_credit");
+  assert.equal(reply.ok,false);
+  assert.equal(reply.code,mode==="forged"?"RECOMMENDATION_RESPONSE_INVALID":"RECOMMEND_OUTCOME_UNKNOWN");
+  assert.equal(sent,1);
+  assert.equal(JSON.stringify(reply).includes("private error"),false);
+ }
+ globalThis.__rc42Db=saved;
+});
 test("default OFF cannot grant any credit or call database",async()=>{
  before();const r=await apply(REPORT,"restore_credit",ACTOR);
  assert.equal(r.ok,false);assert.equal(r.code,"CREDIT_ONLY_ATOMIC_NOT_APPROVED");

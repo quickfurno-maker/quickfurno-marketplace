@@ -30,6 +30,11 @@ const CREDIT_RPC_TIMEOUT_MS=4000;
 // Rejection also changes canonical report state. A lost receipt is not proof
 // of rollback; never invite another contradictory decision automatically.
 const REJECT_RPC_TIMEOUT_MS=4000;
+// A recommendation mutates human-review metadata, even though it MUST never
+// grant a lead credit or cash. Lost write receipts require reconciliation.
+const RECOMMEND_RPC_TIMEOUT_MS=3000;
+const uncertainRecommendation=<T>()=>blocked<T>("RECOMMEND_OUTCOME_UNKNOWN",
+ "Recommendation state may have changed. Reconcile the exact report before another recommendation.");
 const uncertainReject=<T>()=>blocked<T>("REJECT_OUTCOME_UNKNOWN",
  "Rejection outcome is uncertain. Reconcile the exact report before another decision.");
 
@@ -38,12 +43,21 @@ export async function recommendBadLeadRecovery(
 ):Promise<Result<{reportId:string;recommendation:string}>>{
  if(!UUID.test(reportId||""))return blocked("VALIDATION","Valid bad-lead report is required.");
  if(recommendation!=="none"&&recommendation!=="restore_credit")return policyDenied();
+ let timer:ReturnType<typeof setTimeout>|undefined;
  try{
-  const {data,error}=await adminClient().rpc("qf_recommend_bad_lead_recovery_v1",{
-   p_report_id:reportId,p_recommendation:recommendation
-  });
-  if(error)throw error;
-  const row=(data??{}) as RecoveryRpcResult;
+  const result=await Promise.race([
+   Promise.resolve(adminClient().rpc("qf_recommend_bad_lead_recovery_v1",{
+    p_report_id:reportId,p_recommendation:recommendation
+   })).then(value=>({timedOut:false as const,value})),
+   new Promise<{timedOut:true}>(resolve=>{
+    timer=setTimeout(()=>resolve({timedOut:true}),RECOMMEND_RPC_TIMEOUT_MS);
+   })
+  ]);
+  if(result.timedOut)return uncertainRecommendation();
+  const {data,error}=result.value;
+  if(error||!data||typeof data!=="object"||Array.isArray(data))
+   return uncertainRecommendation();
+  const row=data as RecoveryRpcResult;
   if(row.status!=="applied")return blocked(String(row.reason_code??"RECOVERY_RECOMMENDATION_REFUSED"),
    "Recovery recommendation was refused.");
   if((row.lead_credits_restored!==undefined&&row.lead_credits_restored!==0)||
@@ -52,7 +66,8 @@ export async function recommendBadLeadRecovery(
      row.monetary_refund_id!=null)
    return blocked("RECOMMENDATION_RESPONSE_INVALID","Recommendation cannot execute a credit, replacement or refund.");
   return ok({reportId,recommendation});
- }catch(e){return fail(e);}
+ }catch{return uncertainRecommendation();}
+ finally{if(timer!==undefined)clearTimeout(timer);}
 }
 
 export async function generateBadLeadRecoveryRecommendation(

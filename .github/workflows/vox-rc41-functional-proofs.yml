@@ -26,6 +26,9 @@ on:
       - 'scripts/mvp/vox/rc60-*.test.mjs'
       - 'scripts/mvp/vox/rc61-*.test.mjs'
       - 'scripts/mvp/vox/rc62-*.test.mjs'
+      - 'scripts/mvp/vox/rc64-*.test.mjs'
+      - 'lib/vox/badLeadReviewCheckpoint.ts'
+      - 'app/api/vox/v1/official-eod-publish/**'
       - 'scripts/mvp/vox/rc57-private-lexical-reconciliation.mjs'
       - 'docs/vox/VOX-RC53-*'
       - 'docs/vox/VOX-RC54-*'
@@ -121,6 +124,8 @@ jobs:
         run: node --test scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc43-core-route-integration.test.mjs scripts/mvp/vox/rc43-eod-route-integration.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-service.test.mjs scripts/mvp/vox/rc62-operational-deadline-coverage.test.mjs
       - name: RC63 Staff same-nonce recovery across in-tab refresh, denied storage and malformed records
         run: node --test apps/vox-web/scripts/validate-rc63-pending-conversation.spec.mjs
+      - name: RC64 Finance recovery checkpoint and official EOD uncertain-outcome protection
+        run: node --test scripts/mvp/vox/rc64-bad-lead-review-checkpoint.test.mjs scripts/mvp/vox/rc64-official-eod-publish-guard.test.mjs scripts/mvp/vox/rc51-finance-operator-ui.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

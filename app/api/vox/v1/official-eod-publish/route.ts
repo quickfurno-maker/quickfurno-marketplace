@@ -29,9 +29,10 @@ export async function POST(request:Request){
   let ownerTimer:ReturnType<typeof setTimeout>|undefined;
   let ownerId:string|null;
   try{
+   const verifyCurrentOwner=async()=>await verifyVoxOwnerBearer(
+    request.headers.get("authorization"));
    const outcome=await Promise.race([
-    verifyVoxOwnerBearer(request.headers.get("authorization"))
-     .then(value=>({timedOut:false as const,value})),
+    verifyCurrentOwner().then(value=>({timedOut:false as const,value})),
     new Promise<{timedOut:true}>(resolve=>{
      ownerTimer=setTimeout(()=>resolve({timedOut:true}),EOD_OWNER_AUTH_TIMEOUT_MS);
     })

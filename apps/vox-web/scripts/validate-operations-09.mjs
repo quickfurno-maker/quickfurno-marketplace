@@ -13,7 +13,7 @@ t("vendor SSR uses protected Core CRM",()=>assert.match(vendor,/fetchScopedCrm\(
 t("desk SSR uses protected Core service desk",()=>assert.match(desk,/fetchScopedServiceDesk\(\)/));
 t("search actually filters list",()=>assert.match(q,/rows\.filter\(/));
 t("search constrained to bounded input",()=>assert.match(q,/maxLength=\{80\}/));
-t("status selector wired to state",()=>assert.match(q,/onChange=\{e=>setState\(e\.target\.value\)\}/));
+t("status selector updates filter and resets page to first authorized 20",()=>assert.match(q,/onChange=\{e=>\{setState\(e\.target\.value\);setPage\(1\);\}\}/));
 t("attention checkbox changes visible records",()=>assert.match(q,/setAttentionOnly\(e\.target\.checked\)/));
 t("filter reset changes all relevant state",()=>assert.match(q,/setQuery\(""\);setState\("ALL"\);setAttentionOnly\(false\)/));
 t("UI only uses Core-assigned bounded items",()=>assert.doesNotMatch(q,/fetch\(|localStorage|window\.location|sendMessage/));

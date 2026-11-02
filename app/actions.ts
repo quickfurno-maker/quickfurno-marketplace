@@ -995,6 +995,10 @@ export const adminApplyBadLeadRecovery = async (
   action: badLeadRecovery.BadLeadRecoveryAction,
 ) =>
   asAdmin(async (actor) => {
+    // Legacy UI types can still carry an old replacement enum. Reject it at
+    // this public server-action boundary, before Auth lookups or any SQL.
+    if(action!=="restore_credit"&&action!=="reject")
+      return fail(appError("VALIDATION"));
     // Compensation is a financial-equivalent credit mutation, even though
     // QuickFurno NEVER gives money for a bad lead. Require current Owner AAL2
     // from real GoTrue and bind the verified subject to the admin actor.

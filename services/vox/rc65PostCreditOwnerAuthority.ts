@@ -1,6 +1,8 @@
 // A successful SQL receipt does not prove the Owner's AAL2 authority
 // survived the in-flight mutation. Recheck same actor; never claim rollback.
-type Action="restore_credit"|"replace"|"restore_credit_and_replace"|"reject";
+// Only canonical one-credit restoration or rejection can reach this
+// post-commit Owner authority recheck; legacy replacement enums are forbidden.
+type Action="restore_credit"|"reject";
 type Reply={ok:boolean};
 type Unknown=Readonly<{ok:false;code:"CREDIT_OUTCOME_UNKNOWN"|"REJECT_OUTCOME_UNKNOWN";
  error:string}>;

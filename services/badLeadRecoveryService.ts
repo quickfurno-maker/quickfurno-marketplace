@@ -39,7 +39,7 @@ const uncertainReject=<T>()=>blocked<T>("REJECT_OUTCOME_UNKNOWN",
  "Rejection outcome is uncertain. Reconcile the exact report before another decision.");
 
 export async function recommendBadLeadRecovery(
- reportId:string,recommendation:"none"|Exclude<BadLeadRecoveryAction,"reject">
+ reportId:string,recommendation:"none"|"restore_credit"
 ):Promise<Result<{reportId:string;recommendation:string}>>{
  if(!UUID.test(reportId||""))return blocked("VALIDATION","Valid bad-lead report is required.");
  if(recommendation!=="none"&&recommendation!=="restore_credit")return policyDenied();

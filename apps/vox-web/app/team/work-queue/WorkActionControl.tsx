@@ -4,6 +4,7 @@ import Link from "next/link";
 import {useRouter} from "next/navigation";
 import {withReturn} from "../../../lib/returnTo.mjs";
 import {readPendingWork,savePendingWork,clearPendingWork} from "../../../lib/rc66PendingWorkTransition";
+import {isVerifiedWorkReceipt} from "../../../lib/rc69VerifiedWorkReceipt";
 
 const actions=["CLAIM","START","WAIT_EXTERNAL","REQUEST_APPROVAL","BLOCK","RESUME","COMPLETE"] as const;
 type WorkAction=typeof actions[number];
@@ -77,14 +78,7 @@ export default function WorkActionControl({itemId,revision,state,assignedToMe}:P
     return;
    }
    const body:unknown=await result.json();
-   if(!result.ok||!body||typeof body!=="object"||Array.isArray(body)||
-      !("schema" in body)||body.schema!=="qf.vox.work.transaction.receipt.v1"||
-      !("newState" in body)||body.newState!==({CLAIM:"ASSIGNED",START:"IN_PROGRESS",WAIT_EXTERNAL:"WAITING_EXTERNAL",REQUEST_APPROVAL:"WAITING_APPROVAL",BLOCK:"BLOCKED",RESUME:"IN_PROGRESS",COMPLETE:"DONE"} as const)[action]||
-      !("ok" in body)||body.ok!==true||
-      !("workItemId" in body)||body.workItemId!==itemId||
-      !("revision" in body)||body.revision!==revision+1||
-      !("providerMessagesSent" in body)||body.providerMessagesSent!==0||
-      !("affectsVendorLeadMatching" in body)||body.affectsVendorLeadMatching!==false){
+   if(!result.ok||!isVerifiedWorkReceipt(body,{action,itemId,expectedRevision:revision})){
     setUncertain(true);
     setMessage(result.status===409?
      "Core revision changed or its receipt was lost. Do not create a new nonce; reconcile the original command with your Team Leader.":

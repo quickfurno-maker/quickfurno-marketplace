@@ -48,8 +48,7 @@ test("real Staff UI checkpoints before HTTP and locks uncertain commands, valida
  for(const term of ["readPendingWork(tabStore())","savePendingWork(tabStore()",
  "clearPendingWork(tabStore(),itemId,pending.current.nonce)",
  "disabled={busy||uncertain||!recoveryReady}",
- "setUncertain(true)","body.schema!==\"qf.vox.work.transaction.receipt.v1\"",
- "body.affectsVendorLeadMatching!==false"]){
+ "setUncertain(true)","isVerifiedWorkReceipt(body,{action,itemId,expectedRevision:revision})"]){
   assert.ok(ui.includes(term),term);
  }
  assert.ok(ui.indexOf("savePendingWork(tabStore()")<ui.indexOf('fetch("/api/work-transitions"'));

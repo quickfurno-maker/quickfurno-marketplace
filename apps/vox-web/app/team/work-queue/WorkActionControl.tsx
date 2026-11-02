@@ -44,7 +44,16 @@ export default function WorkActionControl({itemId,revision,state,assignedToMe}:P
   }
   setRecoveryReady(true);
  },[itemId,revision]);
- if(options.length===0)return <span>Current state has no permitted work command</span>;
+ // A Core transition may already be committed while its HTTP receipt was
+ // lost. A completed/terminal item has no actionable options, but the original
+ // nonce MUST remain visible for human reconciliation after a page refresh.
+ if(options.length===0)return <div className="voxQueueCaution" role="status">
+  <p>Current Core state has no permitted work command.</p>
+  {!storageAvailable&&recoveryReady?<p>Pending command storage unavailable. Do not issue another transition.</p>:null}
+  {message?<p>{message}</p>:null}
+  {uncertain?<p>The original same-tab nonce remains locked; a Team Leader must reconcile its Core receipt. No new command was sent.</p>:null}
+  {expired?<Link href={withReturn("/login","/team/work-queue")}>Staff sign-in</Link>:null}
+ </div>;
  const needsReason=["BLOCK","REQUEST_APPROVAL","COMPLETE"].includes(action);
  const trimmed=reason.trim();
  const valid=recoveryReady&&storageAvailable&&!busy&&(!needsReason||trimmed.length>=12)&&

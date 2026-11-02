@@ -31,7 +31,9 @@ export function createRc42SignedEodDataApiReviewHandler(deps:Deps){
   const owner=request.headers.get("authorization");
   const leader=request.headers.get("x-vox-team-leader-authorization");
   if(!owner||!leader||owner===leader)return deny("DISTINCT_OWNER_TL_BEARERS_REQUIRED",403);
-  const rpc=deps.rpc();
+  let rpc:Rpc|null;
+  try{rpc=deps.rpc();}
+  catch{return deny("REVIEWED_DATA_API_READER_UNAVAILABLE",503);}
   if(!rpc)return deny("REVIEWED_DATA_API_READER_UNAVAILABLE",503);
   let reviewTimer:ReturnType<typeof setTimeout>|undefined;
   try{

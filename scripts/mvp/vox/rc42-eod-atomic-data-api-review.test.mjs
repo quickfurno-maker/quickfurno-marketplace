@@ -42,6 +42,19 @@ test("missing reviewed Data API reader fails closed before two-human review",asy
  const d=deps({rpc:()=>null});const r=await create(d)(request());
  assert.equal(r.status,503);assert.equal(d.calls.length,0);
 });
+test("reader construction failure never leaks credentials or starts a review",async()=>{
+ let reviews=0;
+ const d=deps({rpc:()=>{throw Error("sensitive_reader_factory_error");},
+  review:async()=>{reviews++;return proof;}});
+ const r=await create(d)(request());
+ assert.equal(r.status,503);
+ const b=await r.json();
+ assert.equal(b.error,"REVIEWED_DATA_API_READER_UNAVAILABLE");
+ assert.equal(b.publicationAuthorized,false);
+ assert.equal(b.providerMessagesSent,0);
+ assert.equal(JSON.stringify(b).includes("sensitive_reader_factory_error"),false);
+ assert.equal(reviews,0);
+});
 test("signed receipt preview never grants official EOD publication",async()=>{
  const d=deps();const r=await create(d)(request());assert.equal(r.status,200);
  const b=await r.json();assert.equal(b.ok,true);

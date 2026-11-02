@@ -45,8 +45,7 @@ export function savePendingWork(store:Store,record:PendingWork):boolean{
   // until the original nonce is independently read back from this tab.
   const verified=readPendingWork(store);
   return verified.available&&verified.records.length===state.records.length&&
-   verified.records.some(x=>x.itemId===record.itemId&&
-    JSON.stringify(x)===JSON.stringify(record));
+   verified.records.every((x,i)=>JSON.stringify(x)===JSON.stringify(state.records[i]));
  }catch{return false;}
 }
 export function clearPendingWork(store:Store,itemId:string,nonce:string):boolean{
@@ -59,6 +58,6 @@ export function clearPendingWork(store:Store,itemId:string,nonce:string):boolean
   store.setItem(PENDING_WORK_KEY,JSON.stringify(remaining));
   const verified=readPendingWork(store);
   return verified.available&&verified.records.length===remaining.length&&
-   !verified.records.some(x=>x.itemId===itemId);
+   verified.records.every((x,i)=>JSON.stringify(x)===JSON.stringify(remaining[i]));
  }catch{return false;}
 }

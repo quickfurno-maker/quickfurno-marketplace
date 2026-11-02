@@ -36,6 +36,7 @@ import * as leadAssignmentLifecycle from "../services/leadAssignmentLifecycleSer
 import * as badLeadRecovery from "../services/badLeadRecoveryService";
 import { verifyVoxOwnerBearer } from "../services/vox/verifiedStaffBearer";
 import { rc65PostCreditOwnerAuthority } from "../services/vox/rc65PostCreditOwnerAuthority";
+import { rc68PostRecommendationOwnerAuthority } from "../services/vox/rc68PostRecommendationOwnerAuthority";
 import {
   queueHumanConversationReply,
   releaseHumanConversationToAi,
@@ -965,13 +966,15 @@ export const adminRecommendBadLeadRecovery = async (
   // Recommendations feed the eventual compensation decision. Require the
   // same CURRENT Owner AAL2 as approval, but never issue credits here.
   if(!await rc44VerifiedBadLeadOwner(actor))return fail(appError("UNAUTHORIZED"));
-  return badLeadRecovery.recommendBadLeadRecovery(reportId,recommendation);
+  const receipt=await badLeadRecovery.recommendBadLeadRecovery(reportId,recommendation);
+  return rc68PostRecommendationOwnerAuthority(receipt,()=>rc44VerifiedBadLeadOwner(actor));
 });
 
 export const adminGenerateBadLeadRecoveryRecommendation = async (reportId: string) =>
   asAdmin(async actor => {
     if(!await rc44VerifiedBadLeadOwner(actor))return fail(appError("UNAUTHORIZED"));
-    return badLeadRecovery.generateBadLeadRecoveryRecommendation(reportId);
+    const receipt=await badLeadRecovery.generateBadLeadRecoveryRecommendation(reportId);
+    return rc68PostRecommendationOwnerAuthority(receipt,()=>rc44VerifiedBadLeadOwner(actor));
   });
 
 export const adminApplyBadLeadRecovery = async (

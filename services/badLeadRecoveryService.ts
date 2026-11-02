@@ -192,9 +192,10 @@ export async function applyBadLeadRecovery(
   }
   // A human rejection must not be reported successful from a response
   // claiming any cash, lead credits or a new assignment.
-  if((r.lead_credits_restored!==undefined&&r.lead_credits_restored!==0)||
-     (r.cash_refunded_minor_units!==undefined&&r.cash_refunded_minor_units!==0)||
-     r.automatic_replacement_created===true||r.replacement_assignment_id!=null||
+  // Absence of the zero-effect fields is NOT proof of zero effects. The
+  // disabled legacy rejection writer cannot be approved based on omissions.
+  if(r.lead_credits_restored!==0||r.cash_refunded_minor_units!==0||
+     r.automatic_replacement_created!==false||r.replacement_assignment_id!=null||
      r.monetary_refund_id!=null)
    return uncertainReject();
   return ok({reportId,action,replacementStatus:"not_requested",replacementAssignmentId:null});

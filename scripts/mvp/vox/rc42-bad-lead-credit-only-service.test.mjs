@@ -169,7 +169,8 @@ test("rejection never acknowledges forged money, credit or replacement effects",
   const v=await apply(REPORT,"reject",ACTOR);
   assert.equal(v.ok,false);assert.equal(v.code,"REJECT_OUTCOME_UNKNOWN");
  }
- globalThis.__rc42Reply={status:"already_applied",lead_credits_restored:0,cash_refunded_minor_units:0};
+ globalThis.__rc42Reply={status:"already_applied",lead_credits_restored:0,cash_refunded_minor_units:0,
+  automatic_replacement_created:false};
  const v=await apply(REPORT,"reject",ACTOR);
  assert.equal(v.ok,true);
  assert.equal(v.data.replacementAssignmentId,null);
@@ -273,4 +274,22 @@ test("RC83 recommendation ambiguous status cannot claim definite refusal",async(
   const r=await recommend(REPORT,"restore_credit");
   assert.equal(r.ok,false);assert.equal(r.code,"RECOMMEND_OUTCOME_UNKNOWN");
  }finally{globalThis.__rc42Db=saved;}
+});
+
+
+test("RC84 rejection receipt must positively prove zero lead credits, cash and replacement",async()=>{
+ before();
+ for(const missing of [
+  {status:"applied",lead_credits_restored:0,cash_refunded_minor_units:0},
+  {status:"applied",cash_refunded_minor_units:0,automatic_replacement_created:false},
+  {status:"applied",lead_credits_restored:0,automatic_replacement_created:false},
+  {status:"applied",lead_credits_restored:0,cash_refunded_minor_units:0,
+   automatic_replacement_created:null}
+ ]){
+  globalThis.__rc42Reply=missing;
+  const r=await apply(REPORT,"reject",ACTOR);
+  assert.equal(r.ok,false);
+  assert.equal(r.code,"REJECT_OUTCOME_UNKNOWN");
+  assert.equal(calls.at(-1).name,"qf_apply_bad_lead_recovery_v1");
+ }
 });

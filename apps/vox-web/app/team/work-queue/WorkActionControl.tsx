@@ -56,7 +56,7 @@ export default function WorkActionControl({itemId,revision,state,assignedToMe}:P
  </div>;
  const needsReason=["BLOCK","REQUEST_APPROVAL","COMPLETE"].includes(action);
  const trimmed=reason.trim();
- const valid=recoveryReady&&storageAvailable&&!busy&&(!needsReason||trimmed.length>=12)&&
+ const valid=recoveryReady&&storageAvailable&&!busy&&options.includes(action)&&(!needsReason||trimmed.length>=12)&&
   (action!=="CLAIM"||trimmed==="")&&trimmed.length<=300;
  async function submit(event:React.FormEvent){
   event.preventDefault();
@@ -113,6 +113,7 @@ export default function WorkActionControl({itemId,revision,state,assignedToMe}:P
    onChange={event=>{if(!uncertain){setAction(event.target.value as WorkAction);setReason("");}}}>
    {options.map(option=><option key={option} value={option}>{option.replaceAll("_"," ")}</option>)}
   </select>
+  {!options.includes(action)?<p role="status" className="voxQueueCaution">The originally selected action is no longer permitted by the current Core state. Refresh and reconcile the original nonce; no new action is authorized.</p>:null}
   {action!=="CLAIM"?<>
    <label htmlFor={"reason-"+itemId}>Reason {needsReason?"(12–300 characters)":"(optional)"}</label>
    <textarea id={"reason-"+itemId} rows={2} maxLength={300} value={reason}

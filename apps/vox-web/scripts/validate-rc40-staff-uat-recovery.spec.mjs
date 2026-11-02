@@ -100,8 +100,16 @@ async function withServer(port,extra,fn){
 }
 const page=async(base,p)=>{const r=await fetch(base+p,{redirect:"manual",signal:AbortSignal.timeout(8000)});
  return {status:r.status,body:await r.text(),cache:r.headers.get("cache-control")??""};};
-const LEAK=/Bearer |service_role|eyJ[A-Za-z0-9_-]{10}|[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
-
+// Reject complete 3-segment JWTs; short Next.js hydration identifiers beginning
+// with "eyJ" are not session credentials. Verify real JWT signatures below.
+const LEAK=/Bearer |service_role|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
+test("compiled HTML leak detector rejects actual full JWTs, tokens, and staff UUIDs",()=>{
+ assert.doesNotMatch("framework hydration: eyJzIjoibm90IiwibnMi",LEAK);
+ assert.match("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.signature",LEAK);
+ assert.match("Bearer live-credential",LEAK);
+ assert.match("service_role",LEAK);
+ assert.match("11111111-1111-4111-8111-111111111111",LEAK);
+});
 test("compiled HTTP: unauthenticated Staff routes show 401 MFA recovery that returns to the same screen",
  {skip:!built&&"requires `npm run build`"},()=>withServer(3196,{
  VOX_TEAM_WORKSPACE_ENABLED:"staging",VOX_EOD_SUBMIT_UI_ENABLED:"staging",

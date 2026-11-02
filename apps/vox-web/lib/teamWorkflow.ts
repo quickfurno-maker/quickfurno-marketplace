@@ -24,8 +24,27 @@ async function requestCore(path:"staff-chat"|"eod-submissions"|"eod-reviews",
    ...(payload?{body:JSON.stringify(payload)}:{}),
    cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)
   });
-  if(!response.ok)return deny(response.status===401?401:
-   response.status===403?403:response.status===409?409:503,"CORE_SCOPE_DENIED_OR_STALE");
+  if(!response.ok){
+   // Preserve only the two exact Core unknown-outcome contracts, never
+   // interpret a lost SQL response as a safe new-nonce rejection.
+   if(response.status===503&&
+      (path==="eod-submissions"||path==="eod-reviews")){
+    try{
+     const uncertain:unknown=await response.json();
+     const expected=path==="eod-submissions"?"EOD_SUBMISSION_OUTCOME_UNKNOWN":
+      "EOD_REVIEW_OUTCOME_UNKNOWN";
+     if(uncertain&&typeof uncertain==="object"&&!Array.isArray(uncertain)){
+      const v=uncertain as Record<string,unknown>;
+      if(exact(v,["ok","error","committed","retrySameNonceOnly"])&&
+         v.ok===false&&v.error===expected&&v.committed===null&&
+         v.retrySameNonceOnly===true)return deny(503,expected);
+     }
+    }catch{/* Unknown response stays locked; never leak raw Core payload. */}
+   }
+   return deny(response.status===401?401:
+    response.status===403?403:response.status===409?409:503,
+    "CORE_SCOPE_DENIED_OR_STALE");
+  }
   const body:unknown=await response.json();
   if(!body||typeof body!=="object"||Array.isArray(body))
    return deny(503,"INVALID_CORE_RESPONSE");

@@ -46,6 +46,11 @@ export default function ReviewDecision({reportId}:{reportId:string}){
     body:JSON.stringify(record)
    });
    const doc:unknown=await response.json();
+   if(!response.ok&&doc&&typeof doc==="object"&&!Array.isArray(doc)&&
+      "error" in doc&&doc.error==="EOD_REVIEW_OUTCOME_UNKNOWN"){
+    setMessage("Core may have committed the original "+decision.toLowerCase()+" review. Preserve its nonce; reconcile before any new decision.");
+    return;
+   }
    if(!response.ok||!doc||typeof doc!=="object"||Array.isArray(doc)||
     Object.keys(doc).sort().join("|")!=="nonce|ok|reportId|revision|state|status"||
     !("ok" in doc)||doc.ok!==true||

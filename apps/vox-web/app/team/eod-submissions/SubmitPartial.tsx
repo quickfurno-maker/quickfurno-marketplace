@@ -40,6 +40,11 @@ export default function SubmitPartial(){
     body:JSON.stringify({nonce:item.nonce})
    });
    const data:unknown=await res.json();
+   if(!res.ok&&data&&typeof data==="object"&&!Array.isArray(data)&&
+      "error" in data&&data.error==="EOD_SUBMISSION_OUTCOME_UNKNOWN"){
+    setState("Core may have committed this partial submission. Preserve the original nonce and reconcile the exact report before any new attempt.");
+    return;
+   }
    if(!res.ok||!data||typeof data!=="object"||Array.isArray(data)||
     Object.keys(data).sort().join("|")!=="businessDate|completeness|eventCount|nonce|ok|reportId|revision|state|status"||
     !("ok" in data)||data.ok!==true||

@@ -2,7 +2,7 @@ $ErrorActionPreference='Stop'
 $root=(Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 $name="qf-vox-rc75-atomic-bad-lead-$PID"
 $fixture=Join-Path $root 'scripts\mvp\vox\fixtures\rc75-bad-lead-status-minimal.pg17.sql'
-$candidate=Join-Path $root 'ops\vox\sql-candidates\20261102040000_vox_rc75_bad_lead_review_atomic_REVIEW_ONLY.sql'
+$candidate=Join-Path $root 'ops\vox\rc75-review-only\20261102040000_vox_rc75_bad_lead_review_atomic_REVIEW_ONLY.sql'
 if(docker ps -aq --filter "name=^/$name$"){throw 'RC75_DOCKER_CONTAINER_COLLISION'}
 function Query([string]$sql,[bool]$failExpected=$false){
  $old=$ErrorActionPreference;$ErrorActionPreference='Continue'

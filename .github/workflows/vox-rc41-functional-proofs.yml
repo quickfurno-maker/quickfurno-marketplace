@@ -39,6 +39,13 @@ on:
       - 'scripts/mvp/vox/rc72-*.test.mjs'
       - 'scripts/mvp/vox/rc73-*.test.mjs'
       - 'scripts/mvp/vox/rc74-*.test.mjs'
+      - 'scripts/mvp/vox/rc75-*.test.mjs'
+      - 'apps/vox-web/scripts/validate-rc75-*.spec.mjs'
+      - 'ops/vox/rc75-review-only/**'
+      - 'scripts/mvp/vox/validate-vox-rc75-atomic-bad-lead-pg17.ps1'
+      - 'scripts/mvp/vox/fixtures/rc75-bad-lead-status-minimal.pg17.sql'
+      - 'apps/vox-web/app/team/eod-reviews/PendingReviewNotice.tsx'
+      - 'apps/vox-web/app/team/eod-reviews/page.tsx'
       - 'apps/vox-web/scripts/validate-rc74-*.spec.mjs'
       - 'apps/vox-web/app/team/work-queue/WorkActionControl.tsx'
       - 'apps/vox-web/app/mfa/page.tsx'
@@ -198,6 +205,8 @@ jobs:
         run: node --test scripts/mvp/vox/rc73-eod-core-date-http.test.mjs scripts/mvp/vox/rc73-finance-comment-owner.test.mjs scripts/mvp/vox/rc73-private-mismatch-triage.test.mjs scripts/mvp/vox/rc73-staging-owner-guard-smoke.test.mjs
       - name: RC74 terminal Staff recovery, linked bad-lead flag, MFA encoding safety
         run: node --test apps/vox-web/scripts/validate-rc74-terminal-work-recovery.spec.mjs scripts/mvp/vox/rc74-bad-lead-linked-assignment.test.mjs apps/vox-web/scripts/validate-rc74-ascii-mfa-utf8.spec.mjs
+      - name: RC75 Staff action/Core parity, TL lost-review notice, quarantined atomic Finance candidate
+        run: node --test apps/vox-web/scripts/validate-rc75-work-state-action-parity.spec.mjs apps/vox-web/scripts/validate-rc75-eod-unlisted-review-recovery.spec.mjs scripts/mvp/vox/rc75-bad-lead-atomic-review.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

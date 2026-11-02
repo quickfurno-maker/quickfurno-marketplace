@@ -1,0 +1,25 @@
+name: VOX Virtual Office VO2 Meet
+on:
+  pull_request:
+    branches:
+      - feat/vox-rc6-operational-20261030
+    paths:
+      - 'services/vox/virtualOfficeMeetProvider.mjs'
+      - 'scripts/mvp/vox/vo01-virtual-office-meet-provider.test.mjs'
+      - '.github/workflows/vox-vo02-meet-replay.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contract-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - name: Run exact VOX virtual office tests
+        run: node --test scripts/mvp/vox/vo00-virtual-office-contract.test.mjs scripts/mvp/vox/vo01-virtual-office-meet-provider.test.mjs

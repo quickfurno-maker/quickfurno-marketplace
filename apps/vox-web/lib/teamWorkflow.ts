@@ -122,7 +122,8 @@ export async function fetchMyEodSubmissions(){
 export async function submitMyPartialEod(nonce:string){
  if(!enabled("VOX_EOD_SUBMIT_UI_ENABLED"))return deny(503,"EOD_SUBMISSION_UI_DISABLED");
  if(!isId(nonce))return deny(400,"INVALID_EOD_NONCE");
- const r=await requestCore("eod-submissions",{nonce,businessDate:today()});
+ const businessDate=today();
+ const r=await requestCore("eod-submissions",{nonce,businessDate});
  if(!r.ok)return r;
  const x=r.body;
  if(!exact(x,["ok","schema","reportId","state","revision","eventCount",
@@ -137,7 +138,7 @@ export async function submitMyPartialEod(nonce:string){
    x.completeness!=="PARTIAL_UNVERIFIED_TOTAL"||
    x.externalMessagesSent!==0||x.staffPrivilegesChanged!==false)
   return deny(503,"INVALID_EOD_RECEIPT");
- return {ok:true,status:200,reportId:x.reportId,
+ return {ok:true,status:200,reportId:x.reportId,businessDate,
   state:x.state as string,revision:x.revision as 0|1,eventCount:x.eventCount as number,
   completeness:"PARTIAL_UNVERIFIED_TOTAL" as const} as const;
 }

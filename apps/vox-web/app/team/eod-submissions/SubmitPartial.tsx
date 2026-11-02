@@ -41,13 +41,14 @@ export default function SubmitPartial(){
    });
    const data:unknown=await res.json();
    if(!res.ok||!data||typeof data!=="object"||Array.isArray(data)||
-    Object.keys(data).sort().join("|")!=="completeness|eventCount|ok|reportId|revision|state|status"||
+    Object.keys(data).sort().join("|")!=="businessDate|completeness|eventCount|ok|reportId|revision|state|status"||
     !("ok" in data)||data.ok!==true||
     !("status" in data)||data.status!==200||
     !("completeness" in data)||data.completeness!=="PARTIAL_UNVERIFIED_TOTAL"||
     !("reportId" in data)||typeof data.reportId!=="string"||
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.reportId)||
     !("state" in data)||!["PENDING_REVIEW","ACKNOWLEDGED","REJECTED"].includes(String(data.state))||
+    !("businessDate" in data)||data.businessDate!==item.businessDate||
     !("revision" in data)||!(data.revision===0||data.revision===1)||
     (data.state==="PENDING_REVIEW"&&data.revision!==0)||
     (data.state!=="PENDING_REVIEW"&&data.revision!==1)||

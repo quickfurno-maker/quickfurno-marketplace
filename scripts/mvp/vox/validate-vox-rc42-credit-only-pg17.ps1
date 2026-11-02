@@ -182,7 +182,7 @@ CREATE UNIQUE INDEX rc44_credit_ref_unique ON public.vendor_credit_logs(referenc
  $report5='15151515-1515-4515-8515-151515151515'
  [void](Sql "insert into public.lead_assignments values ('$assignment5','$vendor','$lead',true,'delivered'); insert into public.bad_lead_reports(id,vendor_id,lead_assignment_id,status,reason_code,recovery_status) values ('$report5','$vendor','$assignment5','Approved','bad_lead_validated','recommended');")
  $fakeApprovalParam=if($UseCanonicalCreditAuthority){'p_approval_id'}else{'p_approval'}
- $fakeOldLedger="CREATE OR REPLACE FUNCTION public.qf_approve_credit_restoration_v2($fakeArgs) RETURNS jsonb LANGUAGE plpgsql AS 'BEGIN UPDATE public.credit_restoration_approvals SET status=''applied'',restoration_ledger_id=(SELECT id FROM public.vendor_credit_logs ORDER BY id LIMIT 1) WHERE id=$fakeApprovalParam; RETURN jsonb_build_object(''status'',''applied'',''ledger_id'',(SELECT id FROM public.vendor_credit_logs ORDER BY id LIMIT 1)); END';"
+ $fakeOldLedger="CREATE OR REPLACE FUNCTION public.qf_approve_credit_restoration_v2($fakeArgs) RETURNS jsonb LANGUAGE plpgsql AS 'BEGIN UPDATE public.credit_restoration_approvals SET status=''applied'',restoration_ledger_id=(SELECT id FROM public.vendor_credit_logs ORDER BY id LIMIT 1) WHERE id=$fakeApprovalParam; RETURN jsonb_build_object(''status'',''applied'',''ledger_id'',(SELECT id FROM public.vendor_credit_logs ORDER BY id LIMIT 1)); END;';"
  [void](Sql $fakeOldLedger)
  $forgedLedgerRejected=$false
  try{[void](Sql "select public.qf_vox_rc42_bad_lead_credit_only_atomic_candidate_v1('$report5','$actor');")}

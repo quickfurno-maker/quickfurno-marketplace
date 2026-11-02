@@ -1,12 +1,14 @@
 "use client";
-import {useRef,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
 import {withReturn} from "../../../lib/returnTo.mjs";
+import {readPendingWork,savePendingWork,clearPendingWork} from "../../../lib/rc66PendingWorkTransition";
 
 const actions=["CLAIM","START","WAIT_EXTERNAL","REQUEST_APPROVAL","BLOCK","RESUME","COMPLETE"] as const;
 type WorkAction=typeof actions[number];
 type Props={itemId:string;revision:number;state:string;assignedToMe:boolean};
+const tabStore=()=>{try{return window.sessionStorage;}catch{return null;}};
 /** UI is merely a client to Core's existing atomic, capacity- and scope-
  * checked RPC. A hidden button or client-side role is never authorization.
  */
@@ -22,55 +24,97 @@ export default function WorkActionControl({itemId,revision,state,assignedToMe}:P
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState("");
  const [expired,setExpired]=useState(false);
+ const [uncertain,setUncertain]=useState(false);
+ const [recoveryReady,setRecoveryReady]=useState(false);
+ const [storageAvailable,setStorageAvailable]=useState(false);
  const pending=useRef<{nonce:string;command:string}|null>(null);
+ useEffect(()=>{
+  const saved=readPendingWork(tabStore());
+  setStorageAvailable(saved.available);
+  const old=saved.records.find(x=>x.itemId===itemId);
+  if(old){
+   const {nonce,...payload}=old;
+   pending.current={nonce,command:JSON.stringify(payload)};
+   setAction(old.action);setReason(old.reason);
+   setUncertain(true);
+   setMessage(old.expectedRevision===revision?
+    "Pending work command restored in this tab. Reconcile it with Core using the SAME nonce; do not change its fields.":
+    "A pending work command exists for an earlier revision. Do not submit a new command until a Team Leader reconciles the original receipt.");
+  }
+  setRecoveryReady(true);
+ },[itemId,revision]);
  if(options.length===0)return <span>Current state has no permitted work command</span>;
  const needsReason=["BLOCK","REQUEST_APPROVAL","COMPLETE"].includes(action);
  const trimmed=reason.trim();
- const valid=!busy&&(!needsReason||trimmed.length>=12)&&
+ const valid=recoveryReady&&storageAvailable&&!busy&&(!needsReason||trimmed.length>=12)&&
   (action!=="CLAIM"||trimmed==="")&&trimmed.length<=300;
  async function submit(event:React.FormEvent){
   event.preventDefault();
   if(!valid)return;
   const payload={action,itemId,expectedRevision:revision,reason:trimmed};
   const fingerprint=JSON.stringify(payload);
-  if(!pending.current||pending.current.command!==fingerprint)
-   pending.current={nonce:crypto.randomUUID(),command:fingerprint};
+  if(pending.current&&pending.current.command!==fingerprint){
+   setUncertain(true);setMessage("Original work command is unresolved; changing it would mint an unsafe new nonce.");
+   return;
+  }
+  if(!pending.current)pending.current={nonce:crypto.randomUUID(),command:fingerprint};
+  // Persist BEFORE Core HTTP. A refresh, MFA expiry or lost receipt must not
+  // make this tab silently issue a conflicting work transition.
+  if(!savePendingWork(tabStore(),{...payload,nonce:pending.current.nonce})){
+   setUncertain(true);
+   setMessage("Pending work checkpoint unavailable or conflicted. No Core request was sent.");
+   return;
+  }
   setBusy(true);setMessage("");setExpired(false);
   try{
    const result=await fetch("/api/work-transitions",{
     method:"POST",credentials:"same-origin",
     headers:{"content-type":"application/json"},cache:"no-store",
     body:JSON.stringify({...payload,nonce:pending.current.nonce})});
-   if(result.status===401){setExpired(true);setMessage("Your verified session ended. Sign in again, then retry this command.");return;}
+   if(result.status===401){
+    setExpired(true);setUncertain(true);
+    setMessage("Verified Staff session ended. The original work command is locked; sign in then reconcile the SAME nonce.");
+    return;
+   }
    const body:unknown=await result.json();
    if(!result.ok||!body||typeof body!=="object"||Array.isArray(body)||
+      !("schema" in body)||body.schema!=="qf.vox.work.transaction.receipt.v1"||
+      !("newState" in body)||body.newState!==({CLAIM:"ASSIGNED",START:"IN_PROGRESS",WAIT_EXTERNAL:"WAITING_EXTERNAL",REQUEST_APPROVAL:"WAITING_APPROVAL",BLOCK:"BLOCKED",RESUME:"IN_PROGRESS",COMPLETE:"DONE"} as const)[action]||
       !("ok" in body)||body.ok!==true||
       !("workItemId" in body)||body.workItemId!==itemId||
       !("revision" in body)||body.revision!==revision+1||
-      !("providerMessagesSent" in body)||body.providerMessagesSent!==0){
+      !("providerMessagesSent" in body)||body.providerMessagesSent!==0||
+      !("affectsVendorLeadMatching" in body)||body.affectsVendorLeadMatching!==false){
+    setUncertain(true);
     setMessage(result.status===409?
-     "The Core revision changed. Refresh the queue before another action.":
-     "Core did not confirm the command. Retry the identical command, or ask your Team Leader.");
+     "Core revision changed or its receipt was lost. Do not create a new nonce; reconcile the original command with your Team Leader.":
+     "Core did not confirm the work transition. Keep this command and nonce unchanged until reconciliation.");
     return;
    }
-   pending.current=null;setReason("");
+   if(!clearPendingWork(tabStore(),itemId,pending.current.nonce)){
+    setUncertain(true);
+    setMessage("Core receipt verified but pending checkpoint cleanup failed. Do not make another decision until reconciled.");
+    return;
+   }
+   pending.current=null;setUncertain(false);setReason("");
    setMessage("Core recorded this internal work transition; no external message sent.");
    router.refresh();
   }catch{
-   setMessage("Core receipt unavailable. Do not change the command before retrying.");
+   setUncertain(true);
+   setMessage("Core outcome unknown. Do not change the work command or nonce before reconciliation.");
   }finally{setBusy(false);}
  }
  return <form className="voxWorkActionForm" onSubmit={submit}>
   <label htmlFor={"action-"+itemId}>Governed action</label>
-  <select id={"action-"+itemId} value={action} disabled={busy}
-   onChange={event=>{setAction(event.target.value as WorkAction);pending.current=null;setReason("");}}>
+  <select id={"action-"+itemId} value={action} disabled={busy||uncertain||!recoveryReady}
+   onChange={event=>{if(!uncertain){setAction(event.target.value as WorkAction);setReason("");}}}>
    {options.map(option=><option key={option} value={option}>{option.replaceAll("_"," ")}</option>)}
   </select>
   {action!=="CLAIM"?<>
    <label htmlFor={"reason-"+itemId}>Reason {needsReason?"(12–300 characters)":"(optional)"}</label>
    <textarea id={"reason-"+itemId} rows={2} maxLength={300} value={reason}
-    disabled={busy} placeholder={needsReason?"Explain the business justification":"Optional internal reason"}
-    onChange={e=>{setReason(e.target.value);pending.current=null;}}/>
+    disabled={busy||uncertain||!recoveryReady} placeholder={needsReason?"Explain the business justification":"Optional internal reason"}
+    onChange={e=>{if(!uncertain)setReason(e.target.value);}}/>
   </>:null}
   <button type="submit" disabled={!valid}>{busy?"Core checking…":"Request Core transition"}</button>
   {message?<p role="status" className="voxQueueCaution">{message}</p>:null}

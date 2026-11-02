@@ -30,7 +30,7 @@ test("VO3 successful HTTP receipt cannot mint cash or claim Production",()=>{
  assert.match(source,/moneyMinorUnits:0,productionCertified:false/);
  assert.match(source,/providerMessagesSent:0/);
  assert.match(source,/outcome\.nonce!==command\.nonce/);
- assert.match(source,/outcome\.revision!==(command\.expectedRevision as number)\+1/);
+ assert.match(source,/outcome\.revision!==\(command\.expectedRevision as number\)\+1/);
  for(const method of ["GET","PUT","PATCH","DELETE"])
   assert.match(source,new RegExp('export function '+method+'\\(\\)'));
 });

@@ -9,6 +9,10 @@ const send=(v:unknown,status:number)=>Response.json(v,{status,headers:{
  "cache-control":"private, no-store, max-age=0","vary":"Authorization",
  "x-content-type-options":"nosniff"
 }});
+// A reviewed SQL decision may already have committed when a response or
+// independent Team Leader authority is lost; never invite a new nonce.
+const outcomeUnknown=()=>send({ok:false,error:"EOD_REVIEW_OUTCOME_UNKNOWN",
+ committed:null,retrySameNonceOnly:true},503);
 const enabled=()=>process.env.VOX_STAFF_GRANTS_ENABLED==="staging"&&
  process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED==="staging"&&
  process.env.VOX_EOD_SUBMISSIONS_ENABLED==="staging"&&
@@ -62,28 +66,63 @@ export async function POST(request:Request){
     !id(body.reportId)||!id(body.nonce)||body.expectedRevision!==0||
     !["ACKNOWLEDGED","REJECTED"].includes(String(body.decision)))
   return send({ok:false,error:"INVALID_REVIEW_COMMAND"},400);
+ let attempted=false;
  try{
   const scope=await getVerifiedScopedStaff(request.headers.get("authorization"));
   if(!scope||scope.role!=="team_leader"||scope.canMutate!==false)
    return send({ok:false,error:"CURRENT_INDEPENDENT_TL_AAL2_REQUIRED"},403);
   // p_actor comes only from independently verified Supabase Auth/Core; SQL
   // locks report and checks TL identity, city, team, expiry and non-self-review.
-  const {data,error}=await adminClient().rpc("qf_vox_eod_review_candidate_v1",{
-   p_actor:scope.userId,p_report:body.reportId,
-   p_expected_revision:0,p_nonce:body.nonce,p_decision:body.decision
-  });
+  attempted=true;
+  let rpcTimer:ReturnType<typeof setTimeout>|undefined;
+  let result:{data:unknown;error:unknown};
+  try{
+   const settled=await Promise.race([
+    Promise.resolve(adminClient().rpc("qf_vox_eod_review_candidate_v1",{
+     p_actor:scope.userId,p_report:body.reportId,
+     p_expected_revision:0,p_nonce:body.nonce,p_decision:body.decision
+    })).then(value=>({timedOut:false as const,value})),
+    new Promise<{timedOut:true}>(resolve=>{
+     rpcTimer=setTimeout(()=>resolve({timedOut:true}),4000);
+    })
+   ]);
+   if(settled.timedOut)return outcomeUnknown();
+   result=settled.value;
+  }finally{if(rpcTimer!==undefined)clearTimeout(rpcTimer);}
+  const {data,error}=result;
   if(error||!Array.isArray(data)||data.length!==1)
-   return send({ok:false,error:"REVIEW_DENIED_STALE_OR_SELF"},409);
+   return outcomeUnknown();
   const row:unknown=data[0];
   if(!row||typeof row!=="object"||Array.isArray(row))
-   return send({ok:false,error:"INVALID_REVIEW_RECEIPT"},503);
+   return outcomeUnknown();
   const r=row as Record<string,unknown>;
   if(r.report_id!==body.reportId||r.report_state!==body.decision||r.report_revision!==1)
-   return send({ok:false,error:"INVALID_REVIEW_RECEIPT"},503);
+   return outcomeUnknown();
+  // An in-flight TL revocation after a committed review is UNKNOWN, never
+  // a successful independent sign-off or evidence of rollback.
+  let authTimer:ReturnType<typeof setTimeout>|undefined;
+  try{
+   const current=await Promise.race([
+    getVerifiedScopedStaff(request.headers.get("authorization"))
+     .then(value=>({timedOut:false as const,value})),
+    new Promise<{timedOut:true}>(resolve=>{
+     authTimer=setTimeout(()=>resolve({timedOut:true}),1250);
+    })
+   ]);
+   if(current.timedOut||!current.value||
+      current.value.userId!==scope.userId||current.value.teamId!==scope.teamId||
+      current.value.cityId!==scope.cityId||current.value.role!=="team_leader"||
+      current.value.canMutate!==false||
+      !Array.isArray(scope.verifiedDepartments)||
+      !Array.isArray(current.value.verifiedDepartments)||
+      [...scope.verifiedDepartments].sort().join("|")!==
+      [...current.value.verifiedDepartments].sort().join("|"))return outcomeUnknown();
+  }catch{return outcomeUnknown();}
+  finally{if(authTimer!==undefined)clearTimeout(authTimer);}
   return send({ok:true,schema:"qf.vox.eod.tl.receipt.v1",reportId:r.report_id,
    nonce:body.nonce,state:r.report_state,revision:1,source:"PARTIAL_CORE_WORK_ONLY",
    providerMessagesSent:0,staffPrivilegesChanged:false},200);
- }catch{return send({ok:false,error:"EOD_REVIEW_UNAVAILABLE"},503);}
+ }catch{return attempted?outcomeUnknown():send({ok:false,error:"EOD_REVIEW_UNAVAILABLE"},503);}
 }
 export function PUT(){return send({ok:false,error:"METHOD_NOT_ALLOWED"},405);}
 export function PATCH(){return send({ok:false,error:"METHOD_NOT_ALLOWED"},405);}

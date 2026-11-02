@@ -14,13 +14,13 @@ class FixedDate extends Date{
  static now(){return Date.parse("2026-10-16T08:00:00.000Z");}
 }
 const flags={};
-const state={scope:{...scope},authCalls:0,calls:[],rpcData:[],rpcError:null,tables:{}};
+const state={scope:{...scope},authCalls:0,authHook:null,calls:[],rpcData:[],rpcError:null,tables:{}};
 const reset=()=>{
  Object.keys(flags).forEach(k=>delete flags[k]);
  for(const n of ["VOX_STAFF_GRANTS_ENABLED","VOX_DEPARTMENT_ENFORCEMENT_ENABLED",
  "VOX_EOD_SUBMISSIONS_ENABLED","VOX_EOD_TL_REVIEW_ENABLED","VOX_STAFF_TEAM_CHAT_ENABLED"])
   flags[n]="staging";
- state.scope={...scope};state.authCalls=0;state.calls=[];state.rpcError=null;
+ state.scope={...scope};state.authCalls=0;state.authHook=null;state.calls=[];state.rpcError=null;
  state.rpcData=[];state.tables={
   vox_staff_eod_reports_candidate_v1:[{id:uuid(4),staff_id:uuid(5),team_id:scope.teamId,
    city_id:scope.cityId,business_date:date,event_count:1,state:"PENDING_REVIEW",
@@ -51,7 +51,7 @@ const db=()=>({
  }
 });
 const ctx=vm.createContext({process:{env:flags},Date:FixedDate,Intl,URL,
- Response,Request});
+ Response,Request,setTimeout,clearTimeout});
 async function load(relative,short){
  const source=readFileSync(new URL("../../../app/api/vox/v1/"+relative+"/route.ts",import.meta.url),"utf8");
  const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,
@@ -62,7 +62,8 @@ async function load(relative,short){
   ["@/contracts/vox/teamChatEligibility.mjs",{canReadWriteTeamInternalChat}],
   ["@/lib/supabase",{adminClient:db}],
   ["@/services/vox/verifiedScopedStaff",{
-   getVerifiedScopedStaff:async hdr=>{state.authCalls++;return hdr==="Bearer TEST_ONLY"?state.scope:null;}
+   getVerifiedScopedStaff:async hdr=>{state.authCalls++;return hdr==="Bearer TEST_ONLY"?
+    (state.authHook?state.authHook(state.authCalls):state.scope):null;}
   }]
  ]);
  await m.link(spec=>{const v=imports.get(spec);
@@ -233,4 +234,39 @@ test("no Core service_role secret or browser-supplied authority in handler sourc
   assert.match(src,/VOX_DEPARTMENT_ENFORCEMENT_ENABLED/);
   assert.doesNotMatch(src,/SUPABASE_SERVICE_ROLE_KEY|sendWhatsApp|\bfetch\(/);
  }
+});
+
+
+test("post-RPC independent TL revocation reports UNKNOWN on original nonce, not an approved receipt",async()=>{
+ const tl={...scope,role:"team_leader",canReadContent:false,verifiedDepartments:[]};
+ state.scope=tl;
+ state.authHook=n=>n===1?tl:{...tl,role:"support_agent"};
+ state.rpcData=[{report_id:uuid(4),report_state:"ACKNOWLEDGED",report_revision:1}];
+ const r=await reviews.POST(post("eod-reviews",{reportId:uuid(4),
+  expectedRevision:0,nonce:uuid(50),decision:"ACKNOWLEDGED"}));
+ assert.equal(r.status,503);
+ const receipt=await r.json();
+ assert.equal(receipt.error,"EOD_REVIEW_OUTCOME_UNKNOWN");
+ assert.equal(receipt.retrySameNonceOnly,true);assert.equal(receipt.committed,null);
+ assert.equal(state.calls.filter(c=>c.type==="rpc").length,1);assert.equal(state.authCalls,2);
+});
+test("changed reviewer department after SQL may not certify independent TL receipt",async()=>{
+ const tl={...scope,role:"team_leader",canReadContent:false,verifiedDepartments:[]};
+ state.scope=tl;
+ state.authHook=n=>n===1?tl:{...tl,verifiedDepartments:["service_support"]};
+ state.rpcData=[{report_id:uuid(4),report_state:"ACKNOWLEDGED",report_revision:1}];
+ const r=await reviews.POST(post("eod-reviews",{reportId:uuid(4),
+  expectedRevision:0,nonce:uuid(50),decision:"ACKNOWLEDGED"}));
+ assert.equal(r.status,503);assert.equal((await r.json()).retrySameNonceOnly,true);
+});
+test("ambiguous Core review RPC failure is UNKNOWN instead of safe retry",async()=>{
+ state.scope={...scope,role:"team_leader",verifiedDepartments:[]};
+ state.rpcError={code:"DB_TRANSPORT_OUTCOME_NOT_PROVEN"};
+ const r=await reviews.POST(post("eod-reviews",{reportId:uuid(4),
+  expectedRevision:0,nonce:uuid(50),decision:"ACKNOWLEDGED"}));
+ assert.equal(r.status,503);
+ const b=await r.json();
+ assert.equal(b.error,"EOD_REVIEW_OUTCOME_UNKNOWN");
+ assert.equal(b.retrySameNonceOnly,true);
+ assert.equal(state.calls.filter(c=>c.type==="rpc").length,1);
 });

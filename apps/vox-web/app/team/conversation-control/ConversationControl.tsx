@@ -76,8 +76,8 @@ export default function ConversationControl(){
     method:"POST",credentials:"same-origin",
     headers:{"content-type":"application/json"},cache:"no-store",
     body:JSON.stringify({...cmd,nonce:pending.current.nonce})});
-   if(response.status===401){setExpired(true);
-    setMessage("Verified Staff MFA expired. Sign in to continue.");return;}
+   if(response.status===401){setExpired(true);setUncertain(true);
+    setMessage("Verified Staff MFA expired. Keep this command and nonce locked while signing in; recheck its original Core outcome before another action.");return;}
    const v:unknown=await response.json();
    if(!response.ok&&v&&typeof v==="object"&&!Array.isArray(v)&&
       "error" in v&&v.error==="CORE_OUTCOME_UNKNOWN"){

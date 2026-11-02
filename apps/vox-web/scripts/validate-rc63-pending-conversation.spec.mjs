@@ -49,7 +49,9 @@ test("actual Staff UI saves before HTTP, restores at mount, only clears after ve
  for(const marker of ["loadPendingConversation(window.sessionStorage)",
   "savePendingConversation(window.sessionStorage","clearPendingConversation(window.sessionStorage)",
   "setUncertain(true)","if(!recoveryReady||busy||!valid)return",
-  "No Core request was sent","pending.current={command:JSON.stringify(cmd),nonce}"])
+  "No Core request was sent","pending.current={command:JSON.stringify(cmd),nonce}",
+  "if(response.status===401){setExpired(true);setUncertain(true)",
+  "setMessage(response.status===409?"])
   assert.ok(ui.includes(marker),marker);
  assert.ok(ui.indexOf("savePendingConversation(window.sessionStorage")<
   ui.indexOf('fetch("/api/conversation-control"'),"persist before network");

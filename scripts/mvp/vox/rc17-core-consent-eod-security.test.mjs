@@ -1,0 +1,35 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {resolve,dirname} from "node:path";
+import {fileURLToPath} from "node:url";
+const base=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
+const read=p=>readFileSync(resolve(base,p),"utf8");
+const core=read("services/vox/rc8PgVendorConversationOperator.ts");
+const eod=read("ops/vox/rc17-review-candidates/20261031002000_rc17_eod_publication_authority_REVIEW_ONLY.sql");
+const publishRoute=read("app/api/vox/v1/official-eod-publish/route.ts");
+const signed=read("scripts/mvp/vox/rc8-pg-signed-intent-writer.mjs");
+test("Core client/vendor conversation requires one current serializable consent transaction",()=>{
+ assert.match(core,/BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE/);
+ assert.match(core,/pg_advisory_xact_lock/);
+ assert.match(core,/scope=ANY\(\$3::text\[\]\) FOR SHARE/);
+ assert.match(core,/principal_id=\$2::uuid AND channel=\$3 AND scope=\$4 FOR SHARE/);
+ assert.match(core,/revoked_at IS NULL/);
+ assert.match(core,/c\.destination_hash!==hash/);
+ assert.match(core,/RC8_CORE_WRITER_INSTALLED=false/);
+ assert.match(core,/allConsentMutationPathsSerialized:false/);
+ assert.match(core,/CORE_WRITER_RELEASE_GATE_CLOSED/);
+ assert.doesNotMatch(core,/fetch\(["']https?:\/\//);
+});
+test("official EOD cannot publish through digest-only service role",()=>{
+ assert.match(eod,/REVIEW ONLY \/ UNINSTALLED/);
+ assert.match(eod,/REVOKE ALL ON FUNCTION public\.qf_vox_ab7g_official_eod_publish_candidate_v1/);
+ assert.match(eod,/FROM PUBLIC,anon,authenticated,service_role/);
+ assert.match(eod,/RC17_UNVERIFIED_EOD_PUBLICATION_AUTHORITY_EXPOSED/);
+ assert.match(publishRoute,/VERIFIED_APPROVAL_WRITER_INSTALLED=false/);
+ assert.match(publishRoute,/VERIFIED_APPROVAL_WRITER_NOT_INSTALLED/);
+ assert.match(signed,/RC8_APPROVAL_WRITER_INSTALLED=false/);
+ assert.match(signed,/humanKeyCeremonyComplete:false/);
+ assert.match(signed,/independentDbaAppsecApproved:false/);
+ assert.match(signed,/managedRestoreCertified:false/);
+});

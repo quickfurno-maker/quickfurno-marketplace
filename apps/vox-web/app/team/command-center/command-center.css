@@ -1,0 +1,11 @@
+.voxCommandCenter{max-width:1250px}
+.voxCommandMetrics,.voxCommandModules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.voxCommandMetrics article,.voxCommandModules article{background:#193039;border:1px solid #476c61;border-radius:12px;padding:17px;min-width:0}
+.voxCommandMetrics span,.voxCommandMetrics small{display:block;color:#bdd8ce;font-size:12px}
+.voxCommandMetrics strong{display:block;font-size:clamp(26px,4vw,38px);color:#f2fbf4;margin:8px 0}
+.voxCommandModules h3{margin:0;color:#eff8f2;font-size:17px}
+.voxCommandModules p{color:#c9d9d2;font-size:13px;line-height:1.7}
+.voxCommandModules a{font-weight:700;display:inline-block;padding-top:8px}
+.voxCommandModules span{color:#eed4aa;font-size:12px}
+@media(max-width:850px){.voxCommandModules{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.voxCommandModules,.voxCommandMetrics{grid-template-columns:minmax(0,1fr)}}

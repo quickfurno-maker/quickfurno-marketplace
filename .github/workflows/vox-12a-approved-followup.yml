@@ -1,0 +1,21 @@
+name: VOX-12A Approved Aarohi Followup Source
+on:
+  pull_request:
+    paths:
+      - 'app/api/vox/v1/execute-followup/**'
+      - 'supabase/migrations/*vox_approved_followup_executor.sql'
+      - 'scripts/mvp/vox/validate-vox12a-source.mjs'
+      - '.github/workflows/vox-12a-approved-followup.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-perimeter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: node scripts/mvp/vox/validate-vox12a-source.mjs

@@ -1,0 +1,22 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {resolve,dirname} from "node:path";
+import {fileURLToPath} from "node:url";
+const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
+const read=p=>readFileSync(resolve(root,p),"utf8");
+test("native EOD writer rechecks pinned human signing-key TTL immediately before commit",()=>{
+ const src=read("scripts/mvp/vox/rc8-pg-signed-intent-writer.mjs");
+ const receipt=src.indexOf("INTENT_RECEIPT_UNVERIFIED");
+ const final=src.indexOf("SIGNED_EOD_SIGNER_KEY_EXPIRED_DURING_TRANSACTION");
+ const commit=src.indexOf('client.query("COMMIT")');
+ assert.ok(receipt>0&&final>receipt&&commit>final);
+ assert.ok(src.includes("keyCommitTime>=k.notAfterMs"));
+ assert.ok(src.includes("keyCommitTime<k.notBeforeMs"));
+ assert.ok(src.includes("await client.query(\"ROLLBACK\");settled=true;"));
+ assert.ok(src.includes("RC8_APPROVAL_WRITER_INSTALLED=false"));
+ const pg=read("scripts/mvp/vox/validate-vox-rc8-real-pg-signed-intent.mjs");
+ assert.ok(pg.includes("IN_FLIGHT_SIGNER_KEY_EXPIRED_DENIED"));
+ assert.ok(pg.includes("EXPIRED_KEY_NO_CLAIMS"));
+ assert.ok(pg.includes("EXPIRED_KEY_NO_INTENT"));
+});

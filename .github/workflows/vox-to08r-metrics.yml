@@ -1,0 +1,23 @@
+name: VOX-08R Metrics Source Hold
+on:
+  pull_request:
+    paths:
+      - 'contracts/vox/outboxMetricsAttestation.mjs'
+      - 'ops/vox/sql-candidates/20261016050000_vox08r_internal_outbox_metrics_candidate.sql'
+      - 'ops/vox/tests/vox08r_metrics_pg17_proof.sql'
+      - 'scripts/mvp/vox/validate-to08r-core-outbox-signature.test.mjs'
+      - '.github/workflows/vox-to08r-metrics.yml'
+permissions:
+  contents: read
+jobs:
+  isolated-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node --test scripts/mvp/vox/*.test.mjs

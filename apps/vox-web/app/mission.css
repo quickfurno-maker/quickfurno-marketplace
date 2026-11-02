@@ -1,0 +1,52 @@
+.voxMissionPage { width: 100%; }
+.voxMissionHero { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 26px 0 32px; }
+.voxMissionHero h1 { font-size: clamp(35px,4.2vw,56px); font-weight: 780; letter-spacing: -.053em; line-height: 1.08; margin: 15px 0 18px; }
+.voxMissionHero h1 em { font-style: normal; color: #6de5b6; }
+.voxMissionHero p:not(.voxWorkspaceEyebrow) { color: #a7c5b9; font-size: 13px; max-width: 560px; line-height: 1.75; }
+.voxMissionHeroActions { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; margin-top: 22px; }
+.voxMissionHeroActions a.voxMissionPrimaryAction { display: inline-flex; justify-content: center; align-items: center; gap: 15px; padding: 12px 17px; border-radius: 9px; background: #6ce4b1; color: #09251d; text-decoration: none; font-size: 12px; font-weight: 800; }
+.voxMissionHeroCaption { color: #7b9f92; font-size: 11px; max-width: 260px; line-height: 1.6; }
+.voxMissionHeroArt { display: flex; align-items: center; justify-content: center; flex-direction: column; width: 185px; height: 185px; border: 1px solid #347e61; border-radius: 50%; position: relative; flex: 0 0 auto; background: radial-gradient(circle, #194e3b, #0a2024 68%); box-shadow: 0 0 70px #1e9b6730; }
+.voxMissionHeroArt span { font-size: 49px; font-weight: 900; color: #70edb7; letter-spacing: .04em; }
+.voxMissionHeroArt small { font-size: 10px; letter-spacing: .13em; color: #9ad9b7; }
+.voxMissionHeroArt i { position: absolute; inset: -11px; border: 1px dashed #307c6266; border-radius: 50%; }
+.voxMissionStats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 13px; }
+.voxMissionStat { min-width: 0; min-height: 192px; border: 1px solid #2c4c42; border-radius: 13px; background: linear-gradient(160deg,#11262b,#0c1c21); padding: 18px; }
+.voxMissionStatTop { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
+.voxMissionStatIcon { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; background: #1d4a3e; color: #95f0c3; font-weight: 800; font-size: 19px; }
+.voxMissionStat .voxWorkspaceStatus { font-size: 8px; padding: 5px; }
+.voxMissionStatValue { color: #b8dccb; font-size: 39px; font-weight: 650; line-height: 1.15; margin-top: 15px; }
+.voxMissionStat h3 { font-size: 13px; font-weight: 800; margin: 4px 0 7px; }
+.voxMissionStat p { font-size: 11px; color: #86a598; line-height: 1.5; margin: 0; }
+.voxMissionColumns { display: grid; grid-template-columns: 1.18fr 1fr; gap: 14px; margin-top: 26px; }
+.voxMissionPanelHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 13px; margin-bottom: 17px; }
+.voxMissionPanelHead h2 { font-size: 18px; margin: 0; }
+.voxMissionPanelHead .voxWorkspaceEyebrow { font-size: 9px; margin-bottom: 6px; }
+.voxMissionPanelHead .voxWorkspaceStatus { font-size: 9px; }
+.voxMissionEmpty { border: 1px dashed #3b6456; background: #091a1e; padding: 27px 22px; border-radius: 11px; text-align: center; }
+.voxMissionEmptySymbol { display: grid; place-items: center; width: 50px; height: 50px; border-radius: 13px; background: #173c32; color: #92edbe; font-size: 26px; margin: 0 auto 14px; }
+.voxMissionEmpty strong { display: block; font-size: 14px; color: #eaf5ed; }
+.voxMissionEmpty p { max-width: 350px; margin: 9px auto 0; }
+.voxMissionPanelFooter { display: flex; justify-content: space-between; gap: 12px; color: #71988a; font-size: 10px; margin-top: 15px; line-height: 1.5; }
+.voxMissionReviewItem { border-top: 1px solid #294d43; padding: 14px 0; display: flex; gap: 11px; align-items: flex-start; }
+.voxMissionReviewIcon { flex: 0 0 27px; color: #8de3ba; font-size: 11px; font-weight: 800; }
+.voxMissionReviewItem div { flex: 1; min-width: 0; }
+.voxMissionReviewItem strong { display: block; font-size: 12px; font-weight: 750; }
+.voxMissionReviewItem p { margin-top: 4px; font-size: 11px; }
+.voxMissionReviewItem > span:last-child { color: #bcae85; font-size: 9px; border: 1px solid #645944; border-radius: 5px; padding: 4px 6px; }
+.voxMissionReviewFoot { font-size: 10px !important; color: #8ba69b !important; margin-top: 9px !important; }
+.voxMissionModules { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 13px; }
+.voxMissionModule { min-height: 184px; padding: 19px; background: #102329; border: 1px solid #284940; border-radius: 12px; display: flex; flex-direction: column; }
+.voxMissionModuleTop { display: flex; align-items: center; justify-content: space-between; gap: 7px; margin-bottom: 15px; }
+.voxMissionModuleIcon { background: #193e35; width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; color: #8fe5bc; font-size: 17px; }
+.voxMissionModuleTop span:last-child { color: #6fae98; letter-spacing: .08em; font-size: 9px; font-weight: 800; }
+.voxMissionModule h3 { font-size: 14px; margin: 0 0 9px; color: #eff7ef; }
+.voxMissionModule p { font-size: 11px; color: #96aea4; line-height: 1.55; margin-bottom: 20px; }
+.voxMissionModule a, .voxMissionModuleRestricted { margin-top: auto; display: flex; justify-content: space-between; gap: 8px; padding-top: 12px; border-top: 1px solid #2e4b42; font-size: 11px; text-decoration: none; font-weight: 700; }
+.voxMissionModuleRestricted { color: #869e93; }
+.voxMissionFoundation { display: grid; grid-template-columns: 1.1fr repeat(3,1fr); gap: 16px; padding: 19px; border: 1px solid #2b5547; border-radius: 12px; background: #102a28; margin-top: 21px; color: #9fc8b7; font-size: 10px; line-height: 1.6; }
+.voxMissionFoundation strong { letter-spacing: .12em; font-size: 10px; color: #baf0d0; }
+.voxMissionFoundation b { color: #78e5b6; letter-spacing: .1em; }
+@media(max-width: 1250px){ .voxMissionStats{grid-template-columns:repeat(2,minmax(0,1fr))}.voxMissionModules{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media(max-width: 950px){.voxMissionHeroArt{width:130px;height:130px}.voxMissionColumns{grid-template-columns:1fr}.voxMissionFoundation{grid-template-columns:repeat(2,1fr)}}
+@media(max-width: 580px){.voxMissionHero{padding:12px 0 22px}.voxMissionHeroArt{display:none}.voxMissionHero h1{font-size:37px}.voxMissionStats,.voxMissionModules,.voxMissionFoundation{grid-template-columns:1fr}.voxMissionStat{min-height:170px}.voxMissionPanelHead{flex-direction:column}}

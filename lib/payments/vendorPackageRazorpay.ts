@@ -17,6 +17,8 @@ export type RazorpayPaymentEntity = {
   currency: string;
   status: string;
   captured?: boolean;
+  amount_refunded?: number | null;
+  refund_status?: string | null;
 };
 
 export function requireRazorpayKeyId(
@@ -38,11 +40,18 @@ export function requireSecret(name: string, value: string | undefined): string {
 }
 
 export function inrToSubunits(value: unknown): number {
-  const amount = Number(value);
-  if (!Number.isFinite(amount) || amount <= 0) throw new Error("PACKAGE_PRICE_INVALID");
-  const subunits = Math.round(amount * 100);
-  if (!Number.isSafeInteger(subunits) || subunits <= 0) throw new Error("PACKAGE_PRICE_INVALID");
-  return subunits;
+  // The database stores NUMERIC and calculates exact paise. Parse the decimal
+  // representation as integers, never via binary float arithmetic or a
+  // magnitude-dependent tolerance that could accept sub-paise amounts.
+  const raw = typeof value === "string" ? value.trim()
+    : typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+  const parts = /^(\d+)(?:\.(\d+))?$/.exec(raw);
+  if (!parts) throw new Error("PACKAGE_PRICE_INVALID");
+  const fractional = (parts[2] ?? "").replace(/0+$/, "");
+  if (fractional.length > 2) throw new Error("PACKAGE_PRICE_INVALID");
+  const paise = BigInt(parts[1]) * 100n + BigInt(fractional.padEnd(2, "0") || "0");
+  if (paise <= 0n || paise > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("PACKAGE_PRICE_INVALID");
+  return Number(paise);
 }
 
 export function packageOrderReceipt(orderId: string): string {
@@ -89,6 +98,21 @@ export function assertCapturedPayment(payment: RazorpayPaymentEntity, expected: 
   if (payment.amount !== expected.amount) throw new Error("PAYMENT_AMOUNT_MISMATCH");
   if (payment.currency !== (expected.currency ?? RAZORPAY_CURRENCY)) {
     throw new Error("PAYMENT_CURRENCY_MISMATCH");
+  }
+  // A fully refunded Razorpay payment reports status "refunded"; a partial
+  // refund keeps "captured" with amount_refunded > 0. Neither may mint credits.
+  // Both are deterministic: quarantine (PAYMENT_REFUNDED), never an endless
+  // PAYMENT_NOT_CAPTURED retry loop or a credit grant against returned money.
+  // Only an actual numeric zero (or absent legacy field) is non-refunded.
+  // Numeric strings, negative amounts, NaN and unexpected refund statuses
+  // are not provider-certified zero and must not authorize credit grants.
+  const refunded = payment.amount_refunded;
+  const amountIsUnrefunded = refunded == null ||
+    (typeof refunded === "number" && Number.isSafeInteger(refunded) && refunded === 0);
+  const refundStatusIsEmpty = payment.refund_status == null;
+  if (payment.status === "refunded" || !amountIsUnrefunded ||
+      !refundStatusIsEmpty) {
+    throw new Error("PAYMENT_REFUNDED");
   }
   if (payment.status !== "captured" || payment.captured === false) {
     throw new Error("PAYMENT_NOT_CAPTURED");

@@ -26,6 +26,7 @@ import {
   EXPECTED_LIVE_MIGRATION_COUNT,
   EXPECTED_POST_RECONCILIATION_ADDITIONS,
   POST_G1_EXTENSION_RECORDS,
+  ACTIVE_POST_G1_EXTENSION_RECORDS,
   SUPERSEDED_LEGACY_VERSIONS,
 } from "../staging/live-migration-ledger.mjs";
 
@@ -255,8 +256,10 @@ check("14 the frozen reconciliation plus explicit extension accounts for the cur
   eq(EXPECTED_POST_RECONCILIATION_ADDITIONS,
     (MANIFEST.pendingPostAnchorMigrations ?? []).length +
     (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length -
-    SUPERSEDED_LEGACY_VERSIONS.length + POST_G1_EXTENSION_RECORDS.length,
-    "legacy pending/staging-applied truth plus extension and supersession accounts for every addition");
+    SUPERSEDED_LEGACY_VERSIONS.length + ACTIVE_POST_G1_EXTENSION_RECORDS.length,
+    "legacy pending/staging-applied truth plus ACTIVE extension and supersession accounts for every addition");
+  eq(POST_G1_EXTENSION_RECORDS.length - ACTIVE_POST_G1_EXTENSION_RECORDS.length, 7,
+    "exactly seven cryptographically pinned VOX foundations remain quarantined from the active migration tree");
 });
 
 // ---- 15-22. the manifest entry ---------------------------------------------

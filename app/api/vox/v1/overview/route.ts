@@ -23,6 +23,10 @@ export async function GET(request:Request){
      .eq("state","HUMAN").eq("human_takeover",true).order("updated_at",{ascending:false}).limit(8),
   ]);
   if(prospects.error||crm.error||support.error||human.error)return response({ok:false,error:"READ_UNAVAILABLE"},503);
+  // Recheck live Owner AAL2/profile after asynchronous Core reads: no stale
+  // Owner scope may expose staff/case/conversation metadata after revocation.
+  const freshOwner=await verifyVoxOwnerBearer(request.headers.get("authorization"));
+  if(!freshOwner||freshOwner!==actor)return response({ok:false,error:"OWNER_AUTH_REVOKED_DURING_READ"},403);
   return response({ok:true,view:projectVoxOverview({
    prospects:prospects.data,crm:crm.data,vendorSupport:support.data,humanConversations:human.data,
   })},200);

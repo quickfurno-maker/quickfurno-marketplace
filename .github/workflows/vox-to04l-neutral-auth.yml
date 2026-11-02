@@ -1,0 +1,43 @@
+name: VOX TO-04L Verified Neutral Staff Signup - No Elevation
+on:
+  pull_request:
+    paths:
+      - 'ops/vox/certification/TO04L-LIVE-AUTH-NEUTRAL-TRIGGER.json'
+      - 'scripts/mvp/vox/validate-to04l-neutral-auth.test.mjs'
+      - 'scripts/mvp/vox/fixtures/vox-to04l-neutral-auth-trigger-pg17.sql'
+      - '.github/workflows/vox-to04l-neutral-auth.yml'
+permissions:
+  contents: read
+jobs:
+  pg17-nonadmin-auth-trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: vox_to04l_synthetic
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic_fixture_only
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vox_to04l_synthetic"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: synthetic_fixture_only
+      PGDATABASE: vox_to04l_synthetic
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: node --test scripts/mvp/vox/validate-to04l-neutral-auth.test.mjs
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Isolated real PostgreSQL never grants admin via signup metadata
+        run: psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to04l-neutral-auth-trigger-pg17.sql

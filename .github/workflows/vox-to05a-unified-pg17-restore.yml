@@ -1,0 +1,81 @@
+name: VOX-05A Single-Database Core Permissions and Work Restore (Synthetic)
+on:
+  pull_request:
+    paths:
+      - 'scripts/mvp/vox/fixtures/vox-to05a-*'
+      - '.github/workflows/vox-to05a-unified-pg17-restore.yml'
+      - 'ops/vox/sql-candidates/*vox_to02*.sql'
+permissions:
+  contents: read
+jobs:
+  combined-sql-transaction-and-disposable-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: vox05_synthetic
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic_fixture_only
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vox05_synthetic"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: synthetic_fixture_only
+      PGDATABASE: vox05_synthetic
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Build one DB with actual Core department schema, RPC and Staff review
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to02b-minimal-staff-schema.sql
+          psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to02c-auth-identity-fixture.sql
+          psql -X -v ON_ERROR_STOP=1 -f ops/vox/sql-candidates/20261015010000_vox_to02b_staff_department_governance.sql
+          psql -X -v ON_ERROR_STOP=1 -f ops/vox/sql-candidates/20261015020000_vox_to02c_reviewed_department_actions.sql
+          psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to02c-real-rpc-assertions.sql
+      - name: Install Core-owned subject verification and actual work candidate in same DB
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to05a-core-source-bridge.sql
+          psql -X -v ON_ERROR_STOP=1 -f ops/vox/sql-candidates/20261015030000_vox_to02e_work_queue_atomic_candidate.sql
+          psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to05a-department-work-assertions.sql
+      - name: Restricted dump checksum, restore to a SECOND disposable DB, verify RLS+revocation+audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          # GitHub Ubuntu's host pg_dump may be older than our PG17 server.
+          # Pin dump and restore CLIENTS to exact PostgreSQL 17 image, too.
+          mkdir -p "$RUNNER_TEMP/vox05-rehearsal"
+          chmod 700 "$RUNNER_TEMP/vox05-rehearsal"
+          docker run --rm --network host \
+            -e PGHOST=127.0.0.1 -e PGPORT=5432 -e PGUSER=postgres \
+            -e PGPASSWORD=synthetic_fixture_only \
+            -v "$RUNNER_TEMP/vox05-rehearsal:/out" postgres:17 \
+            pg_dump --no-owner -Fc -f /out/vox05-offline-synthetic.dump vox05_synthetic
+          test -s "$RUNNER_TEMP/vox05-rehearsal/vox05-offline-synthetic.dump"
+          sha256sum "$RUNNER_TEMP/vox05-rehearsal/vox05-offline-synthetic.dump" \
+            | tee "$RUNNER_TEMP/vox05-rehearsal/vox05-offline-synthetic.sha256"
+          docker run --rm --network host \
+            -v "$RUNNER_TEMP/vox05-rehearsal:/out" postgres:17 \
+            pg_restore --list /out/vox05-offline-synthetic.dump \
+            > "$RUNNER_TEMP/vox05-rehearsal/archive-list.txt"
+          createdb vox05_restored
+          docker run --rm --network host \
+            -e PGHOST=127.0.0.1 -e PGPORT=5432 -e PGUSER=postgres \
+            -e PGPASSWORD=synthetic_fixture_only \
+            -v "$RUNNER_TEMP/vox05-rehearsal:/out" postgres:17 \
+            pg_restore --no-owner --exit-on-error -d vox05_restored /out/vox05-offline-synthetic.dump
+          PGDATABASE=vox05_restored psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to05a-restored-state-assertions.sql
+          echo 'VOX05A_DISPOSABLE_COMBINED_SQL_BACKUP_RESTORE_PASS_NOT_SUPABASE_STAGING'

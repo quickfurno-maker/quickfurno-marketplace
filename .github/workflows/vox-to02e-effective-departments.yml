@@ -1,0 +1,26 @@
+name: VOX TO-02E Effective Departments Source QA
+on:
+  pull_request:
+    paths:
+      - 'contracts/vox/effectiveDepartments.mjs'
+      - 'services/vox/verifiedScopedStaff.ts'
+      - 'scripts/mvp/vox/validate-to02e-effective-departments.test.mjs'
+      - '.github/workflows/vox-to02e-effective-departments.yml'
+permissions:
+  contents: read
+jobs:
+  deny-unreviewed-access:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: node --test scripts/mvp/vox/validate-to02e-effective-departments.test.mjs
+      - run: node --check contracts/vox/effectiveDepartments.mjs
+      - name: Fail if feature default is accidentally enabled
+        run: |
+          ! grep -R -n '^VOX_DEPARTMENT_ENFORCEMENT_ENABLED=staging' apps/vox-web/.env.example .env.example 2>/dev/null

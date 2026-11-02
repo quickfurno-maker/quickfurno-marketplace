@@ -1,0 +1,29 @@
+name: VOX-06B Staff Desk Canonical Vendor Scope and Unified Hub
+on:
+  pull_request:
+    paths:
+      - 'app/api/vox/v1/desk/route.ts'
+      - 'app/api/vox/v1/my-work/route.ts'
+      - 'apps/vox-web/app/team/page.tsx'
+      - 'scripts/mvp/vox/validate-vox06b-staff-desk.test.mjs'
+      - '.github/workflows/vox-06b-staff-desk.yml'
+permissions:
+  contents: read
+jobs:
+  scope-zone-staff-workspace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: node --test scripts/mvp/vox/validate-vox06b-staff-desk.test.mjs
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: apps/vox-web
+      - run: npm run typecheck
+        working-directory: apps/vox-web

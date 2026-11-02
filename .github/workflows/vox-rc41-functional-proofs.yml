@@ -1,0 +1,309 @@
+name: VOX operational Core, Finance, EOD and DB real proof - RELEASE HOLD
+on:
+  pull_request:
+    paths:
+      - 'ops/vox/rc41-review-candidates/**'
+      - 'ops/vox/rc42-review-candidates/**'
+      - 'scripts/mvp/vox/rc42-*.test.mjs'
+      - 'scripts/mvp/vox/rc43-*.test.mjs'
+      - 'scripts/mvp/vox/rc44-*.test.mjs'
+      - 'scripts/mvp/vox/rc45-*.test.mjs'
+      - 'scripts/mvp/vox/rc47-*.test.mjs'
+      - 'scripts/mvp/vox/rc48-*.test.mjs'
+      - 'scripts/mvp/vox/rc50-*.test.mjs'
+      - 'scripts/mvp/vox/rc51-*.test.mjs'
+      - 'scripts/mvp/vox/rc52-*.test.mjs'
+      - 'scripts/mvp/vox/rc52-*.mjs'
+      - 'scripts/mvp/vox/rc53-*.test.mjs'
+      - 'scripts/mvp/vox/rc54-*.test.mjs'
+      - 'scripts/mvp/vox/rc55-*.test.mjs'
+      - 'scripts/mvp/vox/rc55-private-baseline-containment.mjs'
+      - 'scripts/mvp/vox/rc56-*.test.mjs'
+      - 'scripts/mvp/vox/rc56-private-statement-evidence.mjs'
+      - 'scripts/mvp/vox/rc57-*.test.mjs'
+      - 'scripts/mvp/vox/rc58-*.test.mjs'
+      - 'scripts/mvp/vox/rc59-*.test.mjs'
+      - 'scripts/mvp/vox/rc60-*.test.mjs'
+      - 'scripts/mvp/vox/rc61-*.test.mjs'
+      - 'scripts/mvp/vox/rc62-*.test.mjs'
+      - 'scripts/mvp/vox/rc64-*.test.mjs'
+      - 'scripts/mvp/vox/rc65-*.test.mjs'
+      - 'scripts/mvp/vox/rc66-*.test.mjs'
+      - 'scripts/mvp/vox/rc68-*.test.mjs'
+      - 'scripts/mvp/vox/rc69-*.test.mjs'
+      - 'scripts/mvp/vox/rc70-*.test.mjs'
+      - 'apps/vox-web/scripts/validate-rc70-*.spec.mjs'
+      - 'apps/vox-web/scripts/validate-rc71-premium-mfa.spec.mjs'
+      - 'apps/vox-web/scripts/validate-rc71-eod-submission-revision.spec.mjs'
+      - 'scripts/mvp/vox/rc71-bad-lead-metadata-checkpoint.test.mjs'
+      - 'scripts/mvp/vox/rc72-*.test.mjs'
+      - 'scripts/mvp/vox/rc73-*.test.mjs'
+      - 'scripts/mvp/vox/rc74-*.test.mjs'
+      - 'scripts/mvp/vox/rc75-*.test.mjs'
+      - 'scripts/mvp/vox/rc76-*.test.mjs'
+      - 'scripts/mvp/vox/rc77-*.test.mjs'
+      - 'scripts/mvp/vox/rc78-*.test.mjs'
+      - 'scripts/mvp/vox/rc79-*.test.mjs'
+      - 'apps/vox-web/lib/rc69VerifiedWorkReceipt.ts'
+      - 'apps/vox-web/lib/workTransitions.ts'
+      - 'app/api/vox/v1/work-transitions/**'
+      - 'app/api/vox/v1/eod-reviews/**'
+      - 'apps/vox-web/app/team/eod-reviews/ReviewDecision.tsx'
+      - 'apps/vox-web/scripts/validate-rc78-*.spec.mjs'
+      - 'apps/vox-web/lib/rc70PendingTlReview.mjs'
+      - 'lib/vox/badLeadReviewCheckpoint.ts'
+      - 'services/adminAuditService.ts'
+      - 'apps/vox-web/scripts/validate-rc77-*.spec.mjs'
+      - 'apps/vox-web/lib/rc66PendingWorkTransition.ts'
+      - 'services/vox/rc77BoundedAtomicBadLeadReview.ts'
+      - 'app/api/vox/v1/eod-submissions/**'
+      - 'apps/vox-web/lib/teamWorkflow.ts'
+      - 'apps/vox-web/scripts/validate-rc76-*.spec.mjs'
+      - 'apps/vox-web/scripts/validate-rc40-staff-uat-recovery.spec.mjs'
+      - 'services/vox/rc76AtomicBadLeadStatusReceipt.ts'
+      - 'apps/vox-web/app/team/work-queue/PendingWorkNotice.tsx'
+      - 'apps/vox-web/app/team/work-queue/page.tsx'
+      - 'app/actions.ts'
+      - 'apps/vox-web/scripts/validate-rc75-*.spec.mjs'
+      - 'ops/vox/rc75-review-only/**'
+      - 'scripts/mvp/vox/validate-vox-rc75-atomic-bad-lead-pg17.ps1'
+      - 'scripts/mvp/vox/fixtures/rc75-bad-lead-status-minimal.pg17.sql'
+      - 'apps/vox-web/app/team/eod-reviews/PendingReviewNotice.tsx'
+      - 'apps/vox-web/app/team/eod-reviews/page.tsx'
+      - 'apps/vox-web/scripts/validate-rc74-*.spec.mjs'
+      - 'apps/vox-web/app/team/work-queue/WorkActionControl.tsx'
+      - 'apps/vox-web/app/mfa/page.tsx'
+      - 'apps/vox-web/app/mfa/form.tsx'
+      - 'services/adminAuditService.ts'
+      - 'scripts/mvp/vox/rc73-private-mismatch-triage.mjs'
+      - 'scripts/mvp/vox/rc73-staging-owner-guard-smoke.mjs'
+      - 'services/vox/rc73PostCommentOwnerAuthority.ts'
+      - 'app/api/vox/v1/eod-submissions/**'
+      - 'apps/vox-web/scripts/validate-rc72-*.spec.mjs'
+      - 'apps/vox-web/app/components/ScopedQueue.tsx'
+      - 'apps/vox-web/app/components/scopedQueuePage.mjs'
+      - 'apps/vox-web/app/components/scopedQueuePage.d.mts'
+      - 'lib/vox/badLeadReviewCheckpoint.ts'
+      - 'components/admin/LeadMatchingAuditPanels.tsx'
+      - 'apps/vox-web/lib/teamWorkflow.ts'
+      - 'apps/vox-web/app/mfa/**'
+      - 'apps/vox-web/lib/rc70PendingTlReview.mjs'
+      - 'apps/vox-web/lib/rc70PendingEodSubmission.mjs'
+      - 'services/vox/rc70PostEligibilityOwnerAuthority.ts'
+      - 'apps/vox-web/scripts/validate-rc69-work-receipt.spec.mjs'
+      - 'apps/vox-web/lib/rc69VerifiedWorkReceipt.ts'
+      - 'apps/vox-web/scripts/validate-rc68-vendor360-tasks.spec.mjs'
+      - 'apps/vox-web/app/vendor360/**'
+      - 'services/vox/rc68PostRecommendationOwnerAuthority.ts'
+      - 'apps/vox-web/scripts/validate-rc66-work-recovery.spec.mjs'
+      - 'apps/vox-web/lib/rc66PendingWorkTransition.ts'
+      - 'apps/vox-web/lib/workTransitions.ts'
+      - 'apps/vox-web/app/api/work-transitions/**'
+      - 'apps/vox-web/app/team/work-queue/**'
+      - 'app/api/vox/v1/work-transitions/**'
+      - 'apps/vox-web/scripts/validate-rc65-bounded-mfa.spec.mjs'
+      - 'apps/vox-web/lib/rc65BoundedStaffMfa.ts'
+      - 'services/vox/rc65PostCreditOwnerAuthority.ts'
+      - 'lib/vox/badLeadReviewCheckpoint.ts'
+      - 'app/api/vox/v1/official-eod-publish/**'
+      - 'scripts/mvp/vox/rc57-private-lexical-reconciliation.mjs'
+      - 'docs/vox/VOX-RC53-*'
+      - 'docs/vox/VOX-RC54-*'
+      - 'docs/vox/VOX-RC55-*'
+      - 'docs/vox/VOX-RC56-*'
+      - 'docs/vox/VOX-RC57-*'
+      - 'docs/vox/VOX-RC58-*'
+      - 'docs/vox/VOX-RC59-*'
+      - 'docs/vox/VOX-RC60-*'
+      - 'docs/vox/VOX-RC61-*'
+      - 'docs/vox/VOX-OPERATIONAL-BOUNDARIES-*'
+      - 'docs/vox/VOX-RC52-*'
+      - 'scripts/mvp/vox/rc50-staging-sql-handoff.mjs'
+      - 'scripts/mvp/vox/rc47-managed-recovery-handoff.mjs'
+      - 'apps/vox-web/app/api/conversation-control/**'
+      - 'apps/vox-web/lib/conversationControl.ts'
+      - 'apps/vox-web/app/team/conversation-control/**'
+      - 'apps/vox-web/scripts/validate-rc46-conversation-control.spec.mjs'
+      - 'apps/vox-web/scripts/validate-rc63-pending-conversation.spec.mjs'
+      - 'apps/vox-web/lib/pendingConversationRecovery.ts'
+      - 'services/vendorCreditWalletService.ts'
+      - 'lib/supabase.ts'
+      - 'services/vox/rc44DedicatedEodReviewReader.ts'
+      - 'app/actions.ts'
+      - 'services/adminService.ts'
+      - 'scripts/mvp/vox/validate-vox-rc42-*.ps1'
+      - 'scripts/mvp/vox/fixtures/rc42-bad-lead-credit-minimal.pg17.sql'
+      - 'services/vox/rc42*.ts'
+      - 'services/badLeadRecoveryService.ts'
+      - 'components/admin/LeadMatchingAuditPanels.tsx'
+      - 'app/api/vox/v1/core/conversation-operator/**'
+      - 'app/api/vox/v1/core/conversation-candidates/**'
+      - 'apps/vox-web/app/api/conversation-candidates/**'
+      - 'app/api/vox/v1/eod-atomic-review/**'
+      - 'scripts/mvp/vox/validate-vox-rc41-*.mjs'
+      - 'scripts/mvp/vox/validate-vox-rc41-*.ps1'
+      - 'scripts/mvp/vox/rc41-finance-refund-case-review.test.mjs'
+      - 'scripts/mvp/vox/rc40-managed-ledger-reconciler*.mjs'
+      - 'services/vox/financeRefundCaseReview.ts'
+      - 'services/vox/rc41SignedEodReviewSnapshot.ts'
+      - 'app/api/vox/v1/finance/refund-intake/**'
+      - 'scripts/mvp/vox/rc38-staging-predeploy-gate.mjs'
+      - '.github/workflows/vox-rc41-functional-proofs.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: vox-rc41-proofs-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  finance-and-db-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Real compiled Finance route, managed ledger reconciliation and predeployment HOLD regression
+        run: node --test scripts/mvp/vox/rc41-finance-refund-case-review.test.mjs scripts/mvp/vox/rc40-managed-ledger-reconciler.test.mjs scripts/mvp/vox/rc38-staging-predeploy-gate.test.mjs
+      - name: RC42 guarded Core, credit-only Finance, and EOD read-only contracts
+        run: node --test scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-policy.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-service.test.mjs scripts/mvp/vox/rc42-eod-atomic-data-api-review.test.mjs scripts/mvp/vox/rc43-core-route-integration.test.mjs scripts/mvp/vox/rc43-eod-route-integration.test.mjs scripts/mvp/vox/rc43-bad-lead-owner-aal2-review.test.mjs scripts/mvp/vox/rc44-eod-dedicated-reader.test.mjs scripts/mvp/vox/rc45-legacy-bad-lead-credit-bypass.test.mjs
+      - name: RC47 actual EOD transport and fail-closed managed recovery handoff
+        run: node --test scripts/mvp/vox/rc47-eod-actual-supabase-transport.test.mjs scripts/mvp/vox/rc47-managed-recovery-handoff.test.mjs
+      - name: RC48 real Web to native Core two-hop integration, hard-off verification
+        run: node --test scripts/mvp/vox/rc48-core-real-two-hop.test.mjs
+      - name: RC50 Core scoped conversation discovery and SQL evidence handoff
+        run: node --test scripts/mvp/vox/rc50-conversation-candidates.test.mjs scripts/mvp/vox/rc50-staging-sql-handoff.test.mjs
+      - name: RC51 human credit UI duplicate-submit proof
+        run: node --test scripts/mvp/vox/rc51-finance-operator-ui.test.mjs
+      - name: RC52 private original SQL read-only synthetic integrity regression
+        run: node --test scripts/mvp/vox/rc52-private-managed-sql-assessment.test.mjs
+      - name: RC53–RC55 operational proof jobs and protected feature holds cannot silently disappear
+        run: node --test scripts/mvp/vox/rc53-ci-coverage.test.mjs scripts/mvp/vox/rc54-ci-coverage.test.mjs scripts/mvp/vox/rc55-ci-coverage.test.mjs scripts/mvp/vox/rc56-ci-coverage.test.mjs scripts/mvp/vox/rc57-ci-coverage.test.mjs
+      - name: RC55 checked SQL evidence, verified AAL2 finance recommendations, Core receipts, dedicated EOD reader
+        run: node --test scripts/mvp/vox/rc55-private-baseline-containment.test.mjs scripts/mvp/vox/rc55-finance-recommendation-aal2.test.mjs scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc44-eod-dedicated-reader.test.mjs
+      - name: RC56 private statement evidence, cross-evidence Finance uniqueness, Core authority recheck, dedicated EOD reader
+        run: node --test scripts/mvp/vox/rc56-private-statement-evidence.test.mjs scripts/mvp/vox/rc56-cross-evidence-once.test.mjs scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc44-eod-dedicated-reader.test.mjs
+      - name: RC57 SQL lexical reconciliation, actual finance index shape, bounded Core outcome and dedicated EOD reader
+        run: node --test scripts/mvp/vox/rc57-private-lexical-reconciliation.test.mjs scripts/mvp/vox/rc57-finance-index-identity.test.mjs scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc44-eod-dedicated-reader.test.mjs
+      - name: RC58 real Core unknown-outcome, credit reconciliation and EOD reader aging
+        run: node --test scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-service.test.mjs scripts/mvp/vox/rc44-eod-dedicated-reader.test.mjs scripts/mvp/vox/rc58-ci-coverage.test.mjs
+      - name: RC59 Core timeout vs BFF deadline, Finance unknown-credit UI and protected flags
+        run: node --test scripts/mvp/vox/rc51-finance-operator-ui.test.mjs scripts/mvp/vox/rc59-ui-outcome.test.mjs
+      - name: RC60 candidate credit ledger receipt, SQL replay rollback and financial HOLD
+        run: node --test scripts/mvp/vox/rc60-credit-ledger-proof.test.mjs scripts/mvp/vox/rc60-ci-coverage.test.mjs
+      - name: Bounded Core post-SQL auth and genuine two-human EOD review cannot hang
+        run: node --test scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc42-eod-atomic-data-api-review.test.mjs scripts/mvp/vox/rc61-deadline-integrity.test.mjs
+      - name: First-hop Owner and Staff AAL2 plus canonical Finance RPC fail-closed deadlines
+        run: node --test scripts/mvp/vox/rc42-core-atomic-route.test.mjs scripts/mvp/vox/rc43-core-route-integration.test.mjs scripts/mvp/vox/rc43-eod-route-integration.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-service.test.mjs scripts/mvp/vox/rc62-operational-deadline-coverage.test.mjs
+      - name: RC63 Staff same-nonce recovery across in-tab refresh, denied storage and malformed records
+        run: node --test apps/vox-web/scripts/validate-rc63-pending-conversation.spec.mjs
+      - name: RC64 Finance recovery checkpoint and official EOD uncertain-outcome protection
+        run: node --test scripts/mvp/vox/rc64-bad-lead-review-checkpoint.test.mjs scripts/mvp/vox/rc64-official-eod-publish-guard.test.mjs scripts/mvp/vox/rc51-finance-operator-ui.test.mjs
+      - name: RC65 bounded Staff preflight and post-transaction Owner security contracts
+        run: node --test apps/vox-web/scripts/validate-rc65-bounded-mfa.spec.mjs scripts/mvp/vox/rc65-finance-post-owner-check.test.mjs scripts/mvp/vox/rc64-official-eod-publish-guard.test.mjs
+      - name: RC65 real compiled VOX Web adapter and BFF security VM proof
+        run: node --experimental-vm-modules --test apps/vox-web/scripts/validate-rc46-conversation-control.spec.mjs
+      - name: RC66 real Core work transition bounded authority, ambiguous receipt, and same-tab work nonce
+        run: node --test scripts/mvp/vox/rc66-work-core-boundary.test.mjs apps/vox-web/scripts/validate-rc66-work-recovery.spec.mjs scripts/mvp/vox/rc34-vox-web-staff-session-core-http.test.mjs
+      - name: RC66 compiled Web work-queue to Core HTTP security contract
+        run: node --experimental-vm-modules --test apps/vox-web/scripts/validate-voxL4-atomic-work-actions.spec.mjs
+      - name: RC67 post-SQL Staff grant revalidation and bounded human Finance recommendation
+        run: node --test scripts/mvp/vox/rc66-work-core-boundary.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-service.test.mjs
+      - name: RC68 Vendor 360 actual assigned Core tasks and post-recommendation Owner proof
+        run: node --test apps/vox-web/scripts/validate-rc68-vendor360-tasks.spec.mjs scripts/mvp/vox/rc68-finance-recommendation-owner.test.mjs scripts/mvp/vox/rc55-finance-recommendation-aal2.test.mjs
+      - name: RC69 real Core to Staff BFF to browser exact receipt and preserved nonce proof
+        run: node --test scripts/mvp/vox/rc69-work-receipt-two-hop.test.mjs apps/vox-web/scripts/validate-rc69-work-receipt.spec.mjs apps/vox-web/scripts/validate-rc66-work-recovery.spec.mjs scripts/mvp/vox/rc34-vox-web-staff-session-core-http.test.mjs
+      - name: RC70 real TL review and Staff partial EOD restored nonces; financial eligibility Owner authority
+        run: node --test apps/vox-web/scripts/validate-rc70-tl-review-checkpoint.spec.mjs apps/vox-web/scripts/validate-rc70-partial-eod-submission.spec.mjs scripts/mvp/vox/rc70-finance-eligibility-owner.test.mjs scripts/mvp/vox/rc68-finance-recommendation-owner.test.mjs
+      - name: RC71 premium MFA screen, existing AAL2 and safe return regression
+        run: node --test apps/vox-web/scripts/validate-rc71-premium-mfa.spec.mjs apps/vox-web/scripts/validate-staff-session-recovery-rc35.spec.mjs
+      - name: RC71 genuine partial EOD revision and bad-lead metadata unknown-outcome checkpoint proofs
+        run: node --test apps/vox-web/scripts/validate-rc71-eod-submission-revision.spec.mjs apps/vox-web/scripts/validate-rc70-partial-eod-submission.spec.mjs scripts/mvp/vox/rc64-bad-lead-review-checkpoint.test.mjs scripts/mvp/vox/rc71-bad-lead-metadata-checkpoint.test.mjs
+      - name: RC72 Staff 20 per page, Finance comments, EOD business-date receipt proof
+        run: node --test apps/vox-web/scripts/validate-rc72-scoped-pagination.spec.mjs apps/vox-web/scripts/validate-rc72-eod-date-receipt.spec.mjs scripts/mvp/vox/rc72-bad-lead-comment-checkpoint.test.mjs
+      - name: RC73 actual Core EOD business date, comment AAL2, private DBA safety, Staging guard denial
+        run: node --test scripts/mvp/vox/rc73-eod-core-date-http.test.mjs scripts/mvp/vox/rc73-finance-comment-owner.test.mjs scripts/mvp/vox/rc73-private-mismatch-triage.test.mjs scripts/mvp/vox/rc73-staging-owner-guard-smoke.test.mjs
+      - name: RC74 terminal Staff recovery, linked bad-lead flag, MFA encoding safety
+        run: node --test apps/vox-web/scripts/validate-rc74-terminal-work-recovery.spec.mjs scripts/mvp/vox/rc74-bad-lead-linked-assignment.test.mjs apps/vox-web/scripts/validate-rc74-ascii-mfa-utf8.spec.mjs
+      - name: RC75 Staff action/Core parity, TL lost-review notice, quarantined atomic Finance candidate
+        run: node --test apps/vox-web/scripts/validate-rc75-work-state-action-parity.spec.mjs apps/vox-web/scripts/validate-rc75-eod-unlisted-review-recovery.spec.mjs scripts/mvp/vox/rc75-bad-lead-atomic-review.test.mjs
+      - name: RC76 compiled Staff security, fail-closed atomic bad-lead integration and lost Core nonce recovery
+        run: node --test apps/vox-web/scripts/validate-rc40-staff-uat-recovery.spec.mjs scripts/mvp/vox/rc76-finance-atomic-readiness.test.mjs apps/vox-web/scripts/validate-rc76-hidden-work-recovery.spec.mjs
+      - name: RC77 Staff nonce readback, uncertain Finance RPC and verified original EOD nonce
+        run: node --test apps/vox-web/scripts/validate-rc77-persistent-work-nonce.spec.mjs scripts/mvp/vox/rc77-atomic-status-timeout.test.mjs apps/vox-web/scripts/validate-rc77-eod-original-nonce.spec.mjs scripts/mvp/vox/rc73-eod-core-date-http.test.mjs
+      - name: RC78 preserve all original work, Finance and Team Leader nonce checkpoints
+        run: node --test apps/vox-web/scripts/validate-rc78-work-checkpoint-integrity.spec.mjs apps/vox-web/scripts/validate-rc78-tl-checkpoint-integrity.spec.mjs scripts/mvp/vox/rc78-bad-lead-checkpoint-integrity.test.mjs scripts/mvp/vox/rc74-bad-lead-linked-assignment.test.mjs
+      - name: RC79 actual Staff and Team Leader original-nonce receipts, credit-only recommendation API
+        run: node --experimental-vm-modules --test apps/vox-web/scripts/validate-rc69-work-receipt.spec.mjs scripts/mvp/vox/rc69-work-receipt-two-hop.test.mjs apps/vox-web/scripts/validate-governed-workflows-08k.spec.mjs scripts/mvp/vox/rc79-credit-only-recommendation-contract.test.mjs
+      - name: Root TypeScript, unchanged protected release gates
+        run: |
+          npx tsc --noEmit --pretty false
+          node scripts/mvp/vox/rc39-protected-features-off-gate.mjs
+      - name: Explicit source-only release HOLD
+        run: echo 'Review-only implementation and disposable tests; no managed Staging/Production DDL, provider traffic, payment/refunds/credits, or official EOD activation.' >> "$GITHUB_STEP_SUMMARY"
+  core-real-pg17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Execute actual RC41 atomic conversation SQL on disposable PostgreSQL 17 with contention, revocation and STOP-race tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          pwsh -NoProfile -File scripts/mvp/vox/validate-vox-rc41-core-conversation-atomic-pg17.ps1 | tee "$RUNNER_TEMP/rc41-core.log"
+          grep -Fq 'VOX_RC41_CORE_CONVERSATION_ATOMIC_PG17_PASS' "$RUNNER_TEMP/rc41-core.log"
+  credit-only-real-pg17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Real RC42 one-lead-credit authority on disposable PostgreSQL 17 (simulated credit wallet only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          pwsh -NoProfile -File scripts/mvp/vox/validate-vox-rc42-credit-only-pg17.ps1 | tee "$RUNNER_TEMP/rc42-credit.log"
+          grep -Fq 'VOX_RC42_CREDIT_ONLY_PG17_DISPOSABLE_PASS' "$RUNNER_TEMP/rc42-credit.log"
+  canonical-credit-real-pg17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Execute ACTUAL canonical credit mutation and approval SQL against disposable PG17
+        shell: bash
+        run: |
+          set -euo pipefail
+          pwsh -NoProfile -File scripts/mvp/vox/validate-vox-rc42-credit-only-pg17.ps1 -UseCanonicalCreditAuthority | tee "$RUNNER_TEMP/rc44-real-canonical-credit.log"
+          grep -Fq 'VOX_RC44_CANONICAL_CREDIT_PG17_DISPOSABLE_PASS' "$RUNNER_TEMP/rc44-real-canonical-credit.log"
+  eod-real-pg17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Pull isolated PostgreSQL 17 image (do not skip database execution)
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull postgres:17-alpine
+          docker image inspect postgres:17-alpine > /dev/null
+      - name: Real Ed25519 + signed EOD single snapshot PostgREST-shaped RPC proof against isolated PG17
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/mvp/vox/validate-vox-rc41-eod-review-snapshot-pg17.mjs | tee "$RUNNER_TEMP/rc41-eod.log"
+          grep -Fq 'VOX_RC41_EOD_REVIEW_SNAPSHOT_PG17_PASS' "$RUNNER_TEMP/rc41-eod.log"

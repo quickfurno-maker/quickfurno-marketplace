@@ -1,0 +1,48 @@
+name: VOX RC4 Track F Source-Only QA Gate
+# Source-only: no secrets, no network services, no database, no deployment.
+# A green run means SOURCE_PASS at most. It never means release GO (issue #444 stays HOLD).
+on:
+  pull_request:
+    paths:
+      - 'scripts/mvp/vox/**'
+      - 'contracts/vox/**'
+      - 'ops/vox/**'
+      - 'app/api/vox/**'
+      - 'app/api/internal/agni/**'
+      - 'apps/vox-web/app/**'
+      - 'apps/vox-web/lib/**'
+      - 'services/vox/**'
+      - 'lib/vox/**'
+      - 'docs/vox/VOX-RC4-TRACK-*.md'
+      - 'services/jarvisOperatorCommandService.ts'
+      - 'docs/vox/VOX-AB7K-REVIEWED-SOURCE-FINGERPRINT.json'
+      - '.github/workflows/vox-rc4-qa-source-gate.yml'
+permissions:
+  contents: read
+concurrency:
+  group: vox-rc4-qa-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  rc4-source-only-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: RC4 orchestrator unit tests
+        run: node --test scripts/mvp/vox/rc4-qa.test.mjs
+      - name: RC4 integrated source-only orchestrator (writes JSON evidence report)
+        run: node scripts/mvp/vox/rc4-qa-orchestrator.mjs --mode source-only --out test-results/vox-rc4/qa-report.json
+      - name: Upload evidence report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vox-rc4-qa-report
+          path: test-results/vox-rc4/qa-report.json
+          if-no-files-found: warn
+          retention-days: 14

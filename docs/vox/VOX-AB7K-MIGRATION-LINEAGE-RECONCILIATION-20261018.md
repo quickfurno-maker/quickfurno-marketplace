@@ -1,0 +1,156 @@
+# AB-7K read-only staging migration-version reconciliation — 18 Oct 2026
+
+**Not an approval to install or merge.** Retrieved from connected QuickFurno Staging's schema migration ledger read-only and the exact Core source tree at certified parent commit `19b5f889a25a51fd51837e34f2c1deefa3de18f6`. The Staging source is a migration ledger, not proof of bytewise semantic parity.
+
+- Staging applied migration versions: **86**
+- Git tracked `supabase/migrations/*.sql` files: **162**
+- Exact staging versions not present in Core filenames: **31**
+- Exact Core filename versions not in Staging ledger: **107**
+- Installed public `vox_*` tables: **0** (separately read from Staging information schema)
+- Full offline synthetic Core PG17 source install of 7 quarantined foundation + 23 candidates: **PASS 30/30**, 39 tables with FORCE RLS; never run on managed Staging.
+
+## Staging applied versions without exact Core filename match
+- `20260722000100` — qf_mvp_staging_baseline_269c9265
+- `20260926045741` — qf_launch_pune_only_city_activation
+- `20260926045744` — qf_active_city_authority_hardening
+- `20260926045753` — qf_aos_v2_intelligence
+- `20260926045756` — qf_lead_generation_scope_lock
+- `20260926045759` — vendor_media_bucket
+- `20260926045802` — jarvis_os_operator_command_receipts
+- `20260926050242` — qf_phase2_staging_rls_initplan_parity
+- `20260927072347` — qf_client_journey_phase1_foundation
+- `20260927090306` — qf_client_journey_phase1_meta_qualification
+- `20260929161707` — shared_single_number_jarvis_access
+- `20261001151402` — qf_verified_location_geofence_straight_line
+- `20261001153730` — qf_multi_city_service_zone_authority
+- `20261001154754` — qf_city_market_runtime_controls
+- `20261001165444` — qf_admin_service_zone_boundary_control
+- `20261002080447` — vendor_fair_opportunity_distribution
+- `20261002083321` — vendor_fair_opportunity_group_reconcile
+- `20261002083346` — vendor_fair_opportunity_group_reconcile
+- `20261002083936` — vendor_fair_opportunity_fk_indexes
+- `20261002085216` — vendor_fair_opportunity_fk_indexes
+- `20261003034807` — aarohi_phase1_omnichannel_activation
+- `20261003040425` — aarohi_phase1_fk_indexes
+- `20261003072042` — aarohi_phase2_autonomous_acquisition
+- `20261003072049` — aarohi_phase2_scale_governance
+- `20261003072056` — aarohi_phase2_ops_control_analytics
+- `20261003072655` — aarohi_phase2_ops_fk_indexes
+- `20261003081215` — aarohi_full_fk_index_closeout
+- `20261012180214` — qf_vl01_vendor_assignment_update_authority_closeout_staging
+- `20261013053930` — vl05_scale_phase07_durable_jobs_hardening_staging
+- `20261013053959` — vl05_scale_phase12_horizontal_worker_claims_staging
+- `20261013144901` — vendor_profile_approval_atomic_v3_staging_20261013
+
+## Core versions without exact Staging ledger match
+- `20260620000001_create_tables`
+- `20260620000002_rls_policies`
+- `20260620000003_functions`
+- `20260620000004_seed_data`
+- `20260620000005_homepage_alignment`
+- `20260621000006_superadmin_foundation`
+- `20260622000007_vendor_location`
+- `20260624000008_lead_capture_consent`
+- `20260624000009_vendor_onboarding`
+- `20260624000010_vendor_exact_columns`
+- `20260624000011_vendor_office_address`
+- `20260627000012_aos_management_foundation`
+- `20260627000013_crm_analytics_foundation`
+- `20260628000014_aos_control_center_foundation`
+- `20260628000015_crm_analytics_foundation_safe_placeholders`
+- `20260630000016_aos_runtime_settings`
+- `20260630000017_lead_assignment_approvals`
+- `20260630000018_vendor_actions_credits_package_sync`
+- `20260630000019_assignment_ledger_snapshots`
+- `20260630000020_align_active_cities`
+- `20260630000021_category_governance`
+- `20260701000022_phase_25a_paid_only_auto_match_free_vendor_interest`
+- `20260701000023_vendor_package_orders`
+- `20260701000024_vendor_profile_change_requests`
+- `20260701000025_vendor_notifications_support`
+- `20260701000026_bad_lead_report_safety_fields`
+- `20260701000027_phase26a_auto_lead_matching_foundation`
+- `20260701000028_phase26a_live_schema_repair`
+- `20260701000029_phase26a2_admin_audit_hardening`
+- `20260701000030_phase26a2c_smart_override_assignment`
+- `20260701000031_phase26a2c_recovery_fallback_reporting`
+- `20260701000032_phase26a2d_client_requirement_groups`
+- `20260701000033_phase26a2e_preferred_vendor_recharge_window`
+- `20260702000034_fix_auto_match_category_mapping`
+- `20260702000035_preferred_vendor_lead_intent`
+- `20260702000037_fix_preferred_vendor_credit_direct_assignment`
+- `20260702000038_lead_quality_engine_phase1`
+- `20260702000039_b_lead_clarification_flow`
+- `20260704000040_google_area_location_foundation`
+- `20260704000100_align_lead_quality_status_constraints`
+- `20260704000110_lead_scores_security_hardening`
+- `20260705000130_distance_category_matching_rpc`
+- `20260706000140_vendor_accepting_leads`
+- `20260706000141_vendor_credit_wallet_rpc`
+- `20260706000142_credit_wallet_assignment_rpc`
+- `20260706000143_preferred_assignment_accepting_leads`
+- `20260706000144_manual_assignment_accepting_leads`
+- `20260706000145_package_purchase_idempotent_grant`
+- `20260706000146_create_qf_workflow_kernel_foundation`
+- `20260706000147_workflow_kernel_atomic_step`
+- `20260706000148_workflow_kernel_safety_hardening`
+- `20260706000149_workflow_kernel_retry_consistency`
+- `20260706000150_automation_policy_config_foundation`
+- `20260708000160_identity_security_foundation`
+- `20260708000170_unified_communication_core`
+- `20260708000180_vendor_authentication_foundation`
+- `20260708000190_client_whatsapp_otp_login_readiness`
+- `20260708000200_vendor_whatsapp_verification_password_reset`
+- `20260709000100_messaging_channel_provider_foundation`
+- `20260709000200_whatsapp_cloud_api_runtime_control`
+- `20260710000100_auth_transport_resilience_decision_foundation`
+- `20260711000100_whatsapp_inbound_message_foundation`
+- `20260711000200_communication_consent_evidence_and_state_hardening`
+- `20260712000300_communication_consent_command_writer_rpc`
+- `20260713000100_communication_consent_ack_intents`
+- `20260716000100_communication_provider_account_binding`
+- `20260720000100_communication_delivery_event_provider_account_required`
+- `20260721000100_communication_consent_ack_intent_provider_account_required`
+- `20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation`
+- `20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority`
+- `20260912010000_qf_vendor_package_razorpay_testmode`
+- `20260912020000_qf_package_scope_governance`
+- `20260912021527_qf_launch_pune_only_city_activation`
+- `20260912024734_qf_active_city_authority_hardening`
+- `20260912030000_qf_category_runtime_governance`
+- `20260912040000_qf_aos_v2_intelligence`
+- `20260912050000_qf_lead_generation_scope_lock`
+- `20260923170217_vendor_media_bucket`
+- `20260924183000_jarvis_os_operator_command_receipts`
+- `20260927113000_qf_client_journey_phase1_foundation`
+- `20260927150000_qf_client_journey_phase1_meta_qualification`
+- `20260929154156_shared_single_number_jarvis_access`
+- `20261001144025_qf_verified_location_geofence_straight_line`
+- `20261001153000_qf_multi_city_service_zone_authority`
+- `20261001154500_qf_city_market_runtime_controls`
+- `20261001165000_qf_admin_service_zone_boundary_control`
+- `20261002071500_vendor_fair_opportunity_distribution`
+- `20261002090000_vendor_fair_opportunity_group_reconcile`
+- `20261002091500_vendor_fair_opportunity_fk_indexes`
+- `20261003064500_aarohi_phase1_omnichannel_activation`
+- `20261003070000_aarohi_phase1_fk_indexes`
+- `20261003080000_aarohi_phase2_autonomous_acquisition`
+- `20261003081046_aarohi_full_fk_index_closeout`
+- `20261003083000_aarohi_phase2_scale_governance`
+- `20261003090000_aarohi_phase2_ops_control_analytics`
+- `20261003091000_aarohi_phase2_ops_fk_indexes`
+- `20261004190000_scale_phase07_durable_jobs_hardening`
+- `20261004190001_scale_phase08_matching_prefilter`
+- `20261004190002_scale_phase09_data_lifecycle`
+- `20261005160000_scale_phase12_horizontal_worker_claims`
+- `20261005200000_scale_phase14_agni_governance`
+- `20261005203000_scale_phase14_trace_context`
+- `20261006113000_scale_phase18_matching_slo`
+- `20261006113720_phase22_identity_portability`
+- `20261012080000_anisha_vendor_memory_consent_source`
+- `20261012100000_anisha_memory_purge_delivery`
+- `20261012213000_vendor_assignment_update_authority_closeout`
+
+## Mandatory DBA reconciliation before staging deployment
+
+Do not treat a filename mismatch as a missing migration or apply all 107 source-only files. First map staging-specific aliases, equivalent SQL content and superseding fixes to canonical history; independently verify effective tables, constraints, grants, role metadata, triggers, RPC signatures, migration ordering and rollback safety. The 7 foundational VOX SQL files are still quarantined; 23 candidates are uninstalled. Any migration must be individually promoted into a new reviewed signed plan, after verified baseline backup and nonproduction restore rehearsal. Neither this report nor the offline synthetic install authorizes managed changes.

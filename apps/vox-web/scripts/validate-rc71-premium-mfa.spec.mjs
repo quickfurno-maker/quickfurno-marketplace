@@ -1,0 +1,44 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const read=relative=>readFileSync(new URL(relative,import.meta.url),"utf8");
+const page=read("../app/mfa/page.tsx");
+const form=read("../app/mfa/form.tsx");
+const css=read("../app/mfa/mfa.css");
+const api=read("../app/api/auth/mfa/route.ts");
+test("VOX MFA is a branded, responsive, accessible full-viewport second-factor page",()=>{
+ assert.match(page,/import "\.\.\/login\/login\.css"/);
+ assert.match(page,/import "\.\/mfa\.css"/);
+ assert.match(page,/className="voxAuthPage voxMfaPage"/);
+ assert.match(page,/className="voxAuthCard voxMfaCard"/);
+ assert.match(page,/aria-labelledby="vox-mfa-heading"/);
+ assert.match(page,/STEP 02 \/ 02/);
+ assert.match(page,/withReturn\("\/mfa\/enroll",next\)/);
+ assert.match(css,/@media\(max-width:800px\)/);
+ assert.match(css,/@media\(max-width:450px\)/);
+ assert.match(css,/prefers-reduced-motion/);
+ assert.match(css,/voxMfaCodeField input:focus-visible/);
+});
+test("actual form retains exact 6-digit auth endpoint and safe return, never weakens MFA",()=>{
+ assert.match(form,/type="text"/);
+ assert.match(form,/inputMode="numeric"/);
+ assert.match(form,/autoComplete="one-time-code"/);
+ assert.match(form,/pattern="\[0-9\]\{6\}"/);
+ assert.match(form,/\^\[0-9\]\{6\}\$/);
+ assert.match(form,/e\.target\.value\.replace\(\/\\D\/g,""\)\.slice\(0,6\)/);
+ assert.match(form,/method:"POST",credentials:"same-origin",cache:"no-store"/);
+ assert.match(form,/fetch\("\/api\/auth\/mfa"/);
+ assert.match(form,/window\.location\.assign\(safeReturnPath\(next\)\?\?"\/operations"\)/);
+ assert.match(form,/disabled=\{busy\|\|!complete\}/);
+ assert.match(form,/role="alert"/);
+ assert.doesNotMatch(form,/localStorage|sessionStorage|console\.log|alert\(/);
+});
+test("unchanged Core MFA route still requires real verified authenticator and staging gate",()=>{
+ assert.match(api,/VOX_STAFF_PORTAL_ENABLED!=="staging"/);
+ assert.match(api,/allowedOrigin\(request\)/);
+ assert.match(api,/mfa\.listFactors\(\)/);
+ assert.match(api,/status==="verified"/);
+ assert.match(api,/verified\.length!==1/);
+ assert.match(api,/mfa\.challengeAndVerify/);
+ assert.match(api,/return safeJson\(\{ok:true,next:"operations"\}\)/);
+});

@@ -1,0 +1,22 @@
+name: VOX-20 Isolated PG17 Seven Migration Restore
+on:
+  pull_request:
+    paths:
+      - 'scripts/mvp/vox/validate-vox20-isolated-recovery.ps1'
+      - '.github/workflows/vox-20-pg17-recovery.yml'
+      - 'docs/vox/VOX-20-SYNTHETIC-RECOVERY.md'
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  isolated-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - shell: pwsh
+        run: ./scripts/mvp/vox/validate-vox20-isolated-recovery.ps1
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with: {node-version: '20.20.2'}
+      - run: |
+          node scripts/mvp/vox/validate-vox17-history-parity.mjs --self-test
+          node scripts/mvp/vox/validate-vox16c-staging-evidence.mjs

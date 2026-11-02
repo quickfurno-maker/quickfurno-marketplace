@@ -1,0 +1,1044 @@
+{
+  "schema": "qf.vox.to04g.readonly-migration-history.v1",
+  "capturedOn": "2026-10-15",
+  "source": "connected QuickFurno Supabase list_migrations, read-only; no SQL DDL",
+  "authorization": false,
+  "environments": {
+    "staging": {
+      "migrationEntries": 86,
+      "uniqueVersionCount": 86,
+      "uniqueNames": 84,
+      "duplicateNames": [
+        {
+          "name": "vendor_fair_opportunity_group_reconcile",
+          "versions": [
+            "20261002083321",
+            "20261002083346"
+          ]
+        },
+        {
+          "name": "vendor_fair_opportunity_fk_indexes",
+          "versions": [
+            "20261002083936",
+            "20261002085216"
+          ]
+        }
+      ],
+      "migrations": [
+        {
+          "version": "20260722000100",
+          "name": "qf_mvp_staging_baseline_269c9265"
+        },
+        {
+          "version": "20260723000100",
+          "name": "qf_mvp_marketplace_authority_foundation"
+        },
+        {
+          "version": "20260723000200",
+          "name": "qf_mvp_assignment_lineage_backfill"
+        },
+        {
+          "version": "20260723000300",
+          "name": "qf_mvp_canonical_assignment_authority"
+        },
+        {
+          "version": "20260723000400",
+          "name": "qf_mvp_lineage_append_only_grants"
+        },
+        {
+          "version": "20260723000500",
+          "name": "qf_mvp_assignment_universal_enforcement"
+        },
+        {
+          "version": "20260723000600",
+          "name": "qf_mvp_public_projection_privilege_hardening"
+        },
+        {
+          "version": "20260723000700",
+          "name": "qf_mvp_auth_user_onboarding_trigger"
+        },
+        {
+          "version": "20260723000800",
+          "name": "qf_mvp_legacy_assignment_rpc_execute_revocation"
+        },
+        {
+          "version": "20260723000900",
+          "name": "qf_mvp_credit_ledger_reconciliation_exception_register"
+        },
+        {
+          "version": "20260723001000",
+          "name": "qf_mvp_profiles_privilege_admin_role_cleanup"
+        },
+        {
+          "version": "20260723001100",
+          "name": "qf_mvp_vendor_crm_foundation"
+        },
+        {
+          "version": "20260723001200",
+          "name": "qf_mvp_vendor_segment_foundation"
+        },
+        {
+          "version": "20260723001300",
+          "name": "qf_mvp_vendor_campaign_foundation"
+        },
+        {
+          "version": "20260723001400",
+          "name": "qf_mvp_vendor_campaign_evidence_hardening"
+        },
+        {
+          "version": "20260728001500",
+          "name": "qf_mvp_vendor_campaign_execution_handoff_foundation"
+        },
+        {
+          "version": "20260728001600",
+          "name": "qf_mvp_frequency_policy_history_hardening"
+        },
+        {
+          "version": "20260801110000",
+          "name": "qf_mvp_automation_action_persistence"
+        },
+        {
+          "version": "20260801152049",
+          "name": "qf_mvp_automation_transport_replay_guard"
+        },
+        {
+          "version": "20260803000000",
+          "name": "qf_mvp_50_2c_lead_communication_recipient"
+        },
+        {
+          "version": "20260804000000",
+          "name": "qf_mvp_50_2d_automation_transport_completion_route"
+        },
+        {
+          "version": "20260805000000",
+          "name": "qf_mvp_50_2e_automation_transport_client_execution_route"
+        },
+        {
+          "version": "20260806000000",
+          "name": "qf_mvp_50_2_atomic_client_automation_producer"
+        },
+        {
+          "version": "20260807000000",
+          "name": "qf_mvp_50_2_execute_v1_reservation_ambiguity_repair"
+        },
+        {
+          "version": "20260808000000",
+          "name": "qf_mvp_50_2_fresh_claim_retry_wedge_repair"
+        },
+        {
+          "version": "20260808500000",
+          "name": "qf_mvp_50_3_automation_policy_config_foundation_bridge"
+        },
+        {
+          "version": "20260809000000",
+          "name": "qf_mvp_50_3_vendor_automation_producer"
+        },
+        {
+          "version": "20260810000000",
+          "name": "qf_mvp_50_4_campaign_recipient_automation"
+        },
+        {
+          "version": "20260811000000",
+          "name": "qf_mvp_50_3_50_4_family_aware_claim_routing"
+        },
+        {
+          "version": "20260812000000",
+          "name": "qf_mvp_50_5_automation_recovery_reconciliation"
+        },
+        {
+          "version": "20260813000000",
+          "name": "qf_mvp_40_13b_canary_activation_authority"
+        },
+        {
+          "version": "20260814000000",
+          "name": "qf_mvp_40_marketing_consent_writer"
+        },
+        {
+          "version": "20260815000000",
+          "name": "qf_mvp_75_01_matchcore_binding_rank_order"
+        },
+        {
+          "version": "20260816000000",
+          "name": "qf_mvp_75_02_geo_postgis_shortlist"
+        },
+        {
+          "version": "20260817000000",
+          "name": "qf_mvp_80_03_audit_logs_forward_repair"
+        },
+        {
+          "version": "20260904000000",
+          "name": "qf_mvp_82a_r0_whatsapp_inbox_realtime_publication"
+        },
+        {
+          "version": "20260905000000",
+          "name": "qf_mvp_50_6_automation_orphan_cancellation"
+        },
+        {
+          "version": "20260906000000",
+          "name": "qf_mvp_50_7_automation_stale_business_cancellation"
+        },
+        {
+          "version": "20260910060000",
+          "name": "qf_mvp_40_canary_quiesce_transition"
+        },
+        {
+          "version": "20260911000000",
+          "name": "qf_launch_security_closeout"
+        },
+        {
+          "version": "20260917000000",
+          "name": "aarohi_acquisition_crm_foundation"
+        },
+        {
+          "version": "20260918093000",
+          "name": "aarohi_anisha_vendor_crm_handoff"
+        },
+        {
+          "version": "20260918120000",
+          "name": "whatsapp_conversational_jarvis_foundation"
+        },
+        {
+          "version": "20260918180500",
+          "name": "jarvis_whatsapp_callback_replay_receipts"
+        },
+        {
+          "version": "20260919010000",
+          "name": "vendor_review_system"
+        },
+        {
+          "version": "20260921054654",
+          "name": "qf_audit_security_hardening"
+        },
+        {
+          "version": "20260921055639",
+          "name": "qf_audit_rpc_surface_hardening"
+        },
+        {
+          "version": "20260922120000",
+          "name": "false_ceiling_category"
+        },
+        {
+          "version": "20260926035801",
+          "name": "qf_jarvis_service_availability_deploy"
+        },
+        {
+          "version": "20260926035856",
+          "name": "qf_lead_drafts_deploy"
+        },
+        {
+          "version": "20260926045741",
+          "name": "qf_launch_pune_only_city_activation"
+        },
+        {
+          "version": "20260926045744",
+          "name": "qf_active_city_authority_hardening"
+        },
+        {
+          "version": "20260926045753",
+          "name": "qf_aos_v2_intelligence"
+        },
+        {
+          "version": "20260926045756",
+          "name": "qf_lead_generation_scope_lock"
+        },
+        {
+          "version": "20260926045759",
+          "name": "vendor_media_bucket"
+        },
+        {
+          "version": "20260926045802",
+          "name": "jarvis_os_operator_command_receipts"
+        },
+        {
+          "version": "20260926050242",
+          "name": "qf_phase2_staging_rls_initplan_parity"
+        },
+        {
+          "version": "20260927072347",
+          "name": "qf_client_journey_phase1_foundation"
+        },
+        {
+          "version": "20260927090306",
+          "name": "qf_client_journey_phase1_meta_qualification"
+        },
+        {
+          "version": "20260929094500",
+          "name": "qf_riya_qualification_worker_lane"
+        },
+        {
+          "version": "20260929161707",
+          "name": "shared_single_number_jarvis_access"
+        },
+        {
+          "version": "20261001151402",
+          "name": "qf_verified_location_geofence_straight_line"
+        },
+        {
+          "version": "20261001153730",
+          "name": "qf_multi_city_service_zone_authority"
+        },
+        {
+          "version": "20261001154754",
+          "name": "qf_city_market_runtime_controls"
+        },
+        {
+          "version": "20261001165444",
+          "name": "qf_admin_service_zone_boundary_control"
+        },
+        {
+          "version": "20261002040748",
+          "name": "vendor_v2_commercial_activation"
+        },
+        {
+          "version": "20261002043238",
+          "name": "vendor_v3_v5_operating_flow"
+        },
+        {
+          "version": "20261002044054",
+          "name": "vendor_v3_connection_delivery_gate"
+        },
+        {
+          "version": "20261002045022",
+          "name": "vendor_v3_v5_fk_indexes"
+        },
+        {
+          "version": "20261002052224",
+          "name": "vendor_v3_db_delivery_projection"
+        },
+        {
+          "version": "20261002080447",
+          "name": "vendor_fair_opportunity_distribution"
+        },
+        {
+          "version": "20261002083321",
+          "name": "vendor_fair_opportunity_group_reconcile"
+        },
+        {
+          "version": "20261002083346",
+          "name": "vendor_fair_opportunity_group_reconcile"
+        },
+        {
+          "version": "20261002083936",
+          "name": "vendor_fair_opportunity_fk_indexes"
+        },
+        {
+          "version": "20261002085216",
+          "name": "vendor_fair_opportunity_fk_indexes"
+        },
+        {
+          "version": "20261003034807",
+          "name": "aarohi_phase1_omnichannel_activation"
+        },
+        {
+          "version": "20261003040425",
+          "name": "aarohi_phase1_fk_indexes"
+        },
+        {
+          "version": "20261003072042",
+          "name": "aarohi_phase2_autonomous_acquisition"
+        },
+        {
+          "version": "20261003072049",
+          "name": "aarohi_phase2_scale_governance"
+        },
+        {
+          "version": "20261003072056",
+          "name": "aarohi_phase2_ops_control_analytics"
+        },
+        {
+          "version": "20261003072655",
+          "name": "aarohi_phase2_ops_fk_indexes"
+        },
+        {
+          "version": "20261003081215",
+          "name": "aarohi_full_fk_index_closeout"
+        },
+        {
+          "version": "20261012180214",
+          "name": "qf_vl01_vendor_assignment_update_authority_closeout_staging"
+        },
+        {
+          "version": "20261013053930",
+          "name": "vl05_scale_phase07_durable_jobs_hardening_staging"
+        },
+        {
+          "version": "20261013053959",
+          "name": "vl05_scale_phase12_horizontal_worker_claims_staging"
+        },
+        {
+          "version": "20261013144901",
+          "name": "vendor_profile_approval_atomic_v3_staging_20261013"
+        }
+      ]
+    },
+    "production": {
+      "migrationEntries": 86,
+      "uniqueVersionCount": 86,
+      "uniqueNames": 86,
+      "duplicateNames": [],
+      "migrations": [
+        {
+          "version": "20260624095535",
+          "name": "sync_vendor_onboarding_fields"
+        },
+        {
+          "version": "20260713000100",
+          "name": "communication_consent_ack_intents"
+        },
+        {
+          "version": "20260716000100",
+          "name": "communication_provider_account_binding"
+        },
+        {
+          "version": "20260720000100",
+          "name": "communication_delivery_event_provider_account_required"
+        },
+        {
+          "version": "20260801085625",
+          "name": "communication_consent_ack_intent_provider_account_required"
+        },
+        {
+          "version": "20260801090009",
+          "name": "qf_prod_baseline_marketplace_authority_foundation"
+        },
+        {
+          "version": "20260801090125",
+          "name": "qf_prod_baseline_assignment_lineage_backfill"
+        },
+        {
+          "version": "20260801090406",
+          "name": "qf_prod_baseline_canonical_assignment_authority"
+        },
+        {
+          "version": "20260801090504",
+          "name": "qf_prod_baseline_lineage_append_only_grants"
+        },
+        {
+          "version": "20260801100000",
+          "name": "qf_prod_baseline_b2_c_d_atomic_reconciliation"
+        },
+        {
+          "version": "20260801100100",
+          "name": "qf_prod_baseline_legacy_assignment_rpc_execute_revocation"
+        },
+        {
+          "version": "20260801100200",
+          "name": "qf_prod_baseline_credit_ledger_reconciliation_exception_register"
+        },
+        {
+          "version": "20260801100300",
+          "name": "qf_prod_baseline_profiles_privilege_admin_role_cleanup"
+        },
+        {
+          "version": "20260801100400",
+          "name": "qf_prod_baseline_vendor_crm_foundation"
+        },
+        {
+          "version": "20260801100500",
+          "name": "qf_prod_baseline_vendor_segment_foundation"
+        },
+        {
+          "version": "20260801100600",
+          "name": "qf_prod_baseline_vendor_campaign_foundation"
+        },
+        {
+          "version": "20260801100700",
+          "name": "qf_prod_baseline_vendor_campaign_evidence_hardening"
+        },
+        {
+          "version": "20260801100800",
+          "name": "qf_prod_baseline_vendor_campaign_execution_handoff_foundation"
+        },
+        {
+          "version": "20260801100900",
+          "name": "qf_prod_baseline_frequency_policy_history_hardening"
+        },
+        {
+          "version": "20260801110000",
+          "name": "qf_mvp_automation_action_persistence"
+        },
+        {
+          "version": "20260801152049",
+          "name": "qf_mvp_automation_transport_replay_guard"
+        },
+        {
+          "version": "20260803000000",
+          "name": "qf_mvp_50_2c_lead_communication_recipient"
+        },
+        {
+          "version": "20260804000000",
+          "name": "qf_mvp_50_2d_automation_transport_completion_route"
+        },
+        {
+          "version": "20260805000000",
+          "name": "qf_mvp_50_2e_automation_transport_client_execution_route"
+        },
+        {
+          "version": "20260806000000",
+          "name": "qf_mvp_50_2_atomic_client_automation_producer"
+        },
+        {
+          "version": "20260807000000",
+          "name": "qf_mvp_50_2_execute_v1_reservation_ambiguity_repair"
+        },
+        {
+          "version": "20260808000000",
+          "name": "qf_mvp_50_2_fresh_claim_retry_wedge_repair"
+        },
+        {
+          "version": "20260808500000",
+          "name": "qf_mvp_50_3_automation_policy_config_foundation_bridge"
+        },
+        {
+          "version": "20260809000000",
+          "name": "qf_mvp_50_3_vendor_automation_producer"
+        },
+        {
+          "version": "20260810000000",
+          "name": "qf_mvp_50_4_campaign_recipient_automation"
+        },
+        {
+          "version": "20260811000000",
+          "name": "qf_mvp_50_3_50_4_family_aware_claim_routing"
+        },
+        {
+          "version": "20260812000000",
+          "name": "qf_mvp_50_5_automation_recovery_reconciliation"
+        },
+        {
+          "version": "20260813000000",
+          "name": "qf_mvp_40_13b_canary_activation_authority"
+        },
+        {
+          "version": "20260814000000",
+          "name": "qf_mvp_40_marketing_consent_writer"
+        },
+        {
+          "version": "20260815000000",
+          "name": "qf_mvp_75_01_matchcore_binding_rank_order"
+        },
+        {
+          "version": "20260816000000",
+          "name": "qf_mvp_75_02_geo_postgis_shortlist"
+        },
+        {
+          "version": "20260817000000",
+          "name": "qf_mvp_80_03_audit_logs_forward_repair"
+        },
+        {
+          "version": "20260903040000",
+          "name": "qf_mvp_80_14a_meta_lead_assignment_production_activation"
+        },
+        {
+          "version": "20260904000000",
+          "name": "qf_mvp_82a_r0_whatsapp_inbox_realtime_publication"
+        },
+        {
+          "version": "20260905000000",
+          "name": "qf_mvp_50_6_automation_orphan_cancellation"
+        },
+        {
+          "version": "20260906000000",
+          "name": "qf_mvp_50_7_automation_stale_business_cancellation"
+        },
+        {
+          "version": "20260910060000",
+          "name": "qf_mvp_40_canary_quiesce_transition"
+        },
+        {
+          "version": "20260911000000",
+          "name": "qf_launch_security_closeout"
+        },
+        {
+          "version": "20260912000000",
+          "name": "qf_mvp_40_14_meta_transactional_mapping_authority"
+        },
+        {
+          "version": "20260912021527",
+          "name": "qf_launch_pune_only_city_activation"
+        },
+        {
+          "version": "20260912024734",
+          "name": "qf_active_city_authority_hardening"
+        },
+        {
+          "version": "20260912040000",
+          "name": "qf_aos_v2_intelligence"
+        },
+        {
+          "version": "20260912050000",
+          "name": "qf_lead_generation_scope_lock"
+        },
+        {
+          "version": "20260917000000",
+          "name": "aarohi_acquisition_crm_foundation"
+        },
+        {
+          "version": "20260918093000",
+          "name": "aarohi_anisha_vendor_crm_handoff"
+        },
+        {
+          "version": "20260918120000",
+          "name": "whatsapp_conversational_jarvis_foundation"
+        },
+        {
+          "version": "20260918180500",
+          "name": "jarvis_whatsapp_callback_replay_receipts"
+        },
+        {
+          "version": "20260919010000",
+          "name": "vendor_review_system"
+        },
+        {
+          "version": "20260921054654",
+          "name": "qf_audit_security_hardening"
+        },
+        {
+          "version": "20260921055639",
+          "name": "qf_audit_rpc_surface_hardening"
+        },
+        {
+          "version": "20260922120000",
+          "name": "false_ceiling_category"
+        },
+        {
+          "version": "20260923170217",
+          "name": "vendor_media_bucket"
+        },
+        {
+          "version": "20260924183000",
+          "name": "jarvis_os_operator_command_receipts"
+        },
+        {
+          "version": "20260926035801",
+          "name": "qf_jarvis_service_availability_deploy"
+        },
+        {
+          "version": "20260926035856",
+          "name": "qf_lead_drafts_deploy"
+        },
+        {
+          "version": "20260927090616",
+          "name": "qf_client_journey_phase1_foundation"
+        },
+        {
+          "version": "20260927090636",
+          "name": "qf_client_journey_phase1_meta_qualification"
+        },
+        {
+          "version": "20260929094500",
+          "name": "qf_riya_qualification_worker_lane"
+        },
+        {
+          "version": "20260929161730",
+          "name": "shared_single_number_jarvis_access"
+        },
+        {
+          "version": "20261001160619",
+          "name": "qf_verified_location_geofence_straight_line"
+        },
+        {
+          "version": "20261001160623",
+          "name": "qf_multi_city_service_zone_authority"
+        },
+        {
+          "version": "20261001160628",
+          "name": "qf_city_market_runtime_controls"
+        },
+        {
+          "version": "20261001165959",
+          "name": "qf_admin_service_zone_boundary_control"
+        },
+        {
+          "version": "20261002051159",
+          "name": "vendor_v2_commercial_activation"
+        },
+        {
+          "version": "20261002051212",
+          "name": "vendor_v3_v5_operating_flow"
+        },
+        {
+          "version": "20261002051224",
+          "name": "vendor_v3_connection_delivery_gate"
+        },
+        {
+          "version": "20261002051237",
+          "name": "vendor_v3_v5_fk_indexes"
+        },
+        {
+          "version": "20261002052453",
+          "name": "vendor_v3_db_delivery_projection"
+        },
+        {
+          "version": "20261002102901",
+          "name": "vendor_fair_opportunity_distribution"
+        },
+        {
+          "version": "20261002102915",
+          "name": "vendor_fair_opportunity_group_reconcile"
+        },
+        {
+          "version": "20261002102931",
+          "name": "vendor_fair_opportunity_fk_indexes"
+        },
+        {
+          "version": "20261003093614",
+          "name": "aarohi_phase1_omnichannel_activation"
+        },
+        {
+          "version": "20261003093620",
+          "name": "aarohi_phase1_fk_indexes"
+        },
+        {
+          "version": "20261003093626",
+          "name": "aarohi_phase2_autonomous_acquisition"
+        },
+        {
+          "version": "20261003093630",
+          "name": "aarohi_full_fk_index_closeout"
+        },
+        {
+          "version": "20261003093637",
+          "name": "aarohi_phase2_scale_governance"
+        },
+        {
+          "version": "20261003093643",
+          "name": "aarohi_phase2_ops_control_analytics"
+        },
+        {
+          "version": "20261003093648",
+          "name": "aarohi_phase2_ops_fk_indexes"
+        },
+        {
+          "version": "20261008174333",
+          "name": "scale_phase12_horizontal_worker_claims"
+        },
+        {
+          "version": "20261008174802",
+          "name": "scale_phase07_durable_jobs_hardening"
+        },
+        {
+          "version": "20261012181000",
+          "name": "qf_vl01_vendor_assignment_update_authority_closeout_production"
+        }
+      ]
+    }
+  },
+  "comparison": {
+    "sharedExactVersions": 34,
+    "sharedExactVersionAndName": 34,
+    "sharedDistinctNames": 62,
+    "sharedNameDifferentVersion": 28,
+    "sharedNameDifferentVersionEntries": [
+      {
+        "name": "qf_launch_pune_only_city_activation",
+        "stagingVersions": [
+          "20260926045741"
+        ],
+        "productionVersions": [
+          "20260912021527"
+        ]
+      },
+      {
+        "name": "qf_active_city_authority_hardening",
+        "stagingVersions": [
+          "20260926045744"
+        ],
+        "productionVersions": [
+          "20260912024734"
+        ]
+      },
+      {
+        "name": "qf_aos_v2_intelligence",
+        "stagingVersions": [
+          "20260926045753"
+        ],
+        "productionVersions": [
+          "20260912040000"
+        ]
+      },
+      {
+        "name": "qf_lead_generation_scope_lock",
+        "stagingVersions": [
+          "20260926045756"
+        ],
+        "productionVersions": [
+          "20260912050000"
+        ]
+      },
+      {
+        "name": "vendor_media_bucket",
+        "stagingVersions": [
+          "20260926045759"
+        ],
+        "productionVersions": [
+          "20260923170217"
+        ]
+      },
+      {
+        "name": "jarvis_os_operator_command_receipts",
+        "stagingVersions": [
+          "20260926045802"
+        ],
+        "productionVersions": [
+          "20260924183000"
+        ]
+      },
+      {
+        "name": "qf_client_journey_phase1_foundation",
+        "stagingVersions": [
+          "20260927072347"
+        ],
+        "productionVersions": [
+          "20260927090616"
+        ]
+      },
+      {
+        "name": "qf_client_journey_phase1_meta_qualification",
+        "stagingVersions": [
+          "20260927090306"
+        ],
+        "productionVersions": [
+          "20260927090636"
+        ]
+      },
+      {
+        "name": "shared_single_number_jarvis_access",
+        "stagingVersions": [
+          "20260929161707"
+        ],
+        "productionVersions": [
+          "20260929161730"
+        ]
+      },
+      {
+        "name": "qf_verified_location_geofence_straight_line",
+        "stagingVersions": [
+          "20261001151402"
+        ],
+        "productionVersions": [
+          "20261001160619"
+        ]
+      },
+      {
+        "name": "qf_multi_city_service_zone_authority",
+        "stagingVersions": [
+          "20261001153730"
+        ],
+        "productionVersions": [
+          "20261001160623"
+        ]
+      },
+      {
+        "name": "qf_city_market_runtime_controls",
+        "stagingVersions": [
+          "20261001154754"
+        ],
+        "productionVersions": [
+          "20261001160628"
+        ]
+      },
+      {
+        "name": "qf_admin_service_zone_boundary_control",
+        "stagingVersions": [
+          "20261001165444"
+        ],
+        "productionVersions": [
+          "20261001165959"
+        ]
+      },
+      {
+        "name": "vendor_v2_commercial_activation",
+        "stagingVersions": [
+          "20261002040748"
+        ],
+        "productionVersions": [
+          "20261002051159"
+        ]
+      },
+      {
+        "name": "vendor_v3_v5_operating_flow",
+        "stagingVersions": [
+          "20261002043238"
+        ],
+        "productionVersions": [
+          "20261002051212"
+        ]
+      },
+      {
+        "name": "vendor_v3_connection_delivery_gate",
+        "stagingVersions": [
+          "20261002044054"
+        ],
+        "productionVersions": [
+          "20261002051224"
+        ]
+      },
+      {
+        "name": "vendor_v3_v5_fk_indexes",
+        "stagingVersions": [
+          "20261002045022"
+        ],
+        "productionVersions": [
+          "20261002051237"
+        ]
+      },
+      {
+        "name": "vendor_v3_db_delivery_projection",
+        "stagingVersions": [
+          "20261002052224"
+        ],
+        "productionVersions": [
+          "20261002052453"
+        ]
+      },
+      {
+        "name": "vendor_fair_opportunity_distribution",
+        "stagingVersions": [
+          "20261002080447"
+        ],
+        "productionVersions": [
+          "20261002102901"
+        ]
+      },
+      {
+        "name": "vendor_fair_opportunity_group_reconcile",
+        "stagingVersions": [
+          "20261002083321",
+          "20261002083346"
+        ],
+        "productionVersions": [
+          "20261002102915"
+        ]
+      },
+      {
+        "name": "vendor_fair_opportunity_fk_indexes",
+        "stagingVersions": [
+          "20261002083936",
+          "20261002085216"
+        ],
+        "productionVersions": [
+          "20261002102931"
+        ]
+      },
+      {
+        "name": "aarohi_phase1_omnichannel_activation",
+        "stagingVersions": [
+          "20261003034807"
+        ],
+        "productionVersions": [
+          "20261003093614"
+        ]
+      },
+      {
+        "name": "aarohi_phase1_fk_indexes",
+        "stagingVersions": [
+          "20261003040425"
+        ],
+        "productionVersions": [
+          "20261003093620"
+        ]
+      },
+      {
+        "name": "aarohi_phase2_autonomous_acquisition",
+        "stagingVersions": [
+          "20261003072042"
+        ],
+        "productionVersions": [
+          "20261003093626"
+        ]
+      },
+      {
+        "name": "aarohi_phase2_scale_governance",
+        "stagingVersions": [
+          "20261003072049"
+        ],
+        "productionVersions": [
+          "20261003093637"
+        ]
+      },
+      {
+        "name": "aarohi_phase2_ops_control_analytics",
+        "stagingVersions": [
+          "20261003072056"
+        ],
+        "productionVersions": [
+          "20261003093643"
+        ]
+      },
+      {
+        "name": "aarohi_phase2_ops_fk_indexes",
+        "stagingVersions": [
+          "20261003072655"
+        ],
+        "productionVersions": [
+          "20261003093648"
+        ]
+      },
+      {
+        "name": "aarohi_full_fk_index_closeout",
+        "stagingVersions": [
+          "20261003081215"
+        ],
+        "productionVersions": [
+          "20261003093630"
+        ]
+      }
+    ],
+    "stagingOnlyNames": [
+      "qf_mvp_staging_baseline_269c9265",
+      "qf_mvp_marketplace_authority_foundation",
+      "qf_mvp_assignment_lineage_backfill",
+      "qf_mvp_canonical_assignment_authority",
+      "qf_mvp_lineage_append_only_grants",
+      "qf_mvp_assignment_universal_enforcement",
+      "qf_mvp_public_projection_privilege_hardening",
+      "qf_mvp_auth_user_onboarding_trigger",
+      "qf_mvp_legacy_assignment_rpc_execute_revocation",
+      "qf_mvp_credit_ledger_reconciliation_exception_register",
+      "qf_mvp_profiles_privilege_admin_role_cleanup",
+      "qf_mvp_vendor_crm_foundation",
+      "qf_mvp_vendor_segment_foundation",
+      "qf_mvp_vendor_campaign_foundation",
+      "qf_mvp_vendor_campaign_evidence_hardening",
+      "qf_mvp_vendor_campaign_execution_handoff_foundation",
+      "qf_mvp_frequency_policy_history_hardening",
+      "qf_phase2_staging_rls_initplan_parity",
+      "qf_vl01_vendor_assignment_update_authority_closeout_staging",
+      "vl05_scale_phase07_durable_jobs_hardening_staging",
+      "vl05_scale_phase12_horizontal_worker_claims_staging",
+      "vendor_profile_approval_atomic_v3_staging_20261013"
+    ],
+    "productionOnlyNames": [
+      "sync_vendor_onboarding_fields",
+      "communication_consent_ack_intents",
+      "communication_provider_account_binding",
+      "communication_delivery_event_provider_account_required",
+      "communication_consent_ack_intent_provider_account_required",
+      "qf_prod_baseline_marketplace_authority_foundation",
+      "qf_prod_baseline_assignment_lineage_backfill",
+      "qf_prod_baseline_canonical_assignment_authority",
+      "qf_prod_baseline_lineage_append_only_grants",
+      "qf_prod_baseline_b2_c_d_atomic_reconciliation",
+      "qf_prod_baseline_legacy_assignment_rpc_execute_revocation",
+      "qf_prod_baseline_credit_ledger_reconciliation_exception_register",
+      "qf_prod_baseline_profiles_privilege_admin_role_cleanup",
+      "qf_prod_baseline_vendor_crm_foundation",
+      "qf_prod_baseline_vendor_segment_foundation",
+      "qf_prod_baseline_vendor_campaign_foundation",
+      "qf_prod_baseline_vendor_campaign_evidence_hardening",
+      "qf_prod_baseline_vendor_campaign_execution_handoff_foundation",
+      "qf_prod_baseline_frequency_policy_history_hardening",
+      "qf_mvp_80_14a_meta_lead_assignment_production_activation",
+      "qf_mvp_40_14_meta_transactional_mapping_authority",
+      "scale_phase12_horizontal_worker_claims",
+      "scale_phase07_durable_jobs_hardening",
+      "qf_vl01_vendor_assignment_update_authority_closeout_production"
+    ],
+    "sharedVersionDifferentName": []
+  },
+  "dbReviewerAccepted": false,
+  "sqlContentHashesVerified": false,
+  "isolatedRestoreVerified": false,
+  "ready": false
+}

@@ -1,0 +1,24 @@
+name: VOX TO-02F Work HTTP Guard - No Deployment
+on:
+  pull_request:
+    paths:
+      - 'app/api/vox/v1/work-transitions/**'
+      - 'scripts/mvp/vox/validate-to02f-work-http.test.mjs'
+      - 'ops/vox/sql-candidates/*vox_to02e_work_queue_atomic_candidate.sql'
+      - '.github/workflows/vox-to02f-work-http.yml'
+permissions:
+  contents: read
+jobs:
+  work-bearer-and-command-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: node --test scripts/mvp/vox/validate-to02f-work-http.test.mjs
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck

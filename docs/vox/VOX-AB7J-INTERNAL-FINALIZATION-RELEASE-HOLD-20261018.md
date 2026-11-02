@@ -1,0 +1,21 @@
+# VOX AB-7J: Internal engineering integration and outstanding certification gates
+
+**Parent:** source-certified AB-7I integrated draft [#373](https://github.com/quickfurno-maker/quickfurno-marketplace/pull/373) exact SHA `49a282d23dd04d3a479c163fed48e60b4fe0ee14`. Worktrees independent, draft/unmerged; no live deployment.
+
+## Actual AB-7J source changes
+
+**Database reconciliation (DB):** `contracts/vox/ab7jNativeReleaseManifest.mjs` computes the exact byte-level SHA-256 for the **six** latest native Core SQL candidates; reports source completeness, hashes, pending reviewed rollback; `releaseReady:false` and `canApply:false` by design. The managed Staging read-only inspection has native Core communication tables and **zero public VOX tables**; real source-to-database reconciliation, migration dependency ordering and a signed DBA rollback are P0. No SQL was installed.
+
+**Independent Staff (ID):** `ops/vox/sql-candidates/20261018120000_vox_ab7j_two_person_staff_suspend_candidate.sql` adds true user-authenticated, AAL2-gated **two-step** Staff suspension issuance: active Core Owner proposes target/team/city/nonce/digest; a separate currently active neutral Team Leader AAL2 identity confirms the same request within ten minutes. Supabase `auth.uid()` and `auth.jwt()` bind the authenticated identities; caller-supplied Owner UUID alone cannot approve. The existing Core atomic suspension SQL checks the resulting separate attestation. No service_role or anonymous invocation is granted for these issuance functions; no direct table INSERT. Offline PostgreSQL17 executed these functions with simulated PostgREST claims (synthetic **AAL2 fixtures, not real user MFA**), rejecting Owner AAL1, wrong reviewer and service_role, then verified exact Owner/TL transition and atomic suspension. Production/staging untouched.
+
+**Jarvis signed command receipt (AGENT):** `services/jarvisOperatorCommandService.ts` now leaves signed staging STOP commands `CLAIMED` (rather than `FINALIZED UNAVAILABLE`) while separate human review is outstanding, and permits only the **exact same cryptographically authenticated M2M bytes/idempotency key** to retry. Subsequent reviewed Core SQL executes a single atomic PAUSE/TAKEOVER event/nonce; FINALIZED receipt replays return the exact cached result, never a second DB write or legacy split writer. Uncertain Core RPC outcomes remain held for supervised reconciliation; no automatic AI resume/provider sends. Existing production path remains unchanged while stage flag OFF.
+
+**Operational worker (OPS):** `worker/voxAb7jSignedInternalOnce.mjs` is a genuinely callable **single** bounded internal-only Core queue cycle, built on existing reviewed Core worker RPCs, gated by pinned Ed25519 signed independent reviewer manifest + exact immutable release SHA + current Owner AAL2 + installed schema fingerprint + no-provider verification. On verified source-only test evidence, runs at most a 5-job internal cycle with sanitized advisory AGNI health. No scheduler/cron/VPS process, real managed SQL, live Push/WhatsApp or autonomous AGNI action enabled. No unsupported production certification.
+
+## QA / unchanged release stops
+
+AB-7J focused Node tests include true synthetic signed manifest and transport, two-person review source, signed Jarvis PENDING->APPROVED->FINAL retry; integrated Core, Web, offline PostgreSQL17, TypeScript and build still require exact-head certification. The isolated PG17 suite includes six native DDL candidates and genuine synthetic AAL2 two-party user-authenticated approval/Staff revocation, replay and rollback.
+
+**RELEASE HOLD:** all SQL candidates remain under `ops/vox/sql-candidates` and uninstalled. No real Staff user/MFA, independently reviewed bootstrap first TL, actual auth.admin signOut or session invalidation, genuine reviewer signatures/keys, staging deployment, customer messages, official EOD publication, VPS worker start or production mutation occurred. DBA/AppSec/Cursor independent review, reviewed staged migration order/RLS/grants/rollback, signed release, genuine first TL/Owner AAL2, current consent/suppression and authenticated E2E remain necessary. The owner must approve protected actions separately. All PRs draft/unmerged.
+
+This closes substantial **internal source engineering**, not operational activation or launch certification.

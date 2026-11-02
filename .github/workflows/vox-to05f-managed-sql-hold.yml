@@ -1,0 +1,32 @@
+name: VOX-05F Auto-Apply SQL Source Inventory and Release HOLD
+on:
+  pull_request:
+    paths:
+      - 'ops/vox/quarantined-migrations/legacy-20261014/*vox*.sql'
+      - 'supabase/migrations/*.sql'
+      - 'ops/vox/sql-candidates/*vox*.sql'
+      - 'ops/vox/certification/VOX-PR300-MANAGED-SQL-RELEASE-HOLD.json'
+      - 'scripts/mvp/vox/*pr300-managed-migration*'
+      - '.github/workflows/vox-to05f-managed-sql-hold.yml'
+permissions:
+  contents: read
+jobs:
+  fail-closed-exact-git-sql-provenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: node --test scripts/mvp/vox/validate-pr300-managed-migration-hold.test.mjs
+      - name: No approval or real Supabase restore means release check must exit 42
+        shell: bash
+        run: |
+          set +e
+          node scripts/mvp/vox/verify-pr300-managed-migration-hold.mjs --release-check
+          CODE=$?
+          set -e
+          test "$CODE" -eq 42

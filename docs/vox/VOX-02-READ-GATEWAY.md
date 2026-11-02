@@ -1,0 +1,7 @@
+# VOX-02 Core owner read gateway
+
+This endpoint is source-only, not deployed. `GET /api/vox/v1/overview` requires Supabase Auth server `getUser(token)` success, a freshly nonexpired JWT claim of AAL2 matching `user.id`, a Core profile with `role=admin` and `is_active=true`, and an `app_metadata.admin_role=Superadmin`. No client-provided role or decoded JWT alone is trusted. Delegated staff are denied until scoped authorization is separately certified.
+
+The route performs four separate, server-side limited 8-row reads over **existing** Aarohi prospects, Vendor CRM, vendor support and human-takeover conversations; strict projection excludes phones, message bodies, sensitive notes, wallet and payment data. All mutation methods 405; no-store and safe 401/503 errors. `services/vox/verifiedStaffBearer.ts` keeps privileged key in Core only. The independent VOX app is configured with public/anon Supabase credential only and requests data via server-side HTTPS Bearer proxy after revalidating AAL2.
+
+`node scripts/mvp/vox/validate-vox-00-adapters.mjs` 20/20 PASS. `node scripts/mvp/vox/validate-vox-02-overview.mjs` 13/13 PASS. No genuine live-authenticated roundtrip, no Staging deploy, no MFA enrollment or city/team staff grant is represented by these tests. Owner-only first slice; preserve Core matching/credits authority and Jarvis memory/outbound boundaries. Staging E2E and QA required before activating.

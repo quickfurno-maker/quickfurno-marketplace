@@ -1,0 +1,23 @@
+name: VOX-15 private staging source preflight
+on:
+  pull_request:
+    paths:
+      - 'scripts/mvp/vox/validate-vox15-staging-preflight.mjs'
+      - 'docs/vox/VOX-15-STAGING-PREFLIGHT.md'
+      - '.github/workflows/vox-15-staging-preflight.yml'
+      - 'supabase/migrations/*vox*.sql'
+      - 'supabase/staging-history/qf-post-g1-migration-ledger-20260929.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-only-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with: { node-version: '20.20.2' }
+      - run: |
+          node scripts/mvp/vox/validate-vox15-staging-preflight.mjs
+          node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs

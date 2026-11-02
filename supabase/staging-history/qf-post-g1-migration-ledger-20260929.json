@@ -702,6 +702,90 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-10-12_DISPOSABLE_LOCAL_PG_CERTIFIED_6_OF_6_NO_REMOTE_APPLY"
+    },
+    {
+      "version": "20261014010000",
+      "name": "vox_v1_scoped_staff_authority",
+      "filename": "20261014010000_vox_v1_scoped_staff_authority.sql",
+      "path": "supabase/migrations/20261014010000_vox_v1_scoped_staff_authority.sql",
+      "canonicalSha256": "a5d0da20590b178b5e0aaff5045fe9957e367f9396baea4e86222bcc7d076c4c",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"
+    },
+    {
+      "version": "20261014020000",
+      "name": "vox_v1_staff_review_workflow",
+      "filename": "20261014020000_vox_v1_staff_review_workflow.sql",
+      "path": "supabase/migrations/20261014020000_vox_v1_staff_review_workflow.sql",
+      "canonicalSha256": "4f7bb561c4aa7203e11a69672017fe97447a95a6c59ada5c8cfe24ffdd1ad166",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"
+    },
+    {
+      "version": "20261014030000",
+      "name": "vox_v1_approved_grant_finalizer",
+      "filename": "20261014030000_vox_v1_approved_grant_finalizer.sql",
+      "path": "supabase/migrations/20261014030000_vox_v1_approved_grant_finalizer.sql",
+      "canonicalSha256": "1a556c638b9dfe038bdb9cf951e4ee4689c362e5632789c1b97edcd86439184a",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"
+    },
+    {
+      "version": "20261014040000",
+      "name": "vox_v1_staff_emergency_revocation",
+      "filename": "20261014040000_vox_v1_staff_emergency_revocation.sql",
+      "path": "supabase/migrations/20261014040000_vox_v1_staff_emergency_revocation.sql",
+      "canonicalSha256": "fb68eec0f7a7ee2ea097461522aba7fbe3d239c112fc3ccffedbfbb68659934e",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"
+    },
+    {
+      "version": "20261014050000",
+      "name": "vox_v1_team_leader_review_policy",
+      "filename": "20261014050000_vox_v1_team_leader_review_policy.sql",
+      "path": "supabase/migrations/20261014050000_vox_v1_team_leader_review_policy.sql",
+      "canonicalSha256": "b1423c1135891610ee6e55709fc088598678f8ee59a58fd9d80f732f481fe7e9",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"
+    },
+    {
+      "version": "20261014060000",
+      "name": "vox_operational_intent_review",
+      "filename": "20261014060000_vox_operational_intent_review.sql",
+      "path": "supabase/migrations/20261014060000_vox_operational_intent_review.sql",
+      "canonicalSha256": "6484c66d9eec6ca699414ec97fc50962e22b685949d280ce3c2d2aeb21fa8dfb",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"
+    },
+    {
+      "version": "20261014070000",
+      "name": "vox_approved_followup_executor",
+      "filename": "20261014070000_vox_approved_followup_executor.sql",
+      "path": "supabase/migrations/20261014070000_vox_approved_followup_executor.sql",
+      "canonicalSha256": "454fb0c07ca7589962eddaffa0001a9a2a7562a3304d70da8e091a0499918f01",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"
     }
   ],
   "supersededLegacyPins": [

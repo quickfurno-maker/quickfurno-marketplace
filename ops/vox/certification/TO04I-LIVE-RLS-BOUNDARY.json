@@ -1,0 +1,119 @@
+{
+  "schema": "qf.vox.to04i.live-core-rls-readonly.v1",
+  "observedDate": "2026-10-15",
+  "source": "Supabase read-only pg_class, privilege and pg_policies metadata on connected QuickFurno projects",
+  "containsBusinessRows": false,
+  "staging": {
+    "vendor_support_threads": {
+      "rls": true,
+      "hasAnonymousPolicy": false,
+      "hasOwnerAndAdminPredicates": true,
+      "grants": {
+        "anon": {
+          "select": false,
+          "insert": false,
+          "update": false,
+          "delete": false
+        },
+        "authenticated": {
+          "select": false,
+          "insert": false,
+          "update": false,
+          "delete": false
+        },
+        "service_role": {
+          "select": true,
+          "insert": true,
+          "update": true,
+          "delete": true
+        }
+      }
+    },
+    "vendor_public_v": {
+      "selectAnon": true,
+      "selectAuthenticated": true,
+      "securityInvoker": false,
+      "owner": "postgres",
+      "approvedOnly": true,
+      "activeOnly": true,
+      "publicVisibilityRequired": true,
+      "positiveCreditsRequired": true
+    },
+    "helperFunctions": {
+      "is_admin": {
+        "securityDefiner": true,
+        "authExecutable": true,
+        "anonExecutable": false,
+        "usesAuthUid": true
+      },
+      "owns_vendor": {
+        "securityDefiner": true,
+        "authExecutable": true,
+        "anonExecutable": false,
+        "usesAuthUid": true
+      }
+    }
+  },
+  "production": {
+    "vendor_support_threads": {
+      "rls": true,
+      "hasAnonymousPolicy": false,
+      "hasOwnerAndAdminPredicates": true,
+      "grants": {
+        "anon": {
+          "select": true,
+          "insert": true,
+          "update": true,
+          "delete": true
+        },
+        "authenticated": {
+          "select": true,
+          "insert": true,
+          "update": true,
+          "delete": true
+        },
+        "service_role": {
+          "select": true,
+          "insert": true,
+          "update": true,
+          "delete": true
+        }
+      }
+    },
+    "vendor_public_v": {
+      "selectAnon": true,
+      "selectAuthenticated": true,
+      "securityInvoker": false,
+      "owner": "postgres",
+      "approvedOnly": true,
+      "activeOnly": true,
+      "publicVisibilityRequired": true,
+      "positiveCreditsRequired": true
+    },
+    "helperFunctions": {
+      "is_admin": {
+        "securityDefiner": true,
+        "authExecutable": true,
+        "anonExecutable": false,
+        "usesAuthUid": true
+      },
+      "owns_vendor": {
+        "securityDefiner": true,
+        "authExecutable": true,
+        "anonExecutable": false,
+        "usesAuthUid": true
+      }
+    }
+  },
+  "decisions": {
+    "securityReviewApproved": false,
+    "dbaApproved": false,
+    "liveAnonymousAuthorizationE2E": false,
+    "publicDirectoryBehaviorRehearsed": false,
+    "vendorOwnerRlsE2E": false,
+    "protectedStagingApproved": false,
+    "productionMutationAuthorized": false
+  },
+  "conclusion": "RELEASE_HOLD_PRIVILEGES_DIFFER_RLS_DONT_ASSUME_EXPOSURE",
+  "notes": "Table grants alone do not prove data exposure because RLS predicates remain enabled. SECURITY DEFINER public listing may be intentional; switching to security_invoker without anonymous vendor SELECT policy can break legitimate public listings. No DDL, policies, grants, users, keys or data have been modified."
+}

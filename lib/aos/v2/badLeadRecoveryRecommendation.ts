@@ -16,7 +16,8 @@ export function deriveAosBadLeadRecoveryRecommendation(
 ): AosBadLeadRecoveryRecommendation {
   const reason = String(reasonCode ?? "").trim().toLowerCase();
   if (["invalid_wrong_phone", "service_mismatch", "outside_service_area"].includes(reason)) {
-    return "restore_credit_and_replace";
+    // Owner policy: one replacement LEAD CREDIT, not a direct reassignment.
+    return "restore_credit";
   }
   if (["requirement_already_closed", "client_not_reachable"].includes(reason)) {
     return "restore_credit";

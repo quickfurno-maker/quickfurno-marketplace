@@ -1,0 +1,17 @@
+export function reconcileRc8PgSignedIntentOutcome(input:{
+ acquireClient:()=>Promise<{query:(sql:string,values?:unknown[])=>Promise<{rows:any[];rowCount:number}>;release:(destroy?:boolean)=>void}>;
+ intentId:string;subjectId:string;expectedReceiptSha256:string;
+ /** Fixture-only: may advance, never rewind, the key-validity clock. */
+ now?:number
+}):Promise<{ok:boolean;outcome?:string|null;receiptSha256?:string;publicationAuthorized:boolean;
+ intentId?:string;subjectId?:string;ownerId?:string;teamLeaderId?:string;teamId?:string;cityId?:string}>;
+export function rc8SignedEodPublicationAuthorizationState(proof:unknown):{
+ publicationAuthorized:boolean;canPublish:boolean;approved:boolean;state:string;
+};
+/** Pure decision over one consistent evidence snapshot (pg reconciler + RC41 RPC snapshot). */
+export function rc8EvaluateReceiptEvidence(input:{
+ intentId:string;subjectId:string;expectedReceiptSha256:string;now?:number;
+ durable:{intents:any[];claims:any[]};subjectIntentIds:string[];report:any;keys:any[];
+ attestations?:unknown;allowNotCommitted?:boolean
+}):{ok:boolean;outcome?:string|null;receiptSha256?:string;publicationAuthorized:boolean;
+ intentId?:string;subjectId?:string;ownerId?:string;teamLeaderId?:string;teamId?:string;cityId?:string};

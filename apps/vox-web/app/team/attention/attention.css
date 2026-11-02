@@ -1,0 +1,14 @@
+.voxAttention{max-width:1110px;margin:0 auto;padding:clamp(18px,4vw,48px);background:#08161d;color:#e8f5f0;min-height:100vh}
+.voxAttention a{color:#a9ead0}.voxAttentionTrail{display:flex;gap:12px;align-items:center;font-size:13px;margin-bottom:26px}
+.voxAttentionHead{border-radius:18px;border:1px solid #326358;background:linear-gradient(115deg,#122e31,#0c1822);padding:clamp(22px,4vw,38px);margin-bottom:22px}
+.voxAttentionKicker{font-size:11px;letter-spacing:.12em;color:#88e0bd;text-transform:uppercase}
+.voxAttentionHead h1{font-size:clamp(28px,5vw,44px);margin:12px 0}.voxAttentionHead p{color:#c1d5cd;line-height:1.65;max-width:750px}
+.voxAttentionPanel{background:#10262a;border:1px solid #396158;border-radius:16px;padding:clamp(20px,4vw,30px)}
+.voxAttentionTitle{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}.voxAttentionTitle h2{font-size:23px}
+.voxAttentionTitle span{font-size:12px;border:1px solid #809f91;padding:7px 12px;border-radius:50px}
+.voxAttentionCaution{font-size:14px;color:#d4dec0;line-height:1.6}.voxAttentionList{list-style:none;padding:0;display:grid;gap:12px}
+.voxAttentionItem{display:flex;justify-content:space-between;gap:16px;background:#173036;border:1px solid #476257;border-radius:12px;padding:19px;align-items:center}
+.voxAttentionStatus{color:#dfc998;font-size:12px}.voxAttentionItem h3{font-size:16px;margin:9px 0}.voxAttentionItem p,.voxAttentionItem>div:last-child{color:#bed1cb;font-size:13px}
+.voxAttentionItem>div:last-child{display:grid;gap:8px;text-align:right}.voxAttentionBottom{display:flex;gap:22px;flex-wrap:wrap;margin-top:24px}
+.voxAttention a:focus-visible{outline:3px solid #ffe398;outline-offset:4px}
+@media(max-width:590px){.voxAttentionItem{align-items:flex-start;flex-direction:column}.voxAttentionItem>div:last-child{text-align:left}}

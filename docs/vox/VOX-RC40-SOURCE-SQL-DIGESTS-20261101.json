@@ -1,0 +1,1181 @@
+{
+  "schema": "qf.vox.rc40.source-sql-digest-evidence.v1",
+  "releaseGo": false,
+  "connectsToManaged": false,
+  "executesSql": false,
+  "managedWrites": false,
+  "readsSecrets": false,
+  "guessesManagedSql": false,
+  "appendOnly": true,
+  "prevEvidenceSha256": null,
+  "driftCounts": {
+    "sourceOnly": 107,
+    "stagingOnly": 31,
+    "common": 55,
+    "sourceSql": 162
+  },
+  "sourceOnlyDigestSetSha256": "d4db8ec8f5147baf6e0ba2ea982dfc569bbdff4e2c75566eff875930e5f04b28",
+  "counts": {
+    "collected": 107,
+    "attested": 0,
+    "unattested": 107
+  },
+  "complete": false,
+  "expectedEvidenceSchemas": [],
+  "entries": [
+    {
+      "file": "20260620000001_create_tables.sql",
+      "version": "20260620000001",
+      "bytes": 10376,
+      "sha256": "ab03c500be5e873677cc558d23c0641fcd5072ad4ad52bed8fcfe92d6165edbc",
+      "canonicalSha256": "ab03c500be5e873677cc558d23c0641fcd5072ad4ad52bed8fcfe92d6165edbc",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260620000002_rls_policies.sql",
+      "version": "20260620000002",
+      "bytes": 9789,
+      "sha256": "f266be5b9d9a9165e7bea12f84ce773aa51aea1e2d22fec9b43a1a031319df60",
+      "canonicalSha256": "f266be5b9d9a9165e7bea12f84ce773aa51aea1e2d22fec9b43a1a031319df60",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260620000003_functions.sql",
+      "version": "20260620000003",
+      "bytes": 16755,
+      "sha256": "617aeddae50aae7dcdce1f9521690d754c3092ce17ac6bec22d4e6d442e240f7",
+      "canonicalSha256": "617aeddae50aae7dcdce1f9521690d754c3092ce17ac6bec22d4e6d442e240f7",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260620000004_seed_data.sql",
+      "version": "20260620000004",
+      "bytes": 1784,
+      "sha256": "bac3a1f4c896a9e11aae01a2734b4d2ac59292564be0c177f3c53c329ec29682",
+      "canonicalSha256": "bac3a1f4c896a9e11aae01a2734b4d2ac59292564be0c177f3c53c329ec29682",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260620000005_homepage_alignment.sql",
+      "version": "20260620000005",
+      "bytes": 1892,
+      "sha256": "09fafcb2406f7139020cbdd6a95fb7b974876f81e333b2348e03318f54829871",
+      "canonicalSha256": "09fafcb2406f7139020cbdd6a95fb7b974876f81e333b2348e03318f54829871",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260621000006_superadmin_foundation.sql",
+      "version": "20260621000006",
+      "bytes": 12086,
+      "sha256": "d5e1adfddaa3d30ebad148dcaf8291d75da5b9594d359b13fd84345a08c488ae",
+      "canonicalSha256": "d5e1adfddaa3d30ebad148dcaf8291d75da5b9594d359b13fd84345a08c488ae",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260622000007_vendor_location.sql",
+      "version": "20260622000007",
+      "bytes": 1146,
+      "sha256": "595a0e714ba1fac10c423dcde456f8a8316dd321a662f3824921559ef1e3b805",
+      "canonicalSha256": "595a0e714ba1fac10c423dcde456f8a8316dd321a662f3824921559ef1e3b805",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260624000008_lead_capture_consent.sql",
+      "version": "20260624000008",
+      "bytes": 1021,
+      "sha256": "260dcddc22e69a5673aedac3c6a6c97a980df33758c2de3a0e4ef8ed44bc2180",
+      "canonicalSha256": "260dcddc22e69a5673aedac3c6a6c97a980df33758c2de3a0e4ef8ed44bc2180",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260624000009_vendor_onboarding.sql",
+      "version": "20260624000009",
+      "bytes": 1840,
+      "sha256": "d3fff71ade912c37e6ed7a6ca2140c03e9ff0cdfb16160b9374090debbff62d5",
+      "canonicalSha256": "d3fff71ade912c37e6ed7a6ca2140c03e9ff0cdfb16160b9374090debbff62d5",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260624000010_vendor_exact_columns.sql",
+      "version": "20260624000010",
+      "bytes": 1859,
+      "sha256": "64a1c6fc165c885b045c91f03e990c9d0835a22a26b26600ab1cd04c704017d7",
+      "canonicalSha256": "64a1c6fc165c885b045c91f03e990c9d0835a22a26b26600ab1cd04c704017d7",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260624000011_vendor_office_address.sql",
+      "version": "20260624000011",
+      "bytes": 1233,
+      "sha256": "61686e0f72c9c5a2b06346473efc7950c75f08e3f0add9715ee2555944eea1e0",
+      "canonicalSha256": "61686e0f72c9c5a2b06346473efc7950c75f08e3f0add9715ee2555944eea1e0",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260627000012_aos_management_foundation.sql",
+      "version": "20260627000012",
+      "bytes": 23318,
+      "sha256": "04a00aaf0c3effe4ecdcb83d4cc4f9b50ef474276475e757d13a67fe18f027ff",
+      "canonicalSha256": "04a00aaf0c3effe4ecdcb83d4cc4f9b50ef474276475e757d13a67fe18f027ff",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260627000013_crm_analytics_foundation.sql",
+      "version": "20260627000013",
+      "bytes": 15160,
+      "sha256": "3086704cc1f9970f9aa8e05fb8bc627f1609a48d01417980eb626442426ee1b6",
+      "canonicalSha256": "3086704cc1f9970f9aa8e05fb8bc627f1609a48d01417980eb626442426ee1b6",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260628000014_aos_control_center_foundation.sql",
+      "version": "20260628000014",
+      "bytes": 30103,
+      "sha256": "4a26cbc9d61d978a19fbb727568c6c7d1bcc5b42be5ab01c9a84ad630d765589",
+      "canonicalSha256": "4a26cbc9d61d978a19fbb727568c6c7d1bcc5b42be5ab01c9a84ad630d765589",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260628000015_crm_analytics_foundation_safe_placeholders.sql",
+      "version": "20260628000015",
+      "bytes": 12705,
+      "sha256": "2804f03ce0c8845e0d350b1ff9ba7dbd0c301d2b3ecfc3e8b0b75d23204a0d16",
+      "canonicalSha256": "2804f03ce0c8845e0d350b1ff9ba7dbd0c301d2b3ecfc3e8b0b75d23204a0d16",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260630000016_aos_runtime_settings.sql",
+      "version": "20260630000016",
+      "bytes": 4065,
+      "sha256": "347f990cc650dfe83ad08c0c266e66ce4c0e47bbb12bc85a2ffa86647e41ba20",
+      "canonicalSha256": "347f990cc650dfe83ad08c0c266e66ce4c0e47bbb12bc85a2ffa86647e41ba20",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260630000017_lead_assignment_approvals.sql",
+      "version": "20260630000017",
+      "bytes": 5835,
+      "sha256": "e003d15483e06a1878b4fcf1f599255ce58747c6a4a3ea954c3d86d9124fc89a",
+      "canonicalSha256": "e003d15483e06a1878b4fcf1f599255ce58747c6a4a3ea954c3d86d9124fc89a",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260630000018_vendor_actions_credits_package_sync.sql",
+      "version": "20260630000018",
+      "bytes": 5189,
+      "sha256": "088f4edc669b168bae49d917e1be9248ede8cab1ec43bc7b6c0b6ac3cc85cfaf",
+      "canonicalSha256": "088f4edc669b168bae49d917e1be9248ede8cab1ec43bc7b6c0b6ac3cc85cfaf",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260630000019_assignment_ledger_snapshots.sql",
+      "version": "20260630000019",
+      "bytes": 2208,
+      "sha256": "f33b71156779959e77423c85b11b378cbb48437d6e8684c029b9657440de48eb",
+      "canonicalSha256": "f33b71156779959e77423c85b11b378cbb48437d6e8684c029b9657440de48eb",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260630000020_align_active_cities.sql",
+      "version": "20260630000020",
+      "bytes": 1719,
+      "sha256": "71bb73864becb7db69735a8d6c03deecd69308eb22b1da0d1f245e852aa57c56",
+      "canonicalSha256": "71bb73864becb7db69735a8d6c03deecd69308eb22b1da0d1f245e852aa57c56",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260630000021_category_governance.sql",
+      "version": "20260630000021",
+      "bytes": 4726,
+      "sha256": "53008f55163b3b8bbbdf230ca0c86a2aeb487a85f8cf66bbc9c69acd701671e1",
+      "canonicalSha256": "53008f55163b3b8bbbdf230ca0c86a2aeb487a85f8cf66bbc9c69acd701671e1",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260701000022_phase_25a_paid_only_auto_match_free_vendor_interest.sql",
+      "version": "20260701000022",
+      "bytes": 5151,
+      "sha256": "6bce0e939f091102a55d4a4a83f89f4539106781fcdc4abb7f5c8b58de34bf92",
+      "canonicalSha256": "6bce0e939f091102a55d4a4a83f89f4539106781fcdc4abb7f5c8b58de34bf92",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260701000023_vendor_package_orders.sql",
+      "version": "20260701000023",
+      "bytes": 6537,
+      "sha256": "519f702a3875ddf7c6d1ceb1b09a21bca904e0c2e7242f270b83a67bf08a1ed8",
+      "canonicalSha256": "519f702a3875ddf7c6d1ceb1b09a21bca904e0c2e7242f270b83a67bf08a1ed8",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260701000024_vendor_profile_change_requests.sql",
+      "version": "20260701000024",
+      "bytes": 4932,
+      "sha256": "8ca496b72c746b3188b8ba778f79fe64904e310488b281a858afd1f3c75b77cc",
+      "canonicalSha256": "8ca496b72c746b3188b8ba778f79fe64904e310488b281a858afd1f3c75b77cc",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260701000025_vendor_notifications_support.sql",
+      "version": "20260701000025",
+      "bytes": 7593,
+      "sha256": "2b169eaca453e1c50b7c669466e0cf8f41a55c468dab82dc9bba0f61a460a640",
+      "canonicalSha256": "2b169eaca453e1c50b7c669466e0cf8f41a55c468dab82dc9bba0f61a460a640",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260701000026_bad_lead_report_safety_fields.sql",
+      "version": "20260701000026",
+      "bytes": 544,
+      "sha256": "a5b1d0fda6f100ee4537a54a74e9e4b85e3abaea017222dec62113360bad713f",
+      "canonicalSha256": "a5b1d0fda6f100ee4537a54a74e9e4b85e3abaea017222dec62113360bad713f",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260701000027_phase26a_auto_lead_matching_foundation.sql",
+      "version": "20260701000027",
+      "bytes": 11067,
+      "sha256": "f08f41690541492a04071fb0d485f37fc38959c2e6ddc0f560654e8fef5ec9f3",
+      "canonicalSha256": "f08f41690541492a04071fb0d485f37fc38959c2e6ddc0f560654e8fef5ec9f3",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260701000028_phase26a_live_schema_repair.sql",
+      "version": "20260701000028",
+      "bytes": 12417,
+      "sha256": "09c97006357c72ce31cff682c07942b56c197577a9ecc29482e0657f5b22eaf5",
+      "canonicalSha256": "09c97006357c72ce31cff682c07942b56c197577a9ecc29482e0657f5b22eaf5",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260701000029_phase26a2_admin_audit_hardening.sql",
+      "version": "20260701000029",
+      "bytes": 3319,
+      "sha256": "08ff461b0c07da3c54384fc297075f074b2fe76520d6996759ae09992d4c2a2f",
+      "canonicalSha256": "08ff461b0c07da3c54384fc297075f074b2fe76520d6996759ae09992d4c2a2f",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260701000030_phase26a2c_smart_override_assignment.sql",
+      "version": "20260701000030",
+      "bytes": 5663,
+      "sha256": "e3ff8003d8cd9a4e5880a3f8a7b765e0ee8e18e291a53ca69c68102325c67056",
+      "canonicalSha256": "e3ff8003d8cd9a4e5880a3f8a7b765e0ee8e18e291a53ca69c68102325c67056",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260701000031_phase26a2c_recovery_fallback_reporting.sql",
+      "version": "20260701000031",
+      "bytes": 6543,
+      "sha256": "94930bc363b5ba3a0ce79f4751080c59be7e9f28f4b2982ac0d11bc19d2ac483",
+      "canonicalSha256": "94930bc363b5ba3a0ce79f4751080c59be7e9f28f4b2982ac0d11bc19d2ac483",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260701000032_phase26a2d_client_requirement_groups.sql",
+      "version": "20260701000032",
+      "bytes": 13181,
+      "sha256": "2e8f07bae58babf707463849e512c3f673f27385bb9f32a99bdca03feae811b8",
+      "canonicalSha256": "2e8f07bae58babf707463849e512c3f673f27385bb9f32a99bdca03feae811b8",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260701000033_phase26a2e_preferred_vendor_recharge_window.sql",
+      "version": "20260701000033",
+      "bytes": 6095,
+      "sha256": "b70441fd206afb379eac746a5eb75c1b457025dd1050d4beb365daf7df414176",
+      "canonicalSha256": "b70441fd206afb379eac746a5eb75c1b457025dd1050d4beb365daf7df414176",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260702000034_fix_auto_match_category_mapping.sql",
+      "version": "20260702000034",
+      "bytes": 11935,
+      "sha256": "069fdc52c9b584a4e08c6cdb6340f673726db0a104335d5367909f7a960cc7ad",
+      "canonicalSha256": "069fdc52c9b584a4e08c6cdb6340f673726db0a104335d5367909f7a960cc7ad",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260702000035_preferred_vendor_lead_intent.sql",
+      "version": "20260702000035",
+      "bytes": 6937,
+      "sha256": "5be51723f8c955e636e2971a5efd80264f0b9842e4c650e5b459406007eec9b0",
+      "canonicalSha256": "5be51723f8c955e636e2971a5efd80264f0b9842e4c650e5b459406007eec9b0",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260702000037_fix_preferred_vendor_credit_direct_assignment.sql",
+      "version": "20260702000037",
+      "bytes": 6165,
+      "sha256": "493e8173403ba262bc7614b49f8841b0f2ef9d3acd14efe8f4cd3d04dd650c64",
+      "canonicalSha256": "493e8173403ba262bc7614b49f8841b0f2ef9d3acd14efe8f4cd3d04dd650c64",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260702000038_lead_quality_engine_phase1.sql",
+      "version": "20260702000038",
+      "bytes": 1503,
+      "sha256": "ae380fc31af9dab192134128fac9217fa5a423c5b502ad9174cd49a6d30c1de8",
+      "canonicalSha256": "ae380fc31af9dab192134128fac9217fa5a423c5b502ad9174cd49a6d30c1de8",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260702000039_b_lead_clarification_flow.sql",
+      "version": "20260702000039",
+      "bytes": 2681,
+      "sha256": "ed0e04cf7fefcafa07a7fe5f90b7213d8e18c433fc9646836ec3b7b83392fb1d",
+      "canonicalSha256": "ed0e04cf7fefcafa07a7fe5f90b7213d8e18c433fc9646836ec3b7b83392fb1d",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260704000040_google_area_location_foundation.sql",
+      "version": "20260704000040",
+      "bytes": 3364,
+      "sha256": "5ae5b6abb40da2fcb1266bf6db2787cb1745f34bc37dba82137d29b7773e8052",
+      "canonicalSha256": "5ae5b6abb40da2fcb1266bf6db2787cb1745f34bc37dba82137d29b7773e8052",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260704000100_align_lead_quality_status_constraints.sql",
+      "version": "20260704000100",
+      "bytes": 3102,
+      "sha256": "b89b13ba976048228a957f8b1c151a0179d8fa5b3a36d2e52fbe3c14cf618e0e",
+      "canonicalSha256": "b89b13ba976048228a957f8b1c151a0179d8fa5b3a36d2e52fbe3c14cf618e0e",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260704000110_lead_scores_security_hardening.sql",
+      "version": "20260704000110",
+      "bytes": 3419,
+      "sha256": "384f2bbc32f8a84ab5b0e7fba190da68a4df19f2d758dd67cb5e58420340e185",
+      "canonicalSha256": "384f2bbc32f8a84ab5b0e7fba190da68a4df19f2d758dd67cb5e58420340e185",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260705000130_distance_category_matching_rpc.sql",
+      "version": "20260705000130",
+      "bytes": 16361,
+      "sha256": "75f4cfff08402297d577724be8fc48d067203ad37dd2361723daf5ab6fde7393",
+      "canonicalSha256": "75f4cfff08402297d577724be8fc48d067203ad37dd2361723daf5ab6fde7393",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260706000140_vendor_accepting_leads.sql",
+      "version": "20260706000140",
+      "bytes": 1207,
+      "sha256": "f772738cef96f2cef708dc06267a45c40946049bb03b651f70b0815a710a139d",
+      "canonicalSha256": "f772738cef96f2cef708dc06267a45c40946049bb03b651f70b0815a710a139d",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260706000141_vendor_credit_wallet_rpc.sql",
+      "version": "20260706000141",
+      "bytes": 6405,
+      "sha256": "088dcfd3e7e53c4bf2ec01a095c2454813b6e42720d400c2701971df4017d7ef",
+      "canonicalSha256": "088dcfd3e7e53c4bf2ec01a095c2454813b6e42720d400c2701971df4017d7ef",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260706000142_credit_wallet_assignment_rpc.sql",
+      "version": "20260706000142",
+      "bytes": 8556,
+      "sha256": "db929e81304b5fe3203925bca02cbf884b474666a0af769f0eab644102df712a",
+      "canonicalSha256": "db929e81304b5fe3203925bca02cbf884b474666a0af769f0eab644102df712a",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260706000143_preferred_assignment_accepting_leads.sql",
+      "version": "20260706000143",
+      "bytes": 5931,
+      "sha256": "437105dfa4bdfba9d8e494d92db235cedf7efab9e8a235a00a169f8472f4b507",
+      "canonicalSha256": "437105dfa4bdfba9d8e494d92db235cedf7efab9e8a235a00a169f8472f4b507",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260706000144_manual_assignment_accepting_leads.sql",
+      "version": "20260706000144",
+      "bytes": 8685,
+      "sha256": "77aa9aea2f6d5255bd0d90dc89475be1b27cc50869a0d3474bf0edd37d86cd84",
+      "canonicalSha256": "77aa9aea2f6d5255bd0d90dc89475be1b27cc50869a0d3474bf0edd37d86cd84",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260706000145_package_purchase_idempotent_grant.sql",
+      "version": "20260706000145",
+      "bytes": 4226,
+      "sha256": "77494a9d3e5f6da9bcb1bf430a39451515b49c6a870b3dd3db5c8c47ae83374f",
+      "canonicalSha256": "77494a9d3e5f6da9bcb1bf430a39451515b49c6a870b3dd3db5c8c47ae83374f",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260706000146_create_qf_workflow_kernel_foundation.sql",
+      "version": "20260706000146",
+      "bytes": 22877,
+      "sha256": "fc13723ea9a215385b3e894938708d6119e790dcaf379d4209238da213b7d781",
+      "canonicalSha256": "fc13723ea9a215385b3e894938708d6119e790dcaf379d4209238da213b7d781",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260706000147_workflow_kernel_atomic_step.sql",
+      "version": "20260706000147",
+      "bytes": 15084,
+      "sha256": "c75bbe51ca230672c6ce9bd9e07f37ad37e9a39b767a74d7eb7d7a9ee7c609dd",
+      "canonicalSha256": "886ebf39a42354e58668bc2d8225e9d5c5154a7d8e2c6cdc68b8569ae46ad376",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260706000148_workflow_kernel_safety_hardening.sql",
+      "version": "20260706000148",
+      "bytes": 24181,
+      "sha256": "8ffe6876559aebd2acd46afb6b32c2ccd280f4908c4bcff66fe8f365c0b3c30b",
+      "canonicalSha256": "8ffe6876559aebd2acd46afb6b32c2ccd280f4908c4bcff66fe8f365c0b3c30b",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260706000149_workflow_kernel_retry_consistency.sql",
+      "version": "20260706000149",
+      "bytes": 22698,
+      "sha256": "92a1efbaf2713474636180682be0dd3cc40582807bd0f135ac70b95cde93947d",
+      "canonicalSha256": "92a1efbaf2713474636180682be0dd3cc40582807bd0f135ac70b95cde93947d",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260706000150_automation_policy_config_foundation.sql",
+      "version": "20260706000150",
+      "bytes": 7159,
+      "sha256": "4477e72494e399ed714d7d596506a326aeb6d1b2a74b28376fe54f7142150b9d",
+      "canonicalSha256": "4477e72494e399ed714d7d596506a326aeb6d1b2a74b28376fe54f7142150b9d",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260708000160_identity_security_foundation.sql",
+      "version": "20260708000160",
+      "bytes": 11336,
+      "sha256": "61bde9591e4eb09ff327a99f4306c0c9492c2ce45534ea6e7369c72df3bae509",
+      "canonicalSha256": "61bde9591e4eb09ff327a99f4306c0c9492c2ce45534ea6e7369c72df3bae509",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260708000170_unified_communication_core.sql",
+      "version": "20260708000170",
+      "bytes": 20075,
+      "sha256": "a50f54c88dd3a2e64d9dceb8b0a4372eb370a60287f71e88f31afd0addf7e493",
+      "canonicalSha256": "a50f54c88dd3a2e64d9dceb8b0a4372eb370a60287f71e88f31afd0addf7e493",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260708000180_vendor_authentication_foundation.sql",
+      "version": "20260708000180",
+      "bytes": 14706,
+      "sha256": "360b994f9e217d4ad13836a3fba8794539f9d724ddaea6c3a9f2bd6704d17f61",
+      "canonicalSha256": "360b994f9e217d4ad13836a3fba8794539f9d724ddaea6c3a9f2bd6704d17f61",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260708000190_client_whatsapp_otp_login_readiness.sql",
+      "version": "20260708000190",
+      "bytes": 11378,
+      "sha256": "a286b19f52a136afd554f0d072e83d8bba3e39fc75d2086c47780340402cd84e",
+      "canonicalSha256": "a286b19f52a136afd554f0d072e83d8bba3e39fc75d2086c47780340402cd84e",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260708000200_vendor_whatsapp_verification_password_reset.sql",
+      "version": "20260708000200",
+      "bytes": 40482,
+      "sha256": "e232b17f087940308a0487218fbcb9a20343c2aa489646a612f42d56aaea2572",
+      "canonicalSha256": "e232b17f087940308a0487218fbcb9a20343c2aa489646a612f42d56aaea2572",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260709000100_messaging_channel_provider_foundation.sql",
+      "version": "20260709000100",
+      "bytes": 27984,
+      "sha256": "32f3bd3c5cec1ce2188eb3e631f358d188d3dc084b1f21853140a0f635ea17f0",
+      "canonicalSha256": "32f3bd3c5cec1ce2188eb3e631f358d188d3dc084b1f21853140a0f635ea17f0",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260709000200_whatsapp_cloud_api_runtime_control.sql",
+      "version": "20260709000200",
+      "bytes": 16604,
+      "sha256": "161f8f51009bf1c1bca127e01ed6ce6d068dcbe34eadaa2d866402aa4033e0f5",
+      "canonicalSha256": "161f8f51009bf1c1bca127e01ed6ce6d068dcbe34eadaa2d866402aa4033e0f5",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260710000100_auth_transport_resilience_decision_foundation.sql",
+      "version": "20260710000100",
+      "bytes": 42407,
+      "sha256": "6a76183799f25d501fad0f084bcd4c6159b96779343fd3700729e98f4483068b",
+      "canonicalSha256": "6a76183799f25d501fad0f084bcd4c6159b96779343fd3700729e98f4483068b",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260711000100_whatsapp_inbound_message_foundation.sql",
+      "version": "20260711000100",
+      "bytes": 7223,
+      "sha256": "5c95c6a270988e26ed1c70d778f0420b84663a30037949f5898503079a858d3a",
+      "canonicalSha256": "5c95c6a270988e26ed1c70d778f0420b84663a30037949f5898503079a858d3a",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260711000200_communication_consent_evidence_and_state_hardening.sql",
+      "version": "20260711000200",
+      "bytes": 32791,
+      "sha256": "80cb049231d347ebd52fd628bd9b99be1f6c5a79f24b380be844fba951fcba90",
+      "canonicalSha256": "80cb049231d347ebd52fd628bd9b99be1f6c5a79f24b380be844fba951fcba90",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260712000300_communication_consent_command_writer_rpc.sql",
+      "version": "20260712000300",
+      "bytes": 32664,
+      "sha256": "0fbc02fa87a64ca41a9f2018116ee954a6f433d86b0c99385edee1146d7d71fb",
+      "canonicalSha256": "0fbc02fa87a64ca41a9f2018116ee954a6f433d86b0c99385edee1146d7d71fb",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260713000100_communication_consent_ack_intents.sql",
+      "version": "20260713000100",
+      "bytes": 26620,
+      "sha256": "28e17928287964b03ca1ccdb50e8c0dfb69a87422cc2f262d6ecfe3c0e53affe",
+      "canonicalSha256": "28e17928287964b03ca1ccdb50e8c0dfb69a87422cc2f262d6ecfe3c0e53affe",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260716000100_communication_provider_account_binding.sql",
+      "version": "20260716000100",
+      "bytes": 10903,
+      "sha256": "db73a23ca8e1bac86d023a72f920828b103aa8cafe4278be5664a11b40c0518a",
+      "canonicalSha256": "db73a23ca8e1bac86d023a72f920828b103aa8cafe4278be5664a11b40c0518a",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260720000100_communication_delivery_event_provider_account_required.sql",
+      "version": "20260720000100",
+      "bytes": 5792,
+      "sha256": "df951f3788f02545fe31e517753f419b1f9e9f14b8142dd0bd58d8db22be33d7",
+      "canonicalSha256": "df951f3788f02545fe31e517753f419b1f9e9f14b8142dd0bd58d8db22be33d7",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260721000100_communication_consent_ack_intent_provider_account_required.sql",
+      "version": "20260721000100",
+      "bytes": 2979,
+      "sha256": "056696790cfdf2c55ab187dc58e211eab0aa232b47d131abd9009cebf5e831a0",
+      "canonicalSha256": "056696790cfdf2c55ab187dc58e211eab0aa232b47d131abd9009cebf5e831a0",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql",
+      "version": "20260903040000",
+      "bytes": 35778,
+      "sha256": "b3bd351c61c81b02aced5257507412d45ad2d77075265f644633c699384d42e2",
+      "canonicalSha256": "b3bd351c61c81b02aced5257507412d45ad2d77075265f644633c699384d42e2",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql",
+      "version": "20260912000000",
+      "bytes": 58036,
+      "sha256": "f1f03dfe265fbbe245bcf4a53bb91f8b144f1b99aafa9de9f3108e8a244c8cf5",
+      "canonicalSha256": "f1f03dfe265fbbe245bcf4a53bb91f8b144f1b99aafa9de9f3108e8a244c8cf5",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260912010000_qf_vendor_package_razorpay_testmode.sql",
+      "version": "20260912010000",
+      "bytes": 19888,
+      "sha256": "bd16bfb3cf28a7c87b579efaae3c6c543eb78e241bb1b03e7ff95075c3e056a8",
+      "canonicalSha256": "bd16bfb3cf28a7c87b579efaae3c6c543eb78e241bb1b03e7ff95075c3e056a8",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260912020000_qf_package_scope_governance.sql",
+      "version": "20260912020000",
+      "bytes": 5895,
+      "sha256": "43a36f21af0c9cb5c16648dafd20a8e1a3f50c0d85f59ed3c9f21a145dd1a0f0",
+      "canonicalSha256": "43a36f21af0c9cb5c16648dafd20a8e1a3f50c0d85f59ed3c9f21a145dd1a0f0",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260912021527_qf_launch_pune_only_city_activation.sql",
+      "version": "20260912021527",
+      "bytes": 707,
+      "sha256": "f5c3db995a609b2155b5a615ddfe6d637642d7e1ae54d7a07e29b5b7b8625e30",
+      "canonicalSha256": "f5c3db995a609b2155b5a615ddfe6d637642d7e1ae54d7a07e29b5b7b8625e30",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260912024734_qf_active_city_authority_hardening.sql",
+      "version": "20260912024734",
+      "bytes": 11022,
+      "sha256": "391d43b96d107338f1a27688fd7b3f2581b1fb6d65ea27201079d37690b71a52",
+      "canonicalSha256": "391d43b96d107338f1a27688fd7b3f2581b1fb6d65ea27201079d37690b71a52",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260912030000_qf_category_runtime_governance.sql",
+      "version": "20260912030000",
+      "bytes": 4586,
+      "sha256": "0df55d8a507de01325a32cfa4d4709e9a51c73bd05b57e1e158369caeea14483",
+      "canonicalSha256": "0df55d8a507de01325a32cfa4d4709e9a51c73bd05b57e1e158369caeea14483",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260912040000_qf_aos_v2_intelligence.sql",
+      "version": "20260912040000",
+      "bytes": 11939,
+      "sha256": "a89c583bc7e25a4eed26d1e2e6aba0beacbd6e6b85d67226b8916efe2c9fc7d3",
+      "canonicalSha256": "a89c583bc7e25a4eed26d1e2e6aba0beacbd6e6b85d67226b8916efe2c9fc7d3",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260912050000_qf_lead_generation_scope_lock.sql",
+      "version": "20260912050000",
+      "bytes": 22011,
+      "sha256": "45e83f3b9631c24bdfa3860fb42434fdb129ffb3f4e0ce05c6ad269e23d331c5",
+      "canonicalSha256": "45e83f3b9631c24bdfa3860fb42434fdb129ffb3f4e0ce05c6ad269e23d331c5",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260923170217_vendor_media_bucket.sql",
+      "version": "20260923170217",
+      "bytes": 1365,
+      "sha256": "5cc1f5890e2d595dd546734579c10e86e23e02a314cb716cb66400db1afe8843",
+      "canonicalSha256": "5cc1f5890e2d595dd546734579c10e86e23e02a314cb716cb66400db1afe8843",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260924183000_jarvis_os_operator_command_receipts.sql",
+      "version": "20260924183000",
+      "bytes": 1662,
+      "sha256": "c8c66b3f8a55974f6ce92c8fe400bfacdc6ece4e06a431c02b3bc0cbe4b3ac3b",
+      "canonicalSha256": "c8c66b3f8a55974f6ce92c8fe400bfacdc6ece4e06a431c02b3bc0cbe4b3ac3b",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260927113000_qf_client_journey_phase1_foundation.sql",
+      "version": "20260927113000",
+      "bytes": 7142,
+      "sha256": "5f20904a229717d10e2d1cb5e6f6ee82257427ecebf7f2f611d501b6ad35be87",
+      "canonicalSha256": "5f20904a229717d10e2d1cb5e6f6ee82257427ecebf7f2f611d501b6ad35be87",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260927150000_qf_client_journey_phase1_meta_qualification.sql",
+      "version": "20260927150000",
+      "bytes": 12476,
+      "sha256": "86b95c0f871141b40a32e126998a96a1cc2ba7af5fed1ae9de245cb5f195ae2b",
+      "canonicalSha256": "86b95c0f871141b40a32e126998a96a1cc2ba7af5fed1ae9de245cb5f195ae2b",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20260929154156_shared_single_number_jarvis_access.sql",
+      "version": "20260929154156",
+      "bytes": 693,
+      "sha256": "38dde7d10dae5b84f0f1cd8594e76e1953936b700ba41a4cf8b8573bf1205cab",
+      "canonicalSha256": "38dde7d10dae5b84f0f1cd8594e76e1953936b700ba41a4cf8b8573bf1205cab",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261001144025_qf_verified_location_geofence_straight_line.sql",
+      "version": "20261001144025",
+      "bytes": 13036,
+      "sha256": "774c7a10db9d35af6c9bea35ac8e7c88136b02edcfa9ce2935db4697fc9306c4",
+      "canonicalSha256": "774c7a10db9d35af6c9bea35ac8e7c88136b02edcfa9ce2935db4697fc9306c4",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261001153000_qf_multi_city_service_zone_authority.sql",
+      "version": "20261001153000",
+      "bytes": 23143,
+      "sha256": "59c6a3c42701df069ae5b3405ac9732de9c47dc44e7dff18dfb857647c86c871",
+      "canonicalSha256": "59c6a3c42701df069ae5b3405ac9732de9c47dc44e7dff18dfb857647c86c871",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261001154500_qf_city_market_runtime_controls.sql",
+      "version": "20261001154500",
+      "bytes": 17541,
+      "sha256": "4883ce30f177515d2d8f1feed347bc4bc6ccc607b6acdef9fb43df9225aab070",
+      "canonicalSha256": "4883ce30f177515d2d8f1feed347bc4bc6ccc607b6acdef9fb43df9225aab070",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261001165000_qf_admin_service_zone_boundary_control.sql",
+      "version": "20261001165000",
+      "bytes": 7229,
+      "sha256": "68f6109d3ba99e3ca3be09b2f54d457f18e8a021a694a572e88a9a942b2731ee",
+      "canonicalSha256": "68f6109d3ba99e3ca3be09b2f54d457f18e8a021a694a572e88a9a942b2731ee",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261002071500_vendor_fair_opportunity_distribution.sql",
+      "version": "20261002071500",
+      "bytes": 30632,
+      "sha256": "fb11dd6a6c345d9e559dc62175bccdee8dfc74bf389725560827b03c80d3d2cd",
+      "canonicalSha256": "fb11dd6a6c345d9e559dc62175bccdee8dfc74bf389725560827b03c80d3d2cd",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261002090000_vendor_fair_opportunity_group_reconcile.sql",
+      "version": "20261002090000",
+      "bytes": 28390,
+      "sha256": "11a9fff636f2d055571a69fd101d2db2664fcbe022950bb3d2be3ac9c33b21e9",
+      "canonicalSha256": "11a9fff636f2d055571a69fd101d2db2664fcbe022950bb3d2be3ac9c33b21e9",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261002091500_vendor_fair_opportunity_fk_indexes.sql",
+      "version": "20261002091500",
+      "bytes": 396,
+      "sha256": "6df7696af347570441cbba228d13270827bb2fbb194d378f2bca5d6ee3bd8aa7",
+      "canonicalSha256": "6df7696af347570441cbba228d13270827bb2fbb194d378f2bca5d6ee3bd8aa7",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261003064500_aarohi_phase1_omnichannel_activation.sql",
+      "version": "20261003064500",
+      "bytes": 22014,
+      "sha256": "205ee8994485d2b29fa66964708e79d26ae692edcc897b4ad0a95d727f9f3217",
+      "canonicalSha256": "205ee8994485d2b29fa66964708e79d26ae692edcc897b4ad0a95d727f9f3217",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261003070000_aarohi_phase1_fk_indexes.sql",
+      "version": "20261003070000",
+      "bytes": 711,
+      "sha256": "2826eb9bba7df984f929bb3405c3003a87f1d3200d8e5f5650c29bb3a1c07873",
+      "canonicalSha256": "2826eb9bba7df984f929bb3405c3003a87f1d3200d8e5f5650c29bb3a1c07873",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261003080000_aarohi_phase2_autonomous_acquisition.sql",
+      "version": "20261003080000",
+      "bytes": 18362,
+      "sha256": "053d0835687c9c5282f6eddc6d4eeee0fd23ed42f2b4b34dbdd739736d802033",
+      "canonicalSha256": "053d0835687c9c5282f6eddc6d4eeee0fd23ed42f2b4b34dbdd739736d802033",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261003081046_aarohi_full_fk_index_closeout.sql",
+      "version": "20261003081046",
+      "bytes": 2065,
+      "sha256": "f4249c4582498ac3ef59d0374ccfdc343facde338c5cd62535614104dc21192e",
+      "canonicalSha256": "f4249c4582498ac3ef59d0374ccfdc343facde338c5cd62535614104dc21192e",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261003083000_aarohi_phase2_scale_governance.sql",
+      "version": "20261003083000",
+      "bytes": 20739,
+      "sha256": "8de819e5f708bcc99fcde86d1c2b752cd2f79018d0cb1a571825f537f2c402d4",
+      "canonicalSha256": "8de819e5f708bcc99fcde86d1c2b752cd2f79018d0cb1a571825f537f2c402d4",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261003090000_aarohi_phase2_ops_control_analytics.sql",
+      "version": "20261003090000",
+      "bytes": 7232,
+      "sha256": "a2e9eade298ee5639938d211d16e990d07628e13c4c5f042ec2b4b2a3d22c49b",
+      "canonicalSha256": "a2e9eade298ee5639938d211d16e990d07628e13c4c5f042ec2b4b2a3d22c49b",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261003091000_aarohi_phase2_ops_fk_indexes.sql",
+      "version": "20261003091000",
+      "bytes": 515,
+      "sha256": "8d4b34d0c17742172d0f9c2e8ce98f8ffbd5b707263417e51e2c14c70972791a",
+      "canonicalSha256": "8d4b34d0c17742172d0f9c2e8ce98f8ffbd5b707263417e51e2c14c70972791a",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261004190000_scale_phase07_durable_jobs_hardening.sql",
+      "version": "20261004190000",
+      "bytes": 13966,
+      "sha256": "a3e0f84de2b3f107ea12e6febb7cb5419f22a06c8ad675ab362f2fe244bedc04",
+      "canonicalSha256": "a3e0f84de2b3f107ea12e6febb7cb5419f22a06c8ad675ab362f2fe244bedc04",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261004190001_scale_phase08_matching_prefilter.sql",
+      "version": "20261004190001",
+      "bytes": 16953,
+      "sha256": "5ab95933887e8127ccdbd86127dff313a6a7efef8d5253c1275e2cc2ad7b9d84",
+      "canonicalSha256": "5ab95933887e8127ccdbd86127dff313a6a7efef8d5253c1275e2cc2ad7b9d84",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261004190002_scale_phase09_data_lifecycle.sql",
+      "version": "20261004190002",
+      "bytes": 8644,
+      "sha256": "1c3880d334877b4bce174a23fc1398f35cd3ea16fa3132ceb404f40552b9cd7e",
+      "canonicalSha256": "1c3880d334877b4bce174a23fc1398f35cd3ea16fa3132ceb404f40552b9cd7e",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261005160000_scale_phase12_horizontal_worker_claims.sql",
+      "version": "20261005160000",
+      "bytes": 5531,
+      "sha256": "100e8c0ed07130def955ea6b29b2779607557647fe95f69b788b5303243456f7",
+      "canonicalSha256": "100e8c0ed07130def955ea6b29b2779607557647fe95f69b788b5303243456f7",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261005200000_scale_phase14_agni_governance.sql",
+      "version": "20261005200000",
+      "bytes": 6555,
+      "sha256": "e22b181743666f71ee9790501d60e48a088d6c44166ddf21a70b7de6a748c03e",
+      "canonicalSha256": "e22b181743666f71ee9790501d60e48a088d6c44166ddf21a70b7de6a748c03e",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261005203000_scale_phase14_trace_context.sql",
+      "version": "20261005203000",
+      "bytes": 2096,
+      "sha256": "fecb944111eb07b29b7a2efcf19e5b4ae0eae08713e3636822eddf40da6b5259",
+      "canonicalSha256": "fecb944111eb07b29b7a2efcf19e5b4ae0eae08713e3636822eddf40da6b5259",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261006113000_scale_phase18_matching_slo.sql",
+      "version": "20261006113000",
+      "bytes": 10938,
+      "sha256": "da746487c926633d7cc51c53ff959b595f3ea209c597a9e82cb9d0f341192248",
+      "canonicalSha256": "da746487c926633d7cc51c53ff959b595f3ea209c597a9e82cb9d0f341192248",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261006113720_phase22_identity_portability.sql",
+      "version": "20261006113720",
+      "bytes": 13536,
+      "sha256": "6f53e1781e4d2bd277645ed17b2eb635be70f1d2c4df7525cd176dfb0c2f28ba",
+      "canonicalSha256": "6f53e1781e4d2bd277645ed17b2eb635be70f1d2c4df7525cd176dfb0c2f28ba",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261012080000_anisha_vendor_memory_consent_source.sql",
+      "version": "20261012080000",
+      "bytes": 4680,
+      "sha256": "cc0db795bd74f36015405dccea6b0311b32b37d33819ffb851e174673f5cd2e0",
+      "canonicalSha256": "cc0db795bd74f36015405dccea6b0311b32b37d33819ffb851e174673f5cd2e0",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261012100000_anisha_memory_purge_delivery.sql",
+      "version": "20261012100000",
+      "bytes": 3068,
+      "sha256": "bda1609a9da3896599a84d47d1d2eb3f755d5c2c5d8ba5f531bc133a72699eb7",
+      "canonicalSha256": "bda1609a9da3896599a84d47d1d2eb3f755d5c2c5d8ba5f531bc133a72699eb7",
+      "attestation": "UNATTESTED"
+    },
+    {
+      "file": "20261012213000_vendor_assignment_update_authority_closeout.sql",
+      "version": "20261012213000",
+      "bytes": 1789,
+      "sha256": "7cf72f08c39ef88cea33b998e6ca090e6b0a9fd3a61e5068b14cef6b3fa028e4",
+      "canonicalSha256": "7cf72f08c39ef88cea33b998e6ca090e6b0a9fd3a61e5068b14cef6b3fa028e4",
+      "attestation": "UNATTESTED"
+    }
+  ],
+  "unattestedFiles": [
+    "20260620000001_create_tables.sql",
+    "20260620000002_rls_policies.sql",
+    "20260620000003_functions.sql",
+    "20260620000004_seed_data.sql",
+    "20260620000005_homepage_alignment.sql",
+    "20260621000006_superadmin_foundation.sql",
+    "20260622000007_vendor_location.sql",
+    "20260624000008_lead_capture_consent.sql",
+    "20260624000009_vendor_onboarding.sql",
+    "20260624000010_vendor_exact_columns.sql",
+    "20260624000011_vendor_office_address.sql",
+    "20260627000012_aos_management_foundation.sql",
+    "20260627000013_crm_analytics_foundation.sql",
+    "20260628000014_aos_control_center_foundation.sql",
+    "20260628000015_crm_analytics_foundation_safe_placeholders.sql",
+    "20260630000016_aos_runtime_settings.sql",
+    "20260630000017_lead_assignment_approvals.sql",
+    "20260630000018_vendor_actions_credits_package_sync.sql",
+    "20260630000019_assignment_ledger_snapshots.sql",
+    "20260630000020_align_active_cities.sql",
+    "20260630000021_category_governance.sql",
+    "20260701000022_phase_25a_paid_only_auto_match_free_vendor_interest.sql",
+    "20260701000023_vendor_package_orders.sql",
+    "20260701000024_vendor_profile_change_requests.sql",
+    "20260701000025_vendor_notifications_support.sql",
+    "20260701000026_bad_lead_report_safety_fields.sql",
+    "20260701000027_phase26a_auto_lead_matching_foundation.sql",
+    "20260701000028_phase26a_live_schema_repair.sql",
+    "20260701000029_phase26a2_admin_audit_hardening.sql",
+    "20260701000030_phase26a2c_smart_override_assignment.sql",
+    "20260701000031_phase26a2c_recovery_fallback_reporting.sql",
+    "20260701000032_phase26a2d_client_requirement_groups.sql",
+    "20260701000033_phase26a2e_preferred_vendor_recharge_window.sql",
+    "20260702000034_fix_auto_match_category_mapping.sql",
+    "20260702000035_preferred_vendor_lead_intent.sql",
+    "20260702000037_fix_preferred_vendor_credit_direct_assignment.sql",
+    "20260702000038_lead_quality_engine_phase1.sql",
+    "20260702000039_b_lead_clarification_flow.sql",
+    "20260704000040_google_area_location_foundation.sql",
+    "20260704000100_align_lead_quality_status_constraints.sql",
+    "20260704000110_lead_scores_security_hardening.sql",
+    "20260705000130_distance_category_matching_rpc.sql",
+    "20260706000140_vendor_accepting_leads.sql",
+    "20260706000141_vendor_credit_wallet_rpc.sql",
+    "20260706000142_credit_wallet_assignment_rpc.sql",
+    "20260706000143_preferred_assignment_accepting_leads.sql",
+    "20260706000144_manual_assignment_accepting_leads.sql",
+    "20260706000145_package_purchase_idempotent_grant.sql",
+    "20260706000146_create_qf_workflow_kernel_foundation.sql",
+    "20260706000147_workflow_kernel_atomic_step.sql",
+    "20260706000148_workflow_kernel_safety_hardening.sql",
+    "20260706000149_workflow_kernel_retry_consistency.sql",
+    "20260706000150_automation_policy_config_foundation.sql",
+    "20260708000160_identity_security_foundation.sql",
+    "20260708000170_unified_communication_core.sql",
+    "20260708000180_vendor_authentication_foundation.sql",
+    "20260708000190_client_whatsapp_otp_login_readiness.sql",
+    "20260708000200_vendor_whatsapp_verification_password_reset.sql",
+    "20260709000100_messaging_channel_provider_foundation.sql",
+    "20260709000200_whatsapp_cloud_api_runtime_control.sql",
+    "20260710000100_auth_transport_resilience_decision_foundation.sql",
+    "20260711000100_whatsapp_inbound_message_foundation.sql",
+    "20260711000200_communication_consent_evidence_and_state_hardening.sql",
+    "20260712000300_communication_consent_command_writer_rpc.sql",
+    "20260713000100_communication_consent_ack_intents.sql",
+    "20260716000100_communication_provider_account_binding.sql",
+    "20260720000100_communication_delivery_event_provider_account_required.sql",
+    "20260721000100_communication_consent_ack_intent_provider_account_required.sql",
+    "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql",
+    "20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql",
+    "20260912010000_qf_vendor_package_razorpay_testmode.sql",
+    "20260912020000_qf_package_scope_governance.sql",
+    "20260912021527_qf_launch_pune_only_city_activation.sql",
+    "20260912024734_qf_active_city_authority_hardening.sql",
+    "20260912030000_qf_category_runtime_governance.sql",
+    "20260912040000_qf_aos_v2_intelligence.sql",
+    "20260912050000_qf_lead_generation_scope_lock.sql",
+    "20260923170217_vendor_media_bucket.sql",
+    "20260924183000_jarvis_os_operator_command_receipts.sql",
+    "20260927113000_qf_client_journey_phase1_foundation.sql",
+    "20260927150000_qf_client_journey_phase1_meta_qualification.sql",
+    "20260929154156_shared_single_number_jarvis_access.sql",
+    "20261001144025_qf_verified_location_geofence_straight_line.sql",
+    "20261001153000_qf_multi_city_service_zone_authority.sql",
+    "20261001154500_qf_city_market_runtime_controls.sql",
+    "20261001165000_qf_admin_service_zone_boundary_control.sql",
+    "20261002071500_vendor_fair_opportunity_distribution.sql",
+    "20261002090000_vendor_fair_opportunity_group_reconcile.sql",
+    "20261002091500_vendor_fair_opportunity_fk_indexes.sql",
+    "20261003064500_aarohi_phase1_omnichannel_activation.sql",
+    "20261003070000_aarohi_phase1_fk_indexes.sql",
+    "20261003080000_aarohi_phase2_autonomous_acquisition.sql",
+    "20261003081046_aarohi_full_fk_index_closeout.sql",
+    "20261003083000_aarohi_phase2_scale_governance.sql",
+    "20261003090000_aarohi_phase2_ops_control_analytics.sql",
+    "20261003091000_aarohi_phase2_ops_fk_indexes.sql",
+    "20261004190000_scale_phase07_durable_jobs_hardening.sql",
+    "20261004190001_scale_phase08_matching_prefilter.sql",
+    "20261004190002_scale_phase09_data_lifecycle.sql",
+    "20261005160000_scale_phase12_horizontal_worker_claims.sql",
+    "20261005200000_scale_phase14_agni_governance.sql",
+    "20261005203000_scale_phase14_trace_context.sql",
+    "20261006113000_scale_phase18_matching_slo.sql",
+    "20261006113720_phase22_identity_portability.sql",
+    "20261012080000_anisha_vendor_memory_consent_source.sql",
+    "20261012100000_anisha_memory_purge_delivery.sql",
+    "20261012213000_vendor_assignment_update_authority_closeout.sql"
+  ],
+  "managedOnly": [
+    {
+      "version": "20260722000100",
+      "name": "qf_mvp_staging_baseline_269c9265",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20260926045741",
+      "name": "qf_launch_pune_only_city_activation",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20260926045744",
+      "name": "qf_active_city_authority_hardening",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20260926045753",
+      "name": "qf_aos_v2_intelligence",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20260926045756",
+      "name": "qf_lead_generation_scope_lock",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20260926045759",
+      "name": "vendor_media_bucket",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20260926045802",
+      "name": "jarvis_os_operator_command_receipts",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20260926050242",
+      "name": "qf_phase2_staging_rls_initplan_parity",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20260927072347",
+      "name": "qf_client_journey_phase1_foundation",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20260927090306",
+      "name": "qf_client_journey_phase1_meta_qualification",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20260929161707",
+      "name": "shared_single_number_jarvis_access",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261001151402",
+      "name": "qf_verified_location_geofence_straight_line",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261001153730",
+      "name": "qf_multi_city_service_zone_authority",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261001154754",
+      "name": "qf_city_market_runtime_controls",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261001165444",
+      "name": "qf_admin_service_zone_boundary_control",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261002080447",
+      "name": "vendor_fair_opportunity_distribution",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261002083321",
+      "name": "vendor_fair_opportunity_group_reconcile",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261002083346",
+      "name": "vendor_fair_opportunity_group_reconcile",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261002083936",
+      "name": "vendor_fair_opportunity_fk_indexes",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261002085216",
+      "name": "vendor_fair_opportunity_fk_indexes",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261003034807",
+      "name": "aarohi_phase1_omnichannel_activation",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261003040425",
+      "name": "aarohi_phase1_fk_indexes",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261003072042",
+      "name": "aarohi_phase2_autonomous_acquisition",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261003072049",
+      "name": "aarohi_phase2_scale_governance",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261003072056",
+      "name": "aarohi_phase2_ops_control_analytics",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261003072655",
+      "name": "aarohi_phase2_ops_fk_indexes",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261003081215",
+      "name": "aarohi_full_fk_index_closeout",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261012180214",
+      "name": "qf_vl01_vendor_assignment_update_authority_closeout_staging",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261013053930",
+      "name": "vl05_scale_phase07_durable_jobs_hardening_staging",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261013053959",
+      "name": "vl05_scale_phase12_horizontal_worker_claims_staging",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    },
+    {
+      "version": "20261013144901",
+      "name": "vendor_profile_approval_atomic_v3_staging_20261013",
+      "sqlDigest": null,
+      "note": "NOT_GUESSED: managed statements require a reviewed ledger export"
+    }
+  ],
+  "evidenceSha256": "83196c802dcce37f2a9ad6e995233603a6a47d11f9d65bd289787ce977ed0800"
+}

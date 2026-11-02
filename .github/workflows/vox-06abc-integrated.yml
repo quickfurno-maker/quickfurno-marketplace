@@ -1,0 +1,44 @@
+name: VOX-06ABC Integration - Quarantine, Staff Desk, Stage Acceptance
+on:
+  pull_request:
+    paths:
+      - 'ops/vox/quarantined-migrations/**'
+      - 'supabase/migrations/**'
+      - 'contracts/vox/protectedStageReadOnly.mjs'
+      - 'app/api/vox/v1/desk/route.ts'
+      - 'app/api/vox/v1/my-work/route.ts'
+      - 'apps/vox-web/app/team/page.tsx'
+      - 'scripts/mvp/vox/*vox06*'
+      - 'scripts/mvp/vox/*managed-migration*'
+      - '.github/workflows/vox-06abc-integrated.yml'
+permissions:
+  contents: read
+jobs:
+  single-branch-release-hold:
+    runs-on: ubuntu-latest
+    timeout-minutes: 23
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: node --test scripts/mvp/vox/validate-vox06abc-integrated.test.mjs scripts/mvp/vox/validate-vox06a-quarantine.test.mjs scripts/mvp/vox/validate-vox06b-staff-desk.test.mjs scripts/mvp/vox/validate-vox06c-protected-stage.test.mjs
+      - run: node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs
+      - run: node scripts/mvp/vox/validate-vox15-staging-preflight.mjs
+      - name: Unsafe real migration, Auth and provider activation MUST remain blocked
+        shell: bash
+        run: |
+          set +e
+          node scripts/mvp/vox/verify-pr300-managed-migration-hold.mjs --release-check
+          code=$?
+          set -e
+          test "$code" -eq 42
+          node scripts/mvp/vox/run-vox06c-protected-staging.mjs
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: apps/vox-web
+      - run: npm run typecheck
+        working-directory: apps/vox-web

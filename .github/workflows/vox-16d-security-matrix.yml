@@ -1,0 +1,19 @@
+name: VOX-16D security role and revocation matrix
+on:
+  pull_request:
+    paths:
+      - 'scripts/mvp/vox/validate-vox16d-security-matrix.mjs'
+      - 'docs/vox/VOX-16D-SECURITY-MATRIX.md'
+      - '.github/workflows/vox-16d-security-matrix.yml'
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with: {node-version: '20.20.2'}
+      - run: |
+          node scripts/mvp/vox/validate-vox16d-security-matrix.mjs
+          node scripts/mvp/vox/validate-vox-11-qa.mjs

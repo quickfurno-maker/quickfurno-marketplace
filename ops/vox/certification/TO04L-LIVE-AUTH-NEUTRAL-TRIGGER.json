@@ -1,0 +1,58 @@
+{
+  "schema": "qf.vox.to04l.auth-neutral-profile-trigger.v1",
+  "capturedDate": "2026-10-15",
+  "source": "read-only connected Supabase auth.users trigger / public.profiles columns and constraints metadata",
+  "containsUserRows": false,
+  "environments": {
+    "staging": {
+      "triggerName": "on_auth_user_created",
+      "afterInsert": true,
+      "triggerFunction": "public.handle_new_user()",
+      "securityDefiner": true,
+      "selectsServerAppMetadataKey": "qf_principal",
+      "serverVendorClassification": "vendor",
+      "vendorProfileRole": "vendor",
+      "otherClassificationRole": null,
+      "readsUserMetadataOnlyFor": [
+        "full_name",
+        "phone"
+      ],
+      "writesAdminRole": false,
+      "profileRoleNullable": true,
+      "profileRoleCheckValues": [
+        "admin",
+        "vendor"
+      ],
+      "profileRoleDefault": null
+    },
+    "production": {
+      "triggerName": "on_auth_user_created",
+      "afterInsert": true,
+      "triggerFunction": "public.handle_new_user()",
+      "securityDefiner": true,
+      "selectsServerAppMetadataKey": "qf_principal",
+      "serverVendorClassification": "vendor",
+      "vendorProfileRole": "vendor",
+      "otherClassificationRole": null,
+      "readsUserMetadataOnlyFor": [
+        "full_name",
+        "phone"
+      ],
+      "writesAdminRole": false,
+      "profileRoleNullable": true,
+      "profileRoleCheckValues": [
+        "admin",
+        "vendor"
+      ],
+      "profileRoleDefault": null
+    }
+  },
+  "requiresActualAuthSignupE2e": true,
+  "requiresIndependentHumanFirstTl": true,
+  "requiresApprovedVoXMembership": false,
+  "realStageRun": false,
+  "securityReviewerApproved": false,
+  "stagingSchemaInstalled": false,
+  "releaseAuthorized": false,
+  "notes": "A neutral public.profiles.role value is required but not sufficient for Staff. Existing Supabase Auth must also confirm app_metadata qf_principal='vox_staff' and AAL2; Core current Staff membership and independently reviewed exact city/object/department grant must all be valid. A user-controlled raw_user_meta_data role must never grant Admin or Staff."
+}

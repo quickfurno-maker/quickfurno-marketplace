@@ -28,6 +28,7 @@ import {
   EXPECTED_LIVE_MIGRATION_COUNT,
   EXPECTED_POST_RECONCILIATION_ADDITIONS,
   POST_G1_EXTENSION_RECORDS,
+  ACTIVE_POST_G1_EXTENSION_RECORDS,
   SUPERSEDED_LEGACY_VERSIONS,
 } from "../staging/live-migration-ledger.mjs";
 
@@ -302,8 +303,10 @@ check("22 the frozen 80.05 reconciliation count is still 102", () => {
   eq(EXPECTED_POST_RECONCILIATION_ADDITIONS,
     (MANIFEST.pendingPostAnchorMigrations ?? []).length +
     (MANIFEST.stagingAppliedPostAnchorMigrations ?? []).length -
-    SUPERSEDED_LEGACY_VERSIONS.length + POST_G1_EXTENSION_RECORDS.length,
-    "legacy sets plus extension and supersession account for every addition");
+    SUPERSEDED_LEGACY_VERSIONS.length + ACTIVE_POST_G1_EXTENSION_RECORDS.length,
+    "legacy sets plus active extension and supersession account for every addition");
+  eq(POST_G1_EXTENSION_RECORDS.length - ACTIVE_POST_G1_EXTENSION_RECORDS.length, 7,
+    "seven SHA256-pinned historical VOX migrations remain quarantined from the runnable tree");
 });
 
 // ---- 23-26. the new vocabulary, and what it may not become -----------------

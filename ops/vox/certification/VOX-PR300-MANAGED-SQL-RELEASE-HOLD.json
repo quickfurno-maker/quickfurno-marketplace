@@ -1,0 +1,116 @@
+{
+  "schema": "qf.vox.release.migration.quarantine.v2",
+  "observedOn": "2026-10-15",
+  "reviewPr": "https://github.com/quickfurno-maker/quickfurno-marketplace/pull/300",
+  "evidenceScope": "Exact original Git blobs preserved under ops/vox/quarantined-migrations/legacy-20261014; live Supabase metadata read-only",
+  "legacyManagedMigrations": [
+    {
+      "path": "ops/vox/quarantined-migrations/legacy-20261014/20261014010000_vox_v1_scoped_staff_authority.sql",
+      "gitBlobSha": "6cd860e00513f95da6ba4b0ee1bfc7bde5d8871b",
+      "approvedForAutoApply": false
+    },
+    {
+      "path": "ops/vox/quarantined-migrations/legacy-20261014/20261014020000_vox_v1_staff_review_workflow.sql",
+      "gitBlobSha": "ca8797d5406d9fd186014137bb8ae0e8941f8a16",
+      "approvedForAutoApply": false
+    },
+    {
+      "path": "ops/vox/quarantined-migrations/legacy-20261014/20261014030000_vox_v1_approved_grant_finalizer.sql",
+      "gitBlobSha": "7bd6c107c7d49c48c52c88550bfb13312dd8de35",
+      "approvedForAutoApply": false
+    },
+    {
+      "path": "ops/vox/quarantined-migrations/legacy-20261014/20261014040000_vox_v1_staff_emergency_revocation.sql",
+      "gitBlobSha": "73c7732d4d2b7c7c67b656406a23bab91871ca6f",
+      "approvedForAutoApply": false
+    },
+    {
+      "path": "ops/vox/quarantined-migrations/legacy-20261014/20261014050000_vox_v1_team_leader_review_policy.sql",
+      "gitBlobSha": "d9f62ef0e83a43ef179690e14c643f62e8beb699",
+      "approvedForAutoApply": false
+    },
+    {
+      "path": "ops/vox/quarantined-migrations/legacy-20261014/20261014060000_vox_operational_intent_review.sql",
+      "gitBlobSha": "195035e2abbbd5fc9b7fe24dc903b6572dc31e8e",
+      "approvedForAutoApply": false
+    },
+    {
+      "path": "ops/vox/quarantined-migrations/legacy-20261014/20261014070000_vox_approved_followup_executor.sql",
+      "gitBlobSha": "2bf075fc798d62ff47d68c17b23fd590423172a9",
+      "approvedForAutoApply": false
+    }
+  ],
+  "proposedSqlCandidates": [
+    {
+      "path": "ops/vox/sql-candidates/20261015010000_vox_to02b_staff_department_governance.sql",
+      "gitBlobSha": "ddccffe37ae410ff0f37e351dc13a97955feb717",
+      "approvedForAutoApply": false
+    },
+    {
+      "path": "ops/vox/sql-candidates/20261015020000_vox_to02c_reviewed_department_actions.sql",
+      "gitBlobSha": "dbbd137ccab862a040b7690b22d14dad6b9d0055",
+      "approvedForAutoApply": false
+    },
+    {
+      "path": "ops/vox/sql-candidates/20261015030000_vox_to02e_work_queue_atomic_candidate.sql",
+      "gitBlobSha": "bab273d0907b3525915451d1f0d61ba64acbdb9d",
+      "approvedForAutoApply": false
+    }
+  ],
+  "databaseReadiness": {
+    "staging": {
+      "checked": true,
+      "missingVoxTables": 13,
+      "baselineCoreTablesPresent": [
+        "cities",
+        "profiles",
+        "aarohi_tasks",
+        "aarohi_events",
+        "aarohi_prospects"
+      ],
+      "recordedMigrations": 86,
+      "voxMigrationVersionsApplied": 0
+    },
+    "production": {
+      "checked": true,
+      "missingVoxTables": 13,
+      "baselineCoreTablesPresent": [
+        "cities",
+        "profiles",
+        "aarohi_tasks",
+        "aarohi_events",
+        "aarohi_prospects"
+      ],
+      "recordedMigrations": 86,
+      "voxMigrationVersionsApplied": 0
+    }
+  },
+  "schemaTracks": {
+    "legacy": "Legacy October 14 VOX authority SQL QUARANTINED outside supabase/migrations, original Git bytes unchanged",
+    "new": "VOX 20261015: reviewed department request, decision, capability, activation, events and Core work candidate",
+    "canonicalSelected": false,
+    "duplicateAuthorityReviewed": false,
+    "independentGrantDecisionSignatureVerified": false
+  },
+  "approvals": {
+    "independentDbReviewer": false,
+    "securityReviewer": false,
+    "firstTeamLeaderHumanReviewer": false,
+    "original86LedgerSqlBytesReconciled": false,
+    "originalStagingBackupRestoredInIsolation": false,
+    "protectedStageAal2IdorConsentCertified": false,
+    "signedImmutableDeployRollback": false,
+    "ownerGoNoGo": false
+  },
+  "deployment": {
+    "managedMigrationAutoApplyPermitted": false,
+    "activationFlagsEnabled": false,
+    "aiProviderSendsEnabled": false,
+    "productionAuthorized": false
+  },
+  "notes": [
+    "Exactly seven legacy VOX SQL blobs are stored under ops/vox/quarantined-migrations/legacy-20261014; no VOX SQL may remain in supabase/migrations.",
+    "No SQL path in quarantine is a deployable Supabase managed migration. DBA must independently select one canonical schema/authority chain.",
+    "Hash checks and directory enumeration do not substitute for real staging backup, SQL source parity, independent security review, or protected deployment controls."
+  ]
+}

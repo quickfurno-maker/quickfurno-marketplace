@@ -1,0 +1,20 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";import {resolve} from "node:path";
+const root=resolve(import.meta.dirname,"../../.."),src=readFileSync(resolve(root,"app/api/vox/v1/vendor-profile-review/route.ts"),"utf8");
+const service=readFileSync(resolve(root,"services/vendorProfileChangeService.ts"),"utf8");
+let n=0;function t(name,f){f();n++;console.log("PASS "+name)}
+t("default off",()=>assert.match(src,/VOX_VENDOR_PROFILE_REVIEW_ENABLED!=="staging"/));
+t("verified AAL2 scoped staff",()=>assert.match(src,/getVerifiedScopedStaff/));
+t("active vendor",()=>assert.match(src,/\.eq\("is_active",true\)/));
+t("canonical zone city",()=>assert.match(src,/\.eq\("city_id",scope.cityId\)/));
+t("assigned vendor required",()=>assert.match(src,/scope.vendorIds.includes\(vendorId\)/));
+t("native change request table",()=>assert.match(src,/vendor_profile_change_requests/));
+t("only pending",()=>assert.match(src,/\.eq\("status","pending"\)/));
+t("bounded twenty",()=>assert.match(src,/\.limit\(21\)/));
+t("no proposed changes or admin notes leaked",()=>assert.doesNotMatch(src,/select\([^)]*(proposed_changes|admin_notes)/));
+t("reply is read only",()=>assert.match(src,/actionsEnabled:false/));
+t("no untrusted execution via intent",()=>assert.doesNotMatch(src,/qf_vox_execute|qf_approve_vendor_profile_update_v3/));
+t("mutating methods denied",()=>assert.equal((src.match(/CORE_APPROVAL_REQUIRED/g)||[]).length,3));
+t("canonical v3 existing atomic approval",()=>assert.match(service,/db.rpc\("qf_approve_vendor_profile_update_v3"/));
+t("office location split-write prohibited",()=>assert.match(service,/request.request_type === "office_location_change"/));
+console.log("VOX16C_PROFILE_NATIVE_APPROVAL_REVIEW_PASS "+n+"/"+n);

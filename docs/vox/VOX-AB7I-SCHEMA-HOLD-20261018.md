@@ -1,0 +1,3 @@
+# AB-7I A — managed staging migration preflight (RELEASE HOLD)
+
+Live read-only QuickFurno Staging information_schema currently contains native conversation/command tables and **zero installed public vox_* tables**. `contracts/vox/ab7iStagingMigrationPreflight.mjs` enforces canonical baseline tables, detects partial VOX installation, demands exact migration/rollback digests and independent release/Owner checks. It **never executes SQL**; `canApply=false` even with affirmative evidence. No migration has been applied. The true managed schema/constraints and order-dependent candidate migrations still require DBA reconciliation and verified migration dry-run.

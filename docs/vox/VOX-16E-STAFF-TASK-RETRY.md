@@ -1,0 +1,5 @@
+# VOX-16E — Idempotent Vendor 360 staff task retries
+
+Existing Core `createVendorTask` writer already enforces canonical `vendor_tasks` unique idempotency receipts and exact task/vender/actor/payload match. The Vendor 360 Web UI previously generated `crypto.randomUUID()` **for every HTTP retry**; if the server committed but the response was lost, a user retry could create a second task. New UI holds one UUID for the same unchanged draft across network errors, HTTP failures, and uncertain response. On confirmed accepted task it resets the nonce; on changes to vendor, title, category, priority, due date it resets to represent a new distinct intent. Prevent input edits during in-flight delivery.
+
+No WhatsApp, finance, profile, credits or vendor-facing mutations; existing server AAL2/city/assignment/staff controls unchanged. Source-level CI plus native Core writer test; still requires real controlled staging concurrent HTTP/DB tests after SQL migration and staff MFA authorization. Flags stay OFF. No live deployment.

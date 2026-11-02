@@ -1,0 +1,21 @@
+.voxFlow{max-width:1060px;margin:0 auto;min-height:100vh;background:#091720;color:#e5f4ed;padding:clamp(19px,4vw,46px)}
+.voxFlow a{color:#a4e7ce}.voxFlowNav{display:flex;align-items:center;gap:13px;font-size:13px;margin-bottom:26px}
+.voxFlowHero{padding:clamp(22px,4vw,42px);border:1px solid #336557;border-radius:18px;background:linear-gradient(115deg,#153239,#0b1822);margin-bottom:22px}
+.voxFlowEyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.15em;color:#a0dcca}
+.voxFlowHero h1{font-size:clamp(30px,5vw,45px);margin:10px 0}
+.voxFlowHero p{color:#c1d5cc;line-height:1.7;max-width:740px}
+.voxFlowStatus{display:inline-block;border:1px solid #b8a784;color:#f2dba3;border-radius:100px;padding:6px 12px;font-size:12px}
+.voxFlowCard{background:#10262d;border:1px solid #3b5e57;border-radius:17px;padding:clamp(20px,3vw,29px);margin:18px 0}
+.voxFlowCard h2{margin:0 0 16px;font-size:23px}.voxFlowMuted{font-size:14px;color:#c1d3cc;line-height:1.6}
+.voxFlowList{padding:0;margin:0;list-style:none;display:grid;gap:11px}
+.voxFlowRow{background:#193237;border:1px solid #3f6057;border-radius:12px;padding:17px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center}
+.voxFlowRow p{margin:7px 0;color:#c9d8d2;font-size:14px;overflow-wrap:anywhere}
+.voxFlowRow span,.voxFlowRow time{font-size:12px;color:#b3d8c8}
+.voxFlowForm{display:grid;gap:11px;max-width:740px}.voxFlowForm label{font-size:13px;font-weight:600}
+.voxFlowForm input,.voxFlowForm textarea{background:#071f27;color:#f3faf6;border:1px solid #5d8076;border-radius:9px;padding:12px;font:inherit;width:100%;box-sizing:border-box}
+.voxFlowForm textarea{min-height:100px;resize:vertical}
+.voxFlowButton{color:#07221c;border:0;border-radius:9px;background:#a5ebce;padding:11px 16px;font-weight:750;cursor:pointer}
+.voxFlowButton[disabled]{opacity:.5;cursor:not-allowed}.voxFlowActions{display:flex;flex-wrap:wrap;gap:9px}
+.voxFlowError{font-size:13px;color:#ffe1af;line-height:1.6}.voxFlowLinks{display:flex;gap:19px;flex-wrap:wrap;margin:23px 0}
+.voxFlow a:focus-visible,.voxFlow button:focus-visible,.voxFlow input:focus-visible,.voxFlow textarea:focus-visible{outline:3px solid #ffdf91;outline-offset:3px}
+@media(max-width:590px){.voxFlowRow{align-items:flex-start;flex-direction:column}}

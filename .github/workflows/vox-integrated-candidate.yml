@@ -1,0 +1,48 @@
+name: VOX Integrated Candidate - Release HOLD
+on:
+  pull_request:
+    paths:
+      - 'apps/vox-web/**'
+      - 'app/api/vox/**'
+      - 'contracts/vox/**'
+      - 'services/vox/**'
+      - 'supabase/migrations/*vox*'
+      - 'scripts/mvp/vox/**'
+      - 'docs/vox/**'
+      - '.github/workflows/vox-integrated-candidate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: vox-integrated-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  core-web-postgres-and-ingress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - name: Core source and release HOLD gates
+        run: |
+          node scripts/mvp/vox/validate-vox-11-qa.mjs
+          node scripts/mvp/vox/validate-vox-11c-safety.mjs
+      - name: Disposable PostgreSQL 17 approved follow-up tests
+        shell: pwsh
+        run: ./scripts/mvp/vox/validate-vox12a-postgres.ps1
+      - name: Typecheck Core
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+      - name: Web source guards, TypeScript and production build
+        working-directory: apps/vox-web
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          npm run typecheck
+          npm run build
+      - name: Actual locked Next standalone HTTP Origin and Host checks
+        working-directory: apps/vox-web
+        run: node scripts/smoke-standalone-origin-12b.mjs

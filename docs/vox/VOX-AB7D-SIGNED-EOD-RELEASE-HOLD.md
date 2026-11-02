@@ -1,0 +1,4 @@
+# VOX AB-7D — Four Signed Source EOD + Independent TL, Release HOLD
+New `ab7OfficialEod.mjs` validates a verified upstream **four different Ed25519-signed source** manifest + current actor and DB source-window/grant checks, then requires an injected one-transaction Core four-source snapshot/nonce receipt and **separate** independent Team Leader AAL2 ACK with fresh source/reviewer/grant rechecks. Can never call a UI SQL checksum alone official.
+Focused tests: forged signature/source counts, stale current AAL2 and reviewer, fraudulent four-source receipt, self reviewer, revision mismatch.
+The upstream signature verification helper already exists in AB3; here receipt methods are **injected candidates**, not actual registered live Core RPCs. No official report is submitted to production; no Team Leader is actually enrolled/authorized. No managed migrations.

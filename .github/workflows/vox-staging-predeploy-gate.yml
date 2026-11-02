@@ -1,0 +1,40 @@
+name: VOX staging predeploy gate
+# Fail-closed pre-deployment gate for VOX Staging readiness (Finance, EOD, outreach, Core, Web).
+# Intended REQUIRED status check: "VOX staging predeploy gate / predeploy-gate". It deliberately has no
+# path filter so a pull request can never skip it. The logic and its negative regression live in
+# scripts/mvp/vox/qa-staging-predeploy-gate.test.mjs. It checks:
+#   - protected source hard-off switches are literally false (Finance, EOD signer and publish, outreach sender)
+#   - protected routes keep their exact-match staging gates, and env templates and every workflow leave
+#     Finance, EOD and outreach flags off
+#   - no live credentials in the environment, env templates or workflows; no secrets context in VOX workflows
+#   - the generated RC38 staged-migration digest is valid SHA-256, recomputable, deterministic, with releaseGo false
+#   - this workflow stays always-on, read-only and SHA-pinned
+# It never connects to managed Supabase or Staging, runs no SQL and holds no credentials. To enable a protected
+# flag in Staging, raise a separate independently approved change that also updates the gate expectations.
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: vox-staging-predeploy-gate-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  predeploy-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run fail-closed predeploy gate and its negative regression
+        run: node --test scripts/mvp/vox/qa-staging-predeploy-gate.test.mjs
+      - name: Preserve managed Staging HOLD
+        if: always()
+        run: echo 'Source-only gate. No managed or Staging mutation, no credentials. Staging stays HELD until independent approval.' >> "$GITHUB_STEP_SUMMARY"

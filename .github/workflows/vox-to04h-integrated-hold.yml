@@ -1,0 +1,67 @@
+name: VOX TO-04H Real Migration + 50 Distinct Claim Integration HOLD
+on:
+  pull_request:
+    paths:
+      - 'ops/vox/certification/TO04G-READONLY-MIGRATION-METADATA.json'
+      - 'scripts/mvp/vox/*to04g-migration*'
+      - 'scripts/mvp/vox/*to04h*'
+      - 'docs/vox/VOX-TO04G-*'
+      - '.github/workflows/vox-to04h-integrated-hold.yml'
+permissions:
+  contents: read
+jobs:
+  core-migration-human-and-pg17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: vox_to04h_synthetic
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic_fixture_only
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vox_to04h_synthetic"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: synthetic_fixture_only
+      PGDATABASE: vox_to04h_synthetic
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - name: Unified authorization and real metadata contracts
+        run: |
+          node --test scripts/mvp/vox/validate-to04h-integrated-gates.test.mjs
+          node --test scripts/mvp/vox/validate-to04g-migration-history.test.mjs
+          node --test scripts/mvp/vox/validate-to04f-zone-scope.test.mjs
+      - name: No independent DBA means two explicit release denials
+        shell: bash
+        run: |
+          for script in scripts/mvp/vox/check-to04c-schema-readiness.mjs scripts/mvp/vox/verify-to04g-migration-history.mjs; do
+            set +e
+            node "$script" --release-check
+            CODE=$?
+            set -e
+            test "$CODE" -eq 42
+          done
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Actual synthetic PostgreSQL17 source, grants, RLS and denial tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to02e-work-minimal-pg17.sql
+          psql -X -v ON_ERROR_STOP=1 -f ops/vox/sql-candidates/20261015030000_vox_to02e_work_queue_atomic_candidate.sql
+          psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to02e-work-atomic-assertions.sql
+          psql -X -v ON_ERROR_STOP=1 -f scripts/mvp/vox/fixtures/vox-to04h-capacity-baseline.sql
+          bash scripts/mvp/vox/fixtures/vox-to04f-50-distinct-capacity.sh
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck

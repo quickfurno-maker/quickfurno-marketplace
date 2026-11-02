@@ -1,0 +1,1398 @@
+{
+  "schema": "qf.vox.rc26.migration-release-plan.v1",
+  "status": "HOLD_EXTERNAL_EVIDENCE_REQUIRED",
+  "releaseGo": false,
+  "managedWrites": false,
+  "installationClaimedSafe": false,
+  "snapshotSha256": "c43c8f0d36889cf94881ffb279e2ece8653f392103b6d07741388c229509723e",
+  "sourceAggregateSha256": "f36ee78578c26b9b5a6bcd75c92aeb262504c8186f386ae541bda09826725e3f",
+  "legacyV1Sha256": "bd16bfb3cf28a7c87b579efaae3c6c543eb78e241bb1b03e7ff95075c3e056a8",
+  "baselineVersion": "20260722000100",
+  "latestManagedVersion": "20261013144901",
+  "stagingCounts": {
+    "STAGING_BASELINE_SQUASH": 1,
+    "RETIMESTAMPED_EXACT_NAME": 21,
+    "STAGING_ONLY_NO_SOURCE_FILE": 2,
+    "REPEATED_STAGING_NAME_REAPPLY": 4,
+    "RETIMESTAMPED_NORMALISED_NAME_CANDIDATE": 3
+  },
+  "sourceCounts": {
+    "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED": 68,
+    "HISTORICAL_GAP_NOT_IN_MANAGED_LEDGER": 12,
+    "FINANCE_V1_REPLAY_HAZARD": 1,
+    "RETIMESTAMPED_ON_STAGING_CANDIDATE": 26
+  },
+  "orderInversions": [
+    [
+      "20261003083000_aarohi_phase2_scale_governance.sql",
+      "20261003081046_aarohi_full_fk_index_closeout.sql"
+    ],
+    [
+      "20261003090000_aarohi_phase2_ops_control_analytics.sql",
+      "20261003081046_aarohi_full_fk_index_closeout.sql"
+    ],
+    [
+      "20261003091000_aarohi_phase2_ops_fk_indexes.sql",
+      "20261003081046_aarohi_full_fk_index_closeout.sql"
+    ],
+    [
+      "20261012213000_vendor_assignment_update_authority_closeout.sql",
+      "20261004190000_scale_phase07_durable_jobs_hardening.sql"
+    ],
+    [
+      "20261012213000_vendor_assignment_update_authority_closeout.sql",
+      "20261005160000_scale_phase12_horizontal_worker_claims.sql"
+    ]
+  ],
+  "staging": [
+    {
+      "version": "20260722000100",
+      "name": "qf_mvp_staging_baseline_269c9265",
+      "class": "STAGING_BASELINE_SQUASH",
+      "sourceCandidates": [],
+      "dbaQuestion": "Which source files does the baseline physically contain? Requires catalog diff, not version inference."
+    },
+    {
+      "version": "20260926045741",
+      "name": "qf_launch_pune_only_city_activation",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20260912021527_qf_launch_pune_only_city_activation.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20260926045744",
+      "name": "qf_active_city_authority_hardening",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20260912024734_qf_active_city_authority_hardening.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20260926045753",
+      "name": "qf_aos_v2_intelligence",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20260912040000_qf_aos_v2_intelligence.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20260926045756",
+      "name": "qf_lead_generation_scope_lock",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20260912050000_qf_lead_generation_scope_lock.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20260926045759",
+      "name": "vendor_media_bucket",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20260923170217_vendor_media_bucket.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20260926045802",
+      "name": "jarvis_os_operator_command_receipts",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20260924183000_jarvis_os_operator_command_receipts.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20260926050242",
+      "name": "qf_phase2_staging_rls_initplan_parity",
+      "class": "STAGING_ONLY_NO_SOURCE_FILE",
+      "sourceCandidates": [],
+      "dbaQuestion": "Managed-only change with no source file: recover its SQL from the managed ledger statements before any release."
+    },
+    {
+      "version": "20260927072347",
+      "name": "qf_client_journey_phase1_foundation",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20260927113000_qf_client_journey_phase1_foundation.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20260927090306",
+      "name": "qf_client_journey_phase1_meta_qualification",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20260927150000_qf_client_journey_phase1_meta_qualification.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20260929161707",
+      "name": "shared_single_number_jarvis_access",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20260929154156_shared_single_number_jarvis_access.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261001151402",
+      "name": "qf_verified_location_geofence_straight_line",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20261001144025_qf_verified_location_geofence_straight_line.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261001153730",
+      "name": "qf_multi_city_service_zone_authority",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20261001153000_qf_multi_city_service_zone_authority.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261001154754",
+      "name": "qf_city_market_runtime_controls",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20261001154500_qf_city_market_runtime_controls.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261001165444",
+      "name": "qf_admin_service_zone_boundary_control",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20261001165000_qf_admin_service_zone_boundary_control.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261002080447",
+      "name": "vendor_fair_opportunity_distribution",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20261002071500_vendor_fair_opportunity_distribution.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261002083321",
+      "name": "vendor_fair_opportunity_group_reconcile",
+      "class": "REPEATED_STAGING_NAME_REAPPLY",
+      "sourceCandidates": [
+        "20261002090000_vendor_fair_opportunity_group_reconcile.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261002083346",
+      "name": "vendor_fair_opportunity_group_reconcile",
+      "class": "REPEATED_STAGING_NAME_REAPPLY",
+      "sourceCandidates": [
+        "20261002090000_vendor_fair_opportunity_group_reconcile.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261002083936",
+      "name": "vendor_fair_opportunity_fk_indexes",
+      "class": "REPEATED_STAGING_NAME_REAPPLY",
+      "sourceCandidates": [
+        "20261002091500_vendor_fair_opportunity_fk_indexes.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261002085216",
+      "name": "vendor_fair_opportunity_fk_indexes",
+      "class": "REPEATED_STAGING_NAME_REAPPLY",
+      "sourceCandidates": [
+        "20261002091500_vendor_fair_opportunity_fk_indexes.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261003034807",
+      "name": "aarohi_phase1_omnichannel_activation",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20261003064500_aarohi_phase1_omnichannel_activation.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261003040425",
+      "name": "aarohi_phase1_fk_indexes",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20261003070000_aarohi_phase1_fk_indexes.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261003072042",
+      "name": "aarohi_phase2_autonomous_acquisition",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20261003080000_aarohi_phase2_autonomous_acquisition.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261003072049",
+      "name": "aarohi_phase2_scale_governance",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20261003083000_aarohi_phase2_scale_governance.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261003072056",
+      "name": "aarohi_phase2_ops_control_analytics",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20261003090000_aarohi_phase2_ops_control_analytics.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261003072655",
+      "name": "aarohi_phase2_ops_fk_indexes",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20261003091000_aarohi_phase2_ops_fk_indexes.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261003081215",
+      "name": "aarohi_full_fk_index_closeout",
+      "class": "RETIMESTAMPED_EXACT_NAME",
+      "sourceCandidates": [
+        "20261003081046_aarohi_full_fk_index_closeout.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261012180214",
+      "name": "qf_vl01_vendor_assignment_update_authority_closeout_staging",
+      "class": "RETIMESTAMPED_NORMALISED_NAME_CANDIDATE",
+      "sourceCandidates": [
+        "20261012213000_vendor_assignment_update_authority_closeout.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261013053930",
+      "name": "vl05_scale_phase07_durable_jobs_hardening_staging",
+      "class": "RETIMESTAMPED_NORMALISED_NAME_CANDIDATE",
+      "sourceCandidates": [
+        "20261004190000_scale_phase07_durable_jobs_hardening.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261013053959",
+      "name": "vl05_scale_phase12_horizontal_worker_claims_staging",
+      "class": "RETIMESTAMPED_NORMALISED_NAME_CANDIDATE",
+      "sourceCandidates": [
+        "20261005160000_scale_phase12_horizontal_worker_claims.sql"
+      ],
+      "dbaQuestion": "Compare managed applied statements/function hashes to the candidate source SQL; a name match proves nothing."
+    },
+    {
+      "version": "20261013144901",
+      "name": "vendor_profile_approval_atomic_v3_staging_20261013",
+      "class": "STAGING_ONLY_NO_SOURCE_FILE",
+      "sourceCandidates": [],
+      "dbaQuestion": "Managed-only change with no source file: recover its SQL from the managed ledger statements before any release."
+    }
+  ],
+  "source": [
+    {
+      "file": "20260620000001_create_tables.sql",
+      "version": "20260620000001",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260620000002_rls_policies.sql",
+      "version": "20260620000002",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260620000003_functions.sql",
+      "version": "20260620000003",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260620000004_seed_data.sql",
+      "version": "20260620000004",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260620000005_homepage_alignment.sql",
+      "version": "20260620000005",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260621000006_superadmin_foundation.sql",
+      "version": "20260621000006",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260622000007_vendor_location.sql",
+      "version": "20260622000007",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260624000008_lead_capture_consent.sql",
+      "version": "20260624000008",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260624000009_vendor_onboarding.sql",
+      "version": "20260624000009",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260624000010_vendor_exact_columns.sql",
+      "version": "20260624000010",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260624000011_vendor_office_address.sql",
+      "version": "20260624000011",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260627000012_aos_management_foundation.sql",
+      "version": "20260627000012",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260627000013_crm_analytics_foundation.sql",
+      "version": "20260627000013",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260628000014_aos_control_center_foundation.sql",
+      "version": "20260628000014",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260628000015_crm_analytics_foundation_safe_placeholders.sql",
+      "version": "20260628000015",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260630000016_aos_runtime_settings.sql",
+      "version": "20260630000016",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260630000017_lead_assignment_approvals.sql",
+      "version": "20260630000017",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260630000018_vendor_actions_credits_package_sync.sql",
+      "version": "20260630000018",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260630000019_assignment_ledger_snapshots.sql",
+      "version": "20260630000019",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260630000020_align_active_cities.sql",
+      "version": "20260630000020",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260630000021_category_governance.sql",
+      "version": "20260630000021",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260701000022_phase_25a_paid_only_auto_match_free_vendor_interest.sql",
+      "version": "20260701000022",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260701000023_vendor_package_orders.sql",
+      "version": "20260701000023",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260701000024_vendor_profile_change_requests.sql",
+      "version": "20260701000024",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260701000025_vendor_notifications_support.sql",
+      "version": "20260701000025",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260701000026_bad_lead_report_safety_fields.sql",
+      "version": "20260701000026",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260701000027_phase26a_auto_lead_matching_foundation.sql",
+      "version": "20260701000027",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260701000028_phase26a_live_schema_repair.sql",
+      "version": "20260701000028",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260701000029_phase26a2_admin_audit_hardening.sql",
+      "version": "20260701000029",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260701000030_phase26a2c_smart_override_assignment.sql",
+      "version": "20260701000030",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260701000031_phase26a2c_recovery_fallback_reporting.sql",
+      "version": "20260701000031",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260701000032_phase26a2d_client_requirement_groups.sql",
+      "version": "20260701000032",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260701000033_phase26a2e_preferred_vendor_recharge_window.sql",
+      "version": "20260701000033",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260702000034_fix_auto_match_category_mapping.sql",
+      "version": "20260702000034",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260702000035_preferred_vendor_lead_intent.sql",
+      "version": "20260702000035",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260702000037_fix_preferred_vendor_credit_direct_assignment.sql",
+      "version": "20260702000037",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260702000038_lead_quality_engine_phase1.sql",
+      "version": "20260702000038",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260702000039_b_lead_clarification_flow.sql",
+      "version": "20260702000039",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260704000040_google_area_location_foundation.sql",
+      "version": "20260704000040",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260704000100_align_lead_quality_status_constraints.sql",
+      "version": "20260704000100",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260704000110_lead_scores_security_hardening.sql",
+      "version": "20260704000110",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260705000130_distance_category_matching_rpc.sql",
+      "version": "20260705000130",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260706000140_vendor_accepting_leads.sql",
+      "version": "20260706000140",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260706000141_vendor_credit_wallet_rpc.sql",
+      "version": "20260706000141",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260706000142_credit_wallet_assignment_rpc.sql",
+      "version": "20260706000142",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260706000143_preferred_assignment_accepting_leads.sql",
+      "version": "20260706000143",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260706000144_manual_assignment_accepting_leads.sql",
+      "version": "20260706000144",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260706000145_package_purchase_idempotent_grant.sql",
+      "version": "20260706000145",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260706000146_create_qf_workflow_kernel_foundation.sql",
+      "version": "20260706000146",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260706000147_workflow_kernel_atomic_step.sql",
+      "version": "20260706000147",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260706000148_workflow_kernel_safety_hardening.sql",
+      "version": "20260706000148",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260706000149_workflow_kernel_retry_consistency.sql",
+      "version": "20260706000149",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260706000150_automation_policy_config_foundation.sql",
+      "version": "20260706000150",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260708000160_identity_security_foundation.sql",
+      "version": "20260708000160",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260708000170_unified_communication_core.sql",
+      "version": "20260708000170",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260708000180_vendor_authentication_foundation.sql",
+      "version": "20260708000180",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260708000190_client_whatsapp_otp_login_readiness.sql",
+      "version": "20260708000190",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260708000200_vendor_whatsapp_verification_password_reset.sql",
+      "version": "20260708000200",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260709000100_messaging_channel_provider_foundation.sql",
+      "version": "20260709000100",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260709000200_whatsapp_cloud_api_runtime_control.sql",
+      "version": "20260709000200",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260710000100_auth_transport_resilience_decision_foundation.sql",
+      "version": "20260710000100",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260711000100_whatsapp_inbound_message_foundation.sql",
+      "version": "20260711000100",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260711000200_communication_consent_evidence_and_state_hardening.sql",
+      "version": "20260711000200",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260712000300_communication_consent_command_writer_rpc.sql",
+      "version": "20260712000300",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260713000100_communication_consent_ack_intents.sql",
+      "version": "20260713000100",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260716000100_communication_provider_account_binding.sql",
+      "version": "20260716000100",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260720000100_communication_delivery_event_provider_account_required.sql",
+      "version": "20260720000100",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260721000100_communication_consent_ack_intent_provider_account_required.sql",
+      "version": "20260721000100",
+      "class": "PRE_BASELINE_PRESUMED_SQUASHED_UNVERIFIED",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql",
+      "version": "20260903040000",
+      "class": "HISTORICAL_GAP_NOT_IN_MANAGED_LEDGER",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql",
+      "version": "20260912000000",
+      "class": "HISTORICAL_GAP_NOT_IN_MANAGED_LEDGER",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260912010000_qf_vendor_package_razorpay_testmode.sql",
+      "version": "20260912010000",
+      "class": "FINANCE_V1_REPLAY_HAZARD",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260912020000_qf_package_scope_governance.sql",
+      "version": "20260912020000",
+      "class": "HISTORICAL_GAP_NOT_IN_MANAGED_LEDGER",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260912021527_qf_launch_pune_only_city_activation.sql",
+      "version": "20260912021527",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20260926045741"
+      ]
+    },
+    {
+      "file": "20260912024734_qf_active_city_authority_hardening.sql",
+      "version": "20260912024734",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20260926045744"
+      ]
+    },
+    {
+      "file": "20260912030000_qf_category_runtime_governance.sql",
+      "version": "20260912030000",
+      "class": "HISTORICAL_GAP_NOT_IN_MANAGED_LEDGER",
+      "stagingVersions": []
+    },
+    {
+      "file": "20260912040000_qf_aos_v2_intelligence.sql",
+      "version": "20260912040000",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20260926045753"
+      ]
+    },
+    {
+      "file": "20260912050000_qf_lead_generation_scope_lock.sql",
+      "version": "20260912050000",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20260926045756"
+      ]
+    },
+    {
+      "file": "20260923170217_vendor_media_bucket.sql",
+      "version": "20260923170217",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20260926045759"
+      ]
+    },
+    {
+      "file": "20260924183000_jarvis_os_operator_command_receipts.sql",
+      "version": "20260924183000",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20260926045802"
+      ]
+    },
+    {
+      "file": "20260927113000_qf_client_journey_phase1_foundation.sql",
+      "version": "20260927113000",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20260927072347"
+      ]
+    },
+    {
+      "file": "20260927150000_qf_client_journey_phase1_meta_qualification.sql",
+      "version": "20260927150000",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20260927090306"
+      ]
+    },
+    {
+      "file": "20260929154156_shared_single_number_jarvis_access.sql",
+      "version": "20260929154156",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20260929161707"
+      ]
+    },
+    {
+      "file": "20261001144025_qf_verified_location_geofence_straight_line.sql",
+      "version": "20261001144025",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20261001151402"
+      ]
+    },
+    {
+      "file": "20261001153000_qf_multi_city_service_zone_authority.sql",
+      "version": "20261001153000",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20261001153730"
+      ]
+    },
+    {
+      "file": "20261001154500_qf_city_market_runtime_controls.sql",
+      "version": "20261001154500",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20261001154754"
+      ]
+    },
+    {
+      "file": "20261001165000_qf_admin_service_zone_boundary_control.sql",
+      "version": "20261001165000",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20261001165444"
+      ]
+    },
+    {
+      "file": "20261002071500_vendor_fair_opportunity_distribution.sql",
+      "version": "20261002071500",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20261002080447"
+      ]
+    },
+    {
+      "file": "20261002090000_vendor_fair_opportunity_group_reconcile.sql",
+      "version": "20261002090000",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20261002083321",
+        "20261002083346"
+      ]
+    },
+    {
+      "file": "20261002091500_vendor_fair_opportunity_fk_indexes.sql",
+      "version": "20261002091500",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20261002083936",
+        "20261002085216"
+      ]
+    },
+    {
+      "file": "20261003064500_aarohi_phase1_omnichannel_activation.sql",
+      "version": "20261003064500",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20261003034807"
+      ]
+    },
+    {
+      "file": "20261003070000_aarohi_phase1_fk_indexes.sql",
+      "version": "20261003070000",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20261003040425"
+      ]
+    },
+    {
+      "file": "20261003080000_aarohi_phase2_autonomous_acquisition.sql",
+      "version": "20261003080000",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20261003072042"
+      ]
+    },
+    {
+      "file": "20261003081046_aarohi_full_fk_index_closeout.sql",
+      "version": "20261003081046",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20261003081215"
+      ]
+    },
+    {
+      "file": "20261003083000_aarohi_phase2_scale_governance.sql",
+      "version": "20261003083000",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20261003072049"
+      ]
+    },
+    {
+      "file": "20261003090000_aarohi_phase2_ops_control_analytics.sql",
+      "version": "20261003090000",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20261003072056"
+      ]
+    },
+    {
+      "file": "20261003091000_aarohi_phase2_ops_fk_indexes.sql",
+      "version": "20261003091000",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20261003072655"
+      ]
+    },
+    {
+      "file": "20261004190000_scale_phase07_durable_jobs_hardening.sql",
+      "version": "20261004190000",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20261013053930"
+      ]
+    },
+    {
+      "file": "20261004190001_scale_phase08_matching_prefilter.sql",
+      "version": "20261004190001",
+      "class": "HISTORICAL_GAP_NOT_IN_MANAGED_LEDGER",
+      "stagingVersions": []
+    },
+    {
+      "file": "20261004190002_scale_phase09_data_lifecycle.sql",
+      "version": "20261004190002",
+      "class": "HISTORICAL_GAP_NOT_IN_MANAGED_LEDGER",
+      "stagingVersions": []
+    },
+    {
+      "file": "20261005160000_scale_phase12_horizontal_worker_claims.sql",
+      "version": "20261005160000",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20261013053959"
+      ]
+    },
+    {
+      "file": "20261005200000_scale_phase14_agni_governance.sql",
+      "version": "20261005200000",
+      "class": "HISTORICAL_GAP_NOT_IN_MANAGED_LEDGER",
+      "stagingVersions": []
+    },
+    {
+      "file": "20261005203000_scale_phase14_trace_context.sql",
+      "version": "20261005203000",
+      "class": "HISTORICAL_GAP_NOT_IN_MANAGED_LEDGER",
+      "stagingVersions": []
+    },
+    {
+      "file": "20261006113000_scale_phase18_matching_slo.sql",
+      "version": "20261006113000",
+      "class": "HISTORICAL_GAP_NOT_IN_MANAGED_LEDGER",
+      "stagingVersions": []
+    },
+    {
+      "file": "20261006113720_phase22_identity_portability.sql",
+      "version": "20261006113720",
+      "class": "HISTORICAL_GAP_NOT_IN_MANAGED_LEDGER",
+      "stagingVersions": []
+    },
+    {
+      "file": "20261012080000_anisha_vendor_memory_consent_source.sql",
+      "version": "20261012080000",
+      "class": "HISTORICAL_GAP_NOT_IN_MANAGED_LEDGER",
+      "stagingVersions": []
+    },
+    {
+      "file": "20261012100000_anisha_memory_purge_delivery.sql",
+      "version": "20261012100000",
+      "class": "HISTORICAL_GAP_NOT_IN_MANAGED_LEDGER",
+      "stagingVersions": []
+    },
+    {
+      "file": "20261012213000_vendor_assignment_update_authority_closeout.sql",
+      "version": "20261012213000",
+      "class": "RETIMESTAMPED_ON_STAGING_CANDIDATE",
+      "stagingVersions": [
+        "20261012180214"
+      ]
+    }
+  ],
+  "legacyV1": {
+    "replayParserHazard": true,
+    "nullFirstClaimHazard": true,
+    "invalidSingleDollarFunctions": [
+      "public.qf_claim_vendor_package_razorpay_order_v1",
+      "public.qf_release_vendor_package_razorpay_order_claim_v1",
+      "public.qf_mark_vendor_package_payment_failed_v1"
+    ],
+    "wrappedInExplicitTransaction": true
+  },
+  "readOnlyProbes": [
+    {
+      "id": "P01_MANAGED_LEDGER_RECAPTURE",
+      "purpose": "Recapture version/name ledger and compare to pinned snapshot before any decision.",
+      "sql": "select version, name from supabase_migrations.schema_migrations order by version",
+      "executedByTooling": false
+    },
+    {
+      "id": "P02_V1_FUNCTION_PRESENCE_AND_HASH",
+      "purpose": "Prove whether any V1 Razorpay function exists and with which definition.",
+      "sql": "select p.oid::regprocedure::text as signature, md5(pg_get_functiondef(p.oid)) as def_md5 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'qf\\_%razorpay%' order by 1",
+      "executedByTooling": false
+    },
+    {
+      "id": "P03_V1_COLUMNS_PRESENT",
+      "purpose": "Detect partial prior apply of the V1 column expansion.",
+      "sql": "select column_name, data_type from information_schema.columns where table_schema = 'public' and table_name = 'vendor_package_orders' and column_name in ('provider_amount_subunits','provider_receipt','provider_order_request_token','provider_order_requested_at') order by 1",
+      "executedByTooling": false
+    },
+    {
+      "id": "P04_V1_NULL_CLAIM_EXPOSURE",
+      "purpose": "Only if P03 shows the token column: count unbound created orders that a V1 first claim would reject.",
+      "conditionalOn": "P03_V1_COLUMNS_PRESENT includes provider_order_request_token",
+      "sql": "select count(*) filter (where provider_order_request_token is null) as null_token_unbound, count(*) filter (where provider_order_request_token is not null) as token_held_unbound from public.vendor_package_orders where provider_order_id is null and order_status = 'created'",
+      "executedByTooling": false
+    },
+    {
+      "id": "P05_V1_EXECUTE_GRANTS",
+      "purpose": "Confirm no client role could reach any V1 function.",
+      "sql": "select p.oid::regprocedure::text as signature, has_function_privilege('anon', p.oid, 'EXECUTE') as anon_exec, has_function_privilege('authenticated', p.oid, 'EXECUTE') as auth_exec from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'qf\\_%razorpay%' order by 1",
+      "executedByTooling": false
+    }
+  ],
+  "steps": [
+    {
+      "id": "S00_FRESH_READ_ONLY_RECAPTURE",
+      "kind": "EVIDENCE",
+      "mode": "PLAN_ONLY",
+      "executes": false,
+      "targets": [
+        "P01_MANAGED_LEDGER_RECAPTURE"
+      ],
+      "requires": [
+        "Recaptured ledger must equal pinned snapshot sha256 c43c8f0d36889cf94881ffb279e2ece8653f392103b6d07741388c229509723e or this plan is void"
+      ],
+      "approvals": {
+        "dba": null,
+        "owner": null,
+        "appsec": null,
+        "finance": null
+      },
+      "rollback": {
+        "strategy": "NONE_REQUIRED_READ_ONLY",
+        "note": "Step performs no writes."
+      }
+    },
+    {
+      "id": "S01_RECOVERY_PRECONDITIONS",
+      "kind": "EVIDENCE",
+      "mode": "PLAN_ONLY",
+      "executes": false,
+      "targets": [
+        "LOGICAL_SCHEMA_AUTH_STORAGE_DUMP",
+        "PITR_RESTORE_POINT",
+        "ROLE_AND_GRANT_INVENTORY"
+      ],
+      "requires": [
+        "Evidence from managed platform owner; not producible by this tool"
+      ],
+      "approvals": {
+        "dba": null,
+        "owner": null,
+        "appsec": null,
+        "finance": null
+      },
+      "rollback": {
+        "strategy": "NONE_REQUIRED_READ_ONLY",
+        "note": "Step performs no writes."
+      }
+    },
+    {
+      "id": "S02_BASELINE_CONTENT_ADJUDICATION",
+      "kind": "DBA_REVIEW",
+      "mode": "PLAN_ONLY",
+      "executes": false,
+      "targets": [
+        "20260620000001_create_tables.sql",
+        "20260620000002_rls_policies.sql",
+        "20260620000003_functions.sql",
+        "20260620000004_seed_data.sql",
+        "20260620000005_homepage_alignment.sql",
+        "20260621000006_superadmin_foundation.sql",
+        "20260622000007_vendor_location.sql",
+        "20260624000008_lead_capture_consent.sql",
+        "20260624000009_vendor_onboarding.sql",
+        "20260624000010_vendor_exact_columns.sql",
+        "20260624000011_vendor_office_address.sql",
+        "20260627000012_aos_management_foundation.sql",
+        "20260627000013_crm_analytics_foundation.sql",
+        "20260628000014_aos_control_center_foundation.sql",
+        "20260628000015_crm_analytics_foundation_safe_placeholders.sql",
+        "20260630000016_aos_runtime_settings.sql",
+        "20260630000017_lead_assignment_approvals.sql",
+        "20260630000018_vendor_actions_credits_package_sync.sql",
+        "20260630000019_assignment_ledger_snapshots.sql",
+        "20260630000020_align_active_cities.sql",
+        "20260630000021_category_governance.sql",
+        "20260701000022_phase_25a_paid_only_auto_match_free_vendor_interest.sql",
+        "20260701000023_vendor_package_orders.sql",
+        "20260701000024_vendor_profile_change_requests.sql",
+        "20260701000025_vendor_notifications_support.sql",
+        "20260701000026_bad_lead_report_safety_fields.sql",
+        "20260701000027_phase26a_auto_lead_matching_foundation.sql",
+        "20260701000028_phase26a_live_schema_repair.sql",
+        "20260701000029_phase26a2_admin_audit_hardening.sql",
+        "20260701000030_phase26a2c_smart_override_assignment.sql",
+        "20260701000031_phase26a2c_recovery_fallback_reporting.sql",
+        "20260701000032_phase26a2d_client_requirement_groups.sql",
+        "20260701000033_phase26a2e_preferred_vendor_recharge_window.sql",
+        "20260702000034_fix_auto_match_category_mapping.sql",
+        "20260702000035_preferred_vendor_lead_intent.sql",
+        "20260702000037_fix_preferred_vendor_credit_direct_assignment.sql",
+        "20260702000038_lead_quality_engine_phase1.sql",
+        "20260702000039_b_lead_clarification_flow.sql",
+        "20260704000040_google_area_location_foundation.sql",
+        "20260704000100_align_lead_quality_status_constraints.sql",
+        "20260704000110_lead_scores_security_hardening.sql",
+        "20260705000130_distance_category_matching_rpc.sql",
+        "20260706000140_vendor_accepting_leads.sql",
+        "20260706000141_vendor_credit_wallet_rpc.sql",
+        "20260706000142_credit_wallet_assignment_rpc.sql",
+        "20260706000143_preferred_assignment_accepting_leads.sql",
+        "20260706000144_manual_assignment_accepting_leads.sql",
+        "20260706000145_package_purchase_idempotent_grant.sql",
+        "20260706000146_create_qf_workflow_kernel_foundation.sql",
+        "20260706000147_workflow_kernel_atomic_step.sql",
+        "20260706000148_workflow_kernel_safety_hardening.sql",
+        "20260706000149_workflow_kernel_retry_consistency.sql",
+        "20260706000150_automation_policy_config_foundation.sql",
+        "20260708000160_identity_security_foundation.sql",
+        "20260708000170_unified_communication_core.sql",
+        "20260708000180_vendor_authentication_foundation.sql",
+        "20260708000190_client_whatsapp_otp_login_readiness.sql",
+        "20260708000200_vendor_whatsapp_verification_password_reset.sql",
+        "20260709000100_messaging_channel_provider_foundation.sql",
+        "20260709000200_whatsapp_cloud_api_runtime_control.sql",
+        "20260710000100_auth_transport_resilience_decision_foundation.sql",
+        "20260711000100_whatsapp_inbound_message_foundation.sql",
+        "20260711000200_communication_consent_evidence_and_state_hardening.sql",
+        "20260712000300_communication_consent_command_writer_rpc.sql",
+        "20260713000100_communication_consent_ack_intents.sql",
+        "20260716000100_communication_provider_account_binding.sql",
+        "20260720000100_communication_delivery_event_provider_account_required.sql",
+        "20260721000100_communication_consent_ack_intent_provider_account_required.sql",
+        "20260722000100"
+      ],
+      "requires": [
+        "Catalog object diff baseline vs pre-baseline source; version ordering is not evidence"
+      ],
+      "approvals": {
+        "dba": null,
+        "owner": null,
+        "appsec": null,
+        "finance": null
+      },
+      "rollback": {
+        "strategy": "NONE_REQUIRED_READ_ONLY",
+        "note": "Step performs no writes."
+      }
+    },
+    {
+      "id": "S03_RETIMESTAMPED_EQUIVALENCE",
+      "kind": "DBA_REVIEW",
+      "mode": "PLAN_ONLY",
+      "executes": false,
+      "targets": [
+        "20260912021527_qf_launch_pune_only_city_activation.sql",
+        "20260912024734_qf_active_city_authority_hardening.sql",
+        "20260912040000_qf_aos_v2_intelligence.sql",
+        "20260912050000_qf_lead_generation_scope_lock.sql",
+        "20260923170217_vendor_media_bucket.sql",
+        "20260924183000_jarvis_os_operator_command_receipts.sql",
+        "20260927113000_qf_client_journey_phase1_foundation.sql",
+        "20260927150000_qf_client_journey_phase1_meta_qualification.sql",
+        "20260929154156_shared_single_number_jarvis_access.sql",
+        "20261001144025_qf_verified_location_geofence_straight_line.sql",
+        "20261001153000_qf_multi_city_service_zone_authority.sql",
+        "20261001154500_qf_city_market_runtime_controls.sql",
+        "20261001165000_qf_admin_service_zone_boundary_control.sql",
+        "20261002071500_vendor_fair_opportunity_distribution.sql",
+        "20261002090000_vendor_fair_opportunity_group_reconcile.sql",
+        "20261002091500_vendor_fair_opportunity_fk_indexes.sql",
+        "20261003064500_aarohi_phase1_omnichannel_activation.sql",
+        "20261003070000_aarohi_phase1_fk_indexes.sql",
+        "20261003080000_aarohi_phase2_autonomous_acquisition.sql",
+        "20261003081046_aarohi_full_fk_index_closeout.sql",
+        "20261003083000_aarohi_phase2_scale_governance.sql",
+        "20261003090000_aarohi_phase2_ops_control_analytics.sql",
+        "20261003091000_aarohi_phase2_ops_fk_indexes.sql",
+        "20261004190000_scale_phase07_durable_jobs_hardening.sql",
+        "20261005160000_scale_phase12_horizontal_worker_claims.sql",
+        "20261012213000_vendor_assignment_update_authority_closeout.sql"
+      ],
+      "requires": [
+        "Applied statement or function-definition hash comparison per pair",
+        "Order inversions recorded: 5"
+      ],
+      "approvals": {
+        "dba": null,
+        "owner": null,
+        "appsec": null,
+        "finance": null
+      },
+      "rollback": {
+        "strategy": "NONE_REQUIRED_READ_ONLY",
+        "note": "Step performs no writes."
+      }
+    },
+    {
+      "id": "S04_REPEATED_AND_AMBIGUOUS_STAGING",
+      "kind": "DBA_REVIEW",
+      "mode": "PLAN_ONLY",
+      "executes": false,
+      "targets": [
+        "20261002083321",
+        "20261002083346",
+        "20261002083936",
+        "20261002085216"
+      ],
+      "requires": [
+        "Determine which reapply is authoritative and whether the earlier one partially applied"
+      ],
+      "approvals": {
+        "dba": null,
+        "owner": null,
+        "appsec": null,
+        "finance": null
+      },
+      "rollback": {
+        "strategy": "NONE_REQUIRED_READ_ONLY",
+        "note": "Step performs no writes."
+      }
+    },
+    {
+      "id": "S05_STAGING_ONLY_SOURCE_RECOVERY",
+      "kind": "DBA_REVIEW",
+      "mode": "PLAN_ONLY",
+      "executes": false,
+      "targets": [
+        "20260926050242",
+        "20261013144901"
+      ],
+      "requires": [
+        "Recover SQL into reviewed source before any release; never re-derive by guess"
+      ],
+      "approvals": {
+        "dba": null,
+        "owner": null,
+        "appsec": null,
+        "finance": null
+      },
+      "rollback": {
+        "strategy": "NONE_REQUIRED_READ_ONLY",
+        "note": "Step performs no writes."
+      }
+    },
+    {
+      "id": "S06_FINANCE_V1_DO_NOT_REPLAY",
+      "kind": "FINANCE_HOLD",
+      "mode": "PLAN_ONLY",
+      "executes": false,
+      "targets": [
+        "20260912010000_qf_vendor_package_razorpay_testmode.sql",
+        "P02_V1_FUNCTION_PRESENCE_AND_HASH",
+        "P03_V1_COLUMNS_PRESENT",
+        "P04_V1_NULL_CLAIM_EXPOSURE",
+        "P05_V1_EXECUTE_GRANTS"
+      ],
+      "requires": [
+        "Historical V1 must not be replayed or hand-fixed in place",
+        "V2 review candidate stays uninstalled until Finance+DBA+AppSec adjudication",
+        "REPLAY_ABORTS_AT_SYNTAX_ERROR_SINGLE_DOLLAR_QUOTE",
+        "FIRST_CLAIM_ALWAYS_MISMATCH_IF_PARSER_HAND_FIXED",
+        "IN_PLACE_SOURCE_FIX_CHANGES_PINNED_SHA_AND_HIDES_HISTORY",
+        "PARTIAL_PRIOR_APPLY_STATE_MUST_BE_PROVEN_ABSENT_READ_ONLY"
+      ],
+      "approvals": {
+        "dba": null,
+        "owner": null,
+        "appsec": null,
+        "finance": null
+      },
+      "rollback": {
+        "strategy": "NONE_REQUIRED_READ_ONLY",
+        "note": "Step performs no writes."
+      }
+    },
+    {
+      "id": "S07_HISTORICAL_GAP_ADJUDICATION",
+      "kind": "DBA_REVIEW",
+      "mode": "PLAN_ONLY",
+      "executes": false,
+      "targets": [
+        "20260903040000_qf_mvp_80_14a_meta_lead_assignment_production_activation.sql",
+        "20260912000000_qf_mvp_40_14_meta_transactional_mapping_authority.sql",
+        "20260912020000_qf_package_scope_governance.sql",
+        "20260912030000_qf_category_runtime_governance.sql",
+        "20261004190001_scale_phase08_matching_prefilter.sql",
+        "20261004190002_scale_phase09_data_lifecycle.sql",
+        "20261005200000_scale_phase14_agni_governance.sql",
+        "20261005203000_scale_phase14_trace_context.sql",
+        "20261006113000_scale_phase18_matching_slo.sql",
+        "20261006113720_phase22_identity_portability.sql",
+        "20261012080000_anisha_vendor_memory_consent_source.sql",
+        "20261012100000_anisha_memory_purge_delivery.sql"
+      ],
+      "requires": [
+        "Per file: prove objects absent/present read-only; out-of-order replay is forbidden"
+      ],
+      "approvals": {
+        "dba": null,
+        "owner": null,
+        "appsec": null,
+        "finance": null
+      },
+      "rollback": {
+        "strategy": "NONE_REQUIRED_READ_ONLY",
+        "note": "Step performs no writes."
+      }
+    },
+    {
+      "id": "S08_FUTURE_INSTALL_PACKET",
+      "kind": "DEFERRED",
+      "mode": "PLAN_ONLY",
+      "executes": false,
+      "targets": [],
+      "requires": [
+        "Separate reviewed packet per migration after S00-S07 close with real external signatures"
+      ],
+      "approvals": {
+        "dba": null,
+        "owner": null,
+        "appsec": null,
+        "finance": null
+      },
+      "rollback": {
+        "strategy": "PITR_RESTORE_POINT_PLUS_REVIEWED_FORWARD_FIX",
+        "note": "Supabase migrations have no down scripts. Any future install needs a recorded PITR point, logical dump and a separately reviewed forward-fix; none exists in this plan."
+      }
+    }
+  ],
+  "forbiddenOperations": [
+    "supabase db push",
+    "supabase db push --include-all",
+    "supabase migration repair",
+    "supabase db reset --linked",
+    "apply_migration (managed connector)",
+    "direct INSERT/UPDATE/DELETE on supabase_migrations.schema_migrations",
+    "in-place edit of historical supabase/migrations/*.sql"
+  ],
+  "externalBlockers": [
+    "QUALIFIED_DBA_ADJUDICATION_NOT_PRESENT",
+    "FRESH_READ_ONLY_MANAGED_LEDGER_RECAPTURE_NOT_PRESENT",
+    "PITR_AND_LOGICAL_DUMP_EVIDENCE_NOT_PRESENT",
+    "FINANCE_V1_V2_ADJUDICATION_NOT_PRESENT",
+    "INDEPENDENT_APPSEC_AND_OWNER_STAGING_GO_NOT_PRESENT"
+  ],
+  "planSha256": "48dfbd85077d0ed0adea0e871a81f80d8ec7a717271d6e1a2f81e7546633c2ce"
+}

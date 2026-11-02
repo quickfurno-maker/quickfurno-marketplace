@@ -1,0 +1,26 @@
+name: VOX AB7B Three Native Sources - SOURCE RELEASE HOLD
+on:
+  pull_request:
+    paths:
+      - 'ops/vox/sql-candidates/20261018020000_vox_ab7b_nonwork_native_source_candidate.sql'
+      - 'scripts/mvp/vox/validate-voxAB7B-nonwork-pg17.ps1'
+      - '.github/workflows/vox-ab7b-nonwork-release-hold.yml'
+permissions:
+  contents: read
+jobs:
+  source-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node --test scripts/mvp/vox/*.test.mjs
+      - name: Offline disposable PostgreSQL 17 source/nonce/RLS
+        run: pwsh -NoProfile -File scripts/mvp/vox/validate-voxAB7B-nonwork-pg17.ps1
+      - run: npm run typecheck
+      - run: npm run build

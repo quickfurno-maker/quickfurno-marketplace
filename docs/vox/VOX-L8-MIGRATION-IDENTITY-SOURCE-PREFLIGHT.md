@@ -1,0 +1,4 @@
+# VOX-L8 source-only migration and neutral Staff guard
+This first L8 increment adds deterministic negative gating of conflicting migration histories, duplicate/colliding SQL versions, unreviewed managed migration paths, non-AAL2 Staff, and inherited Core admin.
+The guard NEVER returns protected staging or production approval, even when supplied with synthetic matching histories and candidate digests. Existing historical Stage/Production migration discrepancy remains unresolved; actual source metadata cannot be replaced by sample test fixtures. This does not attest complete backup, PostgreSQL restore, production ACLs, RLS, or human review. Source SQL remains in non-deployable candidate directories.
+Launch blockers: independent DBA, AppSec, first Team Leader, full staging backup and isolated restore, real Staff AAL2 and staging E2E. No protected changes or live grant activations.

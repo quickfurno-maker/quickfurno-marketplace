@@ -1,0 +1,9 @@
+{
+  "schema": "qf.vox.rc37.fixture-managed-ledger.v1",
+  "note": "synthetic fixture; not a real ledger export",
+  "migrations": [
+    {"version": "20261101000001", "name": "fix_alpha_table", "statements": ["create table fix_alpha(id int)"]},
+    {"version": "20261101000002", "name": "fix_beta_view", "statements": ["create view fix_beta as select 1 as x"]},
+    {"version": "20261101999999", "name": "tkt42_gamma_index_renamed", "statements": ["create index fix_gamma_idx on fix_alpha(id)"]}
+  ]
+}

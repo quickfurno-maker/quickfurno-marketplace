@@ -45,6 +45,11 @@ export interface ApplyVendorCreditDeltaInput {
 /** Low-level canonical mutation. Prefer the typed helpers below for clarity. */
 export async function applyVendorCreditDelta(input: ApplyVendorCreditDeltaInput): Promise<Result<WalletApplyResult>> {
   try {
+    // RC45: legacy invalid-lead wallet path can grant a credit without the
+    // human approval / assignment-wide uniqueness enforced by VOX RC42.
+    // Deny it at the lowest service boundary, including generic grant callers.
+    if (input.changeType === "invalid_lead_refund")
+      return fail(appError("UNAUTHORIZED"));
     const vendorId = (input.vendorId ?? "").trim();
     if (!vendorId) throw appError("VALIDATION");
     const delta = Math.round(Number(input.delta));
@@ -89,23 +94,19 @@ export async function grantVendorCredits(input: {
   return applyVendorCreditDelta({ ...input, delta: Math.round(Number(input.amount)) });
 }
 
-/** Invalid-lead refund (+1). Idempotent on the assignment/approval id. */
-export async function refundCreditForInvalidLead(input: {
+/** DEPRECATED and permanently closed: the old report/approval-keyed path
+ * does NOT enforce one original assignment => one restored LEAD credit.
+ * Use the human-approved, Owner-AAL2, assignment-unique RC42 authority ONLY
+ * when its reviewed database installation is explicitly authorized.
+ * Money refunds and automatic new assignments are never a bad-lead remedy.
+ */
+export async function refundCreditForInvalidLead(_input: {
   vendorId: string;
-  referenceId: string; // assignment id or refund-approval id
+  referenceId: string;
   reason?: string | null;
   updatedBy?: string;
 }): Promise<Result<WalletApplyResult>> {
-  if (!input.referenceId) return fail(appError("VALIDATION"));
-  return grantVendorCredits({
-    vendorId: input.vendorId,
-    amount: 1,
-    changeType: "invalid_lead_refund",
-    reason: input.reason ?? "Invalid lead refund",
-    referenceType: "invalid_lead_refund",
-    referenceId: input.referenceId,
-    updatedBy: input.updatedBy ?? "admin",
-  });
+  return fail(appError("UNAUTHORIZED"));
 }
 
 /**

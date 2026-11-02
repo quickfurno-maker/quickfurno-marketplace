@@ -11,6 +11,8 @@
 // Server-only: uses adminClient via guarded server actions.
 // ============================================================================
 import { adminClient } from "../lib/supabase";
+import { rc76ValidAtomicBadLeadReceipt } from "./vox/rc76AtomicBadLeadStatusReceipt";
+import { rc77BoundedAtomicBadLeadReview } from "./vox/rc77BoundedAtomicBadLeadReview";
 import { appError, fail, isMissingRelationError, ok, type Result } from "../lib/errors";
 
 export const BAD_LEAD_REVIEW_STATUSES = [
@@ -181,6 +183,43 @@ export async function updateVendorLeadReportStatus(
     if (notes) update.admin_notes = notes;
 
     const db = adminClient();
+    // This optional atomic Staging-only path is OFF by default. If it is
+    // explicitly selected, a missing reviewed SQL function or malformed
+    // receipt MUST FAIL CLOSED: never silently run the legacy two-write path.
+    const atomicMode=process.env.VOX_BAD_LEAD_ATOMIC_REVIEW_ENABLED;
+    if(atomicMode && !["off","disabled","false","0","staging"].includes(atomicMode))
+      throw appError("VALIDATION");
+    if(atomicMode==="staging"){
+      if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+         !["owner","dual"].includes(String(process.env.VOX_STAFF_VIEW_MODE)))
+        throw appError("UNAUTHORIZED");
+      const attempt=await rc77BoundedAtomicBadLeadReview(()=>db.rpc(
+        "qf_vox_rc75_bad_lead_status_atomic_candidate_v1",{
+          p_report_id:reportId,p_status:status,p_admin_notes:notes??null,
+          p_reviewed_by:reviewedBy
+        }));
+      // An atomic SQL mutation can commit despite a dropped or malformed
+      // response. Never invite a retry or fall back to the old two-write flow.
+      if(!attempt.completed||attempt.reply.error||
+         !rc76ValidAtomicBadLeadReceipt(attempt.reply.data,reportId,status))
+        return {ok:false,code:"ATOMIC_REVIEW_OUTCOME_UNKNOWN",
+          error:"Atomic bad-lead review may have committed. Reconcile the original report and assignment in Core before any new status decision."};
+      return ok(null);
+    }
+    // The legacy (non-atomic) review path is still used by the existing
+    // admin service. Before changing a report to Valid, require its original
+    // assignment reference. This preflight avoids a false successful Valid
+    // review for a report that never had an assignment; it does not establish
+    // atomicity or replace the approved RC75 transaction.
+    let expectedAssignmentId:string|null=null;
+    if(status==="Valid"){
+      const {data:existing,error:existingError}=await db
+        .from("bad_lead_reports").select("lead_assignment_id")
+        .eq("id",reportId).single();
+      if(existingError||!existing?.lead_assignment_id)
+        throw appError("VALIDATION");
+      expectedAssignmentId=String(existing.lead_assignment_id);
+    }
     const { data: report, error } = await db
       .from("bad_lead_reports")
       .update(update)
@@ -191,8 +230,18 @@ export async function updateVendorLeadReportStatus(
 
     // Parity with the legacy approve flow: a Valid report flags the assignment
     // for reporting. Informational only — no credit is refunded.
-    if (status === "Valid" && report?.lead_assignment_id) {
-      await db.from("lead_assignments").update({ is_bad_lead_reported: true }).eq("id", report.lead_assignment_id);
+    if(status==="Valid"&&report?.lead_assignment_id!==expectedAssignmentId)
+      throw appError("VALIDATION");
+    if (status === "Valid") {
+      // This flag is informational; it must not grant credit or money.
+      // The report metadata write above may already have committed. If the
+      // linked assignment flag fails or matches no row, return UNKNOWN/failed
+      // to the governed UI, never false confirmation of a complete review.
+      const {data:updatedAssignment,error:assignmentError}=await db
+        .from("lead_assignments").update({is_bad_lead_reported:true})
+        .eq("id",report.lead_assignment_id).select("id").single();
+      if(assignmentError||updatedAssignment?.id!==report.lead_assignment_id)
+        throw appError("VALIDATION");
     }
     return ok(null);
   } catch (e) {

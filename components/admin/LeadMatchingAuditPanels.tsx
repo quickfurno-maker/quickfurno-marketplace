@@ -7,7 +7,7 @@
 // request a replacement only through Core's existing authorities and explicit
 // Superadmin confirmation; this component never mutates money directly.
 // ============================================================================
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   adminAddVendorLeadReportComment,
   adminApplyBadLeadRecovery,
@@ -33,6 +33,7 @@ import type {
   Snapshot,
 } from "./adminTypes";
 import { formatDate, formatNumber, leadName, maskPhone, shortId, uniqueOptions, vendorName } from "./adminUtils";
+import {readBadLeadReviewCheckpoint,markBadLeadPending,clearBadLeadPending} from "@/lib/vox/badLeadReviewCheckpoint";
 
 // Human labels for engine/RPC skip and failure reasons shown to admins.
 const matchReasonLabels: Record<string, string> = {
@@ -430,6 +431,7 @@ export function PreviewMessagesPanel({ data }: { data: Snapshot }) {
 // 5. Bad lead reports review (status workflow + comments; no credit changes)
 // ----------------------------------------------------------------------------
 const badLeadReviewStatuses = ["Under Review", "Valid", "Invalid", "Resolved", "Rejected"] as const;
+const badLeadSessionStore=()=>{try{return window.sessionStorage;}catch{return null;}};
 
 export function BadLeadReportsReviewPanel({
   data,
@@ -441,6 +443,19 @@ export function BadLeadReportsReviewPanel({
   runAction: RunAction;
 }) {
   const [statusFilter, setStatusFilter] = useState("All");
+  const [recoveryReceipt,setRecoveryReceipt]=useState<string|null>(null);
+  const recoveryPending=useRef(new Set<string>());
+  // A missing credit receipt cannot prove that the canonical ledger was
+  // untouched. Do not offer another credit decision on this report in-session.
+  const recoveryNeedsReview=useRef(new Set<string>());
+  const [recoveryReady,setRecoveryReady]=useState(false);
+  const [recoveryStorageAvailable,setRecoveryStorageAvailable]=useState(false);
+  useEffect(()=>{
+    const snapshot=readBadLeadReviewCheckpoint(badLeadSessionStore());
+    recoveryNeedsReview.current=snapshot.locked;
+    setRecoveryStorageAvailable(snapshot.available);
+    setRecoveryReady(true);
+  },[]);
   const commentsByReport = useMemo(() => {
     const map = new Map<string, BadLeadReportComment[]>();
     (data.badLeadReportComments ?? []).forEach((comment) => {
@@ -461,12 +476,52 @@ export function BadLeadReportsReviewPanel({
     [data.assignments],
   );
 
+  // Status and recommendation writes can commit even when a response is lost.
+  // The same local lock used for credit decisions must cover this preliminary
+  // eligibility metadata; it never substitutes for Core's canonical ledger.
+  function runGovernedMetadata(report:BadReport,label:string,
+    write:()=>Promise<{ok:boolean;error?:string}>){
+    if(!recoveryReady||!recoveryStorageAvailable||recoveryNeedsReview.current.has(report.id)||
+       recoveryPending.current.has(report.id)){
+      notify("An earlier bad-lead decision is unresolved. Reconcile the original report first.","error");
+      return;
+    }
+    if(!markBadLeadPending(badLeadSessionStore(),report.id)){
+      notify("Cannot preserve the review checkpoint. No Core action was sent.","error");
+      return;
+    }
+    recoveryNeedsReview.current.add(report.id);
+    recoveryPending.current.add(report.id);
+    runAction(label,async()=>{
+      try{
+        const result=await write();
+        if(!result.ok){
+          setRecoveryReceipt("Review metadata outcome may be unknown for report "+report.id+
+            ". Confirm the original Core report before further decisions.");
+          return result;
+        }
+        if(!clearBadLeadPending(badLeadSessionStore(),report.id)){
+          setRecoveryReceipt("Core acknowledged the metadata write, but the checkpoint cannot be cleared. Reconcile before another decision.");
+          return {ok:false,error:"Metadata checkpoint cleanup failed. Reconcile original report."};
+        }
+        recoveryNeedsReview.current.delete(report.id);
+        setRecoveryReceipt("Core confirmed "+label.toLowerCase()+"; no LEAD credit or money was issued.");
+        return result;
+      }catch{
+        setRecoveryReceipt("Review metadata outcome UNKNOWN for "+report.id+
+          ". Reconcile the Core report; never issue a second decision blindly.");
+        return {ok:false,error:"Metadata outcome uncertain; reconcile original report."};
+      }finally{recoveryPending.current.delete(report.id);}
+    });
+  }
   function updateStatus(report: BadReport, status: (typeof badLeadReviewStatuses)[number]) {
-    const note = window.prompt(`Admin note for "${status}" (optional)`) ?? undefined;
-    runAction(
-      `Report marked ${status}`,
-      () => adminUpdateVendorLeadReportStatus(report.id, { status, adminNotes: note?.trim() || undefined }),
-    );
+    if(!recoveryReady||!recoveryStorageAvailable||recoveryNeedsReview.current.has(report.id)) {
+      notify("Recovery decision checkpoint requires reconciliation before status changes.","error");
+      return;
+    }
+    const note=window.prompt(`Admin note for "${status}" (optional)`)??undefined;
+    runGovernedMetadata(report,`Report marked ${status}`,
+      ()=>adminUpdateVendorLeadReportStatus(report.id,{status,adminNotes:note?.trim()||undefined}));
   }
 
   function addComment(report: BadReport) {
@@ -475,32 +530,103 @@ export function BadLeadReportsReviewPanel({
       notify("Comment text is required.", "error");
       return;
     }
-    runAction("Report comment added", () => adminAddVendorLeadReportComment(report.id, comment));
+    // Comment may have committed even when HTTP/result handling failed.
+    // The same original-report checkpoint prevents duplicate comments and
+    // contradictory credit/eligibility decisions without Core reconciliation.
+    runGovernedMetadata(report,"Report comment added",
+      ()=>adminAddVendorLeadReportComment(report.id,comment));
   }
 
   function generateRecoveryRecommendation(report: BadReport) {
-    runAction("Recovery recommendation generated", () => adminGenerateBadLeadRecoveryRecommendation(report.id));
+    runGovernedMetadata(report,"Recovery recommendation generated",
+      ()=>adminGenerateBadLeadRecoveryRecommendation(report.id));
   }
 
   function applyRecovery(
     report: BadReport,
-    action: "restore_credit" | "replace" | "restore_credit_and_replace" | "reject",
+    action: "restore_credit" | "reject",
   ) {
+    if(!recoveryReady||!recoveryStorageAvailable){
+      notify("Recovery checkpoint unavailable. No decision can be sent safely from this tab.","error");
+      return;
+    }
     const labels = {
-      restore_credit: "restore one credit",
-      replace: "approve a replacement match",
-      restore_credit_and_replace: "restore one credit and approve a replacement match",
+      restore_credit: "return exactly 1 LEAD credit (no money refund or automatic replacement)",
       reject: "reject recovery",
     };
+    if(recoveryNeedsReview.current.has(report.id)){
+      notify("A recovery decision has an UNKNOWN outcome. Verify the report, original assignment and canonical ledger with a reviewer before another decision.","error");
+      return;
+    }
+    if(recoveryPending.current.has(report.id)){
+      notify("This report already has a pending decision. Verify its canonical receipt before trying again.","info");
+      return;
+    }
     if (!window.confirm(`Confirm human recovery decision: ${labels[action]}? This uses Core's governed recovery authority.`)) return;
-    runAction("Recovery decision applied", () => adminApplyBadLeadRecovery(report.id, action));
+    // Persist BEFORE invoking Core; refresh or network loss must not allow a
+    // second credit/rejection from a new unprotected UI session.
+    if(!markBadLeadPending(badLeadSessionStore(),report.id)){
+      notify("Unable to preserve pending decision. No Core request was sent.","error");
+      return;
+    }
+    recoveryNeedsReview.current.add(report.id);
+    recoveryPending.current.add(report.id);
+    setRecoveryReceipt(null);
+    runAction("Recovery decision applied",async()=>{
+      try{
+      const result=await adminApplyBadLeadRecovery(report.id,action);
+      if(!result.ok&&(
+         (action==="restore_credit"&&result.code==="CREDIT_OUTCOME_UNKNOWN")||
+         (action==="reject"&&result.code==="REJECT_OUTCOME_UNKNOWN"))){
+        recoveryNeedsReview.current.add(report.id);
+        setRecoveryReceipt((action==="restore_credit"?"Credit":"Rejection")+
+          " outcome UNKNOWN for report "+report.id+
+          ". Reconcile its original assignment and canonical ledger before ANY further decision.");
+        return result;
+      }
+      if(result.ok&&action==="restore_credit"){
+        const data=result.data;
+        if(data.restorationStatus==="applied"&&data.leadCreditsRestored===1&&
+           data.creditRestorationApprovalId&&data.originalAssignmentId)
+          setRecoveryReceipt("1 LEAD credit restored, no money or replacement. Assignment "+
+            data.originalAssignmentId+"; approval "+data.creditRestorationApprovalId+".");
+        else if(data.restorationStatus==="already_applied"&&data.leadCreditsRestored===0&&
+                data.creditRestorationApprovalId)
+          setRecoveryReceipt("Previously approved credit restoration. 0 additional credits. Approval "+
+            data.creditRestorationApprovalId+".");
+        else {
+          recoveryNeedsReview.current.add(report.id);
+          setRecoveryReceipt("Receipt not verified. Check the canonical assignment ledger before any retry.");
+          return {ok:false,error:"Canonical credit receipt unavailable. Verify the ledger before retrying."};
+        }
+      }else if(result.ok&&action==="reject")setRecoveryReceipt("Recovery rejected. No LEAD credit or money granted.");
+      if(!result.ok){
+        recoveryNeedsReview.current.add(report.id);
+        return result;
+      }
+      if(!clearBadLeadPending(badLeadSessionStore(),report.id)){
+        recoveryNeedsReview.current.add(report.id);
+        setRecoveryReceipt("Canonical response received but local checkpoint could not be cleared. Reconcile this report before another decision.");
+        return {ok:false,error:"Pending checkpoint cleanup requires review."};
+      }
+      recoveryNeedsReview.current.delete(report.id);
+      return result;
+      }catch{
+        recoveryNeedsReview.current.add(report.id);
+        setRecoveryReceipt((action==="restore_credit"?"Credit":"Rejection")+
+          " RPC response lost. Original report and assignment must be reconciled before another decision.");
+        return {ok:false,code:action==="restore_credit"?"CREDIT_OUTCOME_UNKNOWN":"REJECT_OUTCOME_UNKNOWN",
+          error:"Recovery decision uncertain. Check the canonical report and ledger before retrying."};
+      }finally{recoveryPending.current.delete(report.id);}
+    });
   }
 
   return (
     <SectionCard
       title="Bad Lead Reports Review"
-      description="Human-governed recovery. Recommendations are advisory only; credit restoration and replacement require an explicit admin decision and use Core’s existing credit and assignment authorities."
+      description="Bad-lead compensation is always exactly 1 lead credit after human approval—never a cash refund, money wallet credit or automatic replacement. Atomic restoration remains blocked until reviewed Staging installation. Unresolved report decisions are locked in this browser tab until reconciliation."
     >
+      {recoveryReceipt?<p role="status" className="mb-4 rounded-lg border border-slate-200 p-3 text-xs text-slate-700">{recoveryReceipt}</p>:null}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {uniqueOptions(["Pending", "Under Review", "Valid", "Invalid", "Resolved", "Rejected", ...data.badReports.map((report) => report.status)]).map((option) => (
           <button
@@ -606,9 +732,7 @@ export function BadLeadReportsReviewPanel({
                     onClick: () => updateStatus(report, status),
                   })),
                   { label: "Generate recovery recommendation", onClick: () => generateRecoveryRecommendation(report) },
-                  { label: "Restore one credit", onClick: () => applyRecovery(report, "restore_credit") },
-                  { label: "Restore credit + replace", onClick: () => applyRecovery(report, "restore_credit_and_replace") },
-                  { label: "Replace only", onClick: () => applyRecovery(report, "replace") },
+                  { label: "Return 1 lead credit (no money)", onClick: () => applyRecovery(report, "restore_credit") },
                   { label: "Reject recovery", onClick: () => applyRecovery(report, "reject") },
                   { label: "Add admin comment", onClick: () => addComment(report) },
                 ]}

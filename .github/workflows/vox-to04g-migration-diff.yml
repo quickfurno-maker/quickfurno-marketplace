@@ -1,0 +1,29 @@
+name: VOX TO-04G Live Migration History Diff and Release HOLD
+on:
+  pull_request:
+    paths:
+      - 'ops/vox/certification/TO04G-READONLY-MIGRATION-METADATA.json'
+      - 'scripts/mvp/vox/*to04g-migration*'
+      - '.github/workflows/vox-to04g-migration-diff.yml'
+permissions:
+  contents: read
+jobs:
+  real-db-history-signoff-required:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: node --test scripts/mvp/vox/validate-to04g-migration-history.test.mjs
+      - name: Missing immutable SQL parity/DBA approvals must exit 42
+        shell: bash
+        run: |
+          set +e
+          node scripts/mvp/vox/verify-to04g-migration-history.mjs --release-check
+          CODE=$?
+          set -e
+          test "$CODE" -eq 42

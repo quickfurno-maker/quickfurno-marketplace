@@ -4,8 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   EXPECTED_LIVE_MIGRATION_COUNT,
-  POST_G1_EXTENSION_FILENAMES,
-  POST_G1_EXTENSION_RECORDS,
+  ACTIVE_POST_G1_EXTENSION_RECORDS,
   SUPERSEDED_LEGACY_VERSIONS,
 } from "../staging/live-migration-ledger.mjs";
 
@@ -34,7 +33,10 @@ export function validateCurrentMigrationTree() {
   const legacyExpectedFiles = [...canonical.map((x) => x.filename), ...excluded.map((x) => x.filename)].sort();
   const retainedLegacyFiles = legacyExpectedFiles.filter((filename) =>
     !SUPERSEDED_LEGACY_VERSIONS.some((version) => filename.startsWith(`${version}_`)));
-  const expectedFiles = [...new Set([...retainedLegacyFiles, ...POST_G1_EXTENSION_FILENAMES])].sort();
+  // Only active extension pins belong to runnable migrations. The shared
+  // ledger module separately validates all seven quarantined VOX SHA256 pins.
+  const expectedFiles = [...new Set([...retainedLegacyFiles,
+    ...ACTIVE_POST_G1_EXTENSION_RECORDS.map(r=>r.filename)])].sort();
   const actualFiles = readdirSync(MIGRATIONS_DIR)
     .filter((name) => name.endsWith(".sql"))
     .sort();
@@ -53,7 +55,7 @@ export function validateCurrentMigrationTree() {
     const bytes = readFileSync(path.join(MIGRATIONS_DIR, record.filename));
     check(`canonical source hash ${record.version}`, sha256(canonicalBytes(bytes)) === record.sha256, record.filename);
   }
-  for (const record of POST_G1_EXTENSION_RECORDS) {
+  for (const record of ACTIVE_POST_G1_EXTENSION_RECORDS) {
     const bytes = readFileSync(path.join(MIGRATIONS_DIR, record.filename));
     check(`post-G1 source hash ${record.version}`,
       sha256(canonicalBytes(bytes)) === record.canonicalSha256, record.filename);

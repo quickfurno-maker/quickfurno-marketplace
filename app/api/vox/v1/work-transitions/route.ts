@@ -5,6 +5,38 @@ export const runtime="nodejs";
 export const dynamic="force-dynamic";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ACTIONS=new Set(["CLAIM","START","WAIT_EXTERNAL","REQUEST_APPROVAL","BLOCK","RESUME","COMPLETE"]);
+const STAFF_PREFLIGHT_TIMEOUT_MS=1500;
+const WORK_RPC_TIMEOUT_MS=4000;
+const POST_RPC_STAFF_RECHECK_TIMEOUT_MS=1250;
+// Compare the whole bounded object grant surface, not just the JWT subject.
+// A changed/revoked team, city, role, department or object scope must never
+// certify a transaction that may already have committed.
+const sameStaffScope=(a:Awaited<ReturnType<typeof getVerifiedScopedStaff>>,
+ b:Awaited<ReturnType<typeof getVerifiedScopedStaff>>):boolean=>{
+ if(!a||!b||a.userId!==b.userId||a.teamId!==b.teamId||
+  a.cityId!==b.cityId||a.role!==b.role||a.canReadContent!==b.canReadContent||
+  b.canMutate!==false||a.canMutate!==false)return false;
+ for(const key of ["prospectIds","vendorIds","supportThreadIds","conversationIds"] as const){
+  const before=a[key],after=b[key];
+  // A missing array is lost effective Core grant proof, NOT an empty grant.
+  if(!Array.isArray(before)||!Array.isArray(after)||
+     before.some(v=>typeof v!=="string")||after.some(v=>typeof v!=="string")||
+     before.length!==after.length)return false;
+  const initial=[...before].sort(),current=[...after].sort();
+  if(initial.some((v,i)=>v!==current[i]))return false;
+ }
+ // Department revocation or substitution is material even when the scoped
+ // object lists happen to be identical. Never certify an in-flight write.
+ const before=(a as typeof a & {verifiedDepartments?:unknown}).verifiedDepartments;
+ const after=(b as typeof b & {verifiedDepartments?:unknown}).verifiedDepartments;
+ if(!Array.isArray(before)||!Array.isArray(after)||
+    before.some(x=>typeof x!=="string")||after.some(x=>typeof x!=="string")||
+    before.length!==after.length)return false;
+ const initialPacks=[...before].sort(),currentPacks=[...after].sort();
+ return initialPacks.length===currentPacks.length&&
+  initialPacks.every((v,i)=>v===currentPacks[i]);
+};
+const unknown=()=>send({ok:false,error:"WORK_TRANSITION_OUTCOME_UNKNOWN",committed:null,retrySameNonceOnly:true},503);
 const EXACT_FIELDS=["action","itemId","expectedRevision","nonce","reason"];
 const id=(x:unknown):x is string=>typeof x==="string"&&UUID.test(x);
 const send=(data:unknown,status:number)=>Response.json(data,{status,headers:{
@@ -41,40 +73,84 @@ export async function POST(request:Request){
  if(!ACTIONS.has(String(data.action))||!id(data.itemId)||!id(data.nonce)||
     !Number.isSafeInteger(data.expectedRevision)||
     (data.expectedRevision as number)<0||
+    (data.expectedRevision as number)>2147483646||
     typeof data.reason!=="string"||data.reason.length>300||
     data.reason!==data.reason.trim()||
     (data.action==="CLAIM"&&data.reason!=="")||
     (["BLOCK","REQUEST_APPROVAL","COMPLETE"].includes(String(data.action))&&
      data.reason.length<12))
   return send({ok:false,error:"INVALID_WORK_COMMAND"},400);
+ let attempted=false;
  try{
-  const scoped=await getVerifiedScopedStaff(request.headers.get("authorization"));
+  // A hung identity provider must not leave an unbounded request open.
+  let identityTimer:ReturnType<typeof setTimeout>|undefined;
+  let scoped:Awaited<ReturnType<typeof getVerifiedScopedStaff>>;
+  try{
+   const checkCurrentStaff=async()=>await getVerifiedScopedStaff(request.headers.get("authorization"));
+   const result=await Promise.race([
+    checkCurrentStaff().then(value=>({timedOut:false as const,value})),
+    new Promise<{timedOut:true}>(resolve=>{
+     identityTimer=setTimeout(()=>resolve({timedOut:true}),STAFF_PREFLIGHT_TIMEOUT_MS);
+    })
+   ]);
+   if(result.timedOut)return send({ok:false,error:"WORK_STAFF_AUTH_TIMEOUT"},503);
+   scoped=result.value;
+  }finally{if(identityTimer!==undefined)clearTimeout(identityTimer);}
   if(!scoped||scoped.canMutate!==false||
     ["team_leader","auditor"].includes(scoped.role))
    return send({ok:false,error:"CURRENT_NEUTRAL_STAFF_AAL2_REQUIRED"},403);
   // Do not read or trust any actor, role, department, city or team from JSON.
-  const {data:rpc,error}=await adminClient().rpc("qf_vox_work_transition_candidate_v1",{
-   p_actor:scoped.userId,p_item:data.itemId,
-   p_expected_revision:data.expectedRevision,p_nonce:data.nonce,
-   p_action:data.action,p_reason:data.reason
-  });
-  if(error||!Array.isArray(rpc)||rpc.length!==1)return send({
-   ok:false,error:"WORK_TRANSITION_DENIED_OR_STALE"},409);
+  attempted=true;
+  let mutationTimer:ReturnType<typeof setTimeout>|undefined;
+  let outcome:{data:unknown;error:unknown};
+  try{
+   const result=await Promise.race([
+    Promise.resolve(adminClient().rpc("qf_vox_work_transition_candidate_v1",{
+     p_actor:scoped.userId,p_item:data.itemId,
+     p_expected_revision:data.expectedRevision,p_nonce:data.nonce,
+     p_action:data.action,p_reason:data.reason
+    })).then(value=>({timedOut:false as const,value})),
+    new Promise<{timedOut:true}>(resolve=>{
+     mutationTimer=setTimeout(()=>resolve({timedOut:true}),WORK_RPC_TIMEOUT_MS);
+    })
+   ]);
+   if(result.timedOut)return unknown();
+   outcome=result.value;
+  }finally{if(mutationTimer!==undefined)clearTimeout(mutationTimer);}
+  const {data:rpc,error}=outcome;
+  if(error||!Array.isArray(rpc)||rpc.length!==1)return unknown();
   const item:unknown=rpc[0];
   if(!item||typeof item!=="object"||Array.isArray(item))
-   return send({ok:false,error:"INVALID_CORE_RECEIPT"},503);
+   return unknown();
   const receipt=item as Record<string,unknown>;
-  if(receipt.work_item_id!==data.itemId||![
-   "ASSIGNED","IN_PROGRESS","WAITING_EXTERNAL","WAITING_APPROVAL","BLOCKED","DONE"
-  ].includes(String(receipt.new_state))||
+  if(receipt.work_item_id!==data.itemId||
+     receipt.new_state!==({CLAIM:"ASSIGNED",START:"IN_PROGRESS",
+      WAIT_EXTERNAL:"WAITING_EXTERNAL",REQUEST_APPROVAL:"WAITING_APPROVAL",
+      BLOCK:"BLOCKED",RESUME:"IN_PROGRESS",COMPLETE:"DONE"} as Record<string,string>)[data.action as string]||
      !Number.isSafeInteger(receipt.new_revision)||
      receipt.new_revision!==(data.expectedRevision as number)+1)
-   return send({ok:false,error:"INVALID_CORE_RECEIPT"},503);
+   return unknown();
+  // The SQL transaction may have committed while current Staff AAL2,
+  // membership or object scope was revoked. Re-verify after its receipt,
+  // with a bounded deadline. UNKNOWN is not a rollback or permission to
+  // issue another nonce.
+  let recheckTimer:ReturnType<typeof setTimeout>|undefined;
+  try{
+   const latest=await Promise.race([
+    getVerifiedScopedStaff(request.headers.get("authorization"))
+     .then(value=>({timedOut:false as const,value})),
+    new Promise<{timedOut:true}>(resolve=>{
+     recheckTimer=setTimeout(()=>resolve({timedOut:true}),POST_RPC_STAFF_RECHECK_TIMEOUT_MS);
+    })
+   ]);
+   if(latest.timedOut||!sameStaffScope(scoped,latest.value))return unknown();
+  }catch{return unknown();}
+  finally{if(recheckTimer!==undefined)clearTimeout(recheckTimer);}
   return send({ok:true,schema:"qf.vox.work.transaction.receipt.v1",
-   workItemId:receipt.work_item_id,newState:receipt.new_state,
+   workItemId:receipt.work_item_id,nonce:data.nonce,newState:receipt.new_state,
    revision:receipt.new_revision,providerMessagesSent:0,
    affectsVendorLeadMatching:false},200);
- }catch{return send({ok:false,error:"WORK_CORE_UNAVAILABLE"},503);}
+ }catch{return attempted?unknown():send({ok:false,error:"WORK_STAFF_AUTH_UNAVAILABLE"},503);}
 }
 export function GET(){return send({ok:false,error:"METHOD_NOT_ALLOWED"},405);}
 export function PUT(){return send({ok:false,error:"METHOD_NOT_ALLOWED"},405);}

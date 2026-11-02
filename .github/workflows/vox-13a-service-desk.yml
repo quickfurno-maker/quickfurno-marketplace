@@ -1,0 +1,37 @@
+name: VOX-13A scoped internal Service Desk tasks
+on:
+  pull_request:
+    paths:
+      - 'contracts/vox/supportTaskInput.*'
+      - 'app/api/vox/v1/support-task/**'
+      - 'apps/vox-web/**'
+      - 'scripts/mvp/vox/validate-vox13a-support-task.mjs'
+      - '.github/workflows/vox-13a-service-desk.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  scoped-internal-tasks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - name: Core support task scope and release hold
+        run: |
+          node scripts/mvp/vox/validate-vox13a-support-task.mjs
+          node scripts/mvp/vox/validate-vox-11c-safety.mjs
+      - name: Core typecheck
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+      - name: Web support guards, typecheck, build
+        working-directory: apps/vox-web
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          node scripts/validate-vox13a-support-task.mjs
+          npm test
+          npm run typecheck
+          npm run build

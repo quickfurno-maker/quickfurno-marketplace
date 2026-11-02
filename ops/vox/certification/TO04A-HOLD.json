@@ -1,0 +1,17 @@
+{
+  "schema": "qf.vox.to04a.release-evidence.v1",
+  "environment": "staging",
+  "status": "HOLD",
+  "canonicalGrantChain": null,
+  "bootstrapIndependentReviewer": null,
+  "migrationRecoveryDbaApproved": false,
+  "backupRestoreRehearsed": false,
+  "actualSupabaseAuthAal2E2e": false,
+  "exactSubjectAndCityIdorTested": false,
+  "signedCoreJarvisAgniCandidate": false,
+  "protectedHumanStagingApproval": false,
+  "rollbackRehearsed": false,
+  "vendorLeadAndConsentRegressions": false,
+  "externalMessageEgressAuthorized": false,
+  "productionActivationAuthorized": false
+}

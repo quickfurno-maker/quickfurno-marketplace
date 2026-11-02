@@ -1,0 +1,20 @@
+name: VOX-16D synthetic PG17 backup restore
+on:
+  pull_request:
+    paths:
+      - 'scripts/mvp/vox/validate-vox16d-recovery.ps1'
+      - 'docs/vox/VOX-16D-RECOVERY-TRUTH.md'
+      - '.github/workflows/vox-16d-recovery.yml'
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  isolated-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - shell: pwsh
+        run: ./scripts/mvp/vox/validate-vox16d-recovery.ps1
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with: {node-version: '20.20.2'}
+      - run: node scripts/mvp/vox/validate-vox16c-staging-evidence.mjs

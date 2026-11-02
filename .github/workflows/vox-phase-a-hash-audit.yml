@@ -1,0 +1,40 @@
+name: VOX Phase A Migration Fingerprint Audit (No Apply)
+on:
+  pull_request:
+    paths:
+      - 'ops/vox/quarantined-migrations/legacy-20261014/202610140*vox*.sql'
+      - '.github/workflows/vox-phase-a-hash-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  print-review-only-fingerprints:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24.18.0'
+      - name: Show proposed unmerged source SHA256 fingerprints
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const names=[
+          '20261014010000_vox_v1_scoped_staff_authority.sql',
+          '20261014020000_vox_v1_staff_review_workflow.sql',
+          '20261014030000_vox_v1_approved_grant_finalizer.sql',
+          '20261014040000_vox_v1_staff_emergency_revocation.sql',
+          '20261014050000_vox_v1_team_leader_review_policy.sql',
+          '20261014060000_vox_operational_intent_review.sql',
+          '20261014070000_vox_approved_followup_executor.sql'
+          ];
+          const sha=b=>createHash('sha256').update(b).digest('hex');
+          const records=names.map(n=>({version:n.slice(0,14),name:n.slice(15,-4),
+           canonicalSha256:sha(Buffer.from(readFileSync('ops/vox/quarantined-migrations/legacy-20261014/'+n,'utf8').replace(/\r\n/g,'\n').replace(/\r/g,'\n')))}));
+          console.log('VOX_A_REPIN_REVIEW_ONLY '+JSON.stringify(records));
+          console.log('VOX_A_SET_REVIEW_ONLY '+sha(Buffer.from(records.map(r=>r.version+':'+r.canonicalSha256).join('|'))));
+          console.log('VOX_A_DATABASE_APPLIED=false RELEASE_HOLD=true');
+          NODE

@@ -1,0 +1,30 @@
+name: VOX-08H Protected Staff EOD Source-only Preview
+on:
+  pull_request:
+    paths:
+      - 'contracts/vox/currentEodCanonicalProof.mjs'
+      - 'contracts/vox/currentEodCanonicalProof.d.mts'
+      - 'contracts/vox/coreWorkEodPreview.mjs'
+      - 'contracts/vox/coreWorkEodPreview.d.mts'
+      - 'app/api/vox/v1/eod-preview/route.ts'
+      - 'scripts/mvp/vox/validate-to08h-current-day-eod.test.mjs'
+      - 'scripts/mvp/vox/validate-to08h-eod-http.spec.mjs'
+      - '.github/workflows/vox-to08h-eod-protected.yml'
+permissions:
+  contents: read
+jobs:
+  readonly-eod-and-canonical-scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.2'
+      - run: node --check contracts/vox/currentEodCanonicalProof.mjs
+      - run: node --test scripts/mvp/vox/validate-to08h-current-day-eod.test.mjs scripts/mvp/vox/validate-to03c-core-work-eod.test.mjs scripts/mvp/vox/validate-to05e-scoped-queue.test.mjs
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node --experimental-vm-modules --test scripts/mvp/vox/validate-to08h-eod-http.spec.mjs
+      - run: npm run typecheck

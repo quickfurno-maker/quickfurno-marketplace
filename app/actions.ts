@@ -34,6 +34,11 @@ import * as aarohiRegistration from "../services/aarohiRegistrationIntentService
 import * as adminVendorLocation from "../services/adminVendorLocationService";
 import * as leadAssignmentLifecycle from "../services/leadAssignmentLifecycleService";
 import * as badLeadRecovery from "../services/badLeadRecoveryService";
+import { verifyVoxOwnerBearer } from "../services/vox/verifiedStaffBearer";
+import { rc65PostCreditOwnerAuthority } from "../services/vox/rc65PostCreditOwnerAuthority";
+import { rc68PostRecommendationOwnerAuthority } from "../services/vox/rc68PostRecommendationOwnerAuthority";
+import { rc73PostCommentOwnerAuthority } from "../services/vox/rc73PostCommentOwnerAuthority";
+import { rc70PostEligibilityOwnerAuthority } from "../services/vox/rc70PostEligibilityOwnerAuthority";
 import {
   queueHumanConversationReply,
   releaseHumanConversationToAi,
@@ -909,8 +914,26 @@ export const adminSetCityStrictLocation = async (id: string, enabled: boolean) =
     revalidatePath("/api/cities");
     return result;
   });
-export const adminApproveBadLead  = async (id: string, note?: string) => asAdmin(() => admin.approveBadLeadReport(id, note));
-export const adminRejectBadLead   = async (id: string, note?: string) => asAdmin(() => admin.rejectBadLeadReport(id, note));
+// Bad-lead review status is authorization evidence for a future one-credit
+// restoration. Both the original approval and every alternate VALID path must
+// require the SAME genuinely verified Owner AAL2 as the credit mutation itself.
+async function rc44VerifiedBadLeadOwner(actor:string):Promise<boolean>{
+ try{
+  const {data:{session},error}=await (await serverClient()).auth.getSession();
+  if(error||!session?.access_token)return false;
+  return await verifyVoxOwnerBearer("Bearer "+session.access_token)===actor;
+ }catch{return false;}
+}
+export const adminApproveBadLead=async (id:string,note?:string)=>
+ asAdmin(async actor=>{
+  if(!await rc44VerifiedBadLeadOwner(actor))return fail(appError("UNAUTHORIZED"));
+  return admin.approveBadLeadReport(id,note,actor);
+ });
+export const adminRejectBadLead=async (id:string,note?:string)=>
+ asAdmin(async actor=>{
+  if(!await rc44VerifiedBadLeadOwner(actor))return fail(appError("UNAUTHORIZED"));
+  return admin.rejectBadLeadReport(id,note,actor);
+ });
 export const adminBadLeadReports  = async () => asAdmin(() => admin.getPendingBadLeadReports());
 
 // --------------------------------------------------------------------------
@@ -928,39 +951,89 @@ export const adminGetLeadMatchingAuditDetails = async (leadId: string) =>
 export const adminListVendorLeadReports = async (limit?: number) =>
   asAdmin(() => audit.listVendorLeadReports(limit));
 export const adminUpdateVendorLeadReportStatus = async (reportId: string, input: { status: string; adminNotes?: string | null }) =>
-  asAdmin(async () => {
-    const user = await requireSuperadmin();
-    const result = await audit.updateVendorLeadReportStatus(reportId, input, user.id);
-    revalidatePath("/admin/leads");
-    return result;
+  asAdmin(async (actor) => {
+    // "Valid" is a credit-restoration eligibility state in the reviewed SQL.
+    // The alternate status editor MUST NOT approve a bad lead at AAL1.
+    if ((input?.status==="Valid"||process.env.VOX_BAD_LEAD_ATOMIC_REVIEW_ENABLED==="staging")&&
+        !await rc44VerifiedBadLeadOwner(actor))
+      return fail(appError("UNAUTHORIZED"));
+    const result = await audit.updateVendorLeadReportStatus(reportId, input, actor);
+    // "Valid" makes a bad-lead report eligible for a later credit-only
+    // remedy. A successful metadata write followed by revoked Owner AAL2
+    // must remain UNKNOWN, not a falsely acknowledged eligibility approval.
+    const verified = (input?.status==="Valid"||process.env.VOX_BAD_LEAD_ATOMIC_REVIEW_ENABLED==="staging")
+      ?await rc70PostEligibilityOwnerAuthority(result,()=>rc44VerifiedBadLeadOwner(actor))
+      :result;
+    if(verified.ok)revalidatePath("/admin/leads");
+    return verified;
   });
 
 export const adminRecommendBadLeadRecovery = async (
   reportId: string,
-  recommendation: "none" | "restore_credit" | "replace" | "restore_credit_and_replace",
-) => asAdmin(() => badLeadRecovery.recommendBadLeadRecovery(reportId, recommendation));
+  recommendation: "none" | "restore_credit",
+) => asAdmin(async actor => {
+  // Only "none" or a one-LEAD-credit recommendation is permitted. Do not
+  // offer or persist a replacement-assignment recommendation for bad leads.
+  if(recommendation!=="none"&&recommendation!=="restore_credit")
+    return fail(appError("VALIDATION"));
+  // Recommendations feed the eventual compensation decision. Require the
+  // same CURRENT Owner AAL2 as approval, but never issue credits here.
+  if(!await rc44VerifiedBadLeadOwner(actor))return fail(appError("UNAUTHORIZED"));
+  const receipt=await badLeadRecovery.recommendBadLeadRecovery(reportId,recommendation);
+  return rc68PostRecommendationOwnerAuthority(receipt,()=>rc44VerifiedBadLeadOwner(actor));
+});
 
 export const adminGenerateBadLeadRecoveryRecommendation = async (reportId: string) =>
-  asAdmin(() => badLeadRecovery.generateBadLeadRecoveryRecommendation(reportId));
+  asAdmin(async actor => {
+    if(!await rc44VerifiedBadLeadOwner(actor))return fail(appError("UNAUTHORIZED"));
+    const receipt=await badLeadRecovery.generateBadLeadRecoveryRecommendation(reportId);
+    return rc68PostRecommendationOwnerAuthority(receipt,()=>rc44VerifiedBadLeadOwner(actor));
+  });
 
 export const adminApplyBadLeadRecovery = async (
   reportId: string,
   action: badLeadRecovery.BadLeadRecoveryAction,
 ) =>
   asAdmin(async (actor) => {
+    // Legacy UI types can still carry an old replacement enum. Reject it at
+    // this public server-action boundary, before Auth lookups or any SQL.
+    if(action!=="restore_credit"&&action!=="reject")
+      return fail(appError("VALIDATION"));
+    // Compensation is a financial-equivalent credit mutation, even though
+    // QuickFurno NEVER gives money for a bad lead. Require current Owner AAL2
+    // from real GoTrue and bind the verified subject to the admin actor.
+    // A role cookie or client-provided ID alone must never authorize the RPC.
+    try {
+      const { data: { session }, error } = await (await serverClient()).auth.getSession();
+      if (error || !session?.access_token ||
+          await verifyVoxOwnerBearer("Bearer " + session.access_token) !== actor)
+        return fail(appError("UNAUTHORIZED"));
+    } catch { return fail(appError("UNAUTHORIZED")); }
     const result = await badLeadRecovery.applyBadLeadRecovery(reportId, action, actor);
+    // A canonical credit/rejection may have committed while the Owner AAL2
+    // expired. Recheck the identical verified actor after SQL; ambiguity
+    // cannot be reported as successful or used to authorize another decision.
+    const verified=await rc65PostCreditOwnerAuthority(result,action,
+      ()=>rc44VerifiedBadLeadOwner(actor));
     revalidatePath("/admin/leads");
     revalidatePath("/admin/lead-distribution");
     revalidatePath("/vendor/dashboard/matching");
     revalidatePath("/vendor/dashboard");
-    return result;
+    return verified;
   });
 export const adminAddVendorLeadReportComment = async (reportId: string, comment: string, isInternal = false) =>
-  asAdmin(async () => {
-    const user = await requireSuperadmin();
-    const result = await audit.addVendorLeadReportComment(reportId, comment, user.id, isInternal);
-    revalidatePath("/admin/leads");
-    return result;
+  asAdmin(async actor => {
+    // An added bad-lead review comment affects the governed evidence trail.
+    // Staff admin cookies alone cannot authorize this Owner-sensitive write.
+    if(!await rc44VerifiedBadLeadOwner(actor))return fail(appError("UNAUTHORIZED"));
+    const user=await requireSuperadmin();
+    if(user.id!==actor)return fail(appError("UNAUTHORIZED"));
+    const result=await audit.addVendorLeadReportComment(reportId,comment,user.id,isInternal);
+    // A comment can commit immediately before AAL2 revocation. Unknown means
+    // reconcile the original report, not "rolled back" or safe to retry.
+    const verified=await rc73PostCommentOwnerAuthority(result,()=>rc44VerifiedBadLeadOwner(actor));
+    if(verified.ok)revalidatePath("/admin/leads");
+    return verified;
   });
 export const adminListPackageOrdersAuditOnly = async (limit?: number) =>
   asAdmin(() => audit.listPackageOrdersAuditOnly(limit));

@@ -329,3 +329,27 @@ test("RC82 hung independent Team Leader preflight never mutates SQL review",asyn
  assert.equal(state.calls.filter(x=>x.type==="rpc").length,0);
  assert.equal(state.authCalls,1);
 });
+
+
+test("RC83 independent TL cannot certify a report after scoped objects change",async()=>{
+ const tl={...scope,role:"team_leader",canReadContent:false,
+  verifiedDepartments:["service_support"],vendorIds:[uuid(8)]};
+ state.rpcData=[{report_id:uuid(4),report_state:"ACKNOWLEDGED",report_revision:1}];
+ for(const next of [
+  {...tl,vendorIds:[uuid(9)]},
+  {...tl,conversationIds:[uuid(10)]},
+  {...tl,prospectIds:undefined},
+  {...tl,canReadContent:true}
+ ]){
+  state.calls=[];state.authCalls=0;
+  state.authHook=n=>n===1?tl:next;
+  const r=await reviews.POST(post("eod-reviews",{
+   reportId:uuid(4),expectedRevision:0,nonce:uuid(50),decision:"ACKNOWLEDGED"
+  }));
+  assert.equal(r.status,503);const b=await r.json();
+  assert.equal(b.error,"EOD_REVIEW_OUTCOME_UNKNOWN");
+  assert.equal(b.retrySameNonceOnly,true);
+  assert.equal(state.calls.filter(x=>x.type==="rpc").length,1);
+  assert.equal(state.authCalls,2);
+ }
+});

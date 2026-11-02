@@ -125,11 +125,21 @@ export async function POST(request:Request){
    if(current.timedOut||!current.value||
       current.value.userId!==scope.userId||current.value.teamId!==scope.teamId||
       current.value.cityId!==scope.cityId||current.value.role!=="team_leader"||
-      current.value.canMutate!==false||
-      !Array.isArray(scope.verifiedDepartments)||
-      !Array.isArray(current.value.verifiedDepartments)||
-      [...scope.verifiedDepartments].sort().join("|")!==
-      [...current.value.verifiedDepartments].sort().join("|"))return outcomeUnknown();
+      current.value.canMutate!==false||scope.canMutate!==false||
+      current.value.canReadContent!==scope.canReadContent)return outcomeUnknown();
+   // The independent TL identity is not enough if Core silently substituted
+   // departments or any effective scoped object grants during the SQL write.
+   // Compare actual arrays, not string joins (an ID may be malformed).
+   for(const key of ["verifiedDepartments","prospectIds","vendorIds",
+    "supportThreadIds","conversationIds"] as const){
+    const original=scope[key],latest=current.value[key];
+    if(!Array.isArray(original)||!Array.isArray(latest)||
+       original.length!==latest.length||
+       original.some(x=>typeof x!=="string")||
+       latest.some(x=>typeof x!=="string"))return outcomeUnknown();
+    const a=[...original].sort(),b=[...latest].sort();
+    if(a.some((v,i)=>v!==b[i]))return outcomeUnknown();
+   }
   }catch{return outcomeUnknown();}
   finally{if(authTimer!==undefined)clearTimeout(authTimer);}
   return send({ok:true,schema:"qf.vox.eod.tl.receipt.v1",reportId:r.report_id,

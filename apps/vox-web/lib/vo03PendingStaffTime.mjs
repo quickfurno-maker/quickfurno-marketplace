@@ -1,4 +1,27 @@
-import {validateTimeCommand} from "../../../contracts/vox/virtualOfficeTimekeeping.mjs";
+// Browser-safe mirror of Core's strict VO time command validator. This must
+// remain parity-tested against contracts/vox/virtualOfficeTimekeeping.mjs,
+// because Next's Web client bundle cannot import outside its package root.
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ATTENDANCE=new Set(["CLOCK_IN","CLOCK_OUT","BREAK_START","BREAK_END"]);
+const TASK=new Set(["TASK_START","TASK_PAUSE","TASK_RESUME","TASK_STOP","TASK_SWITCH"]);
+function validateTimeCommand(raw){
+ if(!raw||typeof raw!=="object"||Array.isArray(raw)||
+   (!ATTENDANCE.has(raw.action)&&!TASK.has(raw.action)))
+  return {ok:false,reason:"INVALID_COMMAND"};
+ const task=TASK.has(raw.action);
+ const expected=task?["action","expectedRevision","nonce","workItemId"]:
+  ["action","expectedRevision","nonce"];
+ if(Object.keys(raw).sort().join("|")!==expected.sort().join("|"))
+  return {ok:false,reason:"UNKNOWN_OR_MISSING_FIELDS"};
+ if(typeof raw.nonce!=="string"||!UUID.test(raw.nonce)||
+   !Number.isSafeInteger(raw.expectedRevision)||raw.expectedRevision<0||
+   raw.expectedRevision>2147483646)return {ok:false,reason:"INVALID_NONCE_OR_REVISION"};
+ if(task&&(typeof raw.workItemId!=="string"||!UUID.test(raw.workItemId)))
+  return {ok:false,reason:"INVALID_WORK_ITEM"};
+ return {ok:true,command:{action:raw.action,nonce:raw.nonce,
+   expectedRevision:raw.expectedRevision,
+   ...(task?{workItemId:raw.workItemId}:{})}};
+}
 /**
  * Local single-tab recovery guard for time actions that may have reached Core.
  * Not an attendance ledger, server authority, or proof of successful work.

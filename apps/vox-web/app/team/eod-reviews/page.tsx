@@ -2,6 +2,7 @@ import Link from "next/link";
 import {fetchTlEodQueue} from "../../../lib/teamWorkflow";
 import {StaffSignInLink} from "../../components/StaffSignInLink";
 import ReviewDecision from "./ReviewDecision";
+import PendingReviewNotice from "./PendingReviewNotice";
 import "../workflow.css";
 export const dynamic="force-dynamic";
 export default async function TeamLeaderPartialEodReview(){
@@ -26,6 +27,7 @@ export default async function TeamLeaderPartialEodReview(){
    <Link href="/team">Return to Team Operations</Link>
   </section>:<section className="voxFlowCard" aria-labelledby="reviewListTitle">
    <h2 id="reviewListTitle">Pending Core-only reports</h2>
+   <PendingReviewNotice visibleReportIds={r.pending.map(item=>item.reportId)}/>
    <p className="voxFlowMuted">A bounded 16-item view, not a complete team total.
     Decisions are checked again atomically by Core.</p>
    {r.pending.length===0?<p role="status">No current team reports pending review.</p>:

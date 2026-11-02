@@ -30,6 +30,9 @@ on:
       - 'scripts/mvp/vox/rc65-*.test.mjs'
       - 'scripts/mvp/vox/rc66-*.test.mjs'
       - 'scripts/mvp/vox/rc68-*.test.mjs'
+      - 'scripts/mvp/vox/rc69-*.test.mjs'
+      - 'apps/vox-web/scripts/validate-rc69-work-receipt.spec.mjs'
+      - 'apps/vox-web/lib/rc69VerifiedWorkReceipt.ts'
       - 'apps/vox-web/scripts/validate-rc68-vendor360-tasks.spec.mjs'
       - 'apps/vox-web/app/vendor360/**'
       - 'services/vox/rc68PostRecommendationOwnerAuthority.ts'
@@ -153,6 +156,8 @@ jobs:
         run: node --test scripts/mvp/vox/rc66-work-core-boundary.test.mjs scripts/mvp/vox/rc42-bad-lead-credit-only-service.test.mjs
       - name: RC68 Vendor 360 actual assigned Core tasks and post-recommendation Owner proof
         run: node --test apps/vox-web/scripts/validate-rc68-vendor360-tasks.spec.mjs scripts/mvp/vox/rc68-finance-recommendation-owner.test.mjs scripts/mvp/vox/rc55-finance-recommendation-aal2.test.mjs
+      - name: RC69 real Core to Staff BFF to browser exact receipt and preserved nonce proof
+        run: node --test scripts/mvp/vox/rc69-work-receipt-two-hop.test.mjs apps/vox-web/scripts/validate-rc69-work-receipt.spec.mjs apps/vox-web/scripts/validate-rc66-work-recovery.spec.mjs scripts/mvp/vox/rc34-vox-web-staff-session-core-http.test.mjs
       - name: Root TypeScript, unchanged protected release gates
         run: |
           npx tsc --noEmit --pretty false

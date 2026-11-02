@@ -21,6 +21,10 @@ await build({entryPoints:[resolve(root,"apps/vox-web/app/api/work-transitions/ro
    a.path==="core"?'export const origin=()=> "https://staging-core.quickfurno.in";':""}));
  }}]});
 const api=await import(pathToFileURL(out).href);
+const clientOut=join(temp,"ui-receipt.mjs");
+await build({entryPoints:[resolve(root,"apps/vox-web/lib/rc69VerifiedWorkReceipt.ts")],
+ outfile:clientOut,bundle:true,platform:"node",format:"esm",target:"node24",logLevel:"silent"});
+const {isVerifiedWorkReceipt:isTrustedByStaffUi}=await import(pathToFileURL(clientOut).href);
 const ITEM="11111111-1111-4111-8111-111111111111",
  NONCE="22222222-2222-4222-8222-222222222222";
 const STATES={CLAIM:"ASSIGNED",START:"IN_PROGRESS",WAIT_EXTERNAL:"WAITING_EXTERNAL",
@@ -63,6 +67,9 @@ test("real two-hop Core receipt survives Web BFF without losing UI-required sche
   assert.equal(body.workItemId,ITEM);
   assert.equal(body.revision,6);
   assert.equal(body.providerMessagesSent,0);
+  // Genuine BFF output must pass the genuine client validator, not merely
+  // individual server-side assertions, before the UI clears its nonce.
+  assert.equal(isTrustedByStaffUi(body,{action,itemId:ITEM,expectedRevision:5}),true);
   assert.equal(globalThis.__rc69.calls.length,1);
   assert.equal(globalThis.__rc69.calls[0].url,
    "https://staging-core.quickfurno.in/api/vox/v1/work-transitions");
@@ -79,6 +86,7 @@ test("Core success with forged side effects, wrong revision or state cannot beco
   const body=await res.json();
   assert.equal(body.error,"CORE_WORK_OUTCOME_UNKNOWN");
   assert.equal(body.committed,null);assert.equal(body.retrySameNonceOnly,true);
+  assert.equal(isTrustedByStaffUi(body,{action:"CLAIM",itemId:ITEM,expectedRevision:5}),false);
   assert.equal(JSON.stringify(body).includes("secret"),false);
  }
 });

@@ -10,7 +10,7 @@ const KEYS=["affectsVendorLeadMatching","newState","ok","providerMessagesSent",
  "revision","schema","status","workItemId"].join("|");
 export function isVerifiedWorkReceipt(value:unknown,command:Expected):boolean{
  if(!value||typeof value!=="object"||Array.isArray(value)||!command||
-    !Object.hasOwn(states,command.action)||
+    !Object.prototype.hasOwnProperty.call(states,command.action)||
     !Number.isSafeInteger(command.expectedRevision)||
     command.expectedRevision<0||command.expectedRevision>2147483646)return false;
  const receipt=value as Record<string,unknown>;

@@ -58,9 +58,12 @@ export async function submitScopedWorkTransition(cmd:WorkCommand){
     !Number.isSafeInteger(r.revision)||r.revision!==cmd.expectedRevision+1||
     r.providerMessagesSent!==0||r.affectsVendorLeadMatching!==false)
    return uncertain();
-  return {ok:true,status:200,workItemId:cmd.itemId,
-   revision:r.revision as number,newState:r.newState as string,
-   providerMessagesSent:0 as const} as const;
+  // Forward the exact verified Core receipt fields consumed by the Staff UI.
+  // Dropping schema / matching flag would make a committed transition appear
+  // unconfirmed and strand its original nonce in browser recovery storage.
+  return {ok:true,status:200,schema:"qf.vox.work.transaction.receipt.v1" as const,
+   workItemId:cmd.itemId,revision:r.revision as number,newState:r.newState as string,
+   providerMessagesSent:0 as const,affectsVendorLeadMatching:false as const} as const;
  }catch{return uncertain();}
 }
 

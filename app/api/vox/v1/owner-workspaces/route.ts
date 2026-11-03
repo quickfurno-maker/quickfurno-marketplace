@@ -1,7 +1,7 @@
 import "server-only";
 import {adminClient} from "@/lib/supabase";
 import {verifyVoxOwnerBearer} from "@/services/vox/verifiedStaffBearer";
-import {projectOwnerAcquisition,projectOwnerVendor360,projectOwnerDesk} from "@/services/vox/ownerWorkspaceProjection.mjs";
+import {projectOwnerAcquisition,projectOwnerVendor360,projectOwnerDesk,projectOwnerClientInbox} from "@/services/vox/ownerWorkspaceProjection.mjs";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 const HEADERS={"cache-control":"private, no-store, max-age=0","vary":"Authorization","x-content-type-options":"nosniff"};
@@ -9,7 +9,7 @@ const reply=(v:unknown,status:number)=>Response.json(v,{status,headers:HEADERS})
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ids=(rows:Array<{id?:string}>|null)=>Array.isArray(rows)?rows.map(x=>x.id).filter((x):x is string=>typeof x==="string"&&UUID.test(x)):[];
 const valid=(r:{error:unknown;data:unknown})=>!r.error&&Array.isArray(r.data)&&r.data.length<=12;
-const allowedKinds=new Set(["vendor360","acquisition","desk"]);
+const allowedKinds=new Set(["vendor360","acquisition","desk","clients"]);
 /** Owner-only global Core read model. No Staff grants, no payment/credit writes.
  * Disabled unless separately enabled for private Staging. Production HOLD. */
 export async function GET(request:Request){
@@ -51,6 +51,14 @@ export async function GET(request:Request){
     :{data:[],error:null};
    if(!valid(tasks))return reply({ok:false,error:"OWNER_ACQUISITION_UNAVAILABLE"},503);
    view=projectOwnerAcquisition({prospects:prospects.data??[],tasks:tasks.data??[]});
+  }else if(kind==="clients"){
+   // Reuse canonical Core lead records. Never expose contact PII, requirements,
+   // provider identifiers, assignment mutators, or claim a complete lead list.
+   const leads=await db.from("leads")
+    .select("id,status,city,category,source,created_at")
+    .order("created_at",{ascending:false}).limit(12);
+   if(!valid(leads))return reply({ok:false,error:"OWNER_CLIENT_READ_UNAVAILABLE"},503);
+   view=projectOwnerClientInbox({leads:leads.data??[]});
   }else{
    const [threads,conversations]=await Promise.all([
     db.from("vendor_support_threads").select("id,status,priority")

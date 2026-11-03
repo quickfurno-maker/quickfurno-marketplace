@@ -977,6 +977,57 @@ export async function fetchOwnerRefundIntakePreview(){
 }
 
 
+/** Owner-only Client Operations: a truthful recent-record sample from Core.
+ * No direct Staff scope, provider action, lead assignment, or contact PII. */
+export async function fetchOwnerClientInbox(){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_STAFF_VIEW_MODE!=="owner"||
+    process.env.VOX_OWNER_WORKSPACES_ENABLED!=="staging"||
+    process.env.VOX_OWNER_WORKSPACES_STAGE!=="private")
+  return {ok:false,status:503,error:"OWNER_CLIENTS_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const response=await fetch(base+"/api/vox/v1/owner-workspaces?kind=clients",{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   cache:"no-store",redirect:"error",signal:AbortSignal.timeout(3500)});
+  if(!response.ok)return {ok:false,status:response.status===403?403:response.status===401?401:503,
+   error:"OWNER_CLIENTS_UNAVAILABLE"} as const;
+  const raw:unknown=await response.json();
+  if(!raw||typeof raw!=="object"||Array.isArray(raw))
+   return {ok:false,status:503,error:"OWNER_CLIENTS_UNTRUSTED"} as const;
+  const envelope=raw as Record<string,unknown>;
+  const v=envelope.view;
+  if(envelope.ok!==true||!v||typeof v!=="object"||Array.isArray(v))
+   return {ok:false,status:503,error:"OWNER_CLIENTS_UNTRUSTED"} as const;
+  const view=v as Record<string,unknown>;
+  if(view.schema!=="qf.vox.owner.clients.v1"||view.owner!=="quickfurno-core"||
+    view.readOnly!==true||view.actionsEnabled!==false||view.recentOnly!==true||
+    view.totalCountKnown!==false||!Array.isArray(view.leads)||view.leads.length>12)
+   return {ok:false,status:503,error:"OWNER_CLIENTS_UNTRUSTED"} as const;
+  const leads=[] as Array<{leadId:string;state:string;city:string;category:string;
+   source:string;createdAt:string|null}>;
+  for(const rawRow of view.leads){
+   if(!rawRow||typeof rawRow!=="object"||Array.isArray(rawRow))
+    return {ok:false,status:503,error:"OWNER_CLIENTS_UNTRUSTED"} as const;
+   const row=rawRow as Record<string,unknown>;
+   if(!uid(row.leadId)||Object.keys(row).some(k=>!
+    ["leadId","state","city","category","source","createdAt"].includes(k)))
+    return {ok:false,status:503,error:"OWNER_CLIENTS_UNTRUSTED"} as const;
+   if(row.createdAt!==null&&(typeof row.createdAt!=="string"||
+      !Number.isFinite(Date.parse(row.createdAt))))
+    return {ok:false,status:503,error:"OWNER_CLIENTS_UNTRUSTED"} as const;
+   leads.push({leadId:row.leadId as string,
+    state:safeLabel(row.state,40),city:safeLabel(row.city,80),
+    category:safeLabel(row.category,80),source:safeLabel(row.source,60),
+    createdAt:row.createdAt as string|null});
+  }
+  return {ok:true,status:200,view:{leads,recentOnly:true,totalCountKnown:false,
+   actionsEnabled:false}} as const;
+ }catch{return {ok:false,status:503,error:"OWNER_CLIENTS_UNAVAILABLE"} as const;}
+}
+
 /** Private Staging Owner-only reuse of canonical Core data. Staff integration
  * remains unchanged and cannot be reached by switching to Owner view mode. */
 async function fetchOwnerWorkspace(kind:"vendor360"|"acquisition"|"desk"){

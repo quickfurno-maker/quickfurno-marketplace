@@ -8,3 +8,6 @@ export declare function projectOwnerVendor360(input?: {
 export declare function projectOwnerDesk(input?: {
  threads?: Record<string, unknown>[]; conversations?: Record<string, unknown>[]; now?: number;
 }): Readonly<Record<string, unknown>>;
+export declare function projectOwnerClientInbox(input?: {
+ leads?: Record<string, unknown>[];
+}): Readonly<Record<string, unknown>>;

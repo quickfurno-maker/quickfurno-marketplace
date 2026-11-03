@@ -8,4 +8,4 @@ export type VerifiedTeamChatReceipt={ok:true;status:201;nonce:string;messageId:s
  effect:"INTERNAL_TEAM_MESSAGE_ONLY";externalMessagesSent:0;
  agentConversationChanged:false;staffPrivilegesChanged:false};
 export declare function clearPendingTeamChat(store:Pick<Storage,"getItem"|"removeItem">|null,
- row:PendingTeamChat,receipt:VerifiedTeamChatReceipt):boolean;
+ row:PendingTeamChat,receipt:unknown):boolean;

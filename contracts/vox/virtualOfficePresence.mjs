@@ -45,12 +45,12 @@ export function projectVerifiedTeamPresence({viewer,roster,observations,nowMs,
  const entries=roster.map(staffId=>{
   const observation=byId.get(staffId);
   const state=!observation?"UNKNOWN":
-   nowMs-observation.seenAtMs>PRESENCE_TTL_MS?"OFFLINE":observation.state;
+   nowMs-observation.seenAtMs>PRESENCE_TTL_MS?"UNKNOWN":observation.state;
   return Object.freeze({staffId,state,source:"EPHEMERAL_ONLY"});
  });
  const unknownStaffCount=entries.filter(e=>e.state==="UNKNOWN").length;
  return Object.freeze({ok:true,schema:PRESENCE_SCHEMA,entries:Object.freeze(entries),
   totalRosterKnown:true,unknownStaffCount,attendanceVerified:false,
   timeTrackingVerified:false,taskCompletionVerified:false,
-  latestObservationsVerified:observations.length});
+  latestObservationsVerified:observations.filter(o=>nowMs-o.seenAtMs<=PRESENCE_TTL_MS).length});
 }

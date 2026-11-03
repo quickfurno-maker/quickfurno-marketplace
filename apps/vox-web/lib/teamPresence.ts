@@ -5,7 +5,7 @@ export type TeamPresenceView={ok:true;status:200;asOf:string;
  totalRosterKnown:true;unknownStaffCount:number;liveRealtimeConnected:false;
  entries:{staffRef:string;state:string;source:"EPHEMERAL_ONLY"}[]};
 const deny=(status:number,error:string)=>({ok:false,status,error} as const);
-const states=new Set(["ONLINE","AWAY","BUSY","IN_MEETING","ON_BREAK","OFFLINE","UNKNOWN"]);
+const states=new Set(["ONLINE","AWAY","BUSY","IN_MEETING","ON_BREAK","UNKNOWN"]);
 const safe=(x:unknown)=>Number.isSafeInteger(x)&&(x as number)>=0;
 const exact=(x:Record<string,unknown>,fields:string[])=>
  Object.keys(x).sort().join("|")===[...fields].sort().join("|");

@@ -14,9 +14,9 @@ test("VO2 verified roster distinguishes unavailable observation from offline",()
  assert.equal(r.entries[1].state,"UNKNOWN");
  assert.equal(r.attendanceVerified,false);assert.equal(r.timeTrackingVerified,false);
 });
-test("VO2 expiry becomes OFFLINE only for a verified prior observation",()=>{
+test("VO7 expired voluntary presence becomes UNKNOWN, not proof of offline",()=>{
  const r=projectVerifiedTeamPresence({...base,nowMs:1000+PRESENCE_TTL_MS+1});
- assert.equal(r.entries[0].state,"OFFLINE");
+ assert.equal(r.entries[0].state,"UNKNOWN");
  assert.equal(r.entries[1].state,"UNKNOWN");
 });
 test("VO2 verified Staff can view only own roster entry",()=>{

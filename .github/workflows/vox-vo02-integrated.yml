@@ -1,0 +1,35 @@
+name: VOX VO2 Combined Virtual Office Contracts
+on:
+  pull_request:
+    branches:
+      - feat/vox-rc6-operational-20261030
+    paths:
+      - 'contracts/vox/virtualOffice*.mjs'
+      - 'services/vox/virtualOffice*.mjs'
+      - 'scripts/mvp/vox/vo0*-virtual-office-*.test.mjs'
+      - 'scripts/mvp/vox/vo02-*.test.mjs'
+      - '.github/workflows/vox-vo02-integrated.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  combined-contracts:
+    name: Core-authoritative time, meet and presence
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - name: Verify VOX virtual office integrated contracts
+        run: |
+          node --test scripts/mvp/vox/vo00-virtual-office-contract.test.mjs \
+            scripts/mvp/vox/vo01-virtual-office-time-state.test.mjs \
+            scripts/mvp/vox/vo01-virtual-office-time-report.test.mjs \
+            scripts/mvp/vox/vo01-virtual-office-chat-checkpoint.test.mjs \
+            scripts/mvp/vox/vo01-virtual-office-meet-provider.test.mjs \
+            scripts/mvp/vox/vo02-time-writer.test.mjs \
+            scripts/mvp/vox/vo02-presence-projection.test.mjs

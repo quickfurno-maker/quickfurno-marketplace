@@ -116,7 +116,72 @@ export async function GET(request:Request){
     state:e.state,source:e.source}))},200);
  }catch{return send({ok:false,error:"PRESENCE_SOURCE_UNAVAILABLE"},503);}
 }
-export function POST(){return send({ok:false,error:"METHOD_NOT_ALLOWED"},405);}
+/**
+ * Voluntary, idempotent Staff-status signal. This cannot track a keyboard,
+ * GPS, webcam or attendance: a Staff member must explicitly choose a state.
+ * SQL uses verified Core actor, team and server timestamp, never browser IDs.
+ */
+export async function POST(request:Request){
+ if(!VO6_MANAGED_PRESENCE_CERTIFIED||
+    process.env.VOX_VO6_PRESENCE_WRITE_ENABLED!=="staging"||
+    process.env.VOX_STAFF_GRANTS_ENABLED!=="staging"||
+    process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED!=="staging")
+  return send({ok:false,error:"PRESENCE_SIGNAL_NOT_CERTIFIED"},503);
+ if(new URL(request.url).search||new URL(request.url).hash)
+  return send({ok:false,error:"FILTER_DENIED"},400);
+ if(request.headers.get("content-type")?.split(";",1)[0]?.trim().toLowerCase()!=="application/json")
+  return send({ok:false,error:"JSON_REQUIRED"},415);
+ let state:string;
+ try{
+  const raw=await request.text();
+  if(!raw||raw.length>72)return send({ok:false,error:"PRESENCE_PAYLOAD_INVALID"},413);
+  const v:unknown=JSON.parse(raw);
+  if(!v||typeof v!=="object"||Array.isArray(v))
+   return send({ok:false,error:"PRESENCE_PAYLOAD_INVALID"},400);
+  const x=v as Record<string,unknown>;
+  if(Object.keys(x).join("|")!=="state"||
+    !["ONLINE","AWAY","BUSY","IN_MEETING","ON_BREAK"].includes(String(x.state)))
+   return send({ok:false,error:"PRESENCE_STATE_DENIED"},400);
+  state=x.state as string;
+ }catch{return send({ok:false,error:"PRESENCE_PAYLOAD_INVALID"},400);}
+ const header=request.headers.get("authorization");
+ try{
+  const scope=await getVerifiedScopedStaff(header);
+  if(!scope||scope.canMutate!==false||
+    (scope.role==="team_leader"?
+     scope.canReadContent!==false:
+     scope.canReadContent!==true||scope.role==="auditor"))
+   return send({ok:false,error:"CURRENT_STAFF_AAL2_REQUIRED"},403);
+  const response=await adminClient().rpc("qf_vox_staff_presence_signal_candidate_v1",{
+   p_actor:scope.userId,p_team:scope.teamId,p_state:state
+  });
+  if(response.error||!Array.isArray(response.data)||response.data.length!==1)
+   return send({ok:false,error:"PRESENCE_SIGNAL_OUTCOME_UNKNOWN",
+    applied:null,retrySameStateOnly:true},503);
+  const raw:unknown=response.data[0];
+  if(!raw||typeof raw!=="object"||Array.isArray(raw))
+   return send({ok:false,error:"PRESENCE_SIGNAL_OUTCOME_UNKNOWN",
+    applied:null,retrySameStateOnly:true},503);
+  const r=raw as Record<string,unknown>;
+  if(Object.keys(r).sort().join("|")!=="city_id|seen_at|staff_id|state|team_id"||
+    r.staff_id!==scope.userId||r.team_id!==scope.teamId||
+    r.city_id!==scope.cityId||r.state!==state||
+    typeof r.seen_at!=="string"||
+    !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,6})?(?:Z|[+-]\d\d:\d\d)$/.test(r.seen_at)||
+    !Number.isFinite(Date.parse(r.seen_at)))
+   return send({ok:false,error:"PRESENCE_SIGNAL_OUTCOME_UNKNOWN",
+    applied:null,retrySameStateOnly:true},503);
+  const latest=await getVerifiedScopedStaff(header);
+  if(!latest||!same(scope,latest))
+   return send({ok:false,error:"PRESENCE_SCOPE_CHANGED",
+    applied:null,retrySameStateOnly:true},403);
+  return send({ok:true,schema:"qf.vox.presence.signal.receipt.v1",
+   staffRef:"STAFF-"+scope.userId.slice(0,8).toUpperCase(),
+   state,observedAt:r.seen_at,source:"EPHEMERAL_ONLY",
+   attendanceVerified:false,providerMessagesSent:0,moneyMinorUnits:0},200);
+ }catch{return send({ok:false,error:"PRESENCE_SIGNAL_OUTCOME_UNKNOWN",
+  applied:null,retrySameStateOnly:true},503);}
+}
 export function PUT(){return send({ok:false,error:"METHOD_NOT_ALLOWED"},405);}
 export function PATCH(){return send({ok:false,error:"METHOD_NOT_ALLOWED"},405);}
 export function DELETE(){return send({ok:false,error:"METHOD_NOT_ALLOWED"},405);}

@@ -1,0 +1,40 @@
+name: VOX VO6 Private Team Presence Snapshot - HOLD
+on:
+  pull_request:
+    branches:
+      - feat/vox-rc6-operational-20261030
+    paths:
+      - 'app/api/vox/v1/team-presence/**'
+      - 'apps/vox-web/lib/teamPresence.ts'
+      - 'apps/vox-web/app/team/presence/**'
+      - 'contracts/vox/virtualOfficePresence.d.mts'
+      - 'scripts/mvp/vox/vo06-presence-*.test.mjs'
+      - '.github/workflows/vox-vo06-presence-core.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  scoped-presence-view:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Core scope projection and Web semantics
+        run: node --test scripts/mvp/vox/vo02-presence-projection.test.mjs scripts/mvp/vox/vo06-presence-core-route.test.mjs scripts/mvp/vox/vo06-presence-snapshot.test.mjs
+      - name: Core TypeScript
+        run: ./node_modules/.bin/tsc --noEmit
+      - name: Web pinned dependencies
+        working-directory: apps/vox-web
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Full VOX Web regression tests
+        working-directory: apps/vox-web
+        run: npm test
+      - name: VOX optimized Web build
+        working-directory: apps/vox-web
+        run: npm run build -- --webpack

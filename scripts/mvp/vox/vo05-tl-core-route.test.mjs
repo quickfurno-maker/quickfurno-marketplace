@@ -10,7 +10,7 @@ test("VO5 Core Team Leader remains hard off",()=>{
 });
 test("VO5 Core verifies real AAL2 neutral TL and target without client claims",()=>{
  assert.match(src,/getVerifiedScopedStaff\(header\)/);
- assert.match(src,/getVerifiedScopedStaff\(request\.headers\.get\("authorization"\)\)/);
+ assert.match(src,/verifiedTeam\(request\.headers\.get\("authorization"\)\)/);
  assert.match(src,/getUserById\(targetId\)/);
  assert.match(src,/currentTarget:async\(targetId:string\)/);
  assert.match(src,/currentWork:async\(itemId:string\)/);

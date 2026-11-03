@@ -49,10 +49,28 @@ test("VO5 SQL refuses fresh nonce on assigned item; uncertain response stays loc
  assert.equal(r.ok,false);assert.equal(r.reason,"TL_ASSIGNMENT_OUTCOME_UNKNOWN");
  assert.equal(r.retrySameNonceOnly,true);assert.equal(f.calls(),1);
 });
-test("VO5 completed or foreign work cannot be replayed",async()=>{
- for(const state of ["IN_PROGRESS","DONE","BLOCKED"]){
+test("VO7 original nonce stays recoverable after canonical task progress",async()=>{
+ for(const state of ["IN_PROGRESS","DONE"]){
   const f=setup(state,id(2));
+  const r=await assignScopedTeamWork(command,f.deps);
+  assert.equal(r.ok,true,state);
+  assert.equal(r.revision,1);
+  assert.equal(f.calls(),1);
+ }
+});
+test("VO7 different assignee or unsupported state never reaches SQL",async()=>{
+ for(const [state,assignee] of [["IN_PROGRESS",id(9)],["DONE",id(9)],
+   ["BLOCKED",id(2)],["NEW",id(2)]]){
+  const f=setup(state,assignee);
   assert.equal((await assignScopedTeamWork(command,f.deps)).ok,false);
   assert.equal(f.calls(),0);
  }
+});
+test("VO7 new nonce on completed work is checked by SQL, never a second assignment",async()=>{
+ const f=setup("DONE",id(2),()=>({data:null,error:{code:"P0001"}}));
+ const r=await assignScopedTeamWork(command,f.deps);
+ assert.equal(r.ok,false);
+ assert.equal(r.reason,"TL_ASSIGNMENT_OUTCOME_UNKNOWN");
+ assert.equal(r.retrySameNonceOnly,true);
+ assert.equal(f.calls(),1);
 });

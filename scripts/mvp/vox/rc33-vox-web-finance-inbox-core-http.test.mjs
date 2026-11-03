@@ -84,7 +84,7 @@ const chatPost=(body,{origin=ORIGIN,host="127.0.0.1:3107",type="application/json
  chat.POST(new Request(ORIGIN+"/api/team-chat",{method:"POST",
   headers:{origin,host,"content-type":type},
   body:typeof body==="string"?body:JSON.stringify(body)}));
-const receipt=(over={})=>({ok:true,schema:"qf.vox.staff.team.chat.receipt.v1",messageId:MSG,
+const receipt=(over={})=>({ok:true,schema:"qf.vox.staff.team.chat.receipt.v1",messageId:MSG,nonce:NONCE,
  createdAt:"2026-10-31T05:01:00.000Z",effect:"INTERNAL_TEAM_MESSAGE_ONLY",
  externalMessagesSent:0,agentConversationChanged:false,staffPrivilegesChanged:false,...over});
 
@@ -168,7 +168,7 @@ test("inbox: send gates stop before Core; receipts are verified",async()=>{
  assert.equal((await r.json()).effect,"INTERNAL_TEAM_MESSAGE_ONLY");
  assert.deepEqual(JSON.parse(s.requests[0].opts.body),{body:"hi",nonce:NONCE});
  assert.equal(s.requests[0].opts.method,"POST");
- for(const bad of [receipt({externalMessagesSent:1}),receipt({agentConversationChanged:true}),
+ for(const bad of [receipt({nonce:id(45)}),receipt({externalMessagesSent:1}),receipt({agentConversationChanged:true}),
   receipt({staffPrivilegesChanged:true}),receipt({effect:"EXTERNAL"}),receipt({messageId:"x"}),receipt({extra:1})]){
   setup({core:async()=>Response.json(bad,{status:201})});
   const x=await chatPost({body:"hi",nonce:NONCE});assert.equal(x.status,503);

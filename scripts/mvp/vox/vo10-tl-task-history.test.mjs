@@ -75,10 +75,11 @@ test("VO10 TL Core and Web are independently AAL2 scoped, hard-disabled, no Staf
  assert.match(core,/\.eq\("team_id",tl!\.teamId\)/);
  assert.match(core,/\.eq\("city_id",tl!\.cityId\)/);
  assert.match(core,/TEAM_TASK_SCOPE_CHANGED/);
- assert.match(core,/new URL\(request\.url\)\.search/);
+ assert.match(core,/url\.searchParams\.keys\(\)/);
+ assert.match(core,/intervalHistoryKeysetFilter\(cursor\)/);
  assert.doesNotMatch(core,/request\.json\(\)|request\.text\(\)/);
  assert.match(bff,/verifiedMfaSession\(\)/);
  assert.match(bff,/x\.sourceVerified!==true/);
  assert.match(bff,/x\.completeHistory!==false/);
- assert.match(page,/fetchTeamTaskHistory\(\)/);
+ assert.match(page,/fetchTeamTaskHistory\(cursor\)/);
 });

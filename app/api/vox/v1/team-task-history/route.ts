@@ -2,6 +2,7 @@ import "server-only";
 import {adminClient} from "@/lib/supabase";
 import {getVerifiedScopedStaff} from "@/services/vox/verifiedScopedStaff";
 import {projectVerifiedTlTaskHistory} from "@/contracts/vox/virtualOfficeTlTaskHistory.mjs";
+import {intervalHistoryKeysetFilter} from "@/contracts/vox/virtualOfficeHistoryCursor.mjs";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 // VO7 intervals remain review-only. No staging env toggle can install schema,
@@ -23,8 +24,14 @@ export async function GET(request:Request){
     process.env.VOX_STAFF_GRANTS_ENABLED!=="staging"||
     process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED!=="staging")
   return send({ok:false,error:"TEAM_TASK_HISTORY_NOT_CERTIFIED"},503);
- if(new URL(request.url).search||new URL(request.url).hash)
+ const url=new URL(request.url);
+ const keys=[...url.searchParams.keys()];
+ if(url.hash||keys.length>1||(keys.length===1&&keys[0]!=="cursor"))
   return send({ok:false,error:"FILTER_NOT_ALLOWED"},400);
+ const cursor=keys.length?url.searchParams.get("cursor"):null;
+ const filter=cursor===null?null:intervalHistoryKeysetFilter(cursor);
+ if(cursor!==null&&!filter)
+  return send({ok:false,error:"HISTORY_CURSOR_INVALID"},400);
  const auth=request.headers.get("authorization");
  try{
   const tl=await getVerifiedScopedStaff(auth);
@@ -61,10 +68,12 @@ export async function GET(request:Request){
   });
   if(members.some(x=>x.verifiedNeutralStaff!==true))
    return send({ok:false,error:"TEAM_TASK_NEUTRAL_STAFF_REQUIRED"},503);
-  const times=ids.length?await db.from("vox_vo7_staff_task_intervals_candidate_v1")
+  let query=db.from("vox_vo7_staff_task_intervals_candidate_v1")
    .select("closed_by_event_nonce,staff_id,team_id,city_id,work_item_id,started_at,ended_at,elapsed_ms,state_revision,closing_action")
-   .eq("team_id",tl!.teamId).eq("city_id",tl!.cityId)
-   .in("staff_id",ids).order("ended_at",{ascending:false})
+   .eq("team_id",tl!.teamId).eq("city_id",tl!.cityId);
+  if(ids.length)query=query.in("staff_id",ids);
+  if(filter)query=query.or(filter);
+  const times=ids.length?await query.order("ended_at",{ascending:false})
    .order("closed_by_event_nonce",{ascending:false}).limit(21):
    {data:[],error:null};
   if(times.error||!times.data||times.data.length>21)

@@ -2,6 +2,7 @@
 // and immutable VO7 source are independently verified by Core. Not performance,
 // monitoring, payroll, official EOD, or complete historical tracking.
 import {projectVerifiedTaskIntervals} from "./virtualOfficeTimeHistory.mjs";
+import {encodeHistoryCursor} from "./virtualOfficeHistoryCursor.mjs";
 export const TL_TASK_HISTORY_SCHEMA="qf.vox.team.closed-task-intervals.v1";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ROLE=new Set(["operations_manager","acquisition_agent","vendor_success_agent","support_agent"]);
@@ -63,7 +64,9 @@ export function projectVerifiedTlTaskHistory(members,rows,opts={}){
   mode:"TEAM_LEADER_READ_ONLY",source:"CORE_IMMUTABLE_TASK_INTERVALS",
   sourceVerified:true,rosterVerified:true,boundedWindow:true,
   asOf:new Date(serverNowMs).toISOString(),windowSize:20,
-  hasMore:rows.length===21,completeHistory:false,attendanceVerified:false,
+  hasMore:rows.length===21,
+  nextCursor:rows.length===21?encodeHistoryCursor(rows[19]):null,
+  completeHistory:false,attendanceVerified:false,
   payrollVerified:false,officialEod:false,livePresence:false,
   entries:Object.freeze(entries),providerMessagesSent:0,moneyMinorUnits:0});
 }

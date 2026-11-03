@@ -1,9 +1,10 @@
+import Link from "next/link";
 import type {TlTaskHistory} from "../../../lib/teamTaskHistory";
 type Result=TlTaskHistory|{ok:false;status:number;error:string};
 const duration=(ms:number)=>{const n=Math.floor(ms/60000);
  return Math.floor(n/60)+"h "+String(n%60).padStart(2,"0")+"m";};
 const utc=(v:string)=>new Date(v).toISOString().slice(0,19)+" UTC";
-export default function TeamTaskHistory({result}:{result:Result}){
+export default function TeamTaskHistory({result,cursor}:{result:Result;cursor:string|null}){
  if(!result.ok)return <section className="voxFlowCard" role="status">
    <h2>Team task history unavailable</h2>
    <p className="voxFlowMuted">{result.status===401?
@@ -26,8 +27,14 @@ export default function TeamTaskHistory({result}:{result:Result}){
        <time dateTime={item.startedAt}>{utc(item.startedAt)}</time>
        {" to "}<time dateTime={item.endedAt}>{utc(item.endedAt)}</time></p></div>
     </li>)}</ul>}
+  <p className="voxFlowMuted">
+   {cursor?<Link href="/team/shifts">Return to newest team intervals</Link>:null}
+   {result.hasMore&&result.nextCursor?<Link
+    href={"/team/shifts?cursor="+encodeURIComponent(result.nextCursor)}>
+    Older verified team intervals</Link>:null}
+  </p>
   {result.hasMore?<p className="voxFlowMuted">
-   More task intervals exist; only 20 most recent are displayed.</p>:null}
+   More intervals exist. This page shows at most 20, not a complete history.</p>:null}
   <p className="voxFlowMuted">Core snapshot
    <time dateTime={result.asOf}> {utc(result.asOf)}</time>.
    No live presence or full attendance claimed.</p>

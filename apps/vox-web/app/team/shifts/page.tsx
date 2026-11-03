@@ -7,9 +7,14 @@ import "../workflow.css";
 export const dynamic="force-dynamic";
 const duration=(ms:number)=>{const n=Math.floor(ms/60000);
  return Math.floor(n/60)+"h "+String(n%60).padStart(2,"0")+"m";};
-export default async function TeamShiftReports(){
+export default async function TeamShiftReports({searchParams}:{
+ searchParams:Promise<{cursor?:string|string[]}>
+}){
+ const params=await searchParams;
+ const cursor=params?.cursor===undefined?null:
+  typeof params.cursor==="string"?params.cursor:"";
  const [r,taskHistory]=await Promise.all([
-  fetchVerifiedTeamShifts(),fetchTeamTaskHistory()
+  fetchVerifiedTeamShifts(),fetchTeamTaskHistory(cursor)
  ]);
  return <main className="voxFlow">
   <nav className="voxFlowNav"><Link href="/team">Team Operations</Link>
@@ -53,7 +58,7 @@ export default async function TeamShiftReports(){
        </li>)}</ul>}
     </section>
    </>}
-  <TeamTaskHistory result={taskHistory}/>
+  <TeamTaskHistory result={taskHistory} cursor={cursor}/>
   <p className="voxFlowMuted">These values never authorize payroll, official EOD,
    performance scoring or customer/vendor contact.</p>
  </main>;

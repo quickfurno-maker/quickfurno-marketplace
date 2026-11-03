@@ -9,10 +9,13 @@ const timestamp=(v:unknown)=>typeof v==="string"&&v.length<=40&&
  Number.isFinite(Date.parse(v));
 const deny=(status:number,error:string)=>({ok:false,status,error} as const);
 const ACTIONS=new Set(["TASK_PAUSE","TASK_STOP","TASK_SWITCH","BREAK_START","CLOCK_OUT"]);
-export type TlTaskHistory={ok:true;status:200;asOf:string;hasMore:boolean;
+export type TlTaskHistory={ok:true;status:200;asOf:string;hasMore:boolean;nextCursor:string|null;
  entries:Array<{staffRef:string;workRef:string;startedAt:string;
  endedAt:string;elapsedMs:number;revision:number;closingAction:string}>};
-export async function fetchTeamTaskHistory():Promise<TlTaskHistory|ReturnType<typeof deny>>{
+export async function fetchTeamTaskHistory(cursor:string|null=null):Promise<TlTaskHistory|ReturnType<typeof deny>>{
+ if(cursor!==null&&(typeof cursor!=="string"||cursor.length<35||
+  cursor.length>250||!/^[A-Za-z0-9_-]+$/.test(cursor)))
+  return deny(400,"HISTORY_CURSOR_INVALID");
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
     process.env.VOX_TEAM_WORKSPACE_ENABLED!=="staging"||
     process.env.VOX_VO10_TL_TASK_HISTORY_UI_ENABLED!=="staging"||
@@ -22,7 +25,8 @@ export async function fetchTeamTaskHistory():Promise<TlTaskHistory|ReturnType<ty
  if(!token)return deny(401,"TEAM_LEADER_MFA_REQUIRED");
  const base=origin();if(!base)return deny(503,"CORE_UNAVAILABLE");
  try{
-  const response=await fetch(base+"/api/vox/v1/team-task-history",{
+  const response=await fetch(base+"/api/vox/v1/team-task-history"+
+   (cursor?"?cursor="+encodeURIComponent(cursor):""),{
    method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
    cache:"no-store",redirect:"error",signal:AbortSignal.timeout(7000)
   });
@@ -33,7 +37,7 @@ export async function fetchTeamTaskHistory():Promise<TlTaskHistory|ReturnType<ty
    return deny(503,"TEAM_TASK_HISTORY_UNTRUSTED");
   const x=data as Record<string,unknown>;
   if(!exact(x,["ok","schema","mode","source","sourceVerified",
-    "rosterVerified","boundedWindow","asOf","windowSize","hasMore",
+    "rosterVerified","boundedWindow","asOf","windowSize","hasMore","nextCursor",
     "completeHistory","attendanceVerified","payrollVerified","officialEod",
     "livePresence","entries","providerMessagesSent","moneyMinorUnits"])||
     x.ok!==true||x.schema!=="qf.vox.team.closed-task-intervals.v1"||
@@ -44,7 +48,11 @@ export async function fetchTeamTaskHistory():Promise<TlTaskHistory|ReturnType<ty
     x.payrollVerified!==false||x.officialEod!==false||
     x.livePresence!==false||x.providerMessagesSent!==0||x.moneyMinorUnits!==0||
     !timestamp(x.asOf)||!Array.isArray(x.entries)||x.entries.length>20||
-    (x.hasMore===true&&x.entries.length!==20))
+    (x.hasMore===true&&x.entries.length!==20)||
+    (x.hasMore===true&&(typeof x.nextCursor!=="string"||
+     x.nextCursor.length<35||x.nextCursor.length>250||
+     !/^[A-Za-z0-9_-]+$/.test(x.nextCursor)))||
+    (x.hasMore===false&&x.nextCursor!==null))
    return deny(503,"TEAM_TASK_HISTORY_UNTRUSTED");
   const entries:TlTaskHistory["entries"]=[], seen=new Set<string>();
   let newest=Infinity;
@@ -74,6 +82,6 @@ export async function fetchTeamTaskHistory():Promise<TlTaskHistory|ReturnType<ty
    });
   }
   return {ok:true,status:200,asOf:x.asOf as string,
-   hasMore:x.hasMore as boolean,entries};
+   hasMore:x.hasMore as boolean,nextCursor:x.nextCursor as string|null,entries};
  }catch{return deny(503,"TEAM_TASK_HISTORY_SOURCE_UNAVAILABLE");}
 }

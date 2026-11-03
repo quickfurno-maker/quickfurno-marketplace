@@ -49,7 +49,7 @@ begin
  insert into public.vox_vo6_staff_presence_observations_candidate_v1
   (staff_id,team_id,city_id,state,seen_at)
  values(p_actor,p_team,v_city,p_state,v_seen)
- on conflict (staff_id) do update
+ on conflict on constraint vox_vo6_staff_presence_observations_candidate_v1_pkey do update
   set team_id=excluded.team_id,city_id=excluded.city_id,
    state=excluded.state,seen_at=excluded.seen_at;
  return query select p_actor,p_team,v_city,p_state,v_seen;

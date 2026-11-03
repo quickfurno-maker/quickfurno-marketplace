@@ -3,11 +3,13 @@ import {fetchCurrentStaffTime} from "../../../lib/staffTime";
 import {fetchStaffWorkQueuePreview} from "../../../lib/core";
 import {StaffSignInLink} from "../../components/StaffSignInLink";
 import WorkdayControls from "./WorkdayControls";
+import TaskHistory from "./TaskHistory";
+import {fetchMyTaskIntervals} from "../../../lib/staffTimeHistory";
 import "./workday.css";
 export const dynamic="force-dynamic";
 export default async function StaffWorkday(){
- const [shift,work]=await Promise.all([
-  fetchCurrentStaffTime(),fetchStaffWorkQueuePreview()
+ const [shift,work,history]=await Promise.all([
+  fetchCurrentStaffTime(),fetchStaffWorkQueuePreview(),fetchMyTaskIntervals()
  ]);
  const workIds=work.ok?work.items.filter(x=>x.assignedToMe&&
    x.state==="IN_PROGRESS").map(x=>x.workItemId):[];
@@ -32,6 +34,7 @@ export default async function StaffWorkday(){
    <Link href="/team/work-queue">Review permitted work</Link>
   </section>:<>
    <WorkdayControls snapshot={shift} assignedWorkIds={workIds}/>
+   <TaskHistory history={history}/>
    {!work.ok?<section className="voxWorkdayCard" role="status">
     <h2>Task selection unavailable</h2>
     <p>The verified Core work queue is not available, so no new task timers

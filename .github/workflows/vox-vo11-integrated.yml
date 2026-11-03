@@ -1,0 +1,81 @@
+name: VOX VO11 immutable time pagination and Meet reauthorization — HOLD
+on:
+  pull_request:
+    branches:
+      - feat/vox-rc6-operational-20261030
+    paths:
+      - 'contracts/vox/virtualOfficeHistoryCursor.*'
+      - 'contracts/vox/virtualOfficeTimeHistory.*'
+      - 'contracts/vox/virtualOfficeTlTaskHistory.*'
+      - 'app/api/vox/v1/staff-time-history/**'
+      - 'app/api/vox/v1/team-task-history/**'
+      - 'apps/vox-web/lib/staffTimeHistory.ts'
+      - 'apps/vox-web/lib/teamTaskHistory.ts'
+      - 'apps/vox-web/app/team/workday/**'
+      - 'apps/vox-web/app/team/shifts/**'
+      - 'services/vox/virtualOfficeMeetProvider.mjs'
+      - 'scripts/mvp/vox/vo11-*'
+      - 'scripts/mvp/vox/vo01-virtual-office-meet-provider.test.mjs'
+      - '.github/workflows/vox-vo11-integrated.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  role-gated-history-and-provider:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Original nonce cursor and scoped Meet contract tests
+        run: |
+          node --test \
+            scripts/mvp/vox/vo11-history-cursor.test.mjs \
+            scripts/mvp/vox/vo11-staff-history-pages.test.mjs \
+            scripts/mvp/vox/vo11-tl-history-pages.test.mjs \
+            scripts/mvp/vox/vo09-task-history.test.mjs \
+            scripts/mvp/vox/vo10-tl-task-history.test.mjs \
+            scripts/mvp/vox/vo01-virtual-office-meet-provider.test.mjs
+      - name: Full Core TypeScript
+        run: ./node_modules/.bin/tsc --noEmit
+      - name: VOX Web locked dependencies
+        working-directory: apps/vox-web
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Full VOX Web regression suite
+        working-directory: apps/vox-web
+        run: npm test
+      - name: Optimized VOX Web production build
+        working-directory: apps/vox-web
+        run: npm run build -- --webpack
+  disposable-pg17-exact-keyset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: vox_disposable_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Real microsecond timestamp and original nonce keyset parity
+        run: |
+          docker run --rm --network host -v "$PWD:/repo:ro" \
+            -e PGPASSWORD=vox_disposable_only postgres:17 \
+            psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            -f /repo/scripts/mvp/vox/fixtures/vo11-history-cursor.pg17.sql
+      - name: Combined Core Staff/TL immutable interval regression
+        run: bash scripts/mvp/vox/validate-vox-vo08-cross-feature-pg17.sh

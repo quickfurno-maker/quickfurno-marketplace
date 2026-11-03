@@ -1,0 +1,48 @@
+name: VOX VO5 Team Leader Core and Staff Web - HOLD
+on:
+  pull_request:
+    branches:
+      - feat/vox-rc6-operational-20261030
+    paths:
+      - 'app/api/vox/v1/tl-assignments/**'
+      - 'apps/vox-web/app/api/tl-assignments/**'
+      - 'apps/vox-web/app/team/assignments/**'
+      - 'apps/vox-web/lib/teamAssignments.ts'
+      - 'apps/vox-web/lib/vo05PendingTlAssignment.*'
+      - 'services/vox/virtualOfficeTeamAssignment.d.mts'
+      - 'scripts/mvp/vox/vo05-tl-*.test.mjs'
+      - '.github/workflows/vox-vo05-tl-core-ui.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verified-team-delegation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - name: Install root pinned dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Team Leader original nonce, Core auth and Web boundary
+        run: |
+          node --test \
+            scripts/mvp/vox/vo05-tl-core-route.test.mjs \
+            scripts/mvp/vox/vo05-tl-checkpoint.test.mjs \
+            scripts/mvp/vox/vo05-tl-ui-source.test.mjs \
+            scripts/mvp/vox/vo03-team-leader-delegation.test.mjs
+      - name: Root TypeScript
+        run: ./node_modules/.bin/tsc --noEmit
+      - name: Install Web pinned dependencies
+        working-directory: apps/vox-web
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Web security and workflow tests
+        working-directory: apps/vox-web
+        run: npm test
+      - name: Optimized Webpack build
+        working-directory: apps/vox-web
+        run: npm run build -- --webpack

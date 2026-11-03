@@ -10,7 +10,9 @@ export default async function OwnerVendorOperations(){
   <p>{result.status===401?"Owner MFA session required.":"The private Core Vendor read integration has not been certified or enabled."}</p>
   <Link href={result.status===401?"/login":"/operations"}>{result.status===401?"Owner sign-in":"Owner Home"}</Link>
  </section></main>;
- const profiles=new Map(result.view.crm.map(c=>[c.vendorId,c]));
+ const vendors=result.view.vendors??[];
+ const crm=result.view.crm??[];
+ const profiles=new Map(crm.map(c=>[c.vendorId,c]));
  return <main className="voxOps">
   <header className="voxTop"><div className="voxLogo">V</div><div><b>VENDOR OPERATIONS</b><small>QuickFurno Core · Owner-only read</small></div><div className="voxSession">READ ONLY · AAL2</div></header>
   <section className="voxHero"><p className="kicker">VOX / VENDOR OPERATIONS</p>
@@ -21,12 +23,12 @@ export default async function OwnerVendorOperations(){
    <Link href="/operations">Owner Home</Link><Link href="/owner/clients">Client Operations</Link>
    <Link href="/acquisition">Aarohi overview</Link>
   </nav>
-  <div className="voxPills"><div><strong>{result.view.vendors.length}</strong><span>Recent vendors shown</span></div>
-   <div><strong>{result.view.crm.length}</strong><span>Linked CRM statuses</span></div>
+  <div className="voxPills"><div><strong>{vendors.length}</strong><span>Recent vendors shown</span></div>
+   <div><strong>{crm.length}</strong><span>Linked CRM statuses</span></div>
    <div><strong>0</strong><span>Actions enabled</span></div></div>
-  <section className="voxUnit"><div className="voxUnitTop"><div><p>RECENT VENDORS</p><h2>Read-only Core sample</h2></div><strong>{result.view.vendors.length}<small> recent</small></strong></div>
-   {result.view.vendors.length===0?<div className="voxBlank">No recent vendors are available in this view.</div>:
-    <div className="voxRows">{result.view.vendors.map(v=><div className="voxRow" key={v.vendorId}>
+  <section className="voxUnit"><div className="voxUnitTop"><div><p>RECENT VENDORS</p><h2>Read-only Core sample</h2></div><strong>{vendors.length}<small> recent</small></strong></div>
+   {vendors.length===0?<div className="voxBlank">No recent vendors are available in this view.</div>:
+    <div className="voxRows">{vendors.map(v=><div className="voxRow" key={v.vendorId}>
      <div className="voxRowIcon">V</div><div className="voxRowBody">
       <b>{v.businessName}</b><small>Verification: {v.verificationStatus} · Location: {v.locationVerification} · CRM: {profiles.get(v.vendorId)?.relationship??"No current CRM record"}</small>
      </div><span className="voxState">{v.status} · {v.active?"Active":"Inactive"}</span></div>)}</div>}

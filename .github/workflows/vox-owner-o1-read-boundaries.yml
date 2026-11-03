@@ -1,0 +1,35 @@
+name: VOX Owner O1 read boundaries
+
+on:
+  pull_request:
+    paths:
+      - "app/api/vox/v1/owner-workspaces/**"
+      - "services/vox/ownerWorkspaceProjection.*"
+      - "apps/vox-web/**"
+      - "scripts/mvp/vox/owner-o1-client-operations.test.mjs"
+      - ".github/workflows/vox-owner-o1-read-boundaries.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  owner-o1-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install canonical Core dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install existing VOX Web dependencies
+        run: npm ci --prefix apps/vox-web --no-audit --no-fund
+      - name: Verify Owner Core fail-closed read projections
+        run: node --test scripts/mvp/vox/owner-o1-client-operations.test.mjs scripts/mvp/vox/owner-v1-projection.test.mjs scripts/mvp/vox/owner-v1-real-core-route.test.mjs
+      - name: Verify VOX Web type safety
+        run: npm --prefix apps/vox-web run typecheck
+      - name: Verify existing VOX Web and new Owner BFF regression tests
+        run: npm --prefix apps/vox-web test

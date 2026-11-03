@@ -1,0 +1,63 @@
+name: VOX VO12 Real Managed Recovery + Staging Gate — HOLD
+on:
+  pull_request:
+    branches:
+      - feat/vox-rc6-operational-20261030
+    paths:
+      - 'contracts/vox/vo12StagingActivationGate.mjs'
+      - 'scripts/mvp/vox/vo12-*'
+      - '.github/workflows/vox-vo12-recovery-gates.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  immutable-private-capture-and-staging-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Genuine-ledger assembler, current Staging hold and existing RC40 reconciler
+        run: |
+          node --test \
+            scripts/mvp/vox/vo12-managed-ledger-capture.test.mjs \
+            scripts/mvp/vox/vo12-managed-staging-activation.test.mjs \
+            scripts/mvp/vox/rc40-managed-ledger-reconciler.test.mjs \
+            scripts/mvp/vox/rc47-managed-recovery-handoff.test.mjs \
+            scripts/mvp/vox/vo08-real-aal2-preflight.test.mjs
+      - name: Core TypeScript
+        run: ./node_modules/.bin/tsc --noEmit
+      - name: VOX Web lockfile and test regression
+        working-directory: apps/vox-web
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Optimized VOX Web build
+        working-directory: apps/vox-web
+        run: npm run build -- --webpack
+  disposable-postgres17-authorization-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: vox_disposable_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Core/Staff/Team Leader immutability + nonce replay on disposable PG17
+        run: bash scripts/mvp/vox/validate-vox-vo08-cross-feature-pg17.sh

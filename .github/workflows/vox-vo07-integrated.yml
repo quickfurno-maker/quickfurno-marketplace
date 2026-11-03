@@ -1,0 +1,88 @@
+name: VOX VO7 Integrated Time Attribution, TL Replay and Presence — HOLD
+on:
+  pull_request:
+    branches:
+      - feat/vox-rc6-operational-20261030
+    paths:
+      - 'ops/vox/vo07-review-candidates/**'
+      - 'services/vox/virtualOfficeTeamAssignment.mjs'
+      - 'contracts/vox/virtualOfficePresence.mjs'
+      - 'apps/vox-web/lib/teamPresence.ts'
+      - 'apps/vox-web/app/team/presence/**'
+      - 'scripts/mvp/vox/vo07-*'
+      - 'scripts/mvp/vox/fixtures/vo07-*'
+      - '.github/workflows/vox-vo07-integrated.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  combined-root-and-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Real source contracts — nonce, TL and truthful voluntary Presence
+        run: |
+          node --test \
+            scripts/mvp/vox/vo02-presence-projection.test.mjs \
+            scripts/mvp/vox/vo03-team-leader-delegation.test.mjs \
+            scripts/mvp/vox/vo05-tl-replay-preflight.test.mjs \
+            scripts/mvp/vox/vo06-presence-snapshot.test.mjs \
+            scripts/mvp/vox/vo07-presence-expiry.test.mjs
+      - name: Root TypeScript
+        run: ./node_modules/.bin/tsc --noEmit
+      - name: VOX Web locked dependencies
+        working-directory: apps/vox-web
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Complete VOX Web regression suite
+        working-directory: apps/vox-web
+        run: npm test
+      - name: Optimized VOX Web production build
+        working-directory: apps/vox-web
+        run: npm run build -- --webpack
+  immutable-task-intervals-pg17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: vox_disposable_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: bash scripts/mvp/vox/validate-vox-vo07-time-pg17.sh
+  original-leader-nonce-pg17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: vox_disposable_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: bash scripts/mvp/vox/validate-vox-vo07-tl-pg17.sh

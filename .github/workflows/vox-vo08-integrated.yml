@@ -1,0 +1,67 @@
+name: VOX VO8 Integrated Identity, Recovery and Meeting Safety — HOLD
+on:
+  pull_request:
+    branches:
+      - feat/vox-rc6-operational-20261030
+    paths:
+      - 'contracts/vox/realAal2StagingPreflight.mjs'
+      - 'scripts/mvp/vox/vo08-real-aal2-preflight.test.mjs'
+      - 'scripts/mvp/vox/validate-vox-three-real-aal2-staging-20261030.mjs'
+      - 'scripts/mvp/vox/vo01-virtual-office-meet-provider.test.mjs'
+      - 'services/vox/virtualOfficeMeetProvider.mjs'
+      - 'scripts/mvp/vox/fixtures/vo08-cross-feature.pg17.sql'
+      - 'scripts/mvp/vox/validate-vox-vo08-cross-feature-pg17.sh'
+      - '.github/workflows/vox-vo08-integrated.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  three-principal-and-meet-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: VO8 three AAL2 principals and Meet provider fail-closed tests
+        run: |
+          node --test \
+            scripts/mvp/vox/vo08-real-aal2-preflight.test.mjs \
+            scripts/mvp/vox/vo01-virtual-office-meet-provider.test.mjs
+          node --check scripts/mvp/vox/validate-vox-three-real-aal2-staging-20261030.mjs
+      - name: Root TypeScript
+        run: ./node_modules/.bin/tsc --noEmit
+      - name: Locked VOX Web dependencies
+        working-directory: apps/vox-web
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Full VOX Web regression tests
+        working-directory: apps/vox-web
+        run: npm test
+      - name: Optimized VOX Web build
+        working-directory: apps/vox-web
+        run: npm run build -- --webpack
+  shared-disposable-postgres17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: vox_disposable_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Real PG17, combined review-only VO2/VO4/VO6/VO7 SQL
+        run: bash scripts/mvp/vox/validate-vox-vo08-cross-feature-pg17.sh

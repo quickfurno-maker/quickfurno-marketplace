@@ -58,6 +58,14 @@ export async function createScopedMeet(input,deps={}){
  catch{return unknown();}
  if(typeof token!=="string"||token.length<10||token.length>4096||
     /[\r\n]/.test(token))return unknown();
+ // OAuth token acquisition may block while a Staff member's team/invite
+ // grant is revoked. Revalidate immediately before network I/O. The nonce
+ // is already durable: failure here is a stopped/no-call operation; the
+ // original reserved nonce must be reconciled, never silently replaced.
+ try{
+  if(await deps.verifyCurrentScope(intent)!==true)
+   return deny("CURRENT_MEETING_SCOPE_DENIED");
+ }catch{return deny("CURRENT_MEETING_SCOPE_UNAVAILABLE");}
  let response;
  try{
   response=await deps.providerFetch("https://meet.googleapis.com/v2/spaces",{

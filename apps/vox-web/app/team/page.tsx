@@ -9,6 +9,7 @@ const workstreams=[
  {name:"My Work",status:"Read-only",detail:"Only your current Core-authorized tasks",href:"/team/work-queue"},
  {name:"My Workday",status:"Not yet activated",detail:"Core-authoritative attendance, breaks and task timers; no simulated activity or payroll",href:"/team/workday"},
  {name:"Team Leader Delegation",status:"Not yet activated",detail:"Current team-only work and Staff references, atomic original-nonce assignment",href:"/team/assignments"},
+ {name:"Team Shift Overview",status:"Not yet activated",detail:"Verified current-shift Core staff aggregates, never live presence or official EOD",href:"/team/shifts"},
  {name:"Conversation Control",status:"Staging gated",detail:"Human takeover or pause AI through native Core atomic authority; no provider sends",href:"/team/conversation-control"},
  {name:"Needs Attention",status:"Read-only",detail:"Bounded Core work blockers and approval waits; no push sends",href:"/team/attention"},
  {name:"Work Notifications",status:"In-app only",detail:"Current Core work-event notices and read receipts; no push-delivery claim",href:"/team/notifications"},

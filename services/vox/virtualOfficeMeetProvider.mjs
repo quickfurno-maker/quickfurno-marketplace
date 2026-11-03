@@ -46,6 +46,12 @@ export async function createScopedMeet(input,deps={}){
  // Mere truthy RESERVED from a broken adapter must never trigger provider I/O.
  if(reserved?.status!=="RESERVED"||reserved.nonce!==intent.nonce||
     reserved.durable!==true)return deny("MEETING_NONCE_NOT_RESERVED");
+ // Reserving a nonce may have involved a delayed transaction. Recheck the
+ // actor and invitee grants before any Google API call, not only afterwards.
+ try{
+  if(await deps.verifyCurrentScope(intent)!==true)
+   return deny("CURRENT_MEETING_SCOPE_DENIED");
+ }catch{return deny("CURRENT_MEETING_SCOPE_UNAVAILABLE");}
  // From this point a lost response may hide a real provider-created space.
  let token;
  try{token=await deps.accessToken();}

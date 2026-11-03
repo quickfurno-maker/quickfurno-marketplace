@@ -68,3 +68,44 @@ export async function fetchVerifiedTeamPresence():Promise<TeamPresenceView|Retur
    liveRealtimeConnected:false,entries};
  }catch{return deny(503,"PRESENCE_SOURCE_UNAVAILABLE");}
 }
+
+/** Voluntary, idempotent manual Staff signal only; no background heartbeat. */
+export async function setMyPresenceStatus(state:string){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_TEAM_WORKSPACE_ENABLED!=="staging"||
+    process.env.VOX_VO6_PRESENCE_UI_ENABLED!=="staging"||
+    process.env.VOX_VO6_PRESENCE_WRITE_ENABLED!=="staging")
+  return deny(503,"PRESENCE_SIGNAL_NOT_CERTIFIED");
+ if(!["ONLINE","AWAY","BUSY","IN_MEETING","ON_BREAK"].includes(state))
+  return deny(400,"INVALID_PRESENCE_STATE");
+ const token=await verifiedMfaSession();
+ if(!token)return deny(401,"STAFF_MFA_REQUIRED");
+ const core=origin();if(!core)return deny(503,"CORE_ORIGIN_UNAVAILABLE");
+ try{
+  const response=await fetch(core+"/api/vox/v1/team-presence",{
+   method:"POST",headers:{authorization:"Bearer "+token,
+    accept:"application/json","content-type":"application/json"},
+   body:JSON.stringify({state}),cache:"no-store",redirect:"error",
+   signal:AbortSignal.timeout(7000)
+  });
+  if(!response.ok)return deny(response.status===403?403:
+   response.status===401?401:503,"PRESENCE_SIGNAL_OUTCOME_UNKNOWN");
+  const raw:unknown=await response.json();
+  if(!raw||typeof raw!=="object"||Array.isArray(raw))
+   return deny(503,"PRESENCE_SIGNAL_OUTCOME_UNKNOWN");
+  const r=raw as Record<string,unknown>;
+  if(!exact(r,["ok","schema","staffRef","state","observedAt","source",
+   "attendanceVerified","providerMessagesSent","moneyMinorUnits"])||
+   r.ok!==true||r.schema!=="qf.vox.presence.signal.receipt.v1"||
+   typeof r.staffRef!=="string"||!/^STAFF-[0-9A-F]{8}$/.test(r.staffRef)||
+   r.state!==state||typeof r.observedAt!=="string"||
+   !Number.isFinite(Date.parse(r.observedAt))||
+   r.source!=="EPHEMERAL_ONLY"||r.attendanceVerified!==false||
+   r.providerMessagesSent!==0||r.moneyMinorUnits!==0)
+   return deny(503,"PRESENCE_SIGNAL_OUTCOME_UNKNOWN");
+  return {ok:true,status:200,receipt:{ok:true,
+   schema:"qf.vox.presence.signal.receipt.v1",staffRef:r.staffRef,
+   state,observedAt:r.observedAt,source:"EPHEMERAL_ONLY",
+   attendanceVerified:false,providerMessagesSent:0,moneyMinorUnits:0}} as const;
+ }catch{return deny(503,"PRESENCE_SIGNAL_OUTCOME_UNKNOWN");}
+}

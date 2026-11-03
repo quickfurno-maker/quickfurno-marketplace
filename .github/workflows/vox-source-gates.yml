@@ -8,7 +8,7 @@ on:
       - 'docs/vox/**'
       - 'scripts/scale/step3b2*.mjs'
       - 'scripts/scale/step3b21_*.py'
-      - 'ops/vox/sql-review/STEP3B20*'
+      - 'ops/vox/sql-review/STEP3B2*'
       - '.github/workflows/vox-source-gates.yml'
   workflow_dispatch:
 permissions:
@@ -37,4 +37,5 @@ jobs:
       - name: TEST-data cleanup safety gates (non-deploying)
         run: |
           node --test scripts/scale/step3b15a-readonly-cleanup.test.mjs scripts/scale/step3b16-purge-governance.test.mjs scripts/scale/step3b17-immutable-negative.test.mjs scripts/scale/step3b18-evidence-gates.test.mjs scripts/scale/step3b18-integration-contracts.test.mjs scripts/scale/step3b20-current-cleanup-readiness.test.mjs
+          node --test scripts/scale/step3b22-staging-history-digest.test.mjs
           python3 -m unittest discover -s scripts/scale -p 'step3b21_staging_atomic_offline_test.py' -v

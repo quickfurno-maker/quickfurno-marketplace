@@ -1,12 +1,16 @@
 import Link from "next/link";
 import {fetchVerifiedTeamShifts} from "../../../lib/teamShifts";
+import {fetchTeamTaskHistory} from "../../../lib/teamTaskHistory";
+import TeamTaskHistory from "./TeamTaskHistory";
 import {StaffSignInLink} from "../../components/StaffSignInLink";
 import "../workflow.css";
 export const dynamic="force-dynamic";
 const duration=(ms:number)=>{const n=Math.floor(ms/60000);
  return Math.floor(n/60)+"h "+String(n%60).padStart(2,"0")+"m";};
 export default async function TeamShiftReports(){
- const r=await fetchVerifiedTeamShifts();
+ const [r,taskHistory]=await Promise.all([
+  fetchVerifiedTeamShifts(),fetchTeamTaskHistory()
+ ]);
  return <main className="voxFlow">
   <nav className="voxFlowNav"><Link href="/team">Team Operations</Link>
    <span aria-hidden="true">/</span><span>Current Team Shifts</span></nav>
@@ -49,6 +53,7 @@ export default async function TeamShiftReports(){
        </li>)}</ul>}
     </section>
    </>}
+  <TeamTaskHistory result={taskHistory}/>
   <p className="voxFlowMuted">These values never authorize payroll, official EOD,
    performance scoring or customer/vendor contact.</p>
  </main>;

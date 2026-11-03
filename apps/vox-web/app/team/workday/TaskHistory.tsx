@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type {StaffTaskHistory} from "../../../lib/staffTimeHistory";
 type Result=StaffTaskHistory|{ok:false;statusCode:number;error:string};
 const utc=(value:string)=>new Date(value).toISOString().slice(0,19)+" UTC";
@@ -7,7 +8,9 @@ const duration=(ms:number)=>{
  return h?h+"h "+String(m).padStart(2,"0")+"m":
   m?m+"m "+String(s).padStart(2,"0")+"s":s+"s";
 };
-export default function TaskHistory({history}:{history:Result}){
+export default function TaskHistory({history,cursor}:{
+ history:Result;cursor:string|null
+}){
  if(!history.ok)return <section className="voxWorkdayCard" role="status">
   <h2>Per-task interval history unavailable</h2>
   <p>{history.statusCode===401?"Staff MFA must be renewed.":
@@ -34,8 +37,14 @@ export default function TaskHistory({history}:{history:Result}){
      </p>
     </li>)}
    </ul>}
+  <p className="voxWorkdayFine">
+   {cursor?<Link href="/team/workday">Return to newest intervals</Link>:null}
+   {history.hasMore&&history.nextCursor?<Link
+    href={"/team/workday?cursor="+encodeURIComponent(history.nextCursor)}>
+    Older verified intervals</Link>:null}
+  </p>
   {history.hasMore?<p className="voxWorkdayFine">
-   More recorded intervals exist. Only the latest 20 are displayed; no full-history claim.</p>:null}
+   More recorded intervals exist. This page shows at most 20, not a complete history.</p>:null}
   <p className="voxWorkdayFine">As of
    <time dateTime={history.asOf}> {utc(history.asOf)}</time>.
    No live task timer is estimated here.</p>

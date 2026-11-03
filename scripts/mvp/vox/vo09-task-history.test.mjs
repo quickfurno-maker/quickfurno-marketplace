@@ -58,10 +58,11 @@ test("VO9 protected HTTP source and Web never accept browser-selected Staff or d
  assert.match(core,/\.eq\("staff_id",actor\.userId\)/);
  assert.match(core,/sameScope\(actor,latest\)/);
  assert.match(core,/\.limit\(21\)/);
- assert.match(core,/new URL\(request\.url\)\.search/);
+ assert.match(core,/url\.searchParams\.keys\(\)/);
+ assert.match(core,/intervalHistoryKeysetFilter\(cursor\)/);
  assert.doesNotMatch(core,/request\.json\(\)|request\.text\(\)/);
  assert.match(bridge,/verifiedMfaSession\(\)/);
  assert.match(bridge,/r\.sourceVerified!==true/);
  assert.match(bridge,/r\.completeHistory!==false/);
- assert.match(page,/fetchMyTaskIntervals\(\)/);
+ assert.match(page,/fetchMyTaskIntervals\(cursor\)/);
 });

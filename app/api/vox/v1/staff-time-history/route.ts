@@ -2,6 +2,7 @@ import "server-only";
 import {adminClient} from "@/lib/supabase";
 import {getVerifiedScopedStaff} from "@/services/vox/verifiedScopedStaff";
 import {projectVerifiedTaskIntervals} from "@/contracts/vox/virtualOfficeTimeHistory.mjs";
+import {intervalHistoryKeysetFilter} from "@/contracts/vox/virtualOfficeHistoryCursor.mjs";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 // Review-only VO7 table is absent from managed migrations. No env switch alone
@@ -30,8 +31,14 @@ export async function GET(request:Request){
     process.env.VOX_STAFF_GRANTS_ENABLED!=="staging"||
     process.env.VOX_DEPARTMENT_ENFORCEMENT_ENABLED!=="staging")
   return send({ok:false,error:"TASK_HISTORY_NOT_CERTIFIED"},503);
- if(new URL(request.url).search||new URL(request.url).hash)
+ const url=new URL(request.url);
+ const keys=[...url.searchParams.keys()];
+ if(url.hash||keys.length>1||(keys.length===1&&keys[0]!=="cursor"))
   return send({ok:false,error:"FILTER_DENIED"},400);
+ const cursor=keys.length?url.searchParams.get("cursor"):null;
+ const filter=cursor===null?null:intervalHistoryKeysetFilter(cursor);
+ if(cursor!==null&&!filter)
+  return send({ok:false,error:"HISTORY_CURSOR_INVALID"},400);
  const header=request.headers.get("authorization");
  let actor:Scope|null;
  try{actor=await getVerifiedScopedStaff(header);}
@@ -40,11 +47,12 @@ export async function GET(request:Request){
    ["team_leader","auditor"].includes(actor.role))
   return send({ok:false,error:"CURRENT_STAFF_AAL2_REQUIRED"},403);
  try{
-  const rows=await adminClient().from("vox_vo7_staff_task_intervals_candidate_v1")
+  let query=adminClient().from("vox_vo7_staff_task_intervals_candidate_v1")
    .select("closed_by_event_nonce,staff_id,team_id,city_id,work_item_id,started_at,ended_at,elapsed_ms,state_revision,closing_action")
    .eq("staff_id",actor.userId)
-   .eq("team_id",actor.teamId).eq("city_id",actor.cityId)
-   .order("ended_at",{ascending:false})
+   .eq("team_id",actor.teamId).eq("city_id",actor.cityId);
+  if(filter)query=query.or(filter);
+  const rows=await query.order("ended_at",{ascending:false})
    .order("closed_by_event_nonce",{ascending:false}).limit(21);
   if(rows.error||!Array.isArray(rows.data))
    return send({ok:false,error:"TASK_HISTORY_SOURCE_UNAVAILABLE"},503);

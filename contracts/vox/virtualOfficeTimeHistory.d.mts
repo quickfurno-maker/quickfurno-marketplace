@@ -4,7 +4,7 @@ export type TaskIntervalHistory={
  source:"CORE_VERIFIED_TASK_INTERVALS";sourceVerified:true;
  mode:"OWN_STAFF_READ_ONLY";asOf:string;completeHistory:false;
  officialEod:false;payrollVerified:false;moneyMinorUnits:0;providerMessagesSent:0;
- windowSize:20;hasMore:boolean;
+ windowSize:20;hasMore:boolean;nextCursor:string|null;
  entries:ReadonlyArray<{workItemId:string;startedAt:string;endedAt:string;
  elapsedMs:number;revision:number;
  closingAction:"TASK_PAUSE"|"TASK_STOP"|"TASK_SWITCH"|"BREAK_START"|"CLOCK_OUT"}>;

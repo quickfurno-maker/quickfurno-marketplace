@@ -10,12 +10,15 @@ const stamp=(v:unknown)=>typeof v==="string"&&v.length<=40&&
  /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,6})?(?:Z|[+-]\d\d:\d\d)$/.test(v)&&
  Number.isFinite(Date.parse(v));
 export type StaffTaskHistory={
- ok:true;statusCode:200;asOf:string;hasMore:boolean;completeHistory:false;
+ ok:true;statusCode:200;asOf:string;hasMore:boolean;nextCursor:string|null;completeHistory:false;
  entries:Array<{workItemId:string;startedAt:string;endedAt:string;
  elapsedMs:number;revision:number;closingAction:string}>
 };
 const deny=(code:number,error:string)=>({ok:false,statusCode:code,error} as const);
-export async function fetchMyTaskIntervals():Promise<StaffTaskHistory|ReturnType<typeof deny>>{
+export async function fetchMyTaskIntervals(cursor:string|null=null):Promise<StaffTaskHistory|ReturnType<typeof deny>>{
+ if(cursor!==null&&(typeof cursor!=="string"||cursor.length<35||
+   cursor.length>250||!/^[A-Za-z0-9_-]+$/.test(cursor)))
+  return deny(400,"HISTORY_CURSOR_INVALID");
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
     process.env.VOX_TEAM_WORKSPACE_ENABLED!=="staging"||
     process.env.VOX_VO9_TIME_HISTORY_UI_ENABLED!=="staging"||
@@ -25,7 +28,8 @@ export async function fetchMyTaskIntervals():Promise<StaffTaskHistory|ReturnType
  if(!token)return deny(401,"STAFF_MFA_REQUIRED");
  const base=origin();if(!base)return deny(503,"CORE_ORIGIN_UNAVAILABLE");
  try{
-  const response=await fetch(base+"/api/vox/v1/staff-time-history",{
+  const response=await fetch(base+"/api/vox/v1/staff-time-history"+
+   (cursor?"?cursor="+encodeURIComponent(cursor):""),{
    method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
    cache:"no-store",redirect:"error",signal:AbortSignal.timeout(5000)
   });
@@ -37,7 +41,7 @@ export async function fetchMyTaskIntervals():Promise<StaffTaskHistory|ReturnType
   const r=raw as Record<string,unknown>;
   if(!exact(r,["ok","schema","source","sourceVerified","mode","asOf",
    "completeHistory","officialEod","payrollVerified","moneyMinorUnits",
-   "providerMessagesSent","windowSize","hasMore","entries"])||
+   "providerMessagesSent","windowSize","hasMore","nextCursor","entries"])||
    r.ok!==true||r.schema!=="qf.vox.staff.task-intervals.v1"||
    r.source!=="CORE_VERIFIED_TASK_INTERVALS"||r.sourceVerified!==true||
    r.mode!=="OWN_STAFF_READ_ONLY"||r.completeHistory!==false||
@@ -45,7 +49,11 @@ export async function fetchMyTaskIntervals():Promise<StaffTaskHistory|ReturnType
    r.moneyMinorUnits!==0||r.providerMessagesSent!==0||
    r.windowSize!==20||typeof r.hasMore!=="boolean"||
    !stamp(r.asOf)||!Array.isArray(r.entries)||r.entries.length>20||
-   (r.hasMore===true&&r.entries.length!==20))
+   (r.hasMore===true&&r.entries.length!==20)||
+   (r.hasMore===true&&(typeof r.nextCursor!=="string"||
+     r.nextCursor.length<35||r.nextCursor.length>250||
+     !/^[A-Za-z0-9_-]+$/.test(r.nextCursor)))||
+   (r.hasMore===false&&r.nextCursor!==null))
    return deny(503,"TASK_HISTORY_UNTRUSTED");
   const entries:StaffTaskHistory["entries"]=[];
   const revisions=new Set<number>();
@@ -72,6 +80,7 @@ export async function fetchMyTaskIntervals():Promise<StaffTaskHistory|ReturnType
     closingAction:x.closingAction as string});
   }
   return {ok:true,statusCode:200,asOf:r.asOf as string,
-   hasMore:r.hasMore as boolean,completeHistory:false,entries};
+   hasMore:r.hasMore as boolean,nextCursor:r.nextCursor as string|null,
+   completeHistory:false,entries};
  }catch{return deny(503,"TASK_HISTORY_SOURCE_UNAVAILABLE");}
 }

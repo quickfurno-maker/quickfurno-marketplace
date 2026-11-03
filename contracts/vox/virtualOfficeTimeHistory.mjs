@@ -1,5 +1,6 @@
 // VO9 own-Staff per-task time read projection. This is a bounded reference-only
 // view of immutable reviewed candidates; never a payroll or EOD certification.
+import {encodeHistoryCursor} from "./virtualOfficeHistoryCursor.mjs";
 export const TASK_INTERVAL_HISTORY_SCHEMA="qf.vox.staff.task-intervals.v1";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FIELDS=["closed_by_event_nonce","staff_id","team_id","city_id",
@@ -47,5 +48,7 @@ export function projectVerifiedTaskIntervals(rows,scope={}){
   mode:"OWN_STAFF_READ_ONLY",asOf:new Date(serverNowMs).toISOString(),
   completeHistory:false,officialEod:false,payrollVerified:false,
   moneyMinorUnits:0,providerMessagesSent:0,
-  windowSize:20,hasMore:rows.length>20,entries:Object.freeze(entries)});
+  windowSize:20,hasMore:rows.length>20,
+  nextCursor:rows.length>20?encodeHistoryCursor(rows[19]):null,
+  entries:Object.freeze(entries)});
 }

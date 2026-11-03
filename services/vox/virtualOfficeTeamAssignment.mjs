@@ -37,7 +37,8 @@ const grants=(t,w)=>t.objectGrants.some(x=>x.kind===w.sourceKind&&x.id===w.sourc
   t.objectGrants.some(x=>x.kind==="vendor"&&x.id===w.relatedVendorId));
 const work=(w,l,t,i)=>w&&uuid(w.id)&&w.id===i.itemId&&
  w.teamId===l.teamId&&w.cityId===l.cityId&&
- w.state==="NEW"&&w.assigneeId===null&&
+ ((w.state==="NEW"&&w.assigneeId===null)||
+  (w.state==="ASSIGNED"&&w.assigneeId===i.targetStaffId))&&
  ["prospect","vendor","support_thread"].includes(w.sourceKind)&&uuid(w.sourceId)&&
  (w.sourceKind!=="support_thread"||uuid(w.relatedVendorId))&&grants(t,w);
 const sameLeader=(a,b)=>leader(a)&&leader(b)&&

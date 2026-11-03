@@ -109,15 +109,17 @@ export async function sendTeamChat(body:string,nonce:string){
  const r=await requestCore("staff-chat",{body,nonce});
  if(!r.ok)return r;
  const x=r.body;
- if(!exact(x,["ok","schema","messageId","createdAt","effect",
+ if(!exact(x,["ok","schema","messageId","nonce","createdAt","effect",
  "externalMessagesSent","agentConversationChanged","staffPrivilegesChanged"])||
    x.ok!==true||x.schema!=="qf.vox.staff.team.chat.receipt.v1"||
-   !isId(x.messageId)||!time(x.createdAt)||
+   !isId(x.messageId)||x.nonce!==nonce||!time(x.createdAt)||
    x.effect!=="INTERNAL_TEAM_MESSAGE_ONLY"||
    x.externalMessagesSent!==0||x.agentConversationChanged!==false||
    x.staffPrivilegesChanged!==false)
   return deny(503,"INVALID_CHAT_RECEIPT");
- return {ok:true,status:201,messageId:x.messageId,effect:"INTERNAL_TEAM_MESSAGE_ONLY" as const} as const;
+ return {ok:true,status:201,messageId:x.messageId as string,nonce,
+  effect:"INTERNAL_TEAM_MESSAGE_ONLY" as const,externalMessagesSent:0 as const,
+  agentConversationChanged:false as const,staffPrivilegesChanged:false as const} as const;
 }
 export async function fetchMyEodSubmissions(){
  if(!enabled("VOX_EOD_SUBMIT_UI_ENABLED"))return deny(503,"EOD_SUBMISSION_UI_DISABLED");

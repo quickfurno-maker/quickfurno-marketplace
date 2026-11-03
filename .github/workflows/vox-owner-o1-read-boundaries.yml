@@ -31,5 +31,7 @@ jobs:
         run: node --test scripts/mvp/vox/owner-o1-client-operations.test.mjs scripts/mvp/vox/owner-v1-projection.test.mjs scripts/mvp/vox/owner-v1-real-core-route.test.mjs
       - name: Verify VOX Web type safety
         run: npm --prefix apps/vox-web run typecheck
-      - name: Verify existing VOX Web and new Owner BFF regression tests
+      - name: Verify Owner Client Web BFF against the canonical Core contract
+        run: node --test apps/vox-web/scripts/validate-owner-o1-client-bff.spec.mjs
+      - name: Verify existing VOX Web and frozen Staff regressions
         run: npm --prefix apps/vox-web test

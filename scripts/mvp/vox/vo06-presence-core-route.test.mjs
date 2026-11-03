@@ -21,5 +21,9 @@ test("VO6 absence of observation source never becomes fake OFFLINE",()=>{
  assert.match(src,/projectVerifiedTeamPresence\(/);
  assert.match(src,/liveRealtimeConnected:false/);
  assert.match(src,/attendanceVerified:false,timeTrackingVerified:false/);
- assert.doesNotMatch(src,/\.rpc\(|\.insert\(|\.update\(/);
+ // The GET projection stays strictly read-only. Separate manual POST is allowed
+ // only behind its own hard-disabled Core and managed SQL certification.
+ const getOnly=src.slice(src.indexOf("export async function GET("),
+  src.indexOf("export async function POST("));
+ assert.doesNotMatch(getOnly,/\.rpc\(|\.insert\(|\.update\(/);
 });

@@ -1,0 +1,25 @@
+name: VOX VO3 Staff Time Nonce Recovery - SOURCE HOLD
+on:
+  pull_request:
+    branches:
+      - feat/vox-rc6-operational-20261030
+    paths:
+      - 'apps/vox-web/lib/vo03PendingStaffTime.mjs'
+      - 'scripts/mvp/vox/vo03-staff-time-recovery.test.mjs'
+      - '.github/workflows/vox-vo03-time-recovery.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recovery-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - name: Exact original nonce and verified receipt tests
+        run: node --test scripts/mvp/vox/vo03-staff-time-recovery.test.mjs scripts/mvp/vox/vo00-virtual-office-contract.test.mjs

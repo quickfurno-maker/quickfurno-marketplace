@@ -28,8 +28,21 @@ export function savePendingTeamChat(store,row){
   return result.available&&equal(row,result.pending);
  }catch{return false;}
 }
-export function clearPendingTeamChat(store,row){
+/** A persisted intent may clear only after Core confirms the same nonce.
+ * A messageId by itself is never proof the pending original was accepted.
+ */
+export function clearPendingTeamChat(store,row,receipt){
  if(!valid(row))return false;
+ if(!receipt||typeof receipt!=="object"||Array.isArray(receipt)||
+   Object.keys(receipt).sort().join("|")!==
+   "agentConversationChanged|effect|externalMessagesSent|messageId|nonce|ok|staffPrivilegesChanged|status"||
+   receipt.ok!==true||receipt.status!==201||
+   typeof receipt.messageId!=="string"||!UUID.test(receipt.messageId)||
+   receipt.nonce!==row.nonce||
+   receipt.effect!=="INTERNAL_TEAM_MESSAGE_ONLY"||
+   receipt.externalMessagesSent!==0||
+   receipt.agentConversationChanged!==false||
+   receipt.staffPrivilegesChanged!==false)return false;
  const old=readPendingTeamChat(store);
  if(!old.available||!equal(old.pending,row))return false;
  try{

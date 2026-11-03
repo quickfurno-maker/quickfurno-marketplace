@@ -39,16 +39,33 @@ select revision from public.qf_vox_staff_time_atomic_candidate_v1(
 '00000000-0000-4000-8000-000000000601');
 update public.vox_work_items_candidate_v1 set state='DONE',revision=revision+1
 where id='00000000-0000-4000-8000-000000000601'
-  and state='ASSIGNED' and assignee_id='00000000-0000-4000-8000-000000000001';
--- Original TL nonce must reconcile after progress without a second assignment.
+  and state='IN_PROGRESS' and assignee_id='00000000-0000-4000-8000-000000000001';
+-- Original TL and task-time nonces must reconcile after progress to DONE.
 select revision from public.qf_vox_tl_assign_work_candidate_v1(
 '00000000-0000-4000-8000-000000000003',
 '00000000-0000-4000-8000-000000000001',
 '00000000-0000-4000-8000-000000000601',0,
 '00000000-0000-4000-8000-000000000701','');
+-- A lost original task-stop response is recoverable, not another write.
+select revision from public.qf_vox_staff_time_atomic_candidate_v1(
+'00000000-0000-4000-8000-000000000001',
+'00000000-0000-4000-8000-000000000201',
+'00000000-0000-4000-8000-000000000101','TASK_STOP',
+'00000000-0000-4000-8000-000000000803',2,
+'00000000-0000-4000-8000-000000000601');
 do $proof$
 declare actor uuid:='00000000-0000-4000-8000-000000000001';
+ denied boolean:=false;
 begin
+ -- A NEW nonce after DONE must still fail closed; replay is not authorization.
+ begin
+  perform public.qf_vox_staff_time_atomic_candidate_v1(
+   actor,'00000000-0000-4000-8000-000000000201',
+   '00000000-0000-4000-8000-000000000101','TASK_START',
+   '00000000-0000-4000-8000-000000000899',3,
+   '00000000-0000-4000-8000-000000000601');
+ exception when others then denied:=true;end;
+ if not denied then raise exception 'VO9_NEW_NONCE_AUTHORIZED_DONE_TASK';end if;
  if (select count(*) from public.vox_vo4_tl_assignment_receipts_candidate_v1
      where target_staff_id=actor)<>1 then
    raise exception 'VO8_DUPLICATE_TL_RECEIPT';end if;

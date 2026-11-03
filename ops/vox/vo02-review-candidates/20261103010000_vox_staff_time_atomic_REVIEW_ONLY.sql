@@ -94,6 +94,23 @@ begin
    and c.id=p_city and c.is_active=true
  ) then raise exception 'VO2_TIME_IDENTITY_OR_CITY_DENIED' using errcode='P0001'; end if;
 
+ -- The original nonce is an immutable historical receipt, not permission
+ -- to issue a fresh task command. Reconcile it after current identity/team
+ -- checks, but BEFORE requiring a task still be IN_PROGRESS. Core may have
+ -- legitimately completed the work while the first HTTP response was lost.
+ -- The membership row lock serializes this path with other Staff writes.
+ select * into v_replay from public.vox_vo2_staff_time_events_candidate_v1 e
+  where e.event_nonce=p_nonce;
+ if found then
+  if v_replay.staff_id<>p_actor or v_replay.action<>p_action or
+     v_replay.expected_revision<>p_expected_revision or
+     v_replay.work_item_id is distinct from p_work_item
+  then raise exception 'VO2_TIME_NONCE_CONFLICT' using errcode='P0001'; end if;
+  return query select p_nonce,p_actor,v_replay.event_id,v_replay.revision,true,
+   v_replay.occurred_at,v_replay.work_item_id,0,0;
+  return;
+ end if;
+
  if left(p_action,5)='TASK_' then
   -- Work objects, unlike browser payloads, are owned by Core. Lock this
   -- assignment while updating the timer. Do not mutate vendor assignments.
@@ -159,17 +176,6 @@ begin
   where staff_id=p_actor for update;
  if not found or v_state.team_id<>p_team or v_state.city_id<>p_city
  then raise exception 'VO2_TIME_LEDGER_NOT_ACTIVE' using errcode='P0001'; end if;
- select * into v_replay from public.vox_vo2_staff_time_events_candidate_v1 e
-  where e.event_nonce=p_nonce;
- if found then
-  if v_replay.staff_id<>p_actor or v_replay.action<>p_action or
-     v_replay.expected_revision<>p_expected_revision or
-     v_replay.work_item_id is distinct from p_work_item
-  then raise exception 'VO2_TIME_NONCE_CONFLICT' using errcode='P0001'; end if;
-  return query select p_nonce,p_actor,v_replay.event_id,v_replay.revision,true,
-   v_replay.occurred_at,v_replay.work_item_id,0,0;
-  return;
- end if;
  if v_state.revision<>p_expected_revision
  then raise exception 'VO2_TIME_STALE_REVISION' using errcode='P0001'; end if;
  v_now:=clock_timestamp();

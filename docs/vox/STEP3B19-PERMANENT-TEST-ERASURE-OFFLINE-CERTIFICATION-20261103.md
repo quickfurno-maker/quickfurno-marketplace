@@ -71,3 +71,24 @@ The existing pure advisory `scripts/scale/step3b18-evidence-gates.mjs` was exten
 - Existing cleanup source tests updated and added seven regression cases covering November archive pinning, exact-ID drift, canary preservation, ACL/PITR distinction, protected histories, denied production access and realistic release-HOLD. Combined four relevant cleanup source suites: **45/45 passed locally**, no managed writes.
 
 **Do not treat passing CI or Owner's permanent-deletion authorization as completion of protected live cleanup.**
+
+## STEP3B20 — Operable Staging preflight and explicitly blocked live erasure handoff
+
+The next engineering batch uses the existing release gate and adds two **read-only/operator-facing** inputs, not a new cleanup engine:
+
+1. `ops/vox/sql-review/STEP3B20-STAGING-PREDELETE-READ_ONLY.sql` — repeatable Staging-only SELECT inventory returning the exact scoped vendor/lead ID fingerprints, expected unrelated canary and Auth survivors, payments, linked immutable events, relevant no-delete triggers and outstanding runtime/communication counts. No UUID lists, secrets, or personal data are printed.
+2. `scripts/scale/step3b20-current-cleanup-readiness.mjs` — non-networked, no-write **actual-evidence snapshot**, invoking the existing 3B18 advisory release gate. Run `node scripts/scale/step3b20-current-cleanup-readiness.mjs` from repo root to see all explicit HOLD reasons. Evidence not actually verified is `false`, not assumed green. Tests verify the checker remains non-destructive and the current decision is HOLD.
+
+**Staging SELECT-only spot check, 3 November 2026 15:22 UTC:** 26 target vendors, 7 leads, one unrelated canary, 6 immutable events, two unrelated Auth users, zero vendor-linked test Auth accounts and zero payments. Seven named no-delete/immutable history triggers remain ENABLED; existing automation has 106 requests/jobs and 157 transport requests. These are row counts, **not** proof workers are idle or provider queues frozen.
+
+### Concrete reviewer/operator sign-off required for the first LIVE Staging transaction
+- **DBA owns**: exact fixed test-ID allowlist; original ID hashes; no genuine user/payments; a narrowly reviewed exception for the **four** protected history families; actual trigger/FK/ACL restoration and replacement immutable evidence custody. A local exception test **is not** a managed approval.
+- **AppSec owns**: no credential exposure, identity/Owner isolation, trigger-hardening, access logging, retention legality, provider/communication consent copies and safe guard restoration. None may be marked complete by CI alone.
+- **SRE/Operator owns**: Stage tenant/worker/queue/communication outbound freeze, stable row-lock and drift checks, genuine Auth/roles/Storage/PITR recovery, independent rollback validation and an isolated maintenance window. A scheduler with historical queued rows must not be assumed quiescent.
+- **Operator executes**: approved Staging exact-ID transaction ONLY once the above gates pass, then validate 0 targeted IDs/references, 1 unrelated canary, 2 unrelated Auth identities, 0 invalid FKs, 0 disabled protected triggers and no unintended outbox/provider effects. Failures roll back atomically.
+- **Production release**: only after completed Staging live proof, new Production permitted read-only census and independently pinned approval. Production's managed SQL verification was blocked by connection safety checks; **do not change connection path to evade that check**. Separate supported Auth Admin deprovisioning applies only to 9 dedicated TEST vendor accounts after Owner-account cross-app verification.
+- **Data-retention closure**: count deletion from active rows separately from Supabase PITR snapshots, private backup copies, external messages and partner archives. Report permanent erasure only when their retention/deletion dispositions have been verified.
+
+**Owner authorization for permanent removal is already recorded. No more Owner preference questions are needed. Current blocker is reviewed execution evidence, not consent.**
+
+The 3B20 code contains **zero managed DELETE/DDL/privileged Auth actions**. Current evidence evaluated through the existing source gate is `HOLD`. Dedicated Staging/Production activation and external signoffs must not be fabricated.

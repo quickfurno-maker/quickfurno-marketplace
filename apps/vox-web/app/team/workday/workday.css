@@ -1,0 +1,26 @@
+.voxWorkday{min-height:100vh;max-width:1090px;margin:0 auto;padding:clamp(20px,4vw,48px);color:#e8f4ef}
+.voxWorkdayNav{display:flex;gap:11px;align-items:center;margin-bottom:25px;font-size:13px;color:#b5d4ca}
+.voxWorkday a{color:#b9ebd9}
+.voxWorkdayHero{padding:clamp(24px,4vw,42px);border:1px solid #315b57;border-radius:20px;background:linear-gradient(118deg,#163435,#0c1b27);margin-bottom:20px}
+.voxWorkdayEyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#a9e3ce}
+.voxWorkdayHero h1{font-size:clamp(30px,5vw,44px);margin:9px 0}
+.voxWorkdayHero p{max-width:740px;line-height:1.7;color:#c8d9d2}
+.voxWorkdayCard{padding:clamp(20px,4vw,32px);border-radius:18px;border:1px solid #355853;background:#12272c;margin:20px 0}
+.voxWorkdayTitle{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.voxWorkdayTitle h2{font-size:clamp(23px,3vw,32px);margin:7px 0 15px}
+.voxWorkdayPill{border:1px solid #5c8a7a;color:#b9d8ca;border-radius:999px;padding:8px 12px;font-size:12px}
+.voxWorkdayMetrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0}
+.voxWorkdayMetrics>div{background:#173238;padding:18px;border-radius:13px;border:1px solid #365d57;display:grid;gap:9px}
+.voxWorkdayMetrics span{font-size:12px;color:#c4d8d1}
+.voxWorkdayMetrics strong{font-size:clamp(20px,2.8vw,27px);font-variant-numeric:tabular-nums}
+.voxWorkdayFine{font-size:13px;color:#b5ccc3;line-height:1.7}
+.voxWorkdayForm{display:grid;gap:10px;margin-top:24px;max-width:560px}
+.voxWorkdayForm label{font-weight:650;font-size:13px}
+.voxWorkdayForm select{color:#edf9f3;background:#092027;border:1px solid #50736a;border-radius:10px;padding:13px;font:inherit}
+.voxWorkday button{background:#afebd0;color:#08261d;border:0;border-radius:11px;padding:13px 17px;font-weight:750;cursor:pointer}
+.voxWorkday button:disabled{opacity:.5;cursor:not-allowed}
+.voxWorkdayPending{margin-top:22px;padding:17px;border:1px solid #ba9760;border-radius:12px;background:#343020;color:#f7e8c5}
+.voxWorkdayNotice{margin-top:17px;max-width:740px;color:#f3e3b3;font-size:13px;line-height:1.7}
+.voxWorkday :is(a,button,select):focus-visible{outline:3px solid #ffe19a;outline-offset:3px}
+@media(max-width:780px){.voxWorkdayMetrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:500px){.voxWorkdayMetrics{grid-template-columns:1fr}.voxWorkdayTitle{align-items:flex-start;flex-direction:column}}

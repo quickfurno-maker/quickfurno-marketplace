@@ -4,7 +4,7 @@ import Link from "next/link";
 import {useRouter} from "next/navigation";
 import {readPendingTeamChat,savePendingTeamChat,clearPendingTeamChat}
  from "../../../lib/vo01PendingTeamChat.mjs";
-const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type Pending={nonce:string;body:string};
 const store=()=>{try{return window.sessionStorage;}catch{return null;}};
 export default function ChatComposer(){
@@ -56,11 +56,16 @@ export default function ChatComposer(){
       !("ok" in data)||data.ok!==true||
       !("effect" in data)||data.effect!=="INTERNAL_TEAM_MESSAGE_ONLY"||
       !("messageId" in data)||typeof data.messageId!=="string"||
-      !UUID.test(data.messageId)){
+      !UUID.test(data.messageId)||
+      !("nonce" in data)||data.nonce!==item.nonce||
+      !("status" in data)||data.status!==201||
+      !("externalMessagesSent" in data)||data.externalMessagesSent!==0||
+      !("agentConversationChanged" in data)||data.agentConversationChanged!==false||
+      !("staffPrivilegesChanged" in data)||data.staffPrivilegesChanged!==false){
     setResult("Core message outcome unverified. Preserve the original nonce; reconcile before any new message.");
     return;
    }
-   if(!clearPendingTeamChat(store(),item)){
+   if(!clearPendingTeamChat(store(),item,data)){
     setResult("Core confirmed the message, but checkpoint cleanup failed. Reconcile before further messages.");
     return;
    }

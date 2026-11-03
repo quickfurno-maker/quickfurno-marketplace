@@ -1,0 +1,59 @@
+name: VOX VO4 Combined Staff Workday and Delegation - RELEASE HOLD
+on:
+  pull_request:
+    branches:
+      - feat/vox-rc6-operational-20261030
+    paths:
+      - 'app/api/vox/v1/staff-time-state/**'
+      - 'apps/vox-web/app/team/workday/**'
+      - 'apps/vox-web/app/api/staff-time/**'
+      - 'apps/vox-web/lib/staffTime.ts'
+      - 'apps/vox-web/lib/vo03PendingStaffTime.mjs'
+      - 'contracts/vox/virtualOfficeTimeRead.*'
+      - 'ops/vox/vo04-review-candidates/**'
+      - 'scripts/mvp/vox/vo04-*.test.mjs'
+      - '.github/workflows/vox-vo04-combined.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  combined-staff-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - name: Root pinned dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: VO0-VO4 exact contract suites
+        run: |
+          node --test \
+            scripts/mvp/vox/vo00-virtual-office-contract.test.mjs \
+            scripts/mvp/vox/vo01-virtual-office-time-state.test.mjs \
+            scripts/mvp/vox/vo01-virtual-office-time-report.test.mjs \
+            scripts/mvp/vox/vo01-virtual-office-chat-checkpoint.test.mjs \
+            scripts/mvp/vox/vo01-virtual-office-meet-provider.test.mjs \
+            scripts/mvp/vox/vo02-time-writer.test.mjs \
+            scripts/mvp/vox/vo02-presence-projection.test.mjs \
+            scripts/mvp/vox/vo03-time-core-route.test.mjs \
+            scripts/mvp/vox/vo03-team-leader-delegation.test.mjs \
+            scripts/mvp/vox/vo03-staff-time-recovery.test.mjs \
+            scripts/mvp/vox/vo04-time-read.test.mjs \
+            scripts/mvp/vox/vo04-time-read-route.test.mjs \
+            scripts/mvp/vox/vo04-browser-core-time-parity.test.mjs \
+            scripts/mvp/vox/vo04-staff-workday.test.mjs
+      - name: Root TypeScript
+        run: ./node_modules/.bin/tsc --noEmit
+      - name: VOX Web pinned dependencies
+        working-directory: apps/vox-web
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Full VOX Web tests
+        working-directory: apps/vox-web
+        run: npm test
+      - name: VOX optimized production Webpack build
+        working-directory: apps/vox-web
+        run: npm run build -- --webpack

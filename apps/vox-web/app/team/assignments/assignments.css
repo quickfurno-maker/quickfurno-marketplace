@@ -1,0 +1,18 @@
+.voxTl{max-width:1060px;margin:0 auto;padding:clamp(19px,4vw,48px);min-height:100vh;color:#eaf6f0}
+.voxTlNav{display:flex;gap:12px;margin-bottom:23px;font-size:13px}
+.voxTl a{color:#b2e7d0}
+.voxTlHero{padding:clamp(22px,4vw,40px);background:linear-gradient(118deg,#173537,#0b1b27);border:1px solid #366256;border-radius:20px;margin-bottom:20px}
+.voxTlEyebrow{color:#a5e2ce;letter-spacing:.12em;text-transform:uppercase;font-size:11px}
+.voxTlHero h1{font-size:clamp(28px,4.5vw,44px);margin:10px 0}
+.voxTlHero p,.voxTlCard p{line-height:1.6;color:#c5dbd2}
+.voxTlCard{background:#10272c;border:1px solid #345a57;border-radius:16px;margin:20px 0;padding:clamp(19px,3vw,29px)}
+.voxTlMetrics{display:flex;flex-wrap:wrap;gap:14px}.voxTlMetrics>div{border:1px solid #40675b;background:#193339;border-radius:12px;padding:17px;min-width:180px;display:grid;gap:8px}
+.voxTlMetrics strong{font-size:26px}.voxTlMetrics span{font-size:12px;color:#bdd8ca}
+.voxTlForm{display:grid;gap:11px;max-width:600px}.voxTlForm label{font-size:13px;font-weight:650}
+.voxTlForm select,.voxTlForm textarea{background:#091e26;color:#effaf6;border:1px solid #62857d;border-radius:9px;padding:11px;font:inherit;width:100%;box-sizing:border-box}
+.voxTl button{padding:12px 16px;border-radius:10px;border:0;background:#b6ecd6;color:#05261e;font-weight:750;cursor:pointer}
+.voxTl button:disabled{opacity:.46;cursor:not-allowed}
+.voxTlPending{background:#332e20;border:1px solid #a88c5e;border-radius:12px;padding:16px}
+.voxTlNotice{font-size:13px;color:#f5dcad;line-height:1.6}
+.voxTlFoot{font-size:13px;color:#bdd3ca;line-height:1.7}
+.voxTl :is(a,button,select,textarea):focus-visible{outline:3px solid #ffe0a2;outline-offset:3px}

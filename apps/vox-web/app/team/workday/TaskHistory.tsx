@@ -1,5 +1,6 @@
 import type {StaffTaskHistory} from "../../../lib/staffTimeHistory";
 type Result=StaffTaskHistory|{ok:false;statusCode:number;error:string};
+const utc=(value:string)=>new Date(value).toISOString().slice(0,19)+" UTC";
 const duration=(ms:number)=>{
  const seconds=Math.floor(ms/1000);
  const h=Math.floor(seconds/3600),m=Math.floor((seconds%3600)/60),s=seconds%60;
@@ -27,16 +28,16 @@ export default function TaskHistory({history}:{history:Result}){
      <strong>Work {item.workItemId.slice(0,8)}</strong>
      {" — "+duration(item.elapsedMs)+" — "+item.closingAction.replaceAll("_"," ").toLowerCase()}
      <p className="voxWorkdayFine">
-      <time dateTime={item.startedAt}>{item.startedAt.slice(0,19)} UTC</time>
+      <time dateTime={item.startedAt}>{utc(item.startedAt)}</time>
       {" to "}
-      <time dateTime={item.endedAt}>{item.endedAt.slice(0,19)} UTC</time>
+      <time dateTime={item.endedAt}>{utc(item.endedAt)}</time>
      </p>
     </li>)}
    </ul>}
   {history.hasMore?<p className="voxWorkdayFine">
    More recorded intervals exist. Only the latest 20 are displayed; no full-history claim.</p>:null}
   <p className="voxWorkdayFine">As of
-   <time dateTime={history.asOf}> {history.asOf.slice(0,19)} UTC</time>.
+   <time dateTime={history.asOf}> {utc(history.asOf)}</time>.
    No live task timer is estimated here.</p>
  </section>;
 }

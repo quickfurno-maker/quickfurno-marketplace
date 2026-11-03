@@ -34,6 +34,7 @@ jobs:
             scripts/mvp/vox/vo05-tl-core-route.test.mjs \
             scripts/mvp/vox/vo05-tl-checkpoint.test.mjs \
             scripts/mvp/vox/vo05-tl-ui-source.test.mjs \
+            scripts/mvp/vox/vo05-tl-replay-preflight.test.mjs \
             scripts/mvp/vox/vo03-team-leader-delegation.test.mjs
       - name: Root TypeScript
         run: ./node_modules/.bin/tsc --noEmit

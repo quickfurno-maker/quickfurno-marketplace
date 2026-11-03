@@ -1,0 +1,51 @@
+name: VOX Owner V1 existing-workspace integration (NO DEPLOY)
+on:
+  pull_request:
+    paths:
+      - "app/api/vox/v1/owner-workspaces/**"
+      - "app/api/vox/v1/finance/route.ts"
+      - "services/vox/ownerWorkspaceProjection.*"
+      - "apps/vox-web/**"
+      - "scripts/mvp/vox/owner-v1-*.test.mjs"
+      - "scripts/mvp/vox/rc7-finance-real-route-http.test.mjs"
+      - ".github/workflows/vox-owner-v1-integration.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: vox-owner-v1-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  owner-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Exact source checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Node.js 24
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install pinned Core dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Owner-only Core real-route and projection tests
+        run: node --test scripts/mvp/vox/owner-v1-projection.test.mjs scripts/mvp/vox/owner-v1-real-core-route.test.mjs scripts/mvp/vox/rc7-finance-real-route-http.test.mjs
+      - name: Core typecheck
+        run: npm run typecheck
+      - name: Owner-only Web-to-Core BFF integration (root test dependencies)
+        run: node --test apps/vox-web/scripts/validate-owner-v1-workspaces.spec.mjs
+      - name: Install pinned VOX Web dependencies
+        run: npm ci --prefix apps/vox-web --ignore-scripts --no-audit --no-fund
+      - name: VOX Web typecheck
+        run: npm run typecheck --prefix apps/vox-web
+      - name: All existing VOX Web regressions plus new Owner boundary
+        run: npm test --prefix apps/vox-web
+      - name: Production-mode compiled Web build, not deployed
+        run: npm run build --prefix apps/vox-web
+      - name: Source-only hold
+        run: |
+          echo '## VOX Owner V1 source gate' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Owner read integration only. Staff source preserved. No Staging or Production deployment, payments, wallet writes, or provider sends.' >> "$GITHUB_STEP_SUMMARY"

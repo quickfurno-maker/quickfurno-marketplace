@@ -1,5 +1,6 @@
 import {fetchStaffOverview} from "../../lib/core";
 import Link from "next/link";
+import {ownerAdminHref} from "../../lib/ownerAdminLinks";
 import "./operations.css";
 export const dynamic="force-dynamic";
 type RecordValue=Record<string,unknown>;
@@ -28,6 +29,7 @@ function Domain({name,kicker,rows,kind}: {name:string;kicker:string;rows:RecordV
  <footer>Read-only Core projection <span>↗</span></footer></section>;
 }
 export default async function Operations(){
+ const ownerMode=process.env.VOX_STAFF_VIEW_MODE==="owner";
  const result=await fetchStaffOverview();
  if(!result.ok)return <main className="hold"><section className="holdCard">
   <p className="kicker">VOX / ACCESS GATE</p><h1>Operations unavailable</h1>
@@ -41,9 +43,9 @@ export default async function Operations(){
   {name:"Human Desk",kicker:"GOVERNED WHATSAPP",rows:result.view.humanDeskPreview as RecordValue[],kind:"human" as const}];
  const total=views.reduce((sum,x)=>sum+x.rows.length,0);
  return <main className="voxOps"><header className="voxTop"><div className="voxLogo">V</div><div><b>VOX OPERATIONS</b><small>QuickFurno · governed vendor services</small></div><div className="voxSession">CORE VERIFIED · AAL2</div></header>
- <div className="voxHero"><p className="kicker">STAFF COMMAND CENTER / READ-ONLY STAGING</p><h1>Everything that matters,<br/><span>in one operational view.</span></h1>
+ <div className="voxHero"><p className="kicker">{ownerMode?"OWNER COMMAND CENTER / READ-ONLY STAGING":"STAFF COMMAND CENTER / READ-ONLY STAGING"}</p><h1>Everything that matters,<br/><span>in one operational view.</span></h1>
  <p>Trusted live projections from QuickFurno Core. Staff actions, payment decisions and outbound messaging remain disabled until full authorization.</p></div>
- <nav aria-label="VOX staff workspaces" style={{display:"flex",gap:12,flexWrap:"wrap",paddingBottom:20}}><Link href="/acquisition" style={{color:"#8feac3"}}>Aarohi Acquisition →</Link><Link href="/vendor360" style={{color:"#8feac3"}}>Vendor 360 →</Link><Link href="/service-desk" style={{color:"#8feac3"}}>Service Desk →</Link><Link href="/intelligence" style={{color:"#8feac3"}}>Owner Intelligence →</Link><Link href="/studio" style={{color:"#8feac3"}}>Automation Simulation →</Link><Link href="/owner/team-time" style={{color:"#8feac3"}}>Owner Team Time</Link><Link href="/staff-reviews" style={{color:"#8feac3"}}>Team Leader Reviews →</Link><Link href="/approvals" style={{color:"#8feac3"}}>Owner Approvals →</Link><Link href="/finance" style={{color:"#8feac3"}}>Finance Preview →</Link></nav><div className="voxPills"><div><strong>{total}</strong><span>Bounded records</span></div><div><strong>04</strong><span>Core domains</span></div><div><strong>0</strong><span>Direct actions</span></div><div><strong>≤8</strong><span>Rows per domain</span></div></div>
+ {ownerMode?<nav aria-label="Owner operations workspaces" style={{display:"flex",gap:12,flexWrap:"wrap",paddingBottom:20}}><Link href="/vendor360">Vendor 360</Link><Link href="/acquisition">Aarohi Acquisition</Link><Link href="/service-desk">Service Desk</Link><Link href="/finance">Finance Preview</Link><Link href="/intelligence">Owner Intelligence</Link><Link href="/approvals">Owner Approvals</Link>{ownerAdminHref("/admin/dashboard")?<a href={ownerAdminHref("/admin/dashboard")!}>Core Dashboard</a>:null}{" | "}{ownerAdminHref("/admin/leads")?<a href={ownerAdminHref("/admin/leads")!}>Manage Leads</a>:null}{" | "}{ownerAdminHref("/admin/vendors")?<a href={ownerAdminHref("/admin/vendors")!}>Manage Vendors</a>:null}</nav>:<nav aria-label="VOX staff workspaces" style={{display:"flex",gap:12,flexWrap:"wrap",paddingBottom:20}}><Link href="/acquisition" style={{color:"#8feac3"}}>Aarohi Acquisition →</Link><Link href="/vendor360" style={{color:"#8feac3"}}>Vendor 360 →</Link><Link href="/service-desk" style={{color:"#8feac3"}}>Service Desk →</Link><Link href="/intelligence" style={{color:"#8feac3"}}>Owner Intelligence →</Link><Link href="/studio" style={{color:"#8feac3"}}>Automation Simulation →</Link><Link href="/owner/team-time" style={{color:"#8feac3"}}>Owner Team Time</Link><Link href="/staff-reviews" style={{color:"#8feac3"}}>Team Leader Reviews →</Link><Link href="/approvals" style={{color:"#8feac3"}}>Owner Approvals →</Link><Link href="/finance" style={{color:"#8feac3"}}>Finance Preview →</Link></nav>}<div className="voxPills"><div><strong>{total}</strong><span>Bounded records</span></div><div><strong>04</strong><span>Core domains</span></div><div><strong>0</strong><span>Direct actions</span></div><div><strong>≤8</strong><span>Rows per domain</span></div></div>
  <div className="voxSectionTitle"><p className="kicker">YOUR WORKSPACES</p><h2>Operational overview</h2></div>
  <div className="voxWorkspace">{views.map(v=><Domain key={v.kind} {...v}/>)}</div>
  <div className="voxNotice"><b>Operating boundary</b><span>Core owns vendor activation, payments, matching, consent and communication dispatch. Jarvis owns agent reasoning and memory. VOX displays only approved staff projections.</span></div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {fetchScopedServiceDesk} from "../../lib/core";
 import {withReturn} from "../../lib/returnTo.mjs";
+import {ownerAdminHref} from "../../lib/ownerAdminLinks";
 import {ScopedQueue} from "../components/ScopedQueue";
 import {StaffProposalForm} from "../components/StaffProposalForm";
 import {SupportFollowup} from "./components/SupportFollowup";
@@ -8,10 +9,12 @@ import "../components/scoped-queue.css";
 import "../operations/operations.css";
 export const dynamic="force-dynamic";
 export default async function ServiceDesk(){
+ const ownerMode=process.env.VOX_STAFF_VIEW_MODE==="owner";
  const r=await fetchScopedServiceDesk();
  if(!r.ok)return <main className="hold"><section className="holdCard">
  <p className="kicker">VOX / HUMAN DESK</p><h1>Service Desk unavailable</h1>
- <p>{r.status===401?"Verified Staff MFA is required to open the Service Desk.":r.status===403?
+ <p>{ownerMode&&r.status===403?"Owner Core authorization was denied.":ownerMode&&r.status===401?"Owner MFA is required.":
+ r.status===401?"Verified Staff MFA is required to open the Service Desk.":r.status===403?
  "Your current Staff assignment or conversation grant does not authorize the Service Desk.":
  "The protected Service Desk Core projection is currently unavailable. No case or conversation was modified."}</p>
  {r.status===401?<Link href={withReturn("/login","/service-desk")}>Staff sign-in</Link>:
@@ -23,17 +26,18 @@ export default async function ServiceDesk(){
   detail:"Conversation #"+(c.conversationId?.slice(0,8)??"unknown")+" · Service window: "+c.serviceWindow,
   state:c.state,attention:c.serviceWindow==="OPEN"}));
  return <main className="voxOps"><header className="voxTop"><div className="voxLogo">V</div><div><b>VOX / SERVICE DESK</b>
-  <small>Native Core support and governed HUMAN WhatsApp</small></div><div className="voxSession">ASSIGNED ONLY · READ ONLY</div></header>
+  <small>Native Core support and governed HUMAN WhatsApp</small></div><div className="voxSession">{ownerMode?"OWNER AAL2 - READ ONLY":"ASSIGNED ONLY - READ ONLY"}</div></header>
  <div className="voxHero"><p className="kicker">SERVICE CASES / AAROHI + ANISHA</p>
   <h1>Resolve with context.<br/><span>Act only with approval.</span></h1>
  <p>Search assigned support cases and Core HUMAN conversation metadata. Client/Riya conversations and AI-owned threads are excluded. No raw messages or direct provider sends.</p>
  <nav aria-label="Staff workspaces"><Link href="/operations" style={{color:"#9decc8"}}>Mission Control</Link> · <Link href="/acquisition" style={{color:"#9decc8"}}>Aarohi CRM</Link> · <Link href="/vendor360" style={{color:"#9decc8"}}>Vendor 360</Link></nav></div>
+ {ownerMode?<div className="voxNotice"><b>Owner actions — canonical QuickFurno Core Admin</b><span>VOX is a read-only overview. All operational changes stay in the existing authorized Core Admin.</span>{ownerAdminHref("/admin/whatsapp/human-desk")?<a href={ownerAdminHref("/admin/whatsapp/human-desk")!}>Open authorized Human Desk</a>:null}{" | "}{ownerAdminHref("/admin/vendor-crm")?<a href={ownerAdminHref("/admin/vendor-crm")!}>Vendor support CRM</a>:null}</div>:null}
  <div className="voxWorkspace">
   <ScopedQueue kicker="SUPPORT" title="Assigned service cases" rows={cases} emptyLabel="No service cases assigned."/>
   <ScopedQueue kicker="HUMAN" title="Aarohi and Anisha handovers" rows={human} emptyLabel="No assigned HUMAN handovers."/>
  </div>
- {process.env.VOX_OPERATIONAL_PROPOSAL_UI_ENABLED==="staging"?<StaffProposalForm kind="SUPPORT_REPLY" targets={r.view.support.filter(c=>c.threadId).map(c=>({id:c.threadId!,title:"Case "+c.threadId!.slice(0,8)}))}/>:null}
- {process.env.VOX_SUPPORT_TASK_UI_ENABLED==="staging"?<SupportFollowup cases={r.view.support.filter(c=>c.threadId).map(c=>({id:c.threadId!,title:"Case "+c.threadId!.slice(0,8)}))}/>:null}
+ {!ownerMode&&process.env.VOX_OPERATIONAL_PROPOSAL_UI_ENABLED==="staging"?<StaffProposalForm kind="SUPPORT_REPLY" targets={r.view.support.filter(c=>c.threadId).map(c=>({id:c.threadId!,title:"Case "+c.threadId!.slice(0,8)}))}/>:null}
+ {!ownerMode&&process.env.VOX_SUPPORT_TASK_UI_ENABLED==="staging"?<SupportFollowup cases={r.view.support.filter(c=>c.threadId).map(c=>({id:c.threadId!,title:"Case "+c.threadId!.slice(0,8)}))}/>:null}
  <div className="voxNotice"><b>Core service boundary</b><span>Replies, handover, case close, assignment and SLA actions remain disabled pending native Core atomic approval, conversation revision and provider delivery certification.</span></div>
  <footer className="voxBottom">QuickFurno VOX · Staff operations · No direct WhatsApp sends</footer></main>;
 }

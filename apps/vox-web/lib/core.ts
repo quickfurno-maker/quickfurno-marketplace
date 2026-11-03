@@ -273,6 +273,7 @@ function safeLabel(x:unknown,max=70):string {
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const uid=(x:unknown):string|null=>typeof x==="string"&&UUID.test(x)?x:null;
 export async function fetchScopedServiceDesk(){
+ if(process.env.VOX_STAFF_VIEW_MODE==="owner")return fetchOwnerWorkspaceDesk();
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
     (process.env.VOX_STAFF_VIEW_MODE!=="scoped"&&process.env.VOX_STAFF_VIEW_MODE!=="dual"))
    return {ok:false,status:503,error:"STAFF_DESK_DISABLED"} as const;
@@ -316,6 +317,7 @@ export async function fetchScopedServiceDesk(){
 /** VOX staff CRM adapters â€” no browser tokens, no service-role and no outbound writes.
  * Core owns record scope; the BFF independently drops all undeclared fields. */
 export async function fetchScopedCrm(kind:"acquisition"|"vendor360"){
+ if(process.env.VOX_STAFF_VIEW_MODE==="owner")return fetchOwnerWorkspaceCrm(kind);
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
     (process.env.VOX_STAFF_VIEW_MODE!=="scoped"&&process.env.VOX_STAFF_VIEW_MODE!=="dual"))return {ok:false,status:503,error:"STAFF_SCOPE_DISABLED"} as const;
  const token=await verifiedMfaSession();
@@ -972,4 +974,107 @@ export async function fetchOwnerRefundIntakePreview(){
   return {ok:true,status:200,events,mode:"READ_ONLY" as const,
    isCompleteHistory:false as const} as const;
  }catch{return {ok:false,status:503,error:"REFUND_REVIEW_UNAVAILABLE"} as const;}
+}
+
+
+/** Private Staging Owner-only reuse of canonical Core data. Staff integration
+ * remains unchanged and cannot be reached by switching to Owner view mode. */
+async function fetchOwnerWorkspace(kind:"vendor360"|"acquisition"|"desk"){
+ if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging"||
+    process.env.VOX_STAFF_VIEW_MODE!=="owner"||
+    process.env.VOX_OWNER_WORKSPACES_ENABLED!=="staging"||
+    process.env.VOX_OWNER_WORKSPACES_STAGE!=="private")
+  return {ok:false,status:503,error:"OWNER_WORKSPACES_DISABLED"} as const;
+ const token=await verifiedMfaSession();
+ if(!token)return {ok:false,status:401,error:"MFA_REQUIRED"} as const;
+ const base=origin();if(!base)return {ok:false,status:503,error:"CORE_NOT_CONFIGURED"} as const;
+ try{
+  const res=await fetch(base+"/api/vox/v1/owner-workspaces?kind="+kind,{
+   method:"GET",headers:{authorization:"Bearer "+token,accept:"application/json"},
+   redirect:"error",cache:"no-store",signal:AbortSignal.timeout(3500)});
+  if(!res.ok)return {ok:false,status:res.status===403?403:res.status===401?401:503,
+   error:"OWNER_CORE_UNAVAILABLE"} as const;
+  const data:unknown=await res.json();
+  if(!data||typeof data!=="object"||Array.isArray(data))
+   return {ok:false,status:503,error:"OWNER_CORE_UNTRUSTED"} as const;
+  const r=data as Record<string,unknown>;
+  const view=r.view;
+  if(r.ok!==true||!view||typeof view!=="object"||Array.isArray(view))
+   return {ok:false,status:503,error:"OWNER_CORE_UNTRUSTED"} as const;
+  const v=view as Record<string,unknown>;
+  if(v.schema!=="qf.vox.owner."+kind+".v1"||v.owner!=="quickfurno-core"||
+     v.readOnly!==true||v.actionsEnabled!==false)
+   return {ok:false,status:503,error:"OWNER_CORE_UNTRUSTED"} as const;
+  const fields=kind==="vendor360"?["vendors","crm","tasks"]:
+   kind==="acquisition"?["prospects","tasks"]:["support","humanInbox"];
+  if(fields.some(f=>!Array.isArray(v[f])||(v[f] as unknown[]).length>12))
+   return {ok:false,status:503,error:"OWNER_CORE_UNTRUSTED"} as const;
+  return {ok:true,status:200,view:v} as const;
+ }catch{return {ok:false,status:503,error:"OWNER_CORE_UNAVAILABLE"} as const;}
+}
+async function fetchOwnerWorkspaceCrm(kind:"vendor360"|"acquisition"){
+ const response=await fetchOwnerWorkspace(kind);
+ if(!response.ok)return {...response,kind} as const;
+ const v=response.view;
+ const normalize=(x:unknown)=>x&&typeof x==="object"&&!Array.isArray(x)?x as Record<string,unknown>:{};
+ if(kind==="acquisition"){
+  const prospects=(v.prospects as unknown[]).map(raw=>{
+   const p=normalize(raw);
+   return {id:uid(p.id),businessName:safeLabel(p.businessName,120),
+    stage:safeLabel(p.stage,40),priority:safeLabel(p.priority,8),
+    nextAction:safeLabel(p.nextAction,50),humanTakeover:p.humanTakeover===true,
+    doNotContact:p.doNotContact===true};
+  });
+  const tasks=(v.tasks as unknown[]).map(raw=>{
+   const t=normalize(raw);
+   return {id:uid(t.id),prospectId:uid(t.prospectId),
+    status:safeLabel(t.status,30),type:safeLabel(t.type,60),
+    dueAt:typeof t.dueAt==="string"&&Number.isFinite(Date.parse(t.dueAt))?t.dueAt:null};
+  });
+  if(prospects.some(p=>!p.id)||tasks.some(t=>!t.id||!t.prospectId||
+     !prospects.some(p=>p.id===t.prospectId)))
+   return {ok:false,status:503,error:"OWNER_CORE_UNTRUSTED",kind} as const;
+  return {ok:true,status:200,kind,view:{prospects,tasks}} as const;
+ }
+ const vendors=(v.vendors as unknown[]).map(raw=>{
+  const x=normalize(raw);
+  return {vendorId:uid(x.vendorId),businessName:safeLabel(x.businessName,120),
+   status:safeLabel(x.status,45),verificationStatus:safeLabel(x.verificationStatus,45),
+   locationVerification:safeLabel(x.locationVerification,45),active:x.active===true};
+ });
+ const crm=(v.crm as unknown[]).map(raw=>{
+  const x=normalize(raw);
+  return {vendorId:uid(x.vendorId),onboarding:safeLabel(x.onboarding,60),
+   relationship:safeLabel(x.relationship,60)};
+ });
+ const tasks=(v.tasks as unknown[]).map(raw=>{
+  const x=normalize(raw);
+  return {id:uid(x.id),vendorId:uid(x.vendorId),
+   title:safeLabel(x.title,120),status:safeLabel(x.status,30)};
+ });
+ const allowed=new Set(vendors.map(v=>v.vendorId));
+ if(vendors.some(v=>!v.vendorId)||crm.some(c=>!c.vendorId||!allowed.has(c.vendorId))||
+    tasks.some(t=>!t.id||!t.vendorId||!allowed.has(t.vendorId)))
+  return {ok:false,status:503,error:"OWNER_CORE_UNTRUSTED",kind} as const;
+ return {ok:true,status:200,kind,view:{vendors,crm,tasks}} as const;
+}
+async function fetchOwnerWorkspaceDesk(){
+ const response=await fetchOwnerWorkspace("desk");
+ if(!response.ok)return response;
+ const normalize=(x:unknown)=>x&&typeof x==="object"&&!Array.isArray(x)?x as Record<string,unknown>:{};
+ const support=(response.view.support as unknown[]).map(raw=>{
+  const x=normalize(raw);
+  return {threadId:uid(x.threadId),state:safeLabel(x.state,32),
+   priority:safeLabel(x.priority,32),ageBand:"NOT_CONFIGURED" as const,canClose:false};
+ });
+ const humanInbox=(response.view.humanInbox as unknown[]).map(raw=>{
+  const x=normalize(raw);
+  return {conversationId:uid(x.conversationId),
+   lane:x.lane==="ANISHA"?"ANISHA":x.lane==="AAROHI"?"AAROHI":"UNKNOWN",
+   serviceWindow:x.serviceWindow==="OPEN"?"OPEN":"CLOSED_OR_UNKNOWN",
+   state:"HUMAN" as const,canReply:false};
+ });
+ if(support.some(s=>!s.threadId)||humanInbox.some(h=>!h.conversationId))
+  return {ok:false,status:503,error:"OWNER_CORE_UNTRUSTED"} as const;
+ return {ok:true,status:200,view:{support,humanInbox}} as const;
 }

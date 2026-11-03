@@ -111,6 +111,31 @@ test("all mutation HTTP verbs reject before touching Core",async()=>{
  }
  assert.equal(s.checks,0);assert.equal(s.reads,0);
 });
+test("Owner-only finance read works with every Staff gate frozen and still forbids writes",async()=>{
+ const oldOwner=process.env.VOX_OWNER_WORKSPACES_ENABLED;
+ const oldStage=process.env.VOX_OWNER_WORKSPACES_STAGE;
+ try{
+  setFlags(false);
+  process.env.VOX_FINANCE_READ_ENABLED="staging";
+  process.env.VOX_OWNER_WORKSPACES_ENABLED="staging";
+  process.env.VOX_OWNER_WORKSPACES_STAGE="private";
+  const spies=mock();
+  const response=await route.GET(req());
+  assert.equal(response.status,200);
+  const result=await response.json();
+  assert.equal(result.mode,"READ_ONLY");
+  assert.equal(result.canActivatePayments,false);
+  assert.equal(result.canRefund,false);
+  assert.equal(spies.checks,2);
+  for(const method of ["POST","PUT","PATCH","DELETE"])
+   assert.equal(route[method]().status,405);
+ }finally{
+  if(oldOwner===undefined)delete process.env.VOX_OWNER_WORKSPACES_ENABLED;
+  else process.env.VOX_OWNER_WORKSPACES_ENABLED=oldOwner;
+  if(oldStage===undefined)delete process.env.VOX_OWNER_WORKSPACES_STAGE;
+  else process.env.VOX_OWNER_WORKSPACES_STAGE=oldStage;
+ }
+});
 test("fixture cleanup",()=>{
  for(const [k,v] of Object.entries(prev))if(v===undefined)delete process.env[k];else process.env[k]=v;
  delete globalThis.__voxMock;

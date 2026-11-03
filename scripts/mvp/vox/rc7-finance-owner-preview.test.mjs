@@ -35,8 +35,15 @@ test("null or zero recorded price is not a fabricated paid amount",()=>{
  assert.equal(projectRc7OwnerFinanceOrders([{...row,package_price:"0.00"}])[0].recordedOrderAmount,0);
 });
 test("source route is gated, Owner AAL2 revalidated and read-only",()=>{
- for(const gate of ["VOX_FINANCE_READ_ENABLED","VOX_STAFF_READ_ENABLED","VOX_STAFF_GRANTS_ENABLED"])
-  assert.ok(route.includes('process.env.'+gate+'!=="staging"'),gate);
+ assert.ok(route.includes('process.env.VOX_FINANCE_READ_ENABLED!=="staging"'));
+ // Keep the historical Staff read gate AND the new independently gated
+ // Owner-only private Staging read route; neither can skip Finance's own flag.
+ for(const gate of ["VOX_STAFF_READ_ENABLED","VOX_STAFF_GRANTS_ENABLED"])
+  assert.ok(route.includes('process.env.'+gate+'==="staging"'),gate);
+ for(const gate of ["VOX_OWNER_WORKSPACES_ENABLED","VOX_OWNER_WORKSPACES_STAGE"])
+  assert.ok(route.includes('process.env.'+gate+'==='),gate);
+ assert.ok(route.includes('VOX_OWNER_WORKSPACES_STAGE==="private"'));
+ assert.ok(route.includes('!(staffGate||ownerGate)'));
  assert.match(route,/verifyVoxOwnerBearer/);
  assert.equal((route.match(/await verifyVoxOwnerBearer/g)||[]).length,2);
  assert.match(route,/no-store/);assert.match(route,/vary":"Authorization"/);

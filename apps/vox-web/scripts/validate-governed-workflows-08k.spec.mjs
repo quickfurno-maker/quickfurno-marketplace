@@ -16,7 +16,7 @@ const reply=(path,method)=>{
  if(path.endsWith("staff-chat")){
   return method==="POST"?{
    ok:true,schema:"qf.vox.staff.team.chat.receipt.v1",
-   messageId:uuid(8),createdAt:"2026-10-16T08:00:00Z",
+   messageId:uuid(8),nonce:uuid(20),createdAt:"2026-10-16T08:00:00Z",
    effect:"INTERNAL_TEAM_MESSAGE_ONLY",externalMessagesSent:0,
    agentConversationChanged:false,staffPrivilegesChanged:false
   }:{ok:true,schema:"qf.vox.staff.team.chat.preview.v1",mode:"INTERNAL_ONLY",
@@ -127,7 +127,10 @@ test("chat POST admits only text and nonce and rejects provider-sends in receipt
  assert.equal(r.ok,true);assert.equal(r.effect,"INTERNAL_TEAM_MESSAGE_ONLY");
  const payload=JSON.parse(state.requests[0].options.body);
  assert.deepEqual(payload,{body:"Internal update",nonce:uuid(20)});
- state.requests=[];state.payload={...reply("staff-chat","POST"),externalMessagesSent:1};
+ state.requests=[];state.payload={...reply("staff-chat","POST"),nonce:uuid(22)};
+  r=await api.sendTeamChat("Internal update",uuid(20));
+  assert.equal(r.status,503);
+  state.requests=[];state.payload={...reply("staff-chat","POST"),externalMessagesSent:1};
  r=await api.sendTeamChat("Internal update",uuid(20));
  assert.equal(r.status,503);
  for(const bad of ["", " a","x".repeat(501),"bad\ntext"])

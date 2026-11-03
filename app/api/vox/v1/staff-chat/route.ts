@@ -84,7 +84,7 @@ export async function POST(request:Request){
     !Number.isFinite(Date.parse(r.created_time)))
    return send({ok:false,error:"CHAT_RECEIPT_INVALID"},503);
   return send({ok:true,schema:"qf.vox.staff.team.chat.receipt.v1",
-    messageId:r.message_id,createdAt:r.created_time,
+    messageId:r.message_id,nonce:body.nonce,createdAt:r.created_time,
     effect:"INTERNAL_TEAM_MESSAGE_ONLY",externalMessagesSent:0,
     agentConversationChanged:false,staffPrivilegesChanged:false},201);
  }catch{return send({ok:false,error:"CHAT_CORE_UNAVAILABLE"},503);}

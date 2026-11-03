@@ -1,0 +1,48 @@
+name: VOX VO7 Team Leader Progress Replay — HOLD
+on:
+  pull_request:
+    branches:
+      - feat/vox-rc6-operational-20261030
+    paths:
+      - 'services/vox/virtualOfficeTeamAssignment.mjs'
+      - 'scripts/mvp/vox/fixtures/vo07-tl-progress-replay.pg17.sql'
+      - 'scripts/mvp/vox/vo05-tl-replay-preflight.test.mjs'
+      - 'scripts/mvp/vox/validate-vox-vo07-tl-pg17.sh'
+      - '.github/workflows/vox-vo07-tl-replay.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  adapter-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - name: Original nonce recovery after task progress and impersonation denial
+        run: node --test scripts/mvp/vox/vo05-tl-replay-preflight.test.mjs scripts/mvp/vox/vo03-team-leader-delegation.test.mjs
+  real-pg17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: vox_disposable_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Real PostgreSQL17 original nonce after IN_PROGRESS and DONE
+        run: bash scripts/mvp/vox/validate-vox-vo07-tl-pg17.sh

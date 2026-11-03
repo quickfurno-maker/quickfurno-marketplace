@@ -1,0 +1,35 @@
+name: VOX VO4 Team Leader Atomic Assignment PG17 - HOLD
+on:
+  pull_request:
+    branches:
+      - feat/vox-rc6-operational-20261030
+    paths:
+      - 'ops/vox/vo04-review-candidates/**'
+      - 'scripts/mvp/vox/fixtures/vo04-*.pg17.sql'
+      - 'scripts/mvp/vox/validate-vox-vo04-tl-pg17.sh'
+      - '.github/workflows/vox-vo04-tl-pg17.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  disposable-postgres17-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: vox_disposable_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Run real isolated PostgreSQL 17 Team Leader assignment and contention
+        run: bash scripts/mvp/vox/validate-vox-vo04-tl-pg17.sh

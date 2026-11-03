@@ -32,8 +32,8 @@ export default async function TeamPresence(){
     <p className="voxFlowMuted">Snapshot observed at
      <time dateTime={result.asOf}> {result.asOf.slice(0,19)} UTC</time>.
      This is not a live subscription or an attendance report.</p>
-    <p className="voxFlowMuted">{result.unknownStaffCount} unobserved Staff.
-     Unobserved never means offline.</p>
+    <p className="voxFlowMuted">{result.unknownStaffCount} Staff without a current observation.
+     Unobserved or expired statuses are unknown, never proof of being offline.</p>
     {result.entries.length===0?<p role="status">No verified Staff in this current window.</p>:
      <ul className="voxFlowList">{result.entries.map(entry=>
       <li className="voxFlowRow" key={entry.staffRef}>

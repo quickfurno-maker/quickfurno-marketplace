@@ -8,15 +8,16 @@ const viewer={userId:id(1),teamId:id(2),cityId:id(3),role:"team_leader"};
 const staff=(n,state,seenAtMs)=>({staffId:id(n),teamId:id(2),cityId:id(3),
  state,seenAtMs});
 const source=(path)=>readFileSync(new URL("../../../"+path,import.meta.url),"utf8");
-test("VO6 unobserved remains UNKNOWN; expired verified observation becomes OFFLINE",()=>{
+test("VO7 unobserved and expired presence are both UNKNOWN",()=>{
  const now=1000000;
  const r=projectVerifiedTeamPresence({viewer,roster:[id(4),id(5),id(6)],
   observations:[staff(4,"ONLINE",now-1000),
    staff(5,"AWAY",now-PRESENCE_TTL_MS-1)],nowMs:now,rosterVerified:true});
  assert.equal(r.ok,true);assert.equal(r.entries[0].state,"ONLINE");
- assert.equal(r.entries[1].state,"OFFLINE");
+ assert.equal(r.entries[1].state,"UNKNOWN");
  assert.equal(r.entries[2].state,"UNKNOWN");
- assert.equal(r.unknownStaffCount,1);
+ assert.equal(r.unknownStaffCount,2);
+ assert.equal(r.latestObservationsVerified,1);
  assert.equal(r.attendanceVerified,false);assert.equal(r.timeTrackingVerified,false);
 });
 test("VO6 foreign roster, duplicate, stale identity and unauthorized self-view fail",()=>{

@@ -23,6 +23,7 @@ export function projectVerifiedStaffTimeRow(row,scope={}){
   providerMessagesSent:0,moneyMinorUnits:0,asOf:new Date(serverNowMs).toISOString()};
  if(row===null)return Object.freeze({...base,status:"NOT_STARTED",revision:0,
   clockedInAt:null,clockedOutAt:null,activeWorkItemId:null,
+  resumeWorkItemId:null,
   attendanceMs:0,breakMs:0,taskMs:0,netShiftMs:0,unattributedMs:0});
  if(!row||typeof row!=="object"||Array.isArray(row)||
   Object.keys(row).sort().join("|")!==[...FIELDS].sort().join("|")||
@@ -59,6 +60,10 @@ export function projectVerifiedStaffTimeRow(row,scope={}){
   breakStart!==null?"ON_BREAK":taskStart!==null?"TRACKING_TASK":"CLOCKED_IN";
  return Object.freeze({...base,status,revision:row.revision,
   clockedInAt:row.clocked_in_at,clockedOutAt:row.clocked_out_at,
-  activeWorkItemId:row.active_work_item_id,attendanceMs,breakMs,taskMs,
+  activeWorkItemId:row.active_work_item_id,
+  // TASK_RESUME is authoritative only for the most recently paused work
+  // during an open, non-break shift. Never offer a stale cross-shift ID.
+  resumeWorkItemId:status==="CLOCKED_IN"?row.last_work_item_id:null,
+  attendanceMs,breakMs,taskMs,
   netShiftMs,unattributedMs:netShiftMs-taskMs});
 }

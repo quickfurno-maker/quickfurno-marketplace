@@ -28,9 +28,17 @@ export default function WorkdayControls({snapshot,assignedWorkIds}:Props){
   snapshot.status==="ON_BREAK"?["BREAK_END"]:
   snapshot.status==="TRACKING_TASK"?
    ["TASK_PAUSE","TASK_STOP","TASK_SWITCH","BREAK_START","CLOCK_OUT"]:
-  ["TASK_START","BREAK_START","CLOCK_OUT"];
+  ["TASK_START",...(snapshot.resumeWorkItemId&&
+   assignedWorkIds.includes(snapshot.resumeWorkItemId)?["TASK_RESUME" as Action]:[]),
+   "BREAK_START","CLOCK_OUT"];
  const [action,setAction]=useState<Action>(allowed[0]);
  const [workId,setWorkId]=useState(assignedWorkIds[0]??"");
+ useEffect(()=>{
+  setAction(previous=>allowed.includes(previous)?previous:allowed[0]);
+  setWorkId(previous=>assignedWorkIds.includes(previous)?
+   previous:assignedWorkIds[0]??"");
+ },[snapshot.revision,snapshot.status,snapshot.resumeWorkItemId,
+    assignedWorkIds.join("|")]);
  useEffect(()=>{
   const state=readPendingTimeCommand(storage());
   setAvailable(state.available);setPending(state.pending);
@@ -39,7 +47,8 @@ export default function WorkdayControls({snapshot,assignedWorkIds}:Props){
   else if(state.pending)setNotice("Unresolved original time command restored. It may already be committed. Retry only that exact nonce, or reconcile with a Team Leader.");
  },[]);
  const selected=TASK.has(action)?
-  (action==="TASK_PAUSE"||action==="TASK_STOP"?active:workId):null;
+  (action==="TASK_PAUSE"||action==="TASK_STOP"?active:
+   action==="TASK_RESUME"?snapshot.resumeWorkItemId:workId):null;
  const eligible=!!selected&&(
   action==="TASK_PAUSE"||action==="TASK_STOP"||
   (assignedWorkIds.includes(selected)&&
@@ -121,7 +130,10 @@ export default function WorkdayControls({snapshot,assignedWorkIds}:Props){
      onChange={e=>setAction(e.target.value as Action)}>
      {allowed.map(a=><option key={a} value={a}>{a.replaceAll("_"," ")}</option>)}
     </select>
-    {TASK.has(action)&&action!=="TASK_PAUSE"&&action!=="TASK_STOP"?<>
+    {action==="TASK_RESUME"?<p className="voxWorkdayFine">
+     Resume original paused work {snapshot.resumeWorkItemId?.slice(0,8)}.
+     The task must still be assigned and in progress in Core.</p>:null}
+    {TASK.has(action)&&!["TASK_PAUSE","TASK_STOP","TASK_RESUME"].includes(action)?<>
      <label htmlFor="voxWorkdayTask">Assigned Core work item</label>
      <select id="voxWorkdayTask" value={workId} disabled={busy||!ready||!available}
       onChange={e=>setWorkId(e.target.value)}>

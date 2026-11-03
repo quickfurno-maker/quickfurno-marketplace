@@ -5,7 +5,8 @@ export type VerifiedTimeRead={ok:true;schema:typeof TIME_READ_SCHEMA;
  completeHistory:false;officialEod:false;payrollVerified:false;
  providerMessagesSent:0;moneyMinorUnits:0;asOf:string;status:VerifiedTimeStatus;
  revision:number;clockedInAt:string|null;clockedOutAt:string|null;
- activeWorkItemId:string|null;attendanceMs:number;breakMs:number;
+ activeWorkItemId:string|null;resumeWorkItemId:string|null;
+ attendanceMs:number;breakMs:number;
  taskMs:number;netShiftMs:number;unattributedMs:number};
 export declare function projectVerifiedStaffTimeRow(
  row:unknown,scope:{staffId:string;teamId:string;cityId:string;

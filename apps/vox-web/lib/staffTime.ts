@@ -9,7 +9,8 @@ export type StaffTimeSnapshot={ok:true;statusCode:200;
  schema:"qf.vox.staff.time.current-shift.v1";status:"NOT_STARTED"|"CLOCKED_IN"|
  "TRACKING_TASK"|"ON_BREAK"|"CLOCKED_OUT";revision:number;
  asOf:string;clockedInAt:string|null;clockedOutAt:string|null;
- activeWorkItemId:string|null;attendanceMs:number;breakMs:number;
+ activeWorkItemId:string|null;resumeWorkItemId:string|null;
+ attendanceMs:number;breakMs:number;
  taskMs:number;netShiftMs:number;unattributedMs:number;
  completeHistory:false;officialEod:false;payrollVerified:false};
 const disabled=(error:string)=>({ok:false,statusCode:503,error} as const);
@@ -47,7 +48,7 @@ export async function fetchCurrentStaffTime(){
   if(!exact(r,["ok","schema","mode","source","sourceVerified","completeHistory",
    "officialEod","payrollVerified","providerMessagesSent","moneyMinorUnits",
    "asOf","status","revision","clockedInAt","clockedOutAt","activeWorkItemId",
-   "attendanceMs","breakMs","taskMs","netShiftMs","unattributedMs"])||
+   "resumeWorkItemId","attendanceMs","breakMs","taskMs","netShiftMs","unattributedMs"])||
    r.ok!==true||r.schema!=="qf.vox.staff.time.current-shift.v1"||
    r.mode!=="READ_ONLY"||r.source!=="CORE_CURRENT_SHIFT"||
    r.sourceVerified!==true||r.completeHistory!==false||r.officialEod!==false||
@@ -61,6 +62,9 @@ export async function fetchCurrentStaffTime(){
    (r.clockedOutAt!==null&&!time(r.clockedOutAt))||
    (r.activeWorkItemId!==null&&
     (typeof r.activeWorkItemId!=="string"||!UUID.test(r.activeWorkItemId)))||
+   (r.resumeWorkItemId!==null&&
+    (typeof r.resumeWorkItemId!=="string"||!UUID.test(r.resumeWorkItemId)))||
+   (r.status!=="CLOCKED_IN"&&r.resumeWorkItemId!==null)||
    !["attendanceMs","breakMs","taskMs","netShiftMs","unattributedMs"].every(k=>safe(r[k]))||
    (r.attendanceMs as number)!==(r.breakMs as number)+(r.netShiftMs as number)||
    (r.netShiftMs as number)!==(r.taskMs as number)+(r.unattributedMs as number)||
@@ -70,6 +74,7 @@ export async function fetchCurrentStaffTime(){
   return {ok:true,statusCode:200,schema:r.schema,status:r.status,
    revision:r.revision,asOf:r.asOf,clockedInAt:r.clockedInAt,
    clockedOutAt:r.clockedOutAt,activeWorkItemId:r.activeWorkItemId,
+   resumeWorkItemId:r.resumeWorkItemId,
    attendanceMs:r.attendanceMs,breakMs:r.breakMs,taskMs:r.taskMs,
    netShiftMs:r.netShiftMs,unattributedMs:r.unattributedMs,
    completeHistory:false,officialEod:false,payrollVerified:false} as StaffTimeSnapshot;

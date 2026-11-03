@@ -1,0 +1,71 @@
+name: VOX VO10 Owner + Team Leader Time Visibility — HOLD
+on:
+  pull_request:
+    branches:
+      - feat/vox-rc6-operational-20261030
+    paths:
+      - 'contracts/vox/virtualOfficeOwnerTime.*'
+      - 'contracts/vox/virtualOfficeTlTaskHistory.*'
+      - 'app/api/vox/v1/owner-team-time/**'
+      - 'app/api/vox/v1/team-task-history/**'
+      - 'apps/vox-web/lib/ownerTeamTime.ts'
+      - 'apps/vox-web/lib/teamTaskHistory.ts'
+      - 'apps/vox-web/app/owner/team-time/**'
+      - 'apps/vox-web/app/operations/page.tsx'
+      - 'apps/vox-web/app/team/shifts/**'
+      - 'scripts/mvp/vox/vo10-*'
+      - '.github/workflows/vox-vo10-integrated.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  restricted-role-visibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Owner and Team Leader restricted Core projections
+        run: |
+          node --test \
+            scripts/mvp/vox/vo10-owner-time.test.mjs \
+            scripts/mvp/vox/vo10-tl-task-history.test.mjs \
+            scripts/mvp/vox/vo09-task-history.test.mjs \
+            scripts/mvp/vox/vo09-task-resume.test.mjs \
+            scripts/mvp/vox/vo04-time-read.test.mjs
+      - name: Core root TypeScript
+        run: ./node_modules/.bin/tsc --noEmit
+      - name: Locked VOX Web dependencies
+        working-directory: apps/vox-web
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Full VOX Web regression tests
+        working-directory: apps/vox-web
+        run: npm test
+      - name: Optimized VOX Web production build
+        working-directory: apps/vox-web
+        run: npm run build -- --webpack
+  disposable-time-ledger-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: vox_disposable_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: bash scripts/mvp/vox/validate-vox-vo08-cross-feature-pg17.sh

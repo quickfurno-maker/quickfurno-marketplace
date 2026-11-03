@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {fetchVerifiedTeamPresence} from "../../../lib/teamPresence";
 import {StaffSignInLink} from "../../components/StaffSignInLink";
+import ManualPresenceControl from "./ManualPresenceControl";
 import "../workflow.css";
 export const dynamic="force-dynamic";
 export default async function TeamPresence(){
@@ -25,6 +26,7 @@ export default async function TeamPresence(){
    <StaffSignInLink status={result.status} returnTo="/team/presence"/>
    <Link href="/team">Return to Team Operations</Link>
   </section>:<>
+   <ManualPresenceControl/>
    <section className="voxFlowCard">
     <h2>Current verified roster</h2>
     <p className="voxFlowMuted">Snapshot observed at

@@ -52,3 +52,23 @@ UNION ALL SELECT 'communication_messages',count(*) FROM public.communication_mes
 UNION ALL SELECT 'communication_intents',count(*) FROM public.communication_intents
 UNION ALL SELECT 'marketplace_runtime_settings',count(*) FROM public.marketplace_runtime_settings
 ORDER BY object_name;
+
+-- Read-only operational activity snapshot. It is a diagnostic, NOT a maintenance lock.
+-- Absence of heartbeat does not prove that external VPS/cron/queues/providers are stopped.
+SELECT now() AS inspected_at_utc,
+  (SELECT count(*) FROM public.scale_worker_heartbeats) AS registered_worker_rows,
+  (SELECT count(*) FROM public.scale_worker_heartbeats WHERE accepting_work) AS workers_accepting_work,
+  (SELECT coalesce(sum(in_flight),0) FROM public.scale_worker_heartbeats) AS worker_in_flight,
+  (SELECT count(*) FROM public.scale_worker_heartbeats
+   WHERE heartbeat_at > now()-interval '5 minutes') AS workers_recently_heartbeat,
+  (SELECT count(*) FROM public.communication_conversation_outbox
+   WHERE status NOT IN ('sent','failed','cancelled','dead_letter')) AS active_conversation_outbox,
+  (SELECT count(*) FROM public.communication_jarvis_turn_outbox
+   WHERE status NOT IN ('completed','failed','cancelled','dead_letter')) AS active_jarvis_outbox,
+  (SELECT count(*) FROM public.communication_provider_runtime_policies
+   WHERE outbound_enabled) AS enabled_provider_outbound_policies,
+  (SELECT count(*) FROM public.communication_provider_runtime_policies
+   WHERE webhook_processing_enabled) AS enabled_webhook_policies;
+
+-- A real freeze additionally requires an independently verified stop of out-of-DB
+-- workers and provider callbacks, and an operator-signed maintenance window.

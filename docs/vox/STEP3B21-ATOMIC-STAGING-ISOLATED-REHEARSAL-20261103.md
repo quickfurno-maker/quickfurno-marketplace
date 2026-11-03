@@ -48,3 +48,26 @@ The snapshot-source sidecar is used only to make both positive and negative test
 6. Backup retention, provider copies and unstructured TEST PII deletion/expiry evidence; live row erasure does not imply immediate deletion of all snapshots.
 
 **Release verdict:** Code and isolated PG17 transactional rehearsal complete. Managed Staging and Production **DELETE HOLD**; Owner permanent-deletion authorization is already on record; no further preference approval is required. Keep genuine registration, live assignments, provider messaging and Finance activation HOLD until their own end-to-end and security gates pass.
+
+## 3 Nov 2026 — Staging LIVE read-only worker/outbox preflight refinement
+
+A fresh managed **Staging SELECT-only** census at `2026-11-03 16:00:31 UTC` confirmed the same 26 TEST vendors, 7 TEST leads, 9 linked assignments, 6 immutable assignment events, **1 unrelated canary vendor**, **2 non-target Auth users**, **0 payments** and exact November 3 vendor/lead UUID-set fingerprints. This is a census, **not** a deletion or a signed recovery checkpoint.
+
+The subsequent managed Staging read-only operational sample showed:
+
+| Observable | Staging read-only count |
+| --- | ---: |
+| Registered worker-heartbeat records | 1 |
+| Worker rows reporting `accepting_work = true` | 0 |
+| Reported in-flight work | 0 |
+| Worker heartbeats newer than 5 minutes | 0 |
+| Conversation outbox records not in final states | 0 |
+| Jarvis-turn outbox records not in final states | 0 |
+| Provider runtime policies with outbound enabled | 0 |
+| Provider runtime policies with webhook processing enabled | 0 |
+
+These are **positive quiet-state indicators**, not proof that any live VPS worker, scheduled job, webhook source, lead matcher, third-party Meta/WhatsApp callback or external queue is frozen. The operator must separately stop/verify those processes and rule out new records during the change window. Do not set `noLiveOrOutboxJobsRunning`, `productionWorkerFreezeVerified` or `providerOutboxFreezeVerified` to true merely because these database counts are zero.
+
+The existing **SELECT-only** `ops/vox/sql-review/STEP3B20-STAGING-PREDELETE-READ_ONLY.sql` now includes repeatable aggregate worker/outbox/provider diagnostics. The test contract checks for them and explicitly retains the no-inferred-freeze warning. GitHub [Draft PR #414](https://github.com/quickfurno-maker/quickfurno-marketplace/pull/414) has **no submitted review approval** as of this check. Do not claim independent DBA/AppSec approval based solely on CI success.
+
+**Remaining actual release blockers:** approved one-time exception for intentionally immutable history; independent review; full managed recovery/rollback proof; managed Staging worker/provider freeze; reviewed live execution procedure; Production verification access and supported Auth Admin deletion of only the nine dedicated TEST accounts; secure disposition/expiry of database snapshots and provider copies. No live database mutation performed.

@@ -49,3 +49,12 @@ test("S6 no live mutation or elevated access code in evidence module",()=>{
  assert.doesNotMatch(js,/supabase\.co|service_role|db_password/i);
  assert.doesNotMatch(js,/\b(?:DELETE FROM|ALTER TABLE|TRUNCATE TABLE)\b/i);
 });
+
+test("S7 Staging operational diagnostics cover workers, outboxes and provider policies",()=>{
+ for(const column of ["scale_worker_heartbeats","workers_accepting_work",
+   "worker_in_flight","workers_recently_heartbeat","communication_conversation_outbox",
+   "communication_jarvis_turn_outbox","communication_provider_runtime_policies",
+   "enabled_provider_outbound_policies","enabled_webhook_policies"])
+   assert.ok(sql.includes(column),column);
+ assert.match(sql,/does not prove that external VPS\/cron\/queues\/providers are stopped/);
+});

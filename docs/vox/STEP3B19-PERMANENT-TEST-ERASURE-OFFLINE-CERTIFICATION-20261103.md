@@ -58,3 +58,16 @@ These results prove that the *identified SQL dependency graph* can be erased wit
 
 ## Evidence custodians
 Privately retained JARVIS report: `D:\QuickFurno-Workspace\Artifacts\QF-PERMANENT-TEST-ERASURE-20261103.md`. Private SQL files are explicitly offline-only and must not be checked into this repository or launched against managed databases. Related issue: [#413](https://github.com/quickfurno-maker/quickfurno-marketplace/issues/413). This packet adds verified evidence to the existing approval path, **not an executable purge**.
+
+## Same-branch 3B20 release-gate reinforcement (3 Nov 2026)
+
+The existing pure advisory `scripts/scale/step3b18-evidence-gates.mjs` was extended in place (no new deletion system, endpoint, SQL migration or live connection) to recognize the November **Production and Staging** backups and the actual full-schema offline PG17 restore evidence.
+
+- Production archive SHA-256 now pinned to `679457E1FEFB79FBB2996F11E3BAD6077FCE476C430FA3996F82565066BF516F`; separate Staging pinned to `720165400E7B8807CAFEC19D81AF9B9C606FD234A1D3B95FD6B285D996FBD1A5`.
+- Exact Production 29 vendor/74 lead roots and Staging 26 vendor/7 lead roots are separately fingerprint-checked, with a **Staging survivor guard** requiring one outside-scope vendor and two unrelated Auth users.
+- Offline recovery checks require 141/142 RLS-enabled public base tables and 272 validated FKs in Production/Staging respectively, **in addition** to the independent full Supabase role/ACL/Auth/PITR/Storage restore/rollback gate.
+- Separate exceptional review is mandatory for assignment-history immutability, frozen campaign snapshots, append-only vendor notes, and append-only automation history. Worker+outbox/provider freeze, managed Production read access, Staging **live** cleanup certification, Auth and provider-copy review and backup-retention plan remain independently blocking.
+- Every input field is **advisory evidence**. Even hypothetical all-green evaluation returns `REQUIRES_SEPARATE_PRODUCTION_CHANGE`, never permission to run SQL. Real currently missing evidence must stay false, including live Staging erasure, independent DBA/AppSec approval, verified Production read access and worker freeze.
+- Existing cleanup source tests updated and added seven regression cases covering November archive pinning, exact-ID drift, canary preservation, ACL/PITR distinction, protected histories, denied production access and realistic release-HOLD. Combined four relevant cleanup source suites: **45/45 passed locally**, no managed writes.
+
+**Do not treat passing CI or Owner's permanent-deletion authorization as completion of protected live cleanup.**

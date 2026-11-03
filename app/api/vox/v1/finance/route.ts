@@ -12,9 +12,11 @@ const reply=(value:unknown,status:number)=>Response.json(value,{status,headers:{
  * Default disabled, requiring separately approved staging activation.
  */
 export async function GET(request:Request){
- if(process.env.VOX_FINANCE_READ_ENABLED!=="staging"||
-    process.env.VOX_STAFF_READ_ENABLED!=="staging"||
-    process.env.VOX_STAFF_GRANTS_ENABLED!=="staging")
+ const staffGate=process.env.VOX_STAFF_READ_ENABLED==="staging"&&
+   process.env.VOX_STAFF_GRANTS_ENABLED==="staging";
+ const ownerGate=process.env.VOX_OWNER_WORKSPACES_ENABLED==="staging"&&
+   process.env.VOX_OWNER_WORKSPACES_STAGE==="private";
+ if(process.env.VOX_FINANCE_READ_ENABLED!=="staging"||!(staffGate||ownerGate))
   return reply({ok:false,error:"FINANCE_PREVIEW_DISABLED"},503);
  const u=new URL(request.url);
  if(u.search||u.hash)return reply({ok:false,error:"FILTERS_NOT_CERTIFIED"},400);

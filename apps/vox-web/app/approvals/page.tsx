@@ -1,10 +1,16 @@
 import Link from "next/link";
+import {ownerAdminHref} from "../../lib/ownerAdminLinks";
 import {fetchOwnerOperationalIntents,fetchApprovedNativeFollowups} from "../../lib/core";
 import {ApprovedFollowups,type FollowupRow} from "./ApprovedFollowups";
 import {OwnerApprovals,type ApprovalRow} from "./OwnerApprovals";
 import "../operations/operations.css";
 export const dynamic="force-dynamic";
 export default async function OwnerReview(){
+ if(process.env.VOX_STAFF_VIEW_MODE==="owner"){
+  const approvals=ownerAdminHref("/admin/vendor-approvals");
+  const leads=ownerAdminHref("/admin/lead-distribution");
+  return <main className="voxOps"><div className="voxHero"><p className="kicker">OWNER / CORE APPROVALS</p><h1>Operate through existing QuickFurno Admin.</h1><p>The VOX operational-proposal queue belongs to frozen Staff work. Vendor approvals and lead assignments already use canonical Superadmin controls.</p></div><div className="voxNotice"><b>Owner action surfaces</b>{approvals?<a href={approvals}>Open Vendor Approvals</a>:null}{leads?<a href={leads}>Open Lead Distribution</a>:null}<Link href="/operations">Return to Mission Control</Link></div></main>;
+ }
  const [r,approved]=await Promise.all([fetchOwnerOperationalIntents(),fetchApprovedNativeFollowups()]);
  if(!r.ok)return <main className="hold"><section className="holdCard">
   <p className="kicker">VOX / GOVERNANCE</p><h1>Owner approval queue unavailable</h1>

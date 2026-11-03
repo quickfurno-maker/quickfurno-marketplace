@@ -6,6 +6,22 @@ const timestamp=v=>typeof v==="string"&&Number.isFinite(Date.parse(v))?new Date(
 const limited=v=>Array.isArray(v)?v.slice(0,12):[];
 const envelope=(schema,fields)=>Object.freeze({schema,owner:"quickfurno-core",readOnly:true,actionsEnabled:false,...fields});
 
+/** Recent client lead metadata only. Core retains lead/assignment authority and PII.
+ * A 12-row sample is never represented as an exhaustive directory or true KPI. */
+export function projectOwnerClientInbox({leads=[]}={}){
+ const rows=limited(leads).filter(lead=>id(lead?.id)).map(lead=>Object.freeze({
+  leadId:lead.id,
+  state:safe(lead.status,40),
+  city:safe(lead.city,80),
+  category:safe(lead.category,80),
+  source:safe(lead.source,60),
+  createdAt:timestamp(lead.created_at)
+ }));
+ return envelope("qf.vox.owner.clients.v1",{
+  leads:rows,recentOnly:true,totalCountKnown:false
+ });
+}
+
 export function projectOwnerAcquisition({prospects=[],tasks=[]}={}){
  const ps=limited(prospects).filter(p=>id(p?.id)).map(p=>Object.freeze({
   id:p.id,businessName:safe(p.business_name,120),stage:safe(p.prospect_stage,40),

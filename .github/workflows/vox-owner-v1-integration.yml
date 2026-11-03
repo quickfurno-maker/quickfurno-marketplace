@@ -35,6 +35,8 @@ jobs:
         run: node --test scripts/mvp/vox/owner-v1-projection.test.mjs scripts/mvp/vox/owner-v1-real-core-route.test.mjs scripts/mvp/vox/rc7-finance-real-route-http.test.mjs
       - name: Core typecheck
         run: npm run typecheck
+      - name: Owner-only Web-to-Core BFF integration (root test dependencies)
+        run: node --test apps/vox-web/scripts/validate-owner-v1-workspaces.spec.mjs
       - name: Install pinned VOX Web dependencies
         run: npm ci --prefix apps/vox-web --ignore-scripts --no-audit --no-fund
       - name: VOX Web typecheck

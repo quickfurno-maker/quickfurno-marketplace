@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {preflightThreeRealAal2} from "../../../contracts/vox/realAal2StagingPreflight.mjs";
 // MANUAL protected Staging UAT, only after real AAL2 and scoped Staff grants.
 // Supply bearer tokens through an approved local secret-injection mechanism.
 // Never paste tokens into chats, GitHub, Notion, command line flags or logs.
@@ -9,16 +10,16 @@ if(tokens.some(t=>typeof t!=="string"||t.length<80)){
  console.error("BLOCKED_MISSING_GENUINE_AAL2_SESSION");
  process.exit(2);
 }
-function claims(token){
- const parts=token.split(".");
- if(parts.length!==3)throw Error("INVALID_SESSION_FORMAT");
- const payload=JSON.parse(Buffer.from(parts[1],"base64url").toString("utf8"));
- if(payload?.aal!=="aal2"||typeof payload?.sub!=="string")throw Error("REQUIRES_GENUINE_AAL2");
- return {sub:payload.sub,exp:payload.exp};
+// Local JWT decoding is only a preflight: actual bearer verification must be
+// performed by the protected Staging Core, not inferred from these claims.
+try{
+ preflightThreeRealAal2(tokens,{
+  expectedIssuer:process.env.VOX_QA_STAGING_AUTH_ISSUER
+ });
+}catch{
+ console.error("BLOCKED_THREE_REAL_AAL2_PREFLIGHT");
+ process.exit(2);
 }
-const actor=tokens.map(claims);
-assert.equal(new Set(actor.map(x=>x.sub)).size,3,"REAL_DISTINCT_PRINCIPALS_REQUIRED");
-assert.ok(actor.every(x=>Number.isFinite(x.exp)&&x.exp>Math.floor(Date.now()/1000)+60),"SESSION_EXPIRING");
 let tests=0;
 async function check(who,path,expected){
  const url=new URL(path,ORIGIN);assert.equal(url.origin,ORIGIN);

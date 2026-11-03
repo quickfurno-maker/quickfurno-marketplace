@@ -75,7 +75,7 @@ export async function GET(request:Request){
   if(identities.some((identity,i)=>identity.error||
       identity.data.user?.id!==targetIds[i]||
       identity.data.user?.app_metadata?.qf_principal!=="vox_staff"||
-      identity.data.user?.app_metadata?.admin_role!==undefined))
+      identity.data.user?.app_metadata?.admin_role!=null))
    return send({ok:false,error:"TARGET_IDENTITY_NOT_NEUTRAL"},503);
   const staff=[] as Array<{staffId:string;ref:string}>;
   for(const id of targetIds){
@@ -143,7 +143,7 @@ export async function POST(request:Request){
        profile.data.id!==targetId||profile.data.role!==null||
        profile.data.is_active!==true||identity.data.user.id!==targetId||
        identity.data.user.app_metadata?.qf_principal!=="vox_staff"||
-       identity.data.user.app_metadata?.admin_role!==undefined||
+       identity.data.user.app_metadata?.admin_role!=null||
        member.data.team_id!==tl.teamId||
        member.data.auth_user_id!==targetId||
        member.data.is_active!==true||

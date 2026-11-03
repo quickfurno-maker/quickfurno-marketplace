@@ -35,6 +35,7 @@ jobs:
             scripts/mvp/vox/vo05-tl-core-route.test.mjs \
             scripts/mvp/vox/vo05-tl-checkpoint.test.mjs \
             scripts/mvp/vox/vo05-tl-ui-source.test.mjs \
+            scripts/mvp/vox/vo05-tl-replay-preflight.test.mjs \
             scripts/mvp/vox/vo05-team-shift-read.test.mjs \
             scripts/mvp/vox/vo05-team-shift-route.test.mjs \
             scripts/mvp/vox/vo05-team-shifts-web.test.mjs \

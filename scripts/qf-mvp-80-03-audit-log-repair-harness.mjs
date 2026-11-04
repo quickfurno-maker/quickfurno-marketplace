@@ -95,11 +95,20 @@ let auditInserts = [];
 let vendorUpdates = [];
 /** "ok" | "returns-error" | "throws" */
 let auditMode = "ok";
+// This old audit harness must model the NEW mandatory private verification
+// readiness gate for activation. False by default: only tests explicitly
+// exercising an approved private evidence case may turn it on.
+let verificationCaseReady = false;
+let verificationRpcUnavailable = false;
+let verificationRpcCalls = [];
 
 function resetDb() {
   auditInserts = [];
   vendorUpdates = [];
   auditMode = "ok";
+  verificationCaseReady = false;
+  verificationRpcUnavailable = false;
+  verificationRpcCalls = [];
   db.vendors = [{
     id: "vendor-1", business_name: "QA Vendor", status: "Approved", is_active: true,
     accepting_leads: true, remaining_credits: 10, total_credits: 10,
@@ -158,8 +167,20 @@ class MockQuery {
 function fakeAdminClient() {
   return {
     from: (t) => new MockQuery(t),
-    // recomputeVisibility calls this; it is irrelevant to the audit contract.
-    rpc: async () => ({ data: null, error: null }),
+    rpc: async (name, args) => {
+      // Unlike the legacy mock's catch-all NULL RPC, Core's new mandatory
+      // private verification authority is modelled explicitly. A missing or
+      // false readiness result may NEVER be treated as a verified vendor.
+      if (name === "qf_vendor_verification_case_ready") {
+        verificationRpcCalls.push({ name, args });
+        return verificationRpcUnavailable
+          ? { data: null, error: { code: "PGRST202" } }
+          : { data: verificationCaseReady, error: null };
+      }
+      // recomputeVisibility is unrelated to this audit-only harness.
+      if (name === "update_vendor_visibility") return { data: null, error: null };
+      throw new Error("Unexpected RPC in audit harness: " + name);
+    },
   };
 }
 
@@ -339,6 +360,7 @@ check("10 [exec] a RETURNED PostgREST error is detected and reported", async () 
 
 check("11 [exec] a THROWN transport failure is caught and reported, not rethrown", async () => {
   resetDb();
+  verificationCaseReady = true; // Verified case required for positive activation.
   auditMode = "throws";
   let threw = false;
   const { value, output } = await captureConsole(async () => {
@@ -347,6 +369,9 @@ check("11 [exec] a THROWN transport failure is caught and reported, not rethrown
   });
   assert(!threw, "bestEffortAudit must never rethrow");
   assert(value.ok, "the business action must still succeed");
+  assert(verificationRpcCalls.length === 1 &&
+    verificationRpcCalls[0].args?.p_vendor_id === "vendor-1",
+    "activation must first consult the private verification authority");
   assert(/NOT recorded/.test(output), "the throw must be reported");
 });
 
@@ -571,12 +596,41 @@ check("32 [exec] a missing actor also fails closed for credits and package", asy
 
 check("33 [exec] the actor is NOT taken from updatedBy or any label", async () => {
   resetDb();
-  await captureConsole(() => VendorAdmin.setVendorStatusAction("vendor-1", "activate", "Superadmin", ACTOR));
+  verificationCaseReady = true; // Positive activation is now evidence-gated.
+  const activation = await captureConsole(() => VendorAdmin.setVendorStatusAction("vendor-1", "activate", "Superadmin", ACTOR));
+  assert(activation.value.ok, "actor test must execute an authorized activation");
+  assert(verificationRpcCalls.length === 1, "the verification authority must be consulted");
   const row = db.audit_logs[0];
   assert(row.admin_user_id === ACTOR, "actor is the session id");
   assert(row.admin_user_id !== "Superadmin", "the display label must never become the identity");
   assert(row.metadata.updatedBy === "Superadmin", "the label still travels as display context");
   assert(row.admin_user_id !== db.vendors[0].id, "the vendor id is not the actor");
+});
+
+check("33a [exec] unverified vendor activation fails closed without business or audit writes", async () => {
+  resetDb(); // verificationCaseReady is deliberately FALSE by default.
+  const { value } = await captureConsole(() =>
+    VendorAdmin.setVendorStatusAction("vendor-1", "activate", "Superadmin", ACTOR));
+  assert(value.ok === false && value.code === "VENDOR_VERIFICATION_REQUIRED",
+    "incomplete verification evidence must refuse activation");
+  assert(verificationRpcCalls.length === 1 &&
+    verificationRpcCalls[0].args?.p_vendor_id === "vendor-1",
+    "private readiness authority must be asked about the exact vendor");
+  assert(vendorUpdates.length === 0 && auditInserts.length === 0,
+    "denied activation may not touch vendor or audit rows");
+});
+
+check("33b [exec] unavailable verification RPC refuses activation, never assumes ready", async () => {
+  resetDb();
+  verificationCaseReady = true;
+  verificationRpcUnavailable = true;
+  const { value } = await captureConsole(() =>
+    VendorAdmin.setVendorStatusAction("vendor-1", "activate", "Superadmin", ACTOR));
+  assert(value.ok === false && value.code === "VENDOR_VERIFICATION_REQUIRED",
+    "a missing private readiness RPC must block activation");
+  assert(verificationRpcCalls.length === 1, "the missing RPC must be observed");
+  assert(vendorUpdates.length === 0 && auditInserts.length === 0,
+    "an unproven activation can never commit or claim to have audited a write");
 });
 
 check("34 [static] getAdminSession exposes a trusted userId from the session", () => {

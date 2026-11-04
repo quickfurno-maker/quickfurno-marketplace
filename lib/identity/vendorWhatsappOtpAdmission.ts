@@ -19,6 +19,8 @@ export interface VendorOtpAdmissionEvidence {
   expectedPhoneE164: string;
   /** Existing canonical profiles.role; null means neutral, not privileged. */
   existingProfileRole: string | null;
+  /** A client_accounts row is a separate client identity even if profile role is neutral. */
+  existingClientAccount: boolean;
   /** Server-only ledger lookup, NOT a value sent by the public signup form. */
   delivery: {
     authUserId: string;
@@ -50,7 +52,9 @@ export function evaluateVendorOtpAdmission(
     return { admitted: false, reason: "phone_unconfirmed" };
   }
   const role = ev.existingProfileRole?.trim().toLowerCase() || null;
-  if (role !== null && role !== "vendor") {
+  // Require an explicit negative server-side client_accounts lookup. Unknown is
+  // NOT equivalent to absent, so an unavailable role resolver fails closed.
+  if (ev.existingClientAccount !== false || (role !== null && role !== "vendor")) {
     return { admitted: false, reason: "privileged_or_conflicting_role" };
   }
   const delivery = ev.delivery;

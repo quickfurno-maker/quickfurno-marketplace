@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { normalizeVerifiedVendorMobile } from "../../../lib/vendors/vendorContactContract.ts";
 import {
   hasVendorRegistrationConsent,
   isValidOptionalGstin,
@@ -125,6 +126,38 @@ test("S10 pre-Auth validation and independent phone/email rate limits block prem
   }
   assert.match(block,/phoneDigits = String\(input\.phone \?\? ""\)\.replace\(\/\\D\/g, ""\)/);
   assert.match(block,/Number\.isFinite\(input\.office_latitude\)/);
+});
+
+
+test("S12 vendor Core accepts verified E.164 Indian mobile without guessing other countries",()=>{
+  for(const [input,expected] of [
+    ["9876543210","9876543210"],
+    ["+919876543210","9876543210"],
+    ["+918765432109","8765432109"],
+    ["+19876543210",null],
+    ["919876543210",null],
+    ["0000000000",null],
+    ["+91 9876543210",null],
+    [null,null],
+  ]) assert.equal(normalizeVerifiedVendorMobile(input),expected,String(input));
+  assert.match(service,/normalizeVerifiedVendorMobile\(input\.phone\)/);
+});
+
+test("S13 anonymous Core registration cannot create a vendor and optional email is truly optional",()=>{
+  assert.match(service,/if \(!trustedContext\.verifiedAuthUserId\)/);
+  assert.match(service,/code: "VENDOR_WHATSAPP_OTP_REQUIRED"/);
+  assert.match(service,/\(Boolean\(emailClean\) && !isEmailValid\)/);
+  assert.doesNotMatch(service,/!emailClean \|\|/);
+  assert.match(service,/status: "Pending"/);
+  assert.match(service,/is_active: false/);
+});
+test("S14 missing Google or consent schema never silently drops evidence",()=>{
+  const registration=service.slice(service.indexOf("export async function registerVendor("),
+    service.indexOf("function isMissingColumnError("));
+  assert.ok(registration.includes(".insert({ ...payload, ...googleLocationPayload })"));
+  assert.ok(!registration.includes(".insert(payload)"));
+  assert.ok(!registration.includes("Supabase Error Details:"));
+  assert.ok(!registration.includes('logSupabaseInsertError("vendors"'));
 });
 
 test("S11 no public raw Auth errors or sensitive vendor payload logging",()=>{

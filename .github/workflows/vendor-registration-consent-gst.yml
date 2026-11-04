@@ -1,4 +1,4 @@
-name: Vendor Registration Consent and GST
+name: Vendor Registration Consent, OTP Purpose and Private Evidence
 
 on:
   pull_request:
@@ -8,13 +8,20 @@ on:
       - 'services/vendorService.ts'
       - 'app/actions.ts'
       - 'lib/types.ts'
+      - 'lib/vendors/vendorContactContract.ts'
       - 'lib/vendors/vendorSignupPolicy.ts'
       - 'lib/identity/vendorWhatsappOtpAdmission.ts'
+      - 'lib/identity/authOtpPurposePolicy.ts'
+      - 'services/authOtpPurposeReservationService.ts'
       - 'supabase/migrations/20261104090000_vendor_registration_consent_receipt.sql'
+      - 'supabase/migrations/20261104140000_vendor_private_otp_and_verification_foundation.sql'
       - 'supabase/staging-history/qf-post-g1-migration-ledger-20260929.json'
       - 'scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs'
       - 'scripts/mvp/vendor/vendor-signup-consent-gst.test.mjs'
       - 'scripts/mvp/vendor/vendor-whatsapp-otp-admission.test.mjs'
+      - 'scripts/mvp/vendor/vendor-private-otp-verification-foundation.test.mjs'
+      - 'scripts/mvp/vendor/fixtures/vendor-private-pg-bootstrap.sql'
+      - 'scripts/mvp/vendor/vendor-private-pg-acceptance.sql'
       - '.github/workflows/vendor-registration-consent-gst.yml'
   push:
     branches: [main]
@@ -24,13 +31,20 @@ on:
       - 'services/vendorService.ts'
       - 'app/actions.ts'
       - 'lib/types.ts'
+      - 'lib/vendors/vendorContactContract.ts'
       - 'lib/vendors/vendorSignupPolicy.ts'
       - 'lib/identity/vendorWhatsappOtpAdmission.ts'
+      - 'lib/identity/authOtpPurposePolicy.ts'
+      - 'services/authOtpPurposeReservationService.ts'
       - 'supabase/migrations/20261104090000_vendor_registration_consent_receipt.sql'
+      - 'supabase/migrations/20261104140000_vendor_private_otp_and_verification_foundation.sql'
       - 'supabase/staging-history/qf-post-g1-migration-ledger-20260929.json'
       - 'scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs'
       - 'scripts/mvp/vendor/vendor-signup-consent-gst.test.mjs'
       - 'scripts/mvp/vendor/vendor-whatsapp-otp-admission.test.mjs'
+      - 'scripts/mvp/vendor/vendor-private-otp-verification-foundation.test.mjs'
+      - 'scripts/mvp/vendor/fixtures/vendor-private-pg-bootstrap.sql'
+      - 'scripts/mvp/vendor/vendor-private-pg-acceptance.sql'
       - '.github/workflows/vendor-registration-consent-gst.yml'
 
 permissions:
@@ -39,7 +53,7 @@ permissions:
 jobs:
   signup-contract:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -48,15 +62,35 @@ jobs:
           cache: npm
       - name: Install locked app dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Registration consent, GST and inactive vendor tests
-        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-signup-consent-gst.test.mjs
-      - name: Vendor WhatsApp OTP security admission (no provider sends)
-        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-whatsapp-otp-admission.test.mjs
+      - name: Consent, GST, identity and OTP admission
+        run: |
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-signup-consent-gst.test.mjs scripts/mvp/vendor/vendor-whatsapp-otp-admission.test.mjs scripts/mvp/vendor/vendor-private-otp-verification-foundation.test.mjs
       - name: Strict additive migration registry
         run: node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs
-      - name: TypeScript contract
+      - name: Full TypeScript contract
         run: npm run typecheck
       - name: Existing vendor approval and category governance
         run: |
           node scripts/mvp/vendor/validate-vendor-admin-first-approvals.mjs
           node scripts/mvp/vendor/validate-v3-category-approval-isolation.mjs
+      - name: Private PostgreSQL 17 acceptance, synthetic, no network
+        shell: bash
+        run: |
+          set -euo pipefail
+          name=qf-vendor-private-cert
+          docker run --rm -d --name "$name" --network none \
+            -e POSTGRES_PASSWORD=synthetic_ci_only postgres:17-alpine >/dev/null
+          trap 'docker stop "$name" >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 40); do
+            if docker exec "$name" pg_isready -U postgres >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec "$name" pg_isready -U postgres
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < scripts/mvp/vendor/fixtures/vendor-private-pg-bootstrap.sql
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < supabase/migrations/20261104140000_vendor_private_otp_and_verification_foundation.sql
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < scripts/mvp/vendor/vendor-private-pg-acceptance.sql

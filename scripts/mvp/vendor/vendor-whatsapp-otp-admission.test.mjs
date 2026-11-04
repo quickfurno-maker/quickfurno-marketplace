@@ -13,6 +13,7 @@ const good = () => ({
   phoneConfirmedAt: new Date(now - 60_000).toISOString(),
   expectedPhoneE164: "+919876543210",
   existingProfileRole: null,
+  existingClientAccount: false,
   delivery: {
     authUserId: "00000000-0000-4000-8000-000000000111",
     phoneE164: "+919876543210",
@@ -40,6 +41,8 @@ test("A2 rejects missing or mismatched Supabase phone claims",()=>{
 test("A3 never upgrades existing client/admin/other principal from phone possession",()=>{
   for(const existingProfileRole of ["client","admin","superadmin","integration","staff"])
     rejection({existingProfileRole},"privileged_or_conflicting_role");
+  rejection({existingClientAccount:true},"privileged_or_conflicting_role");
+  rejection({existingClientAccount:undefined},"privileged_or_conflicting_role");
   assert.deepEqual(evaluateVendorOtpAdmission({...good(),existingProfileRole:"vendor"}),{admitted:true});
 });
 test("A4 requires server-proven webhook delivery, not a browser checkbox",()=>{

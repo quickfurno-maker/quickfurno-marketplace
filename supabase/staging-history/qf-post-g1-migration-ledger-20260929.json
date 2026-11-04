@@ -714,6 +714,18 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-11-04_REVIEWED_DRAFT_PR_484_NO_REMOTE_APPLY"
+    },
+    {
+      "version": "20261104140000",
+      "name": "vendor_private_otp_and_verification_foundation",
+      "filename": "20261104140000_vendor_private_otp_and_verification_foundation.sql",
+      "path": "supabase/migrations/20261104140000_vendor_private_otp_and_verification_foundation.sql",
+      "canonicalSha256": "b7c8b2f2ff5b4a91605d7842f3d8e65f949fa29bc81a6bf4e4b54f96f338ca6f",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-11-04_PRIVATE_PG_17_SYNTHETIC_REHEARSAL_NO_REMOTE_APPLY"
     }
   ],
   "supersededLegacyPins": [

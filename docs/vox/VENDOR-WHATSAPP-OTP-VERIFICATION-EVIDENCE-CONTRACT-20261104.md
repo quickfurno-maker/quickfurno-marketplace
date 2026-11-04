@@ -1,6 +1,15 @@
 # Vendor WhatsApp OTP / private verification evidence contract — 4 November 2026
 
-**Status: SOURCE-ONLY DESIGN; NO LIVE OTP OR DOCUMENT STORAGE IN THIS BATCH.**
+**Status: SOURCE-ONLY PRIVATE SQL + SERVER HELPERS; NO STAGING/PRODUCTION APPLY, LIVE OTP OR DOCUMENT UPLOAD.**
+
+## Follow-on source batch: exact private migration and tests
+
+- Pending additive SQL: `supabase/migrations/20261104140000_vendor_private_otp_and_verification_foundation.sql` (explicitly SHA-pinned in no-deployment-authorized migration ledger). Creates `qf_vendor_private` tables for atomic client/vendor OTP purpose reservation, private verification case, separate consent, evidence and immutable Owner decision. Only service_role can call OTP-purpose/ready-to-approve RPCs or access the private tables; browser roles have neither schema usage nor function execution.
+- Server adapter `services/authOtpPurposeReservationService.ts` computes a server-only HMAC-SHA256 digest under `QF_AUTH_OTP_PURPOSE_HMAC_KEY_BASE64` (minimum 256-bit decoded secret), makes atomic reserve/claim/release RPC calls and fails closed on missing secret/DB. It is NOT wired to the shared Supabase Auth Hook or public vendor OTP request yet.
+- Readiness evaluator requires a non-revoked identity-method consent (Aadhaar or lawful alternative), reviewed identity attestation, scanned/reviewed office proof and append-only Owner approval decision, in addition to verified contact, category and zone statuses. It is read-only and DOES NOT itself enable vendor approval or assignment.
+- **Verified locally** in network-isolated PostgreSQL 17 with synthetic Auth/vendor IDs: migration applied, cross-purpose OTP collision rejected, signed webhook claim idempotent but unstealable, private permissions denied browser roles, identity/office/decision readiness gated and revoked consent disables readiness. The migration and acceptance fixtures are included in CI. No real vendor PII/OTP or business DB touched.
+- **Still pending**: independently reviewed actual Staging schema migration, Meta approved vendor Authentication template, shared-hook routing for BOTH client/vendor OTP requests, signed Supabase vendor session, private restricted document bucket/scan pipeline, authenticated Owner UI and final Core/DB assignment gate.
+
 
 ## A. Reuse existing authentication and message transport
 

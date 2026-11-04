@@ -31,7 +31,7 @@ export interface VendorOwnershipSnapshot {
 export type VendorOwnershipResolution =
   | { readonly kind: "create_pending"; readonly authUserId: string; readonly mobile10: string }
   | { readonly kind: "resume_existing"; readonly vendorId: string }
-  | { readonly kind: "owner_repair_required"; readonly vendorId: string; readonly reason: "missing_membership" | "inactive_membership" }
+  | { readonly kind: "owner_repair_required"; readonly vendorId: string; readonly reason: "missing_membership" | "inactive_membership" | "missing_vendor_profile" }
   | { readonly kind: "deny"; readonly reason: "unverified" | "lookup_unavailable" | "ambiguous_rows" | "phone_owned_elsewhere" | "ownership_conflict" };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -95,6 +95,11 @@ export function reconcileVerifiedVendorOwnership(
   }
   // No public retry can repair or reactivate a membership. Owner-only repair
   // reuses existing Core provisioning and must separately audit authority.
+  // Auth may already be linked to the business while profiles.role remains
+  // neutral because of historical GoTrue trigger ordering. Never advertise a
+  // usable dashboard until Owner-only role repair has completed.
+  if ((proof.existingProfileRole ?? "").trim().toLowerCase() !== "vendor")
+    return { kind: "owner_repair_required", vendorId: decision.vendorId, reason: "missing_vendor_profile" };
   if (!member) return { kind: "owner_repair_required", vendorId: decision.vendorId, reason: "missing_membership" };
   if (member.status !== "active")
     return { kind: "owner_repair_required", vendorId: decision.vendorId, reason: "inactive_membership" };

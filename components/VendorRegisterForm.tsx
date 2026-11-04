@@ -60,8 +60,6 @@ type WizardState = {
   businessName: string;
   ownerName: string;
   phone: string;
-  whatsappSame: boolean;
-  whatsapp: string;
   email: string;
   categoryId: string;
   subCategory: string;
@@ -102,8 +100,6 @@ const initialState: WizardState = {
   businessName: "",
   ownerName: "",
   phone: "",
-  whatsappSame: true,
-  whatsapp: "",
   email: "",
   categoryId: "",
   subCategory: "",
@@ -403,7 +399,6 @@ export function VendorRegisterForm({
         if (f.businessName.trim().length < 2) e.push({ key: "businessName", message: "Business name must be at least 2 characters." });
         if (f.ownerName.trim().length < 2) e.push({ key: "ownerName", message: "Owner name must be at least 2 characters." });
         if (!VENDOR_MOBILE_RE.test(f.phone.replace(/\D/g, ""))) e.push({ key: "phone", message: "Enter a valid 10-digit mobile number starting with 6, 7, 8 or 9." });
-        if (!f.whatsappSame && !VENDOR_MOBILE_RE.test(f.whatsapp.replace(/\D/g, ""))) e.push({ key: "whatsapp", message: "Enter a valid 10-digit WhatsApp number starting with 6, 7, 8 or 9." });
         if (f.email.trim() && !isEmail(f.email)) e.push({ key: "email", message: "Enter a valid business email or leave it blank." });
         break;
       case 1:
@@ -566,9 +561,7 @@ export function VendorRegisterForm({
     const businessNameStr = String(f.businessName ?? "").trim();
     const ownerNameStr = String(f.ownerName ?? "").trim();
     const phoneDigits = String(f.phone ?? "").replace(/\D/g, "");
-    const whatsappDigits = f.whatsappSame
-      ? phoneDigits
-      : String(f.whatsapp ?? "").replace(/\D/g, "");
+    const whatsappDigits = phoneDigits;
     const emailStr = String(f.email ?? "").trim();
     const address1Str = String(f.addressLine1 ?? "").trim();
     const stateStr = String(f.stateName ?? "").trim();
@@ -826,28 +819,7 @@ export function VendorRegisterForm({
                 maxLength: 10,
                 customOnChange: (val) => set("phone", val.replace(/\D/g, "").slice(0, 10)),
               })}
-              <label className="qf-rf-check">
-                <input
-                  type="checkbox"
-                  checked={f.whatsappSame}
-                  onChange={(e) => set("whatsappSame", e.target.checked)}
-                />
-                <span>This is also my business contact number</span>
-              </label>
-              {!f.whatsappSame ? (
-                <label className="qf-rf-field">
-                  <span>Business contact number</span>
-                  <div className="qf-rf-input-wrapper">
-                    <input
-                      value={f.whatsapp}
-                      onChange={(e) => set("whatsapp", e.target.value.replace(/\D/g, "").slice(0, 10))}
-                      placeholder="10-digit mobile number"
-                      inputMode="numeric"
-                      maxLength={10}
-                    />
-                  </div>
-                </label>
-              ) : null}
+              <p className="qf-rf-qhint">This mobile number will be your WhatsApp verification and initial vendor contact number. A different contact number can be reviewed later in your vendor profile.</p>
               {renderInputField({
                 label: "Business email (optional)",
                 fieldKey: "email",

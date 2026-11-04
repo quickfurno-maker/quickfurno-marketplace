@@ -67,6 +67,37 @@ select 'private_upload_rpc_browser_execute' as check_name,
          'public.qf_vendor_attach_private_evidence(uuid,uuid,uuid,text,text,text)','EXECUTE'))::text as observed,
        'MUST_BE_FALSE' as meaning;
 
+-- A clean type/scan flag without a valid independent scanner receipt is NOT
+-- a launch approval; these counts should be reviewed before rollout.
+select 'clean_office_category_without_scan_receipt' as check_name,
+       count(*)::text as observed,
+       'MUST_BE_ZERO_BEFORE_PRIVATE_DOCUMENT_APPROVAL' as meaning
+from qf_vendor_private.verification_evidence e
+where e.evidence_type in ('office_proof','category_proof')
+  and e.scan_status='clean'
+  and not exists (
+    select 1 from qf_vendor_private.verification_scan_receipts receipt
+    where receipt.evidence_id=e.id
+      and receipt.content_sha256=e.content_sha256
+      and receipt.verdict='clean'
+      and receipt.scanner_engine='clamav_local'
+  );
+
+select 'infected_receipt_not_quarantined' as check_name,
+       count(*)::text as observed,
+       'MUST_BE_ZERO_BEFORE_PRIVATE_DOCUMENT_APPROVAL' as meaning
+from qf_vendor_private.verification_scan_receipts receipt
+join qf_vendor_private.verification_evidence e on e.id=receipt.evidence_id
+where receipt.verdict='infected'
+  and (e.scan_status<>'rejected' or e.evidence_state<>'rejected');
+
+select 'scanner_rpc_browser_execute' as check_name,
+       (has_function_privilege('anon',
+         'public.qf_vendor_record_private_scan(uuid,text,text,text)','EXECUTE')
+        or has_function_privilege('authenticated',
+         'public.qf_vendor_record_private_scan(uuid,text,text,text)','EXECUTE'))::text as observed,
+       'MUST_BE_FALSE' as meaning;
+
 select 'storage_bucket_schema_present' as check_name,
        (to_regclass('storage.buckets') is not null)::text as observed,
        'PRIVATE_ACL_AND_RETENTION_REQUIRE_SEPARATE_APPROVED_EVIDENCE' as meaning;

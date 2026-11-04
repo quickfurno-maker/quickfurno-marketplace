@@ -774,6 +774,18 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-11-04_VOX_OWNER_PRIVATE_REVIEW_QUEUE_PG17_NO_REMOTE_APPLY"
+    },
+    {
+      "version": "20261104173000",
+      "name": "vendor_private_scan_quarantine",
+      "filename": "20261104173000_vendor_private_scan_quarantine.sql",
+      "path": "supabase/migrations/20261104173000_vendor_private_scan_quarantine.sql",
+      "canonicalSha256": "c44f0fce907e4949a504156ee36b8550cd52236f8aef60c4651a284efdc76ac9",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-11-04_CLAMAV_PRIVATE_SCAN_RECEIPT_QUARANTINE_PG17_NO_REMOTE_APPLY"
     }
   ],
   "supersededLegacyPins": [

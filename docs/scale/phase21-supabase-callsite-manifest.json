@@ -9,7 +9,7 @@
     "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
   },
   "totals": {
-    "files": 160,
+    "files": 161,
     "rpcNames": 95,
     "tableNames": 133,
     "storageBuckets": 0,
@@ -370,6 +370,17 @@
       "tables": [
         "vox_operational_intents_v1"
       ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vox/v1/owner-vendor-verification-readiness/route.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_vendor_verification_case_ready"
+      ],
+      "tables": [],
       "storageBuckets": [],
       "auth": false,
       "realtime": false

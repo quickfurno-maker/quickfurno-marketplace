@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { submitVendorAccountRegistration } from "@/app/actions";
+import { isValidOptionalGstin, normalizeOptionalGstin } from "@/lib/vendors/vendorSignupPolicy";
 import { trackEvent, whatsappLink } from "@/lib/config";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 import { mainCategories, signupSelectionForCategory, type MainCategory } from "@/lib/categories";
@@ -89,6 +90,8 @@ type WizardState = {
   rateValue: string;
   businessType: string;
   coversFullCity: boolean;
+  gstNumber: string;
+  registrationConsent: boolean;
 };
 
 // QF-MVP-80.16C. The same Indian-mobile contract the server now enforces in
@@ -130,6 +133,8 @@ const initialState: WizardState = {
   rateValue: "",
   businessType: "",
   coversFullCity: false,
+  gstNumber: "",
+  registrationConsent: false,
 };
 
 /** Lightweight email sanity check (real validation happens at account creation). */
@@ -433,6 +438,10 @@ export function VendorRegisterForm({
         }
         break;
       }
+      case 4:
+        if (!isValidOptionalGstin(f.gstNumber)) e.push({ key: "gstNumber", message: "Enter a valid 15-character GSTIN or leave it blank." });
+        if (!f.registrationConsent) e.push({ key: "registrationConsent", message: "Accept the registration privacy and verification notice to continue." });
+        break;
       case 3:
         // Interior categories require a valid per-sqft rate at/above the minimum.
         if (usesSqftRate && !rateValid)
@@ -545,7 +554,6 @@ export function VendorRegisterForm({
     if (!finalCategory) return;
     const min = CATEGORY_MIN_RATE[finalCategory] ?? null;
     setF((current) => ({ ...current, rateValue: min != null ? String(min) : "" }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finalCategory]);
 
   async function onSubmit() {
@@ -554,7 +562,7 @@ export function VendorRegisterForm({
 
     // Re-validate every step. If an earlier step is incomplete, send the vendor
     // back to it with the exact reason rather than failing silently at submit.
-    for (const s of [0, 1, 2, 3]) {
+    for (const s of [0, 1, 2, 3, 4]) {
       if (stepErrors(s).length > 0) {
         setStep(s);
         setShowErrors(true);
@@ -590,7 +598,8 @@ export function VendorRegisterForm({
       f.baseLatitude != null && f.baseLongitude != null &&
       address1Str.length >= 5 &&
       stateStr.length > 0 &&
-      (!usesSqftRate || rateValid);
+      (!usesSqftRate || rateValid) &&
+      isValidOptionalGstin(f.gstNumber) && f.registrationConsent;
 
     if (!isAllValid) {
       setError("Some required details are missing. Please go back and complete the highlighted fields.");
@@ -604,6 +613,8 @@ export function VendorRegisterForm({
         // profile in one call. The profile still lands Pending / Unpaid / not
         // publicly visible (enforced by registerVendor) until admin approval.
         password: f.password,
+        gst_number: normalizeOptionalGstin(f.gstNumber) || undefined,
+        registration_consent_accepted: f.registrationConsent,
         business_name: businessNameStr,
         owner_name: ownerNameStr || undefined,
         phone: phoneDigits,
@@ -1188,9 +1199,28 @@ export function VendorRegisterForm({
               {f.businessType ? <SummaryRow label="Setup" value={f.businessType} /> : null}
             </dl>
             <p className="qf-rf-qhint" style={{ marginTop: "0.9rem" }}>
-              After verification, our team will share suitable matching options for your city,
-              category and base area.
+              Identity verification is required before approval. Aadhaar verification is voluntary and requires separate consent; an alternative identity document can also be reviewed. Do not enter an Aadhaar number here.
             </p>
+            <label className="qf-rf-field" ref={bindField("gstNumber")}>
+              <span>GSTIN (optional)</span>
+              <div className="qf-rf-input-wrapper">
+                <input
+                  value={f.gstNumber}
+                  onChange={(event) => { set("gstNumber", event.target.value.toUpperCase().replace(/\s/g, "").slice(0, 15)); setTouched((t) => ({...t, gstNumber: true})); }}
+                  placeholder="15-character GSTIN, if registered"
+                  autoComplete="off"
+                  maxLength={15}
+                  aria-label="GSTIN (optional)"
+                />
+              </div>
+              <small>GST registration is optional. Entering a GSTIN does not verify it; QuickFurno will check it during review.</small>
+              {(touched.gstNumber || showErrors) && !isValidOptionalGstin(f.gstNumber) ? <span className="qf-rf-field-err">Enter a valid GSTIN or leave it blank.</span> : null}
+            </label>
+            <label className="qf-rf-check" ref={bindField("registrationConsent")}>
+              <input type="checkbox" checked={f.registrationConsent} onChange={event => set("registrationConsent", event.target.checked)} />
+              <span>I agree to QuickFurno&apos;s <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and consent to collection of these business/contact details for registration and manual vendor verification. Identity verification follows separately with my consent.</span>
+            </label>
+            {(showErrors && !f.registrationConsent) ? <p className="qf-rf-field-err">Consent is required to submit the application.</p> : null}
           </div>
         );
     }

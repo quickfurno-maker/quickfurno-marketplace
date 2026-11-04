@@ -1,0 +1,50 @@
+name: Vendor Registration Consent and GST
+
+on:
+  pull_request:
+    paths:
+      - 'components/VendorRegisterForm.tsx'
+      - 'components/VendorApplicationForm.tsx'
+      - 'services/vendorService.ts'
+      - 'app/actions.ts'
+      - 'lib/types.ts'
+      - 'lib/vendors/vendorSignupPolicy.ts'
+      - 'supabase/migrations/20261104090000_vendor_registration_consent_receipt.sql'
+      - 'scripts/mvp/vendor/vendor-signup-consent-gst.test.mjs'
+      - '.github/workflows/vendor-registration-consent-gst.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'components/VendorRegisterForm.tsx'
+      - 'components/VendorApplicationForm.tsx'
+      - 'services/vendorService.ts'
+      - 'app/actions.ts'
+      - 'lib/types.ts'
+      - 'lib/vendors/vendorSignupPolicy.ts'
+      - 'supabase/migrations/20261104090000_vendor_registration_consent_receipt.sql'
+      - 'scripts/mvp/vendor/vendor-signup-consent-gst.test.mjs'
+      - '.github/workflows/vendor-registration-consent-gst.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  signup-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked app dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Registration consent, GST and inactive vendor tests
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-signup-consent-gst.test.mjs
+      - name: TypeScript contract
+        run: npm run typecheck
+      - name: Existing vendor approval and category governance
+        run: |
+          node scripts/mvp/vendor/validate-vendor-admin-first-approvals.mjs
+          node scripts/mvp/vendor/validate-v3-category-approval-isolation.mjs

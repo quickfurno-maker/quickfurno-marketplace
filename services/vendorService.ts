@@ -10,6 +10,7 @@ import { evaluateAssignedLeadContactAccess } from "../lib/vendors/assignedLeadCo
 // QF-MVP-80.16C — the Indian mobile contract, stated once in a pure module so
 // the server authority, the live form and the notification lane cannot drift.
 import { isValidIndianMobile } from "../lib/vendors/vendorContactContract";
+import { hasVendorRegistrationConsent, isValidOptionalGstin, normalizeOptionalGstin, VENDOR_REGISTRATION_PRIVACY_REVISION } from "../lib/vendors/vendorSignupPolicy";
 import { resolveActiveCity } from "../lib/locations/cityService";
 import { normalizeCoordinate } from "../lib/geo/canonicalCoordinate";
 import { allowPublicMutation } from "../lib/security/publicMutationRateLimit";
@@ -40,6 +41,13 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       input.whatsapp_number ||
       input.office_state
     );
+
+    if (!hasVendorRegistrationConsent(input.registration_consent_accepted)) {
+      return { ok: false, code: "CONSENT_REQUIRED", error: "Please accept the registration privacy and verification notice before submitting." };
+    }
+    if (!isValidOptionalGstin(input.gst_number)) {
+      return { ok: false, code: "VALIDATION", error: "Enter a valid 15-character GSTIN, or leave GST empty if you are not GST registered." };
+    }
 
     if (!businessNameClean || !ownerNameClean || !isValidIndianMobile(cleanedPhone) || !cityClean) {
       return {
@@ -116,7 +124,10 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       service_categories: input.service_categories ?? [],
       experience: input.experience ?? null,
       portfolio_urls: input.portfolio_urls ?? [],
-      gst_number: input.gst_number ?? null,
+      gst_number: normalizeOptionalGstin(input.gst_number) || null,
+      // Signed-off notice receipt is saved atomically with the vendor row.
+      registration_consent_version: VENDOR_REGISTRATION_PRIVACY_REVISION,
+      registration_consent_accepted_at: new Date().toISOString(),
       message: input.message ?? null,
       // Device/browser coordinates are deliberately not accepted for new vendor
       // registration. The Google-selected office/base point above is the only
@@ -133,7 +144,7 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       status: "Pending",
       verification_status: "Pending",
       paid_status: "Unpaid",
-      is_active: !outsideServiceArea,
+      is_active: false, // New applicants must be explicitly activated by the Owner after verification.
       // Registration alone cannot confer matching eligibility. The Google
       // office point must be independently verified before admin activation.
       accepting_leads: false,

@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { submitVendorRegistration } from "@/app/actions";
+import { isValidOptionalGstin, normalizeOptionalGstin } from "@/lib/vendors/vendorSignupPolicy";
 import { SERVICES } from "@/lib/config";
 import GooglePlaceAutocomplete from "@/components/location/GooglePlaceAutocomplete";
 import { isPlaceCompatibleWithSelectedCity } from "@/lib/google-maps/normalizePlace";
@@ -21,6 +22,8 @@ type VendorFormState = {
   address: string;
   projectImage: string;
   message: string;
+  gstNumber: string;
+  registrationConsent: boolean;
 };
 
 const initialVendorForm: VendorFormState = {
@@ -36,6 +39,8 @@ const initialVendorForm: VendorFormState = {
   address: "",
   projectImage: "",
   message: "",
+  gstNumber: "",
+  registrationConsent: false,
 };
 
 export function VendorApplicationForm() {
@@ -81,6 +86,14 @@ export function VendorApplicationForm() {
       setError("Please enter a valid 10 digit phone number.");
       return;
     }
+    if (!form.registrationConsent) {
+      setError("Please accept the registration privacy notice before submitting.");
+      return;
+    }
+    if (!isValidOptionalGstin(form.gstNumber)) {
+      setError("Enter a valid 15-character GSTIN or leave it blank.");
+      return;
+    }
     if (!selectedPlace?.placeId || !selectedPlace.city || !selectedPlace.formattedAddress ||
       selectedPlace.lat == null || selectedPlace.lng == null) {
       setError("Select your business address from Google Places suggestions before applying.");
@@ -100,6 +113,8 @@ export function VendorApplicationForm() {
       const result = await submitVendorRegistration({
         business_name: form.businessName.trim(),
         owner_name: form.ownerName.trim(),
+        gst_number: normalizeOptionalGstin(form.gstNumber) || undefined,
+        registration_consent_accepted: form.registrationConsent,
         phone: form.phone.trim(),
         city: form.city,
         // Captured for Core admin review only: not matching authority at signup.
@@ -211,6 +226,14 @@ export function VendorApplicationForm() {
         </label>
       </div>
 
+      <label className="form-grid-full">
+        <span>GSTIN (optional)</span>
+        <input value={form.gstNumber} onChange={event => updateField("gstNumber", event.target.value.toUpperCase().replace(/\s/g, "").slice(0, 15))} placeholder="15-character GSTIN, if registered" maxLength={15} />
+      </label>
+      <label className="form-grid-full">
+        <input type="checkbox" checked={form.registrationConsent} onChange={event => setForm(current => ({...current, registrationConsent:event.target.checked}))} />
+        <span>I agree to QuickFurno&apos;s <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and the use of submitted business/contact information for vendor registration and verification. Aadhaar verification is voluntary, with an alternative identity method available after signup.</span>
+      </label>
       <button type="submit" className="btn btn-primary form-submit" disabled={submitting}>
         {submitting ? "Submitting..." : "Submit Vendor Application"}
       </button>

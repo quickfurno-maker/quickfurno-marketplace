@@ -12,6 +12,7 @@ import { adminClient, serverClient } from "../lib/supabase";
 import { appError, fail, ok, type Result } from "../lib/errors";
 import * as leads from "../services/leadService";
 import * as vendors from "../services/vendorService";
+import { hasVendorRegistrationConsent, isValidOptionalGstin } from "../lib/vendors/vendorSignupPolicy";
 import * as packages from "../services/packageService";
 import * as vendorPackageOrders from "../services/vendorPackageOrderService";
 import * as vendorProfileChanges from "../services/vendorProfileChangeService";
@@ -352,6 +353,14 @@ export async function submitVendorAccountRegistration(input: VendorRegistrationI
     const email = input.email?.trim().toLowerCase();
     const password = input.password;
 
+    // Validate BEFORE creating an Auth principal: rejected consent/GST must have
+    // zero account creation, provider messages or canonical vendor side effects.
+    if (!hasVendorRegistrationConsent(input.registration_consent_accepted)) {
+      return { ok: false, code: "CONSENT_REQUIRED", error: "Please accept the registration privacy and verification notice." };
+    }
+    if (!isValidOptionalGstin(input.gst_number)) {
+      return { ok: false, code: "VALIDATION", error: "Enter a valid GSTIN or leave it blank." };
+    }
     if (!input.business_name?.trim() || !input.phone?.trim() || !email || !password || password.length < 6) {
       return fail(appError("VALIDATION"));
     }

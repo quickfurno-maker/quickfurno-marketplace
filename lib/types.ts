@@ -119,6 +119,8 @@ export interface VendorRegistrationInput {
   portfolio_urls?: string[];
   profile_image_url?: string;
   gst_number?: string;
+  /** Required affirmative notice acceptance on public vendor applications. */
+  registration_consent_accepted?: boolean;
   message?: string;
   user_id?: string;
   // New vendor location is intentionally Google office/base only. Legacy

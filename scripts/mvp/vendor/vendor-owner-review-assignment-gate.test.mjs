@@ -51,7 +51,7 @@ test("B54 VOX Owner route is staging-OFF, bearer-AAL2, strict and no private doc
   assert.match(route,/verifyVoxOwnerBearer\(request\.headers\.get\("authorization"\)\)/);
   assert.match(route,/qf_vendor_owner_review_snapshot/);
   assert.match(route,/qf_owner_record_vendor_verification_decision/);
-  assert.match(route,/keys\.join\(","\)==="action,reasonCode,vendorId"/);
+  assert.match(route,/keys\.join\(","\)!=="action,reasonCode,vendorId"/);
   assert.match(route,/p_reviewer_user_id:owner/);
   assert.match(route,/private, no-store, max-age=0/);
   assert.match(route,/canViewPrivateDocuments:false/);

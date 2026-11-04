@@ -83,8 +83,10 @@ export async function POST(request: Request): Promise<Response> {
       return response({ok:false,code:"INVALID_REVIEW_ACTION"},400);
     const body = raw as Record<string,unknown>;
     const keys = Object.keys(body).sort();
-    if (keys.join(",")!=="action,reasonCode,vendorId" ||
+    if (keys.join(",")!=="action,caseVersion,reasonCode,vendorId" ||
         typeof body.vendorId!=="string" || !UUID.test(body.vendorId) ||
+        typeof body.caseVersion!=="number" || !Number.isSafeInteger(body.caseVersion) ||
+        body.caseVersion<1 || body.caseVersion>100000 ||
         typeof body.action!=="string" || !ACTIONS.has(body.action) ||
         typeof body.reasonCode!=="string" || !REASON.test(body.reasonCode))
       return response({ok:false,code:"INVALID_REVIEW_ACTION"},400);
@@ -97,6 +99,7 @@ export async function POST(request: Request): Promise<Response> {
       "qf_owner_record_vendor_verification_decision",{
         p_vendor_id:body.vendorId,
         p_reviewer_user_id:owner,
+        p_expected_case_version:body.caseVersion,
         p_action:body.action,
         p_reason_code:body.reasonCode,
       }

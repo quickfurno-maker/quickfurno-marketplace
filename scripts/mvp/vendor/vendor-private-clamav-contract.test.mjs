@@ -136,7 +136,7 @@ test("B8-9 Owner review page is actually in existing navigation and has one shar
  const nav=readFileSync("components/admin/adminConfig.ts","utf8");
  const page=readFileSync("app/admin/vendor-verification/page.tsx","utf8");
  assert.match(nav,/\| "vendor-verification"/);
- assert.match(nav,/'?vendor-verification'?, href: "\/admin\/vendor-verification"/);
+  assert.ok(nav.includes('{ key: "vendor-verification", href: "/admin/vendor-verification"'));
  assert.match(nav,/"vendor-approvals", "vendor-verification"/);
  assert.match(page,/OwnerVendorVerificationDashboard/);
  assert.match(page,/getAdminSession/);

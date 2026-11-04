@@ -9,11 +9,11 @@
     "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
   },
   "totals": {
-    "files": 162,
-    "rpcNames": 95,
+    "files": 163,
+    "rpcNames": 96,
     "tableNames": 133,
     "storageBuckets": 0,
-    "authFiles": 16,
+    "authFiles": 17,
     "realtimeFiles": 0
   },
   "rpcNames": [
@@ -84,6 +84,7 @@
     "qf_mark_vendor_package_payment_failed_v2",
     "qf_prepare_vendor_campaign_v1",
     "qf_project_vendor_lead_delivery_v1",
+    "qf_read_claimed_vendor_auth_otp_purpose",
     "qf_read_vendor_fair_opportunity_v1",
     "qf_recommend_bad_lead_recovery_v1",
     "qf_reconcile_automation_attempt_transport_v1",
@@ -1221,6 +1222,7 @@
       "directImports": [],
       "rpc": [
         "qf_claim_auth_otp_purpose",
+        "qf_read_claimed_vendor_auth_otp_purpose",
         "qf_release_auth_otp_purpose",
         "qf_reserve_auth_otp_purpose"
       ],
@@ -2290,6 +2292,17 @@
       ],
       "storageBuckets": [],
       "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorOtpEvidenceReadService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_messages"
+      ],
+      "storageBuckets": [],
+      "auth": true,
       "realtime": false
     },
     {

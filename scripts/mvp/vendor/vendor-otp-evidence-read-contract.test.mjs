@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 const source=(path)=>readFileSync(path,"utf8");
 const reader=source("services/vendorOtpEvidenceReadService.ts");
+const executableReader=reader.replace(/\/\*[\s\S]*?\*\//g," ").replace(/^\s*\/\/.*$/gm,"");
 const privateService=source("services/authOtpPurposeReservationService.ts");
 const sql=source("supabase/migrations/20261104140000_vendor_private_otp_and_verification_foundation.sql");
 
@@ -56,6 +57,6 @@ test("E4 private receipt RPC cannot be invoked from an anon or authenticated ses
   assert.match(sql,/grant execute on function public\.qf_read_claimed_vendor_auth_otp_purpose\(text,uuid\) to service_role/);
 });
 test("E5 read path cannot independently establish vendor OTP possession or enroll a business",()=>{
-  assert.doesNotMatch(reader,/evaluateVendorOtpAdmission\(|decideVerifiedVendorSignup\(|reconcileVerifiedVendorOwnership\(/);
-  assert.doesNotMatch(reader,/registerVendor\(|vendor_dashboard_users|\.rpc\(|\bcredits\b|\bactivate_leads\b/);
+  assert.doesNotMatch(executableReader,/evaluateVendorOtpAdmission\(|decideVerifiedVendorSignup\(|reconcileVerifiedVendorOwnership\(/);
+  assert.doesNotMatch(executableReader,/registerVendor\(|vendor_dashboard_users|\.rpc\(|\bcredits\b|\bactivate_leads\b/);
 });

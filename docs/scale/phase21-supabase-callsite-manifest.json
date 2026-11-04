@@ -9,11 +9,11 @@
     "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
   },
   "totals": {
-    "files": 164,
-    "rpcNames": 96,
+    "files": 165,
+    "rpcNames": 97,
     "tableNames": 133,
     "storageBuckets": 0,
-    "authFiles": 18,
+    "authFiles": 19,
     "realtimeFiles": 0
   },
   "rpcNames": [
@@ -93,6 +93,7 @@
     "qf_recover_automation_job_transport_v1",
     "qf_recover_automation_job_v1",
     "qf_recover_stale_dispatching_consent_ack_intents",
+    "qf_register_pending_vendor_atomic",
     "qf_release_auth_otp_purpose",
     "qf_release_vendor_package_razorpay_order_claim_v2",
     "qf_reserve_auth_otp_purpose",
@@ -2141,6 +2142,17 @@
       ],
       "storageBuckets": [],
       "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorAtomicSignupService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_register_pending_vendor_atomic"
+      ],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": true,
       "realtime": false
     },
     {

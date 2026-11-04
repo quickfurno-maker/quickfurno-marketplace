@@ -101,6 +101,11 @@ let auditMode = "ok";
 let verificationCaseReady = false;
 let verificationRpcUnavailable = false;
 let verificationRpcCalls = [];
+// Credits must use the canonical atomic wallet RPC. The legacy audit harness
+// predates that migration; simulate its successful committed outcome explicitly,
+// not a silent generic RPC returning NULL.
+let creditRpcCalls = [];
+let creditRpcUnavailable = false;
 
 function resetDb() {
   auditInserts = [];
@@ -109,6 +114,8 @@ function resetDb() {
   verificationCaseReady = false;
   verificationRpcUnavailable = false;
   verificationRpcCalls = [];
+  creditRpcCalls = [];
+  creditRpcUnavailable = false;
   db.vendors = [{
     id: "vendor-1", business_name: "QA Vendor", status: "Approved", is_active: true,
     accepting_leads: true, remaining_credits: 10, total_credits: 10,
@@ -176,6 +183,27 @@ function fakeAdminClient() {
         return verificationRpcUnavailable
           ? { data: null, error: { code: "PGRST202" } }
           : { data: verificationCaseReady, error: null };
+      }
+      if (name === "qf_apply_vendor_credit_delta") {
+        creditRpcCalls.push(args);
+        if (creditRpcUnavailable) return { data: null, error: { code: "PGRST202" } };
+        const vendor = db.vendors.find(v => v.id === args?.p_vendor_id);
+        const delta = args?.p_delta;
+        // Simulate only the canonical verified, single-credit admin-grant case
+        // actually exercised by this audit harness. Unexpected wallet requests
+        // fail closed rather than appearing to succeed.
+        if (!vendor || !Number.isInteger(delta) || delta !== 1 ||
+            args?.p_change_type !== "admin_credit_grant" ||
+            args?.p_allow_negative !== false) {
+          return { data: null, error: { code: "PGRST_INVALID_WALLET_FIXTURE" } };
+        }
+        const before = vendor.remaining_credits;
+        vendor.remaining_credits += delta;
+        vendor.total_credits += delta;
+        return { data: {
+          status: "applied", vendor_id: vendor.id,
+          credits_before: before, credits_after: vendor.remaining_credits, delta,
+        }, error: null };
       }
       // recomputeVisibility is unrelated to this audit-only harness.
       if (name === "update_vendor_visibility") return { data: null, error: null };
@@ -417,9 +445,15 @@ check("14 [exec] the log line carries no metadata and no credential", async () =
 
 check("15 [exec] no credential-shaped key reaches audit metadata", async () => {
   resetDb();
-  await captureConsole(() => VendorAdmin.setVendorStatusAction("vendor-1", "activate", "Superadmin", ACTOR));
-  await captureConsole(() => VendorAdmin.updateVendorCredits("vendor-1", { mode: "add", amount: 1, updatedBy: "Superadmin", actorUserId: ACTOR }));
-  assert(auditInserts.length >= 1, "at least one audit payload to inspect");
+  // Deactivation is safety-negative and needs no identity approval case; the
+  // credit mutation must independently use the canonical wallet RPC.
+  const statusAction = await captureConsole(() =>
+    VendorAdmin.setVendorStatusAction("vendor-1", "deactivate", "Superadmin", ACTOR));
+  const creditsAction = await captureConsole(() =>
+    VendorAdmin.updateVendorCredits("vendor-1", { mode: "add", amount: 1, updatedBy: "Superadmin", actorUserId: ACTOR }));
+  assert(statusAction.value.ok && creditsAction.value.ok, "both audited actions must succeed");
+  assert(creditRpcCalls.length === 1, "credit adjustment must use canonical atomic RPC");
+  assert(auditInserts.length === 2, "inspect exactly one status and one credit audit payload");
   for (const payload of auditInserts) {
     const keys = Object.keys(payload.metadata ?? {});
     for (const k of keys) {
@@ -554,11 +588,27 @@ check("28 [exec] a vendor status action binds the authenticated actor", async ()
 
 check("29 [exec] a credit adjustment binds the authenticated actor", async () => {
   resetDb();
-  await captureConsole(() => VendorAdmin.updateVendorCredits("vendor-1",
+  const action = await captureConsole(() => VendorAdmin.updateVendorCredits("vendor-1",
     { mode: "add", amount: 1, updatedBy: "Superadmin", actorUserId: ACTOR }));
+  assert(action.value.ok, "canonical wallet adjustment must succeed in this positive fixture");
+  assert(creditRpcCalls.length === 1 && creditRpcCalls[0].p_delta === 1 &&
+    creditRpcCalls[0].p_vendor_id === "vendor-1", "credit amount and vendor must bind to the canonical wallet RPC");
+  assert(db.vendors[0].remaining_credits === 11, "wallet mock must record the credit exactly once");
   const rows = db.audit_logs.filter((r) => r.action === "vendor.credits_updated");
   assert(rows.length === 1, `expected 1 credit audit row, got ${rows.length}`);
   assert(rows[0].admin_user_id === ACTOR, String(rows[0].admin_user_id));
+});
+
+check("29a [exec] missing atomic wallet RPC cannot award or audit a credit", async () => {
+  resetDb();
+  creditRpcUnavailable = true;
+  const before = db.vendors[0].remaining_credits;
+  const { value } = await captureConsole(() => VendorAdmin.updateVendorCredits("vendor-1",
+    { mode: "add", amount: 1, updatedBy: "Superadmin", actorUserId: ACTOR }));
+  assert(value.ok === false && value.code === "UPDATE_FAILED", "unavailable canonical RPC must refuse adjustment");
+  assert(creditRpcCalls.length === 1, "must attempt exactly one canonical wallet RPC");
+  assert(db.vendors[0].remaining_credits === before && auditInserts.length === 0,
+    "failed wallet operation cannot change credits or claim a successful audit");
 });
 
 check("30 [exec] a package update binds the authenticated actor", async () => {

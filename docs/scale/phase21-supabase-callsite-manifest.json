@@ -9,11 +9,11 @@
     "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
   },
   "totals": {
-    "files": 170,
+    "files": 169,
     "rpcNames": 101,
     "tableNames": 134,
     "storageBuckets": 1,
-    "authFiles": 22,
+    "authFiles": 21,
     "realtimeFiles": 0
   },
   "rpcNames": [
@@ -498,17 +498,6 @@
     {
       "file": "app/vendor/set-password/page.tsx",
       "directImports": [],
-      "rpc": [],
-      "tables": [],
-      "storageBuckets": [],
-      "auth": true,
-      "realtime": false
-    },
-    {
-      "file": "components/vox/OwnerVendorVerificationDashboard.tsx",
-      "directImports": [
-        "@supabase/ssr"
-      ],
       "rpc": [],
       "tables": [],
       "storageBuckets": [],

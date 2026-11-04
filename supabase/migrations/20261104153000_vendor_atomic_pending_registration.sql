@@ -183,8 +183,8 @@ begin
   if v_count>1 then
     return query select 'ownership_conflict'::text,null::uuid; return;
   end if;
-  select vendor_id,role,status into v_mapping_vendor,v_mapping_role,v_mapping_status
-    from public.vendor_dashboard_users where user_id=p_auth_user_id limit 1;
+  select d.vendor_id,d.role,d.status into v_mapping_vendor,v_mapping_role,v_mapping_status
+    from public.vendor_dashboard_users d where d.user_id=p_auth_user_id limit 1;
 
   if v_existing_id is not null then
     if v_mapping_vendor is distinct from v_existing_id

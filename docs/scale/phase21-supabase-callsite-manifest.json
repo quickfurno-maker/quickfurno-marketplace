@@ -10,7 +10,7 @@
   },
   "totals": {
     "files": 160,
-    "rpcNames": 94,
+    "rpcNames": 95,
     "tableNames": 133,
     "storageBuckets": 0,
     "authFiles": 15,
@@ -104,6 +104,7 @@
     "qf_set_vendor_anisha_memory_consent_v1",
     "qf_snapshot_vendor_fair_opportunity_v1",
     "qf_terminalize_consent_ack_intent",
+    "qf_vendor_verification_case_ready",
     "qf_vox_work_transition_candidate_v1",
     "update_vendor_visibility",
     "vendor_auth_claim_reset_grant",
@@ -2117,6 +2118,7 @@
       "file": "services/vendorAdminService.ts",
       "directImports": [],
       "rpc": [
+        "qf_vendor_verification_case_ready",
         "update_vendor_visibility"
       ],
       "tables": [

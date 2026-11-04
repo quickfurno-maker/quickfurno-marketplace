@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { VendorPrivateEvidenceForm } from "@/components/vendor/VendorPrivateEvidenceForm";
 import { isValidOptionalGstin, normalizeOptionalGstin } from "@/lib/vendors/vendorSignupPolicy";
 import { trackEvent, whatsappLink } from "@/lib/config";
 import { QFIcon } from "@/components/QuickFurnoIcons";
@@ -182,6 +183,7 @@ export function VendorRegisterForm({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [enrolledVendorId, setEnrolledVendorId] = useState<string | null>(null);
   const [otp, setOtp] = useState("");
   const [otpRequested, setOtpRequested] = useState(false);
   const [otpBusy, setOtpBusy] = useState(false);
@@ -655,6 +657,12 @@ export function VendorRegisterForm({
         return;
       }
 
+      const vendorId = (res as { vendorId?: unknown }).vendorId;
+      if (typeof vendorId !== "string" || !/^[0-9a-f-]{36}$/i.test(vendorId)) {
+        setError("Enrollment confirmation is incomplete. Please contact QuickFurno before retrying.");
+        return;
+      }
+      setEnrolledVendorId(vendorId);
       trackEvent("vendor_onboarding_submitted", {
         category: finalCategoryLabel || selectedMain?.label,
         city: cityValue,
@@ -679,6 +687,7 @@ export function VendorRegisterForm({
             verify your identity, office and service categories before enabling your vendor account.
             Registration does not grant leads or credits.
           </p>
+          {enrolledVendorId ? <VendorPrivateEvidenceForm vendorId={enrolledVendorId} /> : null}
           <a className="qf-rf-btn qf-rf-btn--primary qf-rf-btn--full" href="/vendor?mode=login">
             Go to vendor login
           </a>

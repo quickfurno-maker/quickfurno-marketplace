@@ -4,6 +4,9 @@
 export const STAGING_PROJECT="uckafzuochmbvtiodmcl";
 const int=v=>Number.isSafeInteger(v)&&v>=0;
 const utc=s=>typeof s==="string"&&s.endsWith("Z")&&!Number.isNaN(Date.parse(s));
+export const KNOWN_STAGING_BOUND_CONTAINERS=Object.freeze([
+ "qf-core-staging","qf-vox-20261102-mfa-ui-test"
+]);
 const REQUIRED_EXTERNAL=Object.freeze([
  "marketplace_worker","automation_worker","lead_matching_worker",
  "jarvis_communication_worker","provider_webhook_ingress","scheduled_cron",
@@ -42,6 +45,33 @@ export function checkMaintenanceFreeze(e={},now){
       Date.parse(now)-Date.parse(s.observedAt)>120000)
     deny("EXTERNAL_STOP_UNVERIFIED:"+s.service);
   }
+ }
+ // Independent read-only VPS inventory covers real Staging-bound processes,
+ // not just the quiet database/worker-heartbeat tables.
+ const docker=e.stagingDockerInventory;
+ if(docker?.source!=="read_only_docker_inspect"||
+    docker?.inventoryComplete!==true||
+    typeof docker?.evidenceSha256!=="string"||
+    !/^[0-9a-f]{64}$/i.test(docker.evidenceSha256)||
+    !utc(docker?.observedAt)||!utc(now)||
+    Date.parse(docker.observedAt)>Date.parse(now)||
+    Date.parse(now)-Date.parse(docker.observedAt)>120000)
+   deny("STAGING_DOCKER_INVENTORY_UNVERIFIED");
+ const seen=new Set();
+ for(const c of Array.isArray(docker?.containers)?docker.containers:[]){
+  if(typeof c?.name!=="string"||seen.has(c.name)){
+   deny("DUPLICATE_OR_INVALID_CONTAINER");continue;
+  }
+  seen.add(c.name);
+  if(c.stagingRefPresent===true&&c.state!=="exited")
+    deny("STAGING_CONTAINER_ACTIVE:"+c.name);
+  if(KNOWN_STAGING_BOUND_CONTAINERS.includes(c.name)){
+   if(c.stagingRefPresent!==true)deny("STAGING_CONTAINER_TARGET_UNVERIFIED:"+c.name);
+   if(c.state!=="exited")deny("STAGING_CONTAINER_ACTIVE:"+c.name);
+  }
+ }
+ for(const name of KNOWN_STAGING_BOUND_CONTAINERS){
+  if(!seen.has(name))deny("STAGING_CONTAINER_MISSING:"+name);
  }
  if(typeof e.operatorId!=="string"||e.operatorId.trim().length<3||
     !utc(e.windowStartsAt)||!utc(e.windowEndsAt)||

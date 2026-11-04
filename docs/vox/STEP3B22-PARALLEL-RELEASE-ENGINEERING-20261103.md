@@ -39,3 +39,17 @@ Three isolated, clean worktrees were branched from the exact clean 3B21 candidat
 **Actual service state:** managed Staging **26 test vendors / 7 leads remain**; Production **29 test vendors / 74 leads remain** according to last permitted census (a later Production SELECT was blocked and must be reestablished through approved access). No managed DELETE/DDL/trigger disable, Auth identity change, provider messaging or finance activation has occurred. Genuine onboarding stays on HOLD.
 
 **Next human-operated gate:** independently approved exception, trusted DBA/AppSec/SRE registry and signatures, verified full managed rollback and operator maintenance freeze; execute Staging first, postflight certify, then separately authorize pinned Production procedure. Permanent removal from backups/providers needs its own retention closure.
+
+## 4 Nov 2026 — Real Staging VPS source-of-truth for the freeze gate
+
+This is **read-only operational evidence** from the already-authorized JARVIS `qf-staging` SSH alias (host `srv1873796`). The check inspected only Docker container state and the presence/absence of known public Supabase project reference strings in container environment configuration; **no environment values, credentials, tokens or secrets were returned**. Private sanitized evidence retained on JARVIS: `QF-20261104-VPS-SCOPE-READONLY.jsonl`, SHA-256 `71AA2DA6A984CC45A1EB74A93FC14FDB109A93AD70576C30FD413DFAFB33A410`.
+
+- `qf-core-staging`: **running**, includes the **Staging** Supabase project reference.
+- `qf-vox-20261102-mfa-ui-test`: **running**, includes the **Staging** Supabase project reference.
+- `qf-jarvis-whatsapp-worker`, `qf-jarvis-gateway`, Jarvis OS and AGNI control-plane instances: **running**, but the tested environment strings did not directly expose a known Supabase project reference. **Absence of that string is not proof of independence** (configuration may be indirect). Do not broadly stop Jarvis/AGNI without a separate verified dependency map and operating approval.
+- The VPS system `cron.service` is active; `/etc/cron.d` has only standard system/pruning entries visible in the limited inventory. Other cron users/providers or external trigger surfaces have **not** been certified quiet.
+- The managed Staging database reported zero current accepting/in-flight workers, zero recent heartbeats and zero enabled outbound/webhook policies in the prior authorized SELECT. That did not detect the two **running** Staging-bound containers.
+
+**Engineering correction:** Extended the existing `step3b22b-freeze-gate.mjs` to reject a supposedly all-green freeze unless the read-only Docker inventory is fresh, complete, separately evidence-hashed, proves the two currently known Staging-bound containers exited, and shows no additional Staging-reference container still running. Extra four regression tests exercise live-active, unknown-active, stale and missing-container cases. This remains a pure, non-executable adjudicator, not a stop command.
+
+**Operational consequence:** There is presently **no certified Staging freeze**. The release operator must schedule and verify controlled shutdown/isolation of `qf-core-staging` and the Staging-bound VOX MFA UI test, while resolving the Jarvis/AGNI and cron dependency boundary. Neither these containers nor any protected database triggers were stopped/disabled in this inspection. Independent DBA/AppSec exception and managed recoverability remain additional release blockers.

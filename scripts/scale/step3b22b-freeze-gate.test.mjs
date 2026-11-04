@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {checkMaintenanceFreeze,REQUIRED_EXTERNAL_SERVICES,STAGING_PROJECT} from "./step3b22b-freeze-gate.mjs";
+import {checkMaintenanceFreeze,REQUIRED_EXTERNAL_SERVICES,STAGING_PROJECT,KNOWN_STAGING_BOUND_CONTAINERS} from "./step3b22b-freeze-gate.mjs";
 const now="2026-11-03T16:10:00Z";
 const counts=()=>({
  registeredWorkers:1,acceptingWorkers:0,workerInFlight:0,recentHeartbeat5m:0,
@@ -16,7 +16,12 @@ const good=()=>({
  externalStops:REQUIRED_EXTERNAL_SERVICES.map(service=>({
   service,confirmedStopped:true,evidenceSha256:"a".repeat(64),
   observedAt:"2026-11-03T16:09:00Z"
- }))
+ })),
+ stagingDockerInventory:{
+  source:"read_only_docker_inspect",inventoryComplete:true,
+  evidenceSha256:"b".repeat(64),observedAt:"2026-11-03T16:09:00Z",
+  containers:KNOWN_STAGING_BOUND_CONTAINERS.map(name=>({name,stagingRefPresent:true,state:"exited"}))
+ }
 });
 test("B1 absent evidence holds",()=>{
  const r=checkMaintenanceFreeze({},now);
@@ -59,4 +64,33 @@ test("B7 wrong Staging project, absent operator or expired window deny",()=>{
 test("B8 negative pending count fails closed",()=>{
  const e=good();e.counts.workerInFlight=-1;
  assert.ok(checkMaintenanceFreeze(e,now).blockers.includes("COUNT_INVALID:workerInFlight"));
+});
+test("B9 a confirmed Staging-bound Core or VOX container still running blocks freeze",()=>{
+ for(const name of KNOWN_STAGING_BOUND_CONTAINERS){
+  const e=good();e.stagingDockerInventory.containers.find(x=>x.name===name).state="running";
+  assert.ok(checkMaintenanceFreeze(e,now).blockers.includes("STAGING_CONTAINER_ACTIVE:"+name),name);
+ }
+});
+test("B10 a newly discovered Staging-bound container must also be stopped",()=>{
+ const e=good();e.stagingDockerInventory.containers.push({
+  name:"future-staging-worker",stagingRefPresent:true,state:"running"
+ });
+ assert.ok(checkMaintenanceFreeze(e,now).blockers.includes("STAGING_CONTAINER_ACTIVE:future-staging-worker"));
+});
+test("B11 stale, incomplete, or misattributed VPS inventory blocks",()=>{
+ for(const patch of [
+  {inventoryComplete:false},{evidenceSha256:"bad"},
+  {observedAt:"2026-11-03T16:00:00Z"},{source:"unknown"}
+ ]){
+  const e=good();Object.assign(e.stagingDockerInventory,patch);
+  assert.ok(checkMaintenanceFreeze(e,now).blockers.includes("STAGING_DOCKER_INVENTORY_UNVERIFIED"));
+ }
+});
+test("B12 known Staging-bound container must be present with confirmed Staging scope",()=>{
+ const e=good();e.stagingDockerInventory.containers.pop();
+ assert.ok(checkMaintenanceFreeze(e,now).blockers.includes(
+   "STAGING_CONTAINER_MISSING:qf-vox-20261102-mfa-ui-test"));
+ const f=good();f.stagingDockerInventory.containers[0].stagingRefPresent=false;
+ assert.ok(checkMaintenanceFreeze(f,now).blockers.includes(
+   "STAGING_CONTAINER_TARGET_UNVERIFIED:qf-core-staging"));
 });

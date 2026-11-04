@@ -19,6 +19,12 @@ type ReviewSnapshot={
   identityEvidenceVerified?:boolean;officeEvidenceVerified?:boolean;
   readyForCoreApproval?:boolean;requiresSeparateCoreVendorApproval?:boolean;
 };
+type OwnerQueueItem={
+ vendorId:string;caseVersion:number;caseState:string;submittedAt:string;
+ contactStatus:string;identityStatus:string;officeStatus:string;
+ categoryStatus:string;zoneStatus:string;consentValid:boolean;
+ pendingScanCount:number;rejectedScanCount:number;
+};
 type ReviewAction="request_documents"|"request_correction"|"approve"|"reject";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const REASON=/^[a-z][a-z0-9_]{2,63}$/;
@@ -46,6 +52,9 @@ export function OwnerVendorVerificationDashboard(){
  const [reason,setReason]=useState("");
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState("");
+ const [queue,setQueue]=useState<OwnerQueueItem[]>([]);
+ const [queueBusy,setQueueBusy]=useState(false);
+ const [queueMessage,setQueueMessage]=useState("");
 
  const load=useCallback(async (id:string)=>{
   setCaseData(null);setMessage("");
@@ -72,6 +81,36 @@ export function OwnerVendorVerificationDashboard(){
   finally{setBusy(false);}
  },[]);
 
+ async function loadQueue(){
+  setQueueMessage("");setQueueBusy(true);setQueue([]);
+  try{
+   const bearer=await ownerBearer();
+   if(!bearer){setQueueMessage("Owner MFA/AAL2 session required to access the queue.");return;}
+   const result=await fetch("/api/vox/v1/owner-vendor-verification-queue",{
+     ...NO_CACHE,headers:{Authorization:`Bearer ${bearer}`},
+   });
+   if(!result.ok){
+    setQueueMessage(result.status===503
+      ?"Private review queue is disabled until approved Staging."
+      :"Unable to load the Owner-only queue; check your MFA session.");
+    return;
+   }
+   const resultData:unknown=await result.json();
+   if(!resultData||typeof resultData!=="object"||
+      !Array.isArray((resultData as {pending?:unknown}).pending)||
+      (resultData as {pending:unknown[]}).pending.length>20){
+    setQueueMessage("Untrusted queue response rejected.");return;
+   }
+   const incoming=(resultData as {pending:OwnerQueueItem[]}).pending;
+   if(incoming.some(item=>!item||!UUID.test(item.vendorId)||
+       !Number.isInteger(item.caseVersion)||item.caseVersion<1)){
+    setQueueMessage("Untrusted queue records rejected.");return;
+   }
+   setQueue(incoming);
+   if(incoming.length===0)setQueueMessage("No pending vendor cases in the first 20 review slots.");
+  }catch{setQueueMessage("Owner verification queue is unavailable.");}
+  finally{setQueueBusy(false);}
+ }
  async function submit(){
   if(!caseData?.casePresent||!Number.isInteger(caseData.caseVersion)||
      (caseData.caseVersion??0)<1 || !REASON.test(reason)){
@@ -107,6 +146,37 @@ export function OwnerVendorVerificationDashboard(){
     <h2 className="text-xl font-bold text-slate-900">Vendor verification review</h2>
     <p className="text-sm text-slate-600">Read a private case summary and record an audited Owner decision. No private documents, identity numbers, credits, or lead actions are exposed here.</p>
    </div>
+   <section className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-3" aria-label="Pending vendor verification queue">
+    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+     <div>
+      <h3 className="font-semibold text-slate-900">Pending Owner reviews</h3>
+      <p className="text-xs text-slate-600">Oldest 20 current private cases. No identity files or personal details.</p>
+     </div>
+     <button type="button" disabled={queueBusy||busy} onClick={()=>void loadQueue()}
+       className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold disabled:opacity-50">
+       {queueBusy?"Loading…":"Load review queue"}
+     </button>
+    </div>
+    {queueMessage?<p role="status" className="text-sm text-slate-700">{queueMessage}</p>:null}
+    {queue.length>0?(
+     <ul className="max-h-72 space-y-2 overflow-y-auto">
+      {queue.map(item=>(
+       <li key={item.vendorId}>
+        <button type="button" disabled={busy||queueBusy}
+         onClick={()=>{setVendorId(item.vendorId);void load(item.vendorId);}}
+         className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left text-sm hover:border-blue-500 disabled:opacity-50">
+         <span className="block break-all font-mono text-xs text-slate-700">{item.vendorId}</span>
+         <span className="mt-1 block text-slate-600">
+          {item.caseState.replaceAll("_"," ")} · Case v{item.caseVersion} ·
+          {item.consentValid?" Consent valid":" Consent required"} ·
+          {item.pendingScanCount} scans pending
+         </span>
+        </button>
+       </li>
+      ))}
+     </ul>
+    ):null}
+   </section>
    <form className="mb-4 flex flex-wrap gap-2" onSubmit={event=>{event.preventDefault();void load(vendorId);}}>
     <label className="flex-1 text-sm font-semibold text-slate-700">
      Vendor ID

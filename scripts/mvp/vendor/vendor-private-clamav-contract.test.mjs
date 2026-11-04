@@ -116,3 +116,29 @@ test("B8-7 private scan source is a narrow internal database append-only adapter
  assert.match(sql,/revoke all on function public\.qf_vendor_record_private_scan/);
  assert.doesNotMatch(sql,/update public\.vendors|insert into public\.lead_assignments/);
 });
+
+test("B8-8 Owner and assignment readiness reject clean flags without scan receipts",()=>{
+ const sql=readFileSync("supabase/migrations/20261104173000_vendor_private_scan_quarantine.sql","utf8");
+ const fn=sql.slice(sql.indexOf("create or replace function public.qf_vendor_verification_case_ready"),
+  sql.indexOf("create or replace function public.qf_vendor_owner_review_snapshot"));
+ const view=sql.slice(sql.indexOf("create or replace function public.qf_vendor_owner_review_snapshot"),
+  sql.indexOf("-- Worker-only, bounded fetch."));
+ for(const piece of [fn,view]){
+  assert.match(piece,/qf_vendor_private\.verification_scan_receipts scan/);
+  assert.match(piece,/scan\.content_sha256=/);
+  assert.match(piece,/scan\.scanner_engine='clamav_local'/);
+  assert.match(piece,/scan\.verdict='clean'/);
+ }
+ assert.match(fn,/c\.case_version=\(select max\(n\.case_version\)/);
+});
+
+test("B8-9 Owner review page is actually in existing navigation and has one shared title",()=>{
+ const nav=readFileSync("components/admin/adminConfig.ts","utf8");
+ const page=readFileSync("app/admin/vendor-verification/page.tsx","utf8");
+ assert.match(nav,/\| "vendor-verification"/);
+ assert.match(nav,/'?vendor-verification'?, href: "\/admin\/vendor-verification"/);
+ assert.match(nav,/"vendor-approvals", "vendor-verification"/);
+ assert.match(page,/OwnerVendorVerificationDashboard/);
+ assert.match(page,/getAdminSession/);
+ assert.doesNotMatch(page,/<h1/);
+});

@@ -28,7 +28,7 @@ create trigger verification_scan_receipts_immutable
 create or replace function public.qf_vendor_verification_case_ready(
   p_vendor_id uuid
 ) returns boolean language sql stable security definer set search_path=pg_catalog
-as $
+as $$
   select exists (
     select 1 from qf_vendor_private.verification_cases c
     where c.vendor_id=p_vendor_id
@@ -85,11 +85,11 @@ as $
            and decision.reviewer_user_id=c.reviewer_user_id
       )
   );
-$;
+$$;
 create or replace function public.qf_vendor_owner_review_snapshot(
   p_vendor_id uuid
 ) returns jsonb language plpgsql stable security definer
-set search_path=pg_catalog as $
+set search_path=pg_catalog as $$
 declare
   c qf_vendor_private.verification_cases%rowtype;
   v_consent boolean;
@@ -144,7 +144,7 @@ begin
     'readyForCoreApproval',v_ready
   );
 end;
-$;
+$$;
 
 -- Worker-only, bounded fetch. Storage keys never leave the server-held service
 -- role process and must not be copied into VOX or any public JSON response.

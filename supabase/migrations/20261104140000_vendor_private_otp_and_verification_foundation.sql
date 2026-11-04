@@ -273,6 +273,31 @@ as $$
   );
 $$;
 
+-- Immutable, read-only receipt for a signed vendor OTP purpose claim.
+-- Browser sessions cannot execute this RPC. Return no row when the claim
+-- is absent, stale, for a client OTP, or bound to another Auth principal.
+create or replace function public.qf_read_claimed_vendor_auth_otp_purpose(
+  p_phone_digest text, p_auth_user_id uuid
+) returns table (
+  purpose text, state text, auth_user_id uuid, phone_digest text,
+  verified_webhook_id text, created_at timestamptz
+) language sql stable security definer set search_path=pg_catalog
+as $$
+  select r.purpose, r.state, r.auth_user_id, r.phone_digest,
+         r.verified_webhook_id, r.created_at
+  from qf_vendor_private.auth_otp_purpose_reservations r
+  where p_phone_digest ~ '^[0-9a-f]{64}$'
+    and p_auth_user_id is not null
+    and r.phone_digest=p_phone_digest
+    and r.auth_user_id=p_auth_user_id
+    and r.purpose='vendor_login'
+    and r.state='claimed'
+    and r.verified_webhook_id ~ '^[A-Za-z0-9._:-]{1,200}$'
+    and r.created_at<=now()+interval '30 seconds'
+    and r.created_at>now()-interval '10 minutes'
+  limit 1;
+$$;
+
 -- Explicit role/security posture, no client RLS and no public document reads.
 revoke all on all tables in schema qf_vendor_private from public,anon,authenticated;
 revoke all on all functions in schema qf_vendor_private from public,anon,authenticated;
@@ -294,11 +319,14 @@ revoke all on function public.qf_claim_auth_otp_purpose(text,uuid,text)
   from public,anon,authenticated;
 revoke all on function public.qf_release_auth_otp_purpose(text,uuid)
   from public,anon,authenticated;
+revoke all on function public.qf_read_claimed_vendor_auth_otp_purpose(text,uuid)
+  from public,anon,authenticated;
 revoke all on function public.qf_vendor_verification_case_ready(uuid)
   from public,anon,authenticated;
 grant execute on function public.qf_reserve_auth_otp_purpose(text,text,uuid,integer) to service_role;
 grant execute on function public.qf_claim_auth_otp_purpose(text,uuid,text) to service_role;
 grant execute on function public.qf_release_auth_otp_purpose(text,uuid) to service_role;
+grant execute on function public.qf_read_claimed_vendor_auth_otp_purpose(text,uuid) to service_role;
 grant execute on function public.qf_vendor_verification_case_ready(uuid) to service_role;
 
 commit;

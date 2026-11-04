@@ -15,7 +15,7 @@
     "userMetadata": "NEVER_AUTHORIZATION"
   },
   "totals": {
-    "getUser": 13,
+    "getUser": 14,
     "getSession": 0,
     "signInWithPassword": 2,
     "signInWithOtp": 1,
@@ -134,6 +134,14 @@
         "admin": 5
       },
       "usesAppMetadata": true,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "services/vendorOtpEvidenceReadService.ts",
+      "operations": {
+        "getUser": 1
+      },
+      "usesAppMetadata": false,
       "usesUserMetadata": false
     },
     {

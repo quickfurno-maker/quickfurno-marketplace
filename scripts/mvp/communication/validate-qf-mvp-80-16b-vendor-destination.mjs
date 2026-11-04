@@ -253,8 +253,21 @@ check("15 [static] vendor registration STORAGE is NOT changed by this phase", ()
     "registration no longer validates a supplied WhatsApp number");
   assert(/INDIAN_MOBILE_RE = \/\^\[6-9\]\\d\{9\}\$\//.test(VENDOR_CONTACT_SRC),
     "the stored-shape contract is no longer exactly ten digits starting 6-9");
-  assert(!/\+91/.test(VENDOR_SERVICE_SRC) && !/\+91/.test(VENDOR_CONTACT_SRC),
-    "registration started writing a country code — that is a separate phase");
+  // Signup can now RECEIVE a signed +91 Auth phone and reduce it to the
+  // exact ten-digit stored shape. A blanket search for the literal "+91"
+  // was a false failure after verified-OTP signup was added. Inspect the
+  // ACTUAL insert payload and its source normalization instead.
+  assert(/const verifiedMobile = normalizeVerifiedVendorMobile\(input\.phone\)/.test(VENDOR_SERVICE_SRC),
+    "registration no longer normalizes the verified +91 phone through the shared strict contract");
+  assert(/const cleanedPhone = \(verifiedMobile \?\? ""\)\.replace\(\/\\D\/g, ""\)/.test(VENDOR_SERVICE_SRC),
+    "verified login identity is no longer reduced to the stored ten-digit phone");
+  assert(/phone:\s*cleanedPhone\s*,/.test(VENDOR_SERVICE_SRC),
+    "vendors.phone no longer stores the verified ten-digit phone");
+  assert(/whatsapp_number:\s*cleanedWhatsapp\s*\|\|\s*null/.test(VENDOR_SERVICE_SRC),
+    "vendors.whatsapp_number no longer stores the cleaned ten-digit number");
+  // Neither column may be assigned the raw E.164 Auth identity or form input.
+  assert(!/phone:\s*(?:input\.phone|verifiedMobile|(?:["']\+91))\b/.test(VENDOR_SERVICE_SRC),
+    "registration stores raw/E.164 identity rather than the canonical ten-digit phone");
 });
 
 check("16 [static] the adapter matches only the exact stored shape", () => {

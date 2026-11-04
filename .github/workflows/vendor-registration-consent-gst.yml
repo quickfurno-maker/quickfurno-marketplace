@@ -9,8 +9,12 @@ on:
       - 'app/actions.ts'
       - 'lib/types.ts'
       - 'lib/vendors/vendorSignupPolicy.ts'
+      - 'lib/identity/vendorWhatsappOtpAdmission.ts'
       - 'supabase/migrations/20261104090000_vendor_registration_consent_receipt.sql'
+      - 'supabase/staging-history/qf-post-g1-migration-ledger-20260929.json'
+      - 'scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs'
       - 'scripts/mvp/vendor/vendor-signup-consent-gst.test.mjs'
+      - 'scripts/mvp/vendor/vendor-whatsapp-otp-admission.test.mjs'
       - '.github/workflows/vendor-registration-consent-gst.yml'
   push:
     branches: [main]
@@ -21,8 +25,12 @@ on:
       - 'app/actions.ts'
       - 'lib/types.ts'
       - 'lib/vendors/vendorSignupPolicy.ts'
+      - 'lib/identity/vendorWhatsappOtpAdmission.ts'
       - 'supabase/migrations/20261104090000_vendor_registration_consent_receipt.sql'
+      - 'supabase/staging-history/qf-post-g1-migration-ledger-20260929.json'
+      - 'scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs'
       - 'scripts/mvp/vendor/vendor-signup-consent-gst.test.mjs'
+      - 'scripts/mvp/vendor/vendor-whatsapp-otp-admission.test.mjs'
       - '.github/workflows/vendor-registration-consent-gst.yml'
 
 permissions:
@@ -42,6 +50,10 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Registration consent, GST and inactive vendor tests
         run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-signup-consent-gst.test.mjs
+      - name: Vendor WhatsApp OTP security admission (no provider sends)
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-whatsapp-otp-admission.test.mjs
+      - name: Strict additive migration registry
+        run: node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs
       - name: TypeScript contract
         run: npm run typecheck
       - name: Existing vendor approval and category governance

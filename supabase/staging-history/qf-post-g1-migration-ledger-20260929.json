@@ -702,6 +702,18 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-10-12_DISPOSABLE_LOCAL_PG_CERTIFIED_6_OF_6_NO_REMOTE_APPLY"
+    },
+    {
+      "version": "20261104090000",
+      "name": "vendor_registration_consent_receipt",
+      "filename": "20261104090000_vendor_registration_consent_receipt.sql",
+      "path": "supabase/migrations/20261104090000_vendor_registration_consent_receipt.sql",
+      "canonicalSha256": "d633187e5084591056c4a87687297fd9ca385a9e1a8d03ff8ae4df6d9e2c9e19",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-11-04_REVIEWED_DRAFT_PR_484_NO_REMOTE_APPLY"
     }
   ],
   "supersededLegacyPins": [

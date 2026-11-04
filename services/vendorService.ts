@@ -19,7 +19,11 @@ import type {
 } from "../lib/types";
 
 /** Public vendor registration. Always lands as Pending + not visible. */
-export async function registerVendor(input: VendorRegistrationInput): Promise<Result<{ id: string }>> {
+/** Optional authenticated principal is accepted only from trusted server-side callers. */
+export async function registerVendor(
+  input: VendorRegistrationInput,
+  trustedContext: { verifiedAuthUserId?: string } = {},
+): Promise<Result<{ id: string }>> {
   try {
     // 1. Clean phone and whatsapp numbers to 10 digits
     const cleanedPhone = (input.phone ?? "").replace(/\D/g, "");
@@ -155,7 +159,8 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       utm_campaign: input.utm_campaign ?? null,
       // Kept for the account-linked registration path (FK to profiles); null for
       // the public application wizard.
-      user_id: input.user_id ?? null,
+      // Never use an untrusted public signup field as the owner of a vendor record.
+      user_id: trustedContext.verifiedAuthUserId ?? null,
     };
 
     // Phase 1 (Google area foundation): optional Google Place identity + normalized
@@ -181,7 +186,9 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       console.log("Supabase URL exists:", Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL));
       console.log("Supabase Anon Key exists:", Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY));
       console.log("Supabase Service Role Key exists:", Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY));
-      console.log("Vendor payload:", { ...payload, ...googleLocationPayload });
+      console.log("[vendors] submission shape", { has_google_place: Boolean(input.google_place_id),
+        has_verified_auth_principal: Boolean(trustedContext.verifiedAuthUserId),
+        service_count: input.service_categories?.length ?? 0 });
     }
 
     // Single insert with the full payload (base + Phase 1 Google/location fields).
@@ -203,7 +210,8 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
     }
 
     if (error) {
-      console.error("Vendor insert error:", error);
+      // Avoid logging Supabase error detail: it may contain user-supplied PII.
+      console.error("[vendors] insert failed", { code: error.code ?? "DB_ERROR" });
       if (process.env.NODE_ENV === "development") {
         console.log("Supabase Error Details:", {
           message: error.message,
@@ -213,7 +221,7 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
         });
       }
       logSupabaseInsertError("vendors", error, {
-        has_user_id: Boolean(input.user_id),
+        has_user_id: Boolean(trustedContext.verifiedAuthUserId),
         has_email: Boolean(input.email),
         service_count: input.service_categories?.length ?? 0,
         area_count: input.areas_covered?.length ?? 0,

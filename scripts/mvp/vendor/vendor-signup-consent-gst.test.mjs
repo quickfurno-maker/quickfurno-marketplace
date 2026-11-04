@@ -91,3 +91,45 @@ test("S8 only one mounted active vendor signup wizard; no duplicate workflow",()
   assert.match(legacy,/registration_consent_accepted: form\.registrationConsent/);
   assert.match(legacy,/gst_number: normalizeOptionalGstin\(form\.gstNumber\)/);
 });
+
+test("S9 no public account-ownership override survives into privileged vendor insert",()=>{
+  assert.doesNotMatch(types,/^\s*user_id\?:\s*string;/m);
+  assert.doesNotMatch(service,/input\.user_id/);
+  assert.match(service,/user_id: trustedContext\.verifiedAuthUserId \?\? null/);
+  const publicEntry=action.slice(action.indexOf("export async function submitVendorRegistration("),
+    action.indexOf("export async function submitFreeVendorProfileInterest("));
+  assert.match(publicEntry,/VENDOR_WHATSAPP_OTP_REQUIRED/);
+  assert.doesNotMatch(publicEntry,/vendors\.registerVendor\(/);
+  assert.doesNotMatch(publicEntry,/verifiedAuthUserId/);
+  assert.match(action,/verifiedAuthUserId: auth\.user\.id/);
+});
+
+test("S10 pre-Auth validation and independent phone/email rate limits block premature user creation",()=>{
+  const start=action.indexOf("export async function submitVendorAccountRegistration(");
+  const finish=action.indexOf("// VENDOR (owner-scoped)",start);
+  const block=action.slice(start,finish);
+  const authIndex=block.indexOf("db.auth.admin.createUser(");
+  assert.ok(authIndex>0,"expected explicit Auth creation authority");
+  assert.ok(block.indexOf('process.env.QF_VENDOR_LEGACY_EMAIL_SIGNUP !== "explicitly_enabled"')<authIndex,
+    "legacy email route must fail closed until explicitly enabled");
+  for(const guard of [
+    "hasVendorRegistrationConsent(input.registration_consent_accepted)",
+    "isValidOptionalGstin(input.gst_number)",
+    "isValidIndianMobile(phoneDigits)",
+    "resolveActiveCity(input.city)",
+    'scope: "vendor-auth-principal-create-phone"',
+    'scope: "vendor-auth-principal-create-email"',
+  ]) {
+    const pos=block.indexOf(guard);
+    assert.ok(pos>=0 && pos<authIndex,guard+" must run before Auth principal creation");
+  }
+  assert.match(block,/phoneDigits = String\(input\.phone \?\? ""\)\.replace\(\/\\D\/g, ""\)/);
+  assert.match(block,/Number\.isFinite\(input\.office_latitude\)/);
+});
+
+test("S11 no public raw Auth errors or sensitive vendor payload logging",()=>{
+  assert.doesNotMatch(action,/error: authErr\?\.message/);
+  assert.doesNotMatch(service,/console\.log\("Vendor payload:"/);
+  assert.doesNotMatch(service,/console\.error\("Vendor insert error:", error\)/);
+  assert.match(action,/code: "AUTH_SIGNUP_FAILED"/);
+});

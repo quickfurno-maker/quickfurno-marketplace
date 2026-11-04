@@ -131,7 +131,7 @@ export function createPrivateVendorEvidenceStorage(): PrivateEvidenceObjectStora
           maxBytes < 8 || maxBytes > 5 * 1024 * 1024)
         return null;
       await assertPrivate();
-      const { data, error } = await adminClient().storage.from(bucket).download(key);
+      const { data, error } = await adminClient().storage.from("qf-vendor-verification-private").download(key);
       if (error || !data) throw new Error("PRIVATE_EVIDENCE_READ_UNAVAILABLE");
       if (data.size < 8 || data.size > maxBytes) return null;
       const bytes = new Uint8Array(await data.arrayBuffer());

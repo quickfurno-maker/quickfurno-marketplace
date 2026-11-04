@@ -780,7 +780,7 @@
       "name": "vendor_private_scan_quarantine",
       "filename": "20261104173000_vendor_private_scan_quarantine.sql",
       "path": "supabase/migrations/20261104173000_vendor_private_scan_quarantine.sql",
-      "canonicalSha256": "c44f0fce907e4949a504156ee36b8550cd52236f8aef60c4651a284efdc76ac9",
+      "canonicalSha256": "da53a260e9a15b39c24701e480f3d52759965406c8fbbebc2ac383767f481a68",
       "exactVersionPresence": {
         "staging": false,
         "production": false

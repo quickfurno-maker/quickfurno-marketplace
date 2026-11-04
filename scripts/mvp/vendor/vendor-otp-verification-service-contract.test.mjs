@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const source=readFileSync("services/vendorSignupOtpVerificationService.ts","utf8");
+const code=source.replace(/\/\*[\s\S]*?\*\//g," ").replace(/^\s*\/\/.*$/gm,"");
 const position=(text)=>source.indexOf(text);
 
 test("V1 vendor OTP verifier has no public route and is operationally OFF by default",()=>{
@@ -21,7 +22,7 @@ test("V2 code possession comes from request-scoped Supabase Auth, not browser cl
   assert.match(source,/user\.id !== verified\.user\.id/);
   assert.match(source,/user\.phone !== phoneE164/);
   assert.ok(position("await sb.auth.verifyOtp") < position("await sb.auth.getUser()"));
-  assert.doesNotMatch(source,/\.auth\.admin\.|\.signInWithPassword\(|user_metadata|app_metadata/);
+  assert.doesNotMatch(code,/\.auth\.admin\.|\.signInWithPassword\(|user_metadata|app_metadata/);
 });
 
 test("V3 missing, mismatched or cross-lane proof kills the authenticated local session",()=>{

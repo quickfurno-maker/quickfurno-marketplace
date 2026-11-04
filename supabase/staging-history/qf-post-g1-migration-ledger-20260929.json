@@ -738,6 +738,18 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-11-04_ATOMIC_SIGNUP_PRIVATE_PG17_CONTRACT_NO_REMOTE_APPLY"
+    },
+    {
+      "version": "20261104160000",
+      "name": "vendor_owner_review_assignment_gate",
+      "filename": "20261104160000_vendor_owner_review_assignment_gate.sql",
+      "path": "supabase/migrations/20261104160000_vendor_owner_review_assignment_gate.sql",
+      "canonicalSha256": "02c7f1cba91b4b741daa30a3bf3631e6d3db40a5aaafdc3f3b7a3979c90cd66a",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-11-04_OWNER_REVIEW_ASSIGNMENT_GUARD_PG17_NO_REMOTE_APPLY"
     }
   ],
   "supersededLegacyPins": [

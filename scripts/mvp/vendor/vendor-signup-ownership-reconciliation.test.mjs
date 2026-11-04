@@ -84,3 +84,9 @@ test("O12 verified phone row disagreement is never resolved by selecting first",
   const snapshot=existing();snapshot.vendorsByMobile=[vendor({id:V2})];
   assert.equal(reconcileVerifiedVendorOwnership(linked(),snapshot).kind,"deny");
 });
+
+test("O13 linked vendor with neutral profile must be owner-repaired before dashboard resume", () => {
+  assert.deepEqual(reconcileVerifiedVendorOwnership(linked({existingProfileRole:null}),existing()),{
+    kind:"owner_repair_required",vendorId:V,reason:"missing_vendor_profile"
+  });
+});

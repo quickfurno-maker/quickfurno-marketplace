@@ -9,7 +9,7 @@
     "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
   },
   "totals": {
-    "files": 170,
+    "files": 171,
     "rpcNames": 102,
     "tableNames": 134,
     "storageBuckets": 1,
@@ -312,12 +312,8 @@
         "qf_vendor_attach_private_evidence",
         "qf_vendor_begin_private_verification_case"
       ],
-      "tables": [
-        "qf-vendor-verification-private"
-      ],
-      "storageBuckets": [
-        "qf-vendor-verification-private"
-      ],
+      "tables": [],
+      "storageBuckets": [],
       "auth": true,
       "realtime": false
     },
@@ -807,6 +803,19 @@
         "marketplace_service_zones"
       ],
       "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/storage/supabaseObjectStorage.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "qf-vendor-verification-private"
+      ],
+      "storageBuckets": [
+        "qf-vendor-verification-private"
+      ],
       "auth": false,
       "realtime": false
     },

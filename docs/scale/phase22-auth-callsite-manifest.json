@@ -15,7 +15,7 @@
     "userMetadata": "NEVER_AUTHORIZATION"
   },
   "totals": {
-    "getUser": 12,
+    "getUser": 13,
     "getSession": 0,
     "signInWithPassword": 2,
     "signInWithOtp": 1,
@@ -140,6 +140,14 @@
       "file": "services/vendorPasswordResetService.ts",
       "operations": {
         "admin": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "services/vendorSignupOwnershipReadService.ts",
+      "operations": {
+        "getUser": 1
       },
       "usesAppMetadata": false,
       "usesUserMetadata": false

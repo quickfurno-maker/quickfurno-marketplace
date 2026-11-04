@@ -762,6 +762,18 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-11-04_PRIVATE_VENDOR_INTAKE_PG17_NO_REMOTE_APPLY"
+    },
+    {
+      "version": "20261104170000",
+      "name": "vox_owner_vendor_review_queue",
+      "filename": "20261104170000_vox_owner_vendor_review_queue.sql",
+      "path": "supabase/migrations/20261104170000_vox_owner_vendor_review_queue.sql",
+      "canonicalSha256": "47dd11398806729bb93609857cf037cb3123cc0faaf703383a4885f287fe7012",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-11-04_VOX_OWNER_PRIVATE_REVIEW_QUEUE_PG17_NO_REMOTE_APPLY"
     }
   ],
   "supersededLegacyPins": [

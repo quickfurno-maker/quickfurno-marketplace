@@ -15,7 +15,7 @@ const actions = read("app/actions.ts");
 let count=0;
 function check(name,ok){if(!ok)throw new Error("V3_ADMIN_APPROVAL_FAIL:"+name);console.log("PASS",name);count++;}
 check("admin nav destination",nav.includes('/admin/vendor-approvals')&&nav.includes('key: "vendor-approvals"'));
-check("navigation command group",nav.includes('"vendor-approvals", "vendor-crm"'));
+check("navigation command group",nav.includes('"vendors", "vendor-approvals", "vendor-verification", "vendor-crm"')&&nav.includes('key: "vendor-verification", href: "/admin/vendor-verification"'));
 check("server page Superadmin-only",page.includes("session.isSuperadmin")&&page.includes('redirect("/admin/login?error=unauthorized")'));
 check("server queue fetch",page.includes("listPendingVendorProfileChangeRequests()"));
 check("bounded oldest-first",service.includes('.order("created_at", { ascending: true })\n      .limit(100)'));

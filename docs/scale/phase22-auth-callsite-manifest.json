@@ -15,7 +15,7 @@
     "userMetadata": "NEVER_AUTHORIZATION"
   },
   "totals": {
-    "getUser": 15,
+    "getUser": 16,
     "getSession": 0,
     "signInWithPassword": 2,
     "signInWithOtp": 1,
@@ -114,6 +114,14 @@
       "file": "services/vendorAccessService.ts",
       "operations": {
         "getUser": 3
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "services/vendorAtomicSignupService.ts",
+      "operations": {
+        "getUser": 1
       },
       "usesAppMetadata": false,
       "usesUserMetadata": false

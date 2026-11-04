@@ -486,6 +486,25 @@
       "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_APPLY_2026-10-03"
     },
     {
+      "version": "20261003081046",
+      "name": "aarohi_full_fk_index_closeout",
+      "filename": "20261003081046_aarohi_full_fk_index_closeout.sql",
+      "path": "supabase/migrations/20261003081046_aarohi_full_fk_index_closeout.sql",
+      "canonicalSha256": "f4249c4582498ac3ef59d0374ccfdc343facde338c5cd62535614104dc21192e",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "stagingSemanticApplication": "PROVEN",
+      "observedStagingAppliedVersion": "20261003081215",
+      "stagingApplyReplayCount": 1,
+      "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_AAROHI_FULL_FK_INDEX_CLOSEOUT_2026-10-03",
+      "stagingAdvisorClosure": {
+        "indexesPresent": 17,
+        "targetForeignKeyWarningsRemaining": 0
+      }
+    },
+    {
       "version": "20261003083000",
       "name": "aarohi_phase2_scale_governance",
       "filename": "20261003083000_aarohi_phase2_scale_governance.sql",
@@ -553,23 +572,40 @@
       }
     },
     {
-      "version": "20261003081046",
-      "name": "aarohi_full_fk_index_closeout",
-      "filename": "20261003081046_aarohi_full_fk_index_closeout.sql",
-      "path": "supabase/migrations/20261003081046_aarohi_full_fk_index_closeout.sql",
-      "canonicalSha256": "f4249c4582498ac3ef59d0374ccfdc343facde338c5cd62535614104dc21192e",
+      "version": "20261004190000",
+      "name": "scale_phase07_durable_jobs_hardening",
+      "filename": "20261004190000_scale_phase07_durable_jobs_hardening.sql",
+      "path": "supabase/migrations/20261004190000_scale_phase07_durable_jobs_hardening.sql",
+      "canonicalSha256": "a3e0f84de2b3f107ea12e6febb7cb5419f22a06c8ad675ab362f2fe244bedc04",
       "exactVersionPresence": {
         "staging": false,
         "production": false
       },
-      "stagingSemanticApplication": "PROVEN",
-      "observedStagingAppliedVersion": "20261003081215",
-      "stagingApplyReplayCount": 1,
-      "evidence": "FIRST_PARTY_SUPABASE_MCP_STAGING_AAROHI_FULL_FK_INDEX_CLOSEOUT_2026-10-03",
-      "stagingAdvisorClosure": {
-        "indexesPresent": 17,
-        "targetForeignKeyWarningsRemaining": 0
-      }
+      "evidence": "SOURCE_PIN_CREATED_2026-10-04_BEFORE_DEPLOYMENT"
+    },
+    {
+      "version": "20261004190001",
+      "name": "scale_phase08_matching_prefilter",
+      "filename": "20261004190001_scale_phase08_matching_prefilter.sql",
+      "path": "supabase/migrations/20261004190001_scale_phase08_matching_prefilter.sql",
+      "canonicalSha256": "5ab95933887e8127ccdbd86127dff313a6a7efef8d5253c1275e2cc2ad7b9d84",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-04_BEFORE_DEPLOYMENT"
+    },
+    {
+      "version": "20261004190002",
+      "name": "scale_phase09_data_lifecycle",
+      "filename": "20261004190002_scale_phase09_data_lifecycle.sql",
+      "path": "supabase/migrations/20261004190002_scale_phase09_data_lifecycle.sql",
+      "canonicalSha256": "1c3880d334877b4bce174a23fc1398f35cd3ea16fa3132ceb404f40552b9cd7e",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-10-04_BEFORE_DEPLOYMENT"
     },
     {
       "version": "20261005160000",
@@ -606,42 +642,6 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-10-05_BEFORE_DEPLOYMENT"
-    },
-    {
-      "version": "20261004190002",
-      "name": "scale_phase09_data_lifecycle",
-      "filename": "20261004190002_scale_phase09_data_lifecycle.sql",
-      "path": "supabase/migrations/20261004190002_scale_phase09_data_lifecycle.sql",
-      "canonicalSha256": "1c3880d334877b4bce174a23fc1398f35cd3ea16fa3132ceb404f40552b9cd7e",
-      "exactVersionPresence": {
-        "staging": false,
-        "production": false
-      },
-      "evidence": "SOURCE_PIN_CREATED_2026-10-04_BEFORE_DEPLOYMENT"
-    },
-    {
-      "version": "20261004190001",
-      "name": "scale_phase08_matching_prefilter",
-      "filename": "20261004190001_scale_phase08_matching_prefilter.sql",
-      "path": "supabase/migrations/20261004190001_scale_phase08_matching_prefilter.sql",
-      "canonicalSha256": "5ab95933887e8127ccdbd86127dff313a6a7efef8d5253c1275e2cc2ad7b9d84",
-      "exactVersionPresence": {
-        "staging": false,
-        "production": false
-      },
-      "evidence": "SOURCE_PIN_CREATED_2026-10-04_BEFORE_DEPLOYMENT"
-    },
-    {
-      "version": "20261004190000",
-      "name": "scale_phase07_durable_jobs_hardening",
-      "filename": "20261004190000_scale_phase07_durable_jobs_hardening.sql",
-      "path": "supabase/migrations/20261004190000_scale_phase07_durable_jobs_hardening.sql",
-      "canonicalSha256": "a3e0f84de2b3f107ea12e6febb7cb5419f22a06c8ad675ab362f2fe244bedc04",
-      "exactVersionPresence": {
-        "staging": false,
-        "production": false
-      },
-      "evidence": "SOURCE_PIN_CREATED_2026-10-04_BEFORE_DEPLOYMENT"
     },
     {
       "version": "20261006113000",
@@ -720,12 +720,24 @@
       "name": "vendor_private_otp_and_verification_foundation",
       "filename": "20261104140000_vendor_private_otp_and_verification_foundation.sql",
       "path": "supabase/migrations/20261104140000_vendor_private_otp_and_verification_foundation.sql",
-      "canonicalSha256": "b7c8b2f2ff5b4a91605d7842f3d8e65f949fa29bc81a6bf4e4b54f96f338ca6f",
+      "canonicalSha256": "cb5a4e1f74c6cbc6a6f4a89464c4d7235956b2ae9b71c3bd79bf39ed70581f48",
       "exactVersionPresence": {
         "staging": false,
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-11-04_PRIVATE_PG_17_SYNTHETIC_REHEARSAL_NO_REMOTE_APPLY"
+    },
+    {
+      "version": "20261104153000",
+      "name": "vendor_atomic_pending_registration",
+      "filename": "20261104153000_vendor_atomic_pending_registration.sql",
+      "path": "supabase/migrations/20261104153000_vendor_atomic_pending_registration.sql",
+      "canonicalSha256": "7bebd45ce9c6f289930e7927da46e953c29eaf268396a2cb6c89a0cfc7cc0a4a",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-11-04_ATOMIC_SIGNUP_PRIVATE_PG17_CONTRACT_NO_REMOTE_APPLY"
     }
   ],
   "supersededLegacyPins": [

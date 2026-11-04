@@ -744,7 +744,7 @@
       "name": "vendor_owner_review_assignment_gate",
       "filename": "20261104160000_vendor_owner_review_assignment_gate.sql",
       "path": "supabase/migrations/20261104160000_vendor_owner_review_assignment_gate.sql",
-      "canonicalSha256": "02c7f1cba91b4b741daa30a3bf3631e6d3db40a5aaafdc3f3b7a3979c90cd66a",
+      "canonicalSha256": "177c8f11ffeee951040e04bdb1a75e0391308ba022e00cdbd979a675a352e89e",
       "exactVersionPresence": {
         "staging": false,
         "production": false

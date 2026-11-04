@@ -22,6 +22,130 @@ create trigger verification_scan_receipts_immutable
  before update or delete on qf_vendor_private.verification_scan_receipts
  for each row execute function qf_vendor_private.block_decision_mutation();
 
+-- Defense in depth: neither stale clean flags nor Owner review case decisions
+-- can satisfy new assignment eligibility without an immutable genuine local
+-- scanner receipt. Previously approved cases lacking this proof FAIL CLOSED.
+create or replace function public.qf_vendor_verification_case_ready(
+  p_vendor_id uuid
+) returns boolean language sql stable security definer set search_path=pg_catalog
+as $
+  select exists (
+    select 1 from qf_vendor_private.verification_cases c
+    where c.vendor_id=p_vendor_id
+      and c.case_version=(select max(n.case_version)
+                          from qf_vendor_private.verification_cases n
+                          where n.vendor_id=p_vendor_id)
+      and c.state='approved'
+      and c.contact_status='verified' and c.identity_status='verified'
+      and c.office_status='verified' and c.category_status='verified'
+      and c.zone_status='verified'
+      and c.reviewer_user_id is not null and c.reviewed_at is not null
+      and (c.expires_at is null or c.expires_at>now())
+      and exists (
+        select 1 from qf_vendor_private.verification_consents consent
+         where consent.case_id=c.id and consent.revoked_at is null
+           and consent.consented_at<=now()
+      )
+      and exists (
+        select 1 from qf_vendor_private.verification_evidence identity_doc
+         where identity_doc.case_id=c.id
+           and identity_doc.evidence_type='identity_attestation'
+           and identity_doc.evidence_state='verified'
+           and identity_doc.scan_status in ('clean','not_applicable')
+           and identity_doc.reviewed_by is not null
+           and identity_doc.reviewed_at is not null
+           and (identity_doc.processor_reference is not null
+                or identity_doc.private_storage_key is not null)
+           and (identity_doc.expires_at is null or identity_doc.expires_at>now())
+      )
+      and exists (
+        select 1 from qf_vendor_private.verification_evidence office_doc
+         where office_doc.case_id=c.id
+           and office_doc.evidence_type='office_proof'
+           and office_doc.evidence_state='verified'
+           and office_doc.scan_status='clean'
+           and exists (
+             select 1 from qf_vendor_private.verification_scan_receipts scan
+              where scan.evidence_id=office_doc.id
+                and scan.case_id=office_doc.case_id
+                and scan.content_sha256=office_doc.content_sha256
+                and scan.scanner_engine='clamav_local'
+                and scan.verdict='clean'
+           )
+           and office_doc.private_storage_key is not null
+           and office_doc.reviewed_by is not null
+           and office_doc.reviewed_at is not null
+           and (office_doc.expires_at is null or office_doc.expires_at>now())
+      )
+      and exists (
+        select 1 from qf_vendor_private.verification_decisions decision
+         where decision.case_id=c.id
+           and decision.action='approve'
+           and decision.to_state='approved'
+           and decision.reviewer_user_id=c.reviewer_user_id
+      )
+  );
+$;
+create or replace function public.qf_vendor_owner_review_snapshot(
+  p_vendor_id uuid
+) returns jsonb language plpgsql stable security definer
+set search_path=pg_catalog as $
+declare
+  c qf_vendor_private.verification_cases%rowtype;
+  v_consent boolean;
+  v_identity boolean;
+  v_office boolean;
+  v_ready boolean;
+begin
+  if p_vendor_id is null then return null; end if;
+  select * into c from qf_vendor_private.verification_cases v
+    where v.vendor_id=p_vendor_id
+    order by v.case_version desc limit 1;
+  if not found then
+    return jsonb_build_object('casePresent',false,'readyForCoreApproval',false);
+  end if;
+  select exists(select 1 from qf_vendor_private.verification_consents x
+                where x.case_id=c.id and x.revoked_at is null
+                  and x.consented_at<=now()) into v_consent;
+  select exists(select 1 from qf_vendor_private.verification_evidence x
+                where x.case_id=c.id and x.evidence_type='identity_attestation'
+                  and x.evidence_state='verified'
+                  and x.reviewed_by is not null and x.reviewed_at is not null
+                  and x.scan_status in ('clean','not_applicable')
+                  and (x.processor_reference is not null or x.private_storage_key is not null)
+                  and (x.expires_at is null or x.expires_at>now())) into v_identity;
+  select exists(select 1 from qf_vendor_private.verification_evidence x
+                where x.case_id=c.id and x.evidence_type='office_proof'
+                  and x.evidence_state='verified' and x.scan_status='clean'
+           and exists (
+             select 1 from qf_vendor_private.verification_scan_receipts scan
+              where scan.evidence_id=x.id
+                and scan.case_id=x.case_id
+                and scan.content_sha256=x.content_sha256
+                and scan.scanner_engine='clamav_local'
+                and scan.verdict='clean'
+           )
+                  and x.private_storage_key is not null
+                  and x.reviewed_by is not null and x.reviewed_at is not null
+                  and (x.expires_at is null or x.expires_at>now())) into v_office;
+  v_ready:=public.qf_vendor_verification_case_ready(p_vendor_id);
+  return jsonb_build_object(
+    'casePresent',true, 'caseId',c.id, 'caseVersion',c.case_version,
+    'state',c.state,
+    'contactStatus',c.contact_status,
+    'identityStatus',c.identity_status,
+    'officeStatus',c.office_status,
+    'categoryStatus',c.category_status,
+    'zoneStatus',c.zone_status,
+    'consentValid',v_consent,
+    'identityEvidenceVerified',v_identity,
+    'officeEvidenceVerified',v_office,
+    'reviewed',c.reviewer_user_id is not null,
+    'readyForCoreApproval',v_ready
+  );
+end;
+$;
+
 -- Worker-only, bounded fetch. Storage keys never leave the server-held service
 -- role process and must not be copied into VOX or any public JSON response.
 create or replace function public.qf_vendor_private_scan_queue()

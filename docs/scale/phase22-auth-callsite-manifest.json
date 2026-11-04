@@ -16,7 +16,7 @@
   },
   "totals": {
     "getUser": 17,
-    "getSession": 1,
+    "getSession": 0,
     "signInWithPassword": 2,
     "signInWithOtp": 2,
     "verifyOtp": 2,
@@ -65,14 +65,6 @@
         "getUser": 1,
         "signOut": 1,
         "updateUser": 1
-      },
-      "usesAppMetadata": false,
-      "usesUserMetadata": false
-    },
-    {
-      "file": "components/vox/OwnerVendorVerificationDashboard.tsx",
-      "operations": {
-        "getSession": 1
       },
       "usesAppMetadata": false,
       "usesUserMetadata": false

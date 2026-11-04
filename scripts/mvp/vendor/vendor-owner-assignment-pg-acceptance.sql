@@ -5,7 +5,7 @@ declare
  owner_id uuid:='00000000-0000-4000-8000-000000000005';
  wrong_id uuid:='00000000-0000-4000-8000-000000000002';
  vendor_id uuid;
- case_id uuid:='30000000-0000-4000-8000-000000000008';
+ v_case_id uuid:='30000000-0000-4000-8000-000000000008';
  state text;
  snap jsonb;
  decision_count bigint;
@@ -30,7 +30,7 @@ begin
  state:=public.qf_owner_record_vendor_verification_decision(
    vendor_id,owner_id,'approve','approved_evidence');
  if state <> 'evidence_required' then raise exception 'B5_UNPROVEN_CASE_APPROVED'; end if;
- if exists(select 1 from qf_vendor_private.verification_decisions where case_id=case_id) then
+ if exists(select 1 from qf_vendor_private.verification_decisions where d.case_id=v_case_id) then
    raise exception 'B5_FALSE_AUDIT_CREATED'; end if;
 
  state:=public.qf_owner_record_vendor_verification_decision(
@@ -66,12 +66,12 @@ begin
  if snap::text like '%synthetic-private%' or snap::text like '%private/synthetic%'
    then raise exception 'B5_PRIVATE_STORAGE_KEY_EXPOSED'; end if;
  select count(*) into decision_count
-  from qf_vendor_private.verification_decisions d where d.case_id=case_id;
+  from qf_vendor_private.verification_decisions d where d.case_id=v_case_id;
  if decision_count <> 3 then raise exception 'B5_IMMUTABLE_AUDIT_COUNT_DRIFT %',decision_count; end if;
  state:=public.qf_owner_record_vendor_verification_decision(
    vendor_id,owner_id,'approve','approved_evidence');
  if state <> 'case_not_reviewable' then raise exception 'B5_DUPLICATE_APPROVAL'; end if;
- if (select count(*) from qf_vendor_private.verification_decisions d where d.case_id=case_id)<>3
+ if (select count(*) from qf_vendor_private.verification_decisions d where d.case_id=v_case_id)<>3
    then raise exception 'B5_DUPLICATE_DECISION_INSERTED'; end if;
  raise notice 'PASS Owner review: AAL2 backend gate, private evidence, immutable audit, no PII projection';
 end $$;

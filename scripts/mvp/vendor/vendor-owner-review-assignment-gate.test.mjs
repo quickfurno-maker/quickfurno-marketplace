@@ -22,6 +22,8 @@ test("B51 latest private verification case supersedes any historical approval",(
 test("B52 Owner approval writes immutable audit and never vendor/credit mutations",()=>{
   assert.match(sql,/create or replace function public\.qf_owner_record_vendor_verification_decision/);
   assert.match(sql,/p_action is null or p_action not in/);
+  assert.match(sql,/p_expected_case_version is null/);
+  assert.match(sql,/c\.case_version is distinct from p_expected_case_version/);
   assert.match(sql,/p\.role='admin' and p\.is_active is true/);
   assert.match(sql,/a\.raw_app_meta_data->>'admin_role'='Superadmin'/);
   assert.match(sql,/pg_advisory_xact_lock/);
@@ -51,8 +53,9 @@ test("B54 VOX Owner route is staging-OFF, bearer-AAL2, strict and no private doc
   assert.match(route,/verifyVoxOwnerBearer\(request\.headers\.get\("authorization"\)\)/);
   assert.match(route,/qf_vendor_owner_review_snapshot/);
   assert.match(route,/qf_owner_record_vendor_verification_decision/);
-  assert.match(route,/keys\.join\(","\)!=="action,reasonCode,vendorId"/);
+  assert.match(route,/keys\.join\(","\)!=="action,caseVersion,reasonCode,vendorId"/);
   assert.match(route,/p_reviewer_user_id:owner/);
+  assert.match(route,/p_expected_case_version:body\.caseVersion/);
   assert.match(route,/private, no-store, max-age=0/);
   assert.match(route,/canViewPrivateDocuments:false/);
   assert.match(route,/requiresSeparateCoreVendorApproval:true/);

@@ -28,9 +28,11 @@ export async function registerVendor(
     // 1. Clean phone and whatsapp numbers to 10 digits
     // Verified Supabase phone is E.164, while vendors.phone stores 10 digits.
     // Never silently strip an unrelated country code or arbitrary punctuation.
-    const cleanedPhone = normalizeVerifiedVendorMobile(input.phone) ?? "";
+    const verifiedMobile = normalizeVerifiedVendorMobile(input.phone);
+    // Preserve the ten-digit vendor storage contract after strict +91 validation.
+    const cleanedPhone = (verifiedMobile ?? "").replace(/\D/g, "");
     const cleanedWhatsapp = input.whatsapp_number
-      ? normalizeVerifiedVendorMobile(input.whatsapp_number) ?? ""
+      ? (normalizeVerifiedVendorMobile(input.whatsapp_number) ?? "").replace(/\D/g, "")
       : cleanedPhone;
 
     // 2. Validate all required fields before database call

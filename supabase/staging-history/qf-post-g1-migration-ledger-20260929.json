@@ -732,7 +732,7 @@
       "name": "vendor_atomic_pending_registration",
       "filename": "20261104153000_vendor_atomic_pending_registration.sql",
       "path": "supabase/migrations/20261104153000_vendor_atomic_pending_registration.sql",
-      "canonicalSha256": "7bebd45ce9c6f289930e7927da46e953c29eaf268396a2cb6c89a0cfc7cc0a4a",
+      "canonicalSha256": "2f62663edc5f64122f771f8c141019933b7f4eba1680a8a62a8af9c150972596",
       "exactVersionPresence": {
         "staging": false,
         "production": false

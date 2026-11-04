@@ -20,7 +20,7 @@ declare
   v_version integer;
 begin
   if p_vendor_id is null or p_auth_user_id is null
-     or p_identity_method not in ('aadhaar_offline','passport','driving_licence','voter_id')
+     or p_identity_method is null or p_identity_method not in ('aadhaar_offline','passport','driving_licence','voter_id')
      or p_notice_version is distinct from '2026-11-04-v1'
      then return null; end if;
 
@@ -87,7 +87,7 @@ declare
   v_evidence_id uuid;
 begin
   if p_vendor_id is null or p_auth_user_id is null or p_case_id is null
-     or p_evidence_type not in ('office_proof','category_proof')
+     or p_evidence_type is null or p_evidence_type not in ('office_proof','category_proof')
      or p_sha256 is null or p_sha256 !~ '^[0-9a-f]{64}$'
      or p_storage_key is null
      or length(p_storage_key)>220
@@ -100,11 +100,14 @@ begin
     select 1 from public.vendors v
       join public.vendor_dashboard_users m
        on m.vendor_id=v.id and m.user_id=p_auth_user_id
+      join public.profiles p on p.id=p_auth_user_id
       join auth.users u on u.id=p_auth_user_id
     where v.id=p_vendor_id and v.user_id=p_auth_user_id
       and v.status='Pending' and v.is_active=false
-      and m.role='owner' and m.status='active'
+      and m.role='owner' and m.status='active' and p.role='vendor'
       and u.phone_confirmed_at is not null and u.phone='+91'||v.phone
+      and not exists(select 1 from public.client_accounts c
+       where c.user_id=p_auth_user_id or c.phone_e164=u.phone)
   ) then return null; end if;
 
   select c.id into v_case_id from qf_vendor_private.verification_cases c

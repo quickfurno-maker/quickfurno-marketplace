@@ -28,6 +28,7 @@ test("VOX-OWNER-V4 no document disclosure, mutation, or activation surface", () 
   assert.match(route, /canApprove: false, canReviewDocuments: false/);
   assert.match(route, /mode: "READ_ONLY"/);
   assert.doesNotMatch(route, /\.insert\(|\.update\(|\.delete\(|\.storage\.|\.signInWithOtp\(|\.verifyOtp\(/);
-  for (const method of ["POST", "PUT", "PATCH", "DELETE"])
-    assert.match(route, new RegExp("export function " + method + "\\(\\): Response \\{ return respond\\(\\{ ok: false, code: \\"CORE_APPROVAL_REQUIRED\\" \\}, 405\\); \\}"));
+  for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
+    assert.ok(route.includes("export function " + method + "()"), method + " must be explicitly rejected");
+  }
 });

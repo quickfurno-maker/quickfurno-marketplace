@@ -21,7 +21,7 @@ begin
  insert into qf_vendor_private.verification_cases
    (id,vendor_id,case_version,state,contact_status,identity_status,
     office_status,category_status,zone_status)
- values (case_id,vendor_id,1,'pending','verified','verified',
+ values (v_case_id,vendor_id,1,'pending','verified','verified',
          'verified','verified','verified');
 
  state:=public.qf_owner_record_vendor_verification_decision(
@@ -30,7 +30,7 @@ begin
  state:=public.qf_owner_record_vendor_verification_decision(
    vendor_id,owner_id,'approve','approved_evidence');
  if state <> 'evidence_required' then raise exception 'B5_UNPROVEN_CASE_APPROVED'; end if;
- if exists(select 1 from qf_vendor_private.verification_decisions where d.case_id=v_case_id) then
+ if exists(select 1 from qf_vendor_private.verification_decisions d where d.case_id=v_case_id) then
    raise exception 'B5_FALSE_AUDIT_CREATED'; end if;
 
  state:=public.qf_owner_record_vendor_verification_decision(
@@ -42,14 +42,14 @@ begin
 
  insert into qf_vendor_private.verification_consents
   (case_id,method,notice_version,consented_at)
- values (case_id,'driving_licence','2026-11-04-v1',now());
+ values (v_case_id,'driving_licence','2026-11-04-v1',now());
  insert into qf_vendor_private.verification_evidence
   (case_id,evidence_type,processor_reference,scan_status,evidence_state,reviewed_by,reviewed_at)
- values (case_id,'identity_attestation','synthetic-private-id-ref',
+ values (v_case_id,'identity_attestation','synthetic-private-id-ref',
          'not_applicable','verified',owner_id,now());
  insert into qf_vendor_private.verification_evidence
   (case_id,evidence_type,private_storage_key,scan_status,evidence_state,reviewed_by,reviewed_at)
- values (case_id,'office_proof','private/synthetic/office-ref',
+ values (v_case_id,'office_proof','private/synthetic/office-ref',
          'clean','verified',owner_id,now());
 
  state:=public.qf_owner_record_vendor_verification_decision(

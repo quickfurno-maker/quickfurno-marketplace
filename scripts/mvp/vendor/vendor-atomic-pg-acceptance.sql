@@ -141,7 +141,7 @@ declare
   dest text:=repeat('8',64);
   req jsonb;
   result text;
-  id uuid;
+  legacy_vendor_id uuid;
 begin
   req:=jsonb_build_object(
     'phone','6543210987','business_name','Existing Owner','owner_name','Existing',
@@ -163,12 +163,12 @@ begin
   update public.profiles set role='vendor' where id=u;
   insert into public.vendors(user_id,business_name,phone,city,status,is_active)
     values(u,'Historical Linked Pending','6543210987','Pune','Pending',false)
-    returning id into id;
+    returning id into legacy_vendor_id;
   select outcome into result from public.qf_register_pending_vendor_atomic(
     u,digest,dest,'meta_whatsapp',req);
   if result is distinct from 'owner_repair_required'
     then raise exception 'MISSING_MEMBERSHIP_AUTO_REPAIRED %',result; end if;
-  if exists (select 1 from public.vendor_dashboard_users where vendor_id=id)
+  if exists (select 1 from public.vendor_dashboard_users where vendor_id=legacy_vendor_id)
     then raise exception 'PUBLIC_SIGNUP_ADOPTED_MEMBER'; end if;
   raise notice 'PASS Owner-only repair, no automatic dashboard adoption';
 end $$;

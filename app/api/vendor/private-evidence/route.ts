@@ -12,7 +12,6 @@ import { allowPublicMutation } from "@/lib/security/publicMutationRateLimit";
 
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
-const BUCKET="qf-vendor-verification-private";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_SIZE=5*1024*1024;
 const MAX_BODY=MAX_SIZE+65536;
@@ -93,10 +92,15 @@ export async function POST(request:Request):Promise<Response>{
   if(caseError||typeof caseId!=="string"||!UUID.test(caseId))
    return reply({ok:false,code:"PRIVATE_CASE_UNAVAILABLE"},409);
 
+  // A private bucket must exist and remain non-public even if an operator
+  // accidentally enables a feature flag in an unsafe environment.
+  const bucketState=await db.storage.getBucket("qf-vendor-verification-private");
+  if(bucketState.error || !bucketState.data || bucketState.data.public!==false)
+    return reply({ok:false,code:"PRIVATE_BUCKET_NOT_CERTIFIED"},503);
   const key=`vendors/${vendorId}/${randomUUID()}.${accepted.ext}`;
   // PRIVATE bucket only. No signed public URL, service-role key or raw upload
   // file name is returned. A missing bucket is a hard refusal.
-  const {error:uploadError}=await db.storage.from(BUCKET).upload(key,binary,{
+  const {error:uploadError}=await db.storage.from("qf-vendor-verification-private").upload(key,binary,{
     cacheControl:"0",contentType:accepted.mime,upsert:false,
   });
   if(uploadError)return reply({ok:false,code:"PRIVATE_UPLOAD_UNAVAILABLE"},503);
@@ -108,7 +112,7 @@ export async function POST(request:Request):Promise<Response>{
     });
   if(linkError||typeof evidenceId!=="string"||!UUID.test(evidenceId)){
     // Only the new, random path created by this request may be removed.
-    try{await db.storage.from(BUCKET).remove([key]);}catch{/* deny anyway */}
+    try{await db.storage.from("qf-vendor-verification-private").remove([key]);}catch{/* deny anyway */}
     return reply({ok:false,code:"EVIDENCE_LINK_FAILED"},503);
   }
   return reply({

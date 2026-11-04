@@ -67,7 +67,19 @@ test("B6 04 Owner panel requires signed AAL2 bearer, exact caseVersion and no ra
 test("B6 05 private proof route is opt-in and never includes Aadhaar/PAN scans",()=>{
  assert.match(upload,/QF_VENDOR_PRIVATE_EVIDENCE_MODE==="staging"/);
  assert.match(upload,/QF_VENDOR_PRIVATE_BUCKET_CERTIFIED==="staging"/);
- assert.match(upload,/qf-vendor-verification-private/);
+ const providerAdapter=src("lib/storage/supabaseObjectStorage.ts");
+ const privatePort=src("lib/storage/objectStorage.ts");
+ assert.match(upload,/createPrivateVendorEvidenceStorage/);
+ assert.match(upload,/privateEvidenceStorage\.assertPrivate\(\)/);
+ assert.match(upload,/privateEvidenceStorage\.put\(/);
+ assert.match(upload,/privateEvidenceStorage\.remove\(/);
+ assert.match(providerAdapter,/const bucket = "qf-vendor-verification-private"/);
+ assert.match(providerAdapter,/adminClient\(\)\.storage\.getBucket\(bucket\)/);
+ assert.match(providerAdapter,/data\.public !== false/);
+ assert.match(privatePort,/export interface PrivateEvidenceObjectStorage/);
+ assert.doesNotMatch(privatePort.slice(privatePort.indexOf("export interface PrivateEvidenceObjectStorage")),
+  /publicUrl\(|keyFromPublicUrl\(/);
+ assert.doesNotMatch(strip(upload),/\.storage\s*\.\s*from\(|\.storage\s*\.\s*getBucket\(/);
  assert.match(upload,/await sb\.auth\.getUser\(\)/);
  assert.match(upload,/file\.size>MAX_SIZE/);
  assert.match(upload,/Buffer\.from\(await file\.arrayBuffer\(\)\)/);

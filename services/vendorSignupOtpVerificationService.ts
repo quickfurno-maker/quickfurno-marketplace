@@ -71,7 +71,8 @@ export async function verifyVendorSignupWhatsappOtp(
     // Resolve the approved provider BEFORE consuming any code or establishing
     // a session; a disabled/unknown/mock adapter cannot prove WhatsApp OTP.
     const approvedProvider = await runtime.resolveApprovedProvider();
-    if (!approvedProvider || ["mock", "test", "fake", "local", "development"].includes(approvedProvider.trim().toLowerCase()))
+    if (!approvedProvider || !approvedProvider.trim() ||
+        ["mock", "test", "fake", "local", "development"].includes(approvedProvider.trim().toLowerCase()))
       return CLOSED;
 
     sb = await serverClient();
@@ -98,6 +99,8 @@ export async function verifyVendorSignupWhatsappOtp(
       return await deny();
     }
 
+    // Unknown client account ownership is never treated as negative evidence.
+    if (ownership.unsignedEvidence.existingClientAccount !== false) return await deny();
     const admission = evaluateVendorOtpAdmission({
       authUserId: user.id,
       authPhoneE164: user.phone,
@@ -109,7 +112,7 @@ export async function verifyVendorSignupWhatsappOtp(
       expectedProvider: approvedProvider,
       purposeClaim: evidence.purposeClaim,
       existingProfileRole: ownership.unsignedEvidence.existingProfileRole,
-      existingClientAccount: ownership.unsignedEvidence.existingClientAccount === true,
+      existingClientAccount: false, // explicitly proven absent by the signed-session lookup above
       delivery: evidence.delivery,
       nowMs: Date.now(),
     });

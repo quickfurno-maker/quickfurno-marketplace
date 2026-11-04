@@ -32,7 +32,7 @@ test("B52 Owner approval writes immutable audit and never vendor/credit mutation
   assert.match(sql,/insert into qf_vendor_private\.verification_decisions/);
   assert.match(sql,/if p_action='approve'\s+and public\.qf_vendor_verification_case_ready/);
   assert.doesNotMatch(sql,/update public\.vendors|insert into public\.lead_assignments|update public\.vendor_credit/);
-  assert.match(sql,/revoke all on function public\.qf_owner_record_vendor_verification_decision\(uuid,uuid,text,text\)\s+from public,anon,authenticated/);
+  assert.match(sql,/revoke all on function public\.qf_owner_record_vendor_verification_decision\(uuid,uuid,integer,text,text\)\s+from public,anon,authenticated/);
 });
 
 test("B53 New lead assignments require verified case at the DB boundary",()=>{
@@ -65,7 +65,7 @@ test("B54 VOX Owner route is staging-OFF, bearer-AAL2, strict and no private doc
 
 test("B55 SQL privacy and frontend cannot activate vendor by a case review",()=>{
   assert.match(sql,/grant execute on function public\.qf_vendor_owner_review_snapshot\(uuid\) to service_role/);
-  assert.match(sql,/grant execute on function public\.qf_owner_record_vendor_verification_decision\(uuid,uuid,text,text\)\s+to service_role/);
+  assert.match(sql,/grant execute on function public\.qf_owner_record_vendor_verification_decision\(uuid,uuid,integer,text,text\)\s+to service_role/);
   assert.doesNotMatch(sql,/grant execute on function public\.qf_owner_record_vendor_verification_decision.*to authenticated/);
   assert.doesNotMatch(route,/status:"Approved"|canActivateLeads:true|auth\.admin|NEXT_PUBLIC_SERVICE_ROLE/);
 });

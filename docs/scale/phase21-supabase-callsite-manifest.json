@@ -9,11 +9,11 @@
     "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
   },
   "totals": {
-    "files": 163,
+    "files": 164,
     "rpcNames": 96,
     "tableNames": 133,
     "storageBuckets": 0,
-    "authFiles": 17,
+    "authFiles": 18,
     "realtimeFiles": 0
   },
   "rpcNames": [
@@ -2406,6 +2406,15 @@
       ],
       "storageBuckets": [],
       "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorSignupOtpVerificationService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": true,
       "realtime": false
     },
     {

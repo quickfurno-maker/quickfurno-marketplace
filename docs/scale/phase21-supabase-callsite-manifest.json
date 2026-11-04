@@ -9,7 +9,7 @@
     "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
   },
   "totals": {
-    "files": 165,
+    "files": 166,
     "rpcNames": 97,
     "tableNames": 133,
     "storageBuckets": 0,
@@ -371,6 +371,21 @@
       "rpc": [],
       "tables": [
         "vox_operational_intents_v1"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vox/v1/owner-vendor-signup-status/route.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_vendor_verification_case_ready"
+      ],
+      "tables": [
+        "profiles",
+        "vendor_dashboard_users",
+        "vendors"
       ],
       "storageBuckets": [],
       "auth": false,

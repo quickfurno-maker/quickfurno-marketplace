@@ -85,7 +85,7 @@ begin
      or length(v_office) not between 1 and 255
      or length(v_state) not between 1 and 80
      or p_registration->'registration_consent_accepted' is distinct from 'true'::jsonb
-     or p_registration->>'registration_consent_version' <> '2026-11-04-v1'
+     or p_registration->>'registration_consent_version' is distinct from '2026-11-04-v1'
      or (p_registration ? 'whatsapp_number' and
          p_registration->>'whatsapp_number' is distinct from v_mobile)
      or (v_email is not null and (length(v_email)>254 or

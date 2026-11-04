@@ -119,3 +119,68 @@ begin
  then raise exception 'B8_BROWSER_SCAN_PRIVILEGE';end if;
  raise notice 'PASS B8 immutable receipts and service-role-only scan RPC';
 end;$$;
+
+-- Negative bypass acceptance: simply changing an office proof to 'clean'
+-- without a matching immutable scanner receipt is insufficient for Owner
+-- readiness, even if the case status and approval decision are forged.
+do $$
+declare
+ v_owner uuid:='00000000-0000-4000-8000-000000000008';
+ v_vendor uuid:='10000000-0000-4000-8000-000000000008';
+ v_reviewer uuid:='00000000-0000-4000-8000-000000000001';
+ v_case uuid;
+ v_office uuid;
+ v_sha text:=repeat('e',64);
+begin
+ insert into auth.users(id,phone,phone_confirmed_at)
+  values(v_owner,'+919999999998',now());
+ insert into public.profiles(id,role,is_active)
+  values(v_owner,'vendor',true);
+ insert into public.vendors(id,user_id,business_name,owner_name,
+   phone,whatsapp_number,city,status,verification_status,paid_status,
+   is_active,accepting_leads,public_visibility)
+ values(v_vendor,v_owner,'Synthetic Unscanned Office','Owner Eight',
+ '9999999998','9999999998','Pune','Pending','Pending','Unpaid',
+ false,false,false);
+ insert into public.vendor_dashboard_users(vendor_id,user_id,phone,role,status)
+ values(v_vendor,v_owner,'+919999999998','owner','active');
+
+ v_case:=public.qf_vendor_begin_private_verification_case(
+  v_vendor,v_owner,'driving_licence','2026-11-04-v1');
+ if v_case is null then raise exception 'B8_UNSCANNED_CASE_SETUP_FAILED';end if;
+ insert into qf_vendor_private.verification_evidence
+  (case_id,evidence_type,scan_status,evidence_state,
+   processor_reference,reviewed_by,reviewed_at)
+ values(v_case,'identity_attestation','not_applicable','verified',
+ 'synthetic_offline_identity_attestation',v_reviewer,now());
+ insert into qf_vendor_private.verification_evidence
+  (case_id,evidence_type,scan_status,evidence_state,
+   private_storage_key,content_sha256,reviewed_by,reviewed_at)
+ values(v_case,'office_proof','clean','verified',
+  'vendors/'||v_vendor::text||'/70000000-0000-4000-8000-000000000010.pdf',
+  v_sha,v_reviewer,now())
+ returning id into v_office;
+ update qf_vendor_private.verification_cases
+   set state='approved',contact_status='verified',identity_status='verified',
+       office_status='verified',category_status='verified',zone_status='verified',
+       reviewer_user_id=v_reviewer,reviewed_at=now()
+ where id=v_case;
+ insert into qf_vendor_private.verification_decisions
+  (case_id,reviewer_user_id,action,from_state,to_state,reason_code)
+ values(v_case,v_reviewer,'approve','under_review','approved','synthetic_receipt_gate');
+
+ if public.qf_vendor_verification_case_ready(v_vendor)
+ then raise exception 'B8_MISSING_SCAN_RECEIPT_BYPASSED_OWNER_GATE';end if;
+ if (public.qf_vendor_owner_review_snapshot(v_vendor)->>'officeEvidenceVerified')='true'
+ then raise exception 'B8_SNAPSHOT_FALSE_CLEAN_EVIDENCE';end if;
+
+ insert into qf_vendor_private.verification_scan_receipts
+   (evidence_id,case_id,content_sha256,scanner_engine,scanner_build,verdict)
+ values(v_office,v_case,v_sha,'clamav_local','ClamAV_local_engine_v1','clean');
+
+ if not public.qf_vendor_verification_case_ready(v_vendor)
+ then raise exception 'B8_ATTESTED_CLEAN_OWNER_GATE_REFUSED';end if;
+ if (public.qf_vendor_owner_review_snapshot(v_vendor)->>'officeEvidenceVerified')<>'true'
+ then raise exception 'B8_ATTESTED_SNAPSHOT_NOT_VERIFIED';end if;
+ raise notice 'PASS B8 scan receipt mandatory for Owner approval, snapshot and new-assignment gate';
+end;$$;

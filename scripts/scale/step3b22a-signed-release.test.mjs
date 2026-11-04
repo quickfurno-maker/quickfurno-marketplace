@@ -7,6 +7,7 @@ const asOf="2026-11-03T16:10:00Z";
 const payload=()=>({
  environment:"staging",projectRef:"uckafzuochmbvtiodmcl",candidateCommit:commit,
  backupSha256:SHAS.staging,fingerprints:{...FINGERPRINTS.staging},
+ procedureSha256:digest,stagingPostflightEvidenceSha256:digest,
  encryptedAllowlistSha256:digest,recoveryEvidenceSha256:digest,freezeEvidenceSha256:digest,
  issuedAt:"2026-11-03T16:05:00Z",expiresAt:"2026-11-03T16:20:00Z",
  controls:{
@@ -34,7 +35,7 @@ test("A2 canonical document independent of field insertion order",()=>{
 });
 test("A3 test-only all-green verified signatures never return executable approval",()=>{
  const {trust,envelope}=signed();
- const x=evaluateSignedRelease(envelope,trust,asOf);
+ const x=evaluateSignedRelease(envelope,trust,asOf,digest);
  assert.equal(x.decision,"SIGNED_REVIEW_EVIDENCE_PRESENT_MANUAL_CHANGE_REQUIRED");
  assert.equal(x.executable,false);
 });
@@ -72,4 +73,28 @@ test("A8 production cannot be signed without actual staging certification",()=>{
  backupSha256:SHAS.production,fingerprints:{...FINGERPRINTS.production}};
  const {trust,envelope}=signed(p);
  assert.ok(evaluateSignedRelease(envelope,trust,asOf).blockers.includes("STAGING_NOT_CERTIFIED"));
+});
+test("A9 missing exact procedure SHA refuses even independently signed payload",()=>{
+ const p=payload();delete p.procedureSha256;
+ const {trust,envelope}=signed(p);
+ assert.ok(evaluateSignedRelease(envelope,trust,asOf).blockers.includes("EXECUTABLE_SQL_NOT_PINNED"));
+});
+test("A10 changing the reviewed SQL hash after signature invalidates approval",()=>{
+ const {trust,envelope}=signed();
+ envelope.payload.procedureSha256="e".repeat(64);
+ assert.ok(evaluateSignedRelease(envelope,trust,asOf).blockers.some(x=>x.startsWith("INVALID_SIGNATURE")));
+});
+test("A11 Production demands signed Staging postflight evidence digest",()=>{
+ const p={...payload(),environment:"production",projectRef:"yqpgcsduqbxulrlzwzap",
+  backupSha256:SHAS.production,fingerprints:{...FINGERPRINTS.production},stagingCertified:true};
+ delete p.stagingPostflightEvidenceSha256;
+ const {trust,envelope}=signed(p);
+ assert.ok(evaluateSignedRelease(envelope,trust,asOf).blockers.includes("STAGING_POSTFLIGHT_EVIDENCE_NOT_PINNED"));
+});
+test("A12 valid signatures cannot certify a different executed SQL hash",()=>{
+ const {trust,envelope}=signed();
+ assert.ok(evaluateSignedRelease(envelope,trust,asOf,"e".repeat(64)).blockers.includes(
+  "REVIEWED_SQL_DOES_NOT_MATCH_EXECUTION_ARTIFACT"));
+ assert.ok(evaluateSignedRelease(envelope,trust,asOf).blockers.includes(
+  "REVIEWED_SQL_DOES_NOT_MATCH_EXECUTION_ARTIFACT"));
 });

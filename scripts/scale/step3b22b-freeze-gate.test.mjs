@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {checkMaintenanceFreeze,REQUIRED_EXTERNAL_SERVICES,STAGING_PROJECT,KNOWN_STAGING_BOUND_CONTAINERS} from "./step3b22b-freeze-gate.mjs";
+import {checkMaintenanceFreeze,REQUIRED_EXTERNAL_SERVICES,STAGING_PROJECT,PRODUCTION_PROJECT,KNOWN_STAGING_BOUND_CONTAINERS} from "./step3b22b-freeze-gate.mjs";
 const now="2026-11-03T16:10:00Z";
 const counts=()=>({
  registeredWorkers:1,acceptingWorkers:0,workerInFlight:0,recentHeartbeat5m:0,
@@ -93,4 +93,45 @@ test("B12 known Staging-bound container must be present with confirmed Staging s
  const f=good();f.stagingDockerInventory.containers[0].stagingRefPresent=false;
  assert.ok(checkMaintenanceFreeze(f,now).blockers.includes(
    "STAGING_CONTAINER_TARGET_UNVERIFIED:qf-core-staging"));
+});
+const goodProduction=()=>{
+ const e=good();
+ e.projectRef=PRODUCTION_PROJECT;e.environment="production";
+ e.knownProductionWriterNames=["proven-core-writer","proven-queue-worker"];
+ e.productionWriterScopeCrosscheckedBySre=true;
+ e.productionWriterScopeEvidenceSha256="c".repeat(64);
+ e.productionDockerInventory={
+  source:"read_only_docker_inspect",inventoryComplete:true,
+  evidenceSha256:"d".repeat(64),observedAt:"2026-11-03T16:09:00Z",
+  containers:e.knownProductionWriterNames.map(name=>({name,productionRefPresent:true,state:"exited"}))
+ };
+ delete e.stagingDockerInventory;
+ return e;
+};
+test("B13 Production freeze is not silently approved by Staging-only evidence",()=>{
+ const e=good();e.environment="production";e.projectRef=PRODUCTION_PROJECT;
+ assert.equal(checkMaintenanceFreeze(e,now).decision,"HOLD");
+ assert.ok(checkMaintenanceFreeze(e,now).blockers.includes("PRODUCTION_WRITER_SCOPE_NOT_CERTIFIED"));
+});
+test("B14 synthetic complete Production evidence still cannot execute a deletion",()=>{
+ const x=checkMaintenanceFreeze(goodProduction(),now);
+ assert.equal(x.decision,"FREEZE_EVIDENCE_PRESENT_INDEPENDENT_RELEASE_REQUIRED");
+ assert.equal(x.executable,false);
+});
+test("B15 a running Production writer or unknown Production-bound container blocks freeze",()=>{
+ const e=goodProduction();e.productionDockerInventory.containers[0].state="running";
+ assert.ok(checkMaintenanceFreeze(e,now).blockers.includes("PRODUCTION_CONTAINER_ACTIVE:proven-core-writer"));
+ const f=goodProduction();f.productionDockerInventory.containers.push({name:"unexpected-worker",productionRefPresent:true,state:"running"});
+ assert.ok(checkMaintenanceFreeze(f,now).blockers.includes("PRODUCTION_CONTAINER_ACTIVE:unexpected-worker"));
+});
+test("B16 Production writer attestation missing or stale denies",()=>{
+ for(const patch of [
+  {knownProductionWriterNames:[]},{productionWriterScopeCrosscheckedBySre:false},
+  {productionWriterScopeEvidenceSha256:"invalid"}
+ ]){
+  const e={...goodProduction(),...patch};
+  assert.ok(checkMaintenanceFreeze(e,now).blockers.includes("PRODUCTION_WRITER_SCOPE_NOT_CERTIFIED"));
+ }
+ const e=goodProduction();e.productionDockerInventory.observedAt="2026-11-03T16:00:00Z";
+ assert.ok(checkMaintenanceFreeze(e,now).blockers.includes("PRODUCTION_DOCKER_INVENTORY_UNVERIFIED"));
 });

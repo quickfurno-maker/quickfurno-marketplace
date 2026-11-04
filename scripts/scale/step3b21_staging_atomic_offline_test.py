@@ -65,6 +65,8 @@ class AtomicStagingOfflineTests(unittest.TestCase):
         self.assertIn("LOCK TABLE public.vendors", sql)
         self.assertIn("ACCESS EXCLUSIVE MODE", sql)
         self.assertIn("QF_ATOMIC_DISABLED_TRIGGER", sql)
+        self.assertIn("QF_ATOMIC_INTERNAL_CONSTRAINT_TRIGGER_DISABLED", sql)
+        self.assertIn("tgisinternal AND tgconstraint<>0 AND tgenabled<>'O'", sql)
         self.assertIn("QF_ATOMIC_UUID_REFERENCE_OR_SCAN_ERROR", sql)
 
     def test_all_original_ids_are_transaction_local_and_no_dblink(self):

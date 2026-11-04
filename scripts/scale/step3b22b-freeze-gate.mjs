@@ -2,6 +2,7 @@
  * A quiet database snapshot is not a certified worker freeze.
  */
 export const STAGING_PROJECT="uckafzuochmbvtiodmcl";
+export const PRODUCTION_PROJECT="yqpgcsduqbxulrlzwzap";
 const int=v=>Number.isSafeInteger(v)&&v>=0;
 const utc=s=>typeof s==="string"&&s.endsWith("Z")&&!Number.isNaN(Date.parse(s));
 export const KNOWN_STAGING_BOUND_CONTAINERS=Object.freeze([
@@ -15,7 +16,10 @@ const REQUIRED_EXTERNAL=Object.freeze([
 export function checkMaintenanceFreeze(e={},now){
  const blockers=[];
  const deny=b=>{if(!blockers.includes(b))blockers.push(b);};
- if(e.projectRef!==STAGING_PROJECT||e.environment!=="staging")deny("WRONG_MANAGED_ENVIRONMENT");
+ const isProduction=e.environment==="production";
+ if(!["staging","production"].includes(e.environment)||
+    e.projectRef!==(isProduction?PRODUCTION_PROJECT:STAGING_PROJECT))
+  deny("WRONG_MANAGED_ENVIRONMENT");
  if(!utc(now)||!utc(e.observedAt)||Date.parse(e.observedAt)>Date.parse(now)||
     Date.parse(now)-Date.parse(e.observedAt)>120000)deny("OBSERVATION_NOT_FRESH");
  const counts=e.counts;
@@ -48,7 +52,20 @@ export function checkMaintenanceFreeze(e={},now){
  }
  // Independent read-only VPS inventory covers real Staging-bound processes,
  // not just the quiet database/worker-heartbeat tables.
- const docker=e.stagingDockerInventory;
+ // Production needs an independently evidenced COMPLETE writer inventory, not
+ // a copied Staging-specific list. No arbitrary self-declared zero writers.
+ if(isProduction&&(!Array.isArray(e.knownProductionWriterNames)||
+    e.knownProductionWriterNames.length===0||
+    new Set(e.knownProductionWriterNames).size!==e.knownProductionWriterNames.length||
+    e.knownProductionWriterNames.some(x=>typeof x!=="string"||!x.trim())||
+    e.productionWriterScopeCrosscheckedBySre!==true||
+    typeof e.productionWriterScopeEvidenceSha256!=="string"||
+    !/^[0-9a-f]{64}$/i.test(e.productionWriterScopeEvidenceSha256)))
+   deny("PRODUCTION_WRITER_SCOPE_NOT_CERTIFIED");
+ const knownNames=isProduction?(Array.isArray(e.knownProductionWriterNames)?e.knownProductionWriterNames:[]):KNOWN_STAGING_BOUND_CONTAINERS;
+ const docker=isProduction?e.productionDockerInventory:e.stagingDockerInventory;
+ const scope=isProduction?"PRODUCTION":"STAGING";
+ const refKey=isProduction?"productionRefPresent":"stagingRefPresent";
  if(docker?.source!=="read_only_docker_inspect"||
     docker?.inventoryComplete!==true||
     typeof docker?.evidenceSha256!=="string"||
@@ -56,22 +73,22 @@ export function checkMaintenanceFreeze(e={},now){
     !utc(docker?.observedAt)||!utc(now)||
     Date.parse(docker.observedAt)>Date.parse(now)||
     Date.parse(now)-Date.parse(docker.observedAt)>120000)
-   deny("STAGING_DOCKER_INVENTORY_UNVERIFIED");
+   deny(scope+"_DOCKER_INVENTORY_UNVERIFIED");
  const seen=new Set();
  for(const c of Array.isArray(docker?.containers)?docker.containers:[]){
   if(typeof c?.name!=="string"||seen.has(c.name)){
    deny("DUPLICATE_OR_INVALID_CONTAINER");continue;
   }
   seen.add(c.name);
-  if(c.stagingRefPresent===true&&c.state!=="exited")
-    deny("STAGING_CONTAINER_ACTIVE:"+c.name);
-  if(KNOWN_STAGING_BOUND_CONTAINERS.includes(c.name)){
-   if(c.stagingRefPresent!==true)deny("STAGING_CONTAINER_TARGET_UNVERIFIED:"+c.name);
-   if(c.state!=="exited")deny("STAGING_CONTAINER_ACTIVE:"+c.name);
+  if(c[refKey]===true&&c.state!=="exited")
+    deny(scope+"_CONTAINER_ACTIVE:"+c.name);
+  if(knownNames.includes(c.name)){
+   if(c[refKey]!==true)deny(scope+"_CONTAINER_TARGET_UNVERIFIED:"+c.name);
+   if(c.state!=="exited")deny(scope+"_CONTAINER_ACTIVE:"+c.name);
   }
  }
- for(const name of KNOWN_STAGING_BOUND_CONTAINERS){
-  if(!seen.has(name))deny("STAGING_CONTAINER_MISSING:"+name);
+ for(const name of knownNames){
+  if(!seen.has(name))deny(scope+"_CONTAINER_MISSING:"+name);
  }
  if(typeof e.operatorId!=="string"||e.operatorId.trim().length<3||
     !utc(e.windowStartsAt)||!utc(e.windowEndsAt)||

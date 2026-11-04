@@ -95,6 +95,8 @@ class ProductionAtomicTests(unittest.TestCase):
 
     def test_postflight_covers_trigger_fk_and_opaque_scan(self):
         sql = mod.make_production_sql(fixtures())
+        self.assertIn("QF_PROD_OFFLINE_INTERNAL_CONSTRAINT_TRIGGER_DISABLED", sql)
+        self.assertIn("tgisinternal AND tgconstraint<>0 AND tgenabled<>'O'", sql)
         for item in [
             "QF_PROD_OFFLINE_FK_INVALID",
             "QF_PROD_OFFLINE_PROTECTED_TRIGGER_DISABLED",

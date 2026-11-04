@@ -53,3 +53,28 @@ This is **read-only operational evidence** from the already-authorized JARVIS `q
 **Engineering correction:** Extended the existing `step3b22b-freeze-gate.mjs` to reject a supposedly all-green freeze unless the read-only Docker inventory is fresh, complete, separately evidence-hashed, proves the two currently known Staging-bound containers exited, and shows no additional Staging-reference container still running. Extra four regression tests exercise live-active, unknown-active, stale and missing-container cases. This remains a pure, non-executable adjudicator, not a stop command.
 
 **Operational consequence:** There is presently **no certified Staging freeze**. The release operator must schedule and verify controlled shutdown/isolation of `qf-core-staging` and the Staging-bound VOX MFA UI test, while resolving the Jarvis/AGNI and cron dependency boundary. Neither these containers nor any protected database triggers were stopped/disabled in this inspection. Independent DBA/AppSec exception and managed recoverability remain additional release blockers.
+
+## 4 Nov 2026 — Exact Compose isolation boundary (read-only, operator handoff)
+
+A further **read-only** `docker inspect` on the authorized Staging VPS confirmed the orchestration boundary and restart policies without printing env values, credentials, bind mounts, or secrets.
+
+| Container | Current status | Service/project | Restart | Network | Cutover handling |
+| --- | --- | --- | --- | --- | --- |
+| `qf-core-staging` | running | Compose `qf-core-staging` / `core` | `unless-stopped` | `qf-core-staging_default` | **Staging-specific:** only operator-controlled, short maintenance stop after recovery/exception approval |
+| `qf-vox-20261102-mfa-ui-test` | running | Standalone Staging-dependent test | `no` | `bridge` | **Staging-specific:** only operator-controlled maintenance stop; ensure Owner test/UI access is not needed during window |
+| `qf-vox-20261028-access-guard-test` | running | Standalone guard | `no` | `bridge` | **Preserve by default**, do not interrupt Cloudflare Access guard |
+| `qf-jarvis-whatsapp-worker` | running | Compose `qf-jarvis-whatsapp-worker` / `quickfurno-worker` | `unless-stopped` | Jarvis networks | **Preserve unless qualified dependency review shows Staging writes** |
+| `qf-jarvis-gateway` | running | Compose `qf-jarvis-gateway` / `quickfurno-gateway` | `unless-stopped` | Jarvis networks | **Preserve**, shared WhatsApp infrastructure |
+| `qf-jarvis-os` | running | Compose `qf-jarvis-os` | `unless-stopped` | Jarvis network | **Preserve**, separate Jarvis control surface |
+| `qf-agni-blue-control-plane-1` | running | Compose `qf-agni-blue` / `control-plane` | `unless-stopped` | AGNI networks | **Preserve**, separate operations/security control |
+| `traefik-traefik-1` | running | Compose `traefik` | `unless-stopped` | `host` | **Preserve**, shared routing, Cloudflare/VOX access |
+
+**Controlled operator procedure — prospective only, NOT executed:**
+
+1. Confirm signed DBA/AppSec protected-history exception, independently demonstrated **managed** Supabase recovery/rollback, frozen inbound callback routes/cron and that Jarvis/AGNI cannot reingest Staging TEST data. Capture full original container state/identity and operational owner acknowledgement.
+2. Stop **only** the two confirmed Staging-bound containers, using exact names and the authenticated VPS maintenance operator. Avoid broad `docker compose down`, `docker stop $(docker ps ...)`, host-level `systemctl stop docker` or all-workers shutdown. If a container is required for MFA validation, coordinate a separate preserved path rather than claiming it was safe to stop.
+3. Prove both stopped using Docker state (not just database worker heartbeats), recheck all TEST-vendor/lead fingerprint and canary counts **inside a verified maintenance window**, and ensure no other Staging writers or callbacks remain.
+4. Execute **only a newly reviewed, exact-ID managed Staging procedure**, not the database-name-guarded offline rehearsal SQL. Postflight: zero TEST references, zero invalid FKs, zero disabled protected triggers, exactly one canary and two unrelated Auth users preserved, no payment changes.
+5. Restore **only originally running** Staging-specific services in original state and check owner login/VOX/Core health and outbound safeguards. Restore immediately on any failed preflight/rollback condition. Leave shared Traefik/Jarvis/AGNI untouched.
+
+**IMPORTANT:** Stopping even the two confirmed containers **is not yet authorized** because managed recovery and the immutable-history exception are missing. These are precise intended release steps, not proof of execution. No live service/container or database mutation was performed.

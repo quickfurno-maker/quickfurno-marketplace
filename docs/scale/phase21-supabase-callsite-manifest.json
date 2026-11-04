@@ -9,11 +9,11 @@
     "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
   },
   "totals": {
-    "files": 167,
-    "rpcNames": 99,
-    "tableNames": 133,
-    "storageBuckets": 0,
-    "authFiles": 19,
+    "files": 170,
+    "rpcNames": 101,
+    "tableNames": 134,
+    "storageBuckets": 1,
+    "authFiles": 22,
     "realtimeFiles": 0
   },
   "rpcNames": [
@@ -107,6 +107,8 @@
     "qf_set_vendor_anisha_memory_consent_v1",
     "qf_snapshot_vendor_fair_opportunity_v1",
     "qf_terminalize_consent_ack_intent",
+    "qf_vendor_attach_private_evidence",
+    "qf_vendor_begin_private_verification_case",
     "qf_vendor_owner_review_snapshot",
     "qf_vendor_verification_case_ready",
     "qf_vox_work_transition_candidate_v1",
@@ -220,6 +222,7 @@
     "packages",
     "payments",
     "profiles",
+    "qf-vendor-verification-private",
     "service_categories",
     "vendor_anisha_memory_consents",
     "vendor_campaigns",
@@ -252,7 +255,9 @@
     "workflow_tasks",
     "workflow_transition_history"
   ],
-  "storageBuckets": [],
+  "storageBuckets": [
+    "qf-vendor-verification-private"
+  ],
   "files": [
     {
       "file": "app/actions.ts",
@@ -287,6 +292,31 @@
         "vendors"
       ],
       "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vendor/onboarding/request-otp/route.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vendor/private-evidence/route.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_vendor_attach_private_evidence",
+        "qf_vendor_begin_private_verification_case"
+      ],
+      "tables": [
+        "qf-vendor-verification-private"
+      ],
+      "storageBuckets": [
+        "qf-vendor-verification-private"
+      ],
       "auth": true,
       "realtime": false
     },
@@ -468,6 +498,17 @@
     {
       "file": "app/vendor/set-password/page.tsx",
       "directImports": [],
+      "rpc": [],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "components/vox/OwnerVendorVerificationDashboard.tsx",
+      "directImports": [
+        "@supabase/ssr"
+      ],
       "rpc": [],
       "tables": [],
       "storageBuckets": [],

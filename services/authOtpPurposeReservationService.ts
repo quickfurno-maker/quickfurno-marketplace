@@ -110,3 +110,46 @@ export async function releaseUnclaimedAuthOtpPurpose(
     return false;
   }
 }
+
+// Private, read-only purpose receipt for the future vendor OTP verifier.
+// No public caller may supply or read a phone digest. Missing RPC/migration,
+// a client-purpose claim, a conflicting Auth principal or an ambiguous result
+// returns null. This never creates a session or sends an OTP.
+export async function readClaimedVendorOtpPurpose(
+  phoneE164: string,
+  authUserId: string,
+  deps: RpcDeps = defaultRpc,
+): Promise<import("../lib/identity/vendorWhatsappOtpAdmission").VendorOtpPurposeClaim | null> {
+  const digest = getPhoneDigest(phoneE164);
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!digest || !uuid.test(authUserId)) return null;
+  try {
+    const { data, error } = await deps.rpc("qf_read_claimed_vendor_auth_otp_purpose", {
+      p_phone_digest: digest,
+      p_auth_user_id: authUserId,
+    });
+    if (error) return null;
+    const rows = Array.isArray(data) ? data : data ? [data] : [];
+    if (rows.length !== 1) return null;
+    const row = rows[0] as Record<string, unknown>;
+    const webhookId = row.verified_webhook_id;
+    const createdAt = row.created_at;
+    if (row.purpose !== "vendor_login" || row.state !== "claimed" ||
+        row.auth_user_id !== authUserId || row.phone_digest !== digest ||
+        typeof webhookId !== "string" ||
+        !/^[A-Za-z0-9._:-]{1,200}$/.test(webhookId) ||
+        typeof createdAt !== "string" || !Number.isFinite(Date.parse(createdAt))) {
+      return null;
+    }
+    return {
+      purpose: "vendor_login",
+      state: "claimed",
+      authUserId,
+      phoneDigest: digest,
+      verifiedWebhookId: webhookId,
+      createdAt,
+    };
+  } catch {
+    return null;
+  }
+}

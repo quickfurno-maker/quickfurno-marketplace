@@ -14,6 +14,18 @@ begin
   if purpose<>'vendor_login' then raise exception 'OTP_CLAIM_BAD_PURPOSE'; end if;
   if public.qf_claim_auth_otp_purpose(digest,auth_user,'verified-webhook-1')<>'vendor_login'
     then raise exception 'OTP_SAME_WEBHOOK_NOT_IDEMPOTENT'; end if;
+  if (select count(*) from public.qf_read_claimed_vendor_auth_otp_purpose(digest,auth_user))<>1
+    then raise exception 'VENDOR_CLAIM_READ_MISSING'; end if;
+  if (select verified_webhook_id from public.qf_read_claimed_vendor_auth_otp_purpose(digest,auth_user))<>'verified-webhook-1'
+    then raise exception 'VENDOR_CLAIM_WEBHOOK_DRIFT'; end if;
+  if exists(select 1 from public.qf_read_claimed_vendor_auth_otp_purpose(digest,
+       '00000000-0000-4000-8000-000000000002'))
+    then raise exception 'VENDOR_CLAIM_CROSS_PRINCIPAL'; end if;
+  if exists(select 1 from public.qf_read_claimed_vendor_auth_otp_purpose(repeat('b',64),auth_user))
+    then raise exception 'VENDOR_CLAIM_CROSS_PHONE'; end if;
+  if exists(select 1 from public.qf_read_claimed_vendor_auth_otp_purpose('invalid-digest',auth_user))
+    then raise exception 'VENDOR_CLAIM_INVALID_DIGEST'; end if;
+
   if public.qf_claim_auth_otp_purpose(digest,auth_user,'verified-webhook-2') is not null
     then raise exception 'OTP_DIFFERENT_WEBHOOK_STOLE_RESERVATION'; end if;
   if public.qf_claim_auth_otp_purpose(digest,
@@ -94,7 +106,12 @@ begin
     has_function_privilege('authenticated','public.qf_claim_auth_otp_purpose(text,uuid,text)','EXECUTE') or
     has_function_privilege('anon','public.qf_vendor_verification_case_ready(uuid)','EXECUTE')
     then raise exception 'PRIVATE_FUNCTION_BROWSER_EXPOSED'; end if;
- if not has_function_privilege('service_role','public.qf_reserve_auth_otp_purpose(text,text,uuid,integer)','EXECUTE')
+ if has_function_privilege('anon','public.qf_read_claimed_vendor_auth_otp_purpose(text,uuid)','EXECUTE') or
+    has_function_privilege('authenticated','public.qf_read_claimed_vendor_auth_otp_purpose(text,uuid)','EXECUTE') then
+      raise exception 'VENDOR_CLAIM_RPC_BROWSER_EXPOSED'; end if;
+ if not has_function_privilege('service_role','public.qf_read_claimed_vendor_auth_otp_purpose(text,uuid)','EXECUTE') then
+      raise exception 'VENDOR_CLAIM_RPC_SERVICE_ROLE_MISSING'; end if;
+  if not has_function_privilege('service_role','public.qf_reserve_auth_otp_purpose(text,text,uuid,integer)','EXECUTE')
     then raise exception 'SERVICE_ROLE_FUNCTION_MISSING'; end if;
  if (select count(*) from pg_class c join pg_namespace n on c.relnamespace=n.oid
     where n.nspname='qf_vendor_private' and c.relkind='r' and c.relrowsecurity)=0

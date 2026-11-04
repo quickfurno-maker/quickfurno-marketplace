@@ -25,19 +25,19 @@ begin
          'verified','verified','verified');
 
  state:=public.qf_owner_record_vendor_verification_decision(
-   vendor_id,wrong_id,'approve','approved_evidence');
+   vendor_id,wrong_id,1,'approve','approved_evidence');
  if state <> 'owner_required' then raise exception 'B5_NONOWNER_DECIDED'; end if;
  state:=public.qf_owner_record_vendor_verification_decision(
-   vendor_id,owner_id,'approve','approved_evidence');
+   vendor_id,owner_id,1,'approve','approved_evidence');
  if state <> 'evidence_required' then raise exception 'B5_UNPROVEN_CASE_APPROVED'; end if;
  if exists(select 1 from qf_vendor_private.verification_decisions d where d.case_id=v_case_id) then
    raise exception 'B5_FALSE_AUDIT_CREATED'; end if;
 
  state:=public.qf_owner_record_vendor_verification_decision(
-   vendor_id,owner_id,'request_documents','identity_proof_missing');
+   vendor_id,owner_id,1,'request_documents','identity_proof_missing');
  if state <> 'documents_requested' then raise exception 'B5_DOCUMENT_REQUEST_DENIED'; end if;
  state:=public.qf_owner_record_vendor_verification_decision(
-   vendor_id,owner_id,'request_correction','office_address_issue');
+   vendor_id,owner_id,1,'request_correction','office_address_issue');
  if state <> 'needs_correction' then raise exception 'B5_CORRECTION_DENIED'; end if;
 
  insert into qf_vendor_private.verification_consents
@@ -53,7 +53,7 @@ begin
          'clean','verified',owner_id,now());
 
  state:=public.qf_owner_record_vendor_verification_decision(
-   vendor_id,owner_id,'approve','approved_evidence');
+   vendor_id,owner_id,1,'approve','approved_evidence');
  if state <> 'approved' then raise exception 'B5_OWNER_APPROVAL_FAILED %',state; end if;
  if public.qf_vendor_verification_case_ready(vendor_id) is not true
    then raise exception 'B5_COMPLETE_REVIEW_NOT_READY'; end if;
@@ -69,7 +69,7 @@ begin
   from qf_vendor_private.verification_decisions d where d.case_id=v_case_id;
  if decision_count <> 3 then raise exception 'B5_IMMUTABLE_AUDIT_COUNT_DRIFT %',decision_count; end if;
  state:=public.qf_owner_record_vendor_verification_decision(
-   vendor_id,owner_id,'approve','approved_evidence');
+   vendor_id,owner_id,1,'approve','approved_evidence');
  if state <> 'case_not_reviewable' then raise exception 'B5_DUPLICATE_APPROVAL'; end if;
  if (select count(*) from qf_vendor_private.verification_decisions d where d.case_id=v_case_id)<>3
    then raise exception 'B5_DUPLICATE_DECISION_INSERTED'; end if;
@@ -132,6 +132,13 @@ begin
  values (good_vendor,2,'pending','pending','pending','pending','pending','pending');
  if public.qf_vendor_verification_case_ready(good_vendor) is true
    then raise exception 'B5_OLD_APPROVAL_OVERRIDE_LATEST'; end if;
+ if public.qf_owner_record_vendor_verification_decision(
+     good_vendor,'00000000-0000-4000-8000-000000000005',1,
+     'request_documents','review_version_changed') <> 'stale_review'
+   then raise exception 'B5_STALE_OWNER_REVIEW_ALLOWED'; end if;
+ if (select c.state from qf_vendor_private.verification_cases c
+     where c.vendor_id=good_vendor and c.case_version=2) <> 'pending'
+   then raise exception 'B5_STALE_REVIEW_MUTATED_LATEST_CASE'; end if;
  raise notice 'PASS assignment gate: unverified and revoked denied; existing delivery and latest-case supersession safe';
 end $$;
 

@@ -15,12 +15,9 @@ export default async function OwnerVendorVerificationPage(){
  if(!admin.isLoggedIn||!admin.isSuperadmin)redirect("/admin/login?error=unauthorized");
  return (
   <main className="mx-auto max-w-5xl space-y-4 px-4 py-8">
-   <div>
-    <h1 className="text-2xl font-bold">Owner vendor verification</h1>
-    <p className="mt-1 text-sm text-slate-600">
-     Private Core verification review. A live Owner MFA session is required for every case read and decision.
-    </p>
-   </div>
+   <p className="text-sm text-slate-600">
+    Private Core verification review. An independent signed Owner MFA/AAL2 session is required for every case read and decision.
+   </p>
    <OwnerVendorVerificationDashboard />
   </main>
  );

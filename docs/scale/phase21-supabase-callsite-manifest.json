@@ -9,8 +9,8 @@
     "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
   },
   "totals": {
-    "files": 169,
-    "rpcNames": 101,
+    "files": 170,
+    "rpcNames": 102,
     "tableNames": 134,
     "storageBuckets": 1,
     "authFiles": 21,
@@ -111,6 +111,7 @@
     "qf_vendor_begin_private_verification_case",
     "qf_vendor_owner_review_snapshot",
     "qf_vendor_verification_case_ready",
+    "qf_vox_owner_vendor_review_queue",
     "qf_vox_work_transition_candidate_v1",
     "update_vendor_visibility",
     "vendor_auth_claim_reset_grant",
@@ -429,6 +430,17 @@
       "rpc": [
         "qf_owner_record_vendor_verification_decision",
         "qf_vendor_owner_review_snapshot"
+      ],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vox/v1/owner-vendor-verification-queue/route.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_vox_owner_vendor_review_queue"
       ],
       "tables": [],
       "storageBuckets": [],

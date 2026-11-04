@@ -750,6 +750,18 @@
         "production": false
       },
       "evidence": "SOURCE_PIN_CREATED_2026-11-04_OWNER_REVIEW_ASSIGNMENT_GUARD_PG17_NO_REMOTE_APPLY"
+    },
+    {
+      "version": "20261104163000",
+      "name": "vendor_private_document_intake",
+      "filename": "20261104163000_vendor_private_document_intake.sql",
+      "path": "supabase/migrations/20261104163000_vendor_private_document_intake.sql",
+      "canonicalSha256": "dd4914f154e75e361ad862a17a702b9e72f3252e22e3c0a041616507ef3fd7d2",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-11-04_PRIVATE_VENDOR_INTAKE_PG17_NO_REMOTE_APPLY"
     }
   ],
   "supersededLegacyPins": [

@@ -127,7 +127,7 @@ grant execute on function public.qf_vendor_owner_review_snapshot(uuid) to servic
 -- Never updates private evidence flags or vendor business status. The reviewer
 -- may record only a bounded decision state and immutable decision audit.
 create or replace function public.qf_owner_record_vendor_verification_decision(
-  p_vendor_id uuid,p_reviewer_user_id uuid,p_action text,p_reason_code text
+  p_vendor_id uuid,p_reviewer_user_id uuid,p_expected_case_version integer,p_action text,p_reason_code text
 ) returns text language plpgsql security definer set search_path=pg_catalog
 as $$
 declare
@@ -136,6 +136,7 @@ declare
   v_ok boolean;
 begin
   if p_vendor_id is null or p_reviewer_user_id is null
+     or p_expected_case_version is null or p_expected_case_version not between 1 and 100000
      or p_action is null or p_action not in ('request_documents','request_correction','approve','reject')
      or p_reason_code is null
      or p_reason_code !~ '^[a-z][a-z0-9_]{2,63}$' then
@@ -154,6 +155,9 @@ begin
   select * into c from qf_vendor_private.verification_cases v
     where v.vendor_id=p_vendor_id order by v.case_version desc limit 1 for update;
   if not found then return 'case_required'; end if;
+  if c.case_version is distinct from p_expected_case_version then
+    return 'stale_review';
+  end if;
   if c.state not in ('pending','documents_requested','under_review','needs_correction')
      or (c.expires_at is not null and c.expires_at<=now()) then
     return 'case_not_reviewable';
@@ -210,9 +214,9 @@ begin
   return v_state;
 end;
 $$;
-revoke all on function public.qf_owner_record_vendor_verification_decision(uuid,uuid,text,text)
+revoke all on function public.qf_owner_record_vendor_verification_decision(uuid,uuid,integer,text,text)
   from public,anon,authenticated;
-grant execute on function public.qf_owner_record_vendor_verification_decision(uuid,uuid,text,text)
+grant execute on function public.qf_owner_record_vendor_verification_decision(uuid,uuid,integer,text,text)
   to service_role;
 
 -- New-assignment-only, universally applied. Existing assigned -> delivered /
@@ -252,8 +256,8 @@ execute function public.qf_enforce_new_vendor_assignment_verification();
 -- Revoke browser execution even if a schema-wide default EXECUTE grant exists.
 do $$
 begin
- if has_function_privilege('anon','public.qf_owner_record_vendor_verification_decision(uuid,uuid,text,text)','EXECUTE')
-    or has_function_privilege('authenticated','public.qf_owner_record_vendor_verification_decision(uuid,uuid,text,text)','EXECUTE')
+ if has_function_privilege('anon','public.qf_owner_record_vendor_verification_decision(uuid,uuid,integer,text,text)','EXECUTE')
+    or has_function_privilege('authenticated','public.qf_owner_record_vendor_verification_decision(uuid,uuid,integer,text,text)','EXECUTE')
     or has_function_privilege('anon','public.qf_vendor_owner_review_snapshot(uuid)','EXECUTE')
     or has_function_privilege('authenticated','public.qf_vendor_owner_review_snapshot(uuid)','EXECUTE')
     then raise exception 'QF_VENDOR_OWNER_REVIEW_BROWSER_EXPOSED'; end if;

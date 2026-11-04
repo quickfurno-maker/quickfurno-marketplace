@@ -136,7 +136,7 @@ declare
   v_ok boolean;
 begin
   if p_vendor_id is null or p_reviewer_user_id is null
-     or p_action not in ('request_documents','request_correction','approve','reject')
+     or p_action is null or p_action not in ('request_documents','request_correction','approve','reject')
      or p_reason_code is null
      or p_reason_code !~ '^[a-z][a-z0-9_]{2,63}$' then
     return 'denied';

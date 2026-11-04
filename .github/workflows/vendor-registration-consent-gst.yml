@@ -81,13 +81,23 @@ jobs:
           docker run --rm -d --name "$name" --network none \
             -e POSTGRES_PASSWORD=synthetic_ci_only postgres:17-alpine >/dev/null
           trap 'docker stop "$name" >/dev/null 2>&1 || true' EXIT
-          for attempt in $(seq 1 40); do
-            if docker exec "$name" pg_isready -U postgres >/dev/null 2>&1; then
-              break
+          # Postgres bootstraps with a temporary server, stops it, then starts
+          # the final server. A single pg_isready can race that restart.
+          ready=0
+          for attempt in $(seq 1 60); do
+            if docker exec "$name" psql -X -U postgres -d postgres -Atqc 'SELECT 1' >/dev/null 2>&1; then
+              sleep 2
+              if docker exec "$name" psql -X -U postgres -d postgres -Atqc 'SELECT 1' >/dev/null 2>&1; then
+                ready=1
+                break
+              fi
             fi
             sleep 1
           done
-          docker exec "$name" pg_isready -U postgres
+          if [ "$ready" -ne 1 ]; then
+            docker logs "$name"
+            exit 1
+          fi
           docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
             < scripts/mvp/vendor/fixtures/vendor-private-pg-bootstrap.sql
           docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \

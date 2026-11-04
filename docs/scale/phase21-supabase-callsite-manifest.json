@@ -9,8 +9,8 @@
     "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
   },
   "totals": {
-    "files": 159,
-    "rpcNames": 91,
+    "files": 160,
+    "rpcNames": 94,
     "tableNames": 133,
     "storageBuckets": 0,
     "authFiles": 15,
@@ -58,6 +58,7 @@
     "qf_bind_vendor_package_razorpay_order_v2",
     "qf_cancel_orphan_automation_job_v1",
     "qf_cancel_stale_automation_job_v1",
+    "qf_claim_auth_otp_purpose",
     "qf_claim_automation_job_for_family_v1",
     "qf_claim_automation_job_transport_for_family_v1",
     "qf_claim_automation_job_transport_v1",
@@ -91,7 +92,9 @@
     "qf_recover_automation_job_transport_v1",
     "qf_recover_automation_job_v1",
     "qf_recover_stale_dispatching_consent_ack_intents",
+    "qf_release_auth_otp_purpose",
     "qf_release_vendor_package_razorpay_order_claim_v2",
+    "qf_reserve_auth_otp_purpose",
     "qf_reserve_consent_ack_provider_attempt",
     "qf_resolve_service_zone_v1",
     "qf_scale_queue_health_v1",
@@ -1197,6 +1200,19 @@
         "aos_audit_logs",
         "aos_recommendations"
       ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/authOtpPurposeReservationService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_claim_auth_otp_purpose",
+        "qf_release_auth_otp_purpose",
+        "qf_reserve_auth_otp_purpose"
+      ],
+      "tables": [],
       "storageBuckets": [],
       "auth": false,
       "realtime": false

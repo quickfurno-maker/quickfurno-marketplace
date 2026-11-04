@@ -9,11 +9,11 @@
     "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
   },
   "totals": {
-    "files": 161,
+    "files": 162,
     "rpcNames": 95,
     "tableNames": 133,
     "storageBuckets": 0,
-    "authFiles": 15,
+    "authFiles": 16,
     "realtimeFiles": 0
   },
   "rpcNames": [
@@ -2393,6 +2393,20 @@
       ],
       "storageBuckets": [],
       "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorSignupOwnershipReadService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "client_accounts",
+        "profiles",
+        "vendor_dashboard_users",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": true,
       "realtime": false
     },
     {

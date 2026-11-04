@@ -145,16 +145,16 @@ end $$;
 do $$
 begin
  if has_function_privilege('anon',
-   'public.qf_owner_record_vendor_verification_decision(uuid,uuid,text,text)','EXECUTE')
+   'public.qf_owner_record_vendor_verification_decision(uuid,uuid,integer,text,text)','EXECUTE')
    or has_function_privilege('authenticated',
-   'public.qf_owner_record_vendor_verification_decision(uuid,uuid,text,text)','EXECUTE')
+   'public.qf_owner_record_vendor_verification_decision(uuid,uuid,integer,text,text)','EXECUTE')
    or has_function_privilege('anon',
    'public.qf_vendor_owner_review_snapshot(uuid)','EXECUTE')
    or has_function_privilege('authenticated',
    'public.qf_vendor_owner_review_snapshot(uuid)','EXECUTE')
  then raise exception 'B5_BROWSER_OWNER_REVIEW_RPC_EXPOSED'; end if;
  if not has_function_privilege('service_role',
-   'public.qf_owner_record_vendor_verification_decision(uuid,uuid,text,text)','EXECUTE')
+   'public.qf_owner_record_vendor_verification_decision(uuid,uuid,integer,text,text)','EXECUTE')
  then raise exception 'B5_SERVICE_ROLE_OWNER_REVIEW_MISSING'; end if;
  if exists(select 1 from public.vendors where status='Approved'
    and user_id='00000000-0000-4000-8000-000000000001')

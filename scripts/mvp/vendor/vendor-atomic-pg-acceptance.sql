@@ -8,7 +8,7 @@ declare
   dest text:=repeat('d',64);
   req jsonb;
   result text;
-  id uuid;
+  created_id uuid;
   retry_id uuid;
 begin
   req:=jsonb_build_object(
@@ -38,15 +38,15 @@ begin
     dest,'meta_whatsapp','signed-vendor-1','accepted'
   );
 
-  select outcome,vendor_id into result,id from public.qf_register_pending_vendor_atomic(
+  select outcome,vendor_id into result,created_id from public.qf_register_pending_vendor_atomic(
     u,digest,dest,'meta_whatsapp',req);
-  if result is distinct from 'created_pending' or id is null then
+  if result is distinct from 'created_pending' or created_id is null then
     raise exception 'ATOMIC_PENDING_CREATE_FAILED %',result; end if;
   if (select count(*) from public.vendors where user_id=u) <> 1
     then raise exception 'ATOMIC_CREATED_DUPLICATE_VENDOR'; end if;
   if not exists (
     select 1 from public.vendors v
-     where v.id=id and v.phone='9876543210' and v.whatsapp_number='9876543210'
+     where v.id=created_id and v.phone='9876543210' and v.whatsapp_number='9876543210'
        and v.status='Pending' and v.verification_status='Pending'
        and v.paid_status='Unpaid' and v.is_active=false
        and v.accepting_leads=false and v.public_visibility=false
@@ -61,14 +61,14 @@ begin
     then raise exception 'ATOMIC_VENDOR_PROFILE_NOT_LINKED'; end if;
   if not exists (
     select 1 from public.vendor_dashboard_users d
-     where d.user_id=u and d.vendor_id=id
+     where d.user_id=u and d.vendor_id=created_id
        and d.role='owner' and d.status='active'
        and d.phone_verified=false and d.whatsapp_otp_enabled=false
   ) then raise exception 'ATOMIC_OWNER_MEMBERSHIP_NOT_LINKED'; end if;
 
   select outcome,vendor_id into result,retry_id from public.qf_register_pending_vendor_atomic(
     u,digest,dest,'meta_whatsapp',req);
-  if result is distinct from 'resume_existing' or retry_id is distinct from id
+  if result is distinct from 'resume_existing' or retry_id is distinct from created_id
     then raise exception 'ATOMIC_RETRY_WAS_NOT_IDEMPOTENT'; end if;
   if (select count(*) from public.vendor_dashboard_users where user_id=u)<>1
     then raise exception 'ATOMIC_DUPLICATE_MEMBERSHIP'; end if;

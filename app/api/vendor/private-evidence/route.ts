@@ -9,6 +9,7 @@ import { createHash,randomUUID } from "node:crypto";
 import { adminClient,serverClient } from "@/lib/supabase";
 import { createPrivateVendorEvidenceStorage } from "@/lib/storage/supabaseObjectStorage";
 import { VENDOR_REGISTRATION_PRIVACY_REVISION } from "@/lib/vendors/vendorSignupPolicy";
+import { readBoundedVendorMultipart } from "@/lib/vendors/readBoundedVendorMultipart";
 import { allowPublicMutation } from "@/lib/security/publicMutationRateLimit";
 
 export const runtime="nodejs";
@@ -55,7 +56,13 @@ export async function POST(request:Request):Promise<Response>{
   const user=auth?.user;
   if(authError||!user||!UUID.test(user.id)||!user.phone_confirmed_at)
    return reply({ok:false,code:"VERIFIED_VENDOR_SESSION_REQUIRED"},401);
-  const data=await request.formData();
+  // The claimed Content-Length is insufficient: cap streamed bytes before
+  // multipart parsing or any private case / Storage mutation.
+  const bounded=await readBoundedVendorMultipart(request,MAX_BODY);
+  if(!bounded.ok)return bounded.reason==="too_large"
+    ?reply({ok:false,code:"REQUEST_TOO_LARGE"},413)
+    :reply({ok:false,code:"INVALID_EVIDENCE_REQUEST"},400);
+  const data=bounded.form;
   if([...data.keys()].sort().join(",")!==
        "evidenceType,file,identityConsent,identityMethod,vendorId")
    return reply({ok:false,code:"INVALID_EVIDENCE_REQUEST"},400);

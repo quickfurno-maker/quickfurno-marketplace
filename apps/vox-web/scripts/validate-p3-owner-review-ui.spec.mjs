@@ -4,7 +4,7 @@ import {readFileSync} from "node:fs";
 import {resolve,dirname} from "node:path";
 import {fileURLToPath} from "node:url";
 import {
- canOfferOwnerCaseApproval,isOwnerCaseEnvelope,isOwnerQueueEnvelope
+ canOfferOwnerCaseApproval,isLatestOwnerRead,isOwnerCaseEnvelope,isOwnerQueueEnvelope
 } from "../lib/ownerReviewUiGuard.ts";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"..");
 const read=p=>readFileSync(resolve(root,p),"utf8");
@@ -93,4 +93,24 @@ test("P3-UX6 service Core and hard-off Owner flags preserved in server page",()=
  assert.match(bridge,/ownerVendorReadGate\(process\.env\)/);
  assert.match(bridge,/ownerVendorDecisionGate\(process\.env\)/);
  assert.match(bridge,/OWNER_MFA_REQUIRED/);
+});
+
+
+test("P3-UX7 only newest Owner queue/case response may update the browser",()=>{
+ assert.equal(isLatestOwnerRead(1,1),true);
+ assert.equal(isLatestOwnerRead(1,2),false);
+ assert.equal(isLatestOwnerRead(2,1),false);
+ assert.equal(isLatestOwnerRead(2,2),true);
+ for(const bad of [0,-1,NaN,1.5,Number.MAX_SAFE_INTEGER+1]){
+  assert.equal(isLatestOwnerRead(bad,bad),false);
+ }
+ const code=read("app/owner/vendors/verification/OwnerReviewConsole.tsx");
+ assert.match(code,/readEpochRef=useRef\(0\)/);
+ assert.equal((code.match(/\+\+readEpochRef\.current/g)||[]).length,3);
+ assert.equal((code.match(/isLatestOwnerRead\(epoch,readEpochRef\.current\)/g)||[]).length,6);
+ assert.match(code,/setQueueLoaded\(true\)/);
+ assert.match(code,/queueLoaded\?"No pending vendor cases/);
+ assert.match(code,/if\(!isLatestOwnerRead\(epoch,readEpochRef\.current\)\)return/);
+ assert.match(code,/caseVersion:selected\.caseVersion/);
+ assert.doesNotMatch(code,/getPublicUrl|createSignedUrl|\.storage\./);
 });

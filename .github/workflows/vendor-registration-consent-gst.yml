@@ -59,6 +59,9 @@ on:
       - 'lib/vendors/vendorSignupUi.ts'
       - 'scripts/mvp/vendor/vendor-phase2-bounded-json.test.mjs'
       - 'scripts/mvp/vendor/vendor-phase2-ui-contract.test.mjs'
+      - 'scripts/mvp/vendor/p4-*.mjs'
+      - 'docs/vox/QF-P4-*.json'
+      - 'ops/vendor/p4-staging-readonly-catalog-20261105.sql'
       - 'lib/storage/objectStorage.ts'
       - 'lib/storage/supabaseObjectStorage.ts'
       - 'app/admin/vendor-verification/page.tsx'
@@ -150,6 +153,9 @@ on:
       - 'lib/vendors/vendorSignupUi.ts'
       - 'scripts/mvp/vendor/vendor-phase2-bounded-json.test.mjs'
       - 'scripts/mvp/vendor/vendor-phase2-ui-contract.test.mjs'
+      - 'scripts/mvp/vendor/p4-*.mjs'
+      - 'docs/vox/QF-P4-*.json'
+      - 'ops/vendor/p4-staging-readonly-catalog-20261105.sql'
       - 'lib/storage/objectStorage.ts'
       - 'lib/storage/supabaseObjectStorage.ts'
       - 'app/admin/vendor-verification/page.tsx'
@@ -214,6 +220,9 @@ jobs:
       - name: Phase 2 actual-byte OTP signup and browser/private evidence UX acceptance (source only)
         run: |
           node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-phase2-bounded-json.test.mjs scripts/mvp/vendor/vendor-phase2-ui-contract.test.mjs scripts/mvp/vendor/vendor-batch6-enrollment-evidence.test.mjs scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs scripts/mvp/vendor/vendor-otp-request-coordination.test.mjs
+      - name: Phase 4 real read-only Staging and provider blocker observations (NO DEPLOY)
+        run: |
+          node --test scripts/mvp/vendor/p4-staging-catalog-readonly-reconciliation.test.mjs scripts/mvp/vendor/p4-provider-source-preflight.test.mjs scripts/mvp/vendor/p4-disposable-pg17-recovery.test.mjs
       - name: Strict additive migration registry
         run: node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs
       - name: Full TypeScript contract
@@ -294,3 +303,6 @@ jobs:
             < scripts/mvp/vendor/vendor-private-scan-pg-acceptance.sql
           docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
             < ops/vendor/vendor-launch-readonly-preflight-20261104.sql
+
+      - name: Phase 4 isolated PostgreSQL 17 synthetic backup and restore (NO MANAGED DB)
+        run: node scripts/mvp/vendor/p4-disposable-pg17-recovery.mjs

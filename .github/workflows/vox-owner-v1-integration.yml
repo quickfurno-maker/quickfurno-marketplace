@@ -7,6 +7,7 @@ on:
       - "services/vox/ownerWorkspaceProjection.*"
       - "apps/vox-web/**"
       - "scripts/mvp/vox/owner-v1-*.test.mjs"
+      - "scripts/mvp/vox/owner-vendor-image-provenance*.mjs"
       - "scripts/mvp/vox/rc7-finance-real-route-http.test.mjs"
       - ".github/workflows/vox-owner-v1-integration.yml"
   workflow_dispatch:
@@ -33,6 +34,8 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Owner-only Core real-route and projection tests
         run: node --test scripts/mvp/vox/owner-v1-projection.test.mjs scripts/mvp/vox/owner-v1-real-core-route.test.mjs scripts/mvp/vox/rc7-finance-real-route-http.test.mjs scripts/mvp/vox/owner-v1-vendor-core-bridge.test.mjs
+      - name: Owner ↔ Core local-image provenance negative certification (offline, no Docker)
+        run: node --test scripts/mvp/vox/owner-vendor-image-provenance.test.mjs
       - name: Core typecheck
         run: npm run typecheck
       - name: Owner-only Web-to-Core BFF integration (root test dependencies)

@@ -220,6 +220,10 @@ jobs:
             < scripts/mvp/vendor/vendor-atomic-pg-acceptance.sql
           docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
             < scripts/mvp/vendor/fixtures/vendor-owner-assignment-pg-bootstrap.sql
+          # Baseline-safe queries must run before Owner verification + scan migrations.
+          # No writes: counts only, transaction READ ONLY and ROLLBACK.
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < ops/vendor/vendor-before-migration-readonly-preflight-20261105.sql
           docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
             < supabase/migrations/20261104160000_vendor_owner_review_assignment_gate.sql
           docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \

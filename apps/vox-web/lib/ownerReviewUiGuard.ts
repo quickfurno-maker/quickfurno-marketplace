@@ -59,6 +59,9 @@ export function isOwnerCaseEnvelope(v:unknown,requestedVendorId:string):
   v.schema==="qf.vox.owner.vendor-case-bff.v1"&&isOwnerCase(v.case)&&
   v.case.vendorId===requestedVendorId;
 }
+export function isLatestOwnerRead(epoch:number,currentEpoch:number):boolean{
+ return Number.isSafeInteger(epoch)&&epoch>0&&epoch===currentEpoch;
+}
 export function canOfferOwnerCaseApproval(c:OwnerCase|null):boolean{
  return Boolean(c&&c.casePresent&&version(c.caseVersion)&&
   c.caseState!=="approved"&&c.caseState!=="rejected"&&

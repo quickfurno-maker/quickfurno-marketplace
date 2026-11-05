@@ -1,9 +1,9 @@
 "use client";
-import {useCallback,useState} from "react";
+import {useCallback,useEffect,useState} from "react";
+import {canOfferOwnerCaseApproval,isOwnerCaseEnvelope,isOwnerQueueEnvelope} from "../../../../lib/ownerReviewUiGuard";
 import type {OwnerCase,OwnerQueueRow,OwnerReviewAction} from "../../../../lib/ownerVendorVerification";
 
-type QueueResponse={ok:boolean;schema?:string;pending?:OwnerQueueRow[];code?:string};
-type CaseResponse={ok:boolean;schema?:string;case?:OwnerCase;code?:string};
+
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{4}[0-9a-f]{8}$/i;
 const REASON=/^[a-z][a-z0-9_]{2,63}$/;
 const methods:[OwnerReviewAction,string][]=[
@@ -22,24 +22,16 @@ export default function OwnerReviewConsole({decisionEnabled}:{decisionEnabled:bo
  const [queue,setQueue]=useState<OwnerQueueRow[]>([]);
  const [selected,setSelected]=useState<OwnerCase|null>(null);
  const [message,setMessage]=useState("");
- const [busy,setBusy]=useState(false);
  const [action,setAction]=useState<OwnerReviewAction>("request_documents");
  const [reason,setReason]=useState("");
  const [inFlight,setInFlight]=useState<"queue"|"case"|"decision"|null>(null);
- const approveEligible=Boolean(selected?.casePresent&&
-  selected.caseState!== "approved"&&selected.caseState!=="rejected"&&
-  selected.contactStatus==="verified"&&selected.identityStatus==="verified"&&
-  selected.officeStatus==="verified"&&selected.categoryStatus==="verified"&&
-  selected.zoneStatus==="verified"&&selected.consentValid&&
-  selected.identityEvidenceVerified&&selected.officeEvidenceVerified);
+ const approveEligible=canOfferOwnerCaseApproval(selected);
  const loadQueue=useCallback(async()=>{
   setInFlight("queue");setMessage("");setQueue([]);setSelected(null);
   try{
    const r=await fetch("/api/owner/vendor-verification/queue",fetchOptions);
-   const data=await r.json() as QueueResponse;
-   if(!r.ok||data.ok!==true||data.schema!=="qf.vox.owner.vendor-review-bff.v1"||
-      !Array.isArray(data.pending)||data.pending.length>20||
-      data.pending.some(x=>!x||!UUID.test(x.vendorId)||!Number.isInteger(x.caseVersion))){
+   const data:unknown=await r.json();
+   if(!r.ok||!isOwnerQueueEnvelope(data)){
     setMessage(r.status===401||r.status===403?
      "Owner MFA or Core Superadmin permission is required.":
      r.status===503?"Owner review is unavailable until private Staging is certified.":
@@ -51,14 +43,16 @@ export default function OwnerReviewConsole({decisionEnabled}:{decisionEnabled:bo
   }catch{setMessage("Owner queue unavailable. Refresh the session and retry the read.");}
   finally{setInFlight(null);}
  },[]);
+ // The server renders this console only after the independent Owner read gate
+ // and verified AAL2 check. The BFF/Core revalidate on every actual request.
+ useEffect(()=>{void loadQueue();},[loadQueue]);
  const loadCase=useCallback(async(id:string)=>{
   if(!UUID.test(id)){setMessage("Invalid vendor reference.");return;}
   setInFlight("case");setMessage("");setSelected(null);
   try{
    const r=await fetch("/api/owner/vendor-verification/case?vendorId="+encodeURIComponent(id),fetchOptions);
-   const data=await r.json() as CaseResponse;
-   if(!r.ok||data.ok!==true||data.schema!=="qf.vox.owner.vendor-case-bff.v1"||
-      !data.case||data.case.vendorId!==id){
+   const data:unknown=await r.json();
+   if(!r.ok||!isOwnerCaseEnvelope(data,id)){
     setMessage(r.status===401||r.status===403?
      "Owner MFA or Core Superadmin permission is required.":
      "The canonical Core case is unavailable. Do not make a decision.");

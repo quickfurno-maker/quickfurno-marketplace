@@ -10,6 +10,7 @@ import {fileURLToPath} from "node:url";
 import {createHash} from "node:crypto";
 import {RC24_MANAGED_SNAPSHOT_SHA256} from "./rc23-migration-adjudication.mjs";
 import {RC22_PINNED_SOURCE} from "./rc22-migration-release-packet.mjs";
+import {MIGRATIONS} from "../vendor/vendor-seven-migration-fingerprint.mjs";
 import {RC26_SNAPSHOT_PATH,RC26_LEGACY_V1_PATH,assertPlanNonExecuting,assertReadOnlyProbe,
  buildRc26MigrationReleasePlan} from "./rc26-migration-release-plan.mjs";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
@@ -204,7 +205,24 @@ export function buildDependencyGraph(plan,stepEdges=RC27_STEP_EDGES){
 // match the RC22 pinned aggregate, and no row may claim proven equivalence.
 const SAFE_SQL_NAME=/^\d{14}_[a-z0-9_]+\.sql$/;
 export function buildSqlProvenance(plan,{listSqlFiles,readSql}){
- const all=listSqlFiles().filter(n=>/^\d{14}_.+\.sql$/.test(n)).sort();
+ const discovered=listSqlFiles().filter(n=>/^\d{14}_.+\.sql$/.test(n)).sort();
+ // Preserve the exact RC22 historical 162-file aggregate. Separately verify
+ // all seven 2026-11 vendor SQL as raw-byte pinned and SOURCE-PENDING only.
+ // An eighth unknown file or any mutation remains a hard provenance failure.
+ for(const name of discovered)if(!SAFE_SQL_NAME.test(name))
+  fail("SQL_PROVENANCE_UNSAFE_NAME_"+name);
+ const vendorPins=new Map(MIGRATIONS);
+ const added=discovered.filter(n=>vendorPins.has(n));
+ if(added.length!==0&&added.length!==MIGRATIONS.length)
+  fail("SQL_PROVENANCE_INVENTORY_DRIFT");
+ for(const name of added){
+  const bytes=readSql(name);
+  if(!Buffer.isBuffer(bytes)||bytes.length===0)
+   fail("SQL_PROVENANCE_UNREADABLE_"+name);
+  if(sha(bytes)!==vendorPins.get(name))
+   fail("SQL_PROVENANCE_PENDING_VENDOR_SOURCE_CHANGED_"+name);
+ }
+ const all=discovered.filter(n=>!vendorPins.has(n));
  if(all.length!==RC22_PINNED_SOURCE.count)fail("SQL_PROVENANCE_INVENTORY_DRIFT");
  const hashes=new Map();
  for(const n of all){

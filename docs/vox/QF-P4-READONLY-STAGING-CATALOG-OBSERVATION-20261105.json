@@ -1,0 +1,59 @@
+{
+  "schema": "qf.launch.p4.staging-catalog-observation.v1",
+  "observedDate": "2026-11-05",
+  "scope": "QUICKFURNO_STAGING_ONLY_READ_ONLY",
+  "source": "Connected Supabase list_migrations + SELECT from supabase_migrations.schema_migrations, pg_catalog and storage.buckets",
+  "signedProviderAttestation": false,
+  "readOnly": true,
+  "observations": {
+    "appliedMigrationCount": 86,
+    "latestAppliedMigrationVersion": "20261013144901",
+    "sevenRequiredVersions": [
+      {
+        "version": "20261104090000",
+        "applied": false
+      },
+      {
+        "version": "20261104140000",
+        "applied": false
+      },
+      {
+        "version": "20261104153000",
+        "applied": false
+      },
+      {
+        "version": "20261104160000",
+        "applied": false
+      },
+      {
+        "version": "20261104163000",
+        "applied": false
+      },
+      {
+        "version": "20261104170000",
+        "applied": false
+      },
+      {
+        "version": "20261104173000",
+        "applied": false
+      }
+    ],
+    "vendorVerificationRelatedTables": 0,
+    "vendorPrivateOrVoxFunctions": 0,
+    "verificationBucketCount": 0,
+    "publicVerificationBucketCount": 0,
+    "publicNonRlsTableCount": 0
+  },
+  "managementActionsPerformed": [],
+  "canApplyMigrations": false,
+  "canDeploy": false,
+  "releaseDecision": "HOLD",
+  "limitations": [
+    "Not a signed database backup",
+    "Not a full managed schema or RLS review",
+    "Not a recovery exercise",
+    "Not proof of applied SQL from repo",
+    "Observation expires and must be recaptured before any install",
+    "No Production inspection"
+  ]
+}

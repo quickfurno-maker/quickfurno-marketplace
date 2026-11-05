@@ -62,6 +62,10 @@ on:
       - 'scripts/mvp/vendor/p4-*.mjs'
       - 'docs/vox/QF-P4-*.json'
       - 'ops/vendor/p4-staging-readonly-catalog-20261105.sql'
+      - 'lib/google-maps/loadGoogleMaps.ts'
+      - 'scripts/mvp/location/validate-google-places-timeout.test.mjs'
+      - 'scripts/mvp/vendor/p5-synthetic-cross-step-pg-acceptance.sql'
+      - 'scripts/mvp/vendor/p5-synthetic-cross-step-pg-acceptance.test.mjs'
       - 'lib/storage/objectStorage.ts'
       - 'lib/storage/supabaseObjectStorage.ts'
       - 'app/admin/vendor-verification/page.tsx'
@@ -156,6 +160,10 @@ on:
       - 'scripts/mvp/vendor/p4-*.mjs'
       - 'docs/vox/QF-P4-*.json'
       - 'ops/vendor/p4-staging-readonly-catalog-20261105.sql'
+      - 'lib/google-maps/loadGoogleMaps.ts'
+      - 'scripts/mvp/location/validate-google-places-timeout.test.mjs'
+      - 'scripts/mvp/vendor/p5-synthetic-cross-step-pg-acceptance.sql'
+      - 'scripts/mvp/vendor/p5-synthetic-cross-step-pg-acceptance.test.mjs'
       - 'lib/storage/objectStorage.ts'
       - 'lib/storage/supabaseObjectStorage.ts'
       - 'app/admin/vendor-verification/page.tsx'
@@ -223,6 +231,10 @@ jobs:
       - name: Phase 4 real read-only Staging and provider blocker observations (NO DEPLOY)
         run: |
           node --test scripts/mvp/vendor/p4-staging-catalog-readonly-reconciliation.test.mjs scripts/mvp/vendor/p4-provider-source-preflight.test.mjs scripts/mvp/vendor/p4-disposable-pg17-recovery.test.mjs
+      - name: Phase 5 Google Places bootstrap recovery and synthetic vendor approval boundary (NO DEPLOY)
+        run: |
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/location/validate-google-places-timeout.test.mjs
+          node --test scripts/mvp/vendor/p5-synthetic-cross-step-pg-acceptance.test.mjs
       - name: Strict additive migration registry
         run: node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs
       - name: Full TypeScript contract

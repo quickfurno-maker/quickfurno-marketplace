@@ -31,6 +31,7 @@ export const PG17_STEPS=Object.freeze([
  "supabase/migrations/20261104173000_vendor_private_scan_quarantine.sql",
  "scripts/mvp/vendor/vendor-private-scan-pg-acceptance.sql",
  "ops/vendor/vendor-launch-readonly-preflight-20261104.sql",
+ "scripts/mvp/vendor/p5-synthetic-cross-step-pg-acceptance.sql",
 ]);
 export const MIGRATION_COUNT=PG17_STEPS.filter(x=>x.startsWith("supabase/migrations/")).length;
 const CATALOG_SIGNATURE=String.raw`WITH objects AS (

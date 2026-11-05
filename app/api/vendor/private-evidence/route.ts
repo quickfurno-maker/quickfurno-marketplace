@@ -10,6 +10,7 @@ import { adminClient,serverClient } from "@/lib/supabase";
 import { createPrivateVendorEvidenceStorage } from "@/lib/storage/supabaseObjectStorage";
 import { VENDOR_REGISTRATION_PRIVACY_REVISION } from "@/lib/vendors/vendorSignupPolicy";
 import { readBoundedVendorMultipart } from "@/lib/vendors/readBoundedVendorMultipart";
+import { withPrivateEvidenceBuffer } from "@/lib/vendors/withPrivateEvidenceBuffer";
 import { invalidDeclaredVendorLength } from "@/lib/vendors/readBoundedVendorJson";
 import { allowPublicMutation } from "@/lib/security/publicMutationRateLimit";
 
@@ -87,7 +88,8 @@ export async function POST(request:Request):Promise<Response>{
   })))return reply({ok:false,code:"EVIDENCE_RATE_LIMITED"},429);
 
   const binary=Buffer.from(await file.arrayBuffer());
-  const accepted=sniff(binary,file.type);
+  return await withPrivateEvidenceBuffer(binary,async (buffer)=>{
+  const accepted=sniff(buffer,file.type);
   if(!accepted)return reply({ok:false,code:"INVALID_FILE_FORMAT"},415);
 
   // The server-only private case RPC checks verified Auth phone, exact vendor
@@ -111,11 +113,11 @@ export async function POST(request:Request):Promise<Response>{
   // PRIVATE bucket only. No signed public URL, service-role key or raw upload
   // file name is returned. A missing bucket is a hard refusal.
   try{
-    await privateEvidenceStorage.put(key,binary,{
+    await privateEvidenceStorage.put(key,buffer,{
       cacheControl:"0",contentType:accepted.mime,upsert:false,
     });
   }catch{return reply({ok:false,code:"PRIVATE_UPLOAD_UNAVAILABLE"},503);}
-  const hash=createHash("sha256").update(binary).digest("hex");
+  const hash=createHash("sha256").update(buffer).digest("hex");
   const {data:evidenceId,error:linkError}=await db.rpc(
     "qf_vendor_attach_private_evidence",{
       p_vendor_id:vendorId,p_auth_user_id:user.id,p_case_id:caseId,
@@ -131,6 +133,7 @@ export async function POST(request:Request):Promise<Response>{
     caseVersionKnown:false,approved:false,publicDocumentUrl:null,
     vendorBusinessStatusUnchanged:true,
   },202);
+  }); // Always clear this request-scoped private upload Buffer.
  }catch{return reply({ok:false,code:"PRIVATE_EVIDENCE_UNAVAILABLE"},503);}
 }
 export function GET():Response{return reply({ok:false,code:"METHOD_NOT_ALLOWED"},405);}

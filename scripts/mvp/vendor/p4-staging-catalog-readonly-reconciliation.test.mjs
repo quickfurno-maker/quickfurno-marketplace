@@ -58,3 +58,15 @@ test("P4-DB5 observation script is pure source read, no mutation, no Supabase to
  assert.match(code,/READ_ONLY/);
  assert.doesNotMatch(code,/execute_sql|apply_migration|createClient\(|fetch\(|spawnSync\(|INSERT INTO|DELETE FROM|UPDATE\s+public/);
 });
+
+test("P4-DB6 repeatable Staging catalog SQL is transaction read-only and metadata-only",()=>{
+ const sql=readFileSync(resolve(root,"ops/vendor/p4-staging-readonly-catalog-20261105.sql"),"utf8");
+ const statements=sql.split("\n").filter(line=>!line.trim().startsWith("--")).join("\n");
+ assert.match(statements,/BEGIN TRANSACTION READ ONLY;/);
+ assert.match(statements,/ROLLBACK;/);
+ assert.match(statements,/supabase_migrations\.schema_migrations/);
+ assert.match(statements,/pg_catalog\.pg_class/);
+ assert.match(statements,/storage\.buckets/);
+ assert.doesNotMatch(statements,/\b(?:INSERT|UPDATE|DELETE|TRUNCATE|CREATE|ALTER|DROP|GRANT|REVOKE|COPY|VACUUM)\s+/i);
+ assert.doesNotMatch(statements,/\bauth\.users\b|\bpayments\b|\bvendor_leads\b/i);
+});

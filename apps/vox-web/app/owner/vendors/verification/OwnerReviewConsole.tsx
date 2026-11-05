@@ -1,6 +1,6 @@
 "use client";
-import {useCallback,useEffect,useState} from "react";
-import {canOfferOwnerCaseApproval,isOwnerCaseEnvelope,isOwnerQueueEnvelope} from "../../../../lib/ownerReviewUiGuard";
+import {useCallback,useEffect,useRef,useState} from "react";
+import {canOfferOwnerCaseApproval,isLatestOwnerRead,isOwnerCaseEnvelope,isOwnerQueueEnvelope} from "../../../../lib/ownerReviewUiGuard";
 import type {OwnerCase,OwnerQueueRow,OwnerReviewAction} from "../../../../lib/ownerVendorVerification";
 
 
@@ -20,6 +20,9 @@ function friendly(value:string|null|undefined){
 }
 export default function OwnerReviewConsole({decisionEnabled}:{decisionEnabled:boolean}){
  const [queue,setQueue]=useState<OwnerQueueRow[]>([]);
+ const [queueLoaded,setQueueLoaded]=useState(false);
+ // A refreshed queue or a newer selected case invalidates all older read results.
+ const readEpochRef=useRef(0);
  const [selected,setSelected]=useState<OwnerCase|null>(null);
  const [message,setMessage]=useState("");
  const [action,setAction]=useState<OwnerReviewAction>("request_documents");
@@ -27,10 +30,13 @@ export default function OwnerReviewConsole({decisionEnabled}:{decisionEnabled:bo
  const [inFlight,setInFlight]=useState<"queue"|"case"|"decision"|null>(null);
  const approveEligible=canOfferOwnerCaseApproval(selected);
  const loadQueue=useCallback(async()=>{
+  const epoch=++readEpochRef.current;
+  setQueueLoaded(false);
   setInFlight("queue");setMessage("");setQueue([]);setSelected(null);
   try{
    const r=await fetch("/api/owner/vendor-verification/queue",fetchOptions);
    const data:unknown=await r.json();
+   if(!isLatestOwnerRead(epoch,readEpochRef.current))return; // Never overwrite a newer case or refresh.
    if(!r.ok||!isOwnerQueueEnvelope(data)){
     setMessage(r.status===401||r.status===403?
      "Owner MFA or Core Superadmin permission is required.":
@@ -39,19 +45,23 @@ export default function OwnerReviewConsole({decisionEnabled}:{decisionEnabled:bo
     return;
    }
    setQueue(data.pending);
+   setQueueLoaded(true);
    if(data.pending.length===0)setMessage("No current pending vendor cases in this first 20-record window.");
-  }catch{setMessage("Owner queue unavailable. Refresh the session and retry the read.");}
-  finally{setInFlight(null);}
+  }catch{if(isLatestOwnerRead(epoch,readEpochRef.current))
+   setMessage("Owner queue unavailable. Refresh the session and retry the read.");}
+  finally{if(isLatestOwnerRead(epoch,readEpochRef.current))setInFlight(null);}
  },[]);
  // The server renders this console only after the independent Owner read gate
  // and verified AAL2 check. The BFF/Core revalidate on every actual request.
  useEffect(()=>{void loadQueue();},[loadQueue]);
  const loadCase=useCallback(async(id:string)=>{
   if(!UUID.test(id)){setMessage("Invalid vendor reference.");return;}
+  const epoch=++readEpochRef.current;
   setInFlight("case");setMessage("");setSelected(null);
   try{
    const r=await fetch("/api/owner/vendor-verification/case?vendorId="+encodeURIComponent(id),fetchOptions);
    const data:unknown=await r.json();
+   if(!isLatestOwnerRead(epoch,readEpochRef.current))return; // A newer selection supersedes this response.
    if(!r.ok||!isOwnerCaseEnvelope(data,id)){
     setMessage(r.status===401||r.status===403?
      "Owner MFA or Core Superadmin permission is required.":
@@ -59,8 +69,9 @@ export default function OwnerReviewConsole({decisionEnabled}:{decisionEnabled:bo
     return;
    }
    setSelected(data.case);
-  }catch{setMessage("Case read is unavailable. No decision was recorded.");}
-  finally{setInFlight(null);}
+  }catch{if(isLatestOwnerRead(epoch,readEpochRef.current))
+   setMessage("Case read is unavailable. No decision was recorded.");}
+  finally{if(isLatestOwnerRead(epoch,readEpochRef.current))setInFlight(null);}
  },[]);
  async function submitDecision(){
   if(!decisionEnabled||!selected?.casePresent||
@@ -70,6 +81,8 @@ export default function OwnerReviewConsole({decisionEnabled}:{decisionEnabled:bo
     setMessage("Decision blocked: verify case, reason, current MFA and evidence readiness.");
     return;
   }
+  // A decision request must not be followed by a stale read re-enabling controls.
+  ++readEpochRef.current;
   setInFlight("decision");setMessage("");
   const id=selected.vendorId;
   try{
@@ -107,7 +120,7 @@ export default function OwnerReviewConsole({decisionEnabled}:{decisionEnabled:bo
    <div className="ovr-panel">
     <h3>Pending applications</h3>
     <p className="ovr-sub">Oldest 20 current cases. No personal details.</p>
-    {queue.length===0?<p className="ovr-empty">Load the queue to view current private case references.</p>:(
+    {queue.length===0?<p className="ovr-empty">{inFlight==="queue"?"Loading pending cases…":queueLoaded?"No pending vendor cases in this 20-record window.":"Queue not loaded. Use Load pending cases to retry."}</p>:(
      <ul className="ovr-list">
       {queue.map(item=><li key={item.vendorId}>
        <button type="button" className="ovr-case-button" disabled={Boolean(inFlight)}

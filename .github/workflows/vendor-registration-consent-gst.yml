@@ -66,6 +66,7 @@ on:
       - 'scripts/mvp/location/validate-google-places-timeout.test.mjs'
       - 'scripts/mvp/vendor/p5-synthetic-cross-step-pg-acceptance.sql'
       - 'scripts/mvp/vendor/p5-synthetic-cross-step-pg-acceptance.test.mjs'
+      - 'scripts/mvp/launch/launch-source-workflow-hardening.test.mjs'
       - 'lib/storage/objectStorage.ts'
       - 'lib/storage/supabaseObjectStorage.ts'
       - 'app/admin/vendor-verification/page.tsx'
@@ -164,6 +165,7 @@ on:
       - 'scripts/mvp/location/validate-google-places-timeout.test.mjs'
       - 'scripts/mvp/vendor/p5-synthetic-cross-step-pg-acceptance.sql'
       - 'scripts/mvp/vendor/p5-synthetic-cross-step-pg-acceptance.test.mjs'
+      - 'scripts/mvp/launch/launch-source-workflow-hardening.test.mjs'
       - 'lib/storage/objectStorage.ts'
       - 'lib/storage/supabaseObjectStorage.ts'
       - 'app/admin/vendor-verification/page.tsx'
@@ -205,8 +207,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: '22'
           cache: npm
@@ -230,11 +232,13 @@ jobs:
           node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-phase2-bounded-json.test.mjs scripts/mvp/vendor/vendor-phase2-ui-contract.test.mjs scripts/mvp/vendor/vendor-batch6-enrollment-evidence.test.mjs scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs scripts/mvp/vendor/vendor-otp-request-coordination.test.mjs
       - name: Phase 4 real read-only Staging and provider blocker observations (NO DEPLOY)
         run: |
-          node --test scripts/mvp/vendor/p4-staging-catalog-readonly-reconciliation.test.mjs scripts/mvp/vendor/p4-provider-source-preflight.test.mjs scripts/mvp/vendor/p4-disposable-pg17-recovery.test.mjs
+          node --test scripts/mvp/vendor/p4-staging-catalog-readonly-reconciliation.test.mjs scripts/mvp/vendor/p4-provider-source-preflight.test.mjs scripts/mvp/vendor/p4-disposable-pg17-recovery.test.mjs scripts/mvp/vendor/p4-migration-compatibility-source.test.mjs
       - name: Phase 5 Google Places bootstrap recovery and synthetic vendor approval boundary (NO DEPLOY)
         run: |
           node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/location/validate-google-places-timeout.test.mjs
           node --test scripts/mvp/vendor/p5-synthetic-cross-step-pg-acceptance.test.mjs
+      - name: Launch-critical GitHub Action pinning and safe triggers (NO DEPLOY)
+        run: node --test scripts/mvp/launch/launch-source-workflow-hardening.test.mjs
       - name: Strict additive migration registry
         run: node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs
       - name: Full TypeScript contract

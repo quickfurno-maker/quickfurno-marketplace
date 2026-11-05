@@ -1,8 +1,11 @@
--- QuickFurno vendor-registration controlled Staging PRE-FLIGHT TEMPLATE.
--- READ ONLY, no PII rows, no deletes, no migrations, no storage writes.
--- Run against an approved, authenticated Staging psql session ONLY after
--- a separate Owner rollout authorization. Not executed on managed DB here.
--- These are COUNTS / FLAGS, not an automatic release approval.
+-- QuickFurno vendor-registration controlled Staging POST-MIGRATION
+-- VERIFICATION TEMPLATE. It REQUIRES the new qf_vendor_private schema,
+-- scanner receipts, and service-role-only RPCs to already exist. Never run
+-- this against an unmodified pre-migration database; first use
+-- ops/vendor/vendor-before-migration-readonly-preflight-20261105.sql instead.
+-- READ ONLY; no PII rows, deletes, migrations, storage or financial writes.
+-- Run ONLY in separately authorized Staging, after a controlled migration.
+-- These COUNTS / FLAGS are not an automatic release approval.
 begin transaction isolation level repeatable read read only;
 set local statement_timeout='20s';
 set local lock_timeout='3s';

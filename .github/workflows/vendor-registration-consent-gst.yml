@@ -232,7 +232,7 @@ jobs:
           node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-phase2-bounded-json.test.mjs scripts/mvp/vendor/vendor-phase2-ui-contract.test.mjs scripts/mvp/vendor/vendor-batch6-enrollment-evidence.test.mjs scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs scripts/mvp/vendor/vendor-otp-request-coordination.test.mjs
       - name: Phase 4 real read-only Staging and provider blocker observations (NO DEPLOY)
         run: |
-          node --test scripts/mvp/vendor/p4-staging-catalog-readonly-reconciliation.test.mjs scripts/mvp/vendor/p4-provider-source-preflight.test.mjs scripts/mvp/vendor/p4-disposable-pg17-recovery.test.mjs
+          node --test scripts/mvp/vendor/p4-staging-catalog-readonly-reconciliation.test.mjs scripts/mvp/vendor/p4-provider-source-preflight.test.mjs scripts/mvp/vendor/p4-disposable-pg17-recovery.test.mjs scripts/mvp/vendor/p4-migration-compatibility-source.test.mjs
       - name: Phase 5 Google Places bootstrap recovery and synthetic vendor approval boundary (NO DEPLOY)
         run: |
           node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/location/validate-google-places-timeout.test.mjs

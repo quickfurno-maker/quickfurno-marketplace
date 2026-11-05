@@ -57,6 +57,7 @@ on:
       - 'lib/vendors/withPrivateEvidenceBuffer.ts'
       - 'scripts/mvp/vendor/vendor-private-memory-cleanup.test.mjs'
       - 'scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs'
+      - 'scripts/mvp/vendor/vendor-private-bucket-first.test.mjs'
       - 'lib/vendors/readBoundedVendorJson.ts'
       - 'lib/vendors/vendorSignupUi.ts'
       - 'scripts/mvp/vendor/vendor-phase2-bounded-json.test.mjs'
@@ -66,6 +67,7 @@ on:
       - 'ops/vendor/p4-staging-readonly-catalog-20261105.sql'
       - 'lib/google-maps/loadGoogleMaps.ts'
       - 'scripts/mvp/location/validate-google-places-timeout.test.mjs'
+      - 'scripts/mvp/location/validate-google-places-bounded-import.test.mjs'
       - 'scripts/mvp/vendor/p5-synthetic-cross-step-pg-acceptance.sql'
       - 'scripts/mvp/vendor/p5-synthetic-cross-step-pg-acceptance.test.mjs'
       - 'scripts/mvp/launch/launch-source-workflow-hardening.test.mjs'
@@ -158,6 +160,7 @@ on:
       - 'lib/vendors/withPrivateEvidenceBuffer.ts'
       - 'scripts/mvp/vendor/vendor-private-memory-cleanup.test.mjs'
       - 'scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs'
+      - 'scripts/mvp/vendor/vendor-private-bucket-first.test.mjs'
       - 'lib/vendors/readBoundedVendorJson.ts'
       - 'lib/vendors/vendorSignupUi.ts'
       - 'scripts/mvp/vendor/vendor-phase2-bounded-json.test.mjs'
@@ -167,6 +170,7 @@ on:
       - 'ops/vendor/p4-staging-readonly-catalog-20261105.sql'
       - 'lib/google-maps/loadGoogleMaps.ts'
       - 'scripts/mvp/location/validate-google-places-timeout.test.mjs'
+      - 'scripts/mvp/location/validate-google-places-bounded-import.test.mjs'
       - 'scripts/mvp/vendor/p5-synthetic-cross-step-pg-acceptance.sql'
       - 'scripts/mvp/vendor/p5-synthetic-cross-step-pg-acceptance.test.mjs'
       - 'scripts/mvp/launch/launch-source-workflow-hardening.test.mjs'
@@ -228,7 +232,7 @@ jobs:
       - name: VOX + Vendor cross-branch migration tree delta (mocked offline CI)
         run: node --test scripts/mvp/vendor/vendor-vox-migration-cross-branch-delta.test.mjs
       - name: Actual-byte bounded vendor document upload regression
-        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs scripts/mvp/vendor/vendor-private-bucket-first.test.mjs
       - name: Private vendor evidence memory cleanup on success and failures (NO EXTERNAL SEND)
         run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-private-memory-cleanup.test.mjs
       - name: Local ClamAV behavior negative certification (no real daemon or provider)
@@ -241,7 +245,7 @@ jobs:
           node --test scripts/mvp/vendor/p4-staging-catalog-readonly-reconciliation.test.mjs scripts/mvp/vendor/p4-provider-source-preflight.test.mjs scripts/mvp/vendor/p4-disposable-pg17-recovery.test.mjs scripts/mvp/vendor/p4-migration-compatibility-source.test.mjs
       - name: Phase 5 Google Places bootstrap recovery and synthetic vendor approval boundary (NO DEPLOY)
         run: |
-          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/location/validate-google-places-timeout.test.mjs
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/location/validate-google-places-timeout.test.mjs scripts/mvp/location/validate-google-places-bounded-import.test.mjs
           node --test scripts/mvp/vendor/p5-synthetic-cross-step-pg-acceptance.test.mjs
       - name: Launch-critical GitHub Action pinning and safe triggers (NO DEPLOY)
         run: node --test scripts/mvp/launch/launch-source-workflow-hardening.test.mjs

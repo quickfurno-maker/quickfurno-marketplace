@@ -8,6 +8,7 @@ on:
       - "apps/vox-web/**"
       - "scripts/mvp/vox/owner-v1-*.test.mjs"
       - "scripts/mvp/vox/owner-vendor-image-provenance*.mjs"
+      - "scripts/mvp/vox/owner-phase3-image-precheck*.mjs"
       - "scripts/mvp/vox/rc7-finance-real-route-http.test.mjs"
       - ".github/workflows/vox-owner-v1-integration.yml"
   workflow_dispatch:
@@ -36,6 +37,8 @@ jobs:
         run: node --test scripts/mvp/vox/owner-v1-projection.test.mjs scripts/mvp/vox/owner-v1-real-core-route.test.mjs scripts/mvp/vox/rc7-finance-real-route-http.test.mjs scripts/mvp/vox/owner-v1-vendor-core-bridge.test.mjs
       - name: Owner ↔ Core local-image provenance negative certification (offline, no Docker)
         run: node --test scripts/mvp/vox/owner-vendor-image-provenance.test.mjs
+      - name: Phase 3 pinned local OCI source-only release-HOLD precheck
+        run: node --test scripts/mvp/vox/owner-phase3-image-precheck.test.mjs
       - name: Core typecheck
         run: npm run typecheck
       - name: Owner-only Web-to-Core BFF integration (root test dependencies)
@@ -44,6 +47,9 @@ jobs:
         run: npm ci --prefix apps/vox-web --ignore-scripts --no-audit --no-fund
       - name: VOX Web typecheck
         run: npm run typecheck --prefix apps/vox-web
+      - name: Phase 3 Owner UI and MFA security regression (no real identity/session)
+        run: |
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test apps/vox-web/scripts/validate-p3-owner-review-ui.spec.mjs apps/vox-web/scripts/validate-p3-owner-mfa-body.spec.mjs
       - name: All existing VOX Web regressions plus new Owner boundary
         run: npm test --prefix apps/vox-web
       - name: Production-mode compiled Web build, not deployed

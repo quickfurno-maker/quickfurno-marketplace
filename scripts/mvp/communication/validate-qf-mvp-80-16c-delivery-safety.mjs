@@ -374,13 +374,16 @@ check(
 );
 check("§9 the step error uses the rule for phone", /!VENDOR_MOBILE_RE\.test\(f\.phone\.replace/.test(registerFormCode));
 check(
-  "§9 a distinct WhatsApp number is validated too",
-  /!f\.whatsappSame && !VENDOR_MOBILE_RE\.test\(f\.whatsapp\.replace/.test(registerFormCode)
+  "§9 mandatory OTP mobile is the one initial vendor WhatsApp destination",
+  /const whatsappDigits = phoneDigits;/.test(registerFormCode) &&
+    !/f\.whatsappSame|f\.whatsapp\.replace/.test(registerFormCode) &&
+    readFileSync("app/api/vendor/onboarding/complete/route.ts","utf8").includes("raw.phone!==body.mobile")
 );
 check(
-  "§9 the submit guard uses the rule for both numbers",
+  "§9 submit enforces Indian mobile for verified phone and shared WhatsApp destination",
   /VENDOR_MOBILE_RE\.test\(phoneDigits\)/.test(registerFormCode) &&
-    /VENDOR_MOBILE_RE\.test\(whatsappDigits\)/.test(registerFormCode)
+    /VENDOR_MOBILE_RE\.test\(whatsappDigits\)/.test(registerFormCode) &&
+    /const whatsappDigits = phoneDigits;/.test(registerFormCode)
 );
 check(
   "§9 no length-only phone acceptance survives in the form",
@@ -391,13 +394,16 @@ mutant(
   (src) => !/phoneDigits\.length === 10|whatsappDigits\.length === 10|\/\^\\d\{10\}\$\//.test(src),
   `${registerFormCode}\nconst okish = phoneDigits.length === 10;`
 );
-check("§9 both inputs still cap at ten digits", (registerFormCode.match(/maxLength[:=]\s*\{?10\}?/g) ?? []).length >= 2);
+check("§9 the canonical WhatsApp mobile input caps at ten digits",
+  (registerFormCode.match(/maxLength[:=]\s*\{?10\}?/g) ?? []).length >= 1 &&
+  /const whatsappDigits = phoneDigits;/.test(registerFormCode));
 check(
-  "§9 both inputs still strip non-digits",
-  (registerFormCode.match(/replace\(\/\\D\/g, ""\)\.slice\(0, 10\)/g) ?? []).length >= 2
+  "§9 canonical mobile strips nondigits before populating the WhatsApp destination",
+  (registerFormCode.match(/replace\(\/\\D\/g, ""\)\.slice\(0, 10\)/g) ?? []).length >= 1 &&
+    /const whatsappDigits = phoneDigits;/.test(registerFormCode)
 );
 check(
-  "§9 both inputs still declare a numeric keyboard",
+  "§9 mobile and OTP inputs still declare numeric keyboards",
   (registerFormCode.match(/inputMode[:=]\s*\{?"numeric"\}?/g) ?? []).length >= 2
 );
 

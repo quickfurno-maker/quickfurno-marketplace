@@ -12,6 +12,10 @@ import { adminClient, serverClient } from "../lib/supabase";
 import { appError, fail, ok, type Result } from "../lib/errors";
 import * as leads from "../services/leadService";
 import * as vendors from "../services/vendorService";
+import { hasVendorRegistrationConsent, isValidOptionalGstin } from "../lib/vendors/vendorSignupPolicy";
+import { isValidIndianMobile } from "../lib/vendors/vendorContactContract";
+import { allowPublicMutation } from "../lib/security/publicMutationRateLimit";
+import { resolveActiveCity } from "../lib/locations/cityService";
 import * as packages from "../services/packageService";
 import * as vendorPackageOrders from "../services/vendorPackageOrderService";
 import * as vendorProfileChanges from "../services/vendorProfileChangeService";
@@ -333,8 +337,14 @@ export async function fetchPackages() {
   return packages.listPackages();
 }
 
-export async function submitVendorRegistration(input: VendorRegistrationInput) {
-  return vendors.registerVendor(input);
+/** The former anonymous application action has no verified Auth principal.
+ * It cannot be allowed to create an unowned vendor row after the mobile-first
+ * identity policy. Existing active /vendor signup uses a separate action; the
+ * new OTP-verified server submission will replace that path after certification.
+ */
+export async function submitVendorRegistration(_input: VendorRegistrationInput) {
+  return { ok: false as const, code: "VENDOR_WHATSAPP_OTP_REQUIRED",
+    error: "Verify your WhatsApp mobile number before registering as a vendor." };
 }
 
 export async function submitFreeVendorProfileInterest(input: CaptureFreeVendorInterestInput) {
@@ -351,14 +361,59 @@ export async function submitVendorReview(input: vendorReviews.SubmitVendorReview
 }
 
 export async function submitVendorAccountRegistration(input: VendorRegistrationInput & { password: string }) {
+  // Fail-closed by default. Owner chose WhatsApp OTP as the mandatory vendor
+  // signup authority. This legacy email+password account creator can only be
+  // used via an explicit, time-limited internal rollback/canary flag; it is NOT
+  // a production-ready substitute for WhatsApp verification.
+  if (process.env.QF_VENDOR_LEGACY_EMAIL_SIGNUP !== "explicitly_enabled") {
+    return { ok: false as const, code: "VENDOR_WHATSAPP_OTP_REQUIRED",
+      error: "WhatsApp mobile verification is required. This signup route is not yet activated." };
+  }
   let createdUserId: string | null = null;
 
   try {
     const email = input.email?.trim().toLowerCase();
     const password = input.password;
 
+    // Validate BEFORE creating an Auth principal: rejected consent/GST must have
+    // zero account creation, provider messages or canonical vendor side effects.
+    if (!hasVendorRegistrationConsent(input.registration_consent_accepted)) {
+      return { ok: false, code: "CONSENT_REQUIRED", error: "Please accept the registration privacy and verification notice." };
+    }
+    if (!isValidOptionalGstin(input.gst_number)) {
+      return { ok: false, code: "VALIDATION", error: "Enter a valid GSTIN or leave it blank." };
+    }
     if (!input.business_name?.trim() || !input.phone?.trim() || !email || !password || password.length < 6) {
       return fail(appError("VALIDATION"));
+    }
+
+    // Complete input and abuse preflight occurs BEFORE a privileged Auth createUser.
+    // The canonical Core service still revalidates before inserting the vendor.
+    const phoneDigits = String(input.phone ?? "").replace(/\D/g, "");
+    const locationValid = Boolean(input.google_place_id?.trim() && input.google_city?.trim() &&
+      input.formatted_address?.trim() && typeof input.office_latitude === "number" &&
+      typeof input.office_longitude === "number" && Number.isFinite(input.office_latitude) &&
+      Number.isFinite(input.office_longitude) && Math.abs(input.office_latitude) <= 90 &&
+      Math.abs(input.office_longitude) <= 180);
+    if (!isValidIndianMobile(phoneDigits) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+      !input.owner_name?.trim() || !input.office_address_line1?.trim() ||
+      !input.office_state?.trim() || !input.service_categories?.length || !locationValid ||
+      !(await resolveActiveCity(input.city))) {
+      return fail(appError("VALIDATION"));
+    }
+    // This pre-Auth limit supplements the existing canonical vendor-insert limit:
+    // invalid or abusive requests must not allocate Auth users first.
+    if (!(await allowPublicMutation({
+      scope: "vendor-auth-principal-create-phone", identity: phoneDigits,
+      limit: 5, windowMs: 24 * 60 * 60 * 1000,
+    }))) {
+      return { ok: false, code: "RATE_LIMITED", error: "Too many registration attempts. Please try again later." };
+    }
+    if (!(await allowPublicMutation({
+      scope: "vendor-auth-principal-create-email", identity: email,
+      limit: 5, windowMs: 24 * 60 * 60 * 1000,
+    }))) {
+      return { ok: false, code: "RATE_LIMITED", error: "Too many registration attempts. Please try again later." };
     }
 
     const db = adminClient();
@@ -392,8 +447,9 @@ export async function submitVendorAccountRegistration(input: VendorRegistrationI
     if (authErr || !auth.user) {
       return {
         ok: false,
-        code: authErr?.code ?? "AUTH_SIGNUP_FAILED",
-        error: authErr?.message ?? "Could not create vendor account.",
+        // A raw GoTrue error can enumerate registered emails or disclose provider detail.
+        code: "AUTH_SIGNUP_FAILED",
+        error: "Could not create the account. If you previously registered, use vendor login or contact QuickFurno support.",
       };
     }
 
@@ -418,8 +474,7 @@ export async function submitVendorAccountRegistration(input: VendorRegistrationI
     const vendor = await vendors.registerVendor({
       ...input,
       email,
-      user_id: auth.user.id,
-    });
+    }, { verifiedAuthUserId: auth.user.id });
 
     if (!vendor.ok) {
       await db.auth.admin.deleteUser(auth.user.id);

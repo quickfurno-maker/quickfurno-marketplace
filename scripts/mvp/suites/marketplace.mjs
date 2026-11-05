@@ -1009,9 +1009,14 @@ export const suite = {
       name: 'vendor registration keeps one authority and Google-only location rules',
       run: () => {
         const src = readFileSync('components/VendorRegisterForm.tsx', 'utf8');
-        assertTrue(src.includes('submitVendorAccountRegistration'), 'sole submit authority');
-        assertEqual((src.match(/submitVendorAccountRegistration\(/g) || []).length, 1,
-          'submitted through exactly one call');
+        // Batch6: the only ACTIVE submission path is an OTP-bound Core
+        // enrollment API; the retired email/password action is fail-closed.
+        assertEqual((src.match(/fetch\("\/api\/vendor\/onboarding\/complete"/g) || []).length, 1,
+          'one verified OTP-to-atomic-Pending submit path');
+        assertEqual((src.match(/fetch\("\/api\/vendor\/onboarding\/request-otp"/g) || []).length, 1,
+          'one vendor-only purpose-reserved OTP initiation path');
+        assertFalse(src.includes('submitVendorAccountRegistration'),
+          'no fallback to the legacy email/password registration action');
         // Shared sources of truth are not forked.
         for (const dep of ['mainCategories', 'useActiveCities', 'GooglePlaceAutocomplete',
                            'isPlaceCompatibleWithSelectedCity', 'readTracking', 'CATEGORY_MIN_RATE']) {
@@ -1031,8 +1036,11 @@ export const suite = {
         assertTrue(src.includes('office_latitude: f.baseLatitude')
           && src.includes('office_longitude: f.baseLongitude'),
           'Google-selected office/base coordinates remain the vendor location authority');
-        // Validation rules outside the removed device-location step are untouched.
-        assertTrue(src.includes('key: "confirmPassword"'), 'confirm-password rule kept');
+        // Mandatory WhatsApp OTP replaces new-account passwords; historical
+        // vendor password login remains independently tested above.
+        assertFalse(src.includes('key: "confirmPassword"'), 'no new signup password');
+        assertTrue(src.includes('label: "Business email (optional)"'),
+          'optional email does not become authentication authority');
         assertTrue(/10-digit/.test(src), '10-digit phone rule kept');
         // No invented brand remains as a placeholder.
         assertFalse(src.includes('UrbanCraft'), 'fictional business placeholder removed');
@@ -1086,8 +1094,10 @@ export const suite = {
 
         // Title intent is unchanged; the description is the truthful one.
         assertTrue(src.includes('Vendor Portal | QuickFurno'), 'title kept');
-        assertTrue(src.includes('manage matched home-service enquiries when eligible'),
-          'truthful metadata description');
+        assertTrue(src.includes('New vendors apply using mobile WhatsApp verification'),
+          'truthful metadata describes mandatory WhatsApp signup');
+        assertTrue(src.includes('separate Owner approval required before lead matching'),
+          'metadata states independent Owner activation gate');
       },
     },
 
@@ -1175,8 +1185,8 @@ export const suite = {
         const shipped = raw.replace(/\/\*[\s\S]*?\*\//g, '')
           .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
           .replace(/\s+/g, ' ');
-        assertTrue(src.includes('manage matched home-service enquiries when eligible'),
-          'V2-11R metadata description unchanged');
+        assertTrue(src.includes('New vendors apply using mobile WhatsApp verification'),
+          'updated metadata reflects mandatory mobile verification, not legacy credentials');
         assertTrue(src.includes('Client matching access depends on your account being approved and active, with a package and credits in place.'),
           'vendor eligibility step uses Client Matching language');
         assertTrue(src.includes('When can matched enquiries appear?'), 'V2-11R FAQ question unchanged');
@@ -1766,7 +1776,7 @@ export const suite = {
         for (const title of ['Tell us about your business', 'What do you specialise in?',
                              'Where do you serve clients?',
                              'Tell us your business strength', 'Review your application',
-                             'Vendor account created']) {
+                             'Application submitted for verification']) {
           assertTrue(src.includes('<h2>' + title + '</h2>'), title + ' is an h2');
           assertFalse(src.includes('<h3>' + title + '</h3>'), title + ' is not an h3');
         }
@@ -1809,13 +1819,17 @@ export const suite = {
       },
     },
     {
-      name: 'V2-17R changed no vendor registration or auth authority',
+      name: 'V2-17R preserves inline hierarchy and OTP-only registration authority',
       run: () => {
         const src = readFileSync('components/VendorRegisterForm.tsx', 'utf8');
-        // The submit path and its single authority call are untouched.
-        assertTrue(src.includes('import { submitVendorAccountRegistration } from "@/app/actions";'),
-          'registration action import unchanged');
-        assertTrue(src.includes('await submitVendorAccountRegistration({'), 'submit call unchanged');
+        // The inline form can only request an OTP and submit the verified code
+        // to the canonical Core atomic Pending-signup endpoint.
+        assertTrue(src.includes('fetch("/api/vendor/onboarding/request-otp"'),
+          'the vendor-only OTP request endpoint is present');
+        assertTrue(src.includes('fetch("/api/vendor/onboarding/complete"'),
+          'the verified atomic Pending-signup endpoint is present');
+        assertFalse(src.includes('submitVendorAccountRegistration'),
+          'retired email/password account creator cannot be called from the wizard');
         // A presentation pass must never introduce a bypass or a second path.
         assertFalse(/signInWithPassword|signOut\(|service_role|admin_role/.test(src),
           'no auth authority in the registration form');

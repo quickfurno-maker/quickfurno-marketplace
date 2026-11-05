@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { submitVendorAccountRegistration } from "@/app/actions";
+import { VendorPrivateEvidenceForm } from "@/components/vendor/VendorPrivateEvidenceForm";
+import { isValidOptionalGstin, normalizeOptionalGstin } from "@/lib/vendors/vendorSignupPolicy";
 import { trackEvent, whatsappLink } from "@/lib/config";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 import { mainCategories, signupSelectionForCategory, type MainCategory } from "@/lib/categories";
@@ -14,11 +15,9 @@ import { isPlaceCompatibleWithSelectedCity } from "@/lib/google-maps/normalizePl
 import type { NormalizedGooglePlace } from "@/lib/google-maps/types";
 
 // ---------------------------------------------------------------------------
-// Guided vendor onboarding wizard.
-// One focused screen per step, mirroring the premium "requirement first" client
-// flow. Creates a vendor LOGIN account (email + password) AND the vendor profile
-// in one submit via submitVendorAccountRegistration — the profile still lands as
-// Pending / Unpaid / not publicly visible until the team verifies and credits it.
+// Vendor mobile + WhatsApp OTP enrollment uses the signed Supabase Auth session
+// and atomic Pending RPC. The existing category, Google Place, strength and
+// consent steps are retained; no public password account creator is reachable.
 //
 // Step 2 categories come from the SHARED source of truth (lib/categories.ts) so
 // they always match the homepage. The selected leaf category (a public category
@@ -61,11 +60,7 @@ type WizardState = {
   businessName: string;
   ownerName: string;
   phone: string;
-  whatsappSame: boolean;
-  whatsapp: string;
   email: string;
-  password: string;
-  confirmPassword: string;
   categoryId: string;
   subCategory: string;
   city: string;
@@ -89,6 +84,8 @@ type WizardState = {
   rateValue: string;
   businessType: string;
   coversFullCity: boolean;
+  gstNumber: string;
+  registrationConsent: boolean;
 };
 
 // QF-MVP-80.16C. The same Indian-mobile contract the server now enforces in
@@ -103,11 +100,7 @@ const initialState: WizardState = {
   businessName: "",
   ownerName: "",
   phone: "",
-  whatsappSame: true,
-  whatsapp: "",
   email: "",
-  password: "",
-  confirmPassword: "",
   categoryId: "",
   subCategory: "",
   city: "",
@@ -130,6 +123,8 @@ const initialState: WizardState = {
   rateValue: "",
   businessType: "",
   coversFullCity: false,
+  gstNumber: "",
+  registrationConsent: false,
 };
 
 /** Lightweight email sanity check (real validation happens at account creation). */
@@ -184,6 +179,10 @@ export function VendorRegisterForm({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [enrolledVendorId, setEnrolledVendorId] = useState<string | null>(null);
+  const [otp, setOtp] = useState("");
+  const [otpRequested, setOtpRequested] = useState(false);
+  const [otpBusy, setOtpBusy] = useState(false);
   // Show per-field validation warnings only after the user tries to advance.
   const [showErrors, setShowErrors] = useState(false);
   // Track individual fields touched by the user.
@@ -203,11 +202,7 @@ export function VendorRegisterForm({
       case "phone":
         return VENDOR_MOBILE_RE.test(valOf("phone"));
       case "email":
-        return isEmail(valOf("email"));
-      case "password":
-        return valOf("password").length >= 6;
-      case "confirmPassword":
-        return valOf("confirmPassword").length >= 6 && valOf("confirmPassword") === valOf("password");
+        return !valOf("email").trim() || isEmail(valOf("email"));
       case "addressLine1":
         return valOf("addressLine1").trim().length >= 5;
       case "state":
@@ -306,6 +301,7 @@ export function VendorRegisterForm({
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
   function set<K extends keyof WizardState>(key: K, value: WizardState[K]) {
+    if (key === "phone") { setOtp(""); setOtpRequested(false); }
     setF((current) => ({ ...current, [key]: value }));
   }
 
@@ -403,10 +399,7 @@ export function VendorRegisterForm({
         if (f.businessName.trim().length < 2) e.push({ key: "businessName", message: "Business name must be at least 2 characters." });
         if (f.ownerName.trim().length < 2) e.push({ key: "ownerName", message: "Owner name must be at least 2 characters." });
         if (!VENDOR_MOBILE_RE.test(f.phone.replace(/\D/g, ""))) e.push({ key: "phone", message: "Enter a valid 10-digit mobile number starting with 6, 7, 8 or 9." });
-        if (!f.whatsappSame && !VENDOR_MOBILE_RE.test(f.whatsapp.replace(/\D/g, ""))) e.push({ key: "whatsapp", message: "Enter a valid 10-digit WhatsApp number starting with 6, 7, 8 or 9." });
-        if (!isEmail(f.email)) e.push({ key: "email", message: "Enter a valid business email." });
-        if (f.password.length < 6) e.push({ key: "password", message: "Password must be at least 6 characters." });
-        if (f.confirmPassword !== f.password) e.push({ key: "confirmPassword", message: "Passwords do not match." });
+        if (f.email.trim() && !isEmail(f.email)) e.push({ key: "email", message: "Enter a valid business email or leave it blank." });
         break;
       case 1:
         if (!selectedMain) e.push({ key: "category", message: "Select your service category" });
@@ -433,6 +426,10 @@ export function VendorRegisterForm({
         }
         break;
       }
+      case 4:
+        if (!isValidOptionalGstin(f.gstNumber)) e.push({ key: "gstNumber", message: "Enter a valid 15-character GSTIN or leave it blank." });
+        if (!f.registrationConsent) e.push({ key: "registrationConsent", message: "Accept the registration privacy and verification notice to continue." });
+        break;
       case 3:
         // Interior categories require a valid per-sqft rate at/above the minimum.
         if (usesSqftRate && !rateValid)
@@ -468,8 +465,6 @@ export function VendorRegisterForm({
         next.ownerName = true;
         next.phone = true;
         next.email = true;
-        next.password = true;
-        next.confirmPassword = true;
       } else if (step === 2) {
         next.city = true;
         next.baseArea = true;
@@ -545,7 +540,6 @@ export function VendorRegisterForm({
     if (!finalCategory) return;
     const min = CATEGORY_MIN_RATE[finalCategory] ?? null;
     setF((current) => ({ ...current, rateValue: min != null ? String(min) : "" }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finalCategory]);
 
   async function onSubmit() {
@@ -554,7 +548,7 @@ export function VendorRegisterForm({
 
     // Re-validate every step. If an earlier step is incomplete, send the vendor
     // back to it with the exact reason rather than failing silently at submit.
-    for (const s of [0, 1, 2, 3]) {
+    for (const s of [0, 1, 2, 3, 4]) {
       if (stepErrors(s).length > 0) {
         setStep(s);
         setShowErrors(true);
@@ -567,9 +561,7 @@ export function VendorRegisterForm({
     const businessNameStr = String(f.businessName ?? "").trim();
     const ownerNameStr = String(f.ownerName ?? "").trim();
     const phoneDigits = String(f.phone ?? "").replace(/\D/g, "");
-    const whatsappDigits = f.whatsappSame
-      ? phoneDigits
-      : String(f.whatsapp ?? "").replace(/\D/g, "");
+    const whatsappDigits = phoneDigits;
     const emailStr = String(f.email ?? "").trim();
     const address1Str = String(f.addressLine1 ?? "").trim();
     const stateStr = String(f.stateName ?? "").trim();
@@ -579,9 +571,7 @@ export function VendorRegisterForm({
       ownerNameStr.length >= 2 &&
       VENDOR_MOBILE_RE.test(phoneDigits) &&
       VENDOR_MOBILE_RE.test(whatsappDigits) &&
-      isEmail(emailStr) &&
-      f.password.length >= 6 &&
-      f.confirmPassword === f.password &&
+      (!emailStr || isEmail(emailStr)) &&
       selectedMain &&
       (selectedMain.subcategories.length === 0 || f.subCategory) &&
       cityValue &&
@@ -590,7 +580,8 @@ export function VendorRegisterForm({
       f.baseLatitude != null && f.baseLongitude != null &&
       address1Str.length >= 5 &&
       stateStr.length > 0 &&
-      (!usesSqftRate || rateValid);
+      (!usesSqftRate || rateValid) &&
+      isValidOptionalGstin(f.gstNumber) && f.registrationConsent;
 
     if (!isAllValid) {
       setError("Some required details are missing. Please go back and complete the highlighted fields.");
@@ -599,11 +590,13 @@ export function VendorRegisterForm({
 
     setBusy(true);
     try {
-      const res = await submitVendorAccountRegistration({
-        // Creates the Supabase auth login (email + password) AND the vendor
-        // profile in one call. The profile still lands Pending / Unpaid / not
-        // publicly visible (enforced by registerVendor) until admin approval.
-        password: f.password,
+      if (!otpRequested || !/^[0-9]{6,8}$/.test(otp)) {
+        setError("Request and enter the WhatsApp verification code before submitting.");
+        return;
+      }
+      const registration = {
+        gst_number: normalizeOptionalGstin(f.gstNumber) || undefined,
+        registration_consent_accepted: f.registrationConsent,
         business_name: businessNameStr,
         owner_name: ownerNameStr || undefined,
         phone: phoneDigits,
@@ -641,22 +634,35 @@ export function VendorRegisterForm({
         monthly_capacity: f.monthlyCapacity || undefined,
         starting_price: formattedRate || undefined,
         ...tracking,
+      };
+      const response = await fetch("/api/vendor/onboarding/complete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ mobile: phoneDigits, token: otp, registration }),
       });
-
-      if (!res.ok) {
-        setError(res.error);
+      setOtp("");
+      const res: unknown = await response.json();
+      if (!response.ok || !res || typeof res !== "object" || (res as {ok?:boolean}).ok !== true) {
+        setError(response.status === 503
+          ? "WhatsApp verification is not yet available. Your application has not been submitted."
+          : "We could not verify your mobile and application. Check the code or try again.");
         return;
       }
 
+      const vendorId = (res as { vendorId?: unknown }).vendorId;
+      if (typeof vendorId !== "string" || !/^[0-9a-f-]{36}$/i.test(vendorId)) {
+        setError("Enrollment confirmation is incomplete. Please contact QuickFurno before retrying.");
+        return;
+      }
+      setEnrolledVendorId(vendorId);
       trackEvent("vendor_onboarding_submitted", {
         category: finalCategoryLabel || selectedMain?.label,
         city: cityValue,
       });
       setDone(true);
-    } catch (err) {
-      console.error("[vendor onboarding] submission error", {
-        message: err instanceof Error ? err.message : "Unknown error",
-      });
+    } catch {
+      // No OTPs, phone details, provider errors or registration payloads in logs.
       setError("Unable to submit right now. Please check your internet connection and try again.");
     } finally {
       setBusy(false);
@@ -668,12 +674,13 @@ export function VendorRegisterForm({
       <div className="qf-vrf qf-vrf--done">
         <div className="qf-rf-success">
           <span className="qf-rf-success-mark" aria-hidden="true">✓</span>
-          <h2>Vendor account created</h2>
+          <h2>Application submitted for verification</h2>
           <p>
-            Your vendor account and application have been submitted. QuickFurno will review your
-            profile. Once approved and credited, client matches will appear in your dashboard. You can log
-            in from this page.
+            Your mobile was verified and your application is Pending. QuickFurno must independently
+            verify your identity, office and service categories before enabling your vendor account.
+            Registration does not grant leads or credits.
           </p>
+          {enrolledVendorId ? <VendorPrivateEvidenceForm vendorId={enrolledVendorId} /> : null}
           <a className="qf-rf-btn qf-rf-btn--primary qf-rf-btn--full" href="/vendor?mode=login">
             Go to vendor login
           </a>
@@ -763,10 +770,10 @@ export function VendorRegisterForm({
           <button
             type="button"
             className="qf-rf-btn qf-rf-btn--primary"
-            disabled={busy}
+            disabled={busy || otpBusy || !otpRequested}
             onClick={onSubmit}
           >
-            {busy ? "Submitting…" : "Submit Application"}
+            {busy ? "Verifying…" : "Verify WhatsApp & Submit"}
           </button>
         )}
       </footer>
@@ -812,49 +819,14 @@ export function VendorRegisterForm({
                 maxLength: 10,
                 customOnChange: (val) => set("phone", val.replace(/\D/g, "").slice(0, 10)),
               })}
-              <label className="qf-rf-check">
-                <input
-                  type="checkbox"
-                  checked={f.whatsappSame}
-                  onChange={(e) => set("whatsappSame", e.target.checked)}
-                />
-                <span>This is also my business contact number</span>
-              </label>
-              {!f.whatsappSame ? (
-                <label className="qf-rf-field">
-                  <span>Business contact number</span>
-                  <div className="qf-rf-input-wrapper">
-                    <input
-                      value={f.whatsapp}
-                      onChange={(e) => set("whatsapp", e.target.value.replace(/\D/g, "").slice(0, 10))}
-                      placeholder="10-digit mobile number"
-                      inputMode="numeric"
-                      maxLength={10}
-                    />
-                  </div>
-                </label>
-              ) : null}
+              <p className="qf-rf-qhint">This mobile number will be your WhatsApp verification and initial vendor contact number. A different contact number can be reviewed later in your vendor profile.</p>
               {renderInputField({
-                label: "Business email for dashboard login",
+                label: "Business email (optional)",
                 fieldKey: "email",
                 type: "email",
                 placeholder: "you@example.com",
                 inputMode: "email",
                 autoComplete: "email",
-              })}
-              {renderInputField({
-                label: "Create password",
-                fieldKey: "password",
-                type: "password",
-                placeholder: "At least 6 characters",
-                autoComplete: "new-password",
-              })}
-              {renderInputField({
-                label: "Confirm password",
-                fieldKey: "confirmPassword",
-                type: "password",
-                placeholder: "Re-enter password",
-                autoComplete: "new-password",
               })}
             </div>
           </div>
@@ -1187,10 +1159,65 @@ export function VendorRegisterForm({
               {formattedRate ? <SummaryRow label="Starting ₹/sqft rate" value={formattedRate} /> : null}
               {f.businessType ? <SummaryRow label="Setup" value={f.businessType} /> : null}
             </dl>
+            <section className="qf-rf-field" aria-label="Mandatory WhatsApp OTP verification" style={{marginTop:"1rem"}}>
+              <strong>Verify your mobile using WhatsApp OTP</strong>
+              <p className="qf-rf-qhint">The code must arrive through QuickFurno's verified WhatsApp authentication channel. We never use an SMS or password fallback.</p>
+              <button type="button" className="qf-rf-btn qf-rf-btn--ghost" disabled={otpBusy || busy}
+                onClick={async () => {
+                  if (!VENDOR_MOBILE_RE.test(f.phone)) { setError("Enter a valid mobile number in Step 1."); return; }
+                  setOtpBusy(true); setOtp(""); setOtpRequested(false); setError("");
+                  try {
+                    const response = await fetch("/api/vendor/onboarding/request-otp", {
+                      method:"POST",headers:{"content-type":"application/json"},
+                      cache:"no-store",body:JSON.stringify({mobile:f.phone}),
+                    });
+                    if (!response.ok) {
+                      setError(response.status===503
+                        ? "WhatsApp verification is not yet available. Your details remain unsent."
+                        : "Could not initiate verification. Please try again later.");
+                      return;
+                    }
+                    setOtpRequested(true);
+                  } catch {
+                    setError("Verification is unavailable. No application has been submitted.");
+                  } finally { setOtpBusy(false); }
+                }}>
+                {otpBusy ? "Requesting…" : otpRequested ? "Request another code" : "Send WhatsApp verification code"}
+              </button>
+              {otpRequested ? (
+                <label className="qf-rf-field">
+                  <span>WhatsApp verification code (required)</span>
+                  <div className="qf-rf-input-wrapper">
+                    <input type="text" inputMode="numeric" autoComplete="one-time-code"
+                      value={otp} onChange={event=>setOtp(event.target.value.replace(/\\D/g,"").slice(0,8))}
+                      maxLength={8} placeholder="6–8 digit code" />
+                  </div>
+                </label>
+              ) : null}
+            </section>
             <p className="qf-rf-qhint" style={{ marginTop: "0.9rem" }}>
-              After verification, our team will share suitable matching options for your city,
-              category and base area.
+              Identity verification is required before approval. Aadhaar verification is voluntary and requires separate consent; an alternative identity document can also be reviewed. Do not enter an Aadhaar number here.
             </p>
+            <label className="qf-rf-field" ref={bindField("gstNumber")}>
+              <span>GSTIN (optional)</span>
+              <div className="qf-rf-input-wrapper">
+                <input
+                  value={f.gstNumber}
+                  onChange={(event) => { set("gstNumber", event.target.value.toUpperCase().replace(/\s/g, "").slice(0, 15)); setTouched((t) => ({...t, gstNumber: true})); }}
+                  placeholder="15-character GSTIN, if registered"
+                  autoComplete="off"
+                  maxLength={15}
+                  aria-label="GSTIN (optional)"
+                />
+              </div>
+              <small>GST registration is optional. Entering a GSTIN does not verify it; QuickFurno will check it during review.</small>
+              {(touched.gstNumber || showErrors) && !isValidOptionalGstin(f.gstNumber) ? <span className="qf-rf-field-err">Enter a valid GSTIN or leave it blank.</span> : null}
+            </label>
+            <label className="qf-rf-check" ref={bindField("registrationConsent")}>
+              <input type="checkbox" checked={f.registrationConsent} onChange={event => set("registrationConsent", event.target.checked)} />
+              <span>I agree to QuickFurno&apos;s <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and consent to collection of these business/contact details for registration and manual vendor verification. Identity verification follows separately with my consent.</span>
+            </label>
+            {(showErrors && !f.registrationConsent) ? <p className="qf-rf-field-err">Consent is required to submit the application.</p> : null}
           </div>
         );
     }

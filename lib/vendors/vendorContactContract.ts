@@ -39,3 +39,18 @@ export const INDIAN_MOBILE_RE = /^[6-9]\d{9}$/;
 export function isValidIndianMobile(value: unknown): boolean {
   return typeof value === "string" && INDIAN_MOBILE_RE.test(value);
 }
+
+/**
+ * Login uses verified +91 E.164; the historical vendors.phone storage contract
+ * remains a ten-digit Indian number. Convert only these two exact, explicit
+ * representations — never strip arbitrary prefixes or interpret foreign numbers.
+ */
+export function normalizeVerifiedVendorMobile(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (isValidIndianMobile(normalized)) return normalized;
+  if (normalized.startsWith("+91") && isValidIndianMobile(normalized.slice(3))) {
+    return normalized.slice(3);
+  }
+  return null;
+}

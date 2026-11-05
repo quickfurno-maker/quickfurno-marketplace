@@ -55,6 +55,18 @@ export function OwnerVendorVerificationDashboard(){
  const [queue,setQueue]=useState<OwnerQueueItem[]>([]);
  const [queueBusy,setQueueBusy]=useState(false);
  const [queueMessage,setQueueMessage]=useState("");
+ // Readiness for the *private case decision*; unlike readyForCoreApproval,
+ // these individual checks can all become true before the Owner decides.
+ // The server revalidates everything atomically; this only helps the Owner.
+ const approvalEvidenceReady=caseData?.casePresent===true &&
+   caseData.contactStatus==="verified" &&
+   caseData.identityStatus==="verified" &&
+   caseData.officeStatus==="verified" &&
+   caseData.categoryStatus==="verified" &&
+   caseData.zoneStatus==="verified" &&
+   caseData.consentValid===true &&
+   caseData.identityEvidenceVerified===true &&
+   caseData.officeEvidenceVerified===true;
 
  const load=useCallback(async (id:string)=>{
   setCaseData(null);setMessage("");
@@ -112,6 +124,10 @@ export function OwnerVendorVerificationDashboard(){
   finally{setQueueBusy(false);}
  }
  async function submit(){
+  if(action==="approve"&&!approvalEvidenceReady){
+   setMessage("Cannot approve: verified contact, identity, office, categories, zones, consent and independently reviewed evidence are required.");
+   return;
+  }
   if(!caseData?.casePresent||!Number.isInteger(caseData.caseVersion)||
      (caseData.caseVersion??0)<1 || !REASON.test(reason)){
    setMessage("Load an existing case and enter a reason code (lowercase with underscores).");
@@ -212,11 +228,18 @@ export function OwnerVendorVerificationDashboard(){
          <div key={label}><p className="text-xs text-slate-500">{label}</p><p className="font-semibold text-slate-800">{value}</p></div>
         ))}
        </div>
+       {!approvalEvidenceReady?(
+        <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+         Approval blocked: all five verification stages, valid consent and independently verified identity and office evidence must be complete.
+         A malware scan alone does not verify a document. You can still request documents, request corrections, or reject this case.
+        </p>
+       ):null}
        <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm font-semibold">Owner action
          <select className="mt-1 w-full rounded-lg border p-2" value={action}
           onChange={event=>setAction(event.target.value as ReviewAction)}>
-           {OPTIONS.map(item=><option key={item.action} value={item.action}>{item.label}</option>)}
+           {OPTIONS.map(item=><option key={item.action} value={item.action}
+             disabled={item.action==="approve"&&!approvalEvidenceReady}>{item.label}</option>)}
          </select>
         </label>
         <label className="text-sm font-semibold">Reason code
@@ -225,7 +248,7 @@ export function OwnerVendorVerificationDashboard(){
           placeholder="office_proof_incomplete" autoComplete="off"/>
         </label>
        </div>
-       <button type="button" disabled={busy||!REASON.test(reason)}
+       <button type="button" disabled={busy||!REASON.test(reason)||(action==="approve"&&!approvalEvidenceReady)}
         onClick={()=>void submit()}
         className="rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white disabled:opacity-50">
         {busy?"Recording…":"Record Owner decision"}

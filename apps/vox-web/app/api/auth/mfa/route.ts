@@ -1,13 +1,18 @@
 import {allowedOrigin,safeJson,staffAuth} from "../../../../lib/auth";
+import {readBoundedOwnerMfaJson} from "../../../../lib/readBoundedOwnerMfaJson";
 export const runtime="nodejs";
 export async function POST(request:Request){
  if(process.env.VOX_STAFF_PORTAL_ENABLED!=="staging")return safeJson({ok:false,error:"STAFF_GATE_DISABLED"},503);
  if(!allowedOrigin(request))return safeJson({ok:false,error:"ORIGIN_DENIED"},403);
  if(!request.headers.get("content-type")?.startsWith("application/json"))return safeJson({ok:false,error:"INVALID_CONTENT"},415);
  try {
-  const raw=await request.text();
-  if(raw.length>256)return safeJson({ok:false,error:"INVALID_CONTENT"},413);
-  const parsed=JSON.parse(raw);
+  const bounded=await readBoundedOwnerMfaJson(request,256);
+  if(!bounded.ok)return safeJson({ok:false,error:"INVALID_CONTENT"},
+    bounded.reason==="too_large"?413:400);
+  const parsed=bounded.value as Record<string,unknown>;
+  if(!parsed||typeof parsed!=="object"||Array.isArray(parsed)||
+     Object.keys(parsed).sort().join(",")!=="code")
+   return safeJson({ok:false,error:"INVALID_CODE"},400);
   const code=typeof parsed.code==="string"?parsed.code:"";
   if(!/^[0-9]{6}$/.test(code))return safeJson({ok:false,error:"INVALID_CODE"},400);
   const auth=await staffAuth();

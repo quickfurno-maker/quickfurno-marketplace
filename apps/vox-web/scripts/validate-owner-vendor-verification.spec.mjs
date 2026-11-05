@@ -1,28 +1,38 @@
 import test,{after} from "node:test";
 import assert from "node:assert/strict";
-import {build} from "esbuild";
-import {readFileSync,mkdtempSync,rmSync} from "node:fs";
+import ts from "typescript";
+import {runInNewContext} from "node:vm";
+import {readFileSync} from "node:fs";
 import {join,resolve,dirname} from "node:path";
-import {tmpdir} from "node:os";
-import {fileURLToPath,pathToFileURL} from "node:url";
+import {fileURLToPath} from "node:url";
 import {safeReturnPath,withReturn} from "../lib/returnTo.mjs";
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"..");
-const temp=mkdtempSync(join(tmpdir(),"vox-owner-vendor-private-"));
-const out=join(temp,"owner-review.mjs");
-await build({entryPoints:[join(root,"lib/ownerVendorVerification.ts")],
- outfile:out,platform:"node",format:"esm",target:"node24",bundle:true,logLevel:"silent",
- plugins:[{name:"owner-session-and-core-mocks",setup(b){
-  b.onResolve({filter:/^server-only$/},()=>({path:"server-only",namespace:"mock"}));
-  b.onResolve({filter:/^\.\/(auth|core)$/},x=>({path:x.path.slice(2),namespace:"mock"}));
-  b.onLoad({filter:/.*/,namespace:"mock"},x=>({
-   loader:"js",contents:x.path==="auth"?
-    "export async function verifiedMfaSession(){return globalThis.__ownerToken??null;}" :
-    x.path==="core"?
-    "export function origin(){return process.env.VOX_CORE_ORIGIN==='https://staging-core.quickfurno.in'?'https://staging-core.quickfurno.in':null;}" : ""
-  }));
- }}]});
-const bridge=await import(pathToFileURL(out).href);
+// TypeScript is already a pinned VOX Web dependency in every historical CI
+// workflow. Evaluate only this known-local server module under a mocked
+// auth/Core environment; no root-only esbuild dependency is introduced.
+const source=readFileSync(join(root,"lib/ownerVendorVerification.ts"),"utf8");
+const compiled=ts.transpileModule(source,{compilerOptions:{
+ module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true,
+}}).outputText;
+const mockModule={exports:{}};
+const mockRequire=name=>{
+ if(name==="server-only")return {};
+ if(name==="./auth")return {
+  verifiedMfaSession:async()=>globalThis.__ownerToken??null,
+ };
+ if(name==="./core")return {
+  origin:()=>process.env.VOX_CORE_ORIGIN==="https://staging-core.quickfurno.in"
+   ?"https://staging-core.quickfurno.in":null,
+ };
+ throw new Error("UNEXPECTED_IMPORT_"+name);
+};
+runInNewContext(compiled,{
+ module:mockModule,exports:mockModule.exports,require:mockRequire,
+ process,Buffer,URL,Response,AbortSignal,Date,
+ fetch:(...args)=>globalThis.fetch(...args),
+},"ownerVendorVerification.test-compiled.cjs");
+const bridge=mockModule.exports;
 const origFetch=globalThis.fetch;
 const envKeys=["VOX_STAFF_PORTAL_ENABLED","VOX_STAFF_VIEW_MODE",
  "VOX_OWNER_VENDOR_REVIEW_ENABLED","VOX_OWNER_VENDOR_DECISION_ENABLED","VOX_CORE_ORIGIN"];
@@ -30,7 +40,7 @@ const old=Object.fromEntries(envKeys.map(k=>[k,process.env[k]]));
 after(()=>{
  globalThis.fetch=origFetch;delete globalThis.__ownerToken;
  for(const [k,v]of Object.entries(old))if(v===undefined)delete process.env[k];else process.env[k]=v;
- rmSync(temp,{recursive:true,force:true});
+ // No temporary files or host writes were made.
 });
 const UUID="22222222-2222-4222-8222-222222222222";
 const ID2="33333333-3333-4333-8333-333333333333";

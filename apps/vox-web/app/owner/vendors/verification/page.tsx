@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {verifiedMfaSession} from "../../../../lib/auth";
 import {ownerVendorReviewReadEnabled,ownerVendorDecisionEnabled} from "../../../../lib/ownerVendorVerification";
-import {withReturn} from "../../../lib/returnTo.mjs";
+import {withReturn} from "../../../../lib/returnTo.mjs";
 import OwnerReviewConsole from "./OwnerReviewConsole";
 import "./owner-review.css";
 

@@ -7,6 +7,7 @@
 import "server-only";
 import {verifiedMfaSession} from "./auth";
 import {origin} from "./core";
+import {ownerVendorReadGate,ownerVendorDecisionGate} from "./ownerVendorReviewGate";
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const REASON=/^[a-z][a-z0-9_]{2,63}$/;
@@ -48,13 +49,10 @@ const shortError=(status:number)=>{
 };
 
 export function ownerVendorReviewReadEnabled():boolean{
- return process.env.VOX_STAFF_PORTAL_ENABLED==="staging"&&
-   process.env.VOX_STAFF_VIEW_MODE==="owner"&&
-   process.env.VOX_OWNER_VENDOR_REVIEW_ENABLED==="staging";
+ return ownerVendorReadGate(process.env);
 }
 export function ownerVendorDecisionEnabled():boolean{
- return ownerVendorReviewReadEnabled()&&
-   process.env.VOX_OWNER_VENDOR_DECISION_ENABLED==="staging";
+ return ownerVendorDecisionGate(process.env);
 }
 
 /** Full body bounds, not only the untrusted Content-Length header. */

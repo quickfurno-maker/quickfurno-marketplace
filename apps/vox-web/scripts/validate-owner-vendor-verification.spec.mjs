@@ -6,6 +6,7 @@ import {readFileSync} from "node:fs";
 import {join,resolve,dirname} from "node:path";
 import {fileURLToPath} from "node:url";
 import {safeReturnPath,withReturn} from "../lib/returnTo.mjs";
+import {ownerVendorReadGate,ownerVendorDecisionGate} from "../lib/ownerVendorReviewGate.ts";
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"..");
 // TypeScript is already a pinned VOX Web dependency in every historical CI
@@ -18,6 +19,7 @@ const compiled=ts.transpileModule(source,{compilerOptions:{
 const mockModule={exports:{}};
 const mockRequire=name=>{
  if(name==="server-only")return {};
+ if(name==="./ownerVendorReviewGate")return {ownerVendorReadGate,ownerVendorDecisionGate};
  if(name==="./auth")return {
   verifiedMfaSession:async()=>globalThis.__ownerToken??null,
  };

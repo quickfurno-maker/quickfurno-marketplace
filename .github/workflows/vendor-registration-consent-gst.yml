@@ -35,6 +35,8 @@ on:
       - 'scripts/mvp/vendor/run-private-evidence-scan-once.mjs'
       - 'scripts/mvp/vendor/vendor-private-scan-pg-acceptance.sql'
       - 'scripts/mvp/vendor/vendor-private-clamav-contract.test.mjs'
+      - 'scripts/mvp/vendor/certify-vendor-clamav-local-behavior.mjs'
+      - 'scripts/mvp/vendor/certify-vendor-clamav-local-behavior.test.mjs'
       - 'app/api/vox/v1/owner-vendor-verification-queue/route.ts'
       - 'components/vox/OwnerVendorVerificationDashboard.tsx'
       - 'scripts/mvp/vendor/vendor-vox-owner-queue-pg-acceptance.sql'
@@ -51,6 +53,8 @@ on:
       - 'app/api/vendor/onboarding/request-otp/route.ts'
       - 'app/api/vendor/onboarding/complete/route.ts'
       - 'app/api/vendor/private-evidence/route.ts'
+      - 'lib/vendors/readBoundedVendorMultipart.ts'
+      - 'scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs'
       - 'lib/storage/objectStorage.ts'
       - 'lib/storage/supabaseObjectStorage.ts'
       - 'app/admin/vendor-verification/page.tsx'
@@ -118,6 +122,8 @@ on:
       - 'scripts/mvp/vendor/run-private-evidence-scan-once.mjs'
       - 'scripts/mvp/vendor/vendor-private-scan-pg-acceptance.sql'
       - 'scripts/mvp/vendor/vendor-private-clamav-contract.test.mjs'
+      - 'scripts/mvp/vendor/certify-vendor-clamav-local-behavior.mjs'
+      - 'scripts/mvp/vendor/certify-vendor-clamav-local-behavior.test.mjs'
       - 'app/api/vox/v1/owner-vendor-verification-queue/route.ts'
       - 'components/vox/OwnerVendorVerificationDashboard.tsx'
       - 'scripts/mvp/vendor/vendor-vox-owner-queue-pg-acceptance.sql'
@@ -134,6 +140,8 @@ on:
       - 'app/api/vendor/onboarding/request-otp/route.ts'
       - 'app/api/vendor/onboarding/complete/route.ts'
       - 'app/api/vendor/private-evidence/route.ts'
+      - 'lib/vendors/readBoundedVendorMultipart.ts'
+      - 'scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs'
       - 'lib/storage/objectStorage.ts'
       - 'lib/storage/supabaseObjectStorage.ts'
       - 'app/admin/vendor-verification/page.tsx'
@@ -191,6 +199,10 @@ jobs:
           node --test scripts/mvp/vendor/vendor-seven-migration-fingerprint.test.mjs
       - name: VOX + Vendor cross-branch migration tree delta (mocked offline CI)
         run: node --test scripts/mvp/vendor/vendor-vox-migration-cross-branch-delta.test.mjs
+      - name: Actual-byte bounded vendor document upload regression
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs
+      - name: Local ClamAV behavior negative certification (no real daemon or provider)
+        run: node --test scripts/mvp/vendor/certify-vendor-clamav-local-behavior.test.mjs
       - name: Strict additive migration registry
         run: node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs
       - name: Full TypeScript contract

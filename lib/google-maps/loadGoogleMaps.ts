@@ -29,6 +29,7 @@ const RUNTIME_CONFIG_URL = "/api/public/google-maps-config";
 // An already-loaded but nonfunctional bootstrap may never emit another event.
 // Bound the initialization promise so manual location entry never hangs.
 const PLACES_BOOTSTRAP_TIMEOUT_MS = 8000;
+const RUNTIME_KEY_TIMEOUT_MS = 2500;
 
 /** Build-time browser key, trimmed — or null when it was not embedded. */
 export function getGoogleMapsBrowserKey(): string | null {
@@ -49,6 +50,7 @@ async function resolveGoogleMapsBrowserKey(): Promise<string | null> {
     const response = await fetch(RUNTIME_CONFIG_URL, {
       method: "GET",
       cache: "no-store",
+      signal: AbortSignal.timeout(RUNTIME_KEY_TIMEOUT_MS),
       headers: { Accept: "application/json" },
     });
     if (!response.ok) return null;
@@ -73,6 +75,33 @@ function isUsablePlaces(lib: unknown): lib is PlacesLibrary {
       p.AutocompleteSuggestion &&
       typeof p.AutocompleteSuggestion.fetchAutocompleteSuggestions === "function",
   );
+}
+
+/**
+ * The Google script can exist while importLibrary("places") never settles.
+ * Bound BOTH preloaded-script and script-load branches to prevent an unending
+ * location spinner after failed billing, a blocked API, or a stalled SDK.
+ */
+export async function boundedPlacesImport(
+  importPlaces: () => Promise<unknown>,
+  timeoutMs = PLACES_BOOTSTRAP_TIMEOUT_MS,
+): Promise<PlacesLibrary | null> {
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 ||
+      timeoutMs > PLACES_BOOTSTRAP_TIMEOUT_MS) return null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const library = await Promise.race([
+      Promise.resolve().then(importPlaces),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), timeoutMs);
+      }),
+    ]);
+    return isUsablePlaces(library) ? library : null;
+  } catch {
+    return null;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
 }
 
 function cacheRecoverablePlacesPromise(
@@ -107,8 +136,7 @@ export function loadGoogleMaps(): Promise<PlacesLibrary | null> {
   if (typeof window.google?.maps?.importLibrary === "function") {
     const recovered = (async (): Promise<PlacesLibrary | null> => {
       try {
-        const lib = await window.google!.maps!.importLibrary!("places");
-        return isUsablePlaces(lib) ? lib : null;
+        return await boundedPlacesImport(() => window.google!.maps!.importLibrary!("places"));
       } catch {
         return null;
       }
@@ -159,8 +187,8 @@ export function loadGoogleMaps(): Promise<PlacesLibrary | null> {
             fail();
             return;
           }
-          const lib = await importLibrary("places");
-          settle(isUsablePlaces(lib) ? lib : null);
+          const lib = await boundedPlacesImport(() => importLibrary("places"));
+          settle(lib);
         } catch {
           fail();
         }

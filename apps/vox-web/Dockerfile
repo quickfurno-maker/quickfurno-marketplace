@@ -11,6 +11,13 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY apps/vox-web ./
 RUN npm run build
 FROM ${NODE_IMAGE} AS runtime
+ARG GIT_SHA=unknown
+# The standalone Owner image must be traceable to the exact reviewed source.
+RUN printf '%s' "$GIT_SHA" | grep -Eq '^[0-9a-f]{40}$' || (echo 'VOX image build REFUSED: exact source GIT_SHA required' >&2; exit 64)
+LABEL org.opencontainers.image.title="quickfurno-vox-owner-web" \
+      org.opencontainers.image.source="https://github.com/quickfurno-maker/quickfurno-marketplace" \
+      org.opencontainers.image.revision="${GIT_SHA}" \
+      org.opencontainers.image.licenses="UNLICENSED"
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000 VOX_DEMO_PREVIEW=disabled
 RUN groupadd -g 10001 vox && useradd -u 10001 -g 10001 -M vox

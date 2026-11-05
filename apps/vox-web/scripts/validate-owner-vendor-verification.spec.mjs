@@ -205,7 +205,11 @@ test("VOX-V9 route pages never call public DB, arbitrary Core or access staff ac
  assert.match(page,/decisionEnabled=\{ownerVendorDecisionEnabled\(\)\}/);
  const nav=read("app/operations/page.tsx");
  assert.match(nav,/ownerVerificationVisible\?<Link href="\/owner\/vendors\/verification"/);
- assert.doesNotMatch(nav,/ownerVerificationVisible.*href="\/studio"/);
+ const ownerStart=nav.indexOf('{ownerMode?<nav aria-label="Owner operations workspaces"');
+ const ownerEnd=nav.indexOf('</nav>:<nav aria-label="VOX staff workspaces"',ownerStart);
+ assert.ok(ownerStart>=0&&ownerEnd>ownerStart,"Owner and Staff nav must remain separate");
+ assert.doesNotMatch(nav.slice(ownerStart,ownerEnd),/href="\/studio"/,
+  "Jarvis Automation Studio must stay outside the Owner navigation");
 });
 test("VOX-V10 exact owner return path, never open redirect or Staff broadening",()=>{
  assert.equal(safeReturnPath("/owner/vendors/verification"),"/owner/vendors/verification");

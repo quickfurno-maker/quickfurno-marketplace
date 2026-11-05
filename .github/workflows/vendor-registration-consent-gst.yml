@@ -35,6 +35,8 @@ on:
       - 'scripts/mvp/vendor/run-private-evidence-scan-once.mjs'
       - 'scripts/mvp/vendor/vendor-private-scan-pg-acceptance.sql'
       - 'scripts/mvp/vendor/vendor-private-clamav-contract.test.mjs'
+      - 'scripts/mvp/vendor/certify-vendor-clamav-local-behavior.mjs'
+      - 'scripts/mvp/vendor/certify-vendor-clamav-local-behavior.test.mjs'
       - 'app/api/vox/v1/owner-vendor-verification-queue/route.ts'
       - 'components/vox/OwnerVendorVerificationDashboard.tsx'
       - 'scripts/mvp/vendor/vendor-vox-owner-queue-pg-acceptance.sql'
@@ -116,6 +118,8 @@ on:
       - 'scripts/mvp/vendor/run-private-evidence-scan-once.mjs'
       - 'scripts/mvp/vendor/vendor-private-scan-pg-acceptance.sql'
       - 'scripts/mvp/vendor/vendor-private-clamav-contract.test.mjs'
+      - 'scripts/mvp/vendor/certify-vendor-clamav-local-behavior.mjs'
+      - 'scripts/mvp/vendor/certify-vendor-clamav-local-behavior.test.mjs'
       - 'app/api/vox/v1/owner-vendor-verification-queue/route.ts'
       - 'components/vox/OwnerVendorVerificationDashboard.tsx'
       - 'scripts/mvp/vendor/vendor-vox-owner-queue-pg-acceptance.sql'
@@ -183,6 +187,8 @@ jobs:
           node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/vendor/vendor-signup-consent-gst.test.mjs scripts/mvp/vendor/vendor-whatsapp-otp-admission.test.mjs scripts/mvp/vendor/vendor-private-otp-verification-foundation.test.mjs scripts/mvp/vendor/vendor-internal-purpose-routing.test.mjs scripts/mvp/vendor/vendor-document-approval-gate.test.mjs scripts/mvp/vendor/vendor-owner-verification-readiness-route.test.mjs scripts/mvp/vendor/vendor-signup-ownership-reconciliation.test.mjs scripts/mvp/vendor/vendor-signup-ownership-read-contract.test.mjs scripts/mvp/vendor/vendor-otp-request-coordination.test.mjs scripts/mvp/vendor/vendor-otp-evidence-read-contract.test.mjs scripts/mvp/vendor/vendor-otp-verification-service-contract.test.mjs scripts/mvp/vendor/vendor-atomic-registration-contract.test.mjs scripts/mvp/vendor/vendor-owner-signup-status-route.test.mjs scripts/mvp/vendor/vendor-owner-review-assignment-gate.test.mjs scripts/mvp/vendor/vendor-batch6-enrollment-evidence.test.mjs scripts/mvp/vendor/vendor-vox-owner-review-queue-contract.test.mjs scripts/mvp/vendor/vendor-private-clamav-contract.test.mjs scripts/mvp/vendor/vendor-batch9-owner-preflight.test.mjs
       - name: Actual-byte bounded vendor document upload regression
         run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs
+      - name: Local ClamAV behavior negative certification (no real daemon or provider)
+        run: node --test scripts/mvp/vendor/certify-vendor-clamav-local-behavior.test.mjs
       - name: Strict additive migration registry
         run: node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs
       - name: Full TypeScript contract

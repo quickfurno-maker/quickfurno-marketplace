@@ -20,6 +20,9 @@ let row={...base};
 let enabledCities=[{name:"Pune",serviceZoneId:"zone-1"}];
 let writes=[];
 let rejectCAS=false;
+let privateEvidenceReady=true;
+let privateEvidenceError=false;
+let verificationRpcCalls=0;
 const db = {
   from(table) {
     if(table==="audit_logs") return {insert:async()=>({error:null})};
@@ -44,11 +47,20 @@ const db = {
       },
     };
   },
-  rpc:async()=>({data:null,error:null}),
+  rpc:async(name)=>{
+    if(name==="qf_vendor_verification_case_ready"){
+      verificationRpcCalls++;
+      return {data:privateEvidenceReady,error:privateEvidenceError?{code:"PGRST202"}:null};
+    }
+    return {data:null,error:null};
+  },
 };
 const mocks={
   "../lib/supabase":{adminClient:()=>db},
   "../lib/vendors/vendorEligibility":{evaluateVendorEligibility:()=>({eligible:false})},
+  "../lib/vendors/vendorDocumentApprovalGate":{
+    requiresVendorVerificationEvidence:(action)=>["approve","activate","activate_leads"].includes(action),
+  },
   "./vendorCreditWalletService":{applyVendorCreditDelta:async()=>null},
   "../lib/locations/cityService":{getActiveCities:async()=>enabledCities},
   "../lib/geo/canonicalCoordinate":{
@@ -58,11 +70,13 @@ const mocks={
 const m={exports:{}};
 new Function("module","exports","require",code)(m,m.exports,(key)=>{if(!(key in mocks))throw Error(key);return mocks[key];});
 const api=m.exports;
-async function check(name,patch,allow,lock=false){
+async function check(name,patch,allow,lock=false,privateReady=true,privateError=false){
   row={...base,...patch}; writes=[]; enabledCities=[{name:"Pune",serviceZoneId:"zone-1"}]; rejectCAS=lock;
+  privateEvidenceReady=privateReady; privateEvidenceError=privateError; verificationRpcCalls=0;
   const res=await api.setVendorStatusAction(id,"activate_leads","Superadmin",user);
   assert.equal(res.ok,allow,name);
   assert.equal(writes.length,allow?1:0,name+" no unauthorized write");
+  assert.equal(verificationRpcCalls,1,name+" must check private verification before mutation");
   console.log("PASS",name);
 }
 await check("verified and login-linked vendor with credits may enable leads",{},true);
@@ -74,4 +88,6 @@ await check("zero credits rejected",{remaining_credits:0},false);
 await check("unapproved vendor rejected",{status:"Pending"},false);
 await check("inactive vendor rejected",{is_active:false},false);
 await check("concurrent verification change rejects CAS",{},false,true);
-console.log("VL-02 governed lead acceptance functional checks: 9/9 PASS");
+await check("missing private identity and office readiness blocks opt-in",{},false,false,false);
+await check("missing private readiness RPC fails closed",{},false,false,true,true);
+console.log("VL-02 governed lead acceptance functional checks: 11/11 PASS");

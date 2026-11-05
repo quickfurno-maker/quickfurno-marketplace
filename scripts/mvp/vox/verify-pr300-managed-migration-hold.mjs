@@ -1,6 +1,7 @@
 import {readFileSync,readdirSync} from "node:fs";
 import {resolve} from "node:path";
 import {createHash} from "node:crypto";
+import {validatePinnedVendorPendingFiles} from "./rc-launch-vendor-pending-source-addendum.mjs";
 const root=resolve(import.meta.dirname,"../../..");
 export const MANIFEST="ops/vox/certification/VOX-PR300-MANAGED-SQL-RELEASE-HOLD.json";
 const old=[
@@ -44,7 +45,18 @@ export function checkVoxPr300MigrationHold(
  try{managed=listManaged();}catch{return fail("MANAGED_MIGRATION_DISCOVERY_FAILED");}
  if(!Array.isArray(managed)||managed.some(x=>typeof x!=="string"))
   return fail("MANAGED_MIGRATION_DISCOVERY_INVALID");
- const observed=managed.filter(n=>/vox/i.test(n)&&n.endsWith(".sql")).sort();
+ // The Oct14 staff/TL VOX SQL still may not enter migration discovery.
+ // One later *vendor-only* Owner queue migration is allowed solely as part
+ // of the independently pinned seven-file, not-applied November addendum.
+ // Presence here is not database application, release GO or a staff grant.
+ let vendor;
+ try{vendor=validatePinnedVendorPendingFiles({
+  names:managed.filter(n=>/^\d{14}_.+\.sql$/.test(n)),
+  sourceDir:resolve(root,"supabase/migrations"),allowAbsent:true,
+ });}catch{return fail("UNDECLARED_MANAGED_VOX_SQL");}
+ const permittedVox=new Set(vendor.files.filter(n=>
+  n==="20261104170000_vox_owner_vendor_review_queue.sql"));
+ const observed=managed.filter(n=>/vox/i.test(n)&&n.endsWith(".sql")&&!permittedVox.has(n)).sort();
  const expected=[];
  if(JSON.stringify(observed)!==JSON.stringify(expected))
   return fail("UNDECLARED_MANAGED_VOX_SQL");

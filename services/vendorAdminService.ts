@@ -22,6 +22,7 @@ import { evaluateVendorEligibility, type VendorEligibility } from "../lib/vendor
 import { applyVendorCreditDelta } from "./vendorCreditWalletService";
 import { getActiveCities } from "../lib/locations/cityService";
 import { normalizeCoordinate } from "../lib/geo/canonicalCoordinate";
+import { requiresVendorVerificationEvidence } from "../lib/vendors/vendorDocumentApprovalGate";
 
 const VENDOR_FIELDS =
   "id, business_name, owner_name, phone, email, city, areas_covered, covers_full_city, service_categories, status, total_credits, remaining_credits, rating, completed_projects, is_active, public_visibility, paid_status, package_name, package_status, package_expires_at, created_at, accepting_leads, user_id, google_place_id, location_verification_status, service_zone_id, office_latitude, office_longitude";
@@ -169,6 +170,20 @@ export async function setVendorStatusAction(
 
   try {
     const db = adminClient();
+    // Owner status changes must never bypass the private ID/office/zone/category
+    // evidence case. Missing schema/RPC/consent is a hard refusal. Keep reject,
+    // suspend, pause and deactivate possible for immediate safety containment.
+    if (requiresVendorVerificationEvidence(action)) {
+      const { data: verified, error: verificationError } = await db.rpc(
+        "qf_vendor_verification_case_ready", { p_vendor_id: id }
+      );
+      if (verificationError || verified !== true) {
+        return {
+          ok: false, code: "VENDOR_VERIFICATION_REQUIRED",
+          error: "Verify the vendor identity, office, category and service zone before approving or enabling access.",
+        };
+      }
+    }
     let update: Record<string, unknown>;
     let expected: Record<string, unknown> | null = null;
     if (action === "activate") update = { is_active: true };

@@ -5,6 +5,7 @@ import {readFileSync,readdirSync} from "node:fs";
 import {resolve,dirname} from "node:path";
 import {fileURLToPath} from "node:url";
 import {createHash} from "node:crypto";
+import {validatePinnedVendorPendingFiles} from "./rc-launch-vendor-pending-source-addendum.mjs";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
 const digest=b=>createHash("sha256").update(b).digest("hex");
 const read=p=>readFileSync(resolve(root,p));
@@ -28,11 +29,19 @@ export function rc22AssertUniqueVersions(names){
  return true;
 }
 export function buildRc22MigrationPacket(){
- const names=readdirSync(resolve(root,"supabase/migrations"))
+ const allNames=readdirSync(resolve(root,"supabase/migrations"))
   .filter(p=>/^\d{14}_.+\.sql$/.test(p)).sort();
+ // October's 162-file read-only capture remains immutable. November's seven
+ // Pending vendor source files are tested as a separately exact-pinned addendum.
+ // Neither list can have duplicate versions or an unlisted additional file.
+ rc22AssertUniqueVersions(allNames);
+ const vendorAddendum=validatePinnedVendorPendingFiles({
+  names:allNames,sourceDir:resolve(root,"supabase/migrations"),
+ });
+ const vendorNames=new Set(vendorAddendum.files);
+ const names=allNames.filter(n=>!vendorNames.has(n));
  if(names.length!==RC22_PINNED_SOURCE.count)
   throw Error("MIGRATION_SOURCE_INVENTORY_DRIFT");
- rc22AssertUniqueVersions(names);
  const entries=names.map(name=>({name,sha256:digest(read("supabase/migrations/"+name))}));
  const legacy="supabase/migrations/20260912010000_qf_vendor_package_razorpay_testmode.sql";
  const v2="ops/vox/rc17-review-candidates/20261031001000_rc17_razorpay_v2_authority_REVIEW_ONLY.sql";

@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {existsSync,readFileSync} from "node:fs";
 import {resolve} from "node:path";
+import {validatePinnedVendorPendingFiles} from "./rc-launch-vendor-pending-source-addendum.mjs";
+import {readdirSync} from "node:fs";
 
 const root=resolve(import.meta.dirname,"../../..");
 const src=path=>readFileSync(resolve(root,path),"utf8");
@@ -50,15 +52,25 @@ test("Core decision is bounded, version-locked and cannot directly activate a ve
  assert.match(queue,/canViewPrivateDocuments:false,canActivateLeads:false/);
 });
 
-test("Seven SQL dependencies remain outside this code-only candidate and in release HOLD",()=>{
+test("Seven SQL dependencies are exact source-pending in integrated candidate and remain in release HOLD",()=>{
  const versions=["20261104090000","20261104140000","20261104153000",
   "20261104160000","20261104163000","20261104170000","20261104173000"];
  for(const version of versions){
   assert.ok(doc.includes(version),version+" must be in explicit dependency declaration");
-  const manifests=src("supabase/staging-history/qf-post-g1-migration-ledger-20260929.json");
-  assert.ok(!manifests.includes('"version": "'+version+'"'),
-   "do not silently insert new vendor migration in VOX managed pipeline: "+version);
+  const ledger=JSON.parse(src("supabase/staging-history/qf-post-g1-migration-ledger-20260929.json"));
+  const item=ledger.records.find(r=>r.version===version);
+  assert.ok(item,"new exact source-pending migration must be explicitly pinned: "+version);
+  assert.equal(item.exactVersionPresence.staging,false);
+  assert.equal(item.exactVersionPresence.production,false);
+  assert.match(item.evidence,/NO_REMOTE_APPLY$/);
  }
+ const pinned=validatePinnedVendorPendingFiles({
+  names:readdirSync(resolve(root,"supabase/migrations")),
+  sourceDir:resolve(root,"supabase/migrations")
+ });
+ assert.equal(pinned.count,7);
+ assert.equal(pinned.applied,false);
+ assert.equal(pinned.releaseGo,false);
  assert.match(doc,/Release:\*\* HOLD/);
  assert.match(doc,/does not introduce the seven new vendor verification SQL migrations/);
  assert.doesNotMatch(doc,/\bLIVE APPROVED\b|\bPRODUCTION GO\b/);

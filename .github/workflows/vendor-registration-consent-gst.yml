@@ -1,0 +1,285 @@
+name: Vendor Registration Consent, OTP Purpose and Private Evidence
+
+on:
+  pull_request:
+    paths:
+      - 'components/VendorRegisterForm.tsx'
+      - 'components/VendorApplicationForm.tsx'
+      - 'services/vendorService.ts'
+      - 'app/actions.ts'
+      - 'lib/types.ts'
+      - 'lib/vendors/vendorContactContract.ts'
+      - 'lib/vendors/vendorSignupPolicy.ts'
+      - 'lib/identity/vendorWhatsappOtpAdmission.ts'
+      - 'lib/identity/authOtpPurposePolicy.ts'
+      - 'lib/identity/authOtpPurposeRouter.ts'
+      - 'lib/identity/vendorOtpRequestCoordination.ts'
+      - 'scripts/mvp/vendor/vendor-otp-request-coordination.test.mjs'
+      - 'lib/vendors/vendorVerifiedSignupDecision.ts'
+      - 'lib/vendors/vendorSignupOwnershipReconciliation.ts'
+      - 'services/vendorSignupOwnershipReadService.ts'
+      - 'scripts/mvp/vendor/vendor-signup-ownership-reconciliation.test.mjs'
+      - 'scripts/mvp/vendor/vendor-signup-ownership-read-contract.test.mjs'
+      - 'services/vendorAdminService.ts'
+      - 'app/api/vox/v1/owner-vendor-verification-readiness/route.ts'
+      - 'app/api/vox/v1/owner-vendor-signup-status/route.ts'
+      - 'app/api/vox/v1/owner-vendor-verification-case/route.ts'
+      - 'scripts/mvp/vendor/vendor-owner-review-assignment-gate.test.mjs'
+      - 'scripts/mvp/vendor/fixtures/vendor-owner-assignment-pg-bootstrap.sql'
+      - 'scripts/mvp/vendor/vendor-owner-assignment-pg-acceptance.sql'
+      - 'supabase/migrations/20261104160000_vendor_owner_review_assignment_gate.sql'
+      - 'supabase/migrations/20261104163000_vendor_private_document_intake.sql'
+      - 'supabase/migrations/20261104170000_vox_owner_vendor_review_queue.sql'
+      - 'supabase/migrations/20261104173000_vendor_private_scan_quarantine.sql'
+      - 'lib/vendors/privateClamavScanner.mjs'
+      - 'scripts/mvp/vendor/run-private-evidence-scan-once.mjs'
+      - 'scripts/mvp/vendor/vendor-private-scan-pg-acceptance.sql'
+      - 'scripts/mvp/vendor/vendor-private-clamav-contract.test.mjs'
+      - 'scripts/mvp/vendor/certify-vendor-clamav-local-behavior.mjs'
+      - 'scripts/mvp/vendor/certify-vendor-clamav-local-behavior.test.mjs'
+      - 'app/api/vox/v1/owner-vendor-verification-queue/route.ts'
+      - 'components/vox/OwnerVendorVerificationDashboard.tsx'
+      - 'scripts/mvp/vendor/vendor-vox-owner-queue-pg-acceptance.sql'
+      - 'scripts/mvp/vendor/vendor-vox-owner-review-queue-contract.test.mjs'
+      - 'ops/vendor/vendor-launch-readonly-preflight-20261104.sql'
+      - 'ops/vendor/vendor-before-migration-readonly-preflight-20261105.sql'
+      - 'scripts/mvp/vendor/fixtures/vendor-legacy-preflight-pg-bootstrap.sql'
+      - 'scripts/mvp/vendor/vendor-legacy-preflight-pg-acceptance.sql'
+      - 'scripts/mvp/vendor/vendor-batch9-owner-preflight.test.mjs'
+      - 'scripts/mvp/vendor/vendor-seven-migration-fingerprint.mjs'
+      - 'scripts/mvp/vendor/vendor-seven-migration-fingerprint.test.mjs'
+      - 'scripts/mvp/vendor/vendor-vox-migration-cross-branch-delta.mjs'
+      - 'scripts/mvp/vendor/vendor-vox-migration-cross-branch-delta.test.mjs'
+      - 'app/api/vendor/onboarding/request-otp/route.ts'
+      - 'app/api/vendor/onboarding/complete/route.ts'
+      - 'app/api/vendor/private-evidence/route.ts'
+      - 'lib/vendors/readBoundedVendorMultipart.ts'
+      - 'scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs'
+      - 'lib/storage/objectStorage.ts'
+      - 'lib/storage/supabaseObjectStorage.ts'
+      - 'app/admin/vendor-verification/page.tsx'
+      - 'components/vox/OwnerVendorVerificationDashboard.tsx'
+      - 'components/vendor/VendorPrivateEvidenceForm.tsx'
+      - 'app/vendor/page.tsx'
+      - 'scripts/mvp/vendor/vendor-private-intake-pg-acceptance.sql'
+      - 'scripts/mvp/vendor/vendor-batch6-enrollment-evidence.test.mjs'
+      - 'scripts/mvp/vendor/vendor-owner-signup-status-route.test.mjs'
+      - 'scripts/mvp/vendor/vendor-owner-verification-readiness-route.test.mjs'
+      - 'lib/vendors/vendorDocumentApprovalGate.ts'
+      - 'scripts/mvp/vendor/vendor-document-approval-gate.test.mjs'
+      - 'scripts/mvp/vendor/vendor-internal-purpose-routing.test.mjs'
+      - 'services/authOtpPurposeReservationService.ts'
+      - 'services/vendorOtpEvidenceReadService.ts'
+      - 'services/vendorSignupOtpVerificationService.ts'
+      - 'services/vendorAtomicSignupService.ts'
+      - 'scripts/mvp/vendor/vendor-atomic-registration-contract.test.mjs'
+      - 'scripts/mvp/vendor/vendor-atomic-pg-acceptance.sql'
+      - 'supabase/migrations/20261104153000_vendor_atomic_pending_registration.sql'
+      - 'scripts/mvp/vendor/vendor-otp-verification-service-contract.test.mjs'
+      - 'scripts/mvp/vendor/vendor-otp-evidence-read-contract.test.mjs'
+      - 'supabase/migrations/20261104090000_vendor_registration_consent_receipt.sql'
+      - 'supabase/migrations/20261104140000_vendor_private_otp_and_verification_foundation.sql'
+      - 'supabase/staging-history/qf-post-g1-migration-ledger-20260929.json'
+      - 'scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs'
+      - 'scripts/mvp/vendor/vendor-signup-consent-gst.test.mjs'
+      - 'scripts/mvp/vendor/vendor-whatsapp-otp-admission.test.mjs'
+      - 'scripts/mvp/vendor/vendor-private-otp-verification-foundation.test.mjs'
+      - 'scripts/mvp/vendor/fixtures/vendor-private-pg-bootstrap.sql'
+      - 'scripts/mvp/vendor/vendor-private-pg-acceptance.sql'
+      - '.github/workflows/vendor-registration-consent-gst.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'components/VendorRegisterForm.tsx'
+      - 'components/VendorApplicationForm.tsx'
+      - 'services/vendorService.ts'
+      - 'app/actions.ts'
+      - 'lib/types.ts'
+      - 'lib/vendors/vendorContactContract.ts'
+      - 'lib/vendors/vendorSignupPolicy.ts'
+      - 'lib/identity/vendorWhatsappOtpAdmission.ts'
+      - 'lib/identity/authOtpPurposePolicy.ts'
+      - 'lib/identity/authOtpPurposeRouter.ts'
+      - 'lib/identity/vendorOtpRequestCoordination.ts'
+      - 'scripts/mvp/vendor/vendor-otp-request-coordination.test.mjs'
+      - 'lib/vendors/vendorVerifiedSignupDecision.ts'
+      - 'lib/vendors/vendorSignupOwnershipReconciliation.ts'
+      - 'services/vendorSignupOwnershipReadService.ts'
+      - 'scripts/mvp/vendor/vendor-signup-ownership-reconciliation.test.mjs'
+      - 'scripts/mvp/vendor/vendor-signup-ownership-read-contract.test.mjs'
+      - 'services/vendorAdminService.ts'
+      - 'app/api/vox/v1/owner-vendor-verification-readiness/route.ts'
+      - 'app/api/vox/v1/owner-vendor-signup-status/route.ts'
+      - 'app/api/vox/v1/owner-vendor-verification-case/route.ts'
+      - 'scripts/mvp/vendor/vendor-owner-review-assignment-gate.test.mjs'
+      - 'scripts/mvp/vendor/fixtures/vendor-owner-assignment-pg-bootstrap.sql'
+      - 'scripts/mvp/vendor/vendor-owner-assignment-pg-acceptance.sql'
+      - 'supabase/migrations/20261104160000_vendor_owner_review_assignment_gate.sql'
+      - 'supabase/migrations/20261104163000_vendor_private_document_intake.sql'
+      - 'supabase/migrations/20261104170000_vox_owner_vendor_review_queue.sql'
+      - 'supabase/migrations/20261104173000_vendor_private_scan_quarantine.sql'
+      - 'lib/vendors/privateClamavScanner.mjs'
+      - 'scripts/mvp/vendor/run-private-evidence-scan-once.mjs'
+      - 'scripts/mvp/vendor/vendor-private-scan-pg-acceptance.sql'
+      - 'scripts/mvp/vendor/vendor-private-clamav-contract.test.mjs'
+      - 'scripts/mvp/vendor/certify-vendor-clamav-local-behavior.mjs'
+      - 'scripts/mvp/vendor/certify-vendor-clamav-local-behavior.test.mjs'
+      - 'app/api/vox/v1/owner-vendor-verification-queue/route.ts'
+      - 'components/vox/OwnerVendorVerificationDashboard.tsx'
+      - 'scripts/mvp/vendor/vendor-vox-owner-queue-pg-acceptance.sql'
+      - 'scripts/mvp/vendor/vendor-vox-owner-review-queue-contract.test.mjs'
+      - 'ops/vendor/vendor-launch-readonly-preflight-20261104.sql'
+      - 'ops/vendor/vendor-before-migration-readonly-preflight-20261105.sql'
+      - 'scripts/mvp/vendor/fixtures/vendor-legacy-preflight-pg-bootstrap.sql'
+      - 'scripts/mvp/vendor/vendor-legacy-preflight-pg-acceptance.sql'
+      - 'scripts/mvp/vendor/vendor-batch9-owner-preflight.test.mjs'
+      - 'scripts/mvp/vendor/vendor-seven-migration-fingerprint.mjs'
+      - 'scripts/mvp/vendor/vendor-seven-migration-fingerprint.test.mjs'
+      - 'scripts/mvp/vendor/vendor-vox-migration-cross-branch-delta.mjs'
+      - 'scripts/mvp/vendor/vendor-vox-migration-cross-branch-delta.test.mjs'
+      - 'app/api/vendor/onboarding/request-otp/route.ts'
+      - 'app/api/vendor/onboarding/complete/route.ts'
+      - 'app/api/vendor/private-evidence/route.ts'
+      - 'lib/vendors/readBoundedVendorMultipart.ts'
+      - 'scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs'
+      - 'lib/storage/objectStorage.ts'
+      - 'lib/storage/supabaseObjectStorage.ts'
+      - 'app/admin/vendor-verification/page.tsx'
+      - 'components/vox/OwnerVendorVerificationDashboard.tsx'
+      - 'components/vendor/VendorPrivateEvidenceForm.tsx'
+      - 'app/vendor/page.tsx'
+      - 'scripts/mvp/vendor/vendor-private-intake-pg-acceptance.sql'
+      - 'scripts/mvp/vendor/vendor-batch6-enrollment-evidence.test.mjs'
+      - 'scripts/mvp/vendor/vendor-owner-signup-status-route.test.mjs'
+      - 'scripts/mvp/vendor/vendor-owner-verification-readiness-route.test.mjs'
+      - 'lib/vendors/vendorDocumentApprovalGate.ts'
+      - 'scripts/mvp/vendor/vendor-document-approval-gate.test.mjs'
+      - 'scripts/mvp/vendor/vendor-internal-purpose-routing.test.mjs'
+      - 'services/authOtpPurposeReservationService.ts'
+      - 'services/vendorOtpEvidenceReadService.ts'
+      - 'services/vendorSignupOtpVerificationService.ts'
+      - 'services/vendorAtomicSignupService.ts'
+      - 'scripts/mvp/vendor/vendor-atomic-registration-contract.test.mjs'
+      - 'scripts/mvp/vendor/vendor-atomic-pg-acceptance.sql'
+      - 'supabase/migrations/20261104153000_vendor_atomic_pending_registration.sql'
+      - 'scripts/mvp/vendor/vendor-otp-verification-service-contract.test.mjs'
+      - 'scripts/mvp/vendor/vendor-otp-evidence-read-contract.test.mjs'
+      - 'supabase/migrations/20261104090000_vendor_registration_consent_receipt.sql'
+      - 'supabase/migrations/20261104140000_vendor_private_otp_and_verification_foundation.sql'
+      - 'supabase/staging-history/qf-post-g1-migration-ledger-20260929.json'
+      - 'scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs'
+      - 'scripts/mvp/vendor/vendor-signup-consent-gst.test.mjs'
+      - 'scripts/mvp/vendor/vendor-whatsapp-otp-admission.test.mjs'
+      - 'scripts/mvp/vendor/vendor-private-otp-verification-foundation.test.mjs'
+      - 'scripts/mvp/vendor/fixtures/vendor-private-pg-bootstrap.sql'
+      - 'scripts/mvp/vendor/vendor-private-pg-acceptance.sql'
+      - '.github/workflows/vendor-registration-consent-gst.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  signup-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked app dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Consent, GST, identity and OTP admission
+        run: |
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/vendor/vendor-signup-consent-gst.test.mjs scripts/mvp/vendor/vendor-whatsapp-otp-admission.test.mjs scripts/mvp/vendor/vendor-private-otp-verification-foundation.test.mjs scripts/mvp/vendor/vendor-internal-purpose-routing.test.mjs scripts/mvp/vendor/vendor-document-approval-gate.test.mjs scripts/mvp/vendor/vendor-owner-verification-readiness-route.test.mjs scripts/mvp/vendor/vendor-signup-ownership-reconciliation.test.mjs scripts/mvp/vendor/vendor-signup-ownership-read-contract.test.mjs scripts/mvp/vendor/vendor-otp-request-coordination.test.mjs scripts/mvp/vendor/vendor-otp-evidence-read-contract.test.mjs scripts/mvp/vendor/vendor-otp-verification-service-contract.test.mjs scripts/mvp/vendor/vendor-atomic-registration-contract.test.mjs scripts/mvp/vendor/vendor-owner-signup-status-route.test.mjs scripts/mvp/vendor/vendor-owner-review-assignment-gate.test.mjs scripts/mvp/vendor/vendor-batch6-enrollment-evidence.test.mjs scripts/mvp/vendor/vendor-vox-owner-review-queue-contract.test.mjs scripts/mvp/vendor/vendor-private-clamav-contract.test.mjs scripts/mvp/vendor/vendor-batch9-owner-preflight.test.mjs
+      - name: Seven vendor SQL immutable byte fingerprints (source-only, HOLD)
+        run: |
+          node scripts/mvp/vendor/vendor-seven-migration-fingerprint.mjs
+          node --test scripts/mvp/vendor/vendor-seven-migration-fingerprint.test.mjs
+      - name: VOX + Vendor cross-branch migration tree delta (mocked offline CI)
+        run: node --test scripts/mvp/vendor/vendor-vox-migration-cross-branch-delta.test.mjs
+      - name: Actual-byte bounded vendor document upload regression
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs
+      - name: Local ClamAV behavior negative certification (no real daemon or provider)
+        run: node --test scripts/mvp/vendor/certify-vendor-clamav-local-behavior.test.mjs
+      - name: Strict additive migration registry
+        run: node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs
+      - name: Full TypeScript contract
+        run: npm run typecheck
+      - name: Existing vendor approval and category governance
+        run: |
+          node scripts/mvp/vendor/validate-vendor-admin-first-approvals.mjs
+          node scripts/mvp/vendor/validate-v3-category-approval-isolation.mjs
+      - name: Private PostgreSQL 17 acceptance, synthetic, no network
+        shell: bash
+        run: |
+          set -euo pipefail
+          name=qf-vendor-private-cert
+          docker run --rm -d --name "$name" --network none \
+            -e POSTGRES_PASSWORD=synthetic_ci_only postgres:17-alpine >/dev/null
+          trap 'docker stop "$name" >/dev/null 2>&1 || true' EXIT
+          # Postgres bootstraps with a temporary server, stops it, then starts
+          # the final server. A single pg_isready can race that restart.
+          ready=0
+          for attempt in $(seq 1 60); do
+            if docker exec "$name" psql -X -U postgres -d postgres -Atqc 'SELECT 1' >/dev/null 2>&1; then
+              sleep 2
+              if docker exec "$name" psql -X -U postgres -d postgres -Atqc 'SELECT 1' >/dev/null 2>&1; then
+                ready=1
+                break
+              fi
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            docker logs "$name"
+            exit 1
+          fi
+
+          # Independently exercise PRE-migration SQL against fresh legacy-only
+          # Core schema. No new private schema or RPC exists in this database.
+          docker exec "$name" createdb -U postgres vendor_legacy_baseline
+          docker exec -i "$name" psql -X -U postgres -d vendor_legacy_baseline -v ON_ERROR_STOP=1 \
+            < scripts/mvp/vendor/fixtures/vendor-legacy-preflight-pg-bootstrap.sql
+          docker exec -i "$name" psql -X -U postgres -d vendor_legacy_baseline -v ON_ERROR_STOP=1 \
+            < ops/vendor/vendor-before-migration-readonly-preflight-20261105.sql
+          docker exec -i "$name" psql -X -U postgres -d vendor_legacy_baseline -v ON_ERROR_STOP=1 \
+            < scripts/mvp/vendor/vendor-legacy-preflight-pg-acceptance.sql
+          # The existing private signup/Owner/ClamAV chain runs separately.
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < scripts/mvp/vendor/fixtures/vendor-private-pg-bootstrap.sql
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < supabase/migrations/20261104090000_vendor_registration_consent_receipt.sql
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < supabase/migrations/20261104140000_vendor_private_otp_and_verification_foundation.sql
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < scripts/mvp/vendor/vendor-private-pg-acceptance.sql
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < supabase/migrations/20261104153000_vendor_atomic_pending_registration.sql
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < scripts/mvp/vendor/vendor-atomic-pg-acceptance.sql
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < scripts/mvp/vendor/fixtures/vendor-owner-assignment-pg-bootstrap.sql
+          # Baseline-safe queries must run before Owner verification + scan migrations.
+          # No writes: counts only, transaction READ ONLY and ROLLBACK.
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < ops/vendor/vendor-before-migration-readonly-preflight-20261105.sql
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < supabase/migrations/20261104160000_vendor_owner_review_assignment_gate.sql
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < scripts/mvp/vendor/vendor-owner-assignment-pg-acceptance.sql
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < supabase/migrations/20261104163000_vendor_private_document_intake.sql
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < scripts/mvp/vendor/vendor-private-intake-pg-acceptance.sql
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < supabase/migrations/20261104170000_vox_owner_vendor_review_queue.sql
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < scripts/mvp/vendor/vendor-vox-owner-queue-pg-acceptance.sql
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < supabase/migrations/20261104173000_vendor_private_scan_quarantine.sql
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < scripts/mvp/vendor/vendor-private-scan-pg-acceptance.sql
+          docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < ops/vendor/vendor-launch-readonly-preflight-20261104.sql

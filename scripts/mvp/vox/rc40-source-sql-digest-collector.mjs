@@ -13,6 +13,7 @@ import {fileURLToPath} from "node:url";
 import {canonicalSqlDigest} from "./rc35-migration-inventory-reconcile.mjs";
 import {protectedDigestIndex,PROTECTED_ROOTS} from "./rc38-migration-staged-dryrun.mjs";
 import {pendingClass} from "./d-db-release-preflight.mjs";
+import {validatePinnedVendorPendingFiles} from "./rc-launch-vendor-pending-source-addendum.mjs";
 
 export const RC40_SCHEMA="qf.vox.rc40.source-sql-digest-evidence.v1";
 export const EXPECTED_SCHEMA="qf.vox.rc40.source-sql-expected-digests.v1";
@@ -94,7 +95,14 @@ export function collectSourceSqlDigests({driftText,sourceDir,expectedText,prevTe
  const fileByVersion=new Map(drift.files.map(f=>[f.match(FILE_RE)[1],f]));
  const present=new Set(listSql(sourceDir));
  const accounted=new Set([...drift.files,...drift.commonFiles]);
- const extra=[...present].filter(f=>!accounted.has(f));
+ // Validate seven exact post-capture Pending SQL byte hashes. Do not modify
+  // historic RC40 read-only managed source evidence or allow unknown extras.
+  let addon;
+  try{addon=validatePinnedVendorPendingFiles({
+   names:[...present].filter(n=>FILE_RE.test(n)),sourceDir,allowAbsent:true,
+  });}catch{return bad("UNTRUSTED_PENDING_VENDOR_SOURCE_ADDENDUM");}
+  const addonNames=new Set(addon.files);
+  const extra=[...present].filter(f=>!accounted.has(f)&&!addonNames.has(f));
  if(extra.length)bad("EXTRA_SOURCE_FILE:"+extra.join(","));
  const missing=drift.files.filter(f=>!present.has(f));
  if(missing.length)bad("MISSING_SOURCE_FILE:"+missing.join(","));

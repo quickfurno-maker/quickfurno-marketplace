@@ -688,7 +688,7 @@ function validateState(state) {
     extension?.evidenceProjects?.staging?.projectRef === "uckafzuochmbvtiodmcl" &&
     extension?.evidenceProjects?.production?.projectRef === "yqpgcsduqbxulrlzwzap");
   check("post-G1 extension records are unique, exact and hash-pinned",
-    extensionRecords.length === 51 &&
+    extensionRecords.length === 58 &&
     new Set(extensionRecords.map((record) => record.version)).size === extensionRecords.length &&
     extensionRecords.every((record) => {
       const local = localByVersion.get(record.version);
@@ -717,6 +717,16 @@ function validateState(state) {
         ["20261014050000", "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"],
         ["20261014060000", "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"],
         ["20261014070000", "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"],
+        // November vendor verification SQL: seven exact source-only pins.
+        // The old seven VOX quarantine records above remain unchanged.
+        // Never interpret these statements as having been installed remotely.
+        ["20261104090000", "SOURCE_PIN_CREATED_2026-11-04_REVIEWED_DRAFT_PR_484_NO_REMOTE_APPLY"],
+        ["20261104140000", "SOURCE_PIN_CREATED_2026-11-04_PRIVATE_PG_17_SYNTHETIC_REHEARSAL_NO_REMOTE_APPLY"],
+        ["20261104153000", "SOURCE_PIN_CREATED_2026-11-04_ATOMIC_SIGNUP_PRIVATE_PG17_CONTRACT_NO_REMOTE_APPLY"],
+        ["20261104160000", "SOURCE_PIN_CREATED_2026-11-04_OWNER_REVIEW_ASSIGNMENT_GUARD_PG17_NO_REMOTE_APPLY"],
+        ["20261104163000", "SOURCE_PIN_CREATED_2026-11-04_PRIVATE_VENDOR_INTAKE_PG17_NO_REMOTE_APPLY"],
+        ["20261104170000", "SOURCE_PIN_CREATED_2026-11-04_VOX_OWNER_PRIVATE_REVIEW_QUEUE_PG17_NO_REMOTE_APPLY"],
+        ["20261104173000", "SOURCE_PIN_CREATED_2026-11-04_CLAMAV_PRIVATE_SCAN_RECEIPT_QUARANTINE_PG17_NO_REMOTE_APPLY"],
       ]);
       const allowedSourcePin = sourcePinnedEvidence.get(record.version);
       return local?.version === record.version &&

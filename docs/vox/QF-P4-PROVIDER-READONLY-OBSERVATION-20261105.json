@@ -1,0 +1,46 @@
+{
+  "schema": "qf.launch.p4.provider-observation.v1",
+  "date": "2026-11-05",
+  "method": "JARVIS local-only read-only scan and source configuration inspection; no provider API calls",
+  "mode": "SOURCE_AND_LOOPBACK_OBSERVATION_ONLY",
+  "secretsRead": false,
+  "providerMessagesSent": 0,
+  "managedSystemsChanged": 0,
+  "scanner": {
+    "cleanControl": "unavailable",
+    "eicarControl": "unavailable",
+    "behaviorObserved": false,
+    "certified": false
+  },
+  "whatsapp": {
+    "signedHook": "unverified",
+    "templateDeliveryReceipt": "unverified",
+    "otpReplayNegative": "unverified",
+    "recipientConsent": "unverified"
+  },
+  "googlePlaces": {
+    "billingActive": "unverified",
+    "restrictedServerKey": "unverified",
+    "realSuggestions": "unverified",
+    "punePcmcGeofence": "unverified"
+  },
+  "privateStorage": {
+    "privateBucketAcl": "unverified",
+    "scanQuarantineReceipt": "unverified",
+    "retentionPolicy": "unverified"
+  },
+  "owner": {
+    "cloudflareAccessAal2Uat": "unverified",
+    "webCoreRunningDigest": "unverified"
+  },
+  "authz": {
+    "stagingGoApproved": false,
+    "productionGoApproved": false
+  },
+  "releaseDecision": "HOLD",
+  "notes": [
+    "Local docker has no ClamAV image in previously inspected matching names; no pull/run performed",
+    "Existing Google Places account was reported expired, but real current billing not accessed",
+    "Do not infer unverified means absent or present in deployed infrastructure."
+  ]
+}

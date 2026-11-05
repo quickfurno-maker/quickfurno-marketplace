@@ -55,6 +55,10 @@ on:
       - 'app/api/vendor/private-evidence/route.ts'
       - 'lib/vendors/readBoundedVendorMultipart.ts'
       - 'scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs'
+      - 'lib/vendors/readBoundedVendorJson.ts'
+      - 'lib/vendors/vendorSignupUi.ts'
+      - 'scripts/mvp/vendor/vendor-phase2-bounded-json.test.mjs'
+      - 'scripts/mvp/vendor/vendor-phase2-ui-contract.test.mjs'
       - 'lib/storage/objectStorage.ts'
       - 'lib/storage/supabaseObjectStorage.ts'
       - 'app/admin/vendor-verification/page.tsx'
@@ -142,6 +146,10 @@ on:
       - 'app/api/vendor/private-evidence/route.ts'
       - 'lib/vendors/readBoundedVendorMultipart.ts'
       - 'scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs'
+      - 'lib/vendors/readBoundedVendorJson.ts'
+      - 'lib/vendors/vendorSignupUi.ts'
+      - 'scripts/mvp/vendor/vendor-phase2-bounded-json.test.mjs'
+      - 'scripts/mvp/vendor/vendor-phase2-ui-contract.test.mjs'
       - 'lib/storage/objectStorage.ts'
       - 'lib/storage/supabaseObjectStorage.ts'
       - 'app/admin/vendor-verification/page.tsx'
@@ -203,6 +211,9 @@ jobs:
         run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs
       - name: Local ClamAV behavior negative certification (no real daemon or provider)
         run: node --test scripts/mvp/vendor/certify-vendor-clamav-local-behavior.test.mjs
+      - name: Phase 2 actual-byte OTP signup and browser/private evidence UX acceptance (source only)
+        run: |
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-phase2-bounded-json.test.mjs scripts/mvp/vendor/vendor-phase2-ui-contract.test.mjs scripts/mvp/vendor/vendor-batch6-enrollment-evidence.test.mjs scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs scripts/mvp/vendor/vendor-otp-request-coordination.test.mjs
       - name: Strict additive migration registry
         run: node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs
       - name: Full TypeScript contract

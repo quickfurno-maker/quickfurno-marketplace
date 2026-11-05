@@ -114,3 +114,18 @@ test("P3-UX7 only newest Owner queue/case response may update the browser",()=>{
  assert.match(code,/caseVersion:selected\.caseVersion/);
  assert.doesNotMatch(code,/getPublicUrl|createSignedUrl|\.storage\./);
 });
+
+test("P3-UX8 Owner decision uses synchronous single-flight lock before any network write",()=>{
+ const source=read("app/owner/vendors/verification/OwnerReviewConsole.tsx");
+ const claim=source.indexOf("decisionBusyRef.current=true");
+ const submit=source.indexOf('fetch("/api/owner/vendor-verification/decision"');
+ const confirm=source.indexOf('data.schema!=="qf.vox.owner.vendor-decision-bff.v1"');
+ const prune=source.indexOf("setQueue(current=>current.filter(row=>row.vendorId!==id))");
+ assert.match(source,/const decisionBusyRef=useRef\(false\)/);
+ assert.match(source,/if\(decisionBusyRef\.current\|\|inFlight!==null\)return/);
+ assert.ok(claim>0&&submit>claim&&confirm>submit&&prune>confirm);
+ assert.match(source,/finally\{decisionBusyRef\.current=false;setInFlight\(null\);\}/);
+ assert.match(source,/caseVersion:selected\.caseVersion/);
+ assert.match(source,/Core recorded the immutable case decision/);
+ assert.doesNotMatch(source,/service_role|createSignedUrl\(|getPublicUrl\(/);
+});

@@ -9,7 +9,8 @@ import { loadMarketplaceRuntimeSettings } from "../lib/lead-assignment/runtimeSe
 import { evaluateAssignedLeadContactAccess } from "../lib/vendors/assignedLeadContactAccess";
 // QF-MVP-80.16C — the Indian mobile contract, stated once in a pure module so
 // the server authority, the live form and the notification lane cannot drift.
-import { isValidIndianMobile } from "../lib/vendors/vendorContactContract";
+import { isValidIndianMobile, normalizeVerifiedVendorMobile } from "../lib/vendors/vendorContactContract";
+import { hasVendorRegistrationConsent, isValidOptionalGstin, normalizeOptionalGstin, VENDOR_REGISTRATION_PRIVACY_REVISION } from "../lib/vendors/vendorSignupPolicy";
 import { resolveActiveCity } from "../lib/locations/cityService";
 import { normalizeCoordinate } from "../lib/geo/canonicalCoordinate";
 import { allowPublicMutation } from "../lib/security/publicMutationRateLimit";
@@ -18,12 +19,20 @@ import type {
 } from "../lib/types";
 
 /** Public vendor registration. Always lands as Pending + not visible. */
-export async function registerVendor(input: VendorRegistrationInput): Promise<Result<{ id: string }>> {
+/** Optional authenticated principal is accepted only from trusted server-side callers. */
+export async function registerVendor(
+  input: VendorRegistrationInput,
+  trustedContext: { verifiedAuthUserId?: string } = {},
+): Promise<Result<{ id: string }>> {
   try {
     // 1. Clean phone and whatsapp numbers to 10 digits
-    const cleanedPhone = (input.phone ?? "").replace(/\D/g, "");
+    // Verified Supabase phone is E.164, while vendors.phone stores 10 digits.
+    // Never silently strip an unrelated country code or arbitrary punctuation.
+    const verifiedMobile = normalizeVerifiedVendorMobile(input.phone);
+    // Preserve the ten-digit vendor storage contract after strict +91 validation.
+    const cleanedPhone = (verifiedMobile ?? "").replace(/\D/g, "");
     const cleanedWhatsapp = input.whatsapp_number
-      ? input.whatsapp_number.replace(/\D/g, "")
+      ? (normalizeVerifiedVendorMobile(input.whatsapp_number) ?? "").replace(/\D/g, "")
       : cleanedPhone;
 
     // 2. Validate all required fields before database call
@@ -41,6 +50,19 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       input.office_state
     );
 
+    // Only a trusted, server-verified Auth identity can create a vendor row.
+    // The former public anonymous application action was deliberately disabled.
+    if (!trustedContext.verifiedAuthUserId) {
+      return { ok: false, code: "VENDOR_WHATSAPP_OTP_REQUIRED",
+        error: "WhatsApp mobile verification is required before registration." };
+    }
+    if (!hasVendorRegistrationConsent(input.registration_consent_accepted)) {
+      return { ok: false, code: "CONSENT_REQUIRED", error: "Please accept the registration privacy and verification notice before submitting." };
+    }
+    if (!isValidOptionalGstin(input.gst_number)) {
+      return { ok: false, code: "VALIDATION", error: "Enter a valid 15-character GSTIN, or leave GST empty if you are not GST registered." };
+    }
+
     if (!businessNameClean || !ownerNameClean || !isValidIndianMobile(cleanedPhone) || !cityClean) {
       return {
         ok: false,
@@ -56,8 +78,7 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       // via the Google business base area/locality instead.
       if (
         !isValidIndianMobile(cleanedWhatsapp) ||
-        !emailClean ||
-        !isEmailValid ||
+        (Boolean(emailClean) && !isEmailValid) ||
         !input.office_address_line1?.trim() ||
         !input.office_state?.trim()
       ) {
@@ -116,7 +137,10 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       service_categories: input.service_categories ?? [],
       experience: input.experience ?? null,
       portfolio_urls: input.portfolio_urls ?? [],
-      gst_number: input.gst_number ?? null,
+      gst_number: normalizeOptionalGstin(input.gst_number) || null,
+      // Signed-off notice receipt is saved atomically with the vendor row.
+      registration_consent_version: VENDOR_REGISTRATION_PRIVACY_REVISION,
+      registration_consent_accepted_at: new Date().toISOString(),
       message: input.message ?? null,
       // Device/browser coordinates are deliberately not accepted for new vendor
       // registration. The Google-selected office/base point above is the only
@@ -133,7 +157,7 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       status: "Pending",
       verification_status: "Pending",
       paid_status: "Unpaid",
-      is_active: !outsideServiceArea,
+      is_active: false, // New applicants must be explicitly activated by the Owner after verification.
       // Registration alone cannot confer matching eligibility. The Google
       // office point must be independently verified before admin activation.
       accepting_leads: false,
@@ -144,7 +168,8 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       utm_campaign: input.utm_campaign ?? null,
       // Kept for the account-linked registration path (FK to profiles); null for
       // the public application wizard.
-      user_id: input.user_id ?? null,
+      // Never use an untrusted public signup field as the owner of a vendor record.
+      user_id: trustedContext.verifiedAuthUserId ?? null,
     };
 
     // Phase 1 (Google area foundation): optional Google Place identity + normalized
@@ -170,43 +195,26 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       console.log("Supabase URL exists:", Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL));
       console.log("Supabase Anon Key exists:", Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY));
       console.log("Supabase Service Role Key exists:", Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY));
-      console.log("Vendor payload:", { ...payload, ...googleLocationPayload });
+      console.log("[vendors] submission shape", { has_google_place: Boolean(input.google_place_id),
+        has_verified_auth_principal: Boolean(trustedContext.verifiedAuthUserId),
+        service_count: input.service_categories?.length ?? 0 });
     }
 
     // Single insert with the full payload (base + Phase 1 Google/location fields).
-    let { data, error } = await adminClient()
+    const { data, error } = await adminClient()
       .from("vendors")
       .insert({ ...payload, ...googleLocationPayload })
       .select("id")
       .single();
 
-    // Graceful fallback: if the Phase 1 Google/location columns aren't migrated
-    // yet, retry with the base payload only so vendor registration is never broken.
-    if (error && isMissingColumnError(error)) {
-      console.warn("[vendors] Google area/location columns missing — run 20260704000040_google_area_location_foundation.sql; saving vendor without them.");
-      ({ data, error } = await adminClient()
-        .from("vendors")
-        .insert(payload)
-        .select("id")
-        .single());
-    }
+    // Fail closed on missing Google/consent columns. A registration without its
+    // selected Google Place and consent receipt is not a valid application.
 
     if (error) {
-      console.error("Vendor insert error:", error);
-      if (process.env.NODE_ENV === "development") {
-        console.log("Supabase Error Details:", {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint,
-        });
-      }
-      logSupabaseInsertError("vendors", error, {
-        has_user_id: Boolean(input.user_id),
-        has_email: Boolean(input.email),
-        service_count: input.service_categories?.length ?? 0,
-        area_count: input.areas_covered?.length ?? 0,
-      });
+      // Avoid logging Supabase error detail: it may contain user-supplied PII.
+      console.error("[vendors] insert failed", { code: error.code ?? "DB_ERROR" });
+      // No raw database message/details or input payload are logged: they can
+      // contain phone numbers, emails, GSTIN or other user-submitted PII.
 
       // Map database error code to distinct readable message
       const errMsg = String(error.message ?? "").toLowerCase();

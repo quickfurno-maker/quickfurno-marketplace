@@ -9,11 +9,11 @@
     "realtime": "EVENT_GATEWAY_OR_POSTGRES_NOTIFICATION"
   },
   "totals": {
-    "files": 159,
-    "rpcNames": 91,
-    "tableNames": 133,
-    "storageBuckets": 0,
-    "authFiles": 15,
+    "files": 171,
+    "rpcNames": 102,
+    "tableNames": 134,
+    "storageBuckets": 1,
+    "authFiles": 21,
     "realtimeFiles": 0
   },
   "rpcNames": [
@@ -58,6 +58,7 @@
     "qf_bind_vendor_package_razorpay_order_v2",
     "qf_cancel_orphan_automation_job_v1",
     "qf_cancel_stale_automation_job_v1",
+    "qf_claim_auth_otp_purpose",
     "qf_claim_automation_job_for_family_v1",
     "qf_claim_automation_job_transport_for_family_v1",
     "qf_claim_automation_job_transport_v1",
@@ -81,8 +82,10 @@
     "qf_finalize_replacement_request_v1",
     "qf_handoff_vendor_campaign_intents_v1",
     "qf_mark_vendor_package_payment_failed_v2",
+    "qf_owner_record_vendor_verification_decision",
     "qf_prepare_vendor_campaign_v1",
     "qf_project_vendor_lead_delivery_v1",
+    "qf_read_claimed_vendor_auth_otp_purpose",
     "qf_read_vendor_fair_opportunity_v1",
     "qf_recommend_bad_lead_recovery_v1",
     "qf_reconcile_automation_attempt_transport_v1",
@@ -91,7 +94,10 @@
     "qf_recover_automation_job_transport_v1",
     "qf_recover_automation_job_v1",
     "qf_recover_stale_dispatching_consent_ack_intents",
+    "qf_register_pending_vendor_atomic",
+    "qf_release_auth_otp_purpose",
     "qf_release_vendor_package_razorpay_order_claim_v2",
+    "qf_reserve_auth_otp_purpose",
     "qf_reserve_consent_ack_provider_attempt",
     "qf_resolve_service_zone_v1",
     "qf_scale_queue_health_v1",
@@ -101,6 +107,11 @@
     "qf_set_vendor_anisha_memory_consent_v1",
     "qf_snapshot_vendor_fair_opportunity_v1",
     "qf_terminalize_consent_ack_intent",
+    "qf_vendor_attach_private_evidence",
+    "qf_vendor_begin_private_verification_case",
+    "qf_vendor_owner_review_snapshot",
+    "qf_vendor_verification_case_ready",
+    "qf_vox_owner_vendor_review_queue",
     "qf_vox_work_transition_candidate_v1",
     "update_vendor_visibility",
     "vendor_auth_claim_reset_grant",
@@ -212,6 +223,7 @@
     "packages",
     "payments",
     "profiles",
+    "qf-vendor-verification-private",
     "service_categories",
     "vendor_anisha_memory_consents",
     "vendor_campaigns",
@@ -244,7 +256,9 @@
     "workflow_tasks",
     "workflow_transition_history"
   ],
-  "storageBuckets": [],
+  "storageBuckets": [
+    "qf-vendor-verification-private"
+  ],
   "files": [
     {
       "file": "app/actions.ts",
@@ -278,6 +292,27 @@
       "tables": [
         "vendors"
       ],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vendor/onboarding/request-otp/route.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vendor/private-evidence/route.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_vendor_attach_private_evidence",
+        "qf_vendor_begin_private_verification_case"
+      ],
+      "tables": [],
       "storageBuckets": [],
       "auth": true,
       "realtime": false
@@ -366,6 +401,55 @@
       "tables": [
         "vox_operational_intents_v1"
       ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vox/v1/owner-vendor-signup-status/route.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_vendor_verification_case_ready"
+      ],
+      "tables": [
+        "profiles",
+        "vendor_dashboard_users",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vox/v1/owner-vendor-verification-case/route.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_owner_record_vendor_verification_decision",
+        "qf_vendor_owner_review_snapshot"
+      ],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vox/v1/owner-vendor-verification-queue/route.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_vox_owner_vendor_review_queue"
+      ],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "app/api/vox/v1/owner-vendor-verification-readiness/route.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_vendor_verification_case_ready"
+      ],
+      "tables": [],
       "storageBuckets": [],
       "auth": false,
       "realtime": false
@@ -719,6 +803,19 @@
         "marketplace_service_zones"
       ],
       "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "lib/storage/supabaseObjectStorage.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "qf-vendor-verification-private"
+      ],
+      "storageBuckets": [
+        "qf-vendor-verification-private"
+      ],
       "auth": false,
       "realtime": false
     },
@@ -1197,6 +1294,20 @@
         "aos_audit_logs",
         "aos_recommendations"
       ],
+      "storageBuckets": [],
+      "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/authOtpPurposeReservationService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_claim_auth_otp_purpose",
+        "qf_read_claimed_vendor_auth_otp_purpose",
+        "qf_release_auth_otp_purpose",
+        "qf_reserve_auth_otp_purpose"
+      ],
+      "tables": [],
       "storageBuckets": [],
       "auth": false,
       "realtime": false
@@ -2101,6 +2212,7 @@
       "file": "services/vendorAdminService.ts",
       "directImports": [],
       "rpc": [
+        "qf_vendor_verification_case_ready",
         "update_vendor_visibility"
       ],
       "tables": [
@@ -2110,6 +2222,17 @@
       ],
       "storageBuckets": [],
       "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorAtomicSignupService.ts",
+      "directImports": [],
+      "rpc": [
+        "qf_register_pending_vendor_atomic"
+      ],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": true,
       "realtime": false
     },
     {
@@ -2264,6 +2387,17 @@
       "realtime": false
     },
     {
+      "file": "services/vendorOtpEvidenceReadService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "communication_messages"
+      ],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
       "file": "services/vendorPackageOrderService.ts",
       "directImports": [],
       "rpc": [],
@@ -2364,6 +2498,29 @@
       ],
       "storageBuckets": [],
       "auth": false,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorSignupOtpVerificationService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [],
+      "storageBuckets": [],
+      "auth": true,
+      "realtime": false
+    },
+    {
+      "file": "services/vendorSignupOwnershipReadService.ts",
+      "directImports": [],
+      "rpc": [],
+      "tables": [
+        "client_accounts",
+        "profiles",
+        "vendor_dashboard_users",
+        "vendors"
+      ],
+      "storageBuckets": [],
+      "auth": true,
       "realtime": false
     },
     {

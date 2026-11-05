@@ -95,11 +95,27 @@ let auditInserts = [];
 let vendorUpdates = [];
 /** "ok" | "returns-error" | "throws" */
 let auditMode = "ok";
+// This old audit harness must model the NEW mandatory private verification
+// readiness gate for activation. False by default: only tests explicitly
+// exercising an approved private evidence case may turn it on.
+let verificationCaseReady = false;
+let verificationRpcUnavailable = false;
+let verificationRpcCalls = [];
+// Credits must use the canonical atomic wallet RPC. The legacy audit harness
+// predates that migration; simulate its successful committed outcome explicitly,
+// not a silent generic RPC returning NULL.
+let creditRpcCalls = [];
+let creditRpcUnavailable = false;
 
 function resetDb() {
   auditInserts = [];
   vendorUpdates = [];
   auditMode = "ok";
+  verificationCaseReady = false;
+  verificationRpcUnavailable = false;
+  verificationRpcCalls = [];
+  creditRpcCalls = [];
+  creditRpcUnavailable = false;
   db.vendors = [{
     id: "vendor-1", business_name: "QA Vendor", status: "Approved", is_active: true,
     accepting_leads: true, remaining_credits: 10, total_credits: 10,
@@ -158,8 +174,41 @@ class MockQuery {
 function fakeAdminClient() {
   return {
     from: (t) => new MockQuery(t),
-    // recomputeVisibility calls this; it is irrelevant to the audit contract.
-    rpc: async () => ({ data: null, error: null }),
+    rpc: async (name, args) => {
+      // Unlike the legacy mock's catch-all NULL RPC, Core's new mandatory
+      // private verification authority is modelled explicitly. A missing or
+      // false readiness result may NEVER be treated as a verified vendor.
+      if (name === "qf_vendor_verification_case_ready") {
+        verificationRpcCalls.push({ name, args });
+        return verificationRpcUnavailable
+          ? { data: null, error: { code: "PGRST202" } }
+          : { data: verificationCaseReady, error: null };
+      }
+      if (name === "qf_apply_vendor_credit_delta") {
+        creditRpcCalls.push(args);
+        if (creditRpcUnavailable) return { data: null, error: { code: "PGRST202" } };
+        const vendor = db.vendors.find(v => v.id === args?.p_vendor_id);
+        const delta = args?.p_delta;
+        // Simulate only the canonical verified, single-credit admin-grant case
+        // actually exercised by this audit harness. Unexpected wallet requests
+        // fail closed rather than appearing to succeed.
+        if (!vendor || !Number.isInteger(delta) || delta !== 1 ||
+            args?.p_change_type !== "admin_credit_grant" ||
+            args?.p_allow_negative !== false) {
+          return { data: null, error: { code: "PGRST_INVALID_WALLET_FIXTURE" } };
+        }
+        const before = vendor.remaining_credits;
+        vendor.remaining_credits += delta;
+        vendor.total_credits += delta;
+        return { data: {
+          status: "applied", vendor_id: vendor.id,
+          credits_before: before, credits_after: vendor.remaining_credits, delta,
+        }, error: null };
+      }
+      // recomputeVisibility is unrelated to this audit-only harness.
+      if (name === "update_vendor_visibility") return { data: null, error: null };
+      throw new Error("Unexpected RPC in audit harness: " + name);
+    },
   };
 }
 
@@ -339,6 +388,7 @@ check("10 [exec] a RETURNED PostgREST error is detected and reported", async () 
 
 check("11 [exec] a THROWN transport failure is caught and reported, not rethrown", async () => {
   resetDb();
+  verificationCaseReady = true; // Verified case required for positive activation.
   auditMode = "throws";
   let threw = false;
   const { value, output } = await captureConsole(async () => {
@@ -347,6 +397,9 @@ check("11 [exec] a THROWN transport failure is caught and reported, not rethrown
   });
   assert(!threw, "bestEffortAudit must never rethrow");
   assert(value.ok, "the business action must still succeed");
+  assert(verificationRpcCalls.length === 1 &&
+    verificationRpcCalls[0].args?.p_vendor_id === "vendor-1",
+    "activation must first consult the private verification authority");
   assert(/NOT recorded/.test(output), "the throw must be reported");
 });
 
@@ -392,9 +445,15 @@ check("14 [exec] the log line carries no metadata and no credential", async () =
 
 check("15 [exec] no credential-shaped key reaches audit metadata", async () => {
   resetDb();
-  await captureConsole(() => VendorAdmin.setVendorStatusAction("vendor-1", "activate", "Superadmin", ACTOR));
-  await captureConsole(() => VendorAdmin.updateVendorCredits("vendor-1", { mode: "add", amount: 1, updatedBy: "Superadmin", actorUserId: ACTOR }));
-  assert(auditInserts.length >= 1, "at least one audit payload to inspect");
+  // Deactivation is safety-negative and needs no identity approval case; the
+  // credit mutation must independently use the canonical wallet RPC.
+  const statusAction = await captureConsole(() =>
+    VendorAdmin.setVendorStatusAction("vendor-1", "deactivate", "Superadmin", ACTOR));
+  const creditsAction = await captureConsole(() =>
+    VendorAdmin.updateVendorCredits("vendor-1", { mode: "add", amount: 1, updatedBy: "Superadmin", actorUserId: ACTOR }));
+  assert(statusAction.value.ok && creditsAction.value.ok, "both audited actions must succeed");
+  assert(creditRpcCalls.length === 1, "credit adjustment must use canonical atomic RPC");
+  assert(auditInserts.length === 2, "inspect exactly one status and one credit audit payload");
   for (const payload of auditInserts) {
     const keys = Object.keys(payload.metadata ?? {});
     for (const k of keys) {
@@ -529,11 +588,27 @@ check("28 [exec] a vendor status action binds the authenticated actor", async ()
 
 check("29 [exec] a credit adjustment binds the authenticated actor", async () => {
   resetDb();
-  await captureConsole(() => VendorAdmin.updateVendorCredits("vendor-1",
+  const action = await captureConsole(() => VendorAdmin.updateVendorCredits("vendor-1",
     { mode: "add", amount: 1, updatedBy: "Superadmin", actorUserId: ACTOR }));
+  assert(action.value.ok, "canonical wallet adjustment must succeed in this positive fixture");
+  assert(creditRpcCalls.length === 1 && creditRpcCalls[0].p_delta === 1 &&
+    creditRpcCalls[0].p_vendor_id === "vendor-1", "credit amount and vendor must bind to the canonical wallet RPC");
+  assert(db.vendors[0].remaining_credits === 11, "wallet mock must record the credit exactly once");
   const rows = db.audit_logs.filter((r) => r.action === "vendor.credits_updated");
   assert(rows.length === 1, `expected 1 credit audit row, got ${rows.length}`);
   assert(rows[0].admin_user_id === ACTOR, String(rows[0].admin_user_id));
+});
+
+check("29a [exec] missing atomic wallet RPC cannot award or audit a credit", async () => {
+  resetDb();
+  creditRpcUnavailable = true;
+  const before = db.vendors[0].remaining_credits;
+  const { value } = await captureConsole(() => VendorAdmin.updateVendorCredits("vendor-1",
+    { mode: "add", amount: 1, updatedBy: "Superadmin", actorUserId: ACTOR }));
+  assert(value.ok === false && value.code === "UPDATE_FAILED", "unavailable canonical RPC must refuse adjustment");
+  assert(creditRpcCalls.length === 1, "must attempt exactly one canonical wallet RPC");
+  assert(db.vendors[0].remaining_credits === before && auditInserts.length === 0,
+    "failed wallet operation cannot change credits or claim a successful audit");
 });
 
 check("30 [exec] a package update binds the authenticated actor", async () => {
@@ -571,12 +646,41 @@ check("32 [exec] a missing actor also fails closed for credits and package", asy
 
 check("33 [exec] the actor is NOT taken from updatedBy or any label", async () => {
   resetDb();
-  await captureConsole(() => VendorAdmin.setVendorStatusAction("vendor-1", "activate", "Superadmin", ACTOR));
+  verificationCaseReady = true; // Positive activation is now evidence-gated.
+  const activation = await captureConsole(() => VendorAdmin.setVendorStatusAction("vendor-1", "activate", "Superadmin", ACTOR));
+  assert(activation.value.ok, "actor test must execute an authorized activation");
+  assert(verificationRpcCalls.length === 1, "the verification authority must be consulted");
   const row = db.audit_logs[0];
   assert(row.admin_user_id === ACTOR, "actor is the session id");
   assert(row.admin_user_id !== "Superadmin", "the display label must never become the identity");
   assert(row.metadata.updatedBy === "Superadmin", "the label still travels as display context");
   assert(row.admin_user_id !== db.vendors[0].id, "the vendor id is not the actor");
+});
+
+check("33a [exec] unverified vendor activation fails closed without business or audit writes", async () => {
+  resetDb(); // verificationCaseReady is deliberately FALSE by default.
+  const { value } = await captureConsole(() =>
+    VendorAdmin.setVendorStatusAction("vendor-1", "activate", "Superadmin", ACTOR));
+  assert(value.ok === false && value.code === "VENDOR_VERIFICATION_REQUIRED",
+    "incomplete verification evidence must refuse activation");
+  assert(verificationRpcCalls.length === 1 &&
+    verificationRpcCalls[0].args?.p_vendor_id === "vendor-1",
+    "private readiness authority must be asked about the exact vendor");
+  assert(vendorUpdates.length === 0 && auditInserts.length === 0,
+    "denied activation may not touch vendor or audit rows");
+});
+
+check("33b [exec] unavailable verification RPC refuses activation, never assumes ready", async () => {
+  resetDb();
+  verificationCaseReady = true;
+  verificationRpcUnavailable = true;
+  const { value } = await captureConsole(() =>
+    VendorAdmin.setVendorStatusAction("vendor-1", "activate", "Superadmin", ACTOR));
+  assert(value.ok === false && value.code === "VENDOR_VERIFICATION_REQUIRED",
+    "a missing private readiness RPC must block activation");
+  assert(verificationRpcCalls.length === 1, "the missing RPC must be observed");
+  assert(vendorUpdates.length === 0 && auditInserts.length === 0,
+    "an unproven activation can never commit or claim to have audited a write");
 });
 
 check("34 [static] getAdminSession exposes a trusted userId from the session", () => {

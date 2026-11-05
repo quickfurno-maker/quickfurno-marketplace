@@ -1,0 +1,168 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { normalizeVerifiedVendorMobile } from "../../../lib/vendors/vendorContactContract.ts";
+import {
+  hasVendorRegistrationConsent,
+  isValidOptionalGstin,
+  normalizeOptionalGstin,
+  VENDOR_REGISTRATION_PRIVACY_REVISION,
+} from "../../../lib/vendors/vendorSignupPolicy.ts";
+
+const read=(path)=>readFileSync(join(process.cwd(),path),"utf8");
+const form=read("components/VendorRegisterForm.tsx");
+const action=read("app/actions.ts");
+const service=read("services/vendorService.ts");
+const types=read("lib/types.ts");
+const migration=read("supabase/migrations/20261104090000_vendor_registration_consent_receipt.sql");
+
+test("S1 optional GSTIN: blank accepted, normalized valid value accepted, invalid refused",()=>{
+  for(const blank of ["",null,undefined,"  "])assert.equal(isValidOptionalGstin(blank),true);
+  for(const valid of ["27ABCDE1234F1Z5"," 27abcde1234f1z5 ","29AAAAA0000A1Z5"])
+    assert.equal(isValidOptionalGstin(valid),true,valid);
+  for(const invalid of ["27ABCDE1234F1Z","27ABCDE1234F1Z51","123456789012345","27ABCDE1234F1Y5","27ABCDE1234F1Z0junk"])
+    assert.equal(isValidOptionalGstin(invalid),false,invalid);
+  assert.equal(normalizeOptionalGstin(" 27abcde1234f1z5 "),"27ABCDE1234F1Z5");
+});
+
+test("S2 only genuine explicit boolean consent permits signup",()=>{
+  assert.equal(hasVendorRegistrationConsent(true),true);
+  for(const nope of [false,null,undefined,"true",1,{},[]])assert.equal(hasVendorRegistrationConsent(nope),false);
+});
+
+test("S3 active signup wizard shows optional GST and separate privacy consent",()=>{
+  assert.match(form,/GSTIN \(optional\)/);
+  assert.match(form,/registrationConsent: false/);
+  assert.match(form,/if \(!f\.registrationConsent\)/);
+  assert.match(form,/registration_consent_accepted: f\.registrationConsent/);
+  assert.match(form,/href="\/privacy"/);
+  assert.match(form,/identity verification is required before approval|Identity verification is required before approval/);
+  assert.match(form,/Aadhaar verification is voluntary/);
+});
+
+test("S4 client and server both reject missing notice or invalid GST",()=>{
+  assert.match(form,/isValidOptionalGstin\(f\.gstNumber\)/);
+  assert.match(action,/if \(!hasVendorRegistrationConsent\(input\.registration_consent_accepted\)\)/);
+  assert.match(action,/if \(!isValidOptionalGstin\(input\.gst_number\)\)/);
+  assert.ok(action.indexOf("if (!hasVendorRegistrationConsent(input.registration_consent_accepted))")<
+    action.indexOf("db.auth.admin.createUser("),"no Auth account should be created before consent validation");
+  assert.match(service,/if \(!hasVendorRegistrationConsent\(input\.registration_consent_accepted\)\)/);
+  assert.match(service,/if \(!isValidOptionalGstin\(input\.gst_number\)\)/);
+  assert.match(types,/registration_consent_accepted\?: boolean/);
+});
+
+test("S5 inserted application has single-row consent receipt, inactive Pending, no billing",()=>{
+  assert.match(service,/registration_consent_version: VENDOR_REGISTRATION_PRIVACY_REVISION/);
+  assert.match(service,/registration_consent_accepted_at: new Date\(\)\.toISOString\(\)/);
+  assert.match(service,/gst_number: normalizeOptionalGstin\(input\.gst_number\) \|\| null/);
+  assert.match(service,/status: "Pending"/);
+  assert.match(service,/verification_status: "Pending"/);
+  assert.match(service,/paid_status: "Unpaid"/);
+  assert.match(service,/is_active: false/);
+  assert.match(service,/accepting_leads: false/);
+  assert.match(service,/public_visibility: false/);
+  assert.equal(typeof VENDOR_REGISTRATION_PRIVACY_REVISION,"string");
+});
+
+test("S6 migration is additive, requires RLS and never invents legacy consent",()=>{
+  assert.match(migration,/add column if not exists registration_consent_version text/);
+  assert.match(migration,/add column if not exists registration_consent_accepted_at timestamptz/);
+  assert.match(migration,/QF_VENDOR_CONSENT_RLS_REQUIRED/);
+  const executable=migration.split("\n").filter(line=>!line.trimStart().startsWith("--")).join("\n");
+  assert.doesNotMatch(executable,/^\s*(?:update\s|delete\s+from|truncate\s|insert\s+into|drop\s+table|grant\s)/im);
+});
+
+test("S7 no PAN or raw Aadhaar number/document upload in public registration",()=>{
+  const publicPaths=[form,read("components/VendorApplicationForm.tsx"),service,types];
+  for(const src of publicPaths){
+    assert.doesNotMatch(src,/\bPAN(?:\s+card|\s+number|\s+upload|\s+verification)\b|pan_number|pan_upload|pan_card/i);
+    assert.doesNotMatch(src,/aadhaar[_-]?(?:number|image|photo|file|upload)\s*:/i);
+  }
+});
+
+test("S8 only one mounted active vendor signup wizard; no duplicate workflow",()=>{
+  const portal=read("app/vendor/page.tsx");
+  const redirect=read("app/vendors/register/page.tsx");
+  assert.match(portal,/VendorPortal/);
+  assert.match(redirect,/redirect\("\/vendor\?mode=signup"\)/);
+  // The unmounted legacy component remains compatible with the strengthened
+  // canonical public submission action if another route ever imports it.
+  const legacy=read("components/VendorApplicationForm.tsx");
+  assert.match(legacy,/registration_consent_accepted: form\.registrationConsent/);
+  assert.match(legacy,/gst_number: normalizeOptionalGstin\(form\.gstNumber\)/);
+});
+
+test("S9 no public account-ownership override survives into privileged vendor insert",()=>{
+  assert.doesNotMatch(types,/^\s*user_id\?:\s*string;/m);
+  assert.doesNotMatch(service,/input\.user_id/);
+  assert.match(service,/user_id: trustedContext\.verifiedAuthUserId \?\? null/);
+  const publicEntry=action.slice(action.indexOf("export async function submitVendorRegistration("),
+    action.indexOf("export async function submitFreeVendorProfileInterest("));
+  assert.match(publicEntry,/VENDOR_WHATSAPP_OTP_REQUIRED/);
+  assert.doesNotMatch(publicEntry,/vendors\.registerVendor\(/);
+  assert.doesNotMatch(publicEntry,/verifiedAuthUserId/);
+  assert.match(action,/verifiedAuthUserId: auth\.user\.id/);
+});
+
+test("S10 pre-Auth validation and independent phone/email rate limits block premature user creation",()=>{
+  const start=action.indexOf("export async function submitVendorAccountRegistration(");
+  const finish=action.indexOf("// VENDOR (owner-scoped)",start);
+  const block=action.slice(start,finish);
+  const authIndex=block.indexOf("db.auth.admin.createUser(");
+  assert.ok(authIndex>0,"expected explicit Auth creation authority");
+  assert.ok(block.indexOf('process.env.QF_VENDOR_LEGACY_EMAIL_SIGNUP !== "explicitly_enabled"')<authIndex,
+    "legacy email route must fail closed until explicitly enabled");
+  for(const guard of [
+    "hasVendorRegistrationConsent(input.registration_consent_accepted)",
+    "isValidOptionalGstin(input.gst_number)",
+    "isValidIndianMobile(phoneDigits)",
+    "resolveActiveCity(input.city)",
+    'scope: "vendor-auth-principal-create-phone"',
+    'scope: "vendor-auth-principal-create-email"',
+  ]) {
+    const pos=block.indexOf(guard);
+    assert.ok(pos>=0 && pos<authIndex,guard+" must run before Auth principal creation");
+  }
+  assert.match(block,/phoneDigits = String\(input\.phone \?\? ""\)\.replace\(\/\\D\/g, ""\)/);
+  assert.match(block,/Number\.isFinite\(input\.office_latitude\)/);
+});
+
+
+test("S12 vendor Core accepts verified E.164 Indian mobile without guessing other countries",()=>{
+  for(const [input,expected] of [
+    ["9876543210","9876543210"],
+    ["+919876543210","9876543210"],
+    ["+918765432109","8765432109"],
+    ["+19876543210",null],
+    ["919876543210",null],
+    ["0000000000",null],
+    ["+91 9876543210",null],
+    [null,null],
+  ]) assert.equal(normalizeVerifiedVendorMobile(input),expected,String(input));
+  assert.match(service,/normalizeVerifiedVendorMobile\(input\.phone\)/);
+});
+
+test("S13 anonymous Core registration cannot create a vendor and optional email is truly optional",()=>{
+  assert.match(service,/if \(!trustedContext\.verifiedAuthUserId\)/);
+  assert.match(service,/code: "VENDOR_WHATSAPP_OTP_REQUIRED"/);
+  assert.match(service,/\(Boolean\(emailClean\) && !isEmailValid\)/);
+  assert.doesNotMatch(service,/!emailClean \|\|/);
+  assert.match(service,/status: "Pending"/);
+  assert.match(service,/is_active: false/);
+});
+test("S14 missing Google or consent schema never silently drops evidence",()=>{
+  const registration=service.slice(service.indexOf("export async function registerVendor("),
+    service.indexOf("function isMissingColumnError("));
+  assert.ok(registration.includes(".insert({ ...payload, ...googleLocationPayload })"));
+  assert.ok(!registration.includes(".insert(payload)"));
+  assert.ok(!registration.includes("Supabase Error Details:"));
+  assert.ok(!registration.includes('logSupabaseInsertError("vendors"'));
+});
+
+test("S11 no public raw Auth errors or sensitive vendor payload logging",()=>{
+  assert.doesNotMatch(action,/error: authErr\?\.message/);
+  assert.doesNotMatch(service,/console\.log\("Vendor payload:"/);
+  assert.doesNotMatch(service,/console\.error\("Vendor insert error:", error\)/);
+  assert.match(action,/code: "AUTH_SIGNUP_FAILED"/);
+});

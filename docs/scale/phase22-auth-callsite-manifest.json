@@ -15,11 +15,11 @@
     "userMetadata": "NEVER_AUTHORIZATION"
   },
   "totals": {
-    "getUser": 12,
+    "getUser": 17,
     "getSession": 0,
     "signInWithPassword": 2,
-    "signInWithOtp": 1,
-    "verifyOtp": 1,
+    "signInWithOtp": 2,
+    "verifyOtp": 2,
     "signOut": 3,
     "updateUser": 1,
     "resetPasswordForEmail": 0,
@@ -37,6 +37,22 @@
     },
     {
       "file": "app/api/vendor/media/route.ts",
+      "operations": {
+        "getUser": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "app/api/vendor/onboarding/request-otp/route.ts",
+      "operations": {
+        "signInWithOtp": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "app/api/vendor/private-evidence/route.ts",
       "operations": {
         "getUser": 1
       },
@@ -119,6 +135,14 @@
       "usesUserMetadata": false
     },
     {
+      "file": "services/vendorAtomicSignupService.ts",
+      "operations": {
+        "getUser": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
       "file": "services/vendorAuthService.ts",
       "operations": {
         "signInWithPassword": 2,
@@ -137,9 +161,34 @@
       "usesUserMetadata": false
     },
     {
+      "file": "services/vendorOtpEvidenceReadService.ts",
+      "operations": {
+        "getUser": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
       "file": "services/vendorPasswordResetService.ts",
       "operations": {
         "admin": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "services/vendorSignupOtpVerificationService.ts",
+      "operations": {
+        "getUser": 1,
+        "verifyOtp": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "services/vendorSignupOwnershipReadService.ts",
+      "operations": {
+        "getUser": 1
       },
       "usesAppMetadata": false,
       "usesUserMetadata": false

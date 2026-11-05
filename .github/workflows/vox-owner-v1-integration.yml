@@ -32,7 +32,7 @@ jobs:
       - name: Install pinned Core dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Owner-only Core real-route and projection tests
-        run: node --test scripts/mvp/vox/owner-v1-projection.test.mjs scripts/mvp/vox/owner-v1-real-core-route.test.mjs scripts/mvp/vox/rc7-finance-real-route-http.test.mjs
+        run: node --test scripts/mvp/vox/owner-v1-projection.test.mjs scripts/mvp/vox/owner-v1-real-core-route.test.mjs scripts/mvp/vox/rc7-finance-real-route-http.test.mjs scripts/mvp/vox/owner-v1-vendor-core-bridge.test.mjs
       - name: Core typecheck
         run: npm run typecheck
       - name: Owner-only Web-to-Core BFF integration (root test dependencies)

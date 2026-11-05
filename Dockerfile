@@ -17,6 +17,8 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 FROM ${NODE_IMAGE} AS builder
 ARG GIT_SHA=unknown
+# Reject untraceable containers before any expensive build or publication.
+RUN printf '%s' "$GIT_SHA" | grep -Eq '^[0-9a-f]{40}$' || (echo 'QuickFurno Core image build REFUSED: exact source GIT_SHA required' >&2; exit 64)
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NODE_ENV=production \

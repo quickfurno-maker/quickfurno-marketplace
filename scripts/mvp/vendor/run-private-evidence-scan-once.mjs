@@ -63,13 +63,13 @@ async function run(){
    continue;
   }
   const bytes=Buffer.from(await download.data.arrayBuffer());
+  try{
   if(bytes.length!==download.data.size||
      createHash("sha256").update(bytes).digest("hex")!==item.sha256){
    pending++;
    continue;
   }
   const verdict=await scanPrivateDocumentWithLocalClamav(bytes);
-  bytes.fill(0);
   if(verdict!=="clean"&&verdict!=="infected"){
    pending++;
    continue; // daemon missing/errors/unknown response NEVER imply clean
@@ -86,6 +86,7 @@ async function run(){
   }
   if(verdict==="clean")clean++;
   else rejected++;
+  }finally{bytes.fill(0);} // Also clears hash mismatch and RPC error paths.
  }
  process.stdout.write(JSON.stringify({
    mode:"staging_once_only",kind:"PRIVATE_VENDOR_SCAN_SUMMARY",

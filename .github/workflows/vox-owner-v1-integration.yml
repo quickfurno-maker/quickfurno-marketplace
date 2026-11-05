@@ -54,6 +54,8 @@ jobs:
       - name: Phase 3 Owner UI and MFA security regression (no real identity/session)
         run: |
           node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test apps/vox-web/scripts/validate-p3-owner-review-ui.spec.mjs apps/vox-web/scripts/validate-p3-owner-mfa-body.spec.mjs
+      - name: Owner-only vendor lane isolation, Staff preserved OFF (NO DEPLOY)
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test apps/vox-web/scripts/validate-owner-vendor-lane-isolation.test.mjs
       - name: All existing VOX Web regressions plus new Owner boundary
         run: npm test --prefix apps/vox-web
       - name: Production-mode compiled Web build, not deployed

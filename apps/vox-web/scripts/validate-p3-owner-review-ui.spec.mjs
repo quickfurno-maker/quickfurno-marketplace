@@ -87,7 +87,10 @@ test("P3-UX6 service Core and hard-off Owner flags preserved in server page",()=
  assert.match(page,/ownerVendorDecisionEnabled\(\)/);
  assert.match(page,/withReturn\("\/login","\/owner\/vendors\/verification"\)/);
  const bridge=read("lib/ownerVendorVerification.ts");
- assert.match(bridge,/VOX_OWNER_VENDOR_REVIEW_ENABLED==="staging"/);
- assert.match(bridge,/VOX_OWNER_VENDOR_DECISION_ENABLED==="staging"/);
+ const gate=read("lib/ownerVendorReviewGate.ts");
+ assert.match(gate,/VOX_OWNER_VENDOR_REVIEW_ENABLED==="staging"/);
+ assert.match(gate,/VOX_OWNER_VENDOR_DECISION_ENABLED==="staging"/);
+ assert.match(bridge,/ownerVendorReadGate\(process\.env\)/);
+ assert.match(bridge,/ownerVendorDecisionGate\(process\.env\)/);
  assert.match(bridge,/OWNER_MFA_REQUIRED/);
 });

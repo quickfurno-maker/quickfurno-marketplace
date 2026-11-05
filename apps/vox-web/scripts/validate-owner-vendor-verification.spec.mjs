@@ -15,9 +15,22 @@ const source=readFileSync(join(root,"lib/ownerVendorVerification.ts"),"utf8");
 const compiled=ts.transpileModule(source,{compilerOptions:{
  module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true,
 }}).outputText;
+// Node 20 legacy CI cannot import a .ts file directly. Transpile the real
+// side-effect-free gate with the pinned Web TypeScript dependency instead of
+// replacing its security decision with a hardcoded test stub.
+const gateSource=readFileSync(join(root,"lib/ownerVendorReviewGate.ts"),"utf8");
+const gateCompiled=ts.transpileModule(gateSource,{compilerOptions:{
+ module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,
+}}).outputText;
+const gateModule={exports:{}};
+runInNewContext(gateCompiled,{
+ module:gateModule,exports:gateModule.exports,
+},"ownerVendorReviewGate.test-compiled.cjs");
+const {ownerVendorReadGate,ownerVendorDecisionGate}=gateModule.exports;
 const mockModule={exports:{}};
 const mockRequire=name=>{
  if(name==="server-only")return {};
+ if(name==="./ownerVendorReviewGate")return {ownerVendorReadGate,ownerVendorDecisionGate};
  if(name==="./auth")return {
   verifiedMfaSession:async()=>globalThis.__ownerToken??null,
  };

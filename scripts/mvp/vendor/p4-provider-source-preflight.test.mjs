@@ -51,12 +51,15 @@ test("P4-P5 actual vendor OTP and private form source retain independent OFF swi
  const complete=r("app/api/vendor/onboarding/complete/route.ts");
  const evidence=r("app/api/vendor/private-evidence/route.ts");
  const owner=r("apps/vox-web/lib/ownerVendorVerification.ts");
+ const ownerGate=r("apps/vox-web/lib/ownerVendorReviewGate.ts");
  for(const flag of ["QF_VENDOR_OTP_REQUEST_MODE","QF_VENDOR_WHATSAPP_PROVIDER_CERTIFIED","QF_VENDOR_SHARED_SIGNED_HOOK_CERTIFIED"])
   assert.match(otp,new RegExp(flag));
  assert.match(complete,/QF_VENDOR_ATOMIC_SIGNUP_MODE/);
  assert.match(complete,/QF_VENDOR_OTP_VERIFY_MODE/);
  assert.match(evidence,/QF_VENDOR_PRIVATE_EVIDENCE_MODE/);
  assert.match(evidence,/QF_VENDOR_PRIVATE_BUCKET_CERTIFIED/);
- assert.match(owner,/VOX_OWNER_VENDOR_REVIEW_ENABLED/);
- assert.match(owner,/VOX_OWNER_VENDOR_DECISION_ENABLED/);
+ assert.match(ownerGate,/VOX_OWNER_VENDOR_REVIEW_ENABLED/);
+ assert.match(ownerGate,/VOX_OWNER_VENDOR_DECISION_ENABLED/);
+ assert.match(owner,/ownerVendorReadGate\(process\.env\)/);
+ assert.match(owner,/ownerVendorDecisionGate\(process\.env\)/);
 });

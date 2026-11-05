@@ -26,6 +26,9 @@ declare global {
 
 const SCRIPT_ID = "qf-google-maps-js";
 const RUNTIME_CONFIG_URL = "/api/public/google-maps-config";
+// An already-loaded but nonfunctional bootstrap may never emit another event.
+// Bound the initialization promise so manual location entry never hangs.
+const PLACES_BOOTSTRAP_TIMEOUT_MS = 8000;
 
 /** Build-time browser key, trimmed — or null when it was not embedded. */
 export function getGoogleMapsBrowserKey(): string | null {
@@ -128,17 +131,38 @@ export function loadGoogleMaps(): Promise<PlacesLibrary | null> {
     if (!key) return null;
 
     return new Promise<PlacesLibrary | null>((resolve) => {
+      let settled = false;
+      const settle = (places: PlacesLibrary | null) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        resolve(places);
+      };
+      // Existing scripts whose load event fired before this listener was
+      // attached can otherwise leave all client requests unresolved forever.
+      const timeout = window.setTimeout(() => {
+        if (typeof window.google?.maps?.importLibrary !== "function") {
+          document.getElementById(SCRIPT_ID)?.remove();
+        }
+        settle(null);
+      }, PLACES_BOOTSTRAP_TIMEOUT_MS);
+      const fail = () => {
+        if (typeof window.google?.maps?.importLibrary !== "function") {
+          document.getElementById(SCRIPT_ID)?.remove();
+        }
+        settle(null);
+      };
       const importPlaces = async () => {
         try {
           const importLibrary = window.google?.maps?.importLibrary;
           if (typeof importLibrary !== "function") {
-            resolve(null);
+            fail();
             return;
           }
           const lib = await importLibrary("places");
-          resolve(isUsablePlaces(lib) ? lib : null);
+          settle(isUsablePlaces(lib) ? lib : null);
         } catch {
-          resolve(null);
+          fail();
         }
       };
 
@@ -149,7 +173,7 @@ export function loadGoogleMaps(): Promise<PlacesLibrary | null> {
             void importPlaces();
           } else {
             existing.addEventListener("load", () => void importPlaces(), { once: true });
-            existing.addEventListener("error", () => resolve(null), { once: true });
+            existing.addEventListener("error", fail, { once: true });
           }
           return;
         }
@@ -165,10 +189,10 @@ export function loadGoogleMaps(): Promise<PlacesLibrary | null> {
           `?key=${encodeURIComponent(key)}` +
           "&loading=async&language=en&region=IN&libraries=places";
         script.addEventListener("load", () => void importPlaces(), { once: true });
-        script.addEventListener("error", () => resolve(null), { once: true });
+        script.addEventListener("error", fail, { once: true });
         document.head.appendChild(script);
       } catch {
-        resolve(null);
+        fail();
       }
     });
   })().catch(() => null);

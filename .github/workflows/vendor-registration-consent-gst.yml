@@ -46,6 +46,8 @@ on:
       - 'scripts/mvp/vendor/vendor-batch9-owner-preflight.test.mjs'
       - 'scripts/mvp/vendor/vendor-seven-migration-fingerprint.mjs'
       - 'scripts/mvp/vendor/vendor-seven-migration-fingerprint.test.mjs'
+      - 'scripts/mvp/vendor/vendor-vox-migration-cross-branch-delta.mjs'
+      - 'scripts/mvp/vendor/vendor-vox-migration-cross-branch-delta.test.mjs'
       - 'app/api/vendor/onboarding/request-otp/route.ts'
       - 'app/api/vendor/onboarding/complete/route.ts'
       - 'app/api/vendor/private-evidence/route.ts'
@@ -127,6 +129,8 @@ on:
       - 'scripts/mvp/vendor/vendor-batch9-owner-preflight.test.mjs'
       - 'scripts/mvp/vendor/vendor-seven-migration-fingerprint.mjs'
       - 'scripts/mvp/vendor/vendor-seven-migration-fingerprint.test.mjs'
+      - 'scripts/mvp/vendor/vendor-vox-migration-cross-branch-delta.mjs'
+      - 'scripts/mvp/vendor/vendor-vox-migration-cross-branch-delta.test.mjs'
       - 'app/api/vendor/onboarding/request-otp/route.ts'
       - 'app/api/vendor/onboarding/complete/route.ts'
       - 'app/api/vendor/private-evidence/route.ts'
@@ -185,6 +189,8 @@ jobs:
         run: |
           node scripts/mvp/vendor/vendor-seven-migration-fingerprint.mjs
           node --test scripts/mvp/vendor/vendor-seven-migration-fingerprint.test.mjs
+      - name: VOX + Vendor cross-branch migration tree delta (mocked offline CI)
+        run: node --test scripts/mvp/vendor/vendor-vox-migration-cross-branch-delta.test.mjs
       - name: Strict additive migration registry
         run: node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs
       - name: Full TypeScript contract

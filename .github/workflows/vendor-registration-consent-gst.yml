@@ -41,6 +41,8 @@ on:
       - 'scripts/mvp/vendor/vendor-vox-owner-review-queue-contract.test.mjs'
       - 'ops/vendor/vendor-launch-readonly-preflight-20261104.sql'
       - 'ops/vendor/vendor-before-migration-readonly-preflight-20261105.sql'
+      - 'scripts/mvp/vendor/fixtures/vendor-legacy-preflight-pg-bootstrap.sql'
+      - 'scripts/mvp/vendor/vendor-legacy-preflight-pg-acceptance.sql'
       - 'scripts/mvp/vendor/vendor-batch9-owner-preflight.test.mjs'
       - 'app/api/vendor/onboarding/request-otp/route.ts'
       - 'app/api/vendor/onboarding/complete/route.ts'
@@ -118,6 +120,8 @@ on:
       - 'scripts/mvp/vendor/vendor-vox-owner-review-queue-contract.test.mjs'
       - 'ops/vendor/vendor-launch-readonly-preflight-20261104.sql'
       - 'ops/vendor/vendor-before-migration-readonly-preflight-20261105.sql'
+      - 'scripts/mvp/vendor/fixtures/vendor-legacy-preflight-pg-bootstrap.sql'
+      - 'scripts/mvp/vendor/vendor-legacy-preflight-pg-acceptance.sql'
       - 'scripts/mvp/vendor/vendor-batch9-owner-preflight.test.mjs'
       - 'app/api/vendor/onboarding/request-otp/route.ts'
       - 'app/api/vendor/onboarding/complete/route.ts'
@@ -206,6 +210,17 @@ jobs:
             docker logs "$name"
             exit 1
           fi
+
+          # Independently exercise PRE-migration SQL against fresh legacy-only
+          # Core schema. No new private schema or RPC exists in this database.
+          docker exec "$name" createdb -U postgres vendor_legacy_baseline
+          docker exec -i "$name" psql -X -U postgres -d vendor_legacy_baseline -v ON_ERROR_STOP=1 \
+            < scripts/mvp/vendor/fixtures/vendor-legacy-preflight-pg-bootstrap.sql
+          docker exec -i "$name" psql -X -U postgres -d vendor_legacy_baseline -v ON_ERROR_STOP=1 \
+            < ops/vendor/vendor-before-migration-readonly-preflight-20261105.sql
+          docker exec -i "$name" psql -X -U postgres -d vendor_legacy_baseline -v ON_ERROR_STOP=1 \
+            < scripts/mvp/vendor/vendor-legacy-preflight-pg-acceptance.sql
+          # The existing private signup/Owner/ClamAV chain runs separately.
           docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \
             < scripts/mvp/vendor/fixtures/vendor-private-pg-bootstrap.sql
           docker exec -i "$name" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 \

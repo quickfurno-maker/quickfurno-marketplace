@@ -23,6 +23,9 @@ export default function OwnerReviewConsole({decisionEnabled}:{decisionEnabled:bo
  const [queueLoaded,setQueueLoaded]=useState(false);
  // A refreshed queue or a newer selected case invalidates all older read results.
  const readEpochRef=useRef(0);
+ // A synchronous lock closes the double-click window before React renders
+ // the inFlight state. Core still enforces its immutable caseVersion CAS.
+ const decisionBusyRef=useRef(false);
  const [selected,setSelected]=useState<OwnerCase|null>(null);
  const [message,setMessage]=useState("");
  const [action,setAction]=useState<OwnerReviewAction>("request_documents");
@@ -74,6 +77,7 @@ export default function OwnerReviewConsole({decisionEnabled}:{decisionEnabled:bo
   finally{if(isLatestOwnerRead(epoch,readEpochRef.current))setInFlight(null);}
  },[]);
  async function submitDecision(){
+  if(decisionBusyRef.current||inFlight!==null)return;
   if(!decisionEnabled||!selected?.casePresent||
      !selected.caseVersion||!Number.isSafeInteger(selected.caseVersion)||
      !UUID.test(selected.vendorId)||!REASON.test(reason)||
@@ -81,7 +85,8 @@ export default function OwnerReviewConsole({decisionEnabled}:{decisionEnabled:bo
     setMessage("Decision blocked: verify case, reason, current MFA and evidence readiness.");
     return;
   }
-  // A decision request must not be followed by a stale read re-enabling controls.
+  // Claim the lock before the first await, and invalidate older case reads.
+  decisionBusyRef.current=true;
   ++readEpochRef.current;
   setInFlight("decision");setMessage("");
   const id=selected.vendorId;
@@ -100,10 +105,13 @@ export default function OwnerReviewConsole({decisionEnabled}:{decisionEnabled:bo
    setMessage("Core recorded the immutable case decision. Vendor activation, credits and lead eligibility remain separate.");
    setReason("");
    setSelected(null);
+   // A decided case may no longer be in Core pending queue; do not leave
+   // a stale clickable local copy. A manual refresh always rereads Core.
+   setQueue(current=>current.filter(row=>row.vendorId!==id));
   }catch{
    setMessage("Decision outcome is uncertain. Reload the canonical case before attempting any retry.");
    setSelected(null);
-  }finally{setInFlight(null);}
+  }finally{decisionBusyRef.current=false;setInFlight(null);}
  }
  return <section className="ovr-root" aria-label="Owner vendor verification console">
   <header className="ovr-head">

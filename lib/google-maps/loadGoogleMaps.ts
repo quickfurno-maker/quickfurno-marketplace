@@ -131,8 +131,13 @@ export function loadGoogleMaps(): Promise<PlacesLibrary | null> {
   // SSR / non-browser — never touch window on the server.
   if (typeof window === "undefined") return Promise.resolve(null);
 
-  // If Google finished booting after a previous failed attempt, recover from
-  // the already-loaded global immediately instead of trusting stale cached state.
+  // Multiple location fields on the same page must share the *same* pending
+  // SDK initialization. Otherwise a preloaded Google global can start parallel
+  // importLibrary calls, even if an earlier import is still in flight.
+  if (window.__qfGooglePlacesPromise) return window.__qfGooglePlacesPromise;
+
+  // After a failed import, the cache is cleared; a later interaction can
+  // recover from an SDK that finished loading in the meantime.
   if (typeof window.google?.maps?.importLibrary === "function") {
     const recovered = (async (): Promise<PlacesLibrary | null> => {
       try {
@@ -142,16 +147,6 @@ export function loadGoogleMaps(): Promise<PlacesLibrary | null> {
       }
     })();
     return cacheRecoverablePlacesPromise(recovered);
-  }
-
-  // A load is already in flight (or previously completed) — reuse it. If an
-  // earlier load resolved null, clear the poisoned cache and retry cleanly.
-  if (window.__qfGooglePlacesPromise) {
-    return window.__qfGooglePlacesPromise.then((places) => {
-      if (places) return places;
-      window.__qfGooglePlacesPromise = undefined;
-      return loadGoogleMaps();
-    });
   }
 
   const promise = (async (): Promise<PlacesLibrary | null> => {

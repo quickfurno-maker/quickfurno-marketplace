@@ -1,4 +1,5 @@
 import { adminClient } from "@/lib/supabase";
+import { decodeVerifiedPrivateObject } from "@/lib/vendors/decodeVerifiedPrivateObject";
 import type {
   ObjectStorage,
   ObjectStorageListOptions,
@@ -134,8 +135,7 @@ export function createPrivateVendorEvidenceStorage(): PrivateEvidenceObjectStora
       const { data, error } = await adminClient().storage.from("qf-vendor-verification-private").download(key);
       if (error || !data) throw new Error("PRIVATE_EVIDENCE_READ_UNAVAILABLE");
       if (data.size < 8 || data.size > maxBytes) return null;
-      const bytes = new Uint8Array(await data.arrayBuffer());
-      return bytes.byteLength === data.size ? bytes : null;
+      return await decodeVerifiedPrivateObject(data);
     },
 
     async remove(keys: readonly string[]): Promise<void> {

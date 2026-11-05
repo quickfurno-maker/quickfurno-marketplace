@@ -1,0 +1,48 @@
+/* Owner-only VOX verification — scoped; never alters Staff, public or Core UI. */
+.ovr-shell{min-height:100vh;background:radial-gradient(circle at 84% -7%,#153c4b 0,transparent 34%),#071d28;color:#edf7f5;padding:clamp(16px,3vw,48px);font-family:inherit}
+.ovr-shell *{box-sizing:border-box}
+.ovr-nav{max-width:1260px;margin:0 auto 22px;display:flex;gap:18px;flex-wrap:wrap;align-items:center;font-size:13px}
+.ovr-nav a{color:#a3cfc6;text-decoration:none}
+.ovr-nav a:hover,.ovr-nav a:focus-visible{text-decoration:underline;color:#fff}
+.ovr-nav span{margin-left:auto;font-weight:700;color:#e9bb77}
+.ovr-hero,.ovr-root,.ovr-hold,.ovr-footer{max-width:1260px;margin-left:auto;margin-right:auto}
+.ovr-hero{padding:18px 0 28px;border-bottom:1px solid #355966}
+.ovr-kicker{font-size:11px;letter-spacing:.18em;color:#e9bb77;font-weight:750;margin-bottom:10px}
+.ovr-hero h1{margin:0 0 12px;font-size:clamp(34px,5vw,54px);line-height:1.07}
+.ovr-hero p:last-child{color:#c4dadb;font-size:15px;max-width:760px;line-height:1.65}
+.ovr-hold{margin-top:24px;padding:24px;border:1px solid #3d636c;border-radius:18px;background:#113340}
+.ovr-hold h2{font-size:23px;margin:0 0 8px}
+.ovr-hold p{color:#d0dfe0;line-height:1.65}
+.ovr-hold a{color:#f5ca8c;font-weight:700}
+.ovr-root{margin-top:24px}
+.ovr-head{display:flex;gap:20px;align-items:center;justify-content:space-between;margin-bottom:20px}
+.ovr-head h2{font-size:27px;margin:0 0 8px}
+.ovr-head p:not(.ovr-kicker){font-size:14px;line-height:1.5;color:#c0d8da;max-width:680px}
+.ovr-grid{display:grid;grid-template-columns:minmax(270px,0.9fr) minmax(340px,1.3fr);gap:18px}
+.ovr-panel{background:#fff;border:1px solid #d6e6e7;color:#132d35;border-radius:18px;padding:22px;min-width:0;box-shadow:0 12px 26px #00000019}
+.ovr-panel h3{font-size:20px;margin:0 0 5px}
+.ovr-sub{font-size:12px;line-height:1.65;color:#4a6871}
+.ovr-list{margin:18px 0 0;list-style:none;padding:0;display:grid;gap:10px;max-height:560px;overflow-y:auto}
+.ovr-case-button{width:100%;display:grid;gap:5px;text-align:left;border:1px solid #d8e6e8;background:#f7fafb;border-radius:13px;padding:12px;color:#163840;cursor:pointer}
+.ovr-case-button:hover,.ovr-case-button[aria-current="true"]{border-color:#2b8174;background:#e8f5f0}
+.ovr-case-button span{font-size:13px;text-transform:capitalize;color:#47636a}
+.ovr-case-button small{font-size:11px;line-height:1.4;color:#607781}
+.ovr-case-button:disabled{opacity:.55;cursor:wait}
+.ovr-empty{margin-top:18px;background:#eff5f6;border-radius:12px;padding:20px;color:#546b74;font-size:14px;line-height:1.6}
+.ovr-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:16px 0}
+.ovr-facts div{border:1px solid #e2ebef;border-radius:10px;padding:12px;background:#fafcfd}
+.ovr-facts dt{font-size:11px;color:#5a737b;margin-bottom:6px}
+.ovr-facts dd{font-size:13px;font-weight:700;margin:0;text-transform:capitalize;overflow-wrap:anywhere}
+.ovr-warning{background:#fff4df;border:1px solid #d9a95b;border-radius:10px;padding:12px;color:#6b4514;font-size:13px;line-height:1.5}
+.ovr-decision{display:grid;gap:12px;margin-top:22px;padding-top:18px;border-top:1px solid #d6e5e8}
+.ovr-decision label{display:grid;gap:7px;font-size:13px;font-weight:700;color:#334e56}
+.ovr-decision input,.ovr-decision select{font:inherit;width:100%;padding:11px 12px;border:1px solid #bdcfd2;border-radius:10px;background:#fff;color:#112c35}
+.ovr-button{background:#c69b57;color:#142934;border:none;border-radius:11px;padding:12px 18px;font-size:13px;font-weight:800;cursor:pointer;min-height:42px}
+.ovr-button:hover:not(:disabled){background:#ebbe79}
+.ovr-button:disabled{opacity:.45;cursor:not-allowed}
+.ovr-notice{border:1px solid #bcd0d2;border-radius:10px;background:#eaf5f3;color:#173e43;padding:12px 16px;line-height:1.5;margin-bottom:18px}
+.ovr-foot,.ovr-footer{color:#b6ccce;font-size:12px;line-height:1.6;margin-top:24px}
+.ovr-footer{padding-top:14px;border-top:1px solid #345563}
+.ovr-shell :focus-visible{outline:3px solid #f5ca8c;outline-offset:2px}
+@media(max-width:800px){.ovr-grid{grid-template-columns:1fr}.ovr-head{align-items:flex-start;flex-direction:column}.ovr-panel{padding:16px}.ovr-nav span{margin-left:0}}
+@media(max-width:430px){.ovr-facts{grid-template-columns:1fr}.ovr-shell{padding:15px}.ovr-head h2{font-size:23px}}

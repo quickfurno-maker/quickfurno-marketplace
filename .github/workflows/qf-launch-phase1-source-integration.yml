@@ -1,0 +1,68 @@
+name: QF Final Launch Phase 1 Integrated Source (NO DEPLOY, HOLD)
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/staging-history/qf-post-g1-migration-ledger-20260929.json"
+      - "app/api/vendor/**"
+      - "app/api/vox/v1/owner-vendor-*/**"
+      - "apps/vox-web/**"
+      - "services/vendor*"
+      - "scripts/mvp/vendor/**"
+      - "scripts/mvp/vox/**"
+      - "scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs"
+      - "docs/scale/phase21-supabase-callsite-manifest.json"
+      - "docs/scale/phase22-auth-callsite-manifest.json"
+      - ".github/workflows/qf-launch-phase1-source-integration.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: qf-final-launch-p1-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact reviewed source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Node 24, pinned action
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked Core dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Original legacy migration invariants and seven-file exact pending pins
+        run: |
+          node scripts/mvp/staging/validate-qf-mvp-50-2c-s2-g1.mjs
+          node scripts/mvp/vendor/vendor-seven-migration-fingerprint.mjs
+          node --test scripts/mvp/vox/rc-launch-vendor-pending-source-addendum.test.mjs scripts/mvp/vendor/vendor-seven-migration-fingerprint.test.mjs
+      - name: Immutable historical VOX SQL release snapshots remain exact
+        run: |
+          node --test scripts/mvp/vox/rc22-migration-release-packet.test.mjs scripts/mvp/vox/rc23-migration-adjudication.test.mjs scripts/mvp/vox/rc24-source-snapshot-parity.test.mjs scripts/mvp/vox/rc26-migration-release-plan.test.mjs scripts/mvp/vox/rc35-migration-inventory-reconcile.test.mjs scripts/mvp/vox/rc38-migration-staged-dryrun.test.mjs scripts/mvp/vox/rc38-staging-predeploy-gate.test.mjs scripts/mvp/vox/rc40-source-sql-digest-collector.test.mjs scripts/mvp/vox/rc40-managed-ledger-reconciler.test.mjs
+      - name: Regenerate no source inventory; check both against exact files
+        run: |
+          node scripts/scale/generate-phase21-supabase-callsite-manifest.mjs --check
+          node scripts/scale/generate-phase22-auth-callsite-manifest.mjs --check
+      - name: Core OTP, private upload, scanner, Owner AAL2 boundaries
+        run: |
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/vendor/vendor-signup-consent-gst.test.mjs scripts/mvp/vendor/vendor-whatsapp-otp-admission.test.mjs scripts/mvp/vendor/vendor-atomic-registration-contract.test.mjs scripts/mvp/vendor/vendor-private-clamav-contract.test.mjs scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs scripts/mvp/vendor/certify-vendor-clamav-local-behavior.test.mjs scripts/mvp/vendor/vendor-vox-migration-cross-branch-delta.test.mjs scripts/mvp/vox/owner-v1-vendor-core-bridge.test.mjs scripts/mvp/vox/owner-vendor-image-provenance.test.mjs
+      - name: TypeScript Core typecheck
+        run: npm run typecheck
+      - name: Install pinned VOX Web dependencies
+        run: npm ci --prefix apps/vox-web --ignore-scripts --no-audit --no-fund
+      - name: VOX Owner Web typecheck and native UI tests
+        run: |
+          npm run typecheck --prefix apps/vox-web
+          npm test --prefix apps/vox-web
+      - name: Compile standalone Owner Web for static staging-readiness only
+        run: npm run build --prefix apps/vox-web
+      - name: Hard release HOLD and no operational authorization
+        run: |
+          echo '## QuickFurno launch Phase 1 - SOURCE ONLY, RELEASE HOLD' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No managed Staging/Production DB, OCI deploy, vendor OTP provider, Google Places billing, payment, credits, lead assignments, WhatsApp sends, private documents or Owner MFA UAT performed.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'A passing source workflow cannot authorize Staging or Production.' >> "$GITHUB_STEP_SUMMARY"

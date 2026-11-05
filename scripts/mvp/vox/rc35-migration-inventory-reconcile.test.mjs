@@ -8,6 +8,7 @@ import {
  reconcileInventories,buildSourceInventoryFromDir,canonicalSqlDigest,runCli,
  normaliseManagedInventory
 } from "./rc35-migration-inventory-reconcile.mjs";
+import {validatePinnedVendorPendingFiles} from "./rc-launch-vendor-pending-source-addendum.mjs";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
 const snapshot=JSON.parse(readFileSync(resolve(root,"docs/vox/VOX-MANAGED-STAGING-MIGRATION-DRIFT-READONLY-20261031.json"),"utf8"));
 const to04g=JSON.parse(readFileSync(resolve(root,"ops/vox/certification/TO04G-READONLY-MIGRATION-METADATA.json"),"utf8"));
@@ -16,8 +17,24 @@ const H=c=>c.repeat(64);
 
 test("actual captured metadata: 55 version matches, 31 managed-only, 107 source-only",()=>{
  const src=source();
- assert.equal(src.files.length,snapshot.source_sql_count);
- const r=reconcileInventories(snapshot,src);
+ // RC35's historical read-only snapshot is from before the seven
+ // November vendor migrations. Pin all their raw bytes before computing
+ // the old capture's 162-file comparison, and separately verify that
+ // the current 169-file source remains UNRECONCILED with managed history.
+ const addon=validatePinnedVendorPendingFiles({
+  names:src.files.map(x=>x.file),
+  sourceDir:resolve(root,"supabase/migrations")
+ });
+ assert.equal(addon.count,7);
+ assert.equal(src.files.length,snapshot.source_sql_count+addon.count);
+ const pending=new Set(addon.files);
+ const atCapture={...src,files:src.files.filter(x=>!pending.has(x.file))};
+ assert.equal(atCapture.files.length,snapshot.source_sql_count);
+ const r=reconcileInventories(snapshot,atCapture);
+ const current=reconcileInventories(snapshot,src);
+ assert.equal(current.counts.sourceOnly-r.counts.sourceOnly,7);
+ assert.equal(current.reconciled,false);
+ assert.equal(current.releaseGo,false);
  assert.equal(r.counts.managed,86);
  assert.equal(r.counts.managedVersionMatchedInSource,snapshot.common_version_count);
  assert.equal(r.counts.managedOnly,snapshot.staging_only_count);

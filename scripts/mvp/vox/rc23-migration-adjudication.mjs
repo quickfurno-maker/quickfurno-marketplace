@@ -5,6 +5,7 @@ import {resolve,dirname} from "node:path";
 import {fileURLToPath} from "node:url";
 import {createHash} from "node:crypto";
 import {buildRc22MigrationPacket} from "./rc22-migration-release-packet.mjs";
+import {validatePinnedVendorPendingFiles} from "./rc-launch-vendor-pending-source-addendum.mjs";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../..");
 export function analyzeStagingMigrationDrift(snapshot,source){
  const bad=()=>{throw Error("RC23_MIGRATION_HISTORY_EVIDENCE_INVALID")};
@@ -65,12 +66,22 @@ export const RC24_MANAGED_SNAPSHOT_SHA256=
  "c43c8f0d36889cf94881ffb279e2ece8653f392103b6d07741388c229509723e";
 export function verifyRc24CapturedSource(snapshot,localNames){
  const fail=()=>{throw Error("RC24_CAPTURE_OR_LOCAL_SOURCE_DRIFT")};
- if(!snapshot||!Array.isArray(localNames)||localNames.length!==162)return fail();
+ if(!snapshot||!Array.isArray(localNames))return fail();
+ // The captured 2026-10 managed read-only inventory stays immutable (162).
+ // The seven November source-only migrations are exact-pinned separately and
+ // do not turn the old capture into a new, imaginary managed observation.
+ let addon;
+ try{addon=validatePinnedVendorPendingFiles({
+  names:localNames,sourceDir:resolve(root,"supabase/migrations"),allowAbsent:true,
+ });}catch{return fail();}
+ const addonNames=new Set(addon.files);
+ const historical=localNames.filter(name=>!addonNames.has(name));
+ if(historical.length!==162)return fail();
  const listed=[
   ...snapshot.source_only,
   ...snapshot.common_versions.map(e=>e.source_filename)
  ].sort();
- const actual=localNames.slice().sort();
+ const actual=historical.slice().sort();
  if(listed.length!==actual.length||listed.some((v,i)=>v!==actual[i]))return fail();
  if(new Set(actual.map(n=>n.slice(0,14))).size!==162)return fail();
  return true;

@@ -786,6 +786,90 @@
         "production": false
       },
       "evidence": "FIRST_PARTY_SUPABASE_MCP_LIST_MIGRATIONS_2026-10-14_VOX_NOT_APPLIED"
+    },
+    {
+      "version": "20261104090000",
+      "name": "vendor_registration_consent_receipt",
+      "filename": "20261104090000_vendor_registration_consent_receipt.sql",
+      "path": "supabase/migrations/20261104090000_vendor_registration_consent_receipt.sql",
+      "canonicalSha256": "d633187e5084591056c4a87687297fd9ca385a9e1a8d03ff8ae4df6d9e2c9e19",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-11-04_REVIEWED_DRAFT_PR_484_NO_REMOTE_APPLY"
+    },
+    {
+      "version": "20261104140000",
+      "name": "vendor_private_otp_and_verification_foundation",
+      "filename": "20261104140000_vendor_private_otp_and_verification_foundation.sql",
+      "path": "supabase/migrations/20261104140000_vendor_private_otp_and_verification_foundation.sql",
+      "canonicalSha256": "cb5a4e1f74c6cbc6a6f4a89464c4d7235956b2ae9b71c3bd79bf39ed70581f48",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-11-04_PRIVATE_PG_17_SYNTHETIC_REHEARSAL_NO_REMOTE_APPLY"
+    },
+    {
+      "version": "20261104153000",
+      "name": "vendor_atomic_pending_registration",
+      "filename": "20261104153000_vendor_atomic_pending_registration.sql",
+      "path": "supabase/migrations/20261104153000_vendor_atomic_pending_registration.sql",
+      "canonicalSha256": "2f62663edc5f64122f771f8c141019933b7f4eba1680a8a62a8af9c150972596",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-11-04_ATOMIC_SIGNUP_PRIVATE_PG17_CONTRACT_NO_REMOTE_APPLY"
+    },
+    {
+      "version": "20261104160000",
+      "name": "vendor_owner_review_assignment_gate",
+      "filename": "20261104160000_vendor_owner_review_assignment_gate.sql",
+      "path": "supabase/migrations/20261104160000_vendor_owner_review_assignment_gate.sql",
+      "canonicalSha256": "177c8f11ffeee951040e04bdb1a75e0391308ba022e00cdbd979a675a352e89e",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-11-04_OWNER_REVIEW_ASSIGNMENT_GUARD_PG17_NO_REMOTE_APPLY"
+    },
+    {
+      "version": "20261104163000",
+      "name": "vendor_private_document_intake",
+      "filename": "20261104163000_vendor_private_document_intake.sql",
+      "path": "supabase/migrations/20261104163000_vendor_private_document_intake.sql",
+      "canonicalSha256": "dd4914f154e75e361ad862a17a702b9e72f3252e22e3c0a041616507ef3fd7d2",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-11-04_PRIVATE_VENDOR_INTAKE_PG17_NO_REMOTE_APPLY"
+    },
+    {
+      "version": "20261104170000",
+      "name": "vox_owner_vendor_review_queue",
+      "filename": "20261104170000_vox_owner_vendor_review_queue.sql",
+      "path": "supabase/migrations/20261104170000_vox_owner_vendor_review_queue.sql",
+      "canonicalSha256": "47dd11398806729bb93609857cf037cb3123cc0faaf703383a4885f287fe7012",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-11-04_VOX_OWNER_PRIVATE_REVIEW_QUEUE_PG17_NO_REMOTE_APPLY"
+    },
+    {
+      "version": "20261104173000",
+      "name": "vendor_private_scan_quarantine",
+      "filename": "20261104173000_vendor_private_scan_quarantine.sql",
+      "path": "supabase/migrations/20261104173000_vendor_private_scan_quarantine.sql",
+      "canonicalSha256": "da53a260e9a15b39c24701e480f3d52759965406c8fbbebc2ac383767f481a68",
+      "exactVersionPresence": {
+        "staging": false,
+        "production": false
+      },
+      "evidence": "SOURCE_PIN_CREATED_2026-11-04_CLAMAV_PRIVATE_SCAN_RECEIPT_QUARANTINE_PG17_NO_REMOTE_APPLY"
     }
   ],
   "supersededLegacyPins": [

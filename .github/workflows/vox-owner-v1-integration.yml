@@ -6,6 +6,8 @@ on:
       - "app/api/vox/v1/finance/route.ts"
       - "services/vox/ownerWorkspaceProjection.*"
       - "apps/vox-web/**"
+      - "Dockerfile"
+      - "scripts/mvp/vox/owner-image-exact-source-contract.test.mjs"
       - "scripts/mvp/vox/owner-v1-*.test.mjs"
       - "scripts/mvp/vox/owner-vendor-image-provenance*.mjs"
       - "scripts/mvp/vox/owner-phase3-image-precheck*.mjs"
@@ -39,6 +41,8 @@ jobs:
         run: node --test scripts/mvp/vox/owner-vendor-image-provenance.test.mjs
       - name: Phase 3 pinned local OCI source-only release-HOLD precheck
         run: node --test scripts/mvp/vox/owner-phase3-image-precheck.test.mjs
+      - name: Core and VOX Owner exact OCI source contract (NO DEPLOY)
+        run: node --test scripts/mvp/vox/owner-image-exact-source-contract.test.mjs
       - name: Core typecheck
         run: npm run typecheck
       - name: Owner-only Web-to-Core BFF integration (root test dependencies)

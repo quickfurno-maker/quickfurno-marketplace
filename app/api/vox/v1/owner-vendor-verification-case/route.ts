@@ -24,6 +24,42 @@ const response = (payload: unknown, status: number) => Response.json(payload,{
   },
 });
 const enabled = () => process.env.VOX_OWNER_VENDOR_CASE_REVIEW_ENABLED === "staging";
+const MAX_REVIEW_BODY_BYTES = 2048;
+
+/**
+ * Even an authenticated Owner endpoint must not buffer an unlimited request.
+ * Some proxies omit Content-Length or stream a body larger than their claim;
+ * the actual bytes are capped independently of request metadata.
+ */
+async function readBoundedOwnerJson(request: Request): Promise<unknown | null> {
+  const rawLength = request.headers.get("content-length");
+  if (rawLength !== null &&
+      (!/^[0-9]{1,5}$/.test(rawLength) || Number(rawLength) > MAX_REVIEW_BODY_BYTES))
+    return null;
+  const reader = request.body?.getReader();
+  if (!reader) return null;
+  const parts: Buffer[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_REVIEW_BODY_BYTES) {
+        await reader.cancel().catch(() => {});
+        return null;
+      }
+      parts.push(Buffer.from(value));
+    }
+  } catch {
+    return null;
+  } finally {
+    reader.releaseLock();
+  }
+  if (size < 2) return null;
+  try {return JSON.parse(Buffer.concat(parts).toString("utf8")) as unknown;}
+  catch {return null;}
+}
 
 export async function GET(request: Request): Promise<Response> {
   if (!enabled()) return response({ok:false,code:"OWNER_REVIEW_DISABLED"},503);
@@ -75,10 +111,21 @@ export async function POST(request: Request): Promise<Response> {
     return response({ok:false,code:"INVALID_CONTENT_TYPE"},415);
   if (request.headers.has("cookie") && !request.headers.has("authorization"))
     return response({ok:false,code:"OWNER_AAL2_REQUIRED"},403);
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      if (new URL(origin).origin !== new URL(request.url).origin)
+        return response({ok:false,code:"ORIGIN_MISMATCH"},403);
+    } catch {return response({ok:false,code:"ORIGIN_MISMATCH"},403);}
+  }
+  const headerLength = request.headers.get("content-length");
+  if (headerLength!==null &&
+      (!/^[0-9]{1,5}$/.test(headerLength) || Number(headerLength)>MAX_REVIEW_BODY_BYTES))
+    return response({ok:false,code:"OWNER_REVIEW_TOO_LARGE"},413);
   try {
     const owner = await verifyVoxOwnerBearer(request.headers.get("authorization"));
     if (!owner) return response({ok:false,code:"OWNER_AAL2_REQUIRED"},403);
-    const raw: unknown = await request.json();
+    const raw: unknown = await readBoundedOwnerJson(request);
     if (!raw || typeof raw!=="object" || Array.isArray(raw))
       return response({ok:false,code:"INVALID_REVIEW_ACTION"},400);
     const body = raw as Record<string,unknown>;

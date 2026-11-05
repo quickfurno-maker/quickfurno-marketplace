@@ -54,6 +54,8 @@ on:
       - 'app/api/vendor/onboarding/complete/route.ts'
       - 'app/api/vendor/private-evidence/route.ts'
       - 'lib/vendors/readBoundedVendorMultipart.ts'
+      - 'lib/vendors/withPrivateEvidenceBuffer.ts'
+      - 'scripts/mvp/vendor/vendor-private-memory-cleanup.test.mjs'
       - 'scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs'
       - 'lib/vendors/readBoundedVendorJson.ts'
       - 'lib/vendors/vendorSignupUi.ts'
@@ -153,6 +155,8 @@ on:
       - 'app/api/vendor/onboarding/complete/route.ts'
       - 'app/api/vendor/private-evidence/route.ts'
       - 'lib/vendors/readBoundedVendorMultipart.ts'
+      - 'lib/vendors/withPrivateEvidenceBuffer.ts'
+      - 'scripts/mvp/vendor/vendor-private-memory-cleanup.test.mjs'
       - 'scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs'
       - 'lib/vendors/readBoundedVendorJson.ts'
       - 'lib/vendors/vendorSignupUi.ts'
@@ -225,6 +229,8 @@ jobs:
         run: node --test scripts/mvp/vendor/vendor-vox-migration-cross-branch-delta.test.mjs
       - name: Actual-byte bounded vendor document upload regression
         run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-private-bounded-upload.test.mjs
+      - name: Private vendor evidence memory cleanup on success and failures (NO EXTERNAL SEND)
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/mvp/vendor/vendor-private-memory-cleanup.test.mjs
       - name: Local ClamAV behavior negative certification (no real daemon or provider)
         run: node --test scripts/mvp/vendor/certify-vendor-clamav-local-behavior.test.mjs
       - name: Phase 2 actual-byte OTP signup and browser/private evidence UX acceptance (source only)

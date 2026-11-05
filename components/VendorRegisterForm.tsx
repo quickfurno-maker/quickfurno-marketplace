@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { VendorPrivateEvidenceForm } from "@/components/vendor/VendorPrivateEvidenceForm";
 import { isValidOptionalGstin, normalizeOptionalGstin } from "@/lib/vendors/vendorSignupPolicy";
+import { assessVendorOtpRequestUi, isVendorOtpEntryValid, sanitizeVendorOtpInput } from "@/lib/vendors/vendorSignupUi";
 import { trackEvent, whatsappLink } from "@/lib/config";
 import { QFIcon } from "@/components/QuickFurnoIcons";
 import { mainCategories, signupSelectionForCategory, type MainCategory } from "@/lib/categories";
@@ -182,6 +183,7 @@ export function VendorRegisterForm({
   const [enrolledVendorId, setEnrolledVendorId] = useState<string | null>(null);
   const [otp, setOtp] = useState("");
   const [otpRequested, setOtpRequested] = useState(false);
+  const [otpNotice, setOtpNotice] = useState("");
   const [otpBusy, setOtpBusy] = useState(false);
   // Show per-field validation warnings only after the user tries to advance.
   const [showErrors, setShowErrors] = useState(false);
@@ -301,7 +303,7 @@ export function VendorRegisterForm({
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
   function set<K extends keyof WizardState>(key: K, value: WizardState[K]) {
-    if (key === "phone") { setOtp(""); setOtpRequested(false); }
+    if (key === "phone") { setOtp(""); setOtpRequested(false); setOtpNotice(""); }
     setF((current) => ({ ...current, [key]: value }));
   }
 
@@ -590,7 +592,7 @@ export function VendorRegisterForm({
 
     setBusy(true);
     try {
-      if (!otpRequested || !/^[0-9]{6,8}$/.test(otp)) {
+      if (!otpRequested || !isVendorOtpEntryValid(otp)) {
         setError("Request and enter the WhatsApp verification code before submitting.");
         return;
       }
@@ -1165,31 +1167,35 @@ export function VendorRegisterForm({
               <button type="button" className="qf-rf-btn qf-rf-btn--ghost" disabled={otpBusy || busy}
                 onClick={async () => {
                   if (!VENDOR_MOBILE_RE.test(f.phone)) { setError("Enter a valid mobile number in Step 1."); return; }
-                  setOtpBusy(true); setOtp(""); setOtpRequested(false); setError("");
+                  setOtpBusy(true); setOtp(""); setOtpRequested(false); setOtpNotice(""); setError("");
                   try {
                     const response = await fetch("/api/vendor/onboarding/request-otp", {
                       method:"POST",headers:{"content-type":"application/json"},
                       cache:"no-store",body:JSON.stringify({mobile:f.phone}),
                     });
-                    if (!response.ok) {
-                      setError(response.status===503
-                        ? "WhatsApp verification is not yet available. Your details remain unsent."
-                        : "Could not initiate verification. Please try again later.");
+                    const payload:unknown=await response.json().catch(()=>null);
+                    const outcome=assessVendorOtpRequestUi(response.status,payload);
+                    if (!outcome.accepted) {
+                      setOtpNotice("");
+                      setError(outcome.notice);
                       return;
                     }
+                    // An initiated request never proves provider delivery.
                     setOtpRequested(true);
+                    setOtpNotice(outcome.notice);
                   } catch {
                     setError("Verification is unavailable. No application has been submitted.");
                   } finally { setOtpBusy(false); }
                 }}>
                 {otpBusy ? "Requesting…" : otpRequested ? "Request another code" : "Send WhatsApp verification code"}
               </button>
+              {otpNotice ? <p role="status" aria-live="polite" className="qf-rf-qhint">{otpNotice}</p> : null}
               {otpRequested ? (
                 <label className="qf-rf-field">
                   <span>WhatsApp verification code (required)</span>
                   <div className="qf-rf-input-wrapper">
                     <input type="text" inputMode="numeric" autoComplete="one-time-code"
-                      value={otp} onChange={event=>setOtp(event.target.value.replace(/\\D/g,"").slice(0,8))}
+                      value={otp} onChange={event=>setOtp(sanitizeVendorOtpInput(event.target.value))}
                       maxLength={8} placeholder="6–8 digit code" />
                   </div>
                 </label>

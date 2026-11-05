@@ -5,6 +5,7 @@
  */
 import "server-only";
 import { enrollPendingVendorAfterWhatsappOtp } from "@/services/vendorAtomicSignupService";
+import { readBoundedVendorJson } from "@/lib/vendors/readBoundedVendorJson";
 import { normalizeVerifiedVendorMobile } from "@/lib/vendors/vendorContactContract";
 import { isValidOptionalGstin,hasVendorRegistrationConsent } from "@/lib/vendors/vendorSignupPolicy";
 import type { VendorRegistrationInput } from "@/lib/types";
@@ -48,11 +49,12 @@ export async function POST(request:Request):Promise<Response>{
  if(!sameOrigin(request))return respond({ok:false,code:"ORIGIN_REQUIRED"},403);
  if(request.headers.get("content-type")?.split(";")[0].trim()!=="application/json")
    return respond({ok:false,code:"INVALID_CONTENT_TYPE"},415);
- const length=Number(request.headers.get("content-length"));
- if(!Number.isSafeInteger(length)||length<1||length>8192)
-   return respond({ok:false,code:"INVALID_REQUEST_SIZE"},413);
+
  try{
-  const incoming:unknown=await request.json();
+  const bounded=await readBoundedVendorJson(request,8192);
+  if(!bounded.ok)return respond({ok:false,code:
+   bounded.reason==="too_large"?"INVALID_REQUEST_SIZE":"INVALID_SIGNUP"},bounded.reason==="too_large"?413:400);
+  const incoming:unknown=bounded.value;
   if(!incoming||typeof incoming!=="object"||Array.isArray(incoming))
    return respond({ok:false,code:"INVALID_SIGNUP"},400);
   const body=incoming as Record<string,unknown>;

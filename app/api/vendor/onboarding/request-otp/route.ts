@@ -7,6 +7,7 @@ import "server-only";
 import { publicClient } from "@/lib/supabase";
 import { allowPublicMutation } from "@/lib/security/publicMutationRateLimit";
 import { coordinateVendorOtpRequest } from "@/lib/identity/vendorOtpRequestCoordination";
+import { readBoundedVendorJson } from "@/lib/vendors/readBoundedVendorJson";
 import { reserveAuthOtpPurpose } from "@/services/authOtpPurposeReservationService";
 
 export const runtime="nodejs";
@@ -28,11 +29,12 @@ export async function POST(request:Request):Promise<Response>{
   if(!sameOrigin(request))return respond({ok:false,code:"ORIGIN_REQUIRED"},403);
   if(request.headers.get("content-type")?.split(";")[0].trim()!=="application/json")
     return respond({ok:false,code:"INVALID_CONTENT_TYPE"},415);
-  const length=Number(request.headers.get("content-length"));
-  if(!Number.isFinite(length)||length>1024 || length<1)
-    return respond({ok:false,code:"INVALID_REQUEST_SIZE"},413);
+
   try{
-    const value:unknown=await request.json();
+    const bounded=await readBoundedVendorJson(request,1024);
+    if(!bounded.ok)return respond({ok:false,code:
+      bounded.reason==="too_large"?"INVALID_REQUEST_SIZE":"INVALID_MOBILE"},bounded.reason==="too_large"?413:400);
+    const value:unknown=bounded.value;
     if(!value||typeof value!=="object"||Array.isArray(value))
       return respond({ok:false,code:"INVALID_MOBILE"},400);
     const body=value as Record<string,unknown>;

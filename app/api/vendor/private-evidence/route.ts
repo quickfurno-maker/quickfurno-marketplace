@@ -10,6 +10,7 @@ import { adminClient,serverClient } from "@/lib/supabase";
 import { createPrivateVendorEvidenceStorage } from "@/lib/storage/supabaseObjectStorage";
 import { VENDOR_REGISTRATION_PRIVACY_REVISION } from "@/lib/vendors/vendorSignupPolicy";
 import { readBoundedVendorMultipart } from "@/lib/vendors/readBoundedVendorMultipart";
+import { invalidDeclaredVendorLength } from "@/lib/vendors/readBoundedVendorJson";
 import { allowPublicMutation } from "@/lib/security/publicMutationRateLimit";
 
 export const runtime="nodejs";
@@ -47,8 +48,9 @@ export async function POST(request:Request):Promise<Response>{
  if(!sameOrigin(request))return reply({ok:false,code:"ORIGIN_REQUIRED"},403);
  if(!request.headers.get("content-type")?.startsWith("multipart/form-data;"))
   return reply({ok:false,code:"FORMDATA_REQUIRED"},415);
- const length=Number(request.headers.get("content-length"));
- if(!Number.isSafeInteger(length)||length<1||length>MAX_BODY)
+ // HTTP/2/chunked clients may omit Content-Length; bound actual streamed
+ // bytes before any multipart parsing, RPC or Storage call regardless.
+ if(invalidDeclaredVendorLength(request.headers.get("content-length"),MAX_BODY))
   return reply({ok:false,code:"REQUEST_TOO_LARGE"},413);
  try{
   const sb=await serverClient();

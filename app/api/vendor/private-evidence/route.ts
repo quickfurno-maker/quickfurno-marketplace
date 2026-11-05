@@ -92,6 +92,11 @@ export async function POST(request:Request):Promise<Response>{
   const accepted=sniff(buffer,file.type);
   if(!accepted)return reply({ok:false,code:"INVALID_FILE_FORMAT"},415);
 
+  // No verification-case mutation is allowed until the configured Storage
+  // bucket is genuinely private. A feature flag alone is not certification.
+  try{await privateEvidenceStorage.assertPrivate();}
+  catch{return reply({ok:false,code:"PRIVATE_BUCKET_NOT_CERTIFIED"},503);}
+
   // The server-only private case RPC checks verified Auth phone, exact vendor
   // ownership, active membership, Pending business status, case state and
   // unrevoked consent. It is the single privacy/ownership authority.
@@ -105,10 +110,6 @@ export async function POST(request:Request):Promise<Response>{
   if(caseError||typeof caseId!=="string"||!UUID.test(caseId))
    return reply({ok:false,code:"PRIVATE_CASE_UNAVAILABLE"},409);
 
-  // A private bucket must exist and remain non-public even if an operator
-  // accidentally enables a feature flag in an unsafe environment.
-  try{await privateEvidenceStorage.assertPrivate();}
-  catch{return reply({ok:false,code:"PRIVATE_BUCKET_NOT_CERTIFIED"},503);}
   const key=`vendors/${vendorId}/${randomUUID()}.${accepted.ext}`;
   // PRIVATE bucket only. No signed public URL, service-role key or raw upload
   // file name is returned. A missing bucket is a hard refusal.

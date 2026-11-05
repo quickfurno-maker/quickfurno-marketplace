@@ -16,20 +16,21 @@
   },
   "totals": {
     "getUser": 12,
-    "getSession": 0,
+    "getSession": 2,
     "signInWithPassword": 2,
     "signInWithOtp": 1,
     "verifyOtp": 1,
     "signOut": 3,
     "updateUser": 1,
     "resetPasswordForEmail": 0,
-    "admin": 12
+    "admin": 19
   },
   "files": [
     {
       "file": "app/actions.ts",
       "operations": {
         "getUser": 1,
+        "getSession": 2,
         "admin": 5
       },
       "usesAppMetadata": true,
@@ -41,6 +42,46 @@
         "getUser": 1
       },
       "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "app/api/vox/v1/owner-team-time/route.ts",
+      "operations": {
+        "admin": 1
+      },
+      "usesAppMetadata": true,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "app/api/vox/v1/team-presence/route.ts",
+      "operations": {
+        "admin": 1
+      },
+      "usesAppMetadata": true,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "app/api/vox/v1/team-shifts/route.ts",
+      "operations": {
+        "admin": 1
+      },
+      "usesAppMetadata": true,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "app/api/vox/v1/team-task-history/route.ts",
+      "operations": {
+        "admin": 1
+      },
+      "usesAppMetadata": true,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "app/api/vox/v1/tl-assignments/route.ts",
+      "operations": {
+        "admin": 2
+      },
+      "usesAppMetadata": true,
       "usesUserMetadata": false
     },
     {
@@ -73,6 +114,20 @@
       "file": "lib/supabase.ts",
       "operations": {
         "getUser": 1
+      },
+      "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "lib/vox/rc4StaffAuthorization.mjs",
+      "operations": {},
+      "usesAppMetadata": true,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "lib/vox/rc4StaffServerAdapter.ts",
+      "operations": {
+        "admin": 1
       },
       "usesAppMetadata": false,
       "usesUserMetadata": false
@@ -142,6 +197,12 @@
         "admin": 1
       },
       "usesAppMetadata": false,
+      "usesUserMetadata": false
+    },
+    {
+      "file": "services/vox/verifiedFinanceReviewerBearer.ts",
+      "operations": {},
+      "usesAppMetadata": true,
       "usesUserMetadata": false
     },
     {

@@ -119,8 +119,10 @@ export interface VendorRegistrationInput {
   portfolio_urls?: string[];
   profile_image_url?: string;
   gst_number?: string;
+  /** Required affirmative notice acceptance on public vendor applications. */
+  registration_consent_accepted?: boolean;
   message?: string;
-  user_id?: string;
+  // Auth ownership is a server-derived capability, never a public signup field.
   // New vendor location is intentionally Google office/base only. Legacy
   // device-coordinate columns remain in the database for historical rows but
   // are not part of the registration input contract.

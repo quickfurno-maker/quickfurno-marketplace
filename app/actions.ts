@@ -329,6 +329,10 @@ export async function fetchPackages() {
 }
 
 export async function submitVendorRegistration(input: VendorRegistrationInput) {
+  if ((process.env.QF_VENDOR_LEGACY_REGISTRATION_MODE !== "staging" ||
+      process.env.QF_RUNTIME_ENV !== "staging")) {
+    return {ok:false,code:"REGISTRATION_DISABLED",error:"Use verified WhatsApp vendor registration."};
+  }
   return vendors.registerVendor(input);
 }
 
@@ -346,6 +350,12 @@ export async function submitVendorReview(input: vendorReviews.SubmitVendorReview
 }
 
 export async function submitVendorAccountRegistration(input: VendorRegistrationInput & { password: string }) {
+  // The password-based legacy flow is not the approved WhatsApp-first vendor
+  // signup. Keep it closed by default, including before any Auth user is made.
+  if ((process.env.QF_VENDOR_LEGACY_REGISTRATION_MODE !== "staging" ||
+      process.env.QF_RUNTIME_ENV !== "staging")) {
+    return {ok:false,code:"REGISTRATION_DISABLED",error:"Use verified WhatsApp vendor registration."};
+  }
   let createdUserId: string | null = null;
 
   try {
@@ -413,8 +423,7 @@ export async function submitVendorAccountRegistration(input: VendorRegistrationI
     const vendor = await vendors.registerVendor({
       ...input,
       email,
-      user_id: auth.user.id,
-    });
+    }, auth.user.id);
 
     if (!vendor.ok) {
       await db.auth.admin.deleteUser(auth.user.id);

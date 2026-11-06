@@ -1,6 +1,6 @@
 # F3 — Google Places loader recovery without bypassing verification (NO DEPLOY)
 
-**6 November 2026.** Draft integration branch based on [Vendor UI PR #505](https://github.com/quickfurno-maker/quickfurno-marketplace/pull/505) at `8b228beebab2831041265098aaba0c884f912af4`. Reuses one already implemented Google SDK loader source path plus three focused test suites from source SHA `f7ffbc1dbf1f9165c7818d2cfb767be33e238c73`. Does NOT modify Google Cloud account, key restrictions, active cities, location scope, prices, user profiles or managed Staging/Production.
+**6 November 2026.** Draft integration branch based on [Vendor UI PR #505](https://github.com/quickfurno-maker/quickfurno-marketplace/pull/505) at `feaafd491e6b6e54f25116b9f16ed37256a73ce1`. Reuses one already implemented Google SDK loader source path plus three focused test suites from source SHA `f7ffbc1dbf1f9165c7818d2cfb767be33e238c73`. Does NOT modify Google Cloud account, key restrictions, active cities, location scope, prices, user profiles or managed Staging/Production.
 
 ## Problem actually addressed
 

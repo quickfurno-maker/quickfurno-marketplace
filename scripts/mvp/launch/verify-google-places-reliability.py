@@ -3,7 +3,7 @@
 from pathlib import Path
 import argparse, hashlib, json, subprocess
 
-BASE = "8b228beebab2831041265098aaba0c884f912af4"
+BASE = "feaafd491e6b6e54f25116b9f16ed37256a73ce1"
 DONOR = "f7ffbc1dbf1f9165c7818d2cfb767be33e238c73"
 POLICY = "quickfurno.f3.places-timeout-no-deploy.v1"
 FILES = {

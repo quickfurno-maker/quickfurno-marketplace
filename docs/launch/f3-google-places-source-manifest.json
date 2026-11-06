@@ -1,7 +1,7 @@
 {
   "policy": "quickfurno.f3.places-timeout-no-deploy.v1",
   "donor_sha": "f7ffbc1dbf1f9165c7818d2cfb767be33e238c73",
-  "base_sha": "8b228beebab2831041265098aaba0c884f912af4",
+  "base_sha": "feaafd491e6b6e54f25116b9f16ed37256a73ce1",
   "release_authorized": false,
   "google_billing_certified": false,
   "google_places_live_certified": false,

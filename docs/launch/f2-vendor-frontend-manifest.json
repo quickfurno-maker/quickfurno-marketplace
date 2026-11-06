@@ -23,7 +23,9 @@
     },
     {
       "path": "components/VendorRegisterForm.tsx",
-      "sha256": "b3b59d59b39040a2f1883968ce4780e3600cf250e78bde3c1a89a28aebeaf4a7"
+      "sha256": "76dcf01dde730733740cc7ef2a93b2cba21d9692a0d85d95665942517c2a06e1",
+      "overlay": "pending-vendor-login-safety",
+      "donor_sha256": "b3b59d59b39040a2f1883968ce4780e3600cf250e78bde3c1a89a28aebeaf4a7"
     },
     {
       "path": "components/vendor/VendorPrivateEvidenceForm.tsx",

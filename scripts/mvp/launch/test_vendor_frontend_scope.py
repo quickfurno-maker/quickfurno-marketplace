@@ -78,6 +78,16 @@ class VendorFrontendScopeTests(unittest.TestCase):
         finally:
             tmp.cleanup()
 
+    def test_pending_whatsapp_user_is_not_sent_to_password_login(self):
+        tmp, repo = self.fixture()
+        try:
+            f = repo / "components/VendorRegisterForm.tsx"
+            f.write_text(f.read_text(encoding="utf8") +
+                "\n// Go to vendor login", encoding="utf8")
+            self.assertIn("pending_vendor_login_misrepresented", failures(repo))
+        finally:
+            tmp.cleanup()
+
     def test_old_registration_bookmark_must_resolve(self):
         tmp, repo = self.fixture()
         try:

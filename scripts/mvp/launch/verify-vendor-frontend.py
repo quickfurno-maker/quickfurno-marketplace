@@ -13,12 +13,13 @@ EXPECTED = {
     "app/vendor/page.tsx":
         "13d5de3ebd20048e68a5a34dc096ae62937879ef0c165df34d09c38b17252ae4",
     "components/VendorRegisterForm.tsx":
-        "b3b59d59b39040a2f1883968ce4780e3600cf250e78bde3c1a89a28aebeaf4a7",
+        "76dcf01dde730733740cc7ef2a93b2cba21d9692a0d85d95665942517c2a06e1",
     "components/vendor/VendorPrivateEvidenceForm.tsx":
         "b340ae0c3ef418ffb5439d135f22bb31c89d5d568fc96ed01653046e29d95ec8",
     "lib/vendors/vendorSignupUi.ts":
         "8996d8c354968432d9923f02bfba789fca9a9bfb7dacc0c7903bea98fbd1a12b",
 }
+FORM_DONOR_SHA = "b3b59d59b39040a2f1883968ce4780e3600cf250e78bde3c1a89a28aebeaf4a7"
 ARTIFACTS = {
     "docs/launch/F2-VENDOR-WHATSAPP-FRONTEND-20261106.md",
     "docs/launch/f2-vendor-frontend-manifest.json",
@@ -65,6 +66,10 @@ def failures(repo: Path, changed: set[str] | None = None):
         seen.add(path)
         if path not in EXPECTED or row.get("sha256") != EXPECTED.get(path):
             errors.append("unexpected_source_file:" + path)
+        if path == "components/VendorRegisterForm.tsx" and (
+            row.get("overlay") != "pending-vendor-login-safety" or
+            row.get("donor_sha256") != FORM_DONOR_SHA):
+            errors.append("unreviewed_signup_overlay")
         absolute = repo / path
         if not absolute.is_file() or digest(absolute.read_bytes()) != EXPECTED.get(path):
             errors.append("modified_or_missing_source:" + path)
@@ -94,6 +99,9 @@ def failures(repo: Path, changed: set[str] | None = None):
                 errors.append("form_contract_missing:" + value)
         if 'submitVendorAccountRegistration' in form or 'type="password"' in form:
             errors.append("password_signup_resurrected")
+        if 'Go to vendor login' in form or (
+            "WhatsApp-only accounts do not have an email/password login" not in form):
+            errors.append("pending_vendor_login_misrepresented")
         if 'deliveryConfirmed===false' not in helper or 'status===202' not in helper:
             errors.append("delivery_claim_unsafe")
         if 'pending_scan_and_owner_review' not in helper or 'p.approved===false' not in helper:

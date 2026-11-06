@@ -683,8 +683,14 @@ export function VendorRegisterForm({
             Registration does not grant leads or credits.
           </p>
           {enrolledVendorId ? <VendorPrivateEvidenceForm vendorId={enrolledVendorId} /> : null}
-          <a className="qf-rf-btn qf-rf-btn--primary qf-rf-btn--full" href="/vendor?mode=login">
-            Go to vendor login
+          <p className="qf-rf-qhint" role="status">
+            WhatsApp-only accounts do not have an email/password login. Secure vendor
+            WhatsApp sign-in will be available only after separate certification.
+            You can submit private verification evidence above or contact the team
+            for next steps. Your application remains Pending.
+          </p>
+          <a className="qf-rf-btn qf-rf-btn--primary qf-rf-btn--full" href="/">
+            Return to QuickFurno
           </a>
           <a
             className="qf-rf-btn qf-rf-btn--ghost qf-rf-btn--full"

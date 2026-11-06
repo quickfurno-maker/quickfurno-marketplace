@@ -1,0 +1,46 @@
+{
+  "policy": "quickfurno.f5.vendor-returning-whatsapp-login-no-deploy.v1",
+  "base_sha": "abbfcbd7cb432ef3d2b72b5ddc6ae4003d05de5d",
+  "release_authorized": false,
+  "staging_deployed": false,
+  "production_deployed": false,
+  "meta_sender_certified": false,
+  "live_otp_delivered": false,
+  "owner_approved": false,
+  "scanner_certified": false,
+  "staff_activated": false,
+  "files": [
+    {
+      "path": "app/api/vendor/auth/login/request-otp/route.ts",
+      "sha256": "e39b4a84ffd6ad8dd3f6c63e992d401b2caf7d49ff556354efb0ab8181092ab4"
+    },
+    {
+      "path": "app/api/vendor/auth/login/verify-otp/route.ts",
+      "sha256": "883ce4ffb207d5ecec470302511b25081084e492422cdcfc7d92f93557419a45"
+    },
+    {
+      "path": "components/vendor/VendorPortal.tsx",
+      "sha256": "09dab7b5ffbe1e1194a0358b430bbaaead6e362fd81a4c81a0d03b79d9742862"
+    },
+    {
+      "path": "components/vendor/VendorWhatsappLoginForm.tsx",
+      "sha256": "7192f644cb8ed13bb737afa582d18281adf3099d8766ac145b05adb92d2bd411"
+    },
+    {
+      "path": "lib/vendors/vendorReturningLoginPolicy.ts",
+      "sha256": "d8e1dee57015951433a674a3352e24b0f9c5598f05f923df8e7a99f8a8e8e3fe"
+    },
+    {
+      "path": "scripts/mvp/launch/smoke-vendor-returning-login.mjs",
+      "sha256": "5e283659b04984a75484e0a5c49f00c42d9206cbb2821a6ebf99a763592f7113"
+    },
+    {
+      "path": "scripts/mvp/vendor/vendor-returning-login.test.mjs",
+      "sha256": "325e23652cc9bcff84afdfab804784e7494108359647e489679d2e4140b16fae"
+    },
+    {
+      "path": "services/returningWhatsappVendorLoginService.ts",
+      "sha256": "a02d9ccc9f209b16497666a3c1341fee33d3e2791de7e49220296a71a6363ec2"
+    }
+  ]
+}

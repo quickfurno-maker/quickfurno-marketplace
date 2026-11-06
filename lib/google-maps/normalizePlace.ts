@@ -111,12 +111,22 @@ export function normalizeGooglePlace(
   };
 }
 
-/** Case/diacritic-insensitive city key: lowercased, single-spaced, trimmed. */
+/**
+ * Google Places sometimes reports Pune as "पुणे" even when the interface is
+ * English. Convert ONLY that full Marathi city token to the canonical "pune"
+ * key. Other city aliases remain under Admin's accepted_city_labels.
+ * Unicode boundaries prevent misleading partial matches such as "पुणेकर".
+ * This never creates an active city or replaces Google Place ID/coordinates.
+ */
+const EXACT_PUNE_MARATHI_TOKEN = /(?<![\p{L}\p{M}\p{N}])पुणे(?![\p{L}\p{M}\p{N}])/gu;
+
+/** Unicode-aware exact Pune token + case/diacritic-insensitive city key. */
 function cityKey(value: string | null | undefined): string {
   return (value ?? "")
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "") // strip combining diacritics
     .toLowerCase()
+    .replace(EXACT_PUNE_MARATHI_TOKEN, "pune")
     .replace(/\s+/g, " ")
     .trim();
 }

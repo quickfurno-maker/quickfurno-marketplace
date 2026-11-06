@@ -1,0 +1,20 @@
+{
+  "policy": "quickfurno.f4.google-pune-marathi-label-no-deploy.v1",
+  "base_sha": "decf3ddcad49e702cad11b756d8910530938c8bb",
+  "release_authorized": false,
+  "production_deployed": false,
+  "staging_deployed": false,
+  "geofence_disabled": false,
+  "city_activation_changed": false,
+  "managed_db_updated": false,
+  "files": [
+    {
+      "path": "lib/google-maps/normalizePlace.ts",
+      "sha256": "aa88b498ab18c0249cb5325ba74ad1d237acce0a1e801508384b9033cdcd547f"
+    },
+    {
+      "path": "scripts/mvp/location/validate-google-marathi-city.test.mjs",
+      "sha256": "bf7851dd9318ef1e49c23e6aa21f9992b2a284fc72e5125f997275e333d0a727"
+    }
+  ]
+}

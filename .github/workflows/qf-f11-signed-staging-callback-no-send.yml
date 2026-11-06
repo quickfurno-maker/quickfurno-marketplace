@@ -1,0 +1,54 @@
+name: QF F11 Signed Staging Callbacks No-Send (NO DEPLOY)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/mvp/vendor/vendor-signed-callback-preflight.test.mjs"
+      - "scripts/mvp/launch/f11-callback-perimeter-policy.mjs"
+      - "scripts/mvp/launch/f11-callback-perimeter-policy.test.mjs"
+      - "scripts/mvp/launch/probe-f11-callbacks-no-send.mjs"
+      - "scripts/mvp/launch/verify-f11-signed-callback-preflight-scope.py"
+      - ".github/workflows/qf-f11-signed-staging-callback-no-send.yml"
+      - "docs/launch/QF-F11-STAGING-SIGNED-CALLBACK-PREFLIGHT-20261106.md"
+
+permissions:
+  contents: read
+
+jobs:
+  certify-signed-callbacks-without-sending:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout exact review commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Node 24
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+      - name: Review no-deploy scope and operator evidence contract
+        run: python3 scripts/mvp/launch/verify-f11-signed-callback-preflight-scope.py --repo .
+      - name: Independently reverify F1 F5 F6 signed source deltas (historical CI unchanged)
+        run: python3 scripts/mvp/launch/verify-f10-cross-phase-whatsapp-recert.py --repo .
+      - name: Install pinned dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: F11 56 signed webhook cryptography and perimeter hold tests
+        run: node --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/vendor/vendor-signed-callback-preflight.test.mjs scripts/mvp/launch/f11-callback-perimeter-policy.test.mjs
+      - name: F10 29 cross-phase hostile source recertification cases
+        run: python3 -m unittest discover -s scripts/mvp/launch -p test_f10_cross_phase_recert.py -v
+      - name: F9 through F6 and returning-vendor integration regressions
+        run: node --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/vendor/vendor-staging-readiness.test.mjs scripts/mvp/vendor/vendor-dual-waba-webhook-registry.test.mjs scripts/mvp/vendor/vendor-dedicated-otp-transport.test.mjs scripts/mvp/vendor/vendor-whatsapp-lane-isolation.test.mjs scripts/mvp/vendor/vendor-returning-login.test.mjs
+      - name: Previous Riya Anisha Aarohi Jarvis safety checks
+        run: node --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-jarvis-readiness.mjs
+      - name: Full Marketplace TypeScript
+        run: npm run typecheck
+      - name: Full optimized Next production build
+        run: npm run build
+      - name: Compiled localhost Owner NO SEND hold
+        run: node scripts/mvp/launch/smoke-f9-owner-whatsapp-no-send.mjs
+      - name: F11 no-network probe dry run
+        run: node scripts/mvp/launch/probe-f11-callbacks-no-send.mjs
+      - name: Exact seven-file F11 scope and no-deploy gate
+        run: python3 scripts/mvp/launch/verify-f11-signed-callback-preflight-scope.py --repo . --exact-git-diff

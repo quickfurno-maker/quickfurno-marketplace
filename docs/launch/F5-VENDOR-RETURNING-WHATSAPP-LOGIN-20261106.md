@@ -1,0 +1,36 @@
+# F5 Returning-vendor WhatsApp OTP login — source implementation and certification gate
+
+**Date 6 November 2026. Status SOURCE VERIFIED, LIVE HOLD.** Isolated branch `integration/qf-f5-vendor-returning-20261106` on [Google/Pune source Draft PR #507](https://github.com/quickfurno-maker/quickfurno-marketplace/pull/507) exact SHA `abbfcbd7cb432ef3d2b72b5ddc6ae4003d05de5d`. This is the missing vendor journey link identified after the existing new-vendor WhatsApp OTP registration.
+
+## Existing capabilities explicitly reused
+
+- **Registration F1/F2:** `POST /api/vendor/onboarding/request-otp` initiates Supabase Auth phone OTP through a signed Meta WhatsApp Send SMS Hook. `POST /api/vendor/onboarding/complete` verifies OTP and authentic signed session and atomically creates `profiles`, `vendors` and `vendor_dashboard_users` (status active **membership** but business `Pending`, `is_active:false`, `accepting_leads:false`, `credits:0`). Client-created `user_id` cannot confer authority.
+- **Office location:** reuse Google Places New exact Place ID and accepted-city match, including Admin-saved `पुणे` alias after verified production incident. Atomic signup stores office location as **unverified** without trusted coordinates; Owner must separately verify.
+- **Private documents:** existing `POST /api/vendor/private-evidence` requires signed verified phone session, exact owned vendor ID, consent, office/category evidence and private bucket. Uploaded files remain `pending_scan_and_owner_review`. No Aadhaar/PAN raw scans/public URL. Scanner/approval gates remain OFF at Owner's request to defer ClamAV.
+- **Owner review:** standalone VOX Owner `/owner/vendors/verification` uses verified MFA/AAL2, independent Core Owner bearer validation and actual Core review queue/case RPCs. It does not maintain a second verification database or directly activate leads. Actual Staging AAL2, seven SQL fingerprint check and scan receipt are pending.
+- **Vendor access:** canonical `vendor_dashboard_users → vendors` membership resolver already distinguishes dashboard identity from business eligibility; registration SQL creates active membership while business is Pending. No duplicate auth backend or password.
+
+## Newly implemented returning-vendor login
+
+- **`POST /api/vendor/auth/login/request-otp`** accepts only a 10-digit Indian mobile and same-origin JSON. It is disabled unless approved Staging runtime, Meta provider, signed shared Hook and OTP claim gates are certified. Server rate-limits requests and privately confirms the phone maps to one active vendor-owner membership before any provider request; unknown/nonvendor/suspended numbers are silently refused while still receiving a non-enumerating response. It then reserves exact private `vendor_login` purpose, calls Supabase Auth `signInWithOtp({phone,options:{shouldCreateUser:false}})`. All existing/nonexisting numbers receive identical 202 `OTP_REQUEST_ACCEPTED` with `deliveryConfirmed:false` on a live-gated request. No SMS fallback or user creation.
+- **`POST /api/vendor/auth/login/verify-otp`** accepts only `{mobile,token}`, with same-origin bounded JSON and rate-limited verification attempts. Server reuses `verifyVendorSignupWhatsappOtp`: actual Supabase `verifyOtp/getUser`, signed private purpose/delivery, Auth confirmed matching phone, no conflicting client account, unique vendor ownership. Only `resume_existing` can enter returning login.
+- **Post-OTP revalidation:** `resolveVendorAccess` must return the *same* vendor ID and validated Auth user, active `vendor_dashboard_users` membership and `owner` role. Revoked/invited/suspended, cross-vendor, missing profile or ambiguous mappings deny. On any denial after OTP, invalidate only the new local Supabase session; never globally sign out other devices. Success is `VENDOR_LOGIN_VERIFIED` with static `redirectTo:'/vendor/dashboard'`. No browser-supplied user, role, vendor ID, approval or payment accepted. Best-effort security audit and login-method timestamp after verified identity.
+- **Vendor portal:** returning WhatsApp sign-in is the default login tab; old email/password form remains behind an explicit legacy option. Code input is 6–8 ASCII digits; initial OTP response does not claim WhatsApp delivery. The dashboard uses the existing role/membership and business status; a Pending vendor does not gain matching, lead assignment or credits.
+
+## Local QA and exact replay
+
+- **19/19** focused returning-login tests: positive genuine-ownership-shaped decision, denied signup-as-login, cross-account/phone/membership/role, no user creation, non-enumeration, provider gates, attempted brute force and UI.
+- **8/8** adversarial source/manifest tests: forged user creation, bypassed signed delivery, missing session teardown, forged Meta/Prod/Owner/ClamAV certification, modified code and unrelated credits endpoint addition.
+- Whole Marketplace `npm run typecheck` **PASS** and optimized Next production `npm run build` **PASS**.
+- **11/11 real HTTP** production-build localhost tests: signup/login renders 200, legacy redirect 307 and OTP initiation/verification/office proof/Owner cases deny with 503 under provider-disabled test config. Loopback test deliberately clears all managed provider credentials and points the public Supabase URL at `127.0.0.1:9`; no real sends, managed DB or upload.
+- Dedicated read-only GitHub CI must pass against pinned exact head and exact base. No managed env edit, Prod activation, schema migration, finance operation, message send or Staff changes.
+
+## Actual E2E and external release gates still required
+
+1. Confirm **approved Meta Authentication template, WhatsApp sender status, webhook signature and real provider delivery** in approved Staging. The hook must dispatch vendor `vendor_login` only after server HMAC reservation and write one trusted provider-bound communication receipt. No SMS fallback or fake delivery.
+2. Reconcile actual seven managed Staging vendor migration versions and SQL fingerprints against checked-in sources; verify private bucket, RLS and a verified backup/rollback. Dedicated database recovery proof remains mandatory.
+3. Run a real supplier number in a controlled Staging enrolment: request OTP → WhatsApp arrives → verify OTP and create Pending vendor → select Google office Place ID → consent and private evidence → scan/quarantine, Owner MFA review queue → Owner decision → returning OTP login → Pending dashboard → separate approved/paid/credit/matching requirements → first 3-way assignment. Prove failed OTP replay, cross-vendor access and route shutdown.
+4. **ClamAV remains deferred by explicit Owner decision.** Approval and scan-dependent release must not be enabled before scanner and signed receipt are independently verified. Do not treat private upload as verified identity or give lead credits.
+5. Sign exactly approved Core+VOX Staging image pair, prove reverse rollback/restore, complete independent security review and Owner GO. Staff lane remains separate; Automation Studio stays on JARVIS.
+
+**Release decision: REVIEW ONLY.** Source feature is implemented but not yet a live authenticated end-to-end vendor. Do not advertise the sign-in method as ready for use in Production until the real Meta/Auth/SQL/Staging path proves it. Source QA is not a provider receipt or a Production launch certificate.

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LoginForm } from "@/components/LoginForm";
+import { VendorWhatsappLoginForm } from "@/components/vendor/VendorWhatsappLoginForm";
 import { VendorRegisterForm } from "@/components/VendorRegisterForm";
 import { type QuickFurnoCategory } from "@/lib/quickfurno-data";
 
@@ -32,6 +33,7 @@ export function VendorPortal({
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>(initialMode);
+  const [legacyPasswordLogin, setLegacyPasswordLogin] = useState(false);
 
   function switchMode(next: Mode) {
     if (next === mode) return;
@@ -70,7 +72,21 @@ export function VendorPortal({
 
       <div className="qf-vauth-panel">
         {mode === "login" ? (
-          <LoginForm signupHref="/vendor?mode=signup" signupLabel="Create a vendor account" />
+          <div>
+            {legacyPasswordLogin ? (
+              <LoginForm signupHref="/vendor?mode=signup" signupLabel="Create a vendor account" />
+            ) : (
+              <VendorWhatsappLoginForm />
+            )}
+            <div className="qf-vauth-alt">
+              <button type="button" className="qf-rf-btn qf-rf-btn--ghost"
+                onClick={() => setLegacyPasswordLogin(!legacyPasswordLogin)}>
+                {legacyPasswordLogin
+                  ? "Use WhatsApp OTP instead"
+                  : "Existing vendor with email/password? Use legacy login"}
+              </button>
+            </div>
+          </div>
         ) : (
           <div className="qf-vendor-form-wrap">
             <VendorRegisterForm initialCategory={initialCategory} />

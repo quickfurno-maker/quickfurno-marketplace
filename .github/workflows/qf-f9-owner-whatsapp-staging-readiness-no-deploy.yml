@@ -1,0 +1,47 @@
+name: QF F9 Owner WhatsApp Staging Readiness (NO DEPLOY)
+
+on:
+  pull_request:
+    paths:
+      - "lib/communication/whatsappStagingReadiness.ts"
+      - "app/api/vox/v1/owner-whatsapp-launch-readiness/route.ts"
+      - "scripts/mvp/vendor/vendor-staging-readiness.test.mjs"
+      - "scripts/mvp/launch/qf-f9-staging-whatsapp-readonly.sql"
+      - "scripts/mvp/launch/smoke-f9-owner-whatsapp-no-send.mjs"
+      - "scripts/mvp/launch/verify-f9-owner-whatsapp-readiness-scope.py"
+      - ".github/workflows/qf-f9-owner-whatsapp-staging-readiness-no-deploy.yml"
+      - "docs/launch/QF-F9-OWNER-WHATSAPP-STAGING-READINESS-20261106.md"
+
+permissions:
+  contents: read
+
+jobs:
+  certify-readonly-owner-whatsapp-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout isolated proposed commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Node 24
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+      - name: Source, owner AAL2, SQL and NO SEND scope gate
+        run: python3 scripts/mvp/launch/verify-f9-owner-whatsapp-readiness-scope.py --repo .
+      - name: Install pinned dependency tree
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: F9 Owner gate plus F8 F7 F6 vendor isolation regressions
+        run: node --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/vendor/vendor-staging-readiness.test.mjs scripts/mvp/vendor/vendor-dual-waba-webhook-registry.test.mjs scripts/mvp/vendor/vendor-dedicated-otp-transport.test.mjs scripts/mvp/vendor/vendor-whatsapp-lane-isolation.test.mjs scripts/mvp/vendor/vendor-returning-login.test.mjs
+      - name: Existing JARVIS Riya Anisha Aarohi safety regression
+        run: node --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-jarvis-readiness.mjs
+      - name: Whole Marketplace TypeScript
+        run: npm run typecheck
+      - name: Whole Marketplace optimized production build
+        run: npm run build
+      - name: Compiled VOX Owner route no-send HTTP hold
+        run: node scripts/mvp/launch/smoke-f9-owner-whatsapp-no-send.mjs
+      - name: Exact eight-path no-deploy F9 diff
+        run: python3 scripts/mvp/launch/verify-f9-owner-whatsapp-readiness-scope.py --repo . --exact-git-diff

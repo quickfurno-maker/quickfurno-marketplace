@@ -16,6 +16,21 @@ class OwnerVoxScopeTests(unittest.TestCase):
         self.assertIs(obj["production_authorized"], False)
         self.assertIs(obj["unreviewed_staff_enabled"], False)
 
+    def test_no_dead_staff_navigation_or_action_surfaces(self):
+        ops = (REPO / "apps/vox-web/app/operations/page.tsx").read_text(encoding="utf-8")
+        vendor = (REPO / "apps/vox-web/app/vendor360/page.tsx").read_text(encoding="utf-8")
+        self.assertIn('if(!ownerMode)return', ops)
+        self.assertIn('if(!ownerMode)return', vendor)
+        for href in ('/finance', '/studio', '/acquisition', '/service-desk',
+                     '/approvals', '/team'):
+            self.assertNotIn('href="' + href + '"', ops)
+            self.assertNotIn('href="' + href + '"', vendor)
+        for forbidden in ("<TaskCreator", "<StaffProposalForm", "<ProfileReviewQueue"):
+            self.assertNotIn(forbidden, vendor)
+        for route in ("overview", "vendor360"):
+            source = (REPO / f"apps/vox-web/app/api/{route}/route.ts").read_text(encoding="utf-8")
+            self.assertIn('VOX_STAFF_VIEW_MODE!=="owner"', source)
+
     def fixture(self):
         directory = tempfile.TemporaryDirectory()
         dst = Path(directory.name)

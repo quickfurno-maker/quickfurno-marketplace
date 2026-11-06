@@ -9,6 +9,7 @@ import json
 import re
 import shutil
 import subprocess
+from owner_vox_overlays import restrict_owner_surface
 
 CONFIG = (
     ".dockerignore", ".env.example", "Dockerfile", "next-env.d.ts",
@@ -41,7 +42,7 @@ IGNORE_EXTERNAL = {"server-only", "client-only"}
 def imports(source: Path, rel: Path):
     if source.name.endswith((".d.ts", ".d.mts")) or source.suffix not in (".ts", ".tsx", ".mjs", ".js", ".css"):
         return []
-    raw = source.read_text(encoding="utf-8")
+    raw = restrict_owner_surface(rel, source.read_text(encoding="utf-8"))
     found = []
     for spec in RELATIVE_IMPORT.findall(raw):
         prefix = rel.parent / spec
@@ -98,9 +99,18 @@ def extract(src: Path, dst: Path):
         original = source_base / rel
         copy = target_base / rel
         copy.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(original, copy)
-        records.append({"path": str((ROOT / rel).as_posix()),
-                        "sha256": hashlib.sha256(original.read_bytes()).hexdigest()})
+        modified = rel.as_posix() in {"app/operations/page.tsx", "app/vendor360/page.tsx",
+                                        "app/api/overview/route.ts", "app/api/vendor360/route.ts"}
+        source_bytes = original.read_bytes()
+        final_bytes = (restrict_owner_surface(rel, original.read_text(encoding="utf-8")).encode("utf-8")
+                       if modified else source_bytes)
+        copy.write_bytes(final_bytes)
+        record = {"path": str((ROOT / rel).as_posix()),
+                  "sha256": hashlib.sha256(final_bytes).hexdigest()}
+        if modified:
+            record.update({"overlay": "owner_mode_only",
+                           "source_sha256": hashlib.sha256(source_bytes).hexdigest()})
+        records.append(record)
     # A separate minimal landing page; Owner verification remains server-auth gated.
     landing = target_base / "app/page.tsx"
     landing.write_bytes(('import {redirect} from "next/navigation";\n'

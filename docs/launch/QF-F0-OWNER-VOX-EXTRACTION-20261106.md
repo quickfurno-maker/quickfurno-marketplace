@@ -9,16 +9,16 @@ Inherited release PR #502 at `f7ffbc1dbf1f9165c7818d2cfb767be33e238c73` is stack
 ## Actual result
 
 - Created separate clean worktree/branch `integration/qf-f0-owner-minimal-20261106` from protected main.
-- Reused **63** exact source files selected via relative import closure from the candidate, recorded with source SHA and per-file SHA-256 in `docs/launch/f0-owner-vox-file-manifest.json`. Generated one minimal root redirect to `/operations` (does not grant access).
+- Isolated **60** VOX files: 55 exact reused source files, four reproducible Owner-only page/BFF overlays, and one minimal root redirect to `/operations`. Source SHA, per-file SHA-256 and the four overlay source digests are recorded in `docs/launch/f0-owner-vox-file-manifest.json`.
 - Included existing login, MFA, recovery, health, operations, Vendor 360, Owner vendor verification UI and corresponding read/decision BFF API paths.
-- Excluded Staff/Team Leader pages, chat/presence/time, Finance, EOD, Automation Studio, acquisition and discretionary provider actions from this isolated VOX app's routable tree. Shared auth library and Core integration clients may remain because they are real Owner dependencies; importing a shared type is not permission to activate a Staff lane.
+- Excluded Staff/Team Leader pages, chat/presence/time, Finance, EOD, Automation Studio, acquisition and discretionary provider actions from this isolated VOX app's routable tree. Removed imported Staff action widgets and broken links to omitted workspaces; the Owner operations and Vendor 360 pages **and their read BFF routes** reject non-Owner view mode before Core projection reads. Shared auth library and Core integration clients remain true Owner dependencies; importing a shared type is not permission to activate a Staff lane.
 - Enforced fail-closed manifest hash, no unreviewed route, prohibited Staff/Finance routes, no altered source bytes, no implicit Production authorization. Adversarial mutation tests cover Staff-route addition, modified Owner decision, forged release switch and missing Owner page.
 
 ## Evidence
 
 - Local JARVIS `npm ci --offline --ignore-scripts`, `npm run typecheck`, production `npm run build`: PASS on the isolated VOX subset, with only explicit selected routes in compiled output.
 - `python scripts/mvp/launch/verify-owner-vox-scope.py --repo .`: PASS, `deployment_authorized:false`.
-- Five local mutation tests: **5/5 PASS**.
+- Seven local scoped-source/mutation tests: **7/7 PASS**, including dead-route/link and Staff action-surface checks.
 - Existing full VO0–VO12 Staff test suite **173/173 PASS** and complete VOX TypeScript/build independently on the Staff-reactivation worktree; not included in this Owner extraction.
 - CI to run on PR exact head, with read-only token and no deploy job.
 

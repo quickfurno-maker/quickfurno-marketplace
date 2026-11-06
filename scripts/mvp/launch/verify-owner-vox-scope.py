@@ -28,6 +28,10 @@ FORBIDDEN_APP_SEGMENTS = {
 }
 ROUTE_SUFFIXES = {"page.tsx", "page.ts", "route.ts", "route.tsx"}
 SKIP_DIRS = {".next", "node_modules", ".git"}
+OWNER_OVERLAYS = {"apps/vox-web/app/operations/page.tsx",
+                  "apps/vox-web/app/vendor360/page.tsx",
+                  "apps/vox-web/app/api/overview/route.ts",
+                  "apps/vox-web/app/api/vendor360/route.ts"}
 
 def errors_for(repo: Path):
     repo = repo.resolve()
@@ -58,6 +62,9 @@ def errors_for(repo: Path):
         expected[path] = digest
     if len(expected) != document.get("total_files"):
         failures.append("file_count_mismatch")
+    overlay_entries = {row.get("path") for row in entries if row.get("overlay") == "owner_mode_only"}
+    if overlay_entries != OWNER_OVERLAYS:
+        failures.append("unreviewed_owner_overlay")
     actual = set()
     for p in root.rglob("*"):
         if not p.is_file() or p.suffix == ".tsbuildinfo" or any(part in SKIP_DIRS for part in p.parts):
@@ -70,7 +77,7 @@ def errors_for(repo: Path):
             blob = p.read_bytes()
             # Python text generation / Windows checkout may translate only the
             # explicitly new landing redirect; verify its canonical LF form.
-            if path == "apps/vox-web/app/page.tsx":
+            if path == "apps/vox-web/app/page.tsx" or path in OWNER_OVERLAYS:
                 blob = blob.replace(b"\r\n", b"\n")
             if hashlib.sha256(blob).hexdigest() != expected[path]:
                 failures.append("modified_file:" + path)

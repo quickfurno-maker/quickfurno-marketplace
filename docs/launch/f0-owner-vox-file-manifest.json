@@ -2,7 +2,7 @@
   "policy": "quickfurno.f0.owner-vox-minimal.v1",
   "source_sha": "f7ffbc1dbf1f9165c7818d2cfb767be33e238c73",
   "base_sha": "b9f8ada90283704c1841d4cd2572305550bca440",
-  "total_files": 63,
+  "total_files": 60,
   "allowed_routes": [
     "app/layout.tsx",
     "app/operations/page.tsx",
@@ -77,7 +77,9 @@
     },
     {
       "path": "apps/vox-web/app/api/overview/route.ts",
-      "sha256": "252c94ec1cff88acc39c84cab44f2f3b8761667a3851b9f4c10a42c14b2e31fb"
+      "sha256": "e0829fa58986697cb58a479ad128cecd128288f643b90b46637af5bb98b25c67",
+      "overlay": "owner_mode_only",
+      "source_sha256": "252c94ec1cff88acc39c84cab44f2f3b8761667a3851b9f4c10a42c14b2e31fb"
     },
     {
       "path": "apps/vox-web/app/api/owner/vendor-verification/case/route.ts",
@@ -93,7 +95,9 @@
     },
     {
       "path": "apps/vox-web/app/api/vendor360/route.ts",
-      "sha256": "cc919b04fe66fee6dcd3db0b495feb1e12468f5148edc21f84d2a91546484b2d"
+      "sha256": "c89aedab0c34a8ceeb9c0cef7d23b3327187c41619ad8da6ad65aa7b02c1fa01",
+      "overlay": "owner_mode_only",
+      "source_sha256": "cc919b04fe66fee6dcd3db0b495feb1e12468f5148edc21f84d2a91546484b2d"
     },
     {
       "path": "apps/vox-web/app/auth/callback/route.ts",
@@ -102,10 +106,6 @@
     {
       "path": "apps/vox-web/app/components/ScopedQueue.tsx",
       "sha256": "fd73721c560a2c000542fed80fb55eb6ca99d412dd3b12a5c96e2b557a7df895"
-    },
-    {
-      "path": "apps/vox-web/app/components/StaffProposalForm.tsx",
-      "sha256": "0fde9350ccbfbe13663b1feb3b3386da67026ab291da73447e14d489415aca73"
     },
     {
       "path": "apps/vox-web/app/components/scoped-queue.css",
@@ -165,7 +165,9 @@
     },
     {
       "path": "apps/vox-web/app/operations/page.tsx",
-      "sha256": "1a2c5099965e63bf5b22875e2b93888f2711a0a8513e3e4d7340f3f06bcf39d6"
+      "sha256": "28fac6f984de310a07b5314520294e70fe6db0384e00607be63e1220782d8936",
+      "overlay": "owner_mode_only",
+      "source_sha256": "1a2c5099965e63bf5b22875e2b93888f2711a0a8513e3e4d7340f3f06bcf39d6"
     },
     {
       "path": "apps/vox-web/app/owner/vendors/verification/OwnerReviewConsole.tsx",
@@ -201,16 +203,10 @@
       "sha256": "7fb9549a1bcd93c6bef4b7f9b35feabe4438a95a5ba30dbe2bb9fbcc04972c68"
     },
     {
-      "path": "apps/vox-web/app/vendor360/components/ProfileReviewQueue.tsx",
-      "sha256": "f9c611edff83a4bd53e0b4de7ec708058c1e9047b36eec79bbb6f8b9575b484b"
-    },
-    {
-      "path": "apps/vox-web/app/vendor360/components/TaskCreator.tsx",
-      "sha256": "d40d31ee3f33d85bb44d888f5b8d834e81d21a9cb6ac5225ad4d0d1d85d3ef86"
-    },
-    {
       "path": "apps/vox-web/app/vendor360/page.tsx",
-      "sha256": "4adebccd07931225fc7a406f8c818d0f901b735740656686bb7ef10b30eeaf46"
+      "sha256": "a9b5f7f838a5d660b402d2d91b2be3c7111559001cef32e3b16d8d0a5badc21b",
+      "overlay": "owner_mode_only",
+      "source_sha256": "4adebccd07931225fc7a406f8c818d0f901b735740656686bb7ef10b30eeaf46"
     },
     {
       "path": "apps/vox-web/lib/auth.ts",

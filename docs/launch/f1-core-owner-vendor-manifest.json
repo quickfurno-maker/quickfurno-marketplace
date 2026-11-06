@@ -1,0 +1,363 @@
+{
+  "policy": "quickfurno.f1.core-vendor-owner-no-deploy.v1",
+  "source_sha": "f7ffbc1dbf1f9165c7818d2cfb767be33e238c73",
+  "base_sha": "a01ce330b199b8e5f03d336122fc4752b3116566",
+  "entrypoints": [
+    "app/api/vendor/onboarding/request-otp/route.ts",
+    "app/api/vendor/onboarding/complete/route.ts",
+    "app/api/vendor/private-evidence/route.ts",
+    "app/api/vox/v1/owner-vendor-signup-status/route.ts",
+    "app/api/vox/v1/owner-vendor-verification-readiness/route.ts",
+    "app/api/vox/v1/owner-vendor-verification-queue/route.ts",
+    "app/api/vox/v1/owner-vendor-verification-case/route.ts",
+    "app/api/vox/v1/owner-workspaces/route.ts"
+  ],
+  "sql_order": [
+    "supabase/migrations/20261104090000_vendor_registration_consent_receipt.sql",
+    "supabase/migrations/20261104140000_vendor_private_otp_and_verification_foundation.sql",
+    "supabase/migrations/20261104153000_vendor_atomic_pending_registration.sql",
+    "supabase/migrations/20261104160000_vendor_owner_review_assignment_gate.sql",
+    "supabase/migrations/20261104163000_vendor_private_document_intake.sql",
+    "supabase/migrations/20261104170000_vox_owner_vendor_review_queue.sql",
+    "supabase/migrations/20261104173000_vendor_private_scan_quarantine.sql"
+  ],
+  "file_count": 38,
+  "release_authorized": false,
+  "managed_migrations_applied_by_this_batch": false,
+  "public_vendor_signup_enabled": false,
+  "staff_activation_authorized": false,
+  "selected_dependency_edges": {
+    "app/api/vox/v1/owner-workspaces/route.ts": [
+      "lib/supabase.ts",
+      "services/vox/verifiedStaffBearer.ts",
+      "services/vox/ownerWorkspaceProjection.mjs"
+    ],
+    "services/vox/ownerWorkspaceProjection.mjs": [],
+    "services/vox/ownerWorkspaceProjection.d.mts": [],
+    "services/vox/verifiedStaffBearer.ts": [
+      "lib/supabase.ts"
+    ],
+    "lib/supabase.ts": [],
+    "app/api/vox/v1/owner-vendor-verification-case/route.ts": [
+      "lib/supabase.ts",
+      "services/vox/verifiedStaffBearer.ts"
+    ],
+    "app/api/vox/v1/owner-vendor-verification-queue/route.ts": [
+      "lib/supabase.ts",
+      "services/vox/verifiedStaffBearer.ts"
+    ],
+    "app/api/vox/v1/owner-vendor-verification-readiness/route.ts": [
+      "lib/supabase.ts",
+      "services/vox/verifiedStaffBearer.ts"
+    ],
+    "app/api/vox/v1/owner-vendor-signup-status/route.ts": [
+      "lib/supabase.ts",
+      "services/vox/verifiedStaffBearer.ts"
+    ],
+    "app/api/vendor/private-evidence/route.ts": [
+      "lib/supabase.ts",
+      "lib/storage/supabaseObjectStorage.ts",
+      "lib/vendors/vendorSignupPolicy.ts",
+      "lib/vendors/readBoundedVendorMultipart.ts",
+      "lib/vendors/withPrivateEvidenceBuffer.ts",
+      "lib/vendors/readBoundedVendorJson.ts",
+      "lib/security/publicMutationRateLimit.ts"
+    ],
+    "lib/security/publicMutationRateLimit.ts": [
+      "lib/coordination/redisCoordination.ts"
+    ],
+    "lib/coordination/redisCoordination.ts": [
+      "lib/coordination/coordination.ts"
+    ],
+    "lib/coordination/coordination.ts": [],
+    "lib/vendors/readBoundedVendorJson.ts": [],
+    "lib/vendors/withPrivateEvidenceBuffer.ts": [],
+    "lib/vendors/readBoundedVendorMultipart.ts": [],
+    "lib/vendors/vendorSignupPolicy.ts": [],
+    "lib/storage/supabaseObjectStorage.ts": [
+      "lib/supabase.ts",
+      "lib/vendors/decodeVerifiedPrivateObject.ts",
+      "lib/storage/objectStorage.ts"
+    ],
+    "lib/storage/objectStorage.ts": [],
+    "lib/vendors/decodeVerifiedPrivateObject.ts": [],
+    "app/api/vendor/onboarding/complete/route.ts": [
+      "services/vendorAtomicSignupService.ts",
+      "lib/vendors/readBoundedVendorJson.ts",
+      "lib/vendors/vendorContactContract.ts",
+      "lib/vendors/vendorSignupPolicy.ts",
+      "lib/types.ts"
+    ],
+    "lib/types.ts": [],
+    "lib/vendors/vendorContactContract.ts": [],
+    "services/vendorAtomicSignupService.ts": [
+      "lib/supabase.ts",
+      "lib/communication/phone.ts",
+      "lib/vendors/vendorSignupPolicy.ts",
+      "lib/vendors/vendorContactContract.ts",
+      "lib/locations/cityService.ts",
+      "services/authOtpPurposeReservationService.ts",
+      "services/vendorSignupOtpVerificationService.ts",
+      "lib/types.ts"
+    ],
+    "services/vendorSignupOtpVerificationService.ts": [
+      "lib/supabase.ts",
+      "lib/vendors/vendorContactContract.ts",
+      "lib/identity/sessionInvalidation.ts",
+      "lib/identity/vendorWhatsappOtpAdmission.ts",
+      "lib/vendors/vendorSignupOwnershipReconciliation.ts",
+      "services/vendorSignupOwnershipReadService.ts",
+      "services/vendorOtpEvidenceReadService.ts"
+    ],
+    "services/vendorOtpEvidenceReadService.ts": [
+      "lib/supabase.ts",
+      "lib/communication/phone.ts",
+      "services/authOtpPurposeReservationService.ts",
+      "lib/identity/vendorWhatsappOtpAdmission.ts"
+    ],
+    "lib/identity/vendorWhatsappOtpAdmission.ts": [],
+    "services/authOtpPurposeReservationService.ts": [
+      "lib/supabase.ts",
+      "lib/identity/authOtpPurposePolicy.ts",
+      "lib/identity/vendorWhatsappOtpAdmission.ts"
+    ],
+    "lib/identity/authOtpPurposePolicy.ts": [],
+    "lib/communication/phone.ts": [
+      "lib/errors.ts"
+    ],
+    "lib/errors.ts": [],
+    "services/vendorSignupOwnershipReadService.ts": [
+      "lib/supabase.ts",
+      "lib/vendors/vendorContactContract.ts",
+      "lib/vendors/vendorSignupOwnershipReconciliation.ts",
+      "lib/vendors/vendorVerifiedSignupDecision.ts"
+    ],
+    "lib/vendors/vendorVerifiedSignupDecision.ts": [],
+    "lib/vendors/vendorSignupOwnershipReconciliation.ts": [
+      "lib/vendors/vendorVerifiedSignupDecision.ts"
+    ],
+    "lib/identity/sessionInvalidation.ts": [],
+    "lib/locations/cityService.ts": [
+      "lib/supabase.ts"
+    ],
+    "app/api/vendor/onboarding/request-otp/route.ts": [
+      "lib/supabase.ts",
+      "lib/security/publicMutationRateLimit.ts",
+      "lib/identity/vendorOtpRequestCoordination.ts",
+      "lib/vendors/readBoundedVendorJson.ts",
+      "services/authOtpPurposeReservationService.ts"
+    ],
+    "lib/identity/vendorOtpRequestCoordination.ts": []
+  },
+  "files": [
+    {
+      "path": "app/actions.ts",
+      "sha256": "b32ac0aa3849fb18f21217d50afaff027aa42d94b3d212f70449013392d5350c",
+      "new": false,
+      "overlay": "legacy-signup-disabled-by-default",
+      "base_sha256": "10dcf86003647c04ce8d434cbde8a4cd8b9f0b32f63f6e21451e5abb271c3a64"
+    },
+    {
+      "path": "app/api/vendor/onboarding/complete/route.ts",
+      "sha256": "08108648f6ff137c705ef7d55a49a10faa11281d202ee58d9726773c0c5b9f2b",
+      "new": true
+    },
+    {
+      "path": "app/api/vendor/onboarding/request-otp/route.ts",
+      "sha256": "c684db31ff74fc3266b5cc95b7778239a4456f410452f0291cff3296ed563ce2",
+      "new": true
+    },
+    {
+      "path": "app/api/vendor/private-evidence/route.ts",
+      "sha256": "41b22db585666cd5f02db0ee33857dcd6211a472e9582623ed49acf4297db83b",
+      "new": true
+    },
+    {
+      "path": "app/api/vox/v1/owner-vendor-signup-status/route.ts",
+      "sha256": "e700c470d932a7ac829d8d375597269b0b3994b5a8251e0151a69b82f678a516",
+      "new": true
+    },
+    {
+      "path": "app/api/vox/v1/owner-vendor-verification-case/route.ts",
+      "sha256": "03957adea2ce54895550bd79d4f78ecb0c10a66145ccc509b9cd4633978afbee",
+      "new": true
+    },
+    {
+      "path": "app/api/vox/v1/owner-vendor-verification-queue/route.ts",
+      "sha256": "76fefd7bd25fc325ece98a039abee04ba7d4a63cc429714bbe46701a2313baad",
+      "new": true
+    },
+    {
+      "path": "app/api/vox/v1/owner-vendor-verification-readiness/route.ts",
+      "sha256": "c2698fba1c144a08332845e3287630f8f20d49d39c8fef1a3bc396871d4c23ae",
+      "new": true
+    },
+    {
+      "path": "app/api/vox/v1/owner-workspaces/route.ts",
+      "sha256": "21e07d5a8246143ef0618ff0a8f5e415d1c5432a47dc9356df15fa7464404f80",
+      "new": true
+    },
+    {
+      "path": "lib/identity/authOtpPurposePolicy.ts",
+      "sha256": "f899a7442e4f26954b30abee04ce672ec38d54f6646f4b4910fa49602ae5da59",
+      "new": true
+    },
+    {
+      "path": "lib/identity/vendorOtpRequestCoordination.ts",
+      "sha256": "5148a6e777d8021622f3265708fc6fc9167015e96ebd4b05149695a417da0569",
+      "new": true
+    },
+    {
+      "path": "lib/identity/vendorWhatsappOtpAdmission.ts",
+      "sha256": "88b164e62d779260cfd424a871dc7e89f61b0a356941c0ffa38d72b947072ed6",
+      "new": true
+    },
+    {
+      "path": "lib/storage/objectStorage.ts",
+      "sha256": "40cdac1dba97296782b8dde2eb77931992d6f47d252fcfaa08e6477b8266554c",
+      "new": false
+    },
+    {
+      "path": "lib/storage/supabaseObjectStorage.ts",
+      "sha256": "d4c40511b2fd0fad9eae1ef789c4be5083db86b531222c1a900935e44fb43270",
+      "new": false
+    },
+    {
+      "path": "lib/types.ts",
+      "sha256": "b5f5c9196e15eae325d9c413e4a82393bfba8d9989bdbf265e4c7c2bdc11f974",
+      "new": false
+    },
+    {
+      "path": "lib/vendors/decodeVerifiedPrivateObject.ts",
+      "sha256": "ed52ce4ec34b11580912194ba89cf9ef5c6dade75f920521340c91670e3fd774",
+      "new": true
+    },
+    {
+      "path": "lib/vendors/readBoundedVendorJson.ts",
+      "sha256": "e81c86c249abecb89e82c81f3f6f7c94ec4816e78e9dda275bb32e272a07cfd4",
+      "new": true
+    },
+    {
+      "path": "lib/vendors/readBoundedVendorMultipart.ts",
+      "sha256": "75a0ebe57dd1f71a3e5d9c43c20e00bed2e7436303cc91bb6a2d27d746236531",
+      "new": true
+    },
+    {
+      "path": "lib/vendors/vendorContactContract.ts",
+      "sha256": "4a37e2b9a114dc3c75bea7c85b3d6508f45ad999f2a2fb1a7128863fabf70a29",
+      "new": false
+    },
+    {
+      "path": "lib/vendors/vendorSignupOwnershipReconciliation.ts",
+      "sha256": "fbb404f9ce11899d6e0669306dc39ef947b8657fc5c3e056fe5113d14d6f2480",
+      "new": true
+    },
+    {
+      "path": "lib/vendors/vendorSignupPolicy.ts",
+      "sha256": "b4561140d57c3fff50b5e8d3a4cd33405fbf30340aa741b132c209ff642c053e",
+      "new": true
+    },
+    {
+      "path": "lib/vendors/vendorVerifiedSignupDecision.ts",
+      "sha256": "01d726c08c4c11a69435ea1d6aecea6d55281b673de5bc19117681954a31ff98",
+      "new": true
+    },
+    {
+      "path": "lib/vendors/withPrivateEvidenceBuffer.ts",
+      "sha256": "5f707499d29f720cac0133789654588c3021a7d3652d6ee83bd918499147a3bb",
+      "new": true
+    },
+    {
+      "path": "services/authOtpPurposeReservationService.ts",
+      "sha256": "0fbf2780057ffe3d846934aa8022cfd20423cd8f8bd3d98353f4772b946d20d1",
+      "new": true
+    },
+    {
+      "path": "services/vendorAtomicSignupService.ts",
+      "sha256": "acb9d731b7b16402cd756532a28fc2ea33f6c1ba07ea7d3974d6ce8a57370824",
+      "new": true
+    },
+    {
+      "path": "services/vendorOtpEvidenceReadService.ts",
+      "sha256": "d6aeb764c05a4b6e69c8403bcf50cd1bae0ee97222918a37ef66f927863da833",
+      "new": true
+    },
+    {
+      "path": "services/vendorService.ts",
+      "sha256": "482355527eac16f2b107e6c5d9d1588e0e50642c14b2957a4966343f13d00243",
+      "new": false,
+      "overlay": "legacy-signup-disabled-by-default",
+      "base_sha256": "a9057ab3a20d96819c95b8a36ccdb3ed5de50573c76332972b148bca095e9392"
+    },
+    {
+      "path": "services/vendorSignupOtpVerificationService.ts",
+      "sha256": "349bde25e79a5955a38b13c379212adeeb8185fba3a98ace934e96cb862c49d6",
+      "new": true
+    },
+    {
+      "path": "services/vendorSignupOwnershipReadService.ts",
+      "sha256": "2d733eec3052442f3bd07714a090beb011d54fd60313d9678a3040a412919793",
+      "new": true
+    },
+    {
+      "path": "services/vox/ownerWorkspaceProjection.d.mts",
+      "sha256": "51cdf6e51b73b13b074df9651a162af474d055dce7e94b8084122dbd9413b289",
+      "new": true
+    },
+    {
+      "path": "services/vox/ownerWorkspaceProjection.mjs",
+      "sha256": "457bc08f414cde3ff8c884e731496845c47600f11929b641d6a7140dc6546c33",
+      "new": true
+    },
+    {
+      "path": "supabase/migrations/20261104090000_vendor_registration_consent_receipt.sql",
+      "sha256": "d633187e5084591056c4a87687297fd9ca385a9e1a8d03ff8ae4df6d9e2c9e19",
+      "new": true,
+      "migration": true
+    },
+    {
+      "path": "supabase/migrations/20261104140000_vendor_private_otp_and_verification_foundation.sql",
+      "sha256": "cb5a4e1f74c6cbc6a6f4a89464c4d7235956b2ae9b71c3bd79bf39ed70581f48",
+      "new": true,
+      "migration": true
+    },
+    {
+      "path": "supabase/migrations/20261104153000_vendor_atomic_pending_registration.sql",
+      "sha256": "2f62663edc5f64122f771f8c141019933b7f4eba1680a8a62a8af9c150972596",
+      "new": true,
+      "migration": true
+    },
+    {
+      "path": "supabase/migrations/20261104160000_vendor_owner_review_assignment_gate.sql",
+      "sha256": "177c8f11ffeee951040e04bdb1a75e0391308ba022e00cdbd979a675a352e89e",
+      "new": true,
+      "migration": true
+    },
+    {
+      "path": "supabase/migrations/20261104163000_vendor_private_document_intake.sql",
+      "sha256": "dd4914f154e75e361ad862a17a702b9e72f3252e22e3c0a041616507ef3fd7d2",
+      "new": true,
+      "migration": true
+    },
+    {
+      "path": "supabase/migrations/20261104170000_vox_owner_vendor_review_queue.sql",
+      "sha256": "47dd11398806729bb93609857cf037cb3123cc0faaf703383a4885f287fe7012",
+      "new": true,
+      "migration": true
+    },
+    {
+      "path": "supabase/migrations/20261104173000_vendor_private_scan_quarantine.sql",
+      "sha256": "da53a260e9a15b39c24701e480f3d52759965406c8fbbebc2ac383767f481a68",
+      "new": true,
+      "migration": true
+    }
+  ],
+  "baseline_dependencies_preserved": [
+    "lib/supabase.ts",
+    "services/vox/verifiedStaffBearer.ts"
+  ],
+  "legacy_compatibility_overlays": [
+    "app/actions.ts",
+    "services/vendorService.ts"
+  ]
+}

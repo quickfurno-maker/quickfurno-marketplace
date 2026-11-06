@@ -18,7 +18,20 @@ import type {
 } from "../lib/types";
 
 /** Public vendor registration. Always lands as Pending + not visible. */
-export async function registerVendor(input: VendorRegistrationInput): Promise<Result<{ id: string }>> {
+export async function registerVendor(
+  input: VendorRegistrationInput,
+  trustedAuthUserId: string | null = null,
+): Promise<Result<{ id: string }>> {
+  // Legacy forms cannot bypass mandatory WhatsApp OTP on the controlled launch.
+  // This entire path remains separately disabled until explicitly authorized.
+  if ((process.env.QF_VENDOR_LEGACY_REGISTRATION_MODE !== "staging" ||
+      process.env.QF_RUNTIME_ENV !== "staging")) {
+    return {ok:false,code:"REGISTRATION_DISABLED",error:"Use verified WhatsApp vendor registration."};
+  }
+  if (trustedAuthUserId !== null &&
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trustedAuthUserId)) {
+    return {ok:false,code:"INVALID_AUTH_OWNER",error:"Authenticated vendor ownership is required."};
+  }
   try {
     // 1. Clean phone and whatsapp numbers to 10 digits
     const cleanedPhone = (input.phone ?? "").replace(/\D/g, "");
@@ -133,7 +146,7 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       status: "Pending",
       verification_status: "Pending",
       paid_status: "Unpaid",
-      is_active: !outsideServiceArea,
+      is_active: false,
       // Registration alone cannot confer matching eligibility. The Google
       // office point must be independently verified before admin activation.
       accepting_leads: false,
@@ -144,7 +157,7 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
       utm_campaign: input.utm_campaign ?? null,
       // Kept for the account-linked registration path (FK to profiles); null for
       // the public application wizard.
-      user_id: input.user_id ?? null,
+      user_id: trustedAuthUserId,
     };
 
     // Phase 1 (Google area foundation): optional Google Place identity + normalized
@@ -202,7 +215,7 @@ export async function registerVendor(input: VendorRegistrationInput): Promise<Re
         });
       }
       logSupabaseInsertError("vendors", error, {
-        has_user_id: Boolean(input.user_id),
+        has_user_id: Boolean(trustedAuthUserId),
         has_email: Boolean(input.email),
         service_count: input.service_categories?.length ?? 0,
         area_count: input.areas_covered?.length ?? 0,

@@ -1,0 +1,49 @@
+name: QF F1 Scoped Core Vendor + VOX Owner (NO DEPLOY)
+
+on:
+  pull_request:
+    paths:
+      - "app/api/vendor/onboarding/**"
+      - "app/api/vendor/private-evidence/**"
+      - "app/api/vox/v1/owner-vendor-*/**"
+      - "app/api/vox/v1/owner-workspaces/**"
+      - "app/actions.ts"
+      - "lib/storage/**"
+      - "lib/vendors/**"
+      - "lib/identity/**"
+      - "lib/types.ts"
+      - "services/vendor*.ts"
+      - "services/authOtpPurposeReservationService.ts"
+      - "services/vox/ownerWorkspaceProjection.*"
+      - "supabase/migrations/20261104*.sql"
+      - ".github/workflows/qf-f1-core-owner-vendor.yml"
+      - "scripts/mvp/launch/extract-core-owner-vendor.py"
+      - "scripts/mvp/launch/verify-core-owner-vendor.py"
+      - "scripts/mvp/launch/test_core_owner_vendor_scope.py"
+      - "docs/launch/f1-core-owner-vendor-manifest.json"
+      - "docs/launch/QF-F1-CORE-OWNER-VENDOR-EXTRACTION-20261106.md"
+
+permissions:
+  contents: read
+
+jobs:
+  exact-core-scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Validate pinned eight Core endpoints, SQL SHA and denied release flags
+        run: python3 scripts/mvp/launch/verify-core-owner-vendor.py --repo .
+      - name: Run hostile mutation and scope tests
+        run: python3 -m unittest discover -s scripts/mvp/launch -p test_core_owner_vendor_scope.py -v
+      - name: Install pinned root dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Typecheck full Marketplace Core
+        run: npm run typecheck
+      - name: Compile full Marketplace Core
+        run: npm run build
+      - name: Refuse unrelated inherited files at exact base
+        run: python3 scripts/mvp/launch/verify-core-owner-vendor.py --repo . --exact-git-diff

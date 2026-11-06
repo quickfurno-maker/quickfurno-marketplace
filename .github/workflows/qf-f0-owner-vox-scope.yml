@@ -1,0 +1,39 @@
+name: QF F0 Owner-only VOX Source Scope (NO DEPLOY)
+
+on:
+  pull_request:
+    paths:
+      - "apps/vox-web/**"
+      - ".github/workflows/qf-f0-owner-vox-scope.yml"
+      - "scripts/mvp/launch/extract-owner-vox.py"
+      - "scripts/mvp/launch/verify-owner-vox-scope.py"
+      - "scripts/mvp/launch/test_owner_vox_scope.py"
+      - "docs/launch/f0-owner-vox-file-manifest.json"
+      - "docs/launch/QF-F0-OWNER-VOX-EXTRACTION-20261106.md"
+
+permissions:
+  contents: read
+
+jobs:
+  exact-scope-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Fail-closed route scope and byte inventory
+        run: python3 scripts/mvp/launch/verify-owner-vox-scope.py --repo .
+      - name: Security mutation tests
+        run: python3 -m unittest discover -s scripts/mvp/launch -p test_owner_vox_scope.py -v
+      - name: Install pinned VOX dependencies
+        working-directory: apps/vox-web
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Owner-only VOX typecheck
+        working-directory: apps/vox-web
+        run: npm run typecheck
+      - name: Owner-only VOX compiled production build
+        working-directory: apps/vox-web
+        run: npm run build
+      - name: Recheck exact source manifest after build
+        run: python3 scripts/mvp/launch/verify-owner-vox-scope.py --repo .

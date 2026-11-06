@@ -1,0 +1,39 @@
+{
+  "policy": "quickfurno.f2.vendor-whatsapp-ui-no-deploy.v1",
+  "source_sha": "f7ffbc1dbf1f9165c7818d2cfb767be33e238c73",
+  "base_sha": "e44d4d1552431d7aaf1d03fb674c1dcef8f6e7db",
+  "code_files": 4,
+  "expected_paths": [
+    "app/vendor/page.tsx",
+    "components/VendorRegisterForm.tsx",
+    "components/vendor/VendorPrivateEvidenceForm.tsx",
+    "lib/vendors/vendorSignupUi.ts"
+  ],
+  "production_authorized": false,
+  "staging_deployed": false,
+  "provider_delivery_certified": false,
+  "owner_approval_authorized": false,
+  "staff_activation_authorized": false,
+  "scanner_certified": false,
+  "legacy_password_signup_authorized": false,
+  "files": [
+    {
+      "path": "app/vendor/page.tsx",
+      "sha256": "13d5de3ebd20048e68a5a34dc096ae62937879ef0c165df34d09c38b17252ae4"
+    },
+    {
+      "path": "components/VendorRegisterForm.tsx",
+      "sha256": "76dcf01dde730733740cc7ef2a93b2cba21d9692a0d85d95665942517c2a06e1",
+      "overlay": "pending-vendor-login-safety",
+      "donor_sha256": "b3b59d59b39040a2f1883968ce4780e3600cf250e78bde3c1a89a28aebeaf4a7"
+    },
+    {
+      "path": "components/vendor/VendorPrivateEvidenceForm.tsx",
+      "sha256": "b340ae0c3ef418ffb5439d135f22bb31c89d5d568fc96ed01653046e29d95ec8"
+    },
+    {
+      "path": "lib/vendors/vendorSignupUi.ts",
+      "sha256": "8996d8c354968432d9923f02bfba789fca9a9bfb7dacc0c7903bea98fbd1a12b"
+    }
+  ]
+}

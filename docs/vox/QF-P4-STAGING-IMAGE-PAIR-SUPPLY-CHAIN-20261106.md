@@ -39,3 +39,18 @@ Offline Staging backup restore with historical real data and seven vendor SQL re
 The validator always reports `releaseAuthorized:false` and `deploys:false`. Mutation tests reject auto-publish, bypassed main, absent typed approval, missing opt-in, wrong project URL, missing vulnerability check, missing provenance, secret injection, unpinned action and SSH deployment attempt. Syntax also verified with the existing cached YAML parser.
 
 **Operator decision:** review-only PR, no publishing and no Staging/Production deployment authorized. ClamAV and 8→16 GB upgrade remain the final-stage HOLD per Owner.
+
+
+## 6 Nov 2026 — Main-branch integration hazard verified before protected merge
+
+Direct comparison of source candidate `515aec6a` against protected `main` at `b9f8ada9` on JARVIS found **1,257 candidate-only commits and 1,545 changed paths** (109,288 added lines / 605 removed). Approximately **151 changed paths match Staff, Team Leader, Presence, Meet, task-time or attendance terms**; 84 newly introduced API route source files and 7 vendor migration files are also in the history. The independent `apps/vox-web/Dockerfile` and `apps/vox-web/package.json` are **absent on main**, so cherry-picking only this workflow and immediately publishing would fail. The branch merges cleanly at a textual level, but that is **not a product-scope release certification**.
+
+**Owner-only release constraint:** Staff **activation** remains frozen for the vendor pilot, while Staff engineering proceeds independently in Track B. Do not merge or promote the full branch stack to `main` as an incidental step to sign the image pair. First create and review a minimally scoped Owner-only Core + VOX release tree with explicit import/dependency ownership and all Staff flags OFF; independently reconcile the seven already-live Staging SQL migrations, run source/security/rollback gates, and obtain protected approval. This scoped extraction is an **OPEN engineering task**: the current PR stack is an evidence source, not itself a safe mainline release bundle.
+
+## Additional publisher integrity gates (this batch)
+
+- **Public key project binding:** An opaque `sb_publishable_` key cannot be cryptographically tied to this Staging project from its string alone; the workflow now **fails closed** on it. For the planned offline project-ref check, use the legacy Staging `anon` JWT and verify `role=anon` + `ref=uckafzuochmbvtiodmcl`; no key material is logged. Revisit the publishable-key option only after a separate trusted project binding is implemented.
+- **Push/pull swap:** Record exact Docker image IDs after both successful builds; after publishing and pulling, require both image IDs to match the recorded pre-push images before digest signing.
+- **Attestation verification:** After GitHub writes both registry provenance attestations, verify **both** immutable Core and VOX references through `gh attestation verify`; failure aborts publication certification.
+- **Authenticated attestation check:** `gh attestation verify` uses the standard ephemeral GitHub Actions `GH_TOKEN` for private-repository API access, checks both OCI digests against this repository, and fails closed if unavailable; no token is logged.
+- **QA:** source-only workflow/mutation suite and YAML parser must pass on the final committed head. Signed images remain **NOT published**, publication variables unset, PR DRAFT.

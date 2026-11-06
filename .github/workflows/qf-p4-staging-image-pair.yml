@@ -74,7 +74,9 @@ jobs:
           test -n "$STAGING_PUBLIC_KEY"
           STAGING_ANON_KEY="$STAGING_PUBLIC_KEY" node --input-type=module -e '
             const key=process.env.STAGING_ANON_KEY;
-            if(key.startsWith("sb_publishable_")&&key.length>30)process.exit(0);
+            // Opaque publishable keys cannot be project-bound offline. Prefer
+            // the Staging legacy anon JWT with a checked project ref.
+            if(key.startsWith("sb_publishable_"))process.exit(78);
             const parts=key.split(".");
             if(parts.length!==3)process.exit(78);
             try{
@@ -99,6 +101,8 @@ jobs:
           for image in "$CORE_IMAGE:$GITHUB_SHA" "$VOX_IMAGE:$GITHUB_SHA"; do
             test "$(docker image inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$GITHUB_SHA"
           done
+          docker image inspect "$CORE_IMAGE:$GITHUB_SHA" --format '{{.Id}}' > core-build-image-id.txt
+          docker image inspect "$VOX_IMAGE:$GITHUB_SHA" --format '{{.Id}}' > vox-build-image-id.txt
 
       - name: Core vulnerability scan
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
@@ -164,6 +168,9 @@ jobs:
           docker push "$VOX_IMAGE:$GITHUB_SHA"
           docker pull "$CORE_IMAGE:$GITHUB_SHA"
           docker pull "$VOX_IMAGE:$GITHUB_SHA"
+          # Refuse tag replacement between trusted build and registry roundtrip.
+          test "$(docker image inspect "$CORE_IMAGE:$GITHUB_SHA" --format '{{.Id}}')" = "$(cat core-build-image-id.txt)"
+          test "$(docker image inspect "$VOX_IMAGE:$GITHUB_SHA" --format '{{.Id}}')" = "$(cat vox-build-image-id.txt)"
           CORE_REF="$(docker image inspect "$CORE_IMAGE:$GITHUB_SHA" --format '{{index .RepoDigests 0}}')"
           VOX_REF="$(docker image inspect "$VOX_IMAGE:$GITHUB_SHA" --format '{{index .RepoDigests 0}}')"
           [[ "$CORE_REF" =~ ^ghcr.io/quickfurno-maker/quickfurno-staging-core@sha256:[0-9a-f]{64}$ ]]
@@ -206,6 +213,17 @@ jobs:
           subject-name: ghcr.io/quickfurno-maker/quickfurno-staging-vox
           subject-digest: "${{ steps.registry.outputs.vox_digest }}"
           push-to-registry: true
+
+      - name: Verify both immutable GitHub registry attestations
+        env:
+          GH_TOKEN: "${{ github.token }}"
+          CORE_REF: "${{ steps.registry.outputs.core_ref }}"
+          VOX_REF: "${{ steps.registry.outputs.vox_ref }}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh attestation verify "oci://$CORE_REF" --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh attestation verify "oci://$VOX_REF" --repo "$GITHUB_REPOSITORY" >/dev/null
 
       - name: Report signed Staging artifacts ONLY; never deploy
         env:

@@ -34,4 +34,8 @@ mutation("missing VOX attestation blocked","steps.registry.outputs.vox_digest","
 mutation("remote deployment attempt blocked","          docker push \"$CORE_IMAGE:$GITHUB_SHA\"","          ssh staging-server echo bad\n          docker push \"$CORE_IMAGE:$GITHUB_SHA\"","NO_DEPLOY_COMMANDS");
 mutation("privileged key injection blocked","          docker push \"$CORE_IMAGE:$GITHUB_SHA\"","          SUPABASE_SERVICE_ROLE_KEY=unsafe\n          docker push \"$CORE_IMAGE:$GITHUB_SHA\"","NO_SERVICE_SECRETS");
 mutation("unpinned external action blocked","actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1","actions/checkout@main","ALL_EXTERNAL_ACTIONS_PINNED");
+mutation("opaque project-unspecified public key blocked",'if(key.startsWith("sb_publishable_"))process.exit(78)','if(key.startsWith("sb_publishable_"))process.exit(0)',"OPAQUE_PUBLIC_KEY_FAIL_CLOSED");
+mutation("registry image swap blocked","$(cat core-build-image-id.txt)","$(cat unexpected-core-image.txt)","PUBLISH_MUST_MATCH_BUILD_IMAGE_IDS");
+mutation("absent Core attestation verification blocked",'gh attestation verify "oci://$CORE_REF"','echo skip-core-attestation',"VERIFY_BOTH_REGISTRY_ATTESTATIONS");
+mutation("unauthenticated private attestation verification blocked",'GH_TOKEN: "${{ github.token }}"','GH_TOKEN: ""',"AUTHENTICATED_ATTESTATION_VERIFY");
 mutation("missing signed identities blocked","cosign verify --certificate-identity","cosign verify --unsafe-ignore-signed","BOTH_COSIGN_SIGNATURES");

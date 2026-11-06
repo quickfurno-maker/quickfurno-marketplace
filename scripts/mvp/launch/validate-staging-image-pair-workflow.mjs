@@ -36,6 +36,10 @@ export function auditStagingImagePairWorkflow(s){
   test("BOTH_IMAGE_SBOMS",has(publish,"core-sbom.spdx.json")&&has(publish,"vox-sbom.spdx.json"));
   test("IMMUTABLE_REGISTRY_REFS_REQUIRED",has(publish,"core_digest=")&&has(publish,"vox_digest=")&&has(publish,"@sha256:"));
   test("BOTH_COSIGN_SIGNATURES",has(publish,"for ref in \"$CORE_REF\" \"$VOX_REF\"; do")&&has(publish,"cosign sign --yes")&&has(publish,"cosign verify --certificate-identity"));
+  test("OPAQUE_PUBLIC_KEY_FAIL_CLOSED",has(publish,'if(key.startsWith("sb_publishable_"))process.exit(78)'));
+  test("PUBLISH_MUST_MATCH_BUILD_IMAGE_IDS",has(publish,"core-build-image-id.txt")&&has(publish,"vox-build-image-id.txt")&&has(publish,'$(cat core-build-image-id.txt)')&&has(publish,'$(cat vox-build-image-id.txt)'));
+  test("VERIFY_BOTH_REGISTRY_ATTESTATIONS",has(publish,'gh attestation verify "oci://$CORE_REF"')&&has(publish,'gh attestation verify "oci://$VOX_REF"'));
+  test("AUTHENTICATED_ATTESTATION_VERIFY",has(publish,'GH_TOKEN: "${{ github.token }}"'));
   test("BOTH_ATTESTATIONS",has(publish,"steps.registry.outputs.core_digest")&&has(publish,"steps.registry.outputs.vox_digest")&&(publish.match(/actions\/attest-build-provenance@/g)||[]).length===2);
   test("NO_DEPLOY_COMMANDS",!(/^\s*(?:sudo\s+)?(?:ssh|scp|kubectl|helm|rsync|docker\s+(?:run|compose|stack|service))\b/m.test(publish)));
   test("NO_SERVICE_SECRETS",!(/SUPABASE_SERVICE_ROLE_KEY|QF_RUNTIME_ENV=production|QF_PRODUCTION_/i.test(publish)));

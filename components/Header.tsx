@@ -164,7 +164,7 @@ export function Header() {
             <small>{location ? "Change" : "Choose"}</small>
           </button>
           <EnquiryModalTrigger className="qf-header-cta" source="Global public header">
-            Get up to 3 matches
+            Check availability
           </EnquiryModalTrigger>
 
         </div>
@@ -188,7 +188,7 @@ export function Header() {
             source="Global public mobile menu"
             onClick={() => setOpen(false)}
           >
-            Get up to 3 matches
+            Check availability
           </EnquiryModalTrigger>
         </nav>
       ) : null}

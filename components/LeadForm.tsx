@@ -103,7 +103,7 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
         lead_id: result.data.id,
         is_duplicate: result.data.is_duplicate,
       });
-      setSuccess("Thank you. QuickFurno will match you with 3 verified vendors shortly.");
+      setSuccess("Thank you. Your enquiry was received. We'll check availability before any vendor introductions.");
       setForm(initialState);
       setShareConsent(false);
     } catch (err) {
@@ -120,8 +120,8 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
     <form id="lead-form" className={`lead-form-card ${compact ? "lead-form-card--compact" : ""}`} onSubmit={handleSubmit}>
       <div className="form-card-header">
         <span className="eyebrow">Free client enquiry</span>
-        <h2>Get matched with 3 verified vendors</h2>
-        <p>Verified vendors • Fast response • No obligation</p>
+        <h2>Check eligible vendor availability</h2>
+        <p>Up to 3 introductions when available • No obligation</p>
       </div>
 
       {error ? (

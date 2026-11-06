@@ -27,7 +27,7 @@ const CTAS = [
     body:
       "Get approved pros for interiors, carpentry, modular, painting, sofa, civil work and false " +
       "ceiling in Pune.",
-    btn: "Get up to 3 matches",
+    btn: "Check availability",
     href: "/",
     enquiry: true,
     primary: false,

@@ -539,7 +539,7 @@ check("25A [semantic] generic public quote CTAs do not bypass the main modal", (
 });
 
 check("25B [semantic] footer homeowner CTA uses the same main enquiry modal", () => {
-  assert(/btn:\s*"Get up to 3 matches"/.test(FOOTER_SRC), "footer homeowner CTA copy drifted");
+  assert(/btn:\s*"Check availability"/.test(FOOTER_SRC), "footer homeowner CTA must be availability-aware");
   assert(/source="Footer homeowner CTA"/.test(FOOTER_SRC), "footer homeowner CTA no longer uses the shared modal authority");
   assert(/<EnquiryModalTrigger[\s\S]{0,320}source="Footer homeowner CTA"[\s\S]{0,420}\{cta\.btn\}[\s\S]{0,120}<\/EnquiryModalTrigger>/.test(FOOTER_SRC),
     "footer homeowner CTA is not rendered by EnquiryModalTrigger");
@@ -560,8 +560,8 @@ check("27 [semantic] homepage keeps multiple non-duplicate conversion entry poin
   const headerHits = PUBLIC_HEADER_SRC.match(/<EnquiryModalTrigger/g) || [];
   const total = pageHits.length + headerHits.length;
   assert(total >= 5, `expected at least 5 enquiry entry points including the universal header, found ${total}`);
-  assert(/Get up to 3 matches/.test(FINAL_HOME_SRC) || /Get up to 3 matches/.test(PUBLIC_HEADER_SRC),
-    "bounded matching CTA copy is gone");
+  assert(/Check local availability/.test(FINAL_HOME_SRC) || /Check availability/.test(PUBLIC_HEADER_SRC),
+    "availability-aware matching CTA copy is gone");
   assert(/Homepage not-sure card/.test(FINAL_HOME_SRC), "the alternate homeowner entry point is gone");
 });
 
@@ -699,7 +699,7 @@ check("U44 the submit CTA is NOT inside the scrolling body", () => {
   const footerAt = MODAL_SRC.indexOf('className="qf-rf-footer qf-sf-footer"');
   const insideBody = MODAL_SRC.slice(bodyAt, footerAt);
   assert(!/qf-sf-cta/.test(insideBody), "the submit CTA was moved into the scroll body");
-  assert(!/Get up to 3 matches/.test(insideBody), "the submit CTA label appears inside the scroll body");
+  assert(!/Submit enquiry/.test(insideBody), "the submit CTA label appears inside the scroll body");
 });
 
 check("U45 qf-sf-cta lives inside qf-sf-footer", () => {
@@ -707,12 +707,12 @@ check("U45 qf-sf-cta lives inside qf-sf-footer", () => {
   const footerEnd = MODAL_SRC.indexOf("</footer>", footerAt);
   const footer = MODAL_SRC.slice(footerAt, footerEnd);
   assert(/qf-sf-cta/.test(footer), "qf-sf-cta is no longer inside the submit footer");
-  assert(/Get up to 3 matches/.test(footer), "the CTA label left the submit footer");
+  assert(/Submit enquiry/.test(footer), "the CTA label left the submit footer");
   assert(/qf-sf-trust/.test(footer), "the trust line left the submit footer");
 });
 
 check("U46 the CTA label appears exactly once in the modal", () => {
-  const hits = (MODAL_SRC.match(/Get up to 3 matches/g) || []).length;
+  const hits = (MODAL_SRC.match(/Submit enquiry/g) || []).length;
   assert(hits === 1, `expected exactly 1 CTA label, found ${hits}`);
 });
 

@@ -18,6 +18,7 @@
 // ============================================================================
 
 import { META_CALLBACK_ID_GRAMMAR } from "./metaCallbackIdentity";
+import { isExactWhatsappSenderForLane } from "../whatsappAuthLaneIsolation";
 
 export const WHATSAPP_PROVIDER_MODE_ENV = "WHATSAPP_PROVIDER_MODE";
 
@@ -238,28 +239,68 @@ export function resolveWebhookIdentityConfig(env: EnvSource = process.env): Conf
   return { ok: true, config: { wabaId: wabaId as string, phoneNumberId: phoneNumberId as string } };
 }
 
+/**
+ * F8: no new Meta application or webhook endpoint is needed. The existing
+ * signature/identity authority can recognize Riya's client number and
+ * Anisha's vendor number in the SAME signed Meta callback receiver.
+ *
+ * The optional conversational account (Aarohi, when assigned) retains its
+ * historical shape and support for multiple phone IDs under one WABA.
+ * The dedicated vendor pair is stricter: it must match the locked Vendor
+ * WABA/phone AND the primary must be the locked Client/Riya WABA/phone.
+ * No half-configured, swapped or shared sender can authorize callbacks.
+ * All failures return variable NAMES only; never credentials or values.
+ */
 export function resolveWebhookIdentityRegistryConfig(
   env: EnvSource = process.env,
 ): ConfigResult<{ identities: readonly MetaWebhookIdentityConfig[] }> {
   const primary = resolveWebhookIdentityConfig(env);
   if (!primary.ok) return primary;
-
-  const convPhone = readTrimmed(env, WHATSAPP_CONVERSATIONAL_PHONE_NUMBER_ID_ENV);
-  const convWaba = readTrimmed(env, WHATSAPP_CONVERSATIONAL_WABA_ID_ENV);
-  if (convPhone === null && convWaba === null) {
-    return { ok: true, identities: [primary.config] };
-  }
-
+  const identities: MetaWebhookIdentityConfig[] = [primary.config];
   const missing: string[] = [];
   const invalid: string[] = [];
-  const phoneNumberId = readIdVar(env, WHATSAPP_CONVERSATIONAL_PHONE_NUMBER_ID_ENV, missing, invalid);
-  const wabaId = readIdVar(env, WHATSAPP_CONVERSATIONAL_WABA_ID_ENV, missing, invalid);
-  if (missing.length || invalid.length) return { ok: false, missing, invalid };
 
-  const identities = [primary.config];
-  if (phoneNumberId !== primary.config.phoneNumberId || wabaId !== primary.config.wabaId) {
-    identities.push({ phoneNumberId: phoneNumberId as string, wabaId: wabaId as string });
+  const extras = [
+    { kind: "conversational", waba: WHATSAPP_CONVERSATIONAL_WABA_ID_ENV,
+      phone: WHATSAPP_CONVERSATIONAL_PHONE_NUMBER_ID_ENV },
+    { kind: "vendor", waba: "WHATSAPP_VENDOR_WABA_ID",
+      phone: "WHATSAPP_VENDOR_PHONE_NUMBER_ID" },
+  ] as const;
+
+  for (const item of extras) {
+    const anyWaba = readTrimmed(env, item.waba);
+    const anyPhone = readTrimmed(env, item.phone);
+    if (anyWaba === null && anyPhone === null) continue;
+
+    // Both IDs must be provided together, syntactically validated, and bound
+    // to their proper lane before the existing signed callback gate runs.
+    const wabaId = readIdVar(env, item.waba, missing, invalid);
+    const phoneNumberId = readIdVar(env, item.phone, missing, invalid);
+    if (!wabaId || !phoneNumberId) continue;
+
+    if (item.kind === "vendor") {
+      if (!isExactWhatsappSenderForLane("client", primary.config) ||
+          !isExactWhatsappSenderForLane("vendor", { wabaId, phoneNumberId }) ||
+          identities.some((current) =>
+            current.wabaId === wabaId || current.phoneNumberId === phoneNumberId)) {
+        invalid.push(item.waba, item.phone);
+        continue;
+      }
+    } else {
+      // Keep legacy same-WABA, different-phone conversational support.
+      // But a single phone id can never be attributed to two WABAs.
+      if (identities.some((current) =>
+          current.phoneNumberId === phoneNumberId && current.wabaId !== wabaId)) {
+        invalid.push(item.waba, item.phone);
+        continue;
+      }
+      if (identities.some((current) =>
+          current.phoneNumberId === phoneNumberId && current.wabaId === wabaId)) continue;
+    }
+    identities.push({ wabaId, phoneNumberId });
   }
+
+  if (missing.length || invalid.length) return { ok: false, missing, invalid };
   return { ok: true, identities };
 }
 

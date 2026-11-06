@@ -24,7 +24,7 @@ Ran **the exact source** `scripts/mvp/launch/qf-f9-staging-whatsapp-readonly.sql
 
 - F5 [Draft #508](https://github.com/quickfurno-maker/quickfurno-marketplace/pull/508) head `7f2f595db8d407ba6b25f4783691a2f4d0748922`: dedicated F5 workflow SUCCESS.
 - F6 [Draft #509](https://github.com/quickfurno-maker/quickfurno-marketplace/pull/509) head `0d0aa496b97359feea10c3bd946e729eb71231b4`: dedicated F6 workflow SUCCESS.
-- F7 [Draft #510](https://github.com/quickfurno-maker/quickfurno-marketplace/pull/510) head `61bb1ce1e06cf138fe65ed10fe03c0c15557d931`: dedicated F7 workflow SUCCESS; inherited F1/F5/F6 exact-scope checks FAILED against legitimate stacked F7 files. These failures were NOT masked, retried into unrelated branches, overridden or waived.
+- F7 [Draft #510](https://github.com/quickfurno-maker/quickfurno-marketplace/pull/510) head `61bb1ce1e06cf138fe65ed10fe03c0c15557d931`: dedicated F7 workflow SUCCESS, but cross-phase recertification is **NOT complete**. Specifically, inherited **F1 failed** its pinned eight-Core-endpoint/source manifest and denied-flags gate; **F5 failed** its pinned eight returning-login source/flag gate; **F6 failed** its exact-diff no-deploy gate. These failures reflect protected code changed by later PRs and must be investigated/re-certified in a new controlled integration review. They have **NOT** been waived, concealed or fixed by weakening prior gates.
 - F8 [Draft #511](https://github.com/quickfurno-maker/quickfurno-marketplace/pull/511) head `c2a5443e3eeae78882f1822d7be6626bada15aa1`: dedicated F8 workflow 13/13 SUCCESS.
 - F9 is stacked on F8 with its own strict no-deploy scope. It does not modify the previous protected source-scope workflows.
 

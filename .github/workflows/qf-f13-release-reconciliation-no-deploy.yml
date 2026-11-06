@@ -1,0 +1,40 @@
+name: QF F13 Staging Reconciliation (NO DEPLOY)
+on:
+  pull_request:
+    paths:
+      - "scripts/mvp/launch/f13-*"
+      - "docs/launch/qf-f13-*"
+      - "docs/launch/QF-F13-*"
+      - ".github/workflows/qf-f13-release-reconciliation-no-deploy.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reconcile-no-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: F13 actual known migration inventory and adversarial tests
+        run: |
+          node --test scripts/mvp/launch/f13-release-reconciliation.test.mjs
+          node scripts/mvp/launch/f13-release-reconciliation.mjs --stdin < docs/launch/qf-f13-release-reconciliation-20261106.json > /tmp/f13-result.json
+          node -e 'const f=require("fs"),x=JSON.parse(f.readFileSync("/tmp/f13-result.json"));if(x.releaseVerdict!=="HOLD"||x.mayDeployStaging!==false||x.maySendOtp!==false||x.migrationVersionsRegistered!==true)process.exit(1)'
+      - name: Preserve F12 historical safety gate
+        run: node --test scripts/mvp/launch/f12-core-runtime-release-gate.test.mjs
+      - name: Disallow runtime migrations, deployments or unexpected scope
+        run: |
+          git diff --name-only 56aa7959285f4f2b19fbf3e3c90a0fa38bb2ba50 HEAD | sort > /tmp/f13-actual
+          printf '%s\n' \
+            '.github/workflows/qf-f13-release-reconciliation-no-deploy.yml' \
+            'docs/launch/QF-F13-INTEGRATION-PREFLIGHT-20261106.md' \
+            'docs/launch/qf-f13-release-reconciliation-20261106.json' \
+            'scripts/mvp/launch/f13-release-reconciliation.mjs' \
+            'scripts/mvp/launch/f13-release-reconciliation.test.mjs' | sort > /tmp/f13-expected
+          diff -u /tmp/f13-expected /tmp/f13-actual

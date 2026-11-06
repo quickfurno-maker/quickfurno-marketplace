@@ -62,7 +62,7 @@ export const vendorWhatsappReturningModeEnabled = () =>
   process.env.QF_VENDOR_OTP_REQUEST_MODE === "staging" &&
   process.env.QF_VENDOR_WHATSAPP_PROVIDER_CERTIFIED === "staging" &&
   process.env.QF_VENDOR_SHARED_SIGNED_HOOK_CERTIFIED === "staging" &&
-  process.env.QF_VENDOR_TRUSTED_WHATSAPP_PROVIDER === "meta_whatsapp";
+  process.env.QF_VENDOR_TRUSTED_WHATSAPP_PROVIDER === "meta_whatsapp_cloud";
 
 const CLOSED: VendorWhatsappLoginResult = { ok: false, code: RETURNING_VENDOR_LOGIN_FAILED };
 
@@ -79,7 +79,7 @@ export async function verifyReturningVendorWhatsappLogin(
   const verified = await verifyVendorSignupWhatsappOtp(
     { mobile: normalized, token },
     { resolveApprovedProvider: async () =>
-      vendorWhatsappReturningModeEnabled() ? "meta_whatsapp" : null },
+      vendorWhatsappReturningModeEnabled() ? "meta_whatsapp_cloud" : null },
   );
   if (!verified.ok) return CLOSED;
 

@@ -13,6 +13,10 @@
 import "server-only";
 import { adminClient, serverClient } from "../lib/supabase";
 import { hashPhoneE164 } from "../lib/communication/phone";
+import {
+  hasValidVendorAccountIdentity,
+  VENDOR_OTP_PROVIDER_KEY,
+} from "../lib/communication/vendorWhatsappOtpTransport";
 import { readClaimedVendorOtpPurpose } from "./authOtpPurposeReservationService";
 import type {
   VendorOtpAdmissionEvidence,
@@ -43,8 +47,7 @@ export async function inspectVendorOtpEvidenceForCurrentSession(
 ): Promise<VendorOtpEvidenceReadResult | null> {
   if (process.env.QF_VENDOR_OTP_EVIDENCE_READ_ENABLED !== "staging" ||
       !PHONE.test(expectedPhoneE164) ||
-      typeof providerRequired !== "string" || !providerRequired.trim() ||
-      ["mock", "fake", "test", "development", "local"].includes(providerRequired.trim().toLowerCase())) {
+      providerRequired !== VENDOR_OTP_PROVIDER_KEY) {
     return null;
   }
   try {
@@ -61,9 +64,27 @@ export async function inspectVendorOtpEvidenceForCurrentSession(
     if (!claim) return null;
     const destinationHash = hashPhoneE164(expectedPhoneE164);
 
-    const { data, error } = await adminClient()
+    // The provider key "meta_whatsapp_cloud" spans BOTH Meta WABAs.
+    // Authentic vendor OTP evidence must therefore bind to the exact Anisha
+    // provider-account UUID, independently resolved from the correct WABA,
+    // sender, readiness and health rows. A Riya message with the same generic
+    // provider key is never sufficient.
+    const db = adminClient();
+    const { data: accounts, error: accountError } = await db
+      .from("communication_provider_accounts")
+      .select("id,provider_key,channel,business_account_reference,phone_number_reference,readiness_status,configuration_status,phone_number_status,webhook_status,billing_status,health_status,business_verification_status")
+      .eq("provider_key", VENDOR_OTP_PROVIDER_KEY)
+      .eq("channel", "whatsapp")
+      .eq("phone_number_reference", "1088396637681784")
+      .limit(2);
+    if (accountError || !Array.isArray(accounts) || accounts.length !== 1 ||
+        !hasValidVendorAccountIdentity(accounts[0]) ||
+        typeof accounts[0].id !== "string" || !UUID.test(accounts[0].id)) return null;
+    const vendorAccountId = accounts[0].id;
+
+    const { data, error } = await db
       .from("communication_messages")
-      .select("message_type,lane,channel,recipient_type,entity_type,entity_id,destination_hash,provider,correlation_id,status,created_at")
+      .select("message_type,lane,channel,recipient_type,entity_type,entity_id,destination_hash,provider,provider_account_id,correlation_id,status,created_at")
       .eq("message_type", "vendor_login_otp")
       .eq("lane", "authentication")
       .eq("channel", "whatsapp")
@@ -72,6 +93,7 @@ export async function inspectVendorOtpEvidenceForCurrentSession(
       .eq("entity_id", user.id)
       .eq("destination_hash", destinationHash)
       .eq("provider", providerRequired)
+      .eq("provider_account_id", vendorAccountId)
       .eq("correlation_id", claim.verifiedWebhookId)
       .in("status", AUTH_SUCCESS)
       .order("created_at", { ascending: false })
@@ -85,6 +107,7 @@ export async function inspectVendorOtpEvidenceForCurrentSession(
         row.entity_type !== "auth_user" || row.entity_id !== user.id ||
         row.destination_hash !== destinationHash ||
         row.provider !== providerRequired ||
+        row.provider_account_id !== vendorAccountId ||
         row.correlation_id !== claim.verifiedWebhookId ||
         !AUTH_SUCCESS.includes(String(row.status)) ||
         typeof row.created_at !== "string") return null;

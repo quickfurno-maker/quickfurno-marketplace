@@ -41,7 +41,7 @@ function sameOrigin(request:Request):boolean{
 const provider=async():Promise<string|null>=>{
  if(!enabled())return null;
  const p=process.env.QF_VENDOR_TRUSTED_WHATSAPP_PROVIDER;
- return p==="meta_whatsapp" ? p : null;
+ return p==="meta_whatsapp_cloud" ? p : null;
 };
 
 export async function POST(request:Request):Promise<Response>{

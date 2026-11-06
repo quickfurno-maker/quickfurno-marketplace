@@ -36,10 +36,10 @@ jobs:
         run: python3 scripts/mvp/launch/verify-vendor-frontend.py --repo .
       - name: Adversarial source mutation and scope tests
         run: python3 -m unittest discover -s scripts/mvp/launch -p test_vendor_frontend_scope.py -v
-      - name: Existing WhatsApp and private-evidence UI contracts
-        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/vendor/vendor-phase2-ui-contract.test.mjs
       - name: Install pinned Marketplace dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Existing WhatsApp and private-evidence UI contracts
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/vendor/vendor-phase2-ui-contract.test.mjs
       - name: Typecheck complete Marketplace and vendor form
         run: npm run typecheck
       - name: Compile complete Marketplace Core and vendor frontend

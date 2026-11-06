@@ -67,6 +67,11 @@ import {
 import { startAuthHookDeadline, type AuthNetworkDeadline } from "../lib/auth/hookDeadline";
 import { ephemeralAuthDestination, type CommunicationIntent } from "../lib/communication/types";
 import { evaluateClientLoginOtpGate } from "./clientOtpAutomationService";
+import { claimSignedAuthOtpPurpose } from "./authOtpPurposeReservationService";
+import {
+  canUseSignedClientOtpDispatch,
+  mustEnforceSignedAuthLaneIsolation,
+} from "../lib/communication/whatsappAuthLaneIsolation";
 import {
   ClientOtpDeliveryKind,
   deliverClientLoginOtp,
@@ -333,6 +338,31 @@ export async function handleSupabaseSendSmsHook(
     const parsed = parseSendSmsHookEvent(verification.payload);
     if (!parsed.ok) return reject(SendSmsHookRejectReason.MALFORMED_PAYLOAD);
     const event = parsed.event;
+
+    // F6 hard sender partition, enabled only for the source-only vendor Staging
+    // activation path. This shared Hook currently has a CLIENT dispatcher only.
+    // The service-role signed purpose claim is mandatory when any vendor hook
+    // certification flag is enabled: vendor_login, null, ambiguous or spoofed
+    // purposes cannot silently fall through to Riya's client number.
+    // Do NOT dispatch a vendor OTP here until a distinct vendor transport and
+    // provider-account/receipt certification is implemented and signed.
+    if (mustEnforceSignedAuthLaneIsolation(process.env)) {
+      const signedPurpose = await claimSignedAuthOtpPurpose({
+        phoneE164: event.phoneE164,
+        authUserId: event.authUserId,
+        verifiedWebhookId: headers.webhookId,
+      });
+      if (!canUseSignedClientOtpDispatch(signedPurpose, {
+        wabaId: process.env.WHATSAPP_WABA_ID ?? "",
+        phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID ?? "",
+      })) {
+        return {
+          kind: SendSmsHookOutcomeKind.SERVICE_UNAVAILABLE,
+          dispatchAttempted: false,
+          webhookId: headers.webhookId,
+        };
+      }
+    }
 
     // 6) Operational gate — the production kill-switch. Disabled → do not dispatch.
     const gate = await evaluateClientLoginOtpGate();

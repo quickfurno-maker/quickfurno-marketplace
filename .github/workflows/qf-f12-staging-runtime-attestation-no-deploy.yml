@@ -1,0 +1,57 @@
+name: QF F12 Real Staging Runtime Drift Attestation (NO DEPLOY)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/mvp/launch/f12-core-runtime-release-gate.mjs"
+      - "scripts/mvp/launch/f12-core-runtime-release-gate.test.mjs"
+      - "scripts/mvp/launch/verify-f12-runtime-attestation-scope.py"
+      - ".github/workflows/qf-f12-staging-runtime-attestation-no-deploy.yml"
+      - "docs/launch/qf-f12-staging-core-attestation-20261106.json"
+      - "docs/launch/QF-F12-STAGING-CORE-RUNTIME-DRIFT-20261106.md"
+
+permissions:
+  contents: read
+
+jobs:
+  certify-actual-staging-hold:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout exact proposed release evidence
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Node 24
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+      - name: Verify immutable no-secret Staging evidence and scope
+        run: python3 scripts/mvp/launch/verify-f12-runtime-attestation-scope.py --repo .
+      - name: Run F12 drift source-only 22 tests
+        run: node --test scripts/mvp/launch/f12-core-runtime-release-gate.test.mjs
+      - name: Check actual observed Staging snapshot produces HOLD
+        run: |
+          node scripts/mvp/launch/f12-core-runtime-release-gate.mjs --stdin < docs/launch/qf-f12-staging-core-attestation-20261106.json | grep -q '"releaseVerdict":"HOLD"'
+          node scripts/mvp/launch/f12-core-runtime-release-gate.mjs --stdin < docs/launch/qf-f12-staging-core-attestation-20261106.json | grep -q 'OLD_VENDOR_WABA_PAIRED_WITH_ANISHA_PHONE'
+      - name: Install pinned Marketplace dependency tree
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Revalidate F11 signed webhook and perimeter tests
+        run: node --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/vendor/vendor-signed-callback-preflight.test.mjs scripts/mvp/launch/f11-callback-perimeter-policy.test.mjs
+      - name: Revalidate cross-phase F10 security source manifest
+        run: python3 scripts/mvp/launch/verify-f10-cross-phase-whatsapp-recert.py --repo .
+      - name: Revalidate F10 29 guarded original source mutations
+        run: python3 -m unittest discover -s scripts/mvp/launch -p test_f10_cross_phase_recert.py -v
+      - name: Riya Anisha F9-F6 and returning vendor regressions
+        run: node --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/vendor/vendor-staging-readiness.test.mjs scripts/mvp/vendor/vendor-dual-waba-webhook-registry.test.mjs scripts/mvp/vendor/vendor-dedicated-otp-transport.test.mjs scripts/mvp/vendor/vendor-whatsapp-lane-isolation.test.mjs scripts/mvp/vendor/vendor-returning-login.test.mjs
+      - name: Existing 46 Jarvis WhatsApp regression cases
+        run: node --import ./scripts/mvp/loader/register.mjs scripts/mvp/jarvis/validate-qf-whatsapp-jarvis-readiness.mjs
+      - name: Full Marketplace typecheck
+        run: npm run typecheck
+      - name: Full optimized Next build
+        run: npm run build
+      - name: Compiled Owner NO SEND localhost HOLD
+        run: node scripts/mvp/launch/smoke-f9-owner-whatsapp-no-send.mjs
+      - name: Exact six-file F12 NO DEPLOY diff
+        run: python3 scripts/mvp/launch/verify-f12-runtime-attestation-scope.py --repo . --exact-git-diff

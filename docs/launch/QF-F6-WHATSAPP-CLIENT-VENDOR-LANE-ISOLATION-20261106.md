@@ -19,7 +19,7 @@
 
 ## Source changes in F6
 
-1. `lib/identity/whatsappAuthLaneIsolation.ts`: pinned pairs and intended templates; pure exact-match identity guard. Missing/unknown signed OTP purpose is never default client. Mixed IDs and swapped WABAs always reject.
+1. `lib/communication/whatsappAuthLaneIsolation.ts`: pinned pairs and intended templates; pure exact-match identity guard. Missing/unknown signed OTP purpose is never default client. Mixed IDs and swapped WABAs always reject.
 2. `services/supabaseSendSmsHookService.ts`: existing Client/Riya delivery stays untouched by default. **If** any vendor shared-Hook staging certification flag is switched on, immediately require a real, private HMAC/reservation-backed `claimSignedAuthOtpPurpose`, and require a true `client_login` purpose plus the pinned *client* WABA and sender before legacy client dispatcher. A `vendor_login` claim is explicitly held as `SERVICE_UNAVAILABLE`, with no provider send, no retry header, no SMS fallback, and no automatic client redirection.
 3. `scripts/mvp/vendor/vendor-whatsapp-lane-isolation.test.mjs`: 20 pure/structural tests for positive identity pairs, mixed and swapped identities, purpose forgery, client versus vendor template name, no-purpose hold, and actual signed-Hook enforcement ordered before client dispatch.
 4. Dedicated source-only CI exercises exact branch scope and complete Marketplace typecheck/Next build; no managed service changes.

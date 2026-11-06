@@ -3,7 +3,7 @@ name: QF F6 Client Vendor WhatsApp Sender Isolation (NO DEPLOY)
 on:
   pull_request:
     paths:
-      - "lib/identity/whatsappAuthLaneIsolation.ts"
+      - "lib/communication/whatsappAuthLaneIsolation.ts"
       - "services/supabaseSendSmsHookService.ts"
       - "scripts/mvp/vendor/vendor-whatsapp-lane-isolation.test.mjs"
       - "scripts/mvp/launch/verify-whatsapp-lane-isolation-scope.py"

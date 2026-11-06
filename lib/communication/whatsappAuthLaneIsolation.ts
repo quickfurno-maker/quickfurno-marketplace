@@ -5,7 +5,7 @@
  * Caller-supplied WABA, phone, OTP purpose, and template cannot change lanes.
  * The checks are pure and operate before ANY send or provider invocation.
  */
-import { AUTH_OTP_PURPOSE, type AuthOtpPurpose } from "./authOtpPurposePolicy";
+import { AUTH_OTP_PURPOSE, type AuthOtpPurpose } from "../identity/authOtpPurposePolicy";
 
 export type WhatsappAuthLane = "client" | "vendor";
 export interface WhatsappSenderIdentity {

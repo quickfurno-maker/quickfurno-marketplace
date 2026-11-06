@@ -8,7 +8,7 @@ import {
   isExactWhatsappSenderForLane as match,
   canUseSignedClientOtpDispatch as clientDispatch,
   mustEnforceSignedAuthLaneIsolation as enforce,
-} from "../../../lib/identity/whatsappAuthLaneIsolation.ts";
+} from "../../../lib/communication/whatsappAuthLaneIsolation.ts";
 
 const client=ids.client;
 const vendor=ids.vendor;

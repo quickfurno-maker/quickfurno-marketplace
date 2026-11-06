@@ -71,7 +71,7 @@ import { claimSignedAuthOtpPurpose } from "./authOtpPurposeReservationService";
 import {
   canUseSignedClientOtpDispatch,
   mustEnforceSignedAuthLaneIsolation,
-} from "../lib/identity/whatsappAuthLaneIsolation";
+} from "../lib/communication/whatsappAuthLaneIsolation";
 import {
   ClientOtpDeliveryKind,
   deliverClientLoginOtp,

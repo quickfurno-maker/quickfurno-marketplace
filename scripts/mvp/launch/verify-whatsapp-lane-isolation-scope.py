@@ -6,7 +6,7 @@ from pathlib import Path
 
 BASE="7f2f595db8d407ba6b25f4783691a2f4d0748922"
 ALLOWED={
- "lib/identity/whatsappAuthLaneIsolation.ts",
+ "lib/communication/whatsappAuthLaneIsolation.ts",
  "services/supabaseSendSmsHookService.ts",
  "scripts/mvp/vendor/vendor-whatsapp-lane-isolation.test.mjs",
  "scripts/mvp/launch/verify-whatsapp-lane-isolation-scope.py",
@@ -14,14 +14,14 @@ ALLOWED={
  "docs/launch/QF-F6-WHATSAPP-CLIENT-VENDOR-LANE-ISOLATION-20261106.md",
 }
 REQUIRED={
- "lib/identity/whatsappAuthLaneIsolation.ts",
+ "lib/communication/whatsappAuthLaneIsolation.ts",
  "services/supabaseSendSmsHookService.ts",
  "scripts/mvp/vendor/vendor-whatsapp-lane-isolation.test.mjs",
 }
 def audit(repo:Path,changed=None):
  bad=[]
  try:
-  policy=(repo/"lib/identity/whatsappAuthLaneIsolation.ts").read_text(encoding="utf8")
+  policy=(repo/"lib/communication/whatsappAuthLaneIsolation.ts").read_text(encoding="utf8")
   hook=(repo/"services/supabaseSendSmsHookService.ts").read_text(encoding="utf8")
   for expected in ("27861262223494153","1333595106493545","1569174604351612","1088396637681784","qf_client_auth_otp","qf_vendor_auth_otp"):
    if expected not in policy:bad.append("missing_lane_identity:"+expected)

@@ -1,0 +1,51 @@
+name: QF F3 Google Places SDK Reliability (NO DEPLOY)
+
+on:
+  pull_request:
+    paths:
+      - "lib/google-maps/loadGoogleMaps.ts"
+      - "scripts/mvp/location/validate-google-places-bounded-import.test.mjs"
+      - "scripts/mvp/location/validate-google-places-singleflight.test.mjs"
+      - "scripts/mvp/location/validate-google-places-timeout.test.mjs"
+      - "scripts/mvp/launch/verify-google-places-reliability.py"
+      - "scripts/mvp/launch/test_google_places_reliability_scope.py"
+      - "docs/launch/f3-google-places-source-manifest.json"
+      - "docs/launch/F3-GOOGLE-PLACES-BOUNDED-LOADER-20261106.md"
+      - ".github/workflows/qf-f3-google-places-reliability.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  scoped-places-and-vendor-compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Read-only pinned source checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Setup pinned Node 24
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+      - name: Verify source SHA and unmodified live-provider holds
+        run: python3 scripts/mvp/launch/verify-google-places-reliability.py --repo .
+      - name: Hostile contract mutation tests
+        run: python3 -m unittest discover -s scripts/mvp/launch -p test_google_places_reliability_scope.py -v
+      - name: Install pinned Marketplace dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Three SDK timeout/singleflight/recovery test suites
+        run: |
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/location/validate-google-places-bounded-import.test.mjs
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/location/validate-google-places-singleflight.test.mjs
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/location/validate-google-places-timeout.test.mjs
+      - name: Marketplace Core TypeScript contract
+        run: npm run typecheck
+      - name: Compile Marketplace Core and vendor signup
+        run: npm run build
+      - name: Confirm no provider activation after location code change
+        run: node scripts/mvp/launch/smoke-vendor-frontend.mjs
+      - name: Verify exact release diff
+        run: python3 scripts/mvp/launch/verify-google-places-reliability.py --repo . --exact-git-diff

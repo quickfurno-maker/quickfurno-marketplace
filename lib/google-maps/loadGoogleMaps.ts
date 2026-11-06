@@ -26,6 +26,10 @@ declare global {
 
 const SCRIPT_ID = "qf-google-maps-js";
 const RUNTIME_CONFIG_URL = "/api/public/google-maps-config";
+// An already-loaded but nonfunctional bootstrap may never emit another event.
+// Bound the initialization promise so manual location entry never hangs.
+const PLACES_BOOTSTRAP_TIMEOUT_MS = 8000;
+const RUNTIME_KEY_TIMEOUT_MS = 2500;
 
 /** Build-time browser key, trimmed — or null when it was not embedded. */
 export function getGoogleMapsBrowserKey(): string | null {
@@ -46,6 +50,7 @@ async function resolveGoogleMapsBrowserKey(): Promise<string | null> {
     const response = await fetch(RUNTIME_CONFIG_URL, {
       method: "GET",
       cache: "no-store",
+      signal: AbortSignal.timeout(RUNTIME_KEY_TIMEOUT_MS),
       headers: { Accept: "application/json" },
     });
     if (!response.ok) return null;
@@ -70,6 +75,33 @@ function isUsablePlaces(lib: unknown): lib is PlacesLibrary {
       p.AutocompleteSuggestion &&
       typeof p.AutocompleteSuggestion.fetchAutocompleteSuggestions === "function",
   );
+}
+
+/**
+ * The Google script can exist while importLibrary("places") never settles.
+ * Bound BOTH preloaded-script and script-load branches to prevent an unending
+ * location spinner after failed billing, a blocked API, or a stalled SDK.
+ */
+export async function boundedPlacesImport(
+  importPlaces: () => Promise<unknown>,
+  timeoutMs = PLACES_BOOTSTRAP_TIMEOUT_MS,
+): Promise<PlacesLibrary | null> {
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 ||
+      timeoutMs > PLACES_BOOTSTRAP_TIMEOUT_MS) return null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const library = await Promise.race([
+      Promise.resolve().then(importPlaces),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), timeoutMs);
+      }),
+    ]);
+    return isUsablePlaces(library) ? library : null;
+  } catch {
+    return null;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
 }
 
 function cacheRecoverablePlacesPromise(
@@ -99,13 +131,17 @@ export function loadGoogleMaps(): Promise<PlacesLibrary | null> {
   // SSR / non-browser — never touch window on the server.
   if (typeof window === "undefined") return Promise.resolve(null);
 
-  // If Google finished booting after a previous failed attempt, recover from
-  // the already-loaded global immediately instead of trusting stale cached state.
+  // Multiple location fields on the same page must share the *same* pending
+  // SDK initialization. Otherwise a preloaded Google global can start parallel
+  // importLibrary calls, even if an earlier import is still in flight.
+  if (window.__qfGooglePlacesPromise) return window.__qfGooglePlacesPromise;
+
+  // After a failed import, the cache is cleared; a later interaction can
+  // recover from an SDK that finished loading in the meantime.
   if (typeof window.google?.maps?.importLibrary === "function") {
     const recovered = (async (): Promise<PlacesLibrary | null> => {
       try {
-        const lib = await window.google!.maps!.importLibrary!("places");
-        return isUsablePlaces(lib) ? lib : null;
+        return await boundedPlacesImport(() => window.google!.maps!.importLibrary!("places"));
       } catch {
         return null;
       }
@@ -113,32 +149,43 @@ export function loadGoogleMaps(): Promise<PlacesLibrary | null> {
     return cacheRecoverablePlacesPromise(recovered);
   }
 
-  // A load is already in flight (or previously completed) — reuse it. If an
-  // earlier load resolved null, clear the poisoned cache and retry cleanly.
-  if (window.__qfGooglePlacesPromise) {
-    return window.__qfGooglePlacesPromise.then((places) => {
-      if (places) return places;
-      window.__qfGooglePlacesPromise = undefined;
-      return loadGoogleMaps();
-    });
-  }
-
   const promise = (async (): Promise<PlacesLibrary | null> => {
     const key = await resolveGoogleMapsBrowserKey();
     if (!key) return null;
 
     return new Promise<PlacesLibrary | null>((resolve) => {
+      let settled = false;
+      const settle = (places: PlacesLibrary | null) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        resolve(places);
+      };
+      // Existing scripts whose load event fired before this listener was
+      // attached can otherwise leave all client requests unresolved forever.
+      const timeout = window.setTimeout(() => {
+        if (typeof window.google?.maps?.importLibrary !== "function") {
+          document.getElementById(SCRIPT_ID)?.remove();
+        }
+        settle(null);
+      }, PLACES_BOOTSTRAP_TIMEOUT_MS);
+      const fail = () => {
+        if (typeof window.google?.maps?.importLibrary !== "function") {
+          document.getElementById(SCRIPT_ID)?.remove();
+        }
+        settle(null);
+      };
       const importPlaces = async () => {
         try {
           const importLibrary = window.google?.maps?.importLibrary;
           if (typeof importLibrary !== "function") {
-            resolve(null);
+            fail();
             return;
           }
-          const lib = await importLibrary("places");
-          resolve(isUsablePlaces(lib) ? lib : null);
+          const lib = await boundedPlacesImport(() => importLibrary("places"));
+          settle(lib);
         } catch {
-          resolve(null);
+          fail();
         }
       };
 
@@ -149,7 +196,7 @@ export function loadGoogleMaps(): Promise<PlacesLibrary | null> {
             void importPlaces();
           } else {
             existing.addEventListener("load", () => void importPlaces(), { once: true });
-            existing.addEventListener("error", () => resolve(null), { once: true });
+            existing.addEventListener("error", fail, { once: true });
           }
           return;
         }
@@ -165,10 +212,10 @@ export function loadGoogleMaps(): Promise<PlacesLibrary | null> {
           `?key=${encodeURIComponent(key)}` +
           "&loading=async&language=en&region=IN&libraries=places";
         script.addEventListener("load", () => void importPlaces(), { once: true });
-        script.addEventListener("error", () => resolve(null), { once: true });
+        script.addEventListener("error", fail, { once: true });
         document.head.appendChild(script);
       } catch {
-        resolve(null);
+        fail();
       }
     });
   })().catch(() => null);

@@ -1,0 +1,28 @@
+{
+  "policy": "quickfurno.f3.places-timeout-no-deploy.v1",
+  "donor_sha": "f7ffbc1dbf1f9165c7818d2cfb767be33e238c73",
+  "base_sha": "feaafd491e6b6e54f25116b9f16ed37256a73ce1",
+  "release_authorized": false,
+  "google_billing_certified": false,
+  "google_places_live_certified": false,
+  "vendor_geofence_bypass_authorized": false,
+  "managed_env_updated": false,
+  "files": [
+    {
+      "path": "lib/google-maps/loadGoogleMaps.ts",
+      "sha256": "16d113f12315ce4b6cf1b1dc509b9518116b442a9402d5d33a5339d1cd78d90c"
+    },
+    {
+      "path": "scripts/mvp/location/validate-google-places-bounded-import.test.mjs",
+      "sha256": "4d99e689e69bda47aaf073803025b74849f8d4768bec2b687dea9589328c8675"
+    },
+    {
+      "path": "scripts/mvp/location/validate-google-places-singleflight.test.mjs",
+      "sha256": "89481797125531783d34f27c48da9cca25afb4be628c5e7af236fe19c7886005"
+    },
+    {
+      "path": "scripts/mvp/location/validate-google-places-timeout.test.mjs",
+      "sha256": "9a7ec5be4580f399b0823e5bfff76be58abc895023d1a7be76872351463db8cf"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "schema": "quickfurno.f12.observed-staging-core.v1",
+  "observedAt": "2026-11-06",
+  "observation": "ssh-docker-readonly-and-public-no-token-get",
+  "networkExecuted": true,
+  "containerName": "qf-core-staging",
+  "imageTag": "qf-core-staging:09b9d7a4",
+  "envNames": [
+    "WHATSAPP_ACCESS_TOKEN",
+    "WHATSAPP_WABA_ID",
+    "WHATSAPP_PHONE_NUMBER_ID"
+  ],
+  "deployedDefaultSender": "STALE_VENDOR_WABA",
+  "vendorPairExact": false,
+  "coreCallbackHost": "staging-core.quickfurno.in",
+  "metaGetHttp": 403,
+  "metaGetTls": 0,
+  "authHookGetHttp": 405,
+  "authHookGetTls": 0,
+  "actualMetaRegisteredCallbackVerified": false,
+  "actualSupabaseAuthHookUriVerified": false,
+  "signedWebhookEndToEndVerified": false,
+  "vendorMetaQuality": "RED",
+  "consentAndOtpDeviceReceiptVerified": false,
+  "priorProtectedCICleared": false,
+  "ownerStageGo": false
+}

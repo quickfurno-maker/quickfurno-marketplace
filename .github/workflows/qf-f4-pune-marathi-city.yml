@@ -1,0 +1,52 @@
+name: QF F4 Google Marathi Pune City Alias (NO DEPLOY)
+
+on:
+  pull_request:
+    paths:
+      - "lib/google-maps/normalizePlace.ts"
+      - "scripts/mvp/location/validate-google-marathi-city.test.mjs"
+      - "scripts/mvp/launch/verify-pune-marathi-city.py"
+      - "scripts/mvp/launch/test_pune_marathi_scope.py"
+      - "docs/launch/f4-pune-marathi-city-manifest.json"
+      - "docs/launch/F4-MARATHI-PUNE-CITY-MATCHING-20261106.md"
+      - ".github/workflows/qf-f4-pune-marathi-city.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  exact-marathi-city-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Read-only pinned checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Node 24
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+      - name: Verify source pins and all release gates OFF
+        run: python3 scripts/mvp/launch/verify-pune-marathi-city.py --repo .
+      - name: Hostile mutation and scope tests
+        run: python3 -m unittest discover -s scripts/mvp/launch -p test_pune_marathi_scope.py -v
+      - name: Install pinned dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Exact Marathi city, PCMC, unsupported-city and identity regression
+        run: node --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/location/validate-google-marathi-city.test.mjs
+      - name: Existing public Google location and Places regression
+        run: |
+          node scripts/mvp/location/validate-qf-public-google-location.mjs
+          node --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/location/validate-google-places-bounded-import.test.mjs
+          node --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/location/validate-google-places-singleflight.test.mjs
+          node --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/location/validate-google-places-timeout.test.mjs
+      - name: Whole Marketplace TypeScript check
+        run: npm run typecheck
+      - name: Whole Marketplace production build
+        run: npm run build
+      - name: Provider-isolated real local HTTP safety checks
+        run: node scripts/mvp/launch/smoke-vendor-frontend.mjs
+      - name: Refuse unrelated source changes
+        run: python3 scripts/mvp/launch/verify-pune-marathi-city.py --repo . --exact-git-diff

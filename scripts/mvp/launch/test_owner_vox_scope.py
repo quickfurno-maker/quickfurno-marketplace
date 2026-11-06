@@ -60,6 +60,15 @@ class OwnerVoxScopeTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
+    def test_generated_landing_redirect_accepts_canonical_lf(self):
+        temp, dst = self.fixture()
+        try:
+            file = dst / "apps/vox-web/app/page.tsx"
+            file.write_bytes(file.read_bytes().replace(b"\r\n", b"\n"))
+            self.assertEqual(verify(dst), [])
+        finally:
+            temp.cleanup()
+
     def test_missing_owner_route_is_denied(self):
         temp, dst = self.fixture()
         try:

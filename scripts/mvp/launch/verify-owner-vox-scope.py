@@ -66,8 +66,14 @@ def errors_for(repo: Path):
         actual.add(path)
         if path not in expected:
             failures.append("unlisted_file:" + path)
-        elif hashlib.sha256(p.read_bytes()).hexdigest() != expected[path]:
-            failures.append("modified_file:" + path)
+        else:
+            blob = p.read_bytes()
+            # Python text generation / Windows checkout may translate only the
+            # explicitly new landing redirect; verify its canonical LF form.
+            if path == "apps/vox-web/app/page.tsx":
+                blob = blob.replace(b"\r\n", b"\n")
+            if hashlib.sha256(blob).hexdigest() != expected[path]:
+                failures.append("modified_file:" + path)
         rel = p.relative_to(root)
         if rel.parts[0] == "app" and any(part in FORBIDDEN_APP_SEGMENTS for part in rel.parts[1:-1]):
             failures.append("forbidden_app_route:" + path)

@@ -103,9 +103,8 @@ def extract(src: Path, dst: Path):
                         "sha256": hashlib.sha256(original.read_bytes()).hexdigest()})
     # A separate minimal landing page; Owner verification remains server-auth gated.
     landing = target_base / "app/page.tsx"
-    landing.write_text('import {redirect} from "next/navigation";\n'
-                       'export default function Home(){redirect("/operations");}\n',
-                       encoding="utf-8")
+    landing.write_bytes(('import {redirect} from "next/navigation";\n'
+                         'export default function Home(){redirect("/operations");}\n').encode("utf-8"))
     records.append({"path": str((ROOT / "app/page.tsx").as_posix()),
                     "sha256": hashlib.sha256(landing.read_bytes()).hexdigest(),
                     "new": True})

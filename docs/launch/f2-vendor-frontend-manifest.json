@@ -1,7 +1,7 @@
 {
   "policy": "quickfurno.f2.vendor-whatsapp-ui-no-deploy.v1",
   "source_sha": "f7ffbc1dbf1f9165c7818d2cfb767be33e238c73",
-  "base_sha": "089900829040a56644f47fdd22616eca0db6bc4a",
+  "base_sha": "e44d4d1552431d7aaf1d03fb674c1dcef8f6e7db",
   "code_files": 4,
   "expected_paths": [
     "app/vendor/page.tsx",

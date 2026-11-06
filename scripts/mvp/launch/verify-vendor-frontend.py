@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 
 SOURCE_SHA = "f7ffbc1dbf1f9165c7818d2cfb767be33e238c73"
-BASE_SHA = "089900829040a56644f47fdd22616eca0db6bc4a"
+BASE_SHA = "e44d4d1552431d7aaf1d03fb674c1dcef8f6e7db"
 POLICY = "quickfurno.f2.vendor-whatsapp-ui-no-deploy.v1"
 EXPECTED = {
     "app/vendor/page.tsx":

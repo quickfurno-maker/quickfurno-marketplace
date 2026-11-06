@@ -1,0 +1,59 @@
+.voxMfaPage .voxAuthLayout{max-width:1050px;}
+.voxMfaPage .voxAuthStory{min-height:500px;}
+.voxMfaPage .voxAuthPitch>p:not(.voxAuthEyebrow){max-width:420px;}
+.voxMfaCard{max-width:465px;width:100%;justify-self:end;}
+.voxMfaCard .voxAuthCardHead{margin-bottom:32px;}
+.voxMfaEmblem{
+ display:grid;place-items:center;width:58px;height:58px;margin-bottom:23px;
+ border-radius:17px;border:1px solid rgba(134,242,191,.32);
+ background:linear-gradient(145deg,rgba(84,208,152,.19),rgba(36,120,105,.13));
+ box-shadow:inset 0 1px rgba(255,255,255,.09);
+ color:#83f0bc;
+}
+.voxMfaCard .voxAuthCardIntro h1{font-size:clamp(29px,3vw,37px);line-height:1.2;}
+.voxMfaCard .voxAuthCardIntro p{margin-bottom:28px;max-width:350px;}
+.voxMfaForm{gap:15px;}
+.voxMfaCodeField label{font-size:13px;}
+.voxMfaCodeField input{
+ height:68px;font-size:28px;font-weight:750;letter-spacing:.30em;
+ text-align:center;font-variant-numeric:tabular-nums;
+ background:#07171a;border:1px solid #43625b;border-radius:13px;
+ padding:0 6px 0 16px;
+}
+.voxMfaCodeField input::placeholder{color:#425e57;opacity:1;}
+.voxMfaCodeField input[aria-invalid="true"]{border-color:#ed9e90;}
+.voxMfaCodeField input:focus-visible{border-color:#84ecc0;box-shadow:0 0 0 3px rgba(114,232,180,.2);}
+.voxMfaHint{font-size:11px;line-height:1.55;color:#8aa7a1;margin:2px 0 0;}
+.voxMfaForm .voxAuthSubmit{margin-top:7px;min-height:52px;}
+.voxMfaError{margin:0;}
+.voxMfaEnroll{display:grid;gap:7px;text-align:center;padding:20px 0 0;margin-top:19px;border-top:1px solid #29433e;}
+.voxMfaEnroll span{font-size:11px;line-height:1.5;color:#91aaa3;}
+.voxMfaEnroll a{color:#91ecc5;font-size:12px;font-weight:700;text-underline-offset:4px;}
+.voxMfaEnroll a:hover{color:#c9ffe5;}
+.voxMfaEnroll a:focus-visible{outline:2px solid #8df3c6;outline-offset:5px;border-radius:2px;}
+.voxMfaCard .voxAuthCardFoot{margin-top:22px;padding-top:18px;}
+.voxMfaProgress{margin-top:32px;display:grid;gap:0;}
+.voxMfaProgressItem{display:flex;align-items:center;gap:13px;}
+.voxMfaProgressMarker{
+ display:grid;place-items:center;width:34px;height:34px;flex:0 0 34px;border-radius:50%;
+ border:1px solid #3c7561;background:rgba(58,172,120,.22);color:#8af0bb;
+ font-weight:750;font-size:12px;
+}
+.voxMfaProgressCurrent{border-color:#95f1c7;background:#77dcae;color:#103028;}
+.voxMfaProgressItem strong{display:block;color:#dcece5;font-size:12px;font-weight:700;}
+.voxMfaProgressItem small{display:block;color:#809e95;font-size:11px;margin-top:4px;}
+.voxMfaProgressConnector{height:23px;border-left:1px solid #3b6d5c;margin:3px 0 3px 16px;}
+@media(max-width:800px){
+ .voxMfaPage .voxAuthStory{min-height:0;}
+ .voxMfaCard{max-width:none;justify-self:stretch;}
+ .voxMfaPage .voxAuthLayout{max-width:480px;}
+}
+@media(max-width:450px){
+ .voxMfaCard .voxAuthCardHead{margin-bottom:24px;}
+ .voxMfaEmblem{width:50px;height:50px;margin-bottom:19px;}
+ .voxMfaCodeField input{height:60px;font-size:25px;}
+ .voxMfaCard .voxAuthCardIntro p{margin-bottom:22px;}
+}
+@media(prefers-reduced-motion:reduce){
+ .voxMfaCodeField input,.voxMfaEnroll a{transition:none;}
+}

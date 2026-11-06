@@ -1,0 +1,288 @@
+{
+  "policy": "quickfurno.f0.owner-vox-minimal.v1",
+  "source_sha": "f7ffbc1dbf1f9165c7818d2cfb767be33e238c73",
+  "base_sha": "b9f8ada90283704c1841d4cd2572305550bca440",
+  "total_files": 63,
+  "allowed_routes": [
+    "app/layout.tsx",
+    "app/operations/page.tsx",
+    "app/owner/vendors/verification/page.tsx",
+    "app/vendor360/page.tsx",
+    "app/login/page.tsx",
+    "app/mfa/page.tsx",
+    "app/mfa/enroll/page.tsx",
+    "app/password/recover/page.tsx",
+    "app/password/reset/page.tsx",
+    "app/auth/callback/route.ts",
+    "app/api/health/route.ts",
+    "app/api/overview/route.ts",
+    "app/api/vendor360/route.ts",
+    "app/api/auth/sign-in/route.ts",
+    "app/api/auth/sign-out/route.ts",
+    "app/api/auth/mfa/route.ts",
+    "app/api/auth/mfa/enroll/route.ts",
+    "app/api/auth/mfa/confirm/route.ts",
+    "app/api/auth/recovery/request/route.ts",
+    "app/api/auth/recovery/complete/route.ts",
+    "app/api/owner/vendor-verification/queue/route.ts",
+    "app/api/owner/vendor-verification/case/route.ts",
+    "app/api/owner/vendor-verification/decision/route.ts"
+  ],
+  "unreviewed_staff_enabled": false,
+  "production_authorized": false,
+  "files": [
+    {
+      "path": "apps/vox-web/.dockerignore",
+      "sha256": "9a2dfd015948c1466842c945336a900d47af274aab57dcbe8a2d95346cd84ae1"
+    },
+    {
+      "path": "apps/vox-web/.env.example",
+      "sha256": "b4a028b79432b9fa24c561ab8c2a614aa099ab7b1f2733d1bffcd654d1e5d35a"
+    },
+    {
+      "path": "apps/vox-web/Dockerfile",
+      "sha256": "8a021106b0cbfad0ed4791327ccd8b5bd181ee0dcb52b4515a375089ba5bae9d"
+    },
+    {
+      "path": "apps/vox-web/app/api/auth/mfa/confirm/route.ts",
+      "sha256": "36925054d846e32618ec18e8e6499a2406ac0234cd8670f07fa34300e4e4e439"
+    },
+    {
+      "path": "apps/vox-web/app/api/auth/mfa/enroll/route.ts",
+      "sha256": "8b262743fd1ca6d080bbad541e77f4e8a1aad5a1a79f73d9129048e93dc71a1f"
+    },
+    {
+      "path": "apps/vox-web/app/api/auth/mfa/route.ts",
+      "sha256": "bc586bf7dc441bd98f9fe62c2826ce4ef177fcc6494f555e1dcb9c56718274af"
+    },
+    {
+      "path": "apps/vox-web/app/api/auth/recovery/complete/route.ts",
+      "sha256": "60de4915f000c335b1ffe521a66e3a55059313efd5385a2b23b4e7acf5f325fc"
+    },
+    {
+      "path": "apps/vox-web/app/api/auth/recovery/request/route.ts",
+      "sha256": "346b5fc21edf5a360e69a2484ad685de73b646af174a83e1b90df01c55fdec0b"
+    },
+    {
+      "path": "apps/vox-web/app/api/auth/sign-in/route.ts",
+      "sha256": "72b1bd26d62ed1f7d0b1e9d44175b40dc89a777b930e238996ca85e09f425828"
+    },
+    {
+      "path": "apps/vox-web/app/api/auth/sign-out/route.ts",
+      "sha256": "9401e78cbbd6914f52bf4f26a6e9f97205e75e325415c581af1be35b8d820e96"
+    },
+    {
+      "path": "apps/vox-web/app/api/health/route.ts",
+      "sha256": "63f2363bc186a93c68de9fb06d372fc9cc7ba0a2d7e9ad97477703c2fec1fc25"
+    },
+    {
+      "path": "apps/vox-web/app/api/overview/route.ts",
+      "sha256": "252c94ec1cff88acc39c84cab44f2f3b8761667a3851b9f4c10a42c14b2e31fb"
+    },
+    {
+      "path": "apps/vox-web/app/api/owner/vendor-verification/case/route.ts",
+      "sha256": "18f18a8e49af5a66647049ff217db74f2048582416b52ac2dfb59dd11dfbf103"
+    },
+    {
+      "path": "apps/vox-web/app/api/owner/vendor-verification/decision/route.ts",
+      "sha256": "0309df400d849363f6788579b861ebe75fcb7084abab0a17fd4f4b319536b636"
+    },
+    {
+      "path": "apps/vox-web/app/api/owner/vendor-verification/queue/route.ts",
+      "sha256": "cd7ef80197c0442e908a68490b7bbdee3c57591cad1fa573eac0f4bef210e809"
+    },
+    {
+      "path": "apps/vox-web/app/api/vendor360/route.ts",
+      "sha256": "cc919b04fe66fee6dcd3db0b495feb1e12468f5148edc21f84d2a91546484b2d"
+    },
+    {
+      "path": "apps/vox-web/app/auth/callback/route.ts",
+      "sha256": "797206ef38998e00e9307c1e5d1f49d8bf0d14fffa11eb3ea2689d3c2f6477ce"
+    },
+    {
+      "path": "apps/vox-web/app/components/ScopedQueue.tsx",
+      "sha256": "fd73721c560a2c000542fed80fb55eb6ca99d412dd3b12a5c96e2b557a7df895"
+    },
+    {
+      "path": "apps/vox-web/app/components/StaffProposalForm.tsx",
+      "sha256": "0fde9350ccbfbe13663b1feb3b3386da67026ab291da73447e14d489415aca73"
+    },
+    {
+      "path": "apps/vox-web/app/components/scoped-queue.css",
+      "sha256": "9d02f945b4221b2a0d04af447df06f0ed3bf45c54ae74fc71a10aec65131dfed"
+    },
+    {
+      "path": "apps/vox-web/app/components/scopedQueuePage.d.mts",
+      "sha256": "b3c797349b0c22b245b048bfe56f9587b8db597d92a61d9662b8f3b3689b3482"
+    },
+    {
+      "path": "apps/vox-web/app/components/scopedQueuePage.mjs",
+      "sha256": "41f413c2630c7b78253a8da2a495e7901c8de7d87ca0da9514926589e4f21509"
+    },
+    {
+      "path": "apps/vox-web/app/globals.css",
+      "sha256": "7730b42b0b4bb9869eb3c93df7bdadccf42c02ab28a9edb62b3af20f8eba582f"
+    },
+    {
+      "path": "apps/vox-web/app/layout.tsx",
+      "sha256": "423d4e33e61ee63bc0a54ca139f52fbbd16ec35f76eb8d66846caa506feadaca"
+    },
+    {
+      "path": "apps/vox-web/app/login/form.tsx",
+      "sha256": "ed7393094e84b015e1e42a2a7dfdb5cf6c80c719ee294cc4ba8941baafb6ae58"
+    },
+    {
+      "path": "apps/vox-web/app/login/login.css",
+      "sha256": "c40bab476d39b0569a6bdd0493630631805232502eeca899e5257b6a79f4e62f"
+    },
+    {
+      "path": "apps/vox-web/app/login/page.tsx",
+      "sha256": "b5e6b3a99390fe31a77c25c5c640757ac40677c33392f5e548ea8aacacc28d8f"
+    },
+    {
+      "path": "apps/vox-web/app/mfa/enroll/form.tsx",
+      "sha256": "ffbfb894db1d15b658277b54c72f42ed921599e8ab4cb4a12fde5713a49cf5a3"
+    },
+    {
+      "path": "apps/vox-web/app/mfa/enroll/page.tsx",
+      "sha256": "01e6f362f46a1c2fd8668b43b2ebb4f55cfb568c6d6364320b47f5cb920b3d91"
+    },
+    {
+      "path": "apps/vox-web/app/mfa/form.tsx",
+      "sha256": "457f15e4b0f5b238b0898a6c4bfe1996f22eef0840e128e10591a2a50a3385af"
+    },
+    {
+      "path": "apps/vox-web/app/mfa/mfa.css",
+      "sha256": "6d32109c05cdf78d4b9fa54c8e0bd3d1e46123db009b0e7ed7562582742680dc"
+    },
+    {
+      "path": "apps/vox-web/app/mfa/page.tsx",
+      "sha256": "69a4176092ea7cea6be8db3e8b2f871b7e578590d17637fae370b38db9d2f8ea"
+    },
+    {
+      "path": "apps/vox-web/app/operations/operations.css",
+      "sha256": "c3583af423b1da6827dcb6622c8d4286f6f88b34085fad7bea5ba37981ecd14f"
+    },
+    {
+      "path": "apps/vox-web/app/operations/page.tsx",
+      "sha256": "1a2c5099965e63bf5b22875e2b93888f2711a0a8513e3e4d7340f3f06bcf39d6"
+    },
+    {
+      "path": "apps/vox-web/app/owner/vendors/verification/OwnerReviewConsole.tsx",
+      "sha256": "5769502751f53243800dd9323eb14fd035b9f552c0e0324e72c4561011127a3e"
+    },
+    {
+      "path": "apps/vox-web/app/owner/vendors/verification/owner-review.css",
+      "sha256": "7f4de1d67bfb6c6b9925a36f3010a30cc89129cd9e70dfa0913303338369a9ca"
+    },
+    {
+      "path": "apps/vox-web/app/owner/vendors/verification/page.tsx",
+      "sha256": "f584400dfa3415fc1ba926a35498a5ecd4089a379d986f04a030627b698426fb"
+    },
+    {
+      "path": "apps/vox-web/app/page.tsx",
+      "sha256": "a3355729de685e145ee78caf69ec28a39fa69ce7dbcce6378dc8a26cd72a5fa1",
+      "new": true
+    },
+    {
+      "path": "apps/vox-web/app/password/recover/form.tsx",
+      "sha256": "076a851966ae15f59bdc0fbd34c41abb408591151cb7628f868e94d9a60ac00a"
+    },
+    {
+      "path": "apps/vox-web/app/password/recover/page.tsx",
+      "sha256": "98ccbf6b72348494b023d71efddbddd0679bc51bf9f0fe4036c477b32b3fda9c"
+    },
+    {
+      "path": "apps/vox-web/app/password/reset/form.tsx",
+      "sha256": "b4cb2c3177886cdcc687bc622139e254204d59f0568c1d8e56a49b98fca776e3"
+    },
+    {
+      "path": "apps/vox-web/app/password/reset/page.tsx",
+      "sha256": "7fb9549a1bcd93c6bef4b7f9b35feabe4438a95a5ba30dbe2bb9fbcc04972c68"
+    },
+    {
+      "path": "apps/vox-web/app/vendor360/components/ProfileReviewQueue.tsx",
+      "sha256": "f9c611edff83a4bd53e0b4de7ec708058c1e9047b36eec79bbb6f8b9575b484b"
+    },
+    {
+      "path": "apps/vox-web/app/vendor360/components/TaskCreator.tsx",
+      "sha256": "d40d31ee3f33d85bb44d888f5b8d834e81d21a9cb6ac5225ad4d0d1d85d3ef86"
+    },
+    {
+      "path": "apps/vox-web/app/vendor360/page.tsx",
+      "sha256": "4adebccd07931225fc7a406f8c818d0f901b735740656686bb7ef10b30eeaf46"
+    },
+    {
+      "path": "apps/vox-web/lib/auth.ts",
+      "sha256": "2276e4807a5524a73972ac0447c1245251a632e3fddc6e4c4535db474a59e401"
+    },
+    {
+      "path": "apps/vox-web/lib/core.ts",
+      "sha256": "f7130fdbdd661504bc33e21dc617847d4e252188bdcb800529ba8acfab3dd07e"
+    },
+    {
+      "path": "apps/vox-web/lib/ownerAdminLinks.ts",
+      "sha256": "60cfbcd445e7d3f17565de5fbee75514e72afca4f459e82d5824f1e44a8dd819"
+    },
+    {
+      "path": "apps/vox-web/lib/ownerReviewUiGuard.ts",
+      "sha256": "66429bb757692bf815ab3737ae336bcf8e5c5a7f1f76093549087ce522fddaf2"
+    },
+    {
+      "path": "apps/vox-web/lib/ownerVendorReviewGate.ts",
+      "sha256": "48cea43d4128aa67a2af302ce6ad27e5879146480b87e1e20419ad251801e080"
+    },
+    {
+      "path": "apps/vox-web/lib/ownerVendorVerification.ts",
+      "sha256": "aeef97d23a81ee4e3ffafb5ec71d9dc2c5c025e70c03d711c501b8e48f2ec696"
+    },
+    {
+      "path": "apps/vox-web/lib/readBoundedOwnerMfaJson.ts",
+      "sha256": "a2fd69effdf5730db26568dbcc119e22bf7a479cba6386b444a36f2ab94f97c9"
+    },
+    {
+      "path": "apps/vox-web/lib/recoveryStage.ts",
+      "sha256": "d974db4ebf913abcab1f7f93afa1407b3be39fc78552e5d3c49214ab4db5dc73"
+    },
+    {
+      "path": "apps/vox-web/lib/recoveryTicket.d.mts",
+      "sha256": "e3dad29a164bf4c3f6a983ef739d35dffe0ee6c50d0cedb74efb60cafd315388"
+    },
+    {
+      "path": "apps/vox-web/lib/recoveryTicket.mjs",
+      "sha256": "594410029d0560f62c8037335e154eb419f5592dfea87b7a7067d1e3a180c844"
+    },
+    {
+      "path": "apps/vox-web/lib/returnTo.d.mts",
+      "sha256": "c62dd73815207bcfddab28d77f6b261172a731a04ad8ffb0091c247333040e2e"
+    },
+    {
+      "path": "apps/vox-web/lib/returnTo.mjs",
+      "sha256": "f972a535bce6b5c5d58342329bf98aa0763625fc0c1ad7838392c47119515fb7"
+    },
+    {
+      "path": "apps/vox-web/next-env.d.ts",
+      "sha256": "1862ac4bbbc5192d4bf562161df66ea547ed3e67173100656ab606ae9797db2b"
+    },
+    {
+      "path": "apps/vox-web/next.config.ts",
+      "sha256": "62c34d75592e16f620723b54e69006d6dede00de4e07cbb818ca9b8e1e229a41"
+    },
+    {
+      "path": "apps/vox-web/package-lock.json",
+      "sha256": "32557dc2e41ad2a08c1da63aee177abd6bfd68b3370f05535d3b9d65db1c4840"
+    },
+    {
+      "path": "apps/vox-web/package.json",
+      "sha256": "4b2c8a2450b78e31a0a0fcc5764ca04bc2c1ccd84ff2092e66fd3620da35a70e"
+    },
+    {
+      "path": "apps/vox-web/postcss.config.mjs",
+      "sha256": "f555707dbb5ca0b875aed03b9258798a5d323a01b2f6ddd241899b54d8252455"
+    },
+    {
+      "path": "apps/vox-web/tsconfig.json",
+      "sha256": "6bf102b8ecab1f3d366d415e0ea89bb95b2f90036570e40703a2175cd62f10b7"
+    }
+  ]
+}

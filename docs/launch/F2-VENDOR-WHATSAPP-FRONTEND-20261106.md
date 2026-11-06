@@ -1,6 +1,6 @@
 # F2 — Real vendor signup frontend, isolated from the inherited integration stack
 
-Date: 6 November 2026. Branch `integration/qf-f2-vendor-ui-20261106`, based exactly on [Draft Core PR #504](https://github.com/quickfurno-maker/quickfurno-marketplace/pull/504) SHA `089900829040a56644f47fdd22616eca0db6bc4a`, with [VOX Owner PR #503](https://github.com/quickfurno-maker/quickfurno-marketplace/pull/503) below it. **NO DEPLOY.**
+Date: 6 November 2026. Branch `integration/qf-f2-vendor-ui-20261106`, based exactly on [Draft Core PR #504](https://github.com/quickfurno-maker/quickfurno-marketplace/pull/504) SHA `e44d4d1552431d7aaf1d03fb674c1dcef8f6e7db`, with [VOX Owner PR #503](https://github.com/quickfurno-maker/quickfurno-marketplace/pull/503) below it. **NO DEPLOY.**
 
 ## Source and actual changes
 

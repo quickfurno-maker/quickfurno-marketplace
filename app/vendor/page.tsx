@@ -7,8 +7,8 @@ import { getCategoryBySlug } from "@/lib/quickfurno-data";
 
 const steps = [
   {
-    title: "Create your account / apply",
-    copy: "Sign up with your business email and details. This creates your vendor login and submits your profile for review.",
+    title: "Verify mobile / apply",
+    copy: "Enter your business details and verify your mobile with WhatsApp OTP. Your application stays Pending until independently reviewed.",
   },
   {
     title: "QuickFurno verifies",
@@ -27,11 +27,11 @@ const steps = [
 const faqs = [
   {
     question: "How do I sign up as a vendor?",
-    answer: "Use the New Vendor Signup tab above to create your vendor account and submit your business details in one step. QuickFurno will review your profile before enabling dashboard client matching.",
+    answer: "Use New Vendor Signup, provide your business details, and complete WhatsApp mobile OTP verification. No password is required for new registration; your application remains Pending until Owner verification.",
   },
   {
     question: "How do I log in later?",
-    answer: "Return to this page and use the Vendor Login tab with the email and password you signed up with. After login you'll land on your Vendor Dashboard.",
+    answer: "Existing vendors may continue using their current login method. New WhatsApp-verified vendors will use the supported vendor sign-in flow once activated.",
   },
   {
     question: "Which categories are currently supported?",
@@ -54,7 +54,7 @@ const faqs = [
 export const metadata: Metadata = {
   title: "Vendor Portal | QuickFurno",
   description:
-    "Log in to your QuickFurno vendor dashboard or create a vendor account to submit your business profile for review and manage matched home-service enquiries when eligible.",
+    "Existing vendors can sign in to their dashboard. New vendors apply using mobile WhatsApp verification, with separate Owner approval required before lead matching.",
 };
 
 export default async function VendorPortalPage(props: {

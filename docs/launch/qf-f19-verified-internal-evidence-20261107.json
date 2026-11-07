@@ -1,0 +1,153 @@
+{
+  "baseSourceHead": "2fe01eae502c835d46442a32f59ce663a5ad7d27",
+  "externalDependencyWorkDeferred": true,
+  "historicalRegressionsReconciled": [
+    "marketplace suite five obsolete password-based signup and metadata expectations aligned to current mandatory WhatsApp OTP + atomic Pending route",
+    "runtime-setting 80.04 original migration baseline 162 preserved; ten F18 fingerprints allow exactly 172 total; no 80.04 SQL migration or seed"
+  ],
+  "liveStagingCoreModified": false,
+  "managedStagingDatabaseModified": false,
+  "noExternalProviderOperations": true,
+  "observedOn": "2026-11-07",
+  "productionModified": false,
+  "releaseConstraintsStillOpen": [
+    "historical protected F1/F5/F6/F7 check acceptance",
+    "previously exposed legacy Supabase and Meta credential rotations",
+    "Meta vendor registered callback and Supabase Auth Send SMS Hook URL verification",
+    "fresh managed database Auth and Storage object-byte recovery",
+    "signed immutable deployment candidate and approved Staging change"
+  ],
+  "releaseVerdict": "HOLD",
+  "schema": "quickfurno.f19.internal-only-integration-evidence.v1",
+  "secretsIncluded": false,
+  "tests": {
+    "dockerOfflineHttp": {
+      "checks": [
+        {
+          "name": "liveness",
+          "status": 200
+        },
+        {
+          "name": "vendor signup page",
+          "status": 200
+        },
+        {
+          "name": "vendor login page",
+          "status": 200
+        },
+        {
+          "name": "vendor category deeplink",
+          "status": 200
+        },
+        {
+          "name": "legacy register redirect",
+          "status": 307
+        },
+        {
+          "name": "otp request disabled",
+          "status": 503
+        },
+        {
+          "name": "atomic signup disabled",
+          "status": 503
+        },
+        {
+          "name": "returning login request disabled",
+          "status": 503
+        },
+        {
+          "name": "returning login verify disabled",
+          "status": 503
+        },
+        {
+          "name": "private document upload disabled",
+          "status": 503
+        },
+        {
+          "name": "Owner queue disabled",
+          "status": 503
+        },
+        {
+          "name": "Owner decision disabled",
+          "status": 503
+        },
+        {
+          "name": "Owner WhatsApp readiness refuses disconnected dependencies",
+          "status": 503
+        },
+        {
+          "name": "Meta GET without challenge denied",
+          "status": 403
+        },
+        {
+          "name": "Supabase Auth Hook GET denied",
+          "status": 405
+        },
+        {
+          "name": "unsigned Supabase Auth Hook POST denied",
+          "status": 401
+        },
+        {
+          "name": "invalid Meta webhook POST denied",
+          "status": 401
+        }
+      ],
+      "failed": 0,
+      "image": "qf-core-f17-candidate:cb9a1919",
+      "imageBuiltFromRevision": "cb9a1919e5690f29e65da3bea6e09d4e174991b9",
+      "imageId": "sha256:5cecf98b75ec64d52f78e6b3b3db97fe73c6e982c08c696b047b9587f1fc3dc4",
+      "network": "none",
+      "passed": 17,
+      "publishedPorts": 0
+    },
+    "extraSourceSuites": {
+      "failed": 0,
+      "names": [
+        "vendor-v1-v2",
+        "vendor-v3-v5",
+        "deterministic-matching",
+        "fair-opportunity",
+        "straight-line-geography",
+        "closed-runtime-defaults",
+        "vendor-media-exif"
+      ],
+      "passed": 7
+    },
+    "isolatedPostgresLogicalRestore": {
+      "migrationsReplayed": 10,
+      "network": "none",
+      "newestManagedSnapshotProven": false,
+      "passed": true,
+      "sourceBackupDate": "2026-11-05",
+      "storageObjectBytesRestored": false,
+      "strictRlsAndDormantProviderPostflightPassed": true
+    },
+    "marketplaceAssignmentCommunication": {
+      "failed": 0,
+      "passed": 137
+    },
+    "runtimeDefaultInvariant": {
+      "failed": 0,
+      "passed": 33
+    },
+    "typescript": {
+      "command": "npm run typecheck",
+      "passed": true
+    },
+    "vendorNode": {
+      "failed": 0,
+      "passed": 208
+    },
+    "voxFinalInternal": {
+      "failed": 0,
+      "passed": 161,
+      "scope": "source-only"
+    },
+    "voxStaffRead": {
+      "failed": 0,
+      "note": "overlaps with VOX final suite; not additive",
+      "passed": 25
+    }
+  },
+  "whatsappOtpSent": false
+}

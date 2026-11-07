@@ -29,6 +29,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { createHash } from "node:crypto";
 import path, { resolve } from "node:path";
 import { EXPECTED_LIVE_MIGRATION_COUNT } from "./mvp/staging/live-migration-ledger.mjs";
 
@@ -262,17 +263,42 @@ check("22 [static] this slice adds no migration and no seed", () => {
   // false failure about someone else's work, and re-bumping the literal every time
   // just defers it.
   //
-  // Re-pinned to what this slice can actually claim, without losing coverage:
-  //   (1) NO migration belongs to the 80.04 slice — the real scope statement;
-  //   (2) the global tree size equals the fail-closed explicit live ledger.
+  // The original 162-file historical pin predates the ten Nov 4-6
+  // vendor/WhatsApp migrations independently reconciled with live managed
+  // Staging in F18. Keep that old baseline immutable; allow ONLY the ten
+  // exact source-byte-certified additional filenames, never arbitrary growth.
+  // 80.04 itself still adds zero SQL and never seeds mutating mode.
   assert(
     migrations.filter((f) => /80_04/.test(f)).length === 0,
     `QF-MVP-80.04 must add no migration; found ${migrations.filter((f) => /80_04/.test(f)).join(", ")}`
   );
-  assert(
-    migrations.length === EXPECTED_LIVE_MIGRATION_COUNT,
-    `tree has ${migrations.length} migrations but the explicit live ledger pins ${EXPECTED_LIVE_MIGRATION_COUNT}`
-  );
+  const proof = JSON.parse(readFileSync(
+    "docs/launch/qf-f18-managed-sql-ledger-proof-20261107.json", "utf8"
+  ));
+  assert(proof.schema === "quickfurno.f18.real-managed-sql-ledger-proof.v1" &&
+    proof.stagingProjectId === "uckafzuochmbvtiodmcl" &&
+    proof.appliedMigrationVersionCount === 10 &&
+    proof.exactByteContentParityVerified === true &&
+    proof.databaseModified === false &&
+    proof.mayDeployStaging === false && proof.maySendOtp === false,
+    "F18 ten-migration authority must be exact read-only managed evidence");
+  const approved = proof.versions.map((v) => `${v.version}_${v.name}.sql`);
+  assert(approved.length === 10 && new Set(approved).size === 10,
+    "the Nov 4-6 list must contain exactly ten unique certified migrations");
+  const certified = new Set(approved);
+  assert(migrations.length === EXPECTED_LIVE_MIGRATION_COUNT + certified.size,
+    `unexpected repo migration count ${migrations.length} vs historical ${EXPECTED_LIVE_MIGRATION_COUNT} + certified 10`);
+  for (const row of proof.versions) {
+    const filename = `${row.version}_${row.name}.sql`;
+    assert(migrations.includes(filename), `certified migration absent: ${filename}`);
+    const digest = createHash("sha256").update(
+      readFileSync(path.join("supabase", "migrations", filename))
+    ).digest("hex");
+    assert(digest === row.localSourceSha256,
+      `certified migration has changed source bytes: ${filename}`);
+  }
+  assert(migrations.filter((f) => !certified.has(f)).length === EXPECTED_LIVE_MIGRATION_COUNT,
+    "unapproved migration addition or missing prior baseline");
 
   assert(!/upsert\(|insert\(/.test(SETTINGS_SRC.split("updateMarketplaceRuntimeSetting")[0]),
     "the loader must not write a row to make the default real");

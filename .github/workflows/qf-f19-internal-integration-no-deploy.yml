@@ -1,0 +1,84 @@
+name: QF F19 Full Internal Integration (NO EXTERNAL / NO DEPLOY)
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/qf-f19-internal-integration-no-deploy.yml"
+      - "docs/launch/QF-F19-INTERNAL-INTEGRATION-20261107.md"
+      - "docs/launch/qf-f19-verified-internal-evidence-20261107.json"
+      - "scripts/mvp/suites/marketplace.mjs"
+      - "scripts/qf-mvp-80-04-fail-closed-runtime-default-harness.mjs"
+      - "scripts/mvp/launch/f19_offline_core_http.py"
+permissions:
+  contents: read
+jobs:
+  integrated-internal-recert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Vendor auth and WhatsApp isolation hostile suite
+        run: |
+          node --import ./scripts/mvp/loader/register.mjs --test scripts/mvp/vendor/*.test.mjs
+      - name: Marketplace assignment and communication integration
+        run: npm run test:mvp
+      - name: Original runtime default and 10-migration fenced ledger
+        run: npm run test:mvp:80-04
+      - name: Additional deterministic matching and vendor certification
+        run: |
+          npm run test:mvp:vendor-v1-v2
+          npm run test:mvp:vendor-v3-v5
+          npm run test:mvp:75-01
+          npm run test:mvp:fair-opportunity
+          npm run test:mvp:location-straight-line
+          npm run test:ui:vendor-media-exif
+      - name: Existing VOX Owner and staff internal QA
+        run: |
+          node scripts/mvp/vox/validate-vox-final-internal-gates-20261030.mjs
+          node scripts/mvp/vox/validate-vox-staff-admin-read-20261029.mjs
+      - name: Exact existing F10 and F18 source certification
+        run: |
+          python scripts/mvp/launch/verify-f10-cross-phase-whatsapp-recert.py --repo .
+          python scripts/mvp/launch/f18_verify_managed_sql_parity.py --repo .
+      - name: Parse real local Docker and restore evidence without executing any live provider
+        run: |
+          python -m py_compile scripts/mvp/launch/f19_offline_core_http.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("docs/launch/qf-f19-verified-internal-evidence-20261107.json")
+          e=json.loads(p.read_text("utf8"))
+          assert e["schema"]=="quickfurno.f19.internal-only-integration-evidence.v1"
+          assert e["noExternalProviderOperations"] and not e["liveStagingCoreModified"]
+          assert not e["managedStagingDatabaseModified"] and not e["whatsappOtpSent"]
+          assert e["releaseVerdict"]=="HOLD" and not e["secretsIncluded"]
+          assert e["tests"]["dockerOfflineHttp"]["passed"]==17
+          assert e["tests"]["dockerOfflineHttp"]["network"]=="none"
+          assert e["tests"]["isolatedPostgresLogicalRestore"]["migrationsReplayed"]==10
+          assert not e["tests"]["isolatedPostgresLogicalRestore"]["newestManagedSnapshotProven"]
+          print("F19_HISTORICAL_JARVIS_OFFLINE_PROOFS_RECORDED__NOT_LIVE_CI_E2E")
+          PY
+      - name: Full Marketplace TypeScript check
+        run: npm run typecheck
+      - name: Exact six-file F19 diff, no deploy or SQL/runtime edit
+        run: |
+          git diff --name-only 2fe01eae502c835d46442a32f59ce663a5ad7d27 HEAD | sort > /tmp/actual
+          printf '%s\n' \
+            '.github/workflows/qf-f19-internal-integration-no-deploy.yml' \
+            'docs/launch/QF-F19-INTERNAL-INTEGRATION-20261107.md' \
+            'docs/launch/qf-f19-verified-internal-evidence-20261107.json' \
+            'scripts/mvp/launch/f19_offline_core_http.py' \
+            'scripts/mvp/suites/marketplace.mjs' \
+            'scripts/qf-mvp-80-04-fail-closed-runtime-default-harness.mjs' | sort > /tmp/expected
+          diff -u /tmp/expected /tmp/actual

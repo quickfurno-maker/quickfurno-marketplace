@@ -1,0 +1,223 @@
+{
+  "historicalCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+  "historicalCurrentOwnerHostCompatibility": {
+    "failed": 18,
+    "missing": 1,
+    "passed": 2,
+    "requiresLocalNetworkChildReview": 4
+  },
+  "historicalOriginalScriptsRecovered": 24,
+  "historicalOwnerVendorVerificationScriptAbsent": true,
+  "historicalStandaloneStaffFeaturesNotMergedIntoOwnerHost": true,
+  "isolatedHistoricalStaffBranchTests": {
+    "childProcessPermissionDenied": true,
+    "failed": 0,
+    "missing": 1,
+    "networkPermissionDenied": true,
+    "passed": 20,
+    "requiresLocalNetworkChildReview": 4
+  },
+  "mayDeployProduction": false,
+  "mayDeployStaging": false,
+  "maySendOtp": false,
+  "missingOriginalPath": "apps/vox-web/scripts/validate-owner-vendor-verification.spec.mjs",
+  "records": [
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-recovery-gates.mjs",
+      "bytes": 3286,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-recovery-gates.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "da5e6dbd51171bbf5af195aee0e86a24dc65d367e4e16e065319b8bbfde5c275"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-guard.mjs",
+      "bytes": 1726,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-guard.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "e1d5a99be4b328f822f4eaabb264dae064ccaea75b9494c1348716a106983a72"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-auth-gates.mjs",
+      "bytes": 4005,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-auth-gates.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "94122086ae89e7bafad51c583834cc2f335dbcfc6eab9cb99071a0c2b86e611d"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-scope-gates.mjs",
+      "bytes": 2016,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-scope-gates.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "b50f5a79c72809e8eb0dfda86d813d6cc2476eae9f825485e39bff147b146007"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-crm-gates.mjs",
+      "bytes": 2050,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-crm-gates.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "09ac87f54d61f9e6c306253ca03959ec818a6c11477020b56c6e0c09713b8b37"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-operations-09.mjs",
+      "bytes": 2755,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-operations-09.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "b9039fa9172e267a98895ba870d85ed2d5dc90c976fbe65afe621793068993d4"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-review-workflow-09.mjs",
+      "bytes": 2360,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-review-workflow-09.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "36f0f6ad2c74d6217040566e7c3a298118810b23b9d1d2eea76c854f6e7265cc"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-09b-10b-web.mjs",
+      "bytes": 2488,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-09b-10b-web.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "5b1856588678473177d8da95f505e0eb969b0afa2c0dbc89fa7a38b58feb6e76"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-owner-approvals-09c.mjs",
+      "bytes": 2347,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-owner-approvals-09c.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "c9b025bbae41eca80c28c6c5976565287792ff192870a52e4c7202a6f97d4bd5"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-owner-followup-12.mjs",
+      "bytes": 2572,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-owner-followup-12.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "7cf61ae8d39d7fe1552d5955b9024b8ab90793eed4e59078c14060b3a50e8b76"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-staff-proposals-12b.mjs",
+      "bytes": 2712,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-staff-proposals-12b.mjs",
+      "originalBranchTestStatus": "needs_controlled_network_or_child_review",
+      "sha256": "1fd70b5d51336589fbdf81e01a40b40370661414dd6d7915764cdecd095b8566"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-dual-role-12c.mjs",
+      "bytes": 2507,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-dual-role-12c.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "e980c1eb8cf91a13937dfcb9376cfc45156f4a3cc6c8439dc849210c1dac4e43"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-pinned-origin-12b.mjs",
+      "bytes": 2028,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-pinned-origin-12b.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "8f8368d22aa1c4f7d5d2700bccdd6970e7f39289ac8a2df7995205f736f09b0d"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-aarohi-staff-proposal-12b.mjs",
+      "bytes": 2587,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-aarohi-staff-proposal-12b.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "22f4a96f947ad4b6925784eb309c033035d707e22166089bbf54660109a29509"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-eod-attention-08i.spec.mjs",
+      "bytes": 9013,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-eod-attention-08i.spec.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "3444d64725cca6b4ea0856cfe7a91f384c8996c99b93d0be035b5cd3b77ae08b"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-governed-workflows-08k.spec.mjs",
+      "bytes": 12065,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-governed-workflows-08k.spec.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "9e4e6afdb83901b0a1331b91ef6f64b489014e10f38fa5d220ab816bf2b5a6e6"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-staff-notifications-08m.spec.mjs",
+      "bytes": 7222,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-staff-notifications-08m.spec.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "078b399449d4f0a6b4abde23eb345c11cd7e80b2e66f22d063cf69cc51bd5813"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-voxL4-readonly-integration.spec.mjs",
+      "bytes": 2224,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-voxL4-readonly-integration.spec.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "db97fc0a98a43158830a59262c139e7bed5b067536d8fc039fe8f23af62128cd"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-voxL4-atomic-work-actions.spec.mjs",
+      "bytes": 8610,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-voxL4-atomic-work-actions.spec.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "76405e2cf67c1a3a067dbe20cba492dfa8b91b38fa1081619903d9f54e4bf2f8"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-unified-preview.mjs",
+      "bytes": 6003,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-unified-preview.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "e3c8c5645a9032a5250f5fe9dbc05d7eae3a7a23f545f6514e08f56077018a24"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-rc37-navigation-401.spec.mjs",
+      "bytes": 6329,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-rc37-navigation-401.spec.mjs",
+      "originalBranchTestStatus": "needs_controlled_network_or_child_review",
+      "sha256": "aea41a46f66ddd1896e1638901eb8d47b2dd698cfdc419b0856ba6e9d2aa9a50"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-rc38-refund-review-readonly.spec.mjs",
+      "bytes": 5264,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-rc38-refund-review-readonly.spec.mjs",
+      "originalBranchTestStatus": "needs_controlled_network_or_child_review",
+      "sha256": "b78aa744e49583271e64edc502ee90cabca464dba6d8e63f3b82234c73dca2a9"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-rc40-staff-uat-recovery.spec.mjs",
+      "bytes": 8329,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-rc40-staff-uat-recovery.spec.mjs",
+      "originalBranchTestStatus": "needs_controlled_network_or_child_review",
+      "sha256": "c3634631c572eb02cc5752c6eb63b61c1d5695c446d81e01e010ca3738736d8a"
+    },
+    {
+      "archivedPath": "docs/launch/archive/vox-staff-legacy-tests/validate-rc46-conversation-control.spec.mjs",
+      "bytes": 12123,
+      "historicalGitSourceCommit": "015ad722c543b2106b0b46f3fc573e16c4edee63",
+      "historicalPath": "apps/vox-web/scripts/validate-rc46-conversation-control.spec.mjs",
+      "originalBranchTestStatus": "pass",
+      "sha256": "836bb2efe3e12a5718dd0d82cff338ad837a8ec315ae3fbc1d9e8efe0e64ddf3"
+    }
+  ],
+  "releaseVerdict": "HOLD",
+  "replacementTestCasesPassed": 23,
+  "reviewedReplacement": "scripts/mvp/launch/f21_owner_positive_synthetic.test.cjs",
+  "schema": "quickfurno.f22.legacy-vox-source-archive.v1",
+  "secretsIncluded": false
+}

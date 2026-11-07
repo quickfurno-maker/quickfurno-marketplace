@@ -1,0 +1,30 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {resolve} from "node:path";
+const root=resolve(import.meta.dirname,".."),read=p=>readFileSync(resolve(root,p),"utf8");
+const api=read("app/api/followup-proposals/route.ts"),core=read("lib/core.ts"),
+ ui=read("app/acquisition/components/AarohiFollowupProposal.tsx"),
+ page=read("app/acquisition/page.tsx");
+let n=0;const t=(label,fn)=>{fn();n++;console.log("PASS "+label);};
+t("new proposal flag is default disabled",()=>assert.match(core,/VOX_FOLLOWUP_PROPOSALS_WEB_ENABLED!=="staging"/));
+t("scope mode required",()=>assert.match(core,/VOX_STAFF_VIEW_MODE!=="scoped"/));
+t("staff MFA session verified before Core",()=>assert.match(core,/proposeAarohiInternalFollowup[\s\S]*verifiedMfaSession\(\)/));
+t("requests use native Core intent",()=>assert.match(core,/base\+"\/api\/vox\/v1\/action-intents"/));
+t("action fixed to propose",()=>assert.match(core,/action:"propose",intent:/));
+t("action kind fixed to Aarohi follow-up",()=>assert.match(core,/actionKind:"AAROHI_FOLLOWUP"/));
+t("Core response must say pending",()=>assert.match(core,/payload.state!=="PENDING"/));
+t("Core response must deny execution",()=>assert.match(core,/payload.execution!=="NOT_AUTHORIZED"/));
+t("browser uses same-origin BFF",()=>assert.match(ui,/fetch\("\/api\/followup-proposals"/));
+t("BFF refuses missing Origin",()=>assert.match(api,/allowedOrigin\(request\)/));
+t("BFF payload bounded",()=>assert.match(api,/raw.length>510/));
+t("BFF permits only three keys",()=>assert.match(api,/\["targetId","nonce","rationale"\]/));
+t("BFF requires RFC UUID for target and nonce",()=>assert.match(api,/UUID.test\(x.targetId\)[\s\S]*UUID.test\(x.nonce\)/));
+t("user cannot select nonassigned prospects",()=>assert.match(page,/r.view.prospects.filter/));
+t("DNC records omitted",()=>assert.match(page,/!p.doNotContact/));
+t("human takeover records omitted",()=>assert.match(page,/!p.humanTakeover/));
+t("server hides component without feature flag",()=>assert.match(page,/VOX_FOLLOWUP_PROPOSALS_WEB_ENABLED==="staging"/));
+t("retry reuses same nonce after unknown outcome",()=>assert.match(ui,/const requestNonce=nonce\?\?crypto.randomUUID\(\)/));
+t("user clearly told owner approves separately",()=>assert.match(ui,/pending owner approval/));
+t("no provider or wallet mutation",()=>assert.doesNotMatch(api+ui,/sendWhatsApp\(|graph.facebook|credit_recharge|wallet.update/));
+t("other HTTP methods denied",()=>assert.equal((api.match(/METHOD_NOT_ALLOWED/g)||[]).length,3));
+console.log("VOX12B_AAROHI_STAFF_PROPOSAL_PASS "+n+"/21");

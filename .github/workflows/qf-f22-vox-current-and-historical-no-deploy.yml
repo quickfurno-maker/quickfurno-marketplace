@@ -1,0 +1,139 @@
+name: QF F22 Owner-only and historical Staff internal QA (NO DEPLOY)
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/qf-f22-vox-current-and-historical-no-deploy.yml"
+      - "apps/vox-web/package.json"
+      - "docs/launch/archive/vox-staff-legacy-tests/**"
+      - "docs/launch/QF-F22-INTERNAL-VOX-RECOVERY-20261107.md"
+      - "docs/launch/qf-f22-legacy-vox-archive-20261107.json"
+      - "docs/launch/qf-f22-internal-evidence-20261107.json"
+      - "scripts/mvp/launch/f22_verify_vox_test_scope.py"
+      - "scripts/mvp/launch/test_f22_vox_test_scope.py"
+      - "scripts/mvp/launch/f22_owner_compiled_local_http.py"
+      - "scripts/mvp/launch/f22_run_historical_staff.py"
+permissions:
+  contents: read
+jobs:
+  exact-current-owner-no-deploy:
+    name: Current Owner-only VOX (exact test scope, local compiled HTTP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_SUPABASE_URL: https://fixture.invalid
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: F22_FAKE_PUBLIC_ONLY
+      SUPABASE_SERVICE_ROLE_KEY: F22_FAKE_SERVICE_ONLY
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install frozen root and standalone VOX dependencies
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm --prefix apps/vox-web ci --ignore-scripts --no-audit --no-fund
+      - name: Prove historical 24 archives and ONLY reviewed Owner test-command change
+        run: python scripts/mvp/launch/f22_verify_vox_test_scope.py --repo .
+      - name: F22 archive and release HOLD hostile tamper tests
+        run: python -m unittest discover -s scripts/mvp/launch -p test_f22_vox_test_scope.py -v
+      - name: Run actual canonical Owner-only npm test (no skipped legacy Staff claims)
+        run: npm --prefix apps/vox-web test
+      - name: Original Core safety, sender isolation and 10 managed migration source pins
+        run: |
+          python scripts/mvp/launch/f20_verify_owner_scan_internal.py --repo .
+          python scripts/mvp/launch/f18_verify_managed_sql_parity.py --repo .
+          python scripts/mvp/launch/verify-f10-cross-phase-whatsapp-recert.py --repo .
+          npm run test:mvp
+          npm run test:mvp:80-04
+      - name: Core and standalone Owner VOX TypeScript
+        run: |
+          npm run typecheck
+          npm --prefix apps/vox-web run typecheck
+      - name: Build EXACT current Owner-only VOX with local fake credentials only
+        run: npm --prefix apps/vox-web run build -- --webpack
+      - name: Execute six HTTP checks against compiled Owner VOX on loopback only
+        run: python scripts/mvp/launch/f22_owner_compiled_local_http.py
+      - name: Record JARVIS exact Staff/Owner build evidence, not fake new live data
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          e=json.loads(Path("docs/launch/qf-f22-internal-evidence-20261107.json").read_text("utf8"))
+          assert e["schema"]=="quickfurno.f22.real-internal-vox-coverage.v1"
+          assert e["ownerCurrentHost"]["canonicalNpmTestPassed"] is True
+          assert e["ownerCurrentHost"]["compiledLoopbackHttpChecks"]==6
+          assert e["historicStaffPreserved"]["originalScriptsArchivedSha256Exact"]==24
+          assert e["historicStaffPreserved"]["allArchivedHistoricalScriptsPassed"]==24
+          assert e["historicStaffPreserved"]["actualCompiledLocalHttpCasesPassed"]==19
+          assert not e["historicStaffPreserved"]["fullOriginal25FileSetExists"]
+          assert not e["ownerCurrentHost"]["staffFeaturesMergedOrActivated"]
+          assert e["releaseVerdict"]=="HOLD"
+          assert not e["mayDeployStaging"] and not e["maySendOtp"] and not e["mayDeployProduction"]
+          assert not e["secretsPresent"] and not e["externalServiceOperations"]
+          print("F22_JARVIS_HISTORICAL_ONLY_EVIDENCE_REVIEWED; NOT_LIVE_STAGING")
+          PY
+      - name: Exact current F22 path scope, never modify Core SQL or original protected checks
+        run: |
+          python - <<'PY'
+          import json,subprocess
+          from pathlib import Path
+          base="4281e2b79e76ce12cdcfe2c376e40138fe09e1cb"
+          diff=set(subprocess.check_output(["git","diff","--name-only",base,"HEAD"],text=True).splitlines())
+          e=json.loads(Path("docs/launch/qf-f22-legacy-vox-archive-20261107.json").read_text("utf8"))
+          expected={
+            ".github/workflows/qf-f22-vox-current-and-historical-no-deploy.yml",
+            "apps/vox-web/package.json",
+            "docs/launch/QF-F22-INTERNAL-VOX-RECOVERY-20261107.md",
+            "docs/launch/qf-f22-legacy-vox-archive-20261107.json",
+            "docs/launch/qf-f22-internal-evidence-20261107.json",
+            "scripts/mvp/launch/f22_verify_vox_test_scope.py",
+            "scripts/mvp/launch/test_f22_vox_test_scope.py",
+            "scripts/mvp/launch/f22_owner_compiled_local_http.py",
+            "scripts/mvp/launch/f22_run_historical_staff.py",
+          }|{row["archivedPath"] for row in e["records"]}
+          if diff!=expected:
+            print("F22_SCOPE_FAILURE", sorted(diff^expected))
+            raise SystemExit(1)
+          print("F22_EXACT_NONRUNTIME_SCOPE_PASS",len(diff),"files; release HOLD")
+          PY
+
+  isolated-historical-staff-no-deploy:
+    name: Detached historic Staff source (24 genuine restored scripts)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_SUPABASE_URL: https://fixture.invalid
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: F22_FAKE_PUBLIC_ONLY
+      SUPABASE_SERVICE_ROLE_KEY: F22_FAKE_SERVICE_ONLY
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Recover exact detached historical Staff source without touching current Owner host
+        run: |
+          git cat-file -e 015ad722c543b2106b0b46f3fc573e16c4edee63^{commit}
+          git worktree add --detach /tmp/qf-f22-historic-staff 015ad722c543b2106b0b46f3fc573e16c4edee63
+      - name: Install exact historical standalone Staff dependencies without lifecycle scripts
+        run: npm --prefix /tmp/qf-f22-historic-staff/apps/vox-web ci --ignore-scripts --no-audit --no-fund
+      - name: Actual historical Staff Webpack build and ALL 24 archived original tests
+        run: python scripts/mvp/launch/f22_run_historical_staff.py --staff-root /tmp/qf-f22-historic-staff --build
+      - name: Confirm no changes in either original Git tree
+        run: |
+          test -z "$(git -C /tmp/qf-f22-historic-staff status --porcelain --untracked-files=no)"
+          echo "F22_ORIGINAL_STAFF_SOURCE_IMMUTABLE; zero managed/provider calls"

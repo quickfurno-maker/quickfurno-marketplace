@@ -1,0 +1,41 @@
+name: QF F18 Managed Staging SQL Parity (NO DEPLOY)
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/qf-f18-managed-sql-parity-no-deploy.yml"
+      - "docs/launch/QF-F18-RELEASE-SECURITY-20261107.md"
+      - "docs/launch/qf-f18-managed-sql-ledger-proof-20261107.json"
+      - "scripts/mvp/launch/f18_verify_managed_sql_parity.py"
+      - "scripts/mvp/launch/test_f18_managed_sql_parity.py"
+permissions:
+  contents: read
+jobs:
+  exact-managed-ledger-source-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify exactly ten managed read-only fingerprints against unchanged source bytes
+        run: python scripts/mvp/launch/f18_verify_managed_sql_parity.py --repo .
+      - name: Run hostile SQL lexer, source mutation, and no-deploy guard tests
+        run: python -m unittest discover -s scripts/mvp/launch -p test_f18_managed_sql_parity.py -v
+      - name: Confirm F17 release gate remains HOLD
+        run: |
+          node scripts/mvp/launch/f17_operational_release_gate.mjs docs/launch/qf-f17-actual-operational-evidence-20261107.json > /tmp/f18-runtime-gate.json
+          node -e "const o=require('/tmp/f18-runtime-gate.json');if(o.releaseVerdict!=='HOLD'||o.maySendOtp!==false||o.mayDeployStaging!==false||o.mayDeployProduction!==false)process.exit(1)"
+      - name: Exact five-file F18 source diff; no runtime or migration modification
+        run: |
+          git diff --name-only cb9a1919e5690f29e65da3bea6e09d4e174991b9 HEAD | sort > /tmp/actual
+          printf '%s\n' \
+            '.github/workflows/qf-f18-managed-sql-parity-no-deploy.yml' \
+            'docs/launch/QF-F18-RELEASE-SECURITY-20261107.md' \
+            'docs/launch/qf-f18-managed-sql-ledger-proof-20261107.json' \
+            'scripts/mvp/launch/f18_verify_managed_sql_parity.py' \
+            'scripts/mvp/launch/test_f18_managed_sql_parity.py' | sort > /tmp/expected
+          diff -u /tmp/expected /tmp/actual

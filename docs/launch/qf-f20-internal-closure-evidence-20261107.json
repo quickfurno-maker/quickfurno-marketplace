@@ -1,0 +1,62 @@
+{
+  "baseSourceSha": "ee70537221512f94cea8f339c4bb9c192af71d40",
+  "clamavDeferred": true,
+  "date": "2026-11-07",
+  "executionEnvironment": "authorized JARVIS Windows with disposable local Docker",
+  "externalOperationsPerformed": false,
+  "integratedLocalRegression": {
+    "f10CrossPhaseRecertification": true,
+    "f18SourceSqlContentParity": 10,
+    "marketplaceAssignmentCommunication": 137,
+    "typescriptPass": true,
+    "voxOwnerStaffSourceOnly": 161
+  },
+  "isolatedPostgresql": {
+    "currentManagedAuthStorageObjectBackupCertified": false,
+    "fakeScanReceiptForNonexistentEvidenceDenied": true,
+    "immutabilityAndRoleRlsAndAssignmentGateChecked": true,
+    "liveManagedDatabaseRead": false,
+    "liveManagedDatabaseWrite": false,
+    "network": "none",
+    "pass": true,
+    "postgresImage": "local PG17",
+    "privateScanSqlPostflight": true,
+    "productionDatabaseRead": false,
+    "publishedPorts": 0,
+    "randomNonexistentVendorApprovalDenied": true,
+    "replayedManagedAlreadyCertifiedMigrationFiles": 10,
+    "scanReceiptsInLocalSnapshot": 0,
+    "sourceBackupDate": "2026-11-05",
+    "temporaryContainerRemoved": true
+  },
+  "liveStagingChanged": false,
+  "mayDeployProduction": false,
+  "mayDeployStaging": false,
+  "maySendOtp": false,
+  "previouslyBuiltCandidate": {
+    "archiveBytes": 227779072,
+    "archiveSha256": "c2eb6c782a76496633834fac9355970ceb1602a0f5600f82ca4b779de1ab626c",
+    "deployed": false,
+    "signatureVerified": false,
+    "sourceSha": "cb9a1919e5690f29e65da3bea6e09d4e174991b9"
+  },
+  "productionChanged": false,
+  "realMetaSends": 0,
+  "releaseVerdict": "HOLD",
+  "scanDependentApprovalAssignmentCreditFailClosed": true,
+  "schema": "quickfurno.f20.internal-owner-private-scan-offline.v1",
+  "secretsPresent": false,
+  "sourceOnlyAudit": {
+    "hostileMutationTests": 21,
+    "pass": true,
+    "scope": "real source Core Owner case, VOX decision BFF, private scan SQL, new assignment SQL, F17 HOLD",
+    "verifier": "f20_verify_owner_scan_internal.py"
+  },
+  "untouchedExternalGateNames": [
+    "separate Riya and Anisha WABA credential rotation",
+    "registered Meta and Supabase Auth Hook callback settings",
+    "fresh managed Auth DB Storage object recovery",
+    "original F1 F5 F6 F7 protected CI review",
+    "publisher signed immutable exact-head candidate and Owner staging approval"
+  ]
+}

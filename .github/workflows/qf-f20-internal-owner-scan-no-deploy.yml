@@ -1,0 +1,75 @@
+name: QF F20 Owner Scan and Recovery Internal QA (NO EXTERNAL / NO DEPLOY)
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/qf-f20-internal-owner-scan-no-deploy.yml"
+      - "docs/launch/QF-F20-INTERNAL-OWNER-SCAN-20261107.md"
+      - "docs/launch/qf-f20-internal-closure-evidence-20261107.json"
+      - "scripts/mvp/launch/f20_private_scan_isolated_postflight.sql"
+      - "scripts/mvp/launch/f20_verify_owner_scan_internal.py"
+      - "scripts/mvp/launch/test_f20_owner_scan_internal.py"
+permissions:
+  contents: read
+jobs:
+  integrated-internal-no-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 38
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install frozen Marketplace dependencies without scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: F20 Owner Core and VOX BFF scanner/approval/assignment source audit
+        run: python scripts/mvp/launch/f20_verify_owner_scan_internal.py --repo .
+      - name: F20 21 adversarial private document and Owner boundary checks
+        run: python -m unittest discover -s scripts/mvp/launch -p test_f20_owner_scan_internal.py -v
+      - name: Existing VOX Owner and Staff internal regression
+        run: node scripts/mvp/vox/validate-vox-final-internal-gates-20261030.mjs
+      - name: Existing matching/credit-guard and communication semantics
+        run: |
+          npm run test:mvp
+          npm run test:mvp:80-04
+      - name: Existing F10 source reconciliation and F18 exact SQL parity
+        run: |
+          python scripts/mvp/launch/verify-f10-cross-phase-whatsapp-recert.py --repo .
+          python scripts/mvp/launch/f18_verify_managed_sql_parity.py --repo .
+      - name: Historical JARVIS actual offline PG proof recorded, NOT rerun by CI
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          e=json.loads(Path("docs/launch/qf-f20-internal-closure-evidence-20261107.json").read_text("utf8"))
+          assert e["schema"]=="quickfurno.f20.internal-owner-private-scan-offline.v1"
+          assert e["sourceOnlyAudit"]["hostileMutationTests"]==21
+          p=e["isolatedPostgresql"]
+          assert p["pass"] and p["replayedManagedAlreadyCertifiedMigrationFiles"]==10
+          assert p["network"]=="none" and p["publishedPorts"]==0
+          assert p["privateScanSqlPostflight"] and p["temporaryContainerRemoved"]
+          assert not p["currentManagedAuthStorageObjectBackupCertified"]
+          assert not e["secretsPresent"] and not e["externalOperationsPerformed"]
+          assert e["releaseVerdict"]=="HOLD"
+          assert not e["mayDeployStaging"] and not e["maySendOtp"] and not e["mayDeployProduction"]
+          print("F20_JARVIS_LOCAL_OFFLINE_DB_EVIDENCE_RECORD_REVIEWED__NOT_LIVE_DB_CERT")
+          PY
+      - name: Full Marketplace TypeScript
+        run: npm run typecheck
+      - name: Exact six F20-only files, no app runtime or migration/secret changes
+        run: |
+          git diff --name-only ee70537221512f94cea8f339c4bb9c192af71d40 HEAD | sort > /tmp/actual
+          printf '%s\n' \
+            '.github/workflows/qf-f20-internal-owner-scan-no-deploy.yml' \
+            'docs/launch/QF-F20-INTERNAL-OWNER-SCAN-20261107.md' \
+            'docs/launch/qf-f20-internal-closure-evidence-20261107.json' \
+            'scripts/mvp/launch/f20_private_scan_isolated_postflight.sql' \
+            'scripts/mvp/launch/f20_verify_owner_scan_internal.py' \
+            'scripts/mvp/launch/test_f20_owner_scan_internal.py' | sort > /tmp/expected
+          diff -u /tmp/expected /tmp/actual

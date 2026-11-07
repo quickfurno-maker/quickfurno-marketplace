@@ -5,6 +5,7 @@
  * cannot supply any sender or Meta account identifiers. Every outbound path
  * must bind to the VENDOR account, never default to Riya, mock, or SMS.
  */
+import { createHash } from "node:crypto";
 import {
   WHATSAPP_AUTH_LANE_IDENTITIES,
   isExactWhatsappSenderForLane,
@@ -25,6 +26,39 @@ type VendorConfigResult =
 
 const ID = WHATSAPP_AUTH_LANE_IDENTITIES.vendor;
 const GRAPH = /^v\d{1,3}\.\d{1,3}$/;
+const SHA256_HEX = /^[a-f0-9]{64}$/;
+const RED_CANARY_WINDOW_MS = 15 * 60 * 1000;
+
+/**
+ * A RED phone is not automatically disconnected by Meta. The Owner may
+ * authorize one explicitly hashed Staging test recipient for at most 15
+ * minutes, but provider-enforced quotas/restrictions still apply.
+ * Production, absent status, expired approval and unknown quality deny.
+ * No global RED opt-in: callers must independently prove recipient match.
+ */
+export function isApprovedRedVendorOtpCanary(
+  env: Env, nowMs: number = Date.now(),
+): boolean {
+  if (env.QF_RUNTIME_ENV !== "staging" ||
+      env.QF_VENDOR_META_QUALITY_RATING !== "RED" ||
+      env.QF_VENDOR_META_PHONE_STATUS !== "CONNECTED" ||
+      env.QF_VENDOR_RED_CANARY_APPROVED !== "staging" ||
+      !SHA256_HEX.test(env.QF_VENDOR_RED_CANARY_PHONE_SHA256 ?? "")) return false;
+  const expiryText = env.QF_VENDOR_RED_CANARY_UTC_EXPIRES_AT ?? "";
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(expiryText)) return false;
+  const expiresAt = Date.parse(expiryText);
+  return Number.isFinite(nowMs) && Number.isFinite(expiresAt) &&
+    expiresAt > nowMs && expiresAt - nowMs <= RED_CANARY_WINDOW_MS;
+}
+
+export function isApprovedRedVendorOtpRecipient(
+  env: Env, phoneE164: string, nowMs: number = Date.now(),
+): boolean {
+  return isApprovedRedVendorOtpCanary(env,nowMs) &&
+    /^\+91[6-9]\d{9}$/.test(phoneE164) &&
+    createHash("sha256").update(phoneE164,"utf8").digest("hex") ===
+      env.QF_VENDOR_RED_CANARY_PHONE_SHA256;
+}
 
 export function prepareVendorOtpProviderEnv(env: Env): VendorConfigResult {
   // This is a SEPARATE operational approval, not an alias for any Client/Riya
@@ -35,7 +69,8 @@ export function prepareVendorOtpProviderEnv(env: Env): VendorConfigResult {
       env.QF_VENDOR_AUTH_LANE_ISOLATION_MODE !== "staging" ||
       env.QF_VENDOR_OTP_REQUEST_MODE !== "staging" ||
       env.QF_VENDOR_REAL_OTP_CANARY_APPROVED !== "staging" ||
-      env.QF_VENDOR_META_QUALITY_RATING !== "GREEN") {
+      (env.QF_VENDOR_META_QUALITY_RATING !== "GREEN" &&
+       !isApprovedRedVendorOtpCanary(env))) {
     return { ok: false, reason: "vendor_otp_canary_disabled" };
   }
 
@@ -231,6 +266,10 @@ export async function deliverVendorWhatsappOtp(
     input.deadline.remainingNetworkBudgetMs()<500)return FAILED;
   const cfg=prepareVendorOtpProviderEnv(env);
   if(!cfg.ok)return BLOCKED;
+  // A RED rating can never authorize arbitrary vendor phones; narrow,
+  // short-lived approval remains distinct from the signed-hook DB gate.
+  if(env.QF_VENDOR_META_QUALITY_RATING==="RED" &&
+     !isApprovedRedVendorOtpRecipient(env,input.phoneE164))return BLOCKED;
   let gate:Awaited<ReturnType<VendorGate>>;
   try{gate=await deps.gate()}catch{return BLOCKED}
   if(!gate.ok||!UUID.test(gate.providerAccountId))return BLOCKED;

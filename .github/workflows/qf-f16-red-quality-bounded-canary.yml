@@ -1,0 +1,43 @@
+name: QF F16 RED Quality Bounded Staging Canary (NO DEPLOY)
+on:
+  pull_request:
+    paths:
+      - "lib/communication/vendorWhatsappOtpTransport.ts"
+      - "scripts/mvp/vendor/vendor-red-quality-controlled-canary.test.mjs"
+      - "docs/launch/QF-F16-RED-QUALITY-CONTROLLED-CANARY-20261107.md"
+      - ".github/workflows/qf-f16-red-quality-bounded-canary.yml"
+permissions:
+  contents: read
+jobs:
+  vendor-red-controlled-canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      - name: Install frozen Marketplace dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Hostile F16 and original F7 tests
+        run: |
+          node --import ./scripts/mvp/loader/register.mjs --test \
+            scripts/mvp/vendor/vendor-red-quality-controlled-canary.test.mjs \
+            scripts/mvp/vendor/vendor-dedicated-otp-transport.test.mjs
+      - name: Keep historical F7 sender isolation contract
+        run: python scripts/mvp/launch/verify-whatsapp-f7-scope.py --repo .
+      - name: Typecheck whole Marketplace
+        run: npm run typecheck
+      - name: Strict four-path F16 scope; no runtime deployment
+        run: |
+          git diff --name-only 9550503d771b6aa251a4714376d41e82deff9456 HEAD | sort > /tmp/f16-actual
+          printf '%s\n' \
+            '.github/workflows/qf-f16-red-quality-bounded-canary.yml' \
+            'docs/launch/QF-F16-RED-QUALITY-CONTROLLED-CANARY-20261107.md' \
+            'lib/communication/vendorWhatsappOtpTransport.ts' \
+            'scripts/mvp/vendor/vendor-red-quality-controlled-canary.test.mjs' | sort > /tmp/f16-expected
+          diff -u /tmp/f16-expected /tmp/f16-actual

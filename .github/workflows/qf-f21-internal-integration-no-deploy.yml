@@ -61,6 +61,8 @@ jobs:
           assert e["schema"]=="quickfurno.f21.internal-owner-archive-lineage.v1"
           assert e["ownerSimulation"]["testCasesPassed"]==23 and e["ownerSimulation"]["testCasesFailed"]==0
           assert e["ownerSimulation"]["realVOXOwnerStaffSourceRegressionPassed"]==161
+          assert e["releaseLineage"]["protectedHistoricalSourcePathsVerified"]==13
+          assert e["releaseLineage"]["historicalF0F1F5F6F7StillRed"]
           assert e["archiveRecovery"]["offlineHttpChecksPassed"]==17
           assert e["archiveRecovery"]["networkNone"] and e["archiveRecovery"]["publishedPorts"]==0
           assert e["archiveRecovery"]["temporaryRecoveryImageAliasRemoved"]

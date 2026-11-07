@@ -44,11 +44,11 @@
   "realOtpSent": false,
   "realProviderCalls": false,
   "releaseLineage": {
-    "historicalF1F5F6F7StillRed": true,
+    "historicalF0F1F5F6F7StillRed": true,
     "historyUnmodified": true,
     "migrationSourcePinsPreserved": true,
     "newIntegratedGovernanceApproval": false,
-    "protectedHistoricalSourcePathsVerified": 10
+    "protectedHistoricalSourcePathsVerified": 13
   },
   "releaseVerdict": "HOLD",
   "schema": "quickfurno.f21.internal-owner-archive-lineage.v1",

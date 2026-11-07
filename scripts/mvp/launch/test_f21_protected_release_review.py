@@ -13,12 +13,12 @@ class F21ProtectedReleaseTests(unittest.TestCase):
  def test_01_current_original_protection_is_immutable(self):
   value=mod.check(ROOT)
   self.assertTrue(value["valid"],value["failures"])
-  self.assertEqual(value["checkedProtectedPathCount"],10)
+  self.assertEqual(value["checkedProtectedPathCount"],13)
   self.assertEqual(value["releaseVerdict"],"HOLD")
  def test_02_never_claims_old_protected_check_green(self):
   r=mod.check(ROOT)
   self.assertTrue(r["historicalOriginalChecksRemainUnwaived"])
-  self.assertEqual(set(r["historicalFailedRuns"]),{"F1","F5","F6","F7"})
+  self.assertEqual(set(r["historicalFailedRuns"]),{"F0","F1","F5","F6","F7"})
   self.assertFalse(r["newIntegratedReleaseApprovalGranted"])
  def test_03_never_claims_signed_provider_or_deployment(self):
   r=mod.check(ROOT)
@@ -27,7 +27,7 @@ class F21ProtectedReleaseTests(unittest.TestCase):
    self.assertFalse(r[k],k)
  def test_04_f1_f5_f6_f7_file_digests_pin_in_review(self):
   r=mod.check(ROOT)
-  self.assertEqual(len(r["protectedSourceSha256"]),10)
+  self.assertEqual(len(r["protectedSourceSha256"]),13)
   for p,h in r["protectedSourceSha256"].items():
    self.assertTrue((ROOT/p).is_file())
    self.assertRegex(h,r"^[0-9a-f]{64}$")
@@ -57,6 +57,8 @@ class F21ProtectedReleaseTests(unittest.TestCase):
   self.assertTrue(r["reviewedChangedRuntimePaths"] in (
       [],["apps/vox-web/lib/ownerVendorVerification.ts"]))
  def test_10_historical_original_workflows_not_mutated(self):
+  r=mod.check(ROOT)
+  self.assertIn(".github/workflows/qf-f0-owner-vox-scope.yml",r["protectedSourceSha256"])
   r=mod.check(ROOT)
   paths=r["protectedSourceSha256"]
   for tag in ("f1","f5","f6","f7"):

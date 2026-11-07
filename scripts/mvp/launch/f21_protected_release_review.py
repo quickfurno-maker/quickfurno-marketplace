@@ -2,7 +2,7 @@
 """F21 immutable protected-release lineage review (source-only, NO DEPLOY).
 
 Inspects exact git objects and the original F10 source-contract certification.
-A valid review does NOT waive historical F1/F5/F6/F7 protected CI failures,
+A valid review does NOT waive historical F0/F1/F5/F6/F7 protected CI failures,
 merge PRs, permit OTP, or promote any container.
 """
 from pathlib import Path
@@ -11,7 +11,12 @@ import argparse,hashlib,importlib.util,json,subprocess
 BASE="223e9daa1da1f6a705a04a72cd723c2930ece543"
 F7="61bb1ce1e06cf138fe65ed10fe03c0c15557d931"
 F20="99c9a56c63fba6db179201ca0688f96465f07985"
-REQUIRED_PROTECTED=(
+F0_PATHS=(
+ ".github/workflows/qf-f0-owner-vox-scope.yml",
+ "scripts/mvp/launch/verify-owner-vox-scope.py",
+ "docs/launch/f0-owner-vox-file-manifest.json",
+)
+REQUIRED_PROTECTED=F0_PATHS+(
  ".github/workflows/qf-f1-core-owner-vendor.yml",
  ".github/workflows/qf-f5-vendor-returning-login.yml",
  ".github/workflows/qf-f6-whatsapp-auth-lane-isolation.yml",
@@ -26,6 +31,7 @@ REQUIRED_PROTECTED=(
 # These status snapshots were verified against exact GitHub runs during F17.
 # They are *historical evidence*, NOT a substitute for current branch checks.
 LEGACY_RUNS={
+ "F0":"42359751693",
  "F1":"42213054624","F5":"42213054292",
  "F6":"42213054355","F7":"42347125699"
 }
@@ -46,13 +52,30 @@ def check(repo:Path)->dict:
  except ValueError:failures.append("NOT_F20_ANCESTOR")
  protected_sha={}
  for p in REQUIRED_PROTECTED:
-  anchor=F7 if "f7" in p.lower() else BASE
+  anchor=F20 if p in F0_PATHS else F7 if "f7" in p.lower() else BASE
   try:
    old=git(repo,"show",anchor+":"+p)
    now=(repo/p).read_bytes()
    protected_sha[p]=sha(now)
    if old!=now:failures.append("PROTECTED_HISTORICAL_FILE_MODIFIED:"+p)
   except (OSError,ValueError):failures.append("PROTECTED_HISTORICAL_FILE_MISSING:"+p)
+ # F0's original historical byte-inventory verifier is expected to flag
+ # exactly the two F21-reviewed VOX module/package deltas. Any additional
+ # drift must stop review; successful F0 alone cannot authorize deployment.
+ try:
+  cmd=subprocess.run(["python","scripts/mvp/launch/verify-owner-vox-scope.py",
+      "--repo",str(repo)],cwd=repo,capture_output=True,text=True,timeout=30)
+  f0=json.loads(cmd.stdout)
+  expected_f0={
+   "modified_file:apps/vox-web/lib/ownerVendorVerification.ts",
+   "modified_file:apps/vox-web/package.json"
+  }
+  if (cmd.returncode==0 or f0.get("valid") is not False or
+      set(f0.get("failures",[]))!=expected_f0 or
+      f0.get("deployment_authorized") is not False):
+   failures.append("UNRECONCILED_F0_OWNER_VOX_MANIFEST")
+ except (OSError,ValueError,subprocess.TimeoutExpired,TypeError):
+  failures.append("F0_HISTORICAL_VERIFIER_UNAVAILABLE")
  spec=importlib.util.spec_from_file_location("f10recert",repo/"scripts/mvp/launch/verify-f10-cross-phase-whatsapp-recert.py")
  if not spec or not spec.loader:failures.append("F10_CERTIFIER_UNAVAILABLE")
  else:

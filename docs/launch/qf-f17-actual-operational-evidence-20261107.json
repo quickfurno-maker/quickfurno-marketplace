@@ -1,0 +1,78 @@
+{
+  "schema": "quickfurno.f17.actual-operational-evidence.v1",
+  "observedDate": "2026-11-07",
+  "github": {
+    "f10CrossPhaseRecertPassed": true,
+    "f14CIpassed": true,
+    "f16CIpassed": true,
+    "originalProtectedF1F5F6F7Green": false,
+    "reviewedIntegrationOverrideAccepted": false,
+    "approvedReleaseHead": null
+  },
+  "stagingCore": {
+    "currentImage": "qf-core-staging:09b9d7a4",
+    "imageAttested": false,
+    "sourceSha": "09b9d7a484c07fdc60009cbde1332dd4834ae3af",
+    "senderClassification": "STALE_VENDOR_WABA",
+    "vendorPairExact": false,
+    "clientTokenPresent": true,
+    "vendorTokenPresent": false,
+    "signingSecretsPresent": false
+  },
+  "meta": {
+    "client": {
+      "waba": "27861262223494153",
+      "phone": "1333595106493545",
+      "status": "CONNECTED",
+      "quality": "GREEN",
+      "tokenAuthorityVerified": true,
+      "registeredCallbackHost": "quickfurno.in",
+      "registeredCallbackPath": "/api/webhooks/whatsapp/meta"
+    },
+    "vendor": {
+      "waba": "1569174604351612",
+      "phone": "1088396637681784",
+      "status": "CONNECTED",
+      "quality": "RED",
+      "tokenAuthorityVerified": true,
+      "registeredCallbackVerified": false,
+      "registeredCallbackHost": null
+    }
+  },
+  "hooks": {
+    "supabaseAuthHookRegistered": false,
+    "supabaseAuthHookUrl": null,
+    "supabaseAuthHookEnabled": false,
+    "signedCallbacksNegativeE2ePassed": false,
+    "verifiedSource": "unverified"
+  },
+  "database": {
+    "projectId": "uckafzuochmbvtiodmcl",
+    "migrationsRegistered": 10,
+    "sqlContentParityVerified": false,
+    "freshDbAuthStorageSnapshotVerified": false,
+    "restoreOnIsolatedDatabasePassed": true,
+    "storageObjectBytesVerified": false,
+    "providerRowsAreDormant": true,
+    "recordedLoginOtpMessages": 0
+  },
+  "artifacts": {
+    "oldCoreRollbackImageArchiveVerified": true,
+    "oldComposeAndEnvSnapshotsVerified": true,
+    "signedImmutableImageVerified": false,
+    "candidateSha256": null,
+    "candidateSourceSha": null
+  },
+  "security": {
+    "exposedStagingKeysRotatedAndRevoked": false,
+    "oldTokensInvalidatedVerified": false,
+    "clamavActivationDeferred": true,
+    "scanDependentApprovalAndCreditsFailClosed": true
+  },
+  "owner": {
+    "stagingChangeApproved": false,
+    "rollbackOperatorConfirmed": false
+  },
+  "secretsInEvidence": false,
+  "provenNoSend": true
+}

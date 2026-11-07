@@ -1,0 +1,61 @@
+name: QF F17 Integrated Release Gate (NO DEPLOY)
+on:
+  pull_request:
+    paths:
+      - "scripts/mvp/launch/f17_*"
+      - "docs/launch/qf-f17-*"
+      - "docs/launch/QF-F17-*"
+      - ".github/workflows/qf-f17-integrated-release-no-deploy.yml"
+permissions:
+  contents: read
+jobs:
+  integrated-no-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      - name: Install locked source tools and app dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Original F7 and approved F10 F11 F12 scope and recertification
+        run: |
+          python scripts/mvp/launch/verify-whatsapp-f7-scope.py --repo .
+          python scripts/mvp/launch/verify-f10-cross-phase-whatsapp-recert.py --repo .
+          python scripts/mvp/launch/verify-f11-signed-callback-preflight-scope.py --repo .
+          python scripts/mvp/launch/verify-f12-runtime-attestation-scope.py --repo .
+      - name: Actual F17 gate and F11 through F13 regressions
+        run: |
+          node --test \
+            scripts/mvp/launch/f11-callback-perimeter-policy.test.mjs \
+            scripts/mvp/launch/f12-core-runtime-release-gate.test.mjs \
+            scripts/mvp/launch/f13-release-reconciliation.test.mjs \
+            scripts/mvp/launch/f17_operational_release_gate.test.mjs
+          node scripts/mvp/launch/f17_operational_release_gate.mjs docs/launch/qf-f17-actual-operational-evidence-20261107.json > /tmp/f17-verdict.json
+          node -e "const x=require('/tmp/f17-verdict.json'); if(x.releaseVerdict!=='HOLD'||x.maySendOtp!==false||x.mayDeployStaging!==false||!x.blockers.includes('F17_ROTATE_EXPOSED_STAGING_KEYS')) process.exit(1)"
+      - name: All original F7 plus F16 consented RED canary tests
+        run: |
+          node --import ./scripts/mvp/loader/register.mjs --test \
+            scripts/mvp/vendor/vendor-dedicated-otp-transport.test.mjs \
+            scripts/mvp/vendor/vendor-red-quality-controlled-canary.test.mjs
+      - name: Offline-only F14 hostile collector tests
+        run: |
+          python scripts/mvp/launch/f14_collect_staging_runtime.test.py
+          python scripts/mvp/launch/f14_probe_public_core.test.py
+      - name: Full Marketplace TypeScript validation
+        run: npm run typecheck
+      - name: Exact F17-only path scope, no deployment secrets or env
+        run: |
+          git diff --name-only 9290e1b2625e3ca0f8284a80aeb906389defd666 HEAD | sort > /tmp/actual
+          printf '%s\n' \
+            '.github/workflows/qf-f17-integrated-release-no-deploy.yml' \
+            'docs/launch/QF-F17-OPERATIONAL-RELEASE-20261107.md' \
+            'docs/launch/qf-f17-actual-operational-evidence-20261107.json' \
+            'scripts/mvp/launch/f17_operational_release_gate.mjs' \
+            'scripts/mvp/launch/f17_operational_release_gate.test.mjs' | sort > /tmp/expected
+          diff -u /tmp/expected /tmp/actual

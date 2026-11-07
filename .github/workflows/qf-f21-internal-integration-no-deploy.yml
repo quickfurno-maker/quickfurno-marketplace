@@ -1,0 +1,90 @@
+name: QF F21 Internal Owner Positive, Lineage, Archive Evidence (NO DEPLOY)
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/qf-f21-internal-integration-no-deploy.yml"
+      - "apps/vox-web/lib/ownerVendorVerification.ts"
+      - "apps/vox-web/package.json"
+      - "scripts/mvp/launch/f21_owner_positive_synthetic.test.cjs"
+      - "scripts/mvp/launch/f21_protected_release_review.py"
+      - "scripts/mvp/launch/test_f21_protected_release_review.py"
+      - "docs/launch/QF-F21-INTERNAL-INTEGRATION-20261107.md"
+      - "docs/launch/qf-f21-internal-evidence-20261107.json"
+permissions:
+  contents: read
+jobs:
+  internal-voxel-positive-and-protected-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install exact root dependencies without scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Existing VOX Owner and staff gates, real synthetic AAL2, and 23 positive Owner cases
+        run: npm --prefix apps/vox-web run test:internal
+      - name: Protected original F1 F5 F6 F7 SHA and migration lineage (no waiver)
+        run: python scripts/mvp/launch/f21_protected_release_review.py --repo .
+      - name: Ten adversarial historical protection and no-deploy tests
+        run: python -m unittest discover -s scripts/mvp/launch -p test_f21_protected_release_review.py -v
+      - name: Original Owner scan and assignment no-lead credit safety
+        run: |
+          python scripts/mvp/launch/f20_verify_owner_scan_internal.py --repo .
+          python -m unittest discover -s scripts/mvp/launch -p test_f20_owner_scan_internal.py -q
+      - name: Original 10 managed migration source bytes and F10 isolation
+        run: |
+          python scripts/mvp/launch/f18_verify_managed_sql_parity.py --repo .
+          python scripts/mvp/launch/verify-f10-cross-phase-whatsapp-recert.py --repo .
+      - name: Marketplace, matching, communication and default-off assignment
+        run: |
+          npm run test:mvp
+          npm run test:mvp:80-04
+      - name: Full Core and standalone VOX TypeScript
+        run: |
+          npm run typecheck
+          npm --prefix apps/vox-web run typecheck
+      - name: Validate real JARVIS local archive result record; CI does NOT run Docker
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          e=json.loads(Path("docs/launch/qf-f21-internal-evidence-20261107.json").read_text("utf8"))
+          assert e["schema"]=="quickfurno.f21.internal-owner-archive-lineage.v1"
+          assert e["ownerSimulation"]["testCasesPassed"]==23 and e["ownerSimulation"]["testCasesFailed"]==0
+          assert e["ownerSimulation"]["realVOXOwnerStaffSourceRegressionPassed"]==161
+          assert e["releaseLineage"]["protectedHistoricalSourcePathsVerified"]==13
+          assert e["releaseLineage"]["historicalF0F1F5F6F7StillRed"]
+          assert e["archiveRecovery"]["offlineHttpChecksPassed"]==17
+          assert e["archiveRecovery"]["networkNone"] and e["archiveRecovery"]["publishedPorts"]==0
+          assert e["archiveRecovery"]["temporaryRecoveryImageAliasRemoved"]
+          assert not e["archiveRecovery"]["oldActualStagingImageRollbackVerified"]
+          assert not e["archiveRecovery"]["publisherSignatureVerified"]
+          assert e["legacyVOXPackageTestReferenceGap"]["referencedUntrackedScriptCount"]==25
+          assert not e["legacyVOXPackageTestReferenceGap"]["fullLegacyStandaloneSuiteCertified"]
+          assert e["releaseVerdict"]=="HOLD"
+          assert not e["mayDeployStaging"] and not e["maySendOtp"] and not e["mayDeployProduction"]
+          assert not e["secretsPresent"] and not e["realProviderCalls"]
+          print("F21_OFFLINE_ARCHIVE_EVIDENCE_REVIEWED_NOT_CI_LIVE_OR_VPS_ROLLBACK")
+          PY
+      - name: F21 exactly eight reviewed paths; no migrations, keys, external config or deploy
+        run: |
+          git diff --name-only 99c9a56c63fba6db179201ca0688f96465f07985 HEAD | sort > /tmp/actual
+          printf '%s\n' \
+            '.github/workflows/qf-f21-internal-integration-no-deploy.yml' \
+            'apps/vox-web/lib/ownerVendorVerification.ts' \
+            'apps/vox-web/package.json' \
+            'docs/launch/QF-F21-INTERNAL-INTEGRATION-20261107.md' \
+            'docs/launch/qf-f21-internal-evidence-20261107.json' \
+            'scripts/mvp/launch/f21_owner_positive_synthetic.test.cjs' \
+            'scripts/mvp/launch/f21_protected_release_review.py' \
+            'scripts/mvp/launch/test_f21_protected_release_review.py' | sort > /tmp/expected
+          diff -u /tmp/expected /tmp/actual

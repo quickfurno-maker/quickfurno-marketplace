@@ -189,13 +189,22 @@ export function validOwnerReviewInput(v:unknown):v is OwnerReviewInput{
   typeof v.reasonCode==="string"&&REASON.test(v.reasonCode);
 }
 
+const decisionFields=[
+ "ok","schema","vendorId","caseState","immutableDecisionRecorded",
+ "vendorBusinessStatusUnchanged","leadActivationUnchanged",
+ "requiresSeparateCoreVendorApproval",
+] as const;
 export async function ownerVendorDecision(input:OwnerReviewInput):
  Promise<Outcome<{vendorId:string;caseState:string}>>{
  if(!validOwnerReviewInput(input))return {ok:false,status:400,error:"INVALID_OWNER_DECISION"};
  const r=await callCore("/api/vox/v1/owner-vendor-verification-case","POST",input);
  if(!r.ok)return r;
  const v=r.data;
- if(!object(v)||v.ok!==true||v.schema!=="qf.vox.owner.vendor-review-decision.v1"||
+ // An unexpected Core decision field can never become VOX authority, even
+ // if the BFF currently projects only the two safe fields. This prevents
+ // silent future upgrades from trusting unreviewed private data or powers.
+ if(!object(v)||!exact(v,decisionFields)||v.ok!==true||
+   v.schema!=="qf.vox.owner.vendor-review-decision.v1"||
    v.vendorId!==input.vendorId||typeof v.caseState!=="string"||
    !CLOSED.has(v.caseState)||v.immutableDecisionRecorded!==true||
    v.vendorBusinessStatusUnchanged!==true||v.leadActivationUnchanged!==true||

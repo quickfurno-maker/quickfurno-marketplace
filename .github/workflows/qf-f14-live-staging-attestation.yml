@@ -1,0 +1,69 @@
+name: QF F14 Live Staging Evidence (NO DEPLOY)
+on:
+  pull_request:
+    paths:
+      - "scripts/mvp/launch/f14_*"
+      - "docs/launch/qf-f14-*"
+      - "docs/launch/QF-F14-*"
+      - ".github/workflows/qf-f14-live-staging-attestation.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  certify-read-only-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: F14 offline hostile collector and HTTP method tests
+        run: |
+          python scripts/mvp/launch/f14_collect_staging_runtime.test.py
+          python scripts/mvp/launch/f14_probe_public_core.test.py
+      - name: Preserve F12 and F13 signed HOLD policy
+        run: node --test scripts/mvp/launch/f12-core-runtime-release-gate.test.mjs scripts/mvp/launch/f13-release-reconciliation.test.mjs
+      - name: Validate sanitized attestation and permanent HOLD
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("docs/launch")
+          runtime=json.loads((p/"qf-f14-live-staging-runtime-20261107.json").read_text())
+          ingress=json.loads((p/"qf-f14-live-staging-ingress-20261107.json").read_text())
+          db=json.loads((p/"qf-f14-live-staging-db-20261107.json").read_text())
+          assert runtime["networkExecuted"] and runtime["senderClassification"]=="STALE_VENDOR_WABA"
+          assert len(runtime["requiredEnvMissing"])==6 and not runtime["vendorPairExact"]
+          assert runtime["environmentValuesEmitted"] is False
+          assert ingress["allBoundariesMatched"] and ingress["maySendOtp"] is False
+          assert db["riyaDisabled"]==db["anishaDisabled"]==1
+          assert db["recordedOtpMessages"]==db["activeOtpMappings"]==db["activeOtpTemplates"]==db["activeOtpAutomations"]==0
+          assert db["releaseVerdict"]==runtime["releaseVerdict"]==ingress["releaseVerdict"]=="HOLD"
+          for x in [runtime,ingress,db]:
+            assert not x.get("maySendOtp",False)
+            assert not x.get("mayDeployStaging",False)
+          s=" ".join((p/f).read_text() for f in [
+           "qf-f14-live-staging-runtime-20261107.json",
+           "qf-f14-live-staging-ingress-20261107.json",
+           "qf-f14-live-staging-db-20261107.json"]).lower()
+          for bad in ["bearer ","eyjhb","sb_secret_","ghp_","access_token="]:
+            assert bad not in s
+          PY
+      - name: Guard exact nine additive nonruntime paths; zero external network
+        run: |
+          git diff --name-only 945fae05f1502e48b0b455a0a0bcb3e365e501de HEAD | sort > /tmp/f14-actual
+          printf '%s\n' \
+            '.github/workflows/qf-f14-live-staging-attestation.yml' \
+            'docs/launch/QF-F14-LIVE-STAGING-VERIFICATION-20261107.md' \
+            'docs/launch/qf-f14-live-staging-db-20261107.json' \
+            'docs/launch/qf-f14-live-staging-ingress-20261107.json' \
+            'docs/launch/qf-f14-live-staging-runtime-20261107.json' \
+            'scripts/mvp/launch/f14_collect_staging_runtime.py' \
+            'scripts/mvp/launch/f14_collect_staging_runtime.test.py' \
+            'scripts/mvp/launch/f14_probe_public_core.py' \
+            'scripts/mvp/launch/f14_probe_public_core.test.py' | sort > /tmp/f14-expected
+          diff -u /tmp/f14-expected /tmp/f14-actual

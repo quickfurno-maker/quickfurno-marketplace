@@ -1,0 +1,110 @@
+{
+  "schema": "quickfurno.f18.real-managed-sql-ledger-proof.v1",
+  "observedDate": "2026-11-07",
+  "stagingProjectId": "uckafzuochmbvtiodmcl",
+  "referenceSourceSha": "cb9a1919e5690f29e65da3bea6e09d4e174991b9",
+  "databaseReadOnly": true,
+  "sqlSourceReadOnly": true,
+  "databaseModified": false,
+  "appliedMigrationVersionCount": 10,
+  "actualLedgerColumns": [
+    "version",
+    "name",
+    "statements"
+  ],
+  "proofMethods": {
+    "split_trimmed_join": "MD5 of '\\n' joined btrimmed PostgreSQL lexical statements with SQL terminators removed, exact raw SQL byte spaces preserved inside statement",
+    "full_source_exact": "MD5 of complete UTF-8 source file bytes; stored migration registry SQL text directly compared byte-for-byte with source, no canonicalization",
+    "single_terminated": "MD5 of one btrimmed lexed SQL statement with its final terminating semicolon restored"
+  },
+  "versions": [
+    {
+      "version": "20261104090000",
+      "name": "vendor_registration_consent_receipt",
+      "statementCount": 6,
+      "storedStatementMD5": "6ea9ddd2909a77e62bd6ff19f2a66094",
+      "localSourceSha256": "d633187e5084591056c4a87687297fd9ca385a9e1a8d03ff8ae4df6d9e2c9e19",
+      "comparisonMode": "split_trimmed_join"
+    },
+    {
+      "version": "20261104140000",
+      "name": "vendor_private_otp_and_verification_foundation",
+      "statementCount": 45,
+      "storedStatementMD5": "c30b2b3c1c8b4faffce3078ec2fc2f72",
+      "localSourceSha256": "cb5a4e1f74c6cbc6a6f4a89464c4d7235956b2ae9b71c3bd79bf39ed70581f48",
+      "comparisonMode": "split_trimmed_join"
+    },
+    {
+      "version": "20261104153000",
+      "name": "vendor_atomic_pending_registration",
+      "statementCount": 8,
+      "storedStatementMD5": "d110b15da837193ec8b96c7a6d046a22",
+      "localSourceSha256": "2f62663edc5f64122f771f8c141019933b7f4eba1680a8a62a8af9c150972596",
+      "comparisonMode": "split_trimmed_join"
+    },
+    {
+      "version": "20261104160000",
+      "name": "vendor_owner_review_assignment_gate",
+      "statementCount": 16,
+      "storedStatementMD5": "0cac6c66751fd57f011b46b654137510",
+      "localSourceSha256": "177c8f11ffeee951040e04bdb1a75e0391308ba022e00cdbd979a675a352e89e",
+      "comparisonMode": "split_trimmed_join"
+    },
+    {
+      "version": "20261104163000",
+      "name": "vendor_private_document_intake",
+      "statementCount": 8,
+      "storedStatementMD5": "28803e04f55e9e4385056c377f558c48",
+      "localSourceSha256": "dd4914f154e75e361ad862a17a702b9e72f3252e22e3c0a041616507ef3fd7d2",
+      "comparisonMode": "split_trimmed_join"
+    },
+    {
+      "version": "20261104170000",
+      "name": "vox_owner_vendor_review_queue",
+      "statementCount": 6,
+      "storedStatementMD5": "243b95b756ce85531a428302eeae6628",
+      "localSourceSha256": "47dd11398806729bb93609857cf037cb3123cc0faaf703383a4885f287fe7012",
+      "comparisonMode": "split_trimmed_join"
+    },
+    {
+      "version": "20261104173000",
+      "name": "vendor_private_scan_quarantine",
+      "statementCount": 16,
+      "storedStatementMD5": "5addbe1cbaf867c89eb1008d3ad44145",
+      "localSourceSha256": "da53a260e9a15b39c24701e480f3d52759965406c8fbbebc2ac383767f481a68",
+      "comparisonMode": "split_trimmed_join"
+    },
+    {
+      "version": "20261106113825",
+      "name": "qf_f7_dormant_riya_anisha_auth_template_catalog",
+      "statementCount": 1,
+      "storedStatementMD5": "082c22d925739fdf83947e376c361106",
+      "localSourceSha256": "7203b22a2bbaf20bfdf0d3f7824d18d8ee3a707f2d6d004b845d78396e5c5205",
+      "comparisonMode": "full_source_exact"
+    },
+    {
+      "version": "20261106114301",
+      "name": "qf_f7_client_vendor_auth_copy_code_v2_inactive_bindings",
+      "statementCount": 1,
+      "storedStatementMD5": "5bb39ac3d3a14113171333291aad0d22",
+      "localSourceSha256": "a3cb22b253ea7f105eaaa19d1270b635cdbea59b45fdbc428cba3debcd300741",
+      "comparisonMode": "full_source_exact"
+    },
+    {
+      "version": "20261106120124",
+      "name": "qf_f8_dormant_riya_client_provider_account",
+      "statementCount": 1,
+      "storedStatementMD5": "205643fd6da3c24ba8c5cdc147674881",
+      "localSourceSha256": "ba56e0814611dd0e3b4df8164714328d70f33ab0bbc195f2976fcfaaf35a7566",
+      "comparisonMode": "single_terminated"
+    }
+  ],
+  "exactByteContentParityVerified": true,
+  "sourceSha256ValidatedLocally": true,
+  "temporalScope": "These ten registered versions as checked on 2026-11-07. Does not prove no future migrations or latest live DB/Storage backup.",
+  "releaseVerdict": "HOLD",
+  "mayDeployStaging": false,
+  "maySendOtp": false,
+  "mayDeployProduction": false,
+  "secretsPresent": false
+}

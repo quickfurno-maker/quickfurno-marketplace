@@ -1009,9 +1009,14 @@ export const suite = {
       name: 'vendor registration keeps one authority and Google-only location rules',
       run: () => {
         const src = readFileSync('components/VendorRegisterForm.tsx', 'utf8');
-        assertTrue(src.includes('submitVendorAccountRegistration'), 'sole submit authority');
-        assertEqual((src.match(/submitVendorAccountRegistration\(/g) || []).length, 1,
-          'submitted through exactly one call');
+        assertFalse(src.includes('submitVendorAccountRegistration'),
+          'retired public vendor-registration action cannot remain an alternate signup path');
+        assertEqual((src.match(/fetch\("\/api\/vendor\/onboarding\/complete"/g) || []).length, 1,
+          'exactly one atomic Pending enrollment endpoint');
+        assertEqual((src.match(/fetch\("\/api\/vendor\/onboarding\/request-otp"/g) || []).length, 1,
+          'exactly one WhatsApp OTP request endpoint');
+        assertTrue(src.includes('isVendorOtpEntryValid(otp)') && src.includes('registration_consent_accepted'),
+          'OTP verified and registration consent are necessary for enrollment');
         // Shared sources of truth are not forked.
         for (const dep of ['mainCategories', 'useActiveCities', 'GooglePlaceAutocomplete',
                            'isPlaceCompatibleWithSelectedCity', 'readTracking', 'CATEGORY_MIN_RATE']) {
@@ -1032,8 +1037,9 @@ export const suite = {
           && src.includes('office_longitude: f.baseLongitude'),
           'Google-selected office/base coordinates remain the vendor location authority');
         // Validation rules outside the removed device-location step are untouched.
-        assertTrue(src.includes('key: "confirmPassword"'), 'confirm-password rule kept');
-        assertTrue(/10-digit/.test(src), '10-digit phone rule kept');
+        assertFalse(src.includes('confirmPassword'), 'no password-based signup after WhatsApp OTP migration');
+        assertTrue(src.includes('VENDOR_MOBILE_RE') && src.includes('^[6-9]'),
+          'Indian mobile rule and WhatsApp OTP replace old password rule');
         // No invented brand remains as a placeholder.
         assertFalse(src.includes('UrbanCraft'), 'fictional business placeholder removed');
       },
@@ -1086,8 +1092,9 @@ export const suite = {
 
         // Title intent is unchanged; the description is the truthful one.
         assertTrue(src.includes('Vendor Portal | QuickFurno'), 'title kept');
-        assertTrue(src.includes('manage matched home-service enquiries when eligible'),
-          'truthful metadata description');
+        assertTrue(src.includes('New vendors apply using mobile WhatsApp verification') &&
+          src.includes('with separate Owner approval required before lead matching'),
+          'truthful metadata requires mobile OTP and independent Owner approval');
       },
     },
 
@@ -1175,8 +1182,9 @@ export const suite = {
         const shipped = raw.replace(/\/\*[\s\S]*?\*\//g, '')
           .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
           .replace(/\s+/g, ' ');
-        assertTrue(src.includes('manage matched home-service enquiries when eligible'),
-          'V2-11R metadata description unchanged');
+        assertTrue(src.includes('New vendors apply using mobile WhatsApp verification') &&
+          src.includes('with separate Owner approval required before lead matching'),
+          'new approved OTP metadata keeps eligibility truthful');
         assertTrue(src.includes('Client matching access depends on your account being approved and active, with a package and credits in place.'),
           'vendor eligibility step uses Client Matching language');
         assertTrue(src.includes('When can matched enquiries appear?'), 'V2-11R FAQ question unchanged');
@@ -1766,7 +1774,7 @@ export const suite = {
         for (const title of ['Tell us about your business', 'What do you specialise in?',
                              'Where do you serve clients?',
                              'Tell us your business strength', 'Review your application',
-                             'Vendor account created']) {
+                             'Application submitted for verification']) {
           assertTrue(src.includes('<h2>' + title + '</h2>'), title + ' is an h2');
           assertFalse(src.includes('<h3>' + title + '</h3>'), title + ' is not an h3');
         }
@@ -1813,9 +1821,21 @@ export const suite = {
       run: () => {
         const src = readFileSync('components/VendorRegisterForm.tsx', 'utf8');
         // The submit path and its single authority call are untouched.
-        assertTrue(src.includes('import { submitVendorAccountRegistration } from "@/app/actions";'),
-          'registration action import unchanged');
-        assertTrue(src.includes('await submitVendorAccountRegistration({'), 'submit call unchanged');
+        assertFalse(src.includes('submitVendorAccountRegistration'),
+          'legacy public submit action is not reintroduced');
+        assertTrue(src.includes('fetch("/api/vendor/onboarding/complete"'),
+          'signup uses the single atomic Pending registration route');
+        assertTrue(src.includes('fetch("/api/vendor/onboarding/request-otp"'),
+          'same wizard requests a mandatory WhatsApp OTP');
+        assertTrue(src.includes('isVendorOtpEntryValid(otp)'),
+          'OTP entry validated before signup attempt');
+        const route = readFileSync('app/api/vendor/onboarding/complete/route.ts', 'utf8');
+        assertTrue(route.includes('enrollPendingVendorAfterWhatsappOtp'),
+          'server, not browser, owns atomic Pending enrollment');
+        assertTrue(route.includes('sameOrigin(request)') &&
+          route.includes('hasVendorRegistrationConsent') &&
+          route.includes('VENDOR_SIGNUP_NOT_YET_AVAILABLE'),
+          'server enforces same-origin consent and fail-closed activation');
         // A presentation pass must never introduce a bypass or a second path.
         assertFalse(/signInWithPassword|signOut\(|service_role|admin_role/.test(src),
           'no auth authority in the registration form');

@@ -72,9 +72,28 @@ def check(repo:Path)->dict:
   changed=[];failures.append("F20_TO_HEAD_DELTA_UNAVAILABLE")
  # The reviewed PR's only application runtime delta is BFF strict response
  # field validation. All other changes are F21 tests/attestation artifacts.
- runtime=[x for x in changed if x.startswith(("apps/vox-web/","app/","services/","lib/"))]
+ runtime=[x for x in changed if x.startswith(("apps/vox-web/","app/","services/","lib/"))
+          and x!="apps/vox-web/package.json"]
  if runtime not in ([],["apps/vox-web/lib/ownerVendorVerification.ts"]):
   failures.append("UNREVIEWED_RUNTIME_DELTA:"+",".join(runtime))
+ # The VOX manifest change is allowed only if it preserves every historical
+ # script (including explicitly missing legacy scripts) and adds one genuine
+ # internal test entrypoint. Never "fix" CI by deleting an old security test.
+ try:
+  old_pkg=json.loads(git(repo,"show",F20+":apps/vox-web/package.json"))
+  new_pkg=json.loads((repo/"apps/vox-web/package.json").read_text("utf8"))
+  original_scripts=old_pkg["scripts"]
+  current_scripts=new_pkg["scripts"]
+  expected_entry=("node ../../scripts/mvp/vox/validate-vox-final-internal-gates-20261030.mjs "
+    "&& node ../../scripts/mvp/vox/validate-vox-02c-owner-auth200.harness.mjs "
+    "&& node --test ../../scripts/mvp/launch/f21_owner_positive_synthetic.test.cjs")
+  if (set(new_pkg)-{"scripts"}!=set(old_pkg)-{"scripts"} or
+      any(new_pkg.get(k)!=v for k,v in old_pkg.items() if k!="scripts") or
+      current_scripts.get("test:internal")!=expected_entry or
+      {k:v for k,v in current_scripts.items() if k!="test:internal"}!=original_scripts):
+   failures.append("UNAPPROVED_VOX_WEB_PACKAGE_DELTA")
+ except (OSError,ValueError,KeyError,TypeError):
+  failures.append("VOX_WEB_PACKAGE_PROOF_MISSING")
  try:
   e=json.loads((repo/"docs/launch/qf-f18-managed-sql-ledger-proof-20261107.json").read_text("utf8"))
   for item in e.get("versions",[]):

@@ -1,0 +1,62 @@
+{
+  "archiveRecovery": {
+    "archiveSha256": "c2eb6c782a76496633834fac9355970ceb1602a0f5600f82ca4b779de1ab626c",
+    "archivedImageSourceSha": "cb9a1919e5690f29e65da3bea6e09d4e174991b9",
+    "imageId": "sha256:5cecf98b75ec64d52f78e6b3b3db97fe73c6e982c08c696b047b9587f1fc3dc4",
+    "networkNone": true,
+    "newF21ImageBuilt": false,
+    "offlineHttpChecksPassed": 17,
+    "oldActualStagingImageRollbackVerified": false,
+    "originalCandidateTagPreserved": true,
+    "publishedPorts": 0,
+    "publisherSignatureVerified": false,
+    "temporaryRecoveryImageAliasRemoved": true
+  },
+  "externalWorkDeferred": true,
+  "legacyVOXPackageTestReferenceGap": {
+    "fullLegacyStandaloneSuiteCertified": false,
+    "newMaintainedTestInternalCommandPassed": true,
+    "obsoleteCommandPreserved": true,
+    "referencedUntrackedScriptCount": 25
+  },
+  "managedSupabaseWrite": false,
+  "marketplace": {
+    "failed": 0,
+    "passed": 137
+  },
+  "mayDeployProduction": false,
+  "mayDeployStaging": false,
+  "maySendOtp": false,
+  "observedDate": "2026-11-07",
+  "ownerSimulation": {
+    "actualSourceModulesTranspiledInProcess": true,
+    "authenticatedOwnerDecisionPositive": true,
+    "providerAndAuthBoundariesMocked": true,
+    "realCoreOwnerAAL2OverviewHarnessPassed": 6,
+    "realVOXOwnerStaffSourceRegressionPassed": 161,
+    "testCasesFailed": 0,
+    "testCasesPassed": 23,
+    "unexpectedCoreDecisionKeysNowRejected": true,
+    "vendorActivationOrCreditsGranted": false
+  },
+  "productionDeploymentPerformed": false,
+  "realCredentialsUsed": false,
+  "realOtpSent": false,
+  "realProviderCalls": false,
+  "releaseLineage": {
+    "historicalF1F5F6F7StillRed": true,
+    "historyUnmodified": true,
+    "migrationSourcePinsPreserved": true,
+    "newIntegratedGovernanceApproval": false,
+    "protectedHistoricalSourcePathsVerified": 10
+  },
+  "releaseVerdict": "HOLD",
+  "schema": "quickfurno.f21.internal-owner-archive-lineage.v1",
+  "secretsPresent": false,
+  "sourceBaseSha": "99c9a56c63fba6db179201ca0688f96465f07985",
+  "stagingDeploymentPerformed": false,
+  "typecheck": {
+    "rootPassed": true,
+    "voxWebPassed": true
+  }
+}
